@@ -49,6 +49,24 @@ import numpy as np
 
 from .medium import GRAVITY, MediumField
 
+def _cross3(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Row-wise cross product of two (N, 3) arrays.
+
+    ``np.cross`` spends most of its time in ``moveaxis`` and axis normalisation
+    rather than in arithmetic; profiling the fluid step showed it accounting for
+    roughly a fifth of the entire simulation cost.  Writing the three components
+    out directly removes that overhead.
+    """
+    return np.stack(
+        (
+            a[:, 1] * b[:, 2] - a[:, 2] * b[:, 1],
+            a[:, 2] * b[:, 0] - a[:, 0] * b[:, 2],
+            a[:, 0] * b[:, 1] - a[:, 1] * b[:, 0],
+        ),
+        axis=1,
+    )
+
+
 # Kinds of element.
 WING = 0  # a lifting strip: generates lift, induced drag, rotational lift
 BLUFF = 1  # a volume: pressure drag, buoyancy, added mass, no circulation
@@ -263,6 +281,9 @@ class FluidDiagnostics:
     #: Peak slamming force seen this step, N.  Water entry loads are a real
     #: structural sizing case and a real reason amphibious craft break.
     slam: float = 0.0
+    #: True when the force limiter engaged, i.e. the state was already outside
+    #: the range the quasi-steady model is valid over.
+    clamped: bool = False
 
 
 class FluidSolver:
@@ -293,7 +314,19 @@ class FluidSolver:
         self.c_rot = (
             np.pi * (0.75 - panels.pitch_axis) if c_rot is None else np.full(panels.n, c_rot)
         )
-        # Previous normal velocity and added mass, for the d/dt term.
+        # Dry inertial properties, kept so the added-mass augmentation below can
+        # be recomputed from scratch each step rather than accumulating.
+        self._dry_mass = model.body_mass.copy()
+        self._dry_inertia = model.body_inertia.copy()
+        # Mean squared lever arm of each body's panels about its CoM, used to
+        # turn translational added mass into added rotational inertia.
+        self._lever2 = np.zeros(model.nbody)
+        for b in np.unique(panels.body_id):
+            sel = panels.body_id == b
+            r = panels.pos_local[sel] - model.body_ipos[b]
+            self._lever2[b] = float(np.mean(np.sum(r**2, axis=1)))
+
+        # Previous normal velocity and added mass, for the slam *diagnostic*.
         self._prev_vn = np.zeros(panels.n)
         self._prev_ma = np.zeros(panels.n)
         self._prev_t = None
@@ -307,12 +340,17 @@ class FluidSolver:
         # Scratch buffers reused every step.
         self._nbody = model.nbody
         self._vel6 = np.zeros(6)
+        self._bodies = np.unique(panels.body_id)
 
     def reset(self) -> None:
         self._prev_vn[:] = 0.0
         self._prev_ma[:] = 0.0
         self._prev_t = None
         self._primed = False
+        # Restore dry inertia: leaving a previous episode's entrained water in
+        # the mass matrix would silently make the next episode heavier.
+        self.model.body_mass[:] = self._dry_mass
+        self.model.body_inertia[:] = self._dry_inertia
         self.diag = FluidDiagnostics()
 
     # ------------------------------------------------------------------ step
@@ -340,13 +378,22 @@ class FluidSolver:
         n_hat = np.einsum("nij,nj->ni", R, p.normal_local)
 
         # Body 6D velocities (world frame, at the body frame origin).
+        #
+        # Reading ``data.cvel`` directly and vectorising this looks tempting,
+        # but its linear component is referenced to a com-based frame whose
+        # origin is not the body frame origin; reconstructing element velocity
+        # from it disagreed with mj_objectVelocity by ~0.5 m/s in testing, and
+        # profiling showed this loop is not the bottleneck anyway (the step cost
+        # is dominated by mj_step itself).  Correct and adequate beats clever.
         vel = np.zeros((self._nbody, 6))
-        for b in np.unique(p.body_id):
-            mujoco.mj_objectVelocity(self.model, data, mujoco.mjtObj.mjOBJ_BODY, int(b), self._vel6, 0)
+        for b in self._bodies:
+            mujoco.mj_objectVelocity(
+                self.model, data, mujoco.mjtObj.mjOBJ_BODY, int(b), self._vel6, 0
+            )
             vel[b] = self._vel6
         omega = vel[p.body_id, :3]
         v_org = vel[p.body_id, 3:]
-        v_elem = v_org + np.cross(omega, pos - xpos[p.body_id])
+        v_elem = v_org + _cross3(omega, pos - xpos[p.body_id])
 
         # --- medium -------------------------------------------------------
         rho, mu, subf = self.medium.properties(pos, p.half_height, t)
@@ -375,7 +422,7 @@ class FluidSolver:
         reduced_freq = np.abs(omega_s) * p.chord / (2.0 * U_safe)
 
         is_wing = p.kind == WING
-        lift_axis = np.cross(d_hat, s_hat)
+        lift_axis = _cross3(d_hat, s_hat)
         lift_axis /= np.maximum(np.linalg.norm(lift_axis, axis=1, keepdims=True), 1e-12)
 
         F = np.zeros((p.n, 3))
@@ -401,39 +448,78 @@ class FluidSolver:
         )
         F += f_rot[:, None] * lift_axis
 
-        # Added mass, including the d(m)/dt slamming term.  For a flat strip the
-        # 2D added mass for normal acceleration is rho * pi * c^2 / 4 per unit
-        # span; a bluff element uses its displaced volume with Ca = 0.5.
+        # --- added mass ----------------------------------------------------
+        # For a flat strip the 2D added mass for normal acceleration is
+        # rho * pi * c^2 / 4 per unit span; a bluff element uses its displaced
+        # volume with Ca = 0.5.  In water a single wing strip of this machine
+        # carries tens of kilograms of added mass -- several times the mass of
+        # the whole vehicle.
+        #
+        # That ratio is exactly why this must NOT be applied as an external
+        # force.  An explicit ``F = -d(m_a v)/dt`` term is a feedback loop whose
+        # gain is m_added / m_body, so above unity it diverges within a few
+        # steps: the classic added-mass instability of partitioned
+        # fluid-structure coupling.  Applying it explicitly here produced NaN
+        # accelerations after 1.3 s of simulated water time.
+        #
+        # Instead the added mass is folded into the *mass matrix*, which MuJoCo
+        # inverts implicitly, so it is unconditionally stable no matter how far
+        # the added mass exceeds the structural mass.  Two corrections come with
+        # that: MuJoCo would otherwise apply gravity to the added mass (added
+        # mass has inertia but no weight), and the translational term also has
+        # to appear as rotational inertia about the body's CoM.
         vn = np.einsum("ni,ni->n", v_rel, n_hat)
         m_add = np.where(
             is_wing,
             rho * np.pi * p.chord**2 * 0.25 * p.dr,
             0.5 * rho * p.volume,
         ) * self.added_mass_scale
-        # d(m_a * v_n)/dt, backward difference.  The m_dot * v_n part is the
-        # water-entry slam: it fires exactly when a fast-moving surface changes
-        # its submerged fraction, which is the load case that breaks wings.
+
+        m_body = np.zeros(self._nbody)
+        np.add.at(m_body, p.body_id, m_add)
+        self.model.body_mass[:] = self._dry_mass + m_body
+        self.model.body_inertia[:] = self._dry_inertia + (
+            m_body * self._lever2
+        )[:, None]
+        # Cancel the weight MuJoCo will apply to the entrained fluid.
+        F[:, 2] += m_add * GRAVITY
+
+        # The slamming rate term is still computed, but only as a *diagnostic*:
+        # the structural check needs to know the peak entry load, while the
+        # dynamics get the same physics through the varying mass matrix.
         if self._primed:
-            dmv = (m_add * vn - self._prev_ma * self._prev_vn) / dt
             slam = float(np.abs((m_add - self._prev_ma) / dt * vn).max())
         else:
-            # First call after a reset: no previous sample, so no rate term.
-            dmv = np.zeros(p.n)
             slam = 0.0
             self._primed = True
-        F += dmv[:, None] * n_hat
         self._prev_vn = vn.copy()
         self._prev_ma = m_add.copy()
+        dmv = np.zeros(p.n)
 
         # Buoyancy: only the genuinely submerged portion, at true water density,
         # and only over the volume that is actually sealed rather than flooded.
         f_buoy = self.medium.water.rho * GRAVITY * p.volume_buoyant * subf
         F[:, 2] += f_buoy
 
+        # A last-resort limiter.  The quasi-steady model is only valid for
+        # states a real machine could be in; once a candidate is tumbling at
+        # 50 m/s the coefficients are extrapolation and the forces can be
+        # arbitrarily large.  Clamping to a multiple of the vehicle's weight
+        # keeps the integrator alive long enough to record the failure, and
+        # raises the flag that tells the scorer this run left the valid domain
+        # rather than discovering free thrust.
+        weight = float(self._dry_mass.sum()) * GRAVITY + 1.0
+        fmag = np.linalg.norm(F, axis=1)
+        limit = 60.0 * weight
+        if np.any(fmag > limit):
+            scale_f = np.minimum(1.0, limit / np.maximum(fmag, 1e-9))
+            F *= scale_f[:, None]
+            self.diag.clamped = True
+
         # --- accumulate to bodies -----------------------------------------
         # xfrc_applied takes a world-frame force at the body CoM plus a torque.
         arm = pos - xipos[p.body_id]
-        T = np.cross(arm, F)
+        T = _cross3(arm, F)
         np.add.at(data.xfrc_applied[:, :3], p.body_id, F)
         np.add.at(data.xfrc_applied[:, 3:], p.body_id, T)
 
@@ -442,7 +528,7 @@ class FluidSolver:
         d.lift = float(np.abs(L).sum())
         d.drag = float(np.abs(D).sum())
         d.buoyancy = float(f_buoy.sum())
-        d.added_mass = float(np.abs(dmv).sum())
+        d.added_mass = float(m_body.sum())
         d.max_submerged = float(subf.max())
         d.mean_submerged = float(subf.mean())
         d.max_alpha = float(np.abs(alpha).max())
