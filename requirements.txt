@@ -1,0 +1,16 @@
+﻿# Core (CPU-only, portable). Everything below installs without a GPU.
+numpy>=1.26
+scipy>=1.11
+mujoco>=3.1
+
+# Visualisation / observability
+matplotlib>=3.8
+imageio>=2.34
+imageio-ffmpeg>=0.4.9
+
+# Optional accelerators -- the system runs without them.
+#   torch          : only needed for the PPO learner (learning/ppo.py).
+#                    CPU wheel is fine; CUDA wheel is used automatically if present.
+#   ray            : only needed for multi-machine parallel evaluation.
+# torch>=2.2
+# ray>=2.9
