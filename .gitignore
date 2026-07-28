@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+runs/
+*.mp4
+*.png
+!docs/*.png
+.venv/
