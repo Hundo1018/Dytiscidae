@@ -178,6 +178,9 @@ class Curator:
         self.evaluations = 0
         self.prunes = 0
         self._verified: dict[tuple[int, ...], int] = {}
+        self._famine: dict[str, int] = {}
+        self.starved_domains: list[str] = []
+        self.famine_events: list[dict] = []
         self.log: list[dict] = []
 
     # ------------------------------------------------------------ 1. operators
@@ -233,6 +236,9 @@ class Curator:
             )
             w = w * (1.0 - self.regime.feasibility_bias
                      + self.regime.feasibility_bias * (0.25 + 0.75 * feasible))
+
+        # When a domain is starved, tilt hard toward whoever is least bad at it.
+        w = w * self._famine_weight(cells)
 
         w = np.maximum(w, 1e-6)
         w = w / w.sum()
@@ -341,7 +347,11 @@ class Curator:
             r.note += "; archive mostly infeasible, biasing hard toward feasible parents"
 
         self.regime = r
-        return r
+        # Famine detection runs last so it can override the regime it just set:
+        # a domain nothing can perform is a more urgent fact than whether
+        # coverage happened to tick up this generation.
+        self.check_famine()
+        return self.regime
 
     # ------------------------------------------------------ 6. crowding control
 
@@ -371,7 +381,83 @@ class Curator:
         self.prunes += removed
         return removed
 
-    # ------------------------------------------------------ 7. cohort approval
+    # ------------------------------------------------- 7. domain famine rescue
+
+    #: A domain is "starved" when the best elite in the archive cannot do it.
+    FAMINE_THRESHOLD = 0.35
+    #: Generations of starvation before the curator intervenes rather than waits.
+    FAMINE_PATIENCE = 25
+
+    def domain_bests(self) -> dict[str, float]:
+        """Best competence any elite achieves in each domain."""
+        out = {"air": 0.0, "water": 0.0, "land": 0.0}
+        for e in self.archive.cells.values():
+            for k in out:
+                v = (e.meta or {}).get(k)
+                if isinstance(v, (int, float)):
+                    out[k] = max(out[k], float(v))
+        return out
+
+    def check_famine(self) -> list[str]:
+        """Detect domains no design in the archive can perform, and act.
+
+        A whole archive that cannot fly is not a search that needs more
+        generations -- it is a search whose reachable space does not contain the
+        capability, and running it longer produces a better non-flyer.  The
+        useful response is to notice and change something, which is what this
+        does: it redirects selection and mutation toward the starved domain, and
+        it says so loudly enough to be seen in the log.
+
+        This is deliberately *not* a silent adjustment.  A run that has been
+        rescuing the same domain for two hundred generations is telling you the
+        design space is wrong, and that is worth surfacing rather than papering
+        over.
+        """
+        bests = self.domain_bests()
+        starved = [d for d, v in bests.items() if v < self.FAMINE_THRESHOLD]
+        for d in ("air", "water", "land"):
+            if d in starved:
+                self._famine[d] = self._famine.get(d, 0) + 1
+            else:
+                self._famine[d] = 0
+
+        acute = [d for d in starved if self._famine.get(d, 0) >= self.FAMINE_PATIENCE]
+        if acute:
+            # Push hard on structure: the current body plans have been optimised
+            # to their local limits in this domain, and only a topology change
+            # gets out of that.
+            self.regime.name = "famine"
+            self.regime.structural_bias = 2.6
+            self.regime.n_mutations = 3
+            self.regime.emitter_fraction = 0.1
+            self.regime.feasibility_bias = 0.3
+            self.regime.note = (
+                f"no design can do {', '.join(acute)} after "
+                f"{max(self._famine[d] for d in acute)} generations -- "
+                "forcing structural change and biasing selection toward the "
+                "least-bad performers there"
+            )
+            self.famine_events.append(
+                {"generation": self.archive.generation, "domains": acute,
+                 "bests": {k: round(v, 3) for k, v in bests.items()}}
+            )
+            self.starved_domains = acute
+        else:
+            self.starved_domains = []
+        return acute
+
+    def _famine_weight(self, cells: list[Elite]) -> np.ndarray:
+        """Extra selection weight for elites least bad in a starved domain."""
+        if not self.starved_domains:
+            return np.ones(len(cells))
+        w = np.ones(len(cells))
+        for d in self.starved_domains:
+            vals = np.array([float((e.meta or {}).get(d, 0.0)) for e in cells])
+            if vals.max() > 1e-9:
+                w *= 1.0 + 2.5 * (vals / vals.max())
+        return w
+
+    # ------------------------------------------------------ 8. cohort approval
 
     #: How many designs are approved per round.
     #:
@@ -476,5 +562,8 @@ class Curator:
             "promotions": self.promotions,
             "exploits": len(self.exploits),
             "prunes": self.prunes,
+            "domain_best": {k: round(v, 3) for k, v in self.domain_bests().items()},
+            "starved": list(self.starved_domains),
+            "famine_events": len(self.famine_events),
             "top_operators": self.bandit.report()[:5],
         }
