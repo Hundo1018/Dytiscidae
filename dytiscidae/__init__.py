@@ -17,6 +17,17 @@ Nothing here assumes a GPU.  See docs/DESIGN.md for the physics conventions.
 
 __version__ = "0.1.0"
 
+import os as _os
+
+# Headless by default.  MuJoCo picks its GL backend at first import and cannot
+# change it afterwards, so the choice has to be made here, before anything else
+# imports mujoco.  Without a DISPLAY there is no windowing system to render
+# into, and OSMesa is the software rasteriser that works anywhere -- which is
+# what makes `run render` produce video in a container with no GPU.
+# An explicit MUJOCO_GL is always respected.
+if not _os.environ.get("MUJOCO_GL") and not _os.environ.get("DISPLAY"):
+    _os.environ["MUJOCO_GL"] = "osmesa"
+
 # World conventions used everywhere in this package:
 #   * Right-handed world frame, +Z is up.
 #   * z = 0 is the still-water free surface.  z > 0 is air, z < 0 is water.

@@ -73,12 +73,17 @@ def scene_xml(
     beach_slope: float = 0.12,
     shore_x: float = 12.0,
     timestep: float = 0.002,
+    bare: bool = False,
 ) -> ET.Element:
     """Root ``<mujoco>`` element with the triphibian world already in it.
 
     ``z = 0`` is the still waterline.  The beach is a long thin box rotated by
     ``beach_slope`` whose upper end clears the surface near ``x = shore_x``, so a
     machine travelling in +X runs out of water and has to walk.
+
+    ``bare`` omits the terrain and the water plane entirely.  Used for turntable
+    renders, where the point is to read the machine's shape and a seabed filling
+    two thirds of the frame is only in the way.
     """
     root = ET.Element("mujoco", {"model": "dytiscidae"})
 
@@ -96,6 +101,22 @@ def scene_xml(
         },
     )
     ET.SubElement(root, "compiler", {"angle": "radian", "autolimits": "true"})
+
+    # Offscreen framebuffer for headless rendering.  MuJoCo defaults to 640x480
+    # and refuses any larger request at runtime, so it has to be declared here,
+    # in the model, rather than passed to the renderer.
+    visual = ET.SubElement(root, "visual")
+    ET.SubElement(visual, "global", {"offwidth": "1280", "offheight": "800"})
+    ET.SubElement(visual, "quality", {"shadowsize": "2048", "offsamples": "4"})
+    ET.SubElement(visual, "map", {"znear": "0.02", "zfar": "80"})
+    # A camera-mounted fill light. Without it the machine is lit only by the
+    # single overhead lamp and reads as a silhouette against the water, which
+    # defeats the purpose of rendering it at all.
+    ET.SubElement(
+        visual, "headlight",
+        {"ambient": "0.45 0.46 0.48", "diffuse": "0.55 0.55 0.55",
+         "specular": "0.15 0.15 0.15"},
+    )
 
     default = ET.SubElement(root, "default")
     ET.SubElement(
@@ -129,7 +150,16 @@ def scene_xml(
     ET.SubElement(asset, "material", {"name": "water", "rgba": "0.15 0.4 0.55 0.25"})
 
     wb = ET.SubElement(root, "worldbody")
-    ET.SubElement(wb, "light", {"pos": "0 0 20", "dir": "0 0 -1", "diffuse": "0.9 0.9 0.9"})
+    # Key light overhead, plus a low fill from the far side so the underside of
+    # the wings is not pure black when the machine banks.
+    ET.SubElement(wb, "light", {"pos": "4 -6 14", "dir": "-0.2 0.4 -1",
+                                "diffuse": "0.85 0.85 0.82", "specular": "0.2 0.2 0.2",
+                                "castshadow": "true"})
+    ET.SubElement(wb, "light", {"pos": "-8 8 3", "dir": "0.5 -0.5 -0.2",
+                                "diffuse": "0.30 0.34 0.38", "castshadow": "false"})
+
+    if bare:
+        return root
 
     # Seabed.
     ET.SubElement(
@@ -163,8 +193,9 @@ def scene_xml(
     ET.SubElement(
         wb,
         "geom",
-        {"name": "waterplane", "type": "box", "pos": "-14 0 0", "size": "26 30 0.005",
-         "material": "water", "contype": "0", "conaffinity": "0", "group": "2"},
+        {"name": "waterplane", "type": "box", "pos": f"{_fmt(shore_x - 45)} 0 0",
+         "size": "60 60 0.004", "material": "water", "contype": "0", "conaffinity": "0",
+         "group": "2"},
     )
     return root
 

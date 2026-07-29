@@ -153,6 +153,70 @@ def cmd_skills(args) -> int:
     return 0
 
 
+def cmd_train(args) -> int:
+    """Train a controller for one design and render what it learned."""
+    import pickle
+
+    from ..control.train import train_controller
+    from ..core.phenotype import build
+    from ..core.reference import reference_genome
+    from ..viz.render import render_design, render_learning_comparison
+
+    out = Path(args.run)
+    out.mkdir(parents=True, exist_ok=True)
+
+    if args.from_archive:
+        from ..evolution.archive import Archive
+
+        archive = Archive.load(Path(args.from_archive) / "archive.pkl")
+        elites = sorted(archive.cells.values(), key=lambda e: -e.fitness)
+        if not elites:
+            print("archive is empty")
+            return 1
+        genome = elites[min(args.rank, len(elites) - 1)].genome
+        stem = f"elite{args.rank}"
+    else:
+        genome = reference_genome()
+        stem = "reference"
+
+    p = build(genome)
+    print(p.summary())
+    print()
+
+    def progress(it, r):
+        print(f"  iter {it:3d}  best={r['best']:.4f} mean={r['mean']:.4f} "
+              f"sigma={r['sigma']:.3f}  {r['elapsed']:.0f}s", flush=True)
+
+    controller, result = train_controller(
+        p, iterations=args.iterations, popsize=args.popsize,
+        segment_seconds=args.segment_seconds, seed=args.seed, on_iteration=progress,
+    )
+    print()
+    print(f"  {result.summary()}")
+    for medium, basis in result.bases.items():
+        print(f"  discovered axes ({medium}), rank {basis.rank}:")
+        for line in basis.describe()[: basis.rank or 1]:
+            print(f"      {line}")
+
+    with open(out / f"{stem}_controller.pkl", "wb") as f:
+        pickle.dump({"weights": result.policy_weights, "bases": result.bases,
+                     "score": result.score, "baseline": result.baseline_score,
+                     "per_domain": result.per_domain,
+                     "baseline_per_domain": result.baseline_per_domain,
+                     "history": result.history}, f)
+    print(f"\nsaved {out / (stem + '_controller.pkl')}")
+
+    if args.render:
+        print("rendering...")
+        made = render_learning_comparison(p, controller, out / "media", stem=stem,
+                                          duration=args.duration)
+        made += render_design(p, out / "media", stem=stem, duration=args.duration,
+                              controller=controller, turntable=True)
+        for m in made:
+            print(f"  {m}")
+    return 0
+
+
 def cmd_dashboard(args) -> int:
     from ..viz.dashboard import build_dashboard
 
@@ -213,6 +277,19 @@ def main(argv=None) -> int:
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--run", default="runs/skills")
     p.set_defaults(fn=cmd_skills)
+
+    p = sub.add_parser("train", help="train a controller for one design and film it")
+    p.add_argument("--from-archive", default=None,
+                   help="run directory to take a design from; default is the reference")
+    p.add_argument("--rank", type=int, default=0, help="which elite, 0 = best")
+    p.add_argument("--iterations", type=int, default=18)
+    p.add_argument("--popsize", type=int, default=12)
+    p.add_argument("--segment-seconds", type=float, default=5.0)
+    p.add_argument("--duration", type=float, default=10.0, help="video length")
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--run", default="runs/trained")
+    p.add_argument("--no-render", dest="render", action="store_false")
+    p.set_defaults(fn=cmd_train, render=True)
 
     p = sub.add_parser("dashboard", help="regenerate the dashboard for a run")
     p.add_argument("--run", default="runs/latest")
