@@ -341,6 +341,23 @@ class TriphibianEnv:
         )
         return np.concatenate([v[3:], v[:3]])
 
+    def _touching_ground(self) -> bool:
+        """True only for contacts against the terrain, not the machine itself.
+
+        ``data.ncon > 0`` counts every contact including body-on-body, and a
+        design with several surfaces close together -- a bat with six membranes,
+        say -- is in self-contact continuously.  Reading that as "on the ground"
+        marks it as landed for the whole episode, which zeroed its flight score
+        and inflated its ground-contact score at the same time.
+        """
+        for i in range(self.data.ncon):
+            c = self.data.contact[i]
+            b1 = self.model.geom_bodyid[c.geom1]
+            b2 = self.model.geom_bodyid[c.geom2]
+            if b1 == 0 or b2 == 0:  # body 0 is the world
+                return True
+        return False
+
     def root_pos(self) -> np.ndarray:
         return self.data.xpos[self.root_body].copy()
 
@@ -434,7 +451,7 @@ class TriphibianEnv:
             alts.append(pos[2])
             R = self.data.xmat[self.root_body].reshape(3, 3)
             ups.append(float(R[2, 2]))
-            contacts.append(1.0 if self.data.ncon > 0 else 0.0)
+            contacts.append(1.0 if self._touching_ground() else 0.0)
             peak_slam = max(peak_slam, self.solver.diag.slam)
 
         end = self.root_pos().copy()
@@ -448,10 +465,10 @@ class TriphibianEnv:
         res.ground_contact_fraction = float(np.mean(contacts)) if contacts else 0.0
         res.max_depth = float(max(depths)) if depths else 0.0
         res.competence = self._score_segment(domain, res, np.array(depths), np.array(alts),
-                                             np.array(ups))
+                                             np.array(ups), np.array(contacts))
         return res
 
-    def _score_segment(self, domain, res, depths, alts, ups) -> float:
+    def _score_segment(self, domain, res, depths, alts, ups, contacts) -> float:
         """Domain competence in [0, 1].
 
         Each domain is scored on what actually matters there, not on a generic
@@ -463,13 +480,46 @@ class TriphibianEnv:
         upright = float(np.clip(np.mean(ups), 0.0, 1.0))
 
         if domain is Domain.AIR:
-            # Held altitude, stayed dry, went somewhere, stayed upright.
-            drop = float(alts[0] - alts[-1])
-            held = float(np.clip(1.0 - drop / 6.0, 0.0, 1.0))
-            dry = float(np.mean(depths < 0.0))
+            # Flight, not slow descent.
+            #
+            # The first version scored ``1 - drop/6`` over a seven-second window,
+            # which gives partial credit to anything that falls slowly.  The
+            # archive's best "flyers" were then infeasible random genomes with a
+            # wing loading of 1481 N/m^2 -- objects that cannot fly by any
+            # measure, scoring 0.52 for descending in a controlled fashion.
+            #
+            # Sustained flight means the sink rate goes to zero.  So the metric
+            # is built on the descent *rate over the second half* of the episode,
+            # by which time a real flyer has settled: zero or negative sink is
+            # full marks, and it falls to nothing by 1.5 m/s, which is a glide
+            # rather than flight.  Gliding still scores something -- it is a real
+            # capability -- but it can no longer be mistaken for flying.
+            # Airborne means clear of the surface and touching nothing.  A
+            # machine bobbing at the waterline has its hull centre a few
+            # centimetres above the water and no ground contact, so any test
+            # looser than this scores floating as flying -- which is how a
+            # 937 N/m^2 medusa came to outscore a 54 N/m^2 ray at flight.
+            airborne = (depths < -0.3) & (np.asarray(contacts) < 0.5)
+            frac = float(np.mean(airborne))
+            if frac < 0.05:
+                return 0.0  # never left the surface: no flight to score
+
+            # Sink rate measured only over the airborne stretch, and only its
+            # later half, by which time a real flyer has settled.  Zero sink is
+            # full marks; 1.5 m/s is a glide, which is a real capability but is
+            # not flight and no longer scores as if it were.
+            idx = np.flatnonzero(airborne)
+            late = idx[len(idx) // 2:]
+            if len(late) > 1:
+                span_s = (late[-1] - late[0]) * self.timestep
+                sink = float((alts[late[0]] - alts[late[-1]]) / max(span_s, 1e-6))
+            else:
+                sink = 9.9
+            flight = float(np.clip(1.0 - sink / 1.5, 0.0, 1.0))
             speed = float(np.clip(res.mean_speed / 8.0, 0.0, 1.0))
-            res.altitude_held = held
-            return float(0.45 * held + 0.2 * dry + 0.2 * speed + 0.15 * upright)
+            res.altitude_held = flight
+            # Every term is gated on actually being up there.
+            return float(frac * (0.55 * flight + 0.25 + 0.2 * speed))
 
         if domain is Domain.WATER:
             target = 10.0
