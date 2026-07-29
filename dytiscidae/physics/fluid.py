@@ -108,7 +108,14 @@ class PanelSet:
         Aspect ratio of the *surface this strip belongs to* (not of the strip).
         Used for the induced-drag and lift-slope corrections.
     cd_bluff : (N,)
-        Pressure drag coefficient for BLUFF elements, referenced to ``area``.
+        Pressure drag coefficient for BLUFF elements, referenced to the
+        *projected* area, not to ``area``.
+    ext_local : (N, 3)
+        Extent of a BLUFF element along its own span, chord and normal axes, m.
+        This is what makes a bluff element's drag depend on which way round it
+        is: the projected area is recomputed each step from the flow direction
+        and these three numbers.  Defaults to the strip's own dimensions, which
+        is right for a wing and for a capsule stand-in alike.
     """
 
     body_id: np.ndarray
@@ -125,6 +132,7 @@ class PanelSet:
     #: Fraction of chord at which the strip pitches. 0.25 is the quarter-chord.
     pitch_axis: np.ndarray = field(default=None)  # type: ignore[assignment]
     volume_buoyant: np.ndarray = field(default=None)  # type: ignore[assignment]
+    ext_local: np.ndarray = field(default=None)  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
         n = len(self.body_id)
@@ -132,6 +140,10 @@ class PanelSet:
             self.pitch_axis = np.full(n, 0.25)
         if self.volume_buoyant is None:
             self.volume_buoyant = np.array(self.volume, dtype=float)
+        if self.ext_local is None:
+            self.ext_local = np.stack(
+                [self.dr, self.chord, 2.0 * self.half_height], axis=1
+            ) if n else np.zeros((0, 3))
         self.area = self.chord * self.dr
         # Normal axis, n = c x s.
         self.normal_local = np.cross(self.chord_local, self.span_local)
@@ -165,6 +177,7 @@ class PanelSet:
             cd_bluff=z1,
             pitch_axis=z1,
             volume_buoyant=z1,
+            ext_local=z3,
         )
 
     @staticmethod
@@ -187,6 +200,7 @@ class PanelSet:
             cd_bluff=cat("cd_bluff"),
             pitch_axis=cat("pitch_axis"),
             volume_buoyant=cat("volume_buoyant"),
+            ext_local=np.concatenate([s.ext_local for s in sets], axis=0),
         )
 
 
@@ -432,16 +446,56 @@ class FluidSolver:
 
         F = np.zeros((p.n, 3))
 
-        # Circulatory lift and drag.
+        # Circulatory lift and drag, on the lifting strips only.
         cl = np.where(is_wing, lift_coefficient(alpha, re, p.aspect_ratio, reduced_freq), 0.0)
-        cd = np.where(
-            is_wing,
-            drag_coefficient(alpha, re, p.aspect_ratio, cl),
-            p.cd_bluff + skin_friction_cd(re),
-        )
+        cd = np.where(is_wing, drag_coefficient(alpha, re, p.aspect_ratio, cl), 0.0)
         L = q * p.area * cl
         D = q * p.area * cd
         F += L[:, None] * lift_axis + D[:, None] * d_hat
+
+        # --- bluff-body drag ------------------------------------------------
+        # Strip theory is wrong for a volume, and it was wrong here in a way
+        # that mattered: the spanwise component of the flow was projected out
+        # before the drag was formed, so a hull travelling nose-first along its
+        # own axis felt *no* pressure drag at all.  A design could therefore
+        # make its body arbitrarily long and pay nothing for it, and the search
+        # duly produced long thin things.
+        #
+        # A volume is instead given the projected area of its own bounding box
+        # against the true relative flow,
+        #
+        #     A(d) = |d.s| ey ez + |d.c| ex ez + |d.n| ex ey
+        #
+        # which is exact for a box, within a few percent for an ellipsoid, and
+        # -- the point of it -- orientation dependent.  A slender chunk now
+        # presents little area nose-on and a lot broadside, so elongation costs
+        # what it should and the shape the CPPN generated reaches the dynamics
+        # instead of stopping at the mass matrix.
+        n_bluff = int((~is_wing).sum())
+        if n_bluff:
+            b = ~is_wing
+            U_full = np.linalg.norm(v_rel, axis=1)
+            U_full_safe = np.maximum(U_full, 1e-6)
+            d_full = v_rel / U_full_safe[:, None]
+            ex, ey, ez = p.ext_local[:, 0], p.ext_local[:, 1], p.ext_local[:, 2]
+            ps = np.abs(np.einsum("ni,ni->n", d_full, s_hat))
+            pc = np.abs(np.einsum("ni,ni->n", d_full, c_hat))
+            pn = np.abs(np.einsum("ni,ni->n", d_full, n_hat))
+            a_proj = ps * ey * ez + pc * ex * ez + pn * ex * ey
+            # Streamwise extent, for the Reynolds number the skin friction sees.
+            l_stream = np.maximum(ps * ex + pc * ey + pn * ez, 1e-4)
+            q_full = 0.5 * rho * U_full**2
+            re_b = rho * U_full * l_stream / np.maximum(mu, 1e-12)
+            # Pressure drag is referenced to frontal area, skin friction to
+            # wetted area.  Keeping them as separate terms rather than folding
+            # one into the other's coefficient avoids a division by a projected
+            # area that goes to zero for a flat chunk edge-on to the flow.
+            wetted = 2.0 * (ex * ey + ey * ez + ex * ez)
+            D_b = np.where(
+                b, q_full * (p.cd_bluff * a_proj + skin_friction_cd(re_b) * wetted), 0.0
+            )
+            F += D_b[:, None] * d_full
+            D = D + D_b
 
         # Rotational (Kramer) circulation: the force generated by a strip that
         # is pitching while translating.  This is what lets an insect wing

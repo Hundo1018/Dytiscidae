@@ -103,6 +103,72 @@ def _hud(frame: np.ndarray, *, domain: str, t: float, depth: float, speed: float
 # --------------------------------------------------------------------------
 
 
+class _near_plane:
+    """Temporarily move the near clip plane in to suit a close-up.
+
+    MuJoCo sets the near plane to ``model.stat.extent * vis.map.znear``, and
+    ``stat.extent`` is computed over the whole world.  This world contains a
+    kilometre of water and seabed, so ``stat.extent`` is 186 m and the near
+    plane sits at **3.7 m**.  Any camera closer than that to its subject renders
+    the subject entirely clipped -- which is what the turntable was doing: it
+    asked for a 2.9 m camera distance, got an empty seascape, and no amount of
+    fixing the framing would have shown anything, because the machine was being
+    clipped rather than being small.
+
+    Restores the original on exit so an episode render, which genuinely wants
+    the far scene, is unaffected.
+    """
+
+    def __init__(self, model, subject_extent: float, fraction: float = 0.02):
+        self.model = model
+        self.want = max(fraction * subject_extent, 1e-3)
+        self.saved = float(model.vis.map.znear)
+
+    def __enter__(self):
+        self.model.vis.map.znear = self.want / max(float(self.model.stat.extent), 1e-6)
+        return self
+
+    def __exit__(self, *exc):
+        self.model.vis.map.znear = self.saved
+        return False
+
+
+def _geometry_bounds(env, focus: str | None = None) -> tuple[np.ndarray, float]:
+    """Centre and diagonal extent of the geometry actually present, in metres.
+
+    Measured from the compiled model rather than from ``max_span`` and
+    ``body_length``.  Those are phenotype summaries, and framing on them frames
+    on the widest thing in the design -- which is exactly wrong when the subject
+    is a body that the widest thing dwarfs.
+
+    ``geom_rbound`` is used for the per-geom radius because it is defined for
+    every geom type including meshes, so a free-form body framed here is framed
+    on the mesh that was actually generated.
+    """
+    import mujoco
+
+    model, data = env.model, env.data
+    keep = np.ones(model.ngeom, dtype=bool)
+    if focus:
+        want = focus.lower()
+        for g in range(model.ngeom):
+            b = int(model.geom_bodyid[g])
+            name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, b) or ""
+            keep[g] = want in name.lower()
+        if not keep.any():
+            keep[:] = True  # no match: fall back to the whole machine
+    # Exclude world geoms (the ground plane), which would otherwise dominate.
+    keep &= model.geom_bodyid != 0
+    if not keep.any():
+        return np.asarray(env.root_pos(), float), 0.5
+
+    pos = data.geom_xpos[keep]
+    rad = model.geom_rbound[keep][:, None]
+    lo = (pos - rad).min(axis=0)
+    hi = (pos + rad).max(axis=0)
+    return 0.5 * (lo + hi), float(np.linalg.norm(hi - lo))
+
+
 def render_turntable(
     env,
     *,
@@ -113,11 +179,21 @@ def render_turntable(
     fps: int = 24,
     elevation: float = -14.0,
     label: str = "",
+    focus: str | None = None,
+    margin: float = 1.35,
 ) -> str | None:
     """Rotate the camera once around the machine held in a neutral pose.
 
     The machine is posed mid-flap rather than at rest, because a flapping design
     at rest has its surfaces stacked flat and is nearly unreadable.
+
+    ``focus`` names a body (substring match) to frame on instead of the whole
+    machine.  This exists because framing on the whole machine is the wrong shot
+    for looking at a generated body: a design with a 2 m span and a 0.3 m hull
+    puts the hull across about forty pixels, so every free-form volume the
+    search produced looked like a stick regardless of what it actually was.
+    Passing ``focus="hull"`` frames the hull and the surfaces run off frame,
+    which is the correct trade when the hull is the subject.
     """
     backend = gl_available()
     if backend is None:
@@ -138,19 +214,20 @@ def render_turntable(
         for _ in range(90):
             mujoco.mj_step(env.model, env.data)
 
-    renderer = mujoco.Renderer(env.model, height=height, width=width)
+    centre, extent = _geometry_bounds(env, focus)
     cam = mujoco.MjvCamera()
-    span = max(env.p.max_span, env.p.body_length, 0.4)
-    cam.distance = span * 1.25
+    cam.distance = max(extent * margin, 0.05)
     cam.elevation = elevation
-    cam.lookat[:] = env.root_pos()
+    cam.lookat[:] = centre
 
     out = []
-    for i in range(frames):
-        cam.azimuth = 360.0 * i / frames
-        renderer.update_scene(env.data, camera=cam)
-        out.append(renderer.render())
-    renderer.close()
+    with _near_plane(env.model, extent):
+        renderer = mujoco.Renderer(env.model, height=height, width=width)
+        for i in range(frames):
+            cam.azimuth = 360.0 * i / frames
+            renderer.update_scene(env.data, camera=cam)
+            out.append(renderer.render())
+        renderer.close()
 
     imageio.mimsave(str(out_path), out, fps=fps, macro_block_size=None)
     return str(out_path)
@@ -183,14 +260,20 @@ def capture_episode(
     import mujoco
 
     dom_name = domain.value if hasattr(domain, "value") else str(domain)
-    renderer = mujoco.Renderer(env.model, height=height, width=width)
+    env.reset(domain)
+    # Frame on the geometry that exists, and pull the near plane in with it.
+    # Both matter: a compact machine asked for a 1.3 m camera distance and got
+    # nothing at all, because this world's near clip plane sits at 3.7 m.
+    _, extent = _geometry_bounds(env)
     cam = mujoco.MjvCamera()
-    span = max(env.p.max_span, env.p.body_length, 0.5)
-    cam.distance = span * 2.1
+    cam.distance = max(extent * 1.6, 0.6)
     cam.elevation = -12.0
     # Slightly off the beam so the machine is seen three-quarter rather than
     # side-on, which hides all spanwise structure.
     cam.azimuth = 118.0
+    near = _near_plane(env.model, extent)
+    near.__enter__()
+    renderer = mujoco.Renderer(env.model, height=height, width=width)
 
     env.reset(domain)
     params = controller.params if controller is not None else env.cpg.base
@@ -234,6 +317,7 @@ def capture_episode(
             break
 
     renderer.close()
+    near.__exit__(None, None, None)
     return frames
 
 

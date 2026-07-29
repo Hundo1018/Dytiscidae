@@ -70,6 +70,15 @@ class BodyField:
     voxel: float = 0.02
     hulls: list = field(default_factory=list)  # (verts, faces) per convex chunk
     volume: float = 0.0
+    #: Void that is completely surrounded by material, m^3.  Water cannot reach
+    #: it, so it displaces and (if the part is sealed) it floats.  This is what
+    #: makes "enclose a bubble" a move the search can discover rather than a
+    #: property only a hand-written hull was allowed to have.
+    enclosed: float = 0.0
+    #: Open concavity, m^3: the difference between the convex hull and what is
+    #: actually there.  A bell's cavity is open to the water, so it is not
+    #: buoyant and not enclosed -- but it is the volume a pulsed jet expels.
+    cavity: float = 0.0
     surface_area: float = 0.0
     com: np.ndarray = field(default_factory=lambda: np.zeros(3))
     inertia: np.ndarray = field(default_factory=lambda: np.ones(3) * 1e-6
@@ -101,7 +110,7 @@ def sample_body(
     *,
     length: float,
     radius: float,
-    resolution: int = 11,
+    resolution: int = 17,
     threshold: float = 0.0,
     max_clusters: int = 4,
     rng: np.random.Generator | None = None,
@@ -178,8 +187,52 @@ def sample_body(
         float(np.mean(rel[:, 0] ** 2 + rel[:, 1] ** 2)),
     ])
 
+    f.enclosed = _enclosed_volume(occ) * cell_vol
     f.hulls = _convex_chunks(pts, max_clusters=max_clusters, pad=0.5 * f.voxel)
+    f.cavity = max(_hull_volume(pts, pad=0.5 * f.voxel) - f.volume - f.enclosed, 0.0)
     return f
+
+
+def _enclosed_volume(occ: np.ndarray) -> float:
+    """Empty cells that no path reaches from outside, in cells.
+
+    A flood fill of the empty space from the grid boundary; whatever it does not
+    reach is sealed inside the material.  Without this a generated body could
+    only ever float on the material it was made of, so the search had no way to
+    invent a swim bladder -- and buoyancy closure is one of the three binding
+    constraints on this mission.
+    """
+    try:
+        from scipy import ndimage
+    except Exception:
+        return 0.0
+    empty = ~occ
+    if not empty.any():
+        return 0.0
+    # Pad by one cell so the flood always has an outside to start from, even
+    # when the body touches the edge of its own envelope.
+    padded = np.pad(empty, 1, mode="constant", constant_values=True)
+    lab, n = ndimage.label(padded)
+    if n == 0:
+        return 0.0
+    outside = lab[0, 0, 0]
+    sealed = (lab != outside) & padded
+    return float(sealed[1:-1, 1:-1, 1:-1].sum())
+
+
+def _hull_volume(pts: np.ndarray, *, pad: float) -> float:
+    """Volume of the convex hull of the occupied cells."""
+    if len(pts) < 8:
+        return 0.0
+    try:
+        from scipy.spatial import ConvexHull
+
+        corners = pts[:, None, :] + pad * np.array(
+            [[sx, sy, sz] for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)]
+        )[None, :, :]
+        return float(ConvexHull(corners.reshape(-1, 3), qhull_options="QJ").volume)
+    except Exception:
+        return 0.0
 
 
 def _convex_chunks(pts: np.ndarray, *, max_clusters: int, pad: float) -> list:
@@ -227,10 +280,25 @@ def _convex_chunks(pts: np.ndarray, *, max_clusters: int, pad: float) -> list:
 def body_panels(f: BodyField, *, cd: float, n_max: int = 6):
     """Bluff fluid elements for a free-form body.
 
-    One element per chunk rather than one per part, so a long tapered hull
-    presents different volume and area along its length -- which matters for
-    buoyancy distribution and therefore for pitch trim, and which a single
-    capsule element could not express at all.
+    Slices the occupancy along the part's own axis and returns one element per
+    slice, rather than one element per part.  Three things follow that a single
+    capsule element could not express:
+
+    * **Buoyancy is distributed.**  A hull that is fat forward and fine aft has
+      its centre of buoyancy forward of its mid-length, so it trims bow-up.
+      With one element the buoyant force acted at the geometric centre no matter
+      what shape the CPPN drew, and pitch trim was therefore blind to the shape.
+    * **Drag is distributed.**  A slice far from the centre of mass produces a
+      moment as well as a force, which is how a tapered tail stabilises and a
+      blunt one does not.
+    * **Area is honest per slice.**  Each slice reports its own three extents,
+      so the projected-area drag in the solver sees the local cross-section
+      rather than the bounding box of the whole part.
+
+    Slices are cut along the longest extent -- the same axis ``_convex_chunks``
+    uses -- because that is where a body's section actually varies.  Extents are
+    reported in the part's local (span, chord, normal) order, which for a body
+    is (x, y, z): the frame every joint and attachment already uses.
     """
     if f.is_empty:
         return []
@@ -243,14 +311,14 @@ def body_panels(f: BodyField, *, cd: float, n_max: int = 6):
         if len(c) == 0:
             continue
         p = f.centres[c]
-        vol = float(len(c) * cell)
+        # Extents of this slice, floored at one voxel so a single-voxel-thick
+        # slice still has area and does not silently drag-free.
         span = np.maximum(p.max(axis=0) - p.min(axis=0), f.voxel)
         out.append({
             "pos": p.mean(axis=0),
-            "volume": vol,
-            "chord": float(span[0]),
-            "dr": float(max(span[1], span[2])),
-            "half_height": float(0.5 * span[2]),
+            "volume": float(len(c) * cell),
+            "ext": span.astype(float),
+            "half_height": float(0.5 * max(span[1], span[2])),
             "cd": cd,
         })
     return out

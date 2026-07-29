@@ -477,12 +477,34 @@ def build(genome: Genome) -> Phenotype:
                 if s.part.body_cppn < len(genome.body_cppns) else None
             fld = sample_body(bc, length=max(s.length, 0.02), radius=max(s.radius, 0.01))
             s.field = fld
-            wall = hull_wall(s.radius) if s.kind in (HULL, BALLAST, BELL) else tube_wall(s.radius)
-            s.mass = fld.surface_area * wall * mat.rho
-            budget.structure += s.mass
-            s.volume = fld.volume
+            # Same wall rule the capsule branches use, per kind.  Reading
+            # hull_wall for a BELL charged an open, flooded, flexing bell for a
+            # rigid pressure shell rated to 10 m: 9.1 mm of PETG over 1.3 m^2,
+            # 15 kg for one dome, and the medusa plan failed its mass budget for
+            # being the shape it exists to be.
             if s.kind == BELL:
-                s.bell_volume = fld.volume
+                wall = max(0.35 * hull_wall(s.radius), 0.0012)
+            elif s.kind in (HULL, BALLAST):
+                wall = hull_wall(s.radius)
+            else:
+                wall = tube_wall(s.radius)
+            # Mass is a shell of the real wetted surface -- but never more than
+            # building the thing solid would cost.  Without that cap a field that
+            # is *already* a thin shell gets charged for a wall on both of its
+            # faces, which is not a design anyone would build: it made the medusa
+            # bell 18 kg and pushed it outside the mass budget for the crime of
+            # being hollow, exactly the shape the plan exists to explore.
+            s.mass = min(fld.surface_area * wall, fld.volume) * mat.rho
+            budget.structure += s.mass
+            # Displacement is the material plus any void it has sealed off.  An
+            # open concavity is not included: water fills it, so it displaces
+            # nothing, which is the whole difference between a hull and a bowl.
+            s.volume = fld.volume + fld.enclosed
+            if s.kind == BELL:
+                # The jet expels the *open* cavity, not the material and not a
+                # sealed void.  Reading fld.volume here charged the jet with the
+                # volume of the bell's own wall.
+                s.bell_volume = max(fld.cavity, 0.25 * fld.volume)
                 s.orifice_area = max(
                     math.pi * s.radius**2 * float(np.clip(s.part.jet_area_ratio, 0.02, 0.9)),
                     1e-5,
@@ -902,6 +924,42 @@ def build_panels(p: Phenotype, model, body_name_prefix: str = "") -> PanelSet:
             )
         else:
             cd = {HULL: 0.20, BALLAST: 0.25, STRUT: 0.9, FOOT: 1.1}.get(s.kind, 0.6)
+            chunks = []
+            fld = getattr(s, "field", None)
+            if fld is not None and not fld.is_empty:
+                from .sdf import body_panels
+
+                chunks = body_panels(fld, cd=cd)
+            if chunks:
+                # A generated body is a sequence of slices, so the fluid sees
+                # where its volume actually is.  The buoyant fraction is applied
+                # per slice rather than lumped: a hull that is sealed overall is
+                # sealed everywhere along its length, and one that is 30% flooded
+                # floods in proportion to local volume, which is the best the
+                # representation can say without modelling the compartments.
+                frac = s.volume_buoyant / max(s.volume, 1e-9)
+                m = len(chunks)
+                vol = np.array([c["volume"] for c in chunks])
+                ext = np.array([c["ext"] for c in chunks])
+                sets.append(
+                    PanelSet(
+                        body_id=np.full(m, bid),
+                        pos_local=np.array([c["pos"] for c in chunks]),
+                        span_local=np.tile(np.array([1.0, 0.0, 0.0]), (m, 1)),
+                        chord_local=np.tile(np.array([0.0, -1.0, 0.0]), (m, 1)),
+                        chord=np.maximum(ext[:, 1], 1e-3),
+                        dr=np.maximum(ext[:, 0], 1e-3),
+                        volume=vol,
+                        volume_buoyant=vol * frac,
+                        half_height=np.array([c["half_height"] for c in chunks]),
+                        kind=np.full(m, BLUFF),
+                        aspect_ratio=np.ones(m),
+                        cd_bluff=np.full(m, cd),
+                        pitch_axis=np.full(m, 0.5),
+                        ext_local=np.maximum(ext, 1e-3),
+                    )
+                )
+                continue
             sets.append(
                 PanelSet(
                     body_id=np.array([bid]),
@@ -917,6 +975,11 @@ def build_panels(p: Phenotype, model, body_name_prefix: str = "") -> PanelSet:
                     aspect_ratio=np.array([1.0]),
                     cd_bluff=np.array([cd]),
                     pitch_axis=np.array([0.5]),
+                    ext_local=np.array([[
+                        max(s.length, 0.01),
+                        max(2 * s.radius, 0.01),
+                        max(2 * s.radius, 0.01),
+                    ]]),
                 )
             )
     return PanelSet.concat(sets)

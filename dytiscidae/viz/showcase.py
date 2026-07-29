@@ -245,7 +245,7 @@ def render_mission(
     Returns ``(path, ContinuousResult)``.
     """
     from ..envs.mission import ContinuousResult, build_schedule, current_domain, run_continuous
-    from ..envs.triphibian import MissionSpec, TriphibianEnv
+    from ..envs.triphibian import Domain, MissionSpec, TriphibianEnv
     from ..physics.wake import VortexWake, attach_wake_probe
     from .render import gl_available
 
@@ -267,10 +267,18 @@ def render_mission(
     wake = VortexWake() if show_wake else None
     probe = StressProbe(env) if show_stress else None
 
+    # Frame on the geometry, and move the near clip plane in to match.  This
+    # world is 186 m across, so MuJoCo's near plane defaults to 3.7 m and any
+    # closer camera renders the machine entirely clipped -- an empty seascape
+    # with a HUD on it.
+    from .render import _geometry_bounds, _near_plane
+
+    env.reset(Domain.AIR, randomise=False)
+    _, extent = _geometry_bounds(env)
+    _near_plane(env.model, extent).__enter__()
     renderer = mujoco.Renderer(env.model, height=height, width=width, max_geom=6000)
     cam = mujoco.MjvCamera()
-    span = max(phenotype.max_span, phenotype.body_length, 0.6)
-    cam.distance = span * 2.6
+    cam.distance = max(extent * 2.0, 0.6)
     cam.elevation = -13.0
     cam.azimuth = 116.0
 

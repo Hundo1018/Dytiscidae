@@ -195,6 +195,109 @@ def test_buoyancy() -> None:
     check("a 500 kg/m^3 body rises in water", d.qpos[2] > -5.0, f"z={d.qpos[2]:.3f} m")
 
 
+def test_bluff_drag_is_orientation_dependent() -> None:
+    """A volume must cost more drag broadside than nose-on, and must never cost
+    zero.
+
+    This is a regression test for a real defect.  Bluff elements were run
+    through strip theory, which projects the spanwise component of the flow out
+    before forming the drag -- correct for a wing strip, badly wrong for a body.
+    A hull travelling nose-first along its own axis therefore felt *no* pressure
+    drag whatever, so the search could make bodies arbitrarily long and pay
+    nothing, and it did.
+    """
+    print("\nfluid: bluff bodies see their own shape")
+    xml = """
+    <mujoco><worldbody><body name="b" pos="0 0 -5">
+      <freejoint/><geom type="box" size="0.3 0.05 0.05" density="500"/>
+    </body></worldbody></mujoco>
+    """
+    m = mujoco.MjModel.from_xml_string(xml)
+    d = mujoco.MjData(m)
+    bid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "b")
+
+    def drag_at(vel) -> float:
+        panels = PanelSet(
+            body_id=np.array([bid]),
+            pos_local=np.zeros((1, 3)),
+            span_local=np.array([[1.0, 0.0, 0.0]]),
+            chord_local=np.array([[0.0, -1.0, 0.0]]),
+            chord=np.array([0.1]),
+            dr=np.array([0.6]),
+            volume=np.array([0.006]),
+            volume_buoyant=np.array([0.0]),
+            half_height=np.array([0.05]),
+            kind=np.array([BLUFF]),
+            aspect_ratio=np.array([1.0]),
+            cd_bluff=np.array([0.2]),
+            pitch_axis=np.array([0.5]),
+            # 6:1 slender, long along its own span axis.
+            ext_local=np.array([[0.6, 0.1, 0.1]]),
+        )
+        solver = FluidSolver(m, panels, MediumField())
+        mujoco.mj_resetData(m, d)
+        d.qpos[2] = -5.0
+        d.qvel[:3] = vel
+        mujoco.mj_forward(m, d)
+        d.xfrc_applied[:] = 0.0
+        solver.apply(d, 0.0)
+        return solver.diag.drag
+
+    axial = drag_at([3.0, 0.0, 0.0])
+    across = drag_at([0.0, 3.0, 0.0])
+    check("a body moving along its own axis still has drag", axial > 1.0, f"{axial:.1f} N")
+    check(
+        "broadside costs more than nose-on",
+        across > 2.0 * axial,
+        f"{across:.1f} N broadside vs {axial:.1f} N nose-on ({across / axial:.1f}x)",
+    )
+
+
+def test_generated_bodies_reach_the_fluid() -> None:
+    """A free-form body must arrive at the solver as several elements carrying
+    its real volume, not as one capsule standing in for it.
+
+    Without this the shape the CPPN generates changes mass, inertia and
+    collision geometry and stops there: buoyancy still acts at the geometric
+    centre of a rod, so pitch trim is blind to whether the body is fat forward
+    or fat aft.
+    """
+    print("\nfluid: generated shape reaches the solver")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.mjcf import compile_phenotype
+    from dytiscidae.core.phenotype import build
+
+    worst_ratio = 1e9
+    n_plans_with_fields = 0
+    for name, plan in BODY_PLANS.items():
+        p = build(plan())
+        _, _, _, panels = compile_phenotype(p)
+        fields = [s for s in p.segments if getattr(s, "field", None) is not None]
+        if not fields:
+            continue
+        n_plans_with_fields += 1
+        bluff = panels.kind == BLUFF
+        n_bluff = int(bluff.sum())
+        n_nonsurface = sum(1 for s in p.segments if not s.is_surface)
+        check(
+            f"{name}: body is discretised, not lumped",
+            n_bluff > n_nonsurface,
+            f"{n_bluff} bluff elements for {n_nonsurface} non-surface segments",
+        )
+        # The elements must account for the volume the sizing pass reported.
+        want = sum(s.volume for s in p.segments if not s.is_surface)
+        got = float(panels.volume[bluff].sum())
+        worst_ratio = min(worst_ratio, got / max(want, 1e-9))
+
+    check("all five plans carry a generated body", n_plans_with_fields == 5,
+          f"{n_plans_with_fields}/5")
+    check(
+        "panel volume accounts for the body volume",
+        0.9 < worst_ratio < 1.1,
+        f"worst ratio {worst_ratio:.3f}",
+    )
+
+
 def test_free_surface_continuity() -> None:
     """Submerged fraction must sweep smoothly from 0 to 1 across the surface."""
     print("\nmedium: free surface")
@@ -359,6 +462,8 @@ def main() -> int:
     print("=" * 68)
     test_lift_sign_and_magnitude()
     test_buoyancy()
+    test_bluff_drag_is_orientation_dependent()
+    test_generated_bodies_reach_the_fluid()
     test_free_surface_continuity()
     test_added_mass_dominates_in_water()
     test_lev_extends_stall()

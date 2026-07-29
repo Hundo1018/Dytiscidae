@@ -43,6 +43,7 @@ import math
 import numpy as np
 
 from .cppn import CPPN, SURFACE_INPUTS, SURFACE_OUTPUTS, Connection, Node, new_surface_cppn
+from .sdf import BODY_INPUTS, BODY_OUTPUTS
 from .genome import (
     BALLAST,
     BELL,
@@ -77,6 +78,116 @@ CHORD, TWIST, CAMBER, THICK, DIHED = 4, 5, 6, 7, 8
 
 
 # --------------------------------------------------------------------------
+# Body volumes
+#
+# Every archetype's body used to be a capsule, because ``body_cppn`` defaulted
+# to -1 and only the ``body_field`` mutation ever set it.  A seeded run
+# therefore started with five plans whose bodies were all the same rod, and the
+# free-form representation only entered the population if that one operator
+# happened to fire and happened to survive selection.  That is why the renders
+# came out as sticks: the machinery was there and nothing was using it.
+#
+# The fields below are hand-wired rather than random, for the same reason the
+# surface CPPNs are: a prior that is recognisably a beetle, a bell, a ray costs
+# a little diversity and saves thousands of evaluations spent rediscovering that
+# a body should enclose a volume.  Mutation dismantles them freely -- these are
+# ordinary CPPNs with no protected status.
+#
+# Coordinates are the part's own normalised frame: x runs base to tip (-1..1),
+# y and z are lateral, r = sqrt(y^2+z^2), d = |x|.  Occupancy is ``solid > 0``
+# intersected with r <= 1, so writing a shape means writing an inequality.
+# --------------------------------------------------------------------------
+
+# Input indices for a body CPPN: x, y, z, r, d, bias.  Outputs: solid, shell.
+BX, BY, BZ, BR, BD, BB = 0, 1, 2, 3, 4, 5
+SOLID, SHELL = 6, 7
+
+
+def _body(
+    weights: dict[tuple[int, int], float],
+    *,
+    bias: dict[int, float] | None = None,
+    hidden: list[tuple[str, float]] | None = None,
+) -> CPPN:
+    """A hand-wired body CPPN.
+
+    ``hidden`` adds nodes (activation, bias) after the outputs, numbered from 8
+    upward, so a shape that needs a ring or a crease can have one.  Keys in
+    ``weights`` are (src_index, dst_index) over inputs 0-5, outputs 6-7 and
+    hidden 8+.
+    """
+    c = CPPN(inputs=list(BODY_INPUTS), outputs=list(BODY_OUTPUTS))
+    for _ in BODY_INPUTS:
+        c.nodes.append(Node(id=c._new_id(), activation="identity", layer=0))
+    bias = bias or {}
+    for i, _ in enumerate(BODY_OUTPUTS):
+        c.nodes.append(
+            Node(id=c._new_id(), activation="identity", bias=bias.get(6 + i, 0.0), layer=2)
+        )
+    for act, b in hidden or []:
+        c.nodes.append(Node(id=c._new_id(), activation=act, bias=b, layer=1))
+    c.connections = [Connection(a, b, w) for (a, b), w in weights.items()]
+    return c
+
+
+def _fusiform(taper: float = 0.85, flatten: float = 0.0) -> CPPN:
+    """A spindle: fat amidships, fine at both ends.
+
+    ``solid = 1.05 - r - taper*|x| - flatten*|z|``, so occupancy is a body of
+    revolution whose radius falls off toward the ends, optionally squashed in z.
+    This is the shape a hull wants for the same reason every fish and every
+    airship has it: minimum wetted area for a given volume at low drag.
+    """
+    w = {(BR, SOLID): -1.0, (BD, SOLID): -taper, (BB, SOLID): 1.05}
+    hid = []
+    if flatten > 0.0:
+        hid = [("abs", 0.0)]
+        w[(BZ, 8)] = 1.0
+        w[(8, SOLID)] = -flatten
+    return _body(w, hidden=hid)
+
+
+def _dome_shell(curve: float = 0.55, radius: float = 0.72, thickness: float = 5.0) -> CPPN:
+    """A hollow bell, open at one end.
+
+    A single linear unit cannot express an annulus -- it can only cut space with
+    a plane -- so this uses one gaussian hidden node to place a *band* at
+    ``r + curve*x = radius``.  Everything inside and outside the band is empty,
+    which is what makes it a shell with a cavity rather than a lump, and the
+    cavity is what the jet model needs to have somewhere to push from.
+    """
+    return _body(
+        {
+            (BR, 8): thickness,
+            (BX, 8): thickness * curve,
+            (8, SOLID): 1.0,
+            (BR, SHELL): 1.0,
+        },
+        bias={SOLID: -0.42},
+        hidden=[("gauss", -thickness * radius)],
+    )
+
+
+def _oblate(squash: float = 3.0, taper: float = 0.5) -> CPPN:
+    """A flattened disc: wide in y, thin in z, tapering fore and aft."""
+    return _body(
+        {
+            (BZ, 8): 1.0,
+            (8, SOLID): -squash,
+            (BD, SOLID): -taper,
+            (BB, SOLID): 1.2,
+            (BR, SHELL): 0.5,
+        },
+        hidden=[("abs", 0.0)],
+    )
+
+
+def _cone(base: float = 0.75, slope: float = 0.6) -> CPPN:
+    """A tapered nose: broad at the base, fine at the tip."""
+    return _body({(BR, SOLID): -1.0, (BX, SOLID): -slope, (BB, SOLID): base})
+
+
+# --------------------------------------------------------------------------
 
 
 def beetle() -> Genome:
@@ -91,8 +202,9 @@ def beetle() -> Genome:
         _cppn({(U, CHORD): 0.55, (BIAS, CHORD): 0.35, (BIAS, CAMBER): 0.25,
                (BIAS, THICK): -0.40}),
     ]
+    g.body_cppns = [_fusiform(taper=0.80, flatten=1.6)]
     hull = Part(kind=HULL, length=0.62, radius=0.078, material="petg", joint="none",
-                actuated=False, sealed=False, dry_fraction=0.88)
+                actuated=False, sealed=False, dry_fraction=0.88, body_cppn=0)
     wing = Part(kind=WING, span=1.15, root_chord=0.34, radius=0.013, material="cfrp",
                 surface_cppn=0, joint="hinge", joint_axis=np.array([1.0, 0.0, 0.0]),
                 joint_range=(-0.62, 0.62), motor_class="geared", motor_mass=0.42,
@@ -131,15 +243,17 @@ def medusa() -> Genome:
         _cppn({(U, CHORD): 0.40, (BIAS, CHORD): -0.10, (BIAS, THICK): -0.75,
                (BIAS, CAMBER): 0.15}),
     ]
+    g.body_cppns = [_dome_shell(curve=0.55, radius=0.72), _fusiform(taper=1.05)]
     bell = Part(kind=BELL, length=0.34, radius=0.24, material="petg", joint="none",
                 actuated=False, sealed=False, dry_fraction=0.35,
-                jet_area_ratio=0.16, stroke_fraction=0.42)
+                jet_area_ratio=0.16, stroke_fraction=0.42, body_cppn=0)
     # The contracting segments *are* the muscle: eight radial flaps that squeeze
     # the cavity.  Each is a BELL so each contributes jet thrust.
     muscle = Part(kind=BELL, length=0.22, radius=0.10, material="petg", joint="hinge",
                   joint_axis=np.array([0.0, 0.0, 1.0]), joint_range=(-0.9, 0.15),
                   motor_class="geared", motor_mass=0.10, gear_ratio=30.0, sealed=True,
-                  dry_fraction=0.1, jet_area_ratio=0.14, stroke_fraction=0.5)
+                  dry_fraction=0.1, jet_area_ratio=0.14, stroke_fraction=0.5,
+                  body_cppn=1)
     tentacle = Part(kind=FIN, span=0.42, root_chord=0.06, radius=0.008,
                     material="cfrp", surface_cppn=0, joint="hinge",
                     joint_axis=np.array([0.0, 0.0, 1.0]), joint_range=(-0.7, 0.7),
@@ -171,8 +285,9 @@ def bat() -> Genome:
         _cppn({(U, CHORD): -0.35, (BIAS, CHORD): 0.75, (U, TWIST): -0.55,
                (BIAS, CAMBER): 0.85, (BIAS, THICK): -0.85}),
     ]
+    g.body_cppns = [_fusiform(taper=0.95, flatten=0.8)]
     body = Part(kind=HULL, length=0.44, radius=0.062, material="petg", joint="none",
-                actuated=False, sealed=False, dry_fraction=0.9)
+                actuated=False, sealed=False, dry_fraction=0.9, body_cppn=0)
     # Three digits per side, each shorter than the last, each carrying membrane.
     digit = Part(kind=STRUT, length=0.46, radius=0.010, material="cfrp", joint="hinge",
                  joint_axis=np.array([1.0, 0.0, 0.0]), joint_range=(-0.9, 0.55),
@@ -213,8 +328,9 @@ def eel() -> Genome:
     g.cppns = [
         _cppn({(BIAS, CHORD): 0.30, (U, CHORD): -0.15, (BIAS, THICK): -0.55}),
     ]
+    g.body_cppns = [_cone(base=0.80, slope=0.55)]
     head = Part(kind=HULL, length=0.28, radius=0.055, material="petg", joint="none",
-                actuated=False, sealed=False, dry_fraction=0.85)
+                actuated=False, sealed=False, dry_fraction=0.85, body_cppn=0)
     # One body segment; recursion 5 builds the chain, and the phase offset makes
     # the wave travel down it rather than the whole body flapping in unison.
     segment = Part(kind=FIN, span=0.22, root_chord=0.14, radius=0.009,
@@ -250,8 +366,9 @@ def ray() -> Genome:
         _cppn({(U, CHORD): -0.55, (BIAS, CHORD): 0.90, (U, TWIST): -0.45,
                (BIAS, CAMBER): 0.55, (BIAS, THICK): -0.80, (U, DIHED): 0.25}),
     ]
+    g.body_cppns = [_oblate(squash=2.6, taper=0.45)]
     disc = Part(kind=HULL, length=0.40, radius=0.070, material="petg", joint="none",
-                actuated=False, sealed=False, dry_fraction=0.86)
+                actuated=False, sealed=False, dry_fraction=0.86, body_cppn=0)
     # Four fin rays per side, phase-offset so the wave runs fore to aft.
     # 22 mm carbon: the membranes these carry are half a metre across, and in
     # water that is a serious cantilever no matter how compliant the skin is.
