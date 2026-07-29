@@ -119,10 +119,23 @@ def scene_xml(
     )
 
     default = ET.SubElement(root, "default")
+    # contype 1 / conaffinity 2 on the machine, the reverse on the terrain.  Two
+    # geoms collide when (contype_a & conaffinity_b) or (contype_b & conaffinity_a),
+    # so this makes the machine collide with the world and never with itself.
+    #
+    # Self-collision was pure cost.  Nothing scores it -- ground contact was
+    # already filtered to world-body contacts, because counting self-contacts
+    # made every design "standing on the ground" the moment two of its own parts
+    # touched.  And it is not cheap: a medusa is 36 convex mesh geoms in one
+    # machine, and pairwise mesh collision made it 10x slower than every other
+    # plan, 1.2x realtime against 0.14x.  Interpenetration between a design's own
+    # limbs is a real defect, but it is one for the structural checks to catch,
+    # not the contact solver.
     ET.SubElement(
         default,
         "geom",
-        {"friction": "0.9 0.02 0.001", "condim": "4", "solref": "0.004 1", "margin": "0.001"},
+        {"friction": "0.9 0.02 0.001", "condim": "4", "solref": "0.004 1",
+         "margin": "0.001", "contype": "1", "conaffinity": "2"},
     )
     ET.SubElement(default, "joint", {"damping": "0.05", "armature": "0.002", "limited": "true"})
 
@@ -166,20 +179,35 @@ def scene_xml(
         wb,
         "geom",
         {"name": "seabed", "type": "plane", "pos": f"0 0 {-seabed_depth}",
-         "size": "60 60 0.5", "material": "seabed"},
+         "size": "60 60 0.5", "material": "seabed", "contype": "2", "conaffinity": "1"},
     )
     # Beach: a ramp that emerges through the waterline.
+    #
+    # The rotation sign here was wrong, and it made the land domain physically
+    # unreachable for the entire project.  The matrix below is the *columns* of
+    # the geom frame in world axes, so column 0 is where the ramp's own +x
+    # points.  With the old sign it pointed down-slope as world x increased,
+    # which put the shore end of the ramp at z = +4.8 m and the seaward end at
+    # z = +0.7 m: a ramp floating entirely above the water, never crossing it,
+    # with the land spawn point 3.5 m underneath it.  Every "land" episode was a
+    # machine dropped inside terrain it could not touch, falling into the sea.
+    # That is why no generation ever completed all three domains.
     ramp_len = 40.0
     ang = math.atan(beach_slope)
-    # Place it so the surface crossing lands at x = shore_x.
-    cx = shore_x + 0.5 * ramp_len * math.cos(ang)
-    cz = 0.5 * ramp_len * math.sin(ang)
+    # Place it so the surface crossing lands at x = shore_x, with ``submerged``
+    # metres of it continuing below the waterline.  Without that run the ramp
+    # began exactly at z = 0 and a swimming machine met a vertical 1 m wall
+    # instead of a beach, so a water-to-land transition meant climbing a cliff.
+    submerged = 12.0
+    t0 = submerged - 0.5 * ramp_len  # ramp-local coordinate of the waterline
+    cx = shore_x - t0 * math.cos(ang)
+    cz = -t0 * math.sin(ang)
     q = mat2quat(
         np.array(
             [
-                [math.cos(ang), 0.0, math.sin(ang)],
+                [math.cos(ang), 0.0, -math.sin(ang)],
                 [0.0, 1.0, 0.0],
-                [-math.sin(ang), 0.0, math.cos(ang)],
+                [math.sin(ang), 0.0, math.cos(ang)],
             ]
         )
     )
@@ -187,7 +215,8 @@ def scene_xml(
         wb,
         "geom",
         {"name": "beach", "type": "box", "pos": f"{_fmt(cx)} 0 {_fmt(cz)}",
-         "quat": _fmt(q), "size": f"{_fmt(0.5*ramp_len)} 30 0.5", "material": "beach"},
+         "quat": _fmt(q), "size": f"{_fmt(0.5*ramp_len)} 30 0.5", "material": "beach",
+         "contype": "2", "conaffinity": "1"},
     )
     # Visual water plane (no contact).
     ET.SubElement(

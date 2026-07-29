@@ -298,6 +298,101 @@ def test_generated_bodies_reach_the_fluid() -> None:
     )
 
 
+def test_land_domain_is_reachable() -> None:
+    """There must be dry ground above the waterline, and a machine dropped on
+    the land spawn must land on it.
+
+    The beach ramp's rotation sign was inverted, which put the whole ramp above
+    the water -- z = +4.8 m at the shoreline, never crossing z = 0 -- and put
+    the land spawn point 3.5 m *underneath* it.  Every land episode was a
+    machine dropped inside terrain it could not touch, free-falling into the
+    sea, and no generation could complete all three domains because one of them
+    did not physically exist.  Nothing crashed and nothing warned; the land
+    score just stayed low and read like a hard control problem.
+    """
+    print("\nscene: land exists")
+    import mujoco as mj
+
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(beetle()))
+    model, data = env.model, env.data
+    env.reset(Domain.LAND, randomise=False)
+    mj.mj_forward(model, data)
+
+    bg = mj.mj_name2id(model, mj.mjtObj.mjOBJ_GEOM, "beach")
+    R = data.geom_xmat[bg].reshape(3, 3)
+    c, half = data.geom_xpos[bg], model.geom_size[bg][0]
+
+    def ramp_z(x: float) -> float:
+        return float(c[2] + ((x - c[0]) / R[0, 0]) * R[2, 0])
+
+    def on_ramp(x: float) -> bool:
+        return abs((x - c[0]) / R[0, 0]) <= half
+
+    xs = [x for x in np.linspace(c[0] - half * R[0, 0], c[0] + half * R[0, 0], 40) if on_ramp(x)]
+    zs = [ramp_z(x) for x in xs]
+    check("the beach crosses the waterline", min(zs) < 0.0 < max(zs),
+          f"ramp spans z {min(zs):+.2f} .. {max(zs):+.2f} m")
+    check("the ramp rises inland", zs[-1] > zs[0], f"{zs[0]:+.2f} -> {zs[-1]:+.2f} m")
+
+    spawn = env.root_pos().copy()
+    check("the land spawn is above the ground under it", spawn[2] > ramp_z(spawn[0]),
+          f"spawn z={spawn[2]:.2f} vs ground z={ramp_z(spawn[0]):.2f}")
+
+    contacts = 0
+    steps = int(4.0 / env.timestep)
+    for _ in range(steps):
+        env.step(env.cpg.command(env.cpg.base, env.data.time))
+        if env._touching_ground():
+            contacts += 1
+    check("a machine dropped on land ends up touching it", contacts > 0.2 * steps,
+          f"{contacts}/{steps} steps in ground contact")
+    check("and does not fall through the world", env.root_pos()[2] > -1.0,
+          f"z={float(env.root_pos()[2]):.2f} m")
+
+
+def test_machine_does_not_collide_with_itself() -> None:
+    """The machine collides with terrain and never with its own parts."""
+    print("\nscene: contact masks")
+    from dytiscidae.core.bodyplans import medusa
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(medusa()))
+    model = env.model
+    machine = model.geom_bodyid != 0
+    pairs_possible = 0
+    for a in np.nonzero(machine)[0]:
+        for b in np.nonzero(machine)[0]:
+            if a < b and (
+                (model.geom_contype[a] & model.geom_conaffinity[b])
+                or (model.geom_contype[b] & model.geom_conaffinity[a])
+            ):
+                pairs_possible += 1
+    check("no self-collision pair is enabled", pairs_possible == 0, f"{pairs_possible} pairs")
+
+    terrain = np.nonzero(~machine)[0]
+    solid = [
+        g for g in terrain
+        if model.geom_contype[g] or model.geom_conaffinity[g]
+    ]
+    ok = all(
+        (model.geom_contype[g] & model.geom_conaffinity[np.nonzero(machine)[0][0]])
+        or (model.geom_contype[np.nonzero(machine)[0][0]] & model.geom_conaffinity[g])
+        for g in solid
+    )
+    check("the machine still collides with the terrain", ok and len(solid) >= 2,
+          f"{len(solid)} solid terrain geoms")
+
+    env.reset(Domain.LAND, randomise=False)
+    for _ in range(int(2.0 / env.timestep)):
+        env.step(env.cpg.command(env.cpg.base, env.data.time))
+    check("and reaches it", env._touching_ground(), f"ncon={env.data.ncon}")
+
+
 def test_free_surface_continuity() -> None:
     """Submerged fraction must sweep smoothly from 0 to 1 across the surface."""
     print("\nmedium: free surface")
@@ -464,6 +559,8 @@ def main() -> int:
     test_buoyancy()
     test_bluff_drag_is_orientation_dependent()
     test_generated_bodies_reach_the_fluid()
+    test_land_domain_is_reachable()
+    test_machine_does_not_collide_with_itself()
     test_free_surface_continuity()
     test_added_mass_dominates_in_water()
     test_lev_extends_stall()

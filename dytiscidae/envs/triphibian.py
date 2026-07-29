@@ -316,10 +316,39 @@ class TriphibianEnv:
         if self.model.nq >= 7:
             self.data.qpos[:3] = (x, y, z)
             self.data.qpos[3:7] = (1.0, 0.0, 0.0, 0.0)
+            if domain is Domain.LAND:
+                self.data.qpos[2] = self._clear_of_terrain(x, y, z)
         self.solver.reset()
         self.cpg.reset()
         self.budget.reset()
         self._mj.mj_forward(self.model, self.data)
+
+    def _clear_of_terrain(self, x: float, y: float, z: float, gap: float = 0.05) -> float:
+        """Raise a land spawn until the machine's lowest geometry clears ground.
+
+        The spawn height was a constant, so a machine larger than that constant
+        started *inside* the beach.  A medusa began its land episode with 99
+        contacts and was ejected to 8 m altitude within a second, and whatever
+        the land score measured after that, it was not locomotion.  Since the
+        search is free to invent machines of any size, the spawn has to be
+        derived from the machine rather than assumed.
+
+        Measured from the compiled geometry with the pose already written, using
+        ``geom_rbound`` so it is correct for meshes as well as primitives.
+        """
+        self._mj.mj_forward(self.model, self.data)
+        g = self.model.geom_bodyid != 0
+        if not g.any():
+            return z
+        lowest = float((self.data.geom_xpos[g][:, 2] - self.model.geom_rbound[g]).min())
+        # Probe the terrain directly below the root by dropping a ray.
+        ray = np.zeros(1, dtype=np.int32)
+        hit = self._mj.mj_ray(
+            self.model, self.data, np.array([x, y, z + 60.0]), np.array([0.0, 0.0, -1.0]),
+            None, 1, -1, ray,
+        )
+        ground = (z + 60.0 - float(hit)) if hit >= 0 else 0.0
+        return z + max(ground + gap - lowest, 0.0)
 
     def snapshot(self) -> tuple:
         return (self.data.qpos.copy(), self.data.qvel.copy(), self.data.time)
