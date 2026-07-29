@@ -74,6 +74,10 @@ class Part:
     root_chord: float = 0.15  # m, for surfaces
     material: str = "petg"
     surface_cppn: int = -1  # index into Genome.cppns
+    #: Index into ``Genome.body_cppns``.  Non-surface parts get their volume
+    #: from an implicit occupancy field rather than from a capsule, so a hull
+    #: can be a bell, a teardrop or a lobed fairing instead of a rod.
+    body_cppn: int = -1
 
     joint: str = "hinge"
     joint_axis: np.ndarray = field(default_factory=lambda: np.array([0.0, 1.0, 0.0]))
@@ -158,6 +162,8 @@ class Genome:
     parts: list[Part] = field(default_factory=list)
     edges: list[Edge] = field(default_factory=list)
     cppns: list[CPPN] = field(default_factory=list)
+    #: Implicit occupancy fields for the non-surface parts.
+    body_cppns: list[CPPN] = field(default_factory=list)
     root: int = 0
 
     # --- global design genes ------------------------------------------------
@@ -186,6 +192,7 @@ class Genome:
             parts=[p.copy() for p in self.parts],
             edges=[e.copy() for e in self.edges],
             cppns=[c.copy() for c in self.cppns],
+            body_cppns=[c.copy() for c in self.body_cppns],
             root=self.root,
             scale=self.scale,
             battery_wh=self.battery_wh,
@@ -225,6 +232,9 @@ def random_genome(rng: np.random.Generator, *, target_scale: float = 1.0) -> Gen
 
     # A CPPN per surface family.
     g.cppns = [new_surface_cppn(rng) for _ in range(2)]
+    from .sdf import new_body_cppn
+
+    g.body_cppns = [new_body_cppn(rng)]
 
     hull = Part(
         kind=HULL,
@@ -235,6 +245,7 @@ def random_genome(rng: np.random.Generator, *, target_scale: float = 1.0) -> Gen
         actuated=False,
         sealed=False,
         dry_fraction=float(rng.uniform(0.55, 0.9)),
+        body_cppn=0,
     )
     wing = Part(
         kind=WING,
@@ -555,6 +566,37 @@ def mut_material(g: Genome, rng: np.random.Generator) -> bool:
     return True
 
 
+def mut_body_field(g: Genome, rng: np.random.Generator) -> bool:
+    """Reshape a part's implicit volume.
+
+    This is the operator that can turn a fuselage into a bell.  Without it the
+    occupancy fields exist but never change, and every body reverts to the
+    cylinder the field defaults to -- which is how the previous version of this
+    project ended up generating nothing but sticks.
+    """
+    from .sdf import new_body_cppn
+
+    bodies = [pp for pp in g.parts if not pp.is_surface]
+    if not bodies:
+        return False
+    part = bodies[int(rng.integers(len(bodies)))]
+    if part.body_cppn < 0 or part.body_cppn >= len(g.body_cppns):
+        g.body_cppns.append(new_body_cppn(rng))
+        part.body_cppn = len(g.body_cppns) - 1
+        return True
+    c = g.body_cppns[part.body_cppn]
+    roll = rng.random()
+    if roll < 0.5:
+        c.mutate_weights(rng)
+    elif roll < 0.7:
+        return c.mutate_add_node(rng)
+    elif roll < 0.85:
+        return c.mutate_add_connection(rng)
+    else:
+        return c.mutate_activation(rng)
+    return True
+
+
 def mut_cppn_weights(g: Genome, rng: np.random.Generator) -> bool:
     if not g.cppns:
         return False
@@ -622,6 +664,7 @@ MUTATION_OPERATORS: dict[str, callable] = {
     "remove_part": mut_remove_part,
     "part_kind": mut_part_kind,
     "material": mut_material,
+    "body_field": mut_body_field,
     "cppn_weights": mut_cppn_weights,
     "cppn_structure": mut_cppn_structure,
     "global_energy": mut_global_energy,
@@ -634,7 +677,7 @@ MUTATION_OPERATORS: dict[str, callable] = {
 #: worth more early and less once the archive is dense.
 STRUCTURAL_OPERATORS = {
     "edge_topology", "add_part", "remove_part", "part_kind", "cppn_structure",
-    "radial_symmetry",
+    "radial_symmetry", "body_field",
 }
 
 

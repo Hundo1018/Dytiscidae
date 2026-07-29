@@ -135,6 +135,9 @@ class Segment:
     #: BELL only: enclosed cavity volume and nozzle area for the jet model.
     bell_volume: float = 0.0
     orifice_area: float = 0.0
+    #: Free-form occupancy field for non-surface parts.  When present it, not a
+    #: capsule, is what the mass budget, the buoyancy and the fluid panels read.
+    field: object | None = None
     actuator: Actuator | None = None
 
     @property
@@ -464,6 +467,26 @@ def build(genome: Genome) -> Phenotype:
             # then fail the flight-power check for having no wing.
             if s.kind in (WING_KIND, MEMBRANE, FIN):
                 wing_area += area
+        elif not s.is_surface and s.part.body_cppn >= 0:
+            # Free-form volume from the implicit field.  Mass is a shell of the
+            # real wetted surface rather than a formula for a cylinder, so a
+            # lobed or hollow body is charged for the skin it actually has.
+            from .sdf import sample_body
+
+            bc = genome.body_cppns[s.part.body_cppn] \
+                if s.part.body_cppn < len(genome.body_cppns) else None
+            fld = sample_body(bc, length=max(s.length, 0.02), radius=max(s.radius, 0.01))
+            s.field = fld
+            wall = hull_wall(s.radius) if s.kind in (HULL, BALLAST, BELL) else tube_wall(s.radius)
+            s.mass = fld.surface_area * wall * mat.rho
+            budget.structure += s.mass
+            s.volume = fld.volume
+            if s.kind == BELL:
+                s.bell_volume = fld.volume
+                s.orifice_area = max(
+                    math.pi * s.radius**2 * float(np.clip(s.part.jet_area_ratio, 0.02, 0.9)),
+                    1e-5,
+                )
         elif s.kind == BELL:
             # A contracting cavity.  Its wall must flex, so it is thin and
             # elastomeric rather than a rigid pressure shell.

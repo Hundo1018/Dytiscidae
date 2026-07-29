@@ -205,6 +205,46 @@ def scene_xml(
 # --------------------------------------------------------------------------
 
 
+_MESH_COUNTER = [0]
+
+
+def _add_field_geoms(root: ET.Element, body: ET.Element, s: Segment, mass: float) -> bool:
+    """Emit a free-form body as convex mesh chunks.  True if anything was made.
+
+    MuJoCo needs convex collision geometry, so the occupancy field is written as
+    several convex hulls rather than one.  A bell keeps its cavity that way; a
+    single hull would fill it in and the machine would collide as a lump.
+    """
+    fld = getattr(s, "field", None)
+    if fld is None or not getattr(fld, "hulls", None):
+        return False
+    asset = root.find("asset")
+    if asset is None:
+        asset = ET.SubElement(root, "asset")
+
+    share = mass / max(len(fld.hulls), 1)
+    made = False
+    for verts, faces in fld.hulls:
+        if len(verts) < 4 or len(faces) < 4:
+            continue
+        name = f"m{_MESH_COUNTER[0]}"
+        _MESH_COUNTER[0] += 1
+        ET.SubElement(asset, "mesh", {
+            "name": name,
+            "vertex": " ".join(f"{v:.5g}" for v in np.asarray(verts).ravel()),
+            "face": " ".join(str(int(i)) for i in np.asarray(faces).ravel()),
+        })
+        ET.SubElement(body, "geom", {
+            "name": f"{s.name}_g{_MESH_COUNTER[0]}",
+            "type": "mesh",
+            "mesh": name,
+            "mass": _fmt(max(share, 1e-5)),
+            "rgba": "0.25 0.28 0.32 1" if s.kind == HULL else "0.5 0.35 0.6 1",
+        })
+        made = True
+    return made
+
+
 def _add_geoms(body: ET.Element, s: Segment, extra_mass: float) -> None:
     """Attach collision/visual geometry and pin down the mass explicitly.
 
@@ -327,7 +367,9 @@ def build_model_xml(
                 actuator_names.append(aname)
                 act_specs.append((aname, jname, s.actuator.stall_torque))
 
-        _add_geoms(body, s, extra_root if s.parent < 0 else 0.0)
+        m_extra = extra_root if s.parent < 0 else 0.0
+        if not _add_field_geoms(root, body, s, max(s.mass + m_extra, 1e-4)):
+            _add_geoms(body, s, m_extra)
 
         for c in children.get(s.index, ()):
             add_segment(c, body)
