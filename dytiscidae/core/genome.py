@@ -33,12 +33,29 @@ from .cppn import CPPN, new_surface_cppn
 
 # Part kinds.  Each behaves differently in the fluid solver and the mass budget.
 HULL = "hull"  # dry pressure volume: carries battery, avionics, buoyancy
-STRUT = "strut"  # structural member, no surface
-WING = "wing"  # lifting surface, CPPN-shaped
+STRUT = "strut"  # structural member, no surface -- a bone, or a digit
+WING = "wing"  # stiff lifting surface with its own spar: bird, insect forewing
 PADDLE = "paddle"  # high-drag surface tuned for water; still generates lift
 FOOT = "foot"  # ground contact element
 BALLAST = "ballast"  # variable buoyancy volume
-PART_KINDS = [HULL, STRUT, WING, PADDLE, FOOT, BALLAST]
+#: A tension-only skin carried by the strut it hangs from, with no spar of its
+#: own.  This is the bat and pterosaur architecture: the load path runs through
+#: articulated digits rather than a single cantilever, which is why a bat can
+#: change its wing's camber and area continuously and a bird cannot.  Expressing
+#: it needs a part kind that has area but no bending member.
+MEMBRANE = "membrane"
+#: A contracting cavity that ejects fluid: medusa bell, squid mantle.  Thrust is
+#: momentum flux, rho * Q^2 / A_orifice, so it works underwater and does almost
+#: nothing in air.  Nothing in a wing-shaped parameterisation can express this.
+BELL = "bell"
+#: A slender surface meant to be driven as a travelling wave rather than flapped.
+#: Combined with a phase gradient along a serial chain this gives anguilliform
+#: swimming and the reverse Karman street that produces its thrust.
+FIN = "fin"
+PART_KINDS = [HULL, STRUT, WING, PADDLE, FOOT, BALLAST, MEMBRANE, BELL, FIN]
+
+#: Kinds that present an aerodynamic/hydrodynamic surface.
+SURFACE_KINDS = (WING, PADDLE, MEMBRANE, FIN)
 
 JOINT_KINDS = ["none", "hinge", "universal"]
 
@@ -73,6 +90,18 @@ class Part:
     #: whether that helps or hurts depends on which domain the machine is in.
     dry_fraction: float = 0.0
 
+    #: Phase offset of this part's oscillator, radians.  With a serial chain and
+    #: a per-part offset the pattern generator can produce a travelling wave
+    #: along the body, which is how anguilliform swimmers make thrust.  Fixing
+    #: the phase to a linspace, as the first version did, put every undulatory
+    #: gait outside the search space.
+    phase_offset: float = 0.0
+    #: For BELL: orifice area as a fraction of the bell's frontal area.  Jet
+    #: thrust goes as 1/A, so a small orifice trades flow rate for velocity.
+    jet_area_ratio: float = 0.18
+    #: For BELL: fraction of enclosed volume expelled per contraction.
+    stroke_fraction: float = 0.35
+
     def copy(self) -> "Part":
         p = replace(self)
         p.joint_axis = np.array(self.joint_axis, dtype=float)
@@ -80,7 +109,17 @@ class Part:
 
     @property
     def is_surface(self) -> bool:
-        return self.kind in (WING, PADDLE)
+        return self.kind in SURFACE_KINDS
+
+    @property
+    def has_own_spar(self) -> bool:
+        """Whether this surface carries its own bending member.
+
+        A membrane does not: it is tension-only skin, and its loads pass into
+        whatever strut it hangs from.  That distinction is the whole reason to
+        have a membrane kind at all.
+        """
+        return self.kind in (WING, PADDLE, FIN)
 
 
 @dataclass
@@ -95,6 +134,10 @@ class Edge:
     roll: float = 0.0  # rad, twist of the child about its own axis
     scale: float = 0.8  # size multiplier applied to the child
     reflect: bool = False  # also emit a mirrored copy across the XZ plane
+    #: Replicate the child this many times evenly around the parent's long axis.
+    #: One gene away from a medusa, a radial limb array, or a ring of fins --
+    #: none of which bilateral mirroring can reach at any mutation distance.
+    radial: int = 1
     recursion: int = 1  # how many times this edge may be followed
 
     def copy(self) -> "Edge":

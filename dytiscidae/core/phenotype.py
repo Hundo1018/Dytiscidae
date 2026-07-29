@@ -30,7 +30,18 @@ from ..physics.fluid import BLUFF, WING, PanelSet
 from ..physics.materials import STRUCTURAL_MATERIALS, Material
 from ..physics.medium import GRAVITY, SEAWATER
 from .cppn import SurfaceField, sample_surface
-from .genome import BALLAST, FOOT, HULL, PADDLE, STRUT, Genome, Part
+from .genome import (
+    BALLAST,
+    BELL,
+    FIN,
+    FOOT,
+    HULL,
+    MEMBRANE,
+    PADDLE,
+    STRUT,
+    Genome,
+    Part,
+)
 from .genome import WING as WING_KIND
 
 #: Fixed avionics mass: flight controller, IMU, depth sensor, radio, wiring.
@@ -121,6 +132,9 @@ class Segment:
     #: beyond its own material.  Conflating the two is what makes every
     #: generated design come out as a balloon.
     volume_buoyant: float = 0.0
+    #: BELL only: enclosed cavity volume and nozzle area for the jet model.
+    bell_volume: float = 0.0
+    orifice_area: float = 0.0
     actuator: Actuator | None = None
 
     @property
@@ -325,11 +339,21 @@ def expand(genome: Genome, *, max_segments: int = 22) -> list[Segment]:
                 continue
             child_counts = dict(counts)
             child_counts[ei] = child_counts.get(ei, 0) + 1
-            variants = [(1.0, mirrored)]
-            if e.reflect:
-                variants.append((-1.0, not mirrored))
-            for sign, mir in variants:
-                az = e.azimuth * sign
+            # Radial replication and bilateral reflection are alternative
+            # symmetries, not composable ones: a ring of six limbs mirrored is
+            # a ring of six limbs.  Radial wins when set, because reaching a
+            # medusa or a radial limb array should cost one gene, not a lucky
+            # accumulation of separate attachments.
+            n_radial = int(np.clip(e.radial, 1, 8))
+            variants = []
+            if n_radial > 1:
+                for k in range(n_radial):
+                    variants.append((1.0, mirrored, e.azimuth + 2.0 * math.pi * k / n_radial))
+            else:
+                variants.append((1.0, mirrored, e.azimuth))
+                if e.reflect:
+                    variants.append((-1.0, not mirrored, -e.azimuth))
+            for sign, mir, az in variants:
                 roll = e.roll * sign
                 # Neutral (az=0, el=0) points the child straight out to the side,
                 # so the default body plan is a winged one.
@@ -399,12 +423,18 @@ def build(genome: Genome) -> Phenotype:
         if s.is_surface:
             s.surface = _surface_of(genome, s)
             area = float(np.trapezoid(s.surface.chord, s.surface.u))
-            mean_t = float(np.mean(s.surface.thickness * s.surface.chord))
-            # Spar: a tube running the span, sized by the part's radius gene.
-            wall = tube_wall(s.radius)
-            a_sec, _, _ = structure.tube_section(2 * s.radius, wall)
-            spar_mass = a_sec * s.span * mat.rho
-            skin_mass = 2.0 * area * SKIN_AREAL_DENSITY
+            if s.part.has_own_spar:
+                # Spar: a tube running the span, sized by the part's radius gene.
+                wall = tube_wall(s.radius)
+                a_sec, _, _ = structure.tube_section(2 * s.radius, wall)
+                spar_mass = a_sec * s.span * mat.rho
+                skin_mass = 2.0 * area * SKIN_AREAL_DENSITY
+            else:
+                # A membrane has no bending member of its own; its loads go into
+                # whatever strut it hangs from.  It pays for a heavier, tougher
+                # skin instead, because it is the structure.
+                spar_mass = 0.0
+                skin_mass = 2.4 * area * SKIN_AREAL_DENSITY
             s.mass = spar_mass + skin_mass
             budget.structure += spar_mass
             budget.skin += skin_mass
@@ -414,6 +444,20 @@ def build(genome: Genome) -> Phenotype:
                                           s.surface.u))
             if s.kind == WING_KIND:
                 wing_area += area
+        elif s.kind == BELL:
+            # A contracting cavity.  Its wall must flex, so it is thin and
+            # elastomeric rather than a rigid pressure shell.
+            wall = max(0.35 * hull_wall(s.radius), 0.0012)
+            s.mass = structure.hull_mass(
+                radius=s.radius, wall=wall, length=s.length, material=mat
+            )
+            budget.structure += s.mass
+            s.volume = math.pi * s.radius**2 * s.length
+            s.bell_volume = s.volume
+            s.orifice_area = max(
+                math.pi * s.radius**2 * float(np.clip(s.part.jet_area_ratio, 0.02, 0.9)),
+                1e-5,
+            )
         elif s.kind in (HULL, BALLAST):
             wall = hull_wall(s.radius)
             s.mass = structure.hull_mass(
