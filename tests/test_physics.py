@@ -393,6 +393,54 @@ def test_machine_does_not_collide_with_itself() -> None:
     check("and reaches it", env._touching_ground(), f"ncon={env.data.ncon}")
 
 
+def test_air_segment_can_be_scored() -> None:
+    """The air score's ceiling must be set by aerodynamics, not by the drop.
+
+    Every air term is multiplied by the fraction of the episode spent airborne.
+    With the old spawn -- 6 m altitude, zero airspeed -- that fraction was
+    free-fall time over segment length, measured at 0.136 to 0.173 across all
+    five plans, so the air score could not exceed about 0.15 however well a
+    machine flew, and it did not vary with wing loading at all.  The search was
+    being asked to optimise a number it could barely move.
+    """
+    print("\nenv: the air segment is winnable")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    fractions, loadings, launches = [], [], []
+    for plan in BODY_PLANS.values():
+        p = build(plan())
+        env = TriphibianEnv(p)
+        env.reset(Domain.AIR, randomise=False)
+        launches.append(env.launch_speed)
+        loadings.append(p.mass * 9.80665 / max(p.wing_area, 1e-3))
+        steps = int(6.0 / env.timestep)
+        aloft = 0
+        for _ in range(steps):
+            env.step(env.cpg.command(env.cpg.base, env.data.time))
+            if env.depth() < -0.3 and not env._touching_ground():
+                aloft += 1
+        fractions.append(aloft / steps)
+
+    check(
+        "an untrained machine is airborne for a scorable share of the segment",
+        min(fractions) > 0.30,
+        f"airborne fraction {min(fractions):.2f}..{max(fractions):.2f}",
+    )
+    check(
+        "the launch is each design's own trim speed, not one number",
+        max(launches) - min(launches) > 4.0,
+        f"{min(launches):.1f}..{max(launches):.1f} m/s over W/S "
+        f"{min(loadings):.0f}..{max(loadings):.0f} N/m^2",
+    )
+    # A heavier-loaded design must be launched faster: that is what trim means.
+    order = np.argsort(loadings)
+    v = np.array(launches)[order]
+    check("launch speed rises with wing loading", bool(np.all(np.diff(v) >= -1e-9)),
+          " ".join(f"{x:.1f}" for x in v))
+
+
 def test_free_surface_continuity() -> None:
     """Submerged fraction must sweep smoothly from 0 to 1 across the surface."""
     print("\nmedium: free surface")
@@ -561,6 +609,7 @@ def main() -> int:
     test_generated_bodies_reach_the_fluid()
     test_land_domain_is_reachable()
     test_machine_does_not_collide_with_itself()
+    test_air_segment_can_be_scored()
     test_free_surface_continuity()
     test_added_mass_dominates_in_water()
     test_lev_extends_stall()

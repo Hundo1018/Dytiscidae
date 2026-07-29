@@ -232,13 +232,33 @@ def evaluate_tier0(p: Phenotype, spec: MissionSpec | None = None) -> MissionResu
 class TriphibianEnv:
     """A compiled machine in the triphibian world, steppable by a controller."""
 
-    #: Spawn poses per domain.  Air is well clear of the surface, water is deep
-    #: enough that the free surface is not doing the work, land is up the beach.
+    #: Spawn poses per domain.  Water is deep enough that the free surface is
+    #: not doing the work, land is up the beach (the exact height is derived
+    #: from the machine, see ``_clear_of_terrain``).
+    #:
+    #: Air is a *launch*, not a drop, and the difference decided the whole air
+    #: score.  The old spawn released the machine at 6 m with zero airspeed:
+    #: 1.1 s of free fall inside an 8 s segment, so the airborne fraction --
+    #: which every air term is multiplied by -- could not exceed 0.15 however
+    #: well the thing flew.  Measured across all five plans it was 0.136 to
+    #: 0.173, and the observed air scores were 0.035 to 0.044.  The ceiling was
+    #: set by the height of the drop, not by aerodynamics, so the search was
+    #: being asked to optimise a number it could barely move.
+    #:
+    #: A flight test does not start with the aircraft at rest in mid-air.  The
+    #: launch is deliberately identical for every design -- a per-design trim
+    #: speed would hand a tiny-winged machine a large free velocity and the
+    #: speed term would pay it for that.
     SPAWN = {
-        Domain.AIR: (-8.0, 0.0, 6.0),
+        Domain.AIR: (-40.0, 0.0, 30.0),
         Domain.WATER: (-8.0, 0.0, -4.0),
         Domain.LAND: (15.0, 0.0, 0.9),
     }
+
+    #: Bounds on the launch airspeed, m/s.  Outside this band the quasi-steady
+    #: coefficients are extrapolating and the design is not one this mission is
+    #: about anyway.
+    LAUNCH_SPEED_RANGE = (6.0, 30.0)
 
     def __init__(
         self,
@@ -318,10 +338,40 @@ class TriphibianEnv:
             self.data.qpos[3:7] = (1.0, 0.0, 0.0, 0.0)
             if domain is Domain.LAND:
                 self.data.qpos[2] = self._clear_of_terrain(x, y, z)
+        if domain is Domain.AIR and self.model.nv >= 6:
+            # Free joint velocity is [linear, angular] in the world frame, and
+            # the spawn attitude is identity, so body +x is world +x.
+            self.data.qvel[0] = self.launch_speed
         self.solver.reset()
         self.cpg.reset()
         self.budget.reset()
         self._mj.mj_forward(self.model, self.data)
+
+    @property
+    def launch_speed(self) -> float:
+        """Airspeed the air segment begins at, m/s: this design's own trim speed.
+
+        ``V = sqrt(2 W / (rho S CL))`` at CL = 0.9, so by construction the
+        launch is the condition at which *this* machine's surfaces balance its
+        weight.  A single fixed launch speed cannot do that job: measured
+        against a static pitch sweep, this world's plans reach L/W = 1 anywhere
+        between 16 and 24 m/s, so any one number is far above some designs'
+        flight speed and far below others'.  Launching everyone at 10 m/s meant
+        launching everyone below their trim speed, and none of them could hold
+        altitude no matter how well they were controlled.
+
+        This is not a gift.  Being placed at trim speed says nothing about
+        whether a machine can *stay* there -- it still has to overcome its own
+        drag, stay the right way up, and not shake itself apart, and a design
+        with a small wing gets a correspondingly high launch speed and a
+        correspondingly brutal drag bill to pay for it.
+        """
+        from ..physics.medium import AIR
+
+        s = max(self.p.wing_area, 1e-3)
+        v = math.sqrt(2.0 * self.p.mass * GRAVITY / (AIR.rho * s * 0.9))
+        lo, hi = self.LAUNCH_SPEED_RANGE
+        return float(np.clip(v, lo, hi))
 
     def _clear_of_terrain(self, x: float, y: float, z: float, gap: float = 0.05) -> float:
         """Raise a land spawn until the machine's lowest geometry clears ground.
@@ -545,7 +595,13 @@ class TriphibianEnv:
             else:
                 sink = 9.9
             flight = float(np.clip(1.0 - sink / 1.5, 0.0, 1.0))
-            speed = float(np.clip(res.mean_speed / 8.0, 0.0, 1.0))
+            # Speed is scored against this design's own launch, not against a
+            # fixed 8 m/s.  With the launch set to each machine's trim speed, an
+            # absolute threshold would hand full marks to every design that
+            # simply had a small wing, since a small wing means a fast launch.
+            # Measured this way the term asks whether the machine *kept* the
+            # speed it was given, which is what sustaining flight means.
+            speed = float(np.clip(res.mean_speed / max(self.launch_speed, 1e-6), 0.0, 1.0))
             res.altitude_held = flight
             # Every term is gated on actually being up there.
             return float(frac * (0.55 * flight + 0.25 + 0.2 * speed))
