@@ -96,6 +96,7 @@ def spar_check(
     material: Material,
     load_factor: float = 3.0,
     cycles: float = 1e5,
+    generable_lift_n: float | None = None,
     report: StructuralReport | None = None,
 ) -> Check:
     """Root bending of a wing spar under an elliptically distributed lift.
@@ -111,6 +112,18 @@ def spar_check(
     _, _, z = tube_section(outer_d, wall)
     if z <= 0:
         z = 1e-12
+
+    # A surface cannot be broken by a load it is incapable of generating.
+    #
+    # Sizing every spar against "the share of vehicle weight this surface would
+    # have to lift" assumes the machine flies.  A medusa does not fly; its
+    # tentacles will never see flight loads, and failing it for not surviving
+    # them deletes an entire body plan for a load case that cannot occur.  The
+    # honest bound is the smaller of what the surface must carry and what it
+    # can physically produce at its maximum credible dynamic pressure.
+    if generable_lift_n is not None:
+        lift_n = min(lift_n, generable_lift_n)
+
     l_semi = lift_n * load_factor / 2.0
     moment = l_semi * semi_span * 4.0 / (3.0 * math.pi)
     sigma = moment / z
@@ -174,6 +187,7 @@ def hydrodynamic_sweep_check(
     material: Material,
     min_tip_speed: float = 1.5,
     drag_coefficient: float = 1.9,
+    compliant: bool = False,
     report: StructuralReport | None = None,
 ) -> Check:
     """Root bending of a surface swept through *water*.
@@ -199,6 +213,16 @@ def hydrodynamic_sweep_check(
     c = np.asarray(chord_distribution, float)
     integral = float(np.trapezoid(c * r**3, r)) if len(r) > 1 else 0.0
     _, _, z = tube_section(outer_d, wall)
+
+    # A compliant surface sheds load instead of carrying it.  A fish fin, a
+    # jellyfish tentacle and a bat membrane all deflect out of the flow as
+    # pressure rises, so the force they transmit to their root saturates far
+    # below what a rigid plate of the same area would.  Applying the rigid
+    # cantilever coefficient to them declares every non-avian body plan
+    # structurally impossible -- which is the same mistake as checking a wing
+    # spar in air and calling the job done, made in the opposite direction.
+    if compliant:
+        drag_coefficient *= 0.35
 
     # Checked at the sweep rate needed for *useful swimming*, not at the air
     # flap frequency.  Applying air kinematics underwater is what the first
@@ -227,7 +251,7 @@ def hydrodynamic_sweep_check(
 
 def max_sweep_tip_speed(
     *, chord_distribution, span_stations, span: float, outer_d: float, wall: float,
-    material: Material, drag_coefficient: float = 1.9,
+    material: Material, drag_coefficient: float = 1.9, compliant: bool = False,
 ) -> float:
     """Fastest this surface may be swept through water, m/s at the tip.
 
@@ -241,6 +265,16 @@ def max_sweep_tip_speed(
     c = np.asarray(chord_distribution, float)
     integral = float(np.trapezoid(c * r**3, r)) if len(r) > 1 else 0.0
     _, _, z = tube_section(outer_d, wall)
+
+    # A compliant surface sheds load instead of carrying it.  A fish fin, a
+    # jellyfish tentacle and a bat membrane all deflect out of the flow as
+    # pressure rises, so the force they transmit to their root saturates far
+    # below what a rigid plate of the same area would.  Applying the rigid
+    # cantilever coefficient to them declares every non-avian body plan
+    # structurally impossible -- which is the same mistake as checking a wing
+    # spar in air and calling the job done, made in the opposite direction.
+    if compliant:
+        drag_coefficient *= 0.35
     if integral <= 0 or z <= 0:
         return 0.0
     allow_moment = material.allowable_stress(cycles=1e5) * z

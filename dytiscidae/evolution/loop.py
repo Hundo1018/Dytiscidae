@@ -32,7 +32,7 @@ import numpy as np
 from ..control.cpg import CPGParams, Policy
 from ..core.genome import Genome, crossover, mutate, random_genome
 from ..core.phenotype import build
-from ..core.reference import reference_variants
+from ..core.bodyplans import seed_population
 from ..envs.evaluate import (
     BD_AXES,
     Controller,
@@ -74,7 +74,7 @@ class SearchConfig:
     n_modes: int = 4
 
     # Seeding
-    n_reference_seeds: int = 12
+    n_reference_seeds: int = 20
     n_random_seeds: int = 8
 
     # Output
@@ -145,7 +145,11 @@ def evaluate_candidate(
 def seed_archive(state: SearchState, spec: MissionSpec) -> None:
     """Populate the archive with the reference design and its neighbourhood."""
     cfg = state.config
-    seeds: list[Genome] = list(reference_variants(state.rng, cfg.n_reference_seeds))
+    # Round-robin over every archetype, then random graphs.  Seeding only from
+    # one plan is what produced an archive of nothing but bilateral flappers:
+    # body plans are separated by valleys that mutation does not cross, so an
+    # unseeded plan is not merely rare, it is unreachable.
+    seeds: list[Genome] = list(seed_population(state.rng, cfg.n_reference_seeds))
     seeds += [random_genome(state.rng) for _ in range(cfg.n_random_seeds)]
 
     for i, g in enumerate(seeds):
@@ -170,6 +174,7 @@ def _meta(pheno, result, ctrl) -> dict:
         "battery_wh": round(pheno.genome.battery_wh, 1),
         "flap_hz": round(pheno.genome.flap_frequency, 2),
         "dof": pheno.n_actuated,
+        "body_plan": (pheno.genome.lineage[0] if pheno.genome.lineage else "?"),
         "feasible": bool(pheno.report.ok),
         "margin": round(pheno.report.min_margin, 3),
         "worst_check": pheno.report.worst.name if pheno.report.worst else "",

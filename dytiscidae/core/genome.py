@@ -367,6 +367,68 @@ def mut_edge_placement(g: Genome, rng: np.random.Generator) -> bool:
     return True
 
 
+def mut_radial_symmetry(g: Genome, rng: np.random.Generator) -> bool:
+    """Change how many times an attachment is replicated around its parent.
+
+    The single highest-leverage structural gene in the encoding.  Going from
+    ``radial=1`` to ``radial=6`` turns a bilateral machine into a medusa in one
+    step; a search that can only mirror will never find one, no matter how long
+    it runs, because every intermediate is a worse bilateral machine.
+    """
+    if not g.edges:
+        return False
+    e = g.edges[int(rng.integers(len(g.edges)))]
+    if rng.random() < 0.45:
+        e.radial = int(np.clip(e.radial + rng.choice([-2, -1, 1, 2]), 1, 8))
+    else:
+        e.radial = int(rng.choice([1, 2, 3, 4, 5, 6, 8]))
+    if e.radial > 1:
+        e.reflect = False  # radial subsumes mirroring
+    return True
+
+
+def mut_phase_gradient(g: Genome, rng: np.random.Generator) -> bool:
+    """Shift the oscillator phases, which is what turns flapping into swimming.
+
+    A serial chain of segments whose phases advance along the body produces a
+    travelling wave, and a travelling wave sheds a reverse Karman street, which
+    is thrust.  With a fixed phase pattern this whole family of gaits is
+    unreachable; with this operator it is one mutation away.
+    """
+    if not g.parts:
+        return False
+    roll = rng.random()
+    if roll < 0.5:
+        # A coherent gradient across every part: the travelling-wave move.
+        step = float(rng.uniform(-1.4, 1.4))
+        for i, part in enumerate(g.parts):
+            part.phase_offset = float((part.phase_offset + i * step) % (2 * math.pi))
+    else:
+        part = g.parts[int(rng.integers(len(g.parts)))]
+        part.phase_offset = float((part.phase_offset + rng.normal(0, 0.9)) % (2 * math.pi))
+    return True
+
+
+def mut_jet(g: Genome, rng: np.random.Generator) -> bool:
+    """Tune a bell's nozzle and stroke.
+
+    Thrust goes as ``Q^2 / A``, so a smaller orifice is better at fixed flow but
+    costs pressure and therefore actuator work.  There is a real optimum and it
+    is not obvious, which makes it worth a dedicated operator.
+    """
+    bells = [p for p in g.parts if p.kind == BELL]
+    if not bells:
+        return False
+    part = bells[int(rng.integers(len(bells)))]
+    if rng.random() < 0.5:
+        part.jet_area_ratio = float(np.clip(part.jet_area_ratio * math.exp(rng.normal(0, 0.35)),
+                                            0.02, 0.9))
+    else:
+        part.stroke_fraction = float(np.clip(part.stroke_fraction + rng.normal(0, 0.12),
+                                             0.05, 0.8))
+    return True
+
+
 def mut_edge_topology(g: Genome, rng: np.random.Generator) -> bool:
     """Rewire, reflect, or change the recursion depth of an attachment.
 
@@ -394,7 +456,10 @@ def mut_add_part(g: Genome, rng: np.random.Generator) -> bool:
     """Grow a new module and attach it somewhere."""
     if len(g.parts) >= 8:
         return False
-    kind = str(rng.choice(PART_KINDS, p=[0.08, 0.18, 0.24, 0.24, 0.16, 0.10]))
+    kind = str(rng.choice(
+        PART_KINDS,
+        p=[0.05, 0.13, 0.15, 0.15, 0.10, 0.06, 0.14, 0.10, 0.12],
+    ))
     p = Part(
         kind=kind,
         length=float(rng.uniform(0.06, 0.4)),
@@ -411,6 +476,9 @@ def mut_add_part(g: Genome, rng: np.random.Generator) -> bool:
         gear_ratio=float(rng.uniform(1.0, 40.0)),
         sealed=bool(rng.random() < 0.7),
         dry_fraction=float(rng.uniform(0.0, 0.9)),
+        phase_offset=float(rng.uniform(0.0, 2 * math.pi)),
+        jet_area_ratio=float(rng.uniform(0.05, 0.5)),
+        stroke_fraction=float(rng.uniform(0.15, 0.6)),
     )
     n = np.linalg.norm(p.joint_axis)
     p.joint_axis = p.joint_axis / n if n > 1e-6 else np.array([0.0, 1.0, 0.0])
@@ -429,7 +497,8 @@ def mut_add_part(g: Genome, rng: np.random.Generator) -> bool:
             azimuth=float(rng.uniform(-math.pi, math.pi)),
             elevation=float(rng.uniform(-1.0, 1.0)),
             scale=float(rng.uniform(0.5, 1.1)),
-            reflect=bool(rng.random() < 0.6),
+            reflect=bool(rng.random() < 0.45),
+            radial=int(rng.choice([1, 1, 1, 2, 3, 4, 6])),
             recursion=int(rng.integers(1, 3)),
         )
     )
@@ -541,6 +610,9 @@ def mut_scale(g: Genome, rng: np.random.Generator) -> bool:
 
 
 MUTATION_OPERATORS: dict[str, callable] = {
+    "radial_symmetry": mut_radial_symmetry,
+    "phase_gradient": mut_phase_gradient,
+    "jet": mut_jet,
     "part_dimensions": mut_part_dimensions,
     "joint": mut_joint,
     "actuator": mut_actuator,
@@ -560,7 +632,10 @@ MUTATION_OPERATORS: dict[str, callable] = {
 #: Operators that change the graph rather than a value.  The curator throttles
 #: these separately: structural moves have much higher variance, so they are
 #: worth more early and less once the archive is dense.
-STRUCTURAL_OPERATORS = {"edge_topology", "add_part", "remove_part", "part_kind", "cppn_structure"}
+STRUCTURAL_OPERATORS = {
+    "edge_topology", "add_part", "remove_part", "part_kind", "cppn_structure",
+    "radial_symmetry",
+}
 
 
 def mutate(

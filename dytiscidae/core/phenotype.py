@@ -241,6 +241,22 @@ class Phenotype:
         return self.max_span**2 / self.wing_area
 
     @property
+    def is_plausible_flyer(self) -> bool:
+        """Whether flight load cases apply to this design at all.
+
+        Wing loading above ~450 N/m^2 puts the stall speed past 25 m/s, and an
+        aspect ratio below 1.5 means the surfaces are arranged along the body
+        rather than across it -- an eel's fins, not a wing.  Neither machine
+        will ever fly, so sizing its spars for flight loads and its battery for
+        flight power judges it on a mission it does not attempt, and deletes
+        whole body plans from the search for failing a test that never applies.
+
+        Flight *competence* remains a performance outcome measured in
+        simulation.  This only decides which structural load cases are real.
+        """
+        return self.wing_area > 1e-3 and self.wing_loading < 450.0 and self.aspect_ratio > 1.5
+
+    @property
     def density_ratio(self) -> float:
         """Mean density relative to seawater.  1.0 is neutrally buoyant."""
         return self.mass / max(self.buoyant_volume * SEAWATER.rho, 1e-6)
@@ -442,7 +458,11 @@ def build(genome: Genome) -> Phenotype:
             # elliptic section, so V = (pi/4) * t * c integrated over span.
             s.volume = float(np.trapezoid(0.785 * s.surface.thickness * s.surface.chord**2,
                                           s.surface.u))
-            if s.kind == WING_KIND:
+            # Every surface that makes lift counts, not just the ones called
+            # "wing".  A bat's membrane and a ray's pectoral fin are its wings;
+            # counting only WING made every non-avian plan report zero area and
+            # then fail the flight-power check for having no wing.
+            if s.kind in (WING_KIND, MEMBRANE, FIN):
                 wing_area += area
         elif s.kind == BELL:
             # A contracting cavity.  Its wall must flex, so it is thin and
@@ -571,49 +591,97 @@ def _structural_checks(p: Phenotype) -> None:
     lift_required = mass * GRAVITY
 
     surfaces = [s for s in p.segments if s.is_surface and s.surface is not None]
-    if not surfaces:
+    jets = [s for s in p.segments if s.kind == BELL and s.bell_volume > 0]
+    if not surfaces and not jets:
+        # No surface and no jet means no way to move through any fluid at all.
+        # A design with only a jet is fine -- it is a squid.
         p.report.add(
-            structure.Check("has_lifting_surface", applied=1.0, allowable=0.0,
-                            note="no lifting surface at all")
+            structure.Check("has_propulsor", applied=1.0, allowable=0.0,
+                            note="no lifting surface and no jet")
         )
+    by_index = {seg.index: seg for seg in p.segments}
     for s in surfaces:
-        wall = tube_wall(s.radius)
+        # Which member actually reacts this surface's loads?
+        #
+        # A wing, paddle or fin carries its own spar.  A membrane does not: it is
+        # 2 mm of mylar with a section modulus of 4 mm^3, and checking it against
+        # its own geometry reports a 300x overload for every membraned design --
+        # which silently deleted the bat and the ray from the search entirely.
+        # Its loads go into the digit it is stretched across, and that is the
+        # whole structural point of the architecture.
+        carrier = s
+        if not s.part.has_own_spar:
+            parent = by_index.get(s.parent)
+            if parent is not None and not parent.is_surface:
+                carrier = parent
+            else:
+                continue  # membrane hanging off a membrane: nothing to check
+
+        wall = tube_wall(carrier.radius)
         share = float(np.trapezoid(s.surface.chord, s.surface.u)) / max(p.wing_area, 1e-6)
         share = min(max(share, 0.05), 1.0)
+        if not p.is_plausible_flyer:
+            # Not a flyer: skip the flight load case, but the water sweep and
+            # inertial checks below still apply -- those happen in every domain.
+            structure.hydrodynamic_sweep_check(
+                span=s.span, chord_distribution=s.surface.chord,
+                span_stations=s.surface.u, outer_d=2 * carrier.radius, wall=wall,
+                material=carrier.material, compliant=s.kind in (FIN, MEMBRANE),
+                report=p.report,
+            )
+            p.max_sweep_speed[s.index] = structure.max_sweep_tip_speed(
+                chord_distribution=s.surface.chord, span_stations=s.surface.u,
+                span=s.span, outer_d=2 * carrier.radius, wall=wall,
+                material=carrier.material, compliant=s.kind in (FIN, MEMBRANE),
+            )
+            continue
+        area_s = float(np.trapezoid(s.surface.chord, s.surface.u))
+        # Most lift this surface could ever make: CL_max at a generous airspeed.
+        # 30 m/s is well past anything a machine of this class will reach, so it
+        # is a bound rather than an assumption about how fast it flies.
+        generable = 1.8 * 0.5 * 1.225 * 30.0**2 * area_s
         structure.spar_check(
             lift_n=lift_required * share,
             semi_span=s.span,
-            outer_d=2 * s.radius,
+            outer_d=2 * carrier.radius,
             wall=wall,
-            material=s.material,
+            material=carrier.material,
             load_factor=3.0,
             cycles=1e5,
+            generable_lift_n=generable,
             report=p.report,
         )
         # Every surface that can end up in water gets checked against the
         # hydrodynamic sweep load, which is the largest load case in the whole
         # machine and the one an air-only spar check never sees.
+        # Note ``carrier``, not ``s``.  A membrane has no section of its own to
+        # check -- it is 2 mm of mylar, section modulus 4 mm^3 -- so checking it
+        # against its own geometry reports a 300x overload for every membraned
+        # design and silently deletes the bat and ray body plans from the search.
+        # The load goes into the digit.
         structure.hydrodynamic_sweep_check(
             span=s.span,
             chord_distribution=s.surface.chord,
             span_stations=s.surface.u,
-            outer_d=2 * s.radius,
+            outer_d=2 * carrier.radius,
             wall=wall,
-            material=s.material,
+            material=carrier.material,
+            compliant=s.kind in (FIN, MEMBRANE),
             report=p.report,
         )
         p.max_sweep_speed[s.index] = structure.max_sweep_tip_speed(
             chord_distribution=s.surface.chord, span_stations=s.surface.u,
-            span=s.span, outer_d=2 * s.radius, wall=wall, material=s.material,
+            span=s.span, outer_d=2 * carrier.radius, wall=wall,
+            material=carrier.material, compliant=s.kind in (FIN, MEMBRANE),
         )
         structure.flapping_inertial_check(
             wing_mass=s.mass,
             semi_span=s.span,
             flap_freq=g.flap_frequency,
             flap_amplitude_rad=abs(s.part.joint_range[1] - s.part.joint_range[0]) / 2.0,
-            outer_d=2 * s.radius,
+            outer_d=2 * carrier.radius,
             wall=wall,
-            material=s.material,
+            material=carrier.material,
             report=p.report,
         )
 
@@ -694,16 +762,26 @@ def _structural_checks(p: Phenotype) -> None:
     # downward unless it pumps continuously.  Not a failure, but the power cost
     # of holding depth is charged against it in the mission.
     p.depth_instability = -p.buoyancy_state(0.5).depth_stability(5.0)
-    # Battery must be able to deliver flight power without exceeding its C rate.
-    p.report.add(
-        structure.Check(
-            "battery_power_rating",
-            applied=max(_flight_power_estimate(p), 1.0),
-            allowable=max(p.battery.p_max, 1.0),
-            unit="W",
-            note=f"{p.battery.cell.name} {p.genome.battery_wh:.0f}Wh",
+    # Battery must be able to deliver flight power without exceeding its C rate
+    # -- but only for designs that are actually trying to fly.  A medusa has no
+    # lifting surface and will never leave the water; that is a *performance*
+    # outcome, scored as zero air competence, not a structural impossibility.
+    # Treating it as one made every non-flying body plan infeasible before it
+    # was ever simulated, which is precisely how a search space gets quietly
+    # narrowed back to the one plan its author had in mind.
+    # Wing loading above ~450 N/m^2 puts the stall speed past 25 m/s, which no
+    # machine in this class reaches.  Such a design is not a flyer, so judging
+    # its battery on flight power is judging it on a mission it never flies.
+    if p.is_plausible_flyer:
+        p.report.add(
+            structure.Check(
+                "battery_power_rating",
+                applied=max(_flight_power_estimate(p), 1.0),
+                allowable=max(p.battery.p_max, 1.0),
+                unit="W",
+                note=f"{p.battery.cell.name} {p.genome.battery_wh:.0f}Wh",
+            )
         )
-    )
 
 
 def _survivable_entry_speed(hull: Segment, deadrise_deg: float) -> float:

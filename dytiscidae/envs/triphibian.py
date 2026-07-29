@@ -282,6 +282,24 @@ class TriphibianEnv:
             base_frequency=phenotype.genome.flap_frequency,
             joint_range=self.joint_range if len(ranges) else None,
         )
+        # Seed the oscillator phases from the genome rather than from a fixed
+        # linspace.  Without this ``Part.phase_offset`` is a gene nothing reads,
+        # and a travelling wave along a serial chain -- the entire anguilliform
+        # and batoid family of gaits -- stays unreachable no matter what the
+        # search does.
+        phases = []
+        for name in self.act_names:
+            seg_name = name[:-2]  # strip the "_a" suffix
+            seg = next((x for x in phenotype.segments if x.name == seg_name), None)
+            # Multiplied by chain depth, because ``phase_offset`` is a *phase
+            # advance per link*, not an absolute phase.  Every segment in a
+            # recursive chain shares one Part, so a flat offset makes the whole
+            # chain beat in unison -- which is not a travelling wave, it is a
+            # very long paddle.  Accumulating it down the chain is what makes
+            # the wave travel, and the wave is where the thrust comes from.
+            phases.append(seg.part.phase_offset * max(seg.depth, 1) if seg is not None else 0.0)
+        if phases:
+            self.cpg.base.phase = np.array(phases, float)
         self.actuators = getattr(phenotype, "actuators", [])
         self.budget = PowerBudget(battery=phenotype.battery, actuators=self.actuators)
         self._saved = None
