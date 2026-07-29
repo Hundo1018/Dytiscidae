@@ -12,6 +12,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
+import numpy as np
+
 from .materials import (
     SEALING_MASS_FRACTION,
     SHAFT_SEAL_MASS,
@@ -160,6 +162,91 @@ def flapping_inertial_check(
     if report is not None:
         report.add(c)
     return c
+
+
+def hydrodynamic_sweep_check(
+    *,
+    span: float,
+    chord_distribution,
+    span_stations,
+    outer_d: float,
+    wall: float,
+    material: Material,
+    min_tip_speed: float = 1.5,
+    drag_coefficient: float = 1.9,
+    report: StructuralReport | None = None,
+) -> Check:
+    """Root bending of a surface swept through *water*.
+
+    This is the load case that the lift-based spar check completely misses, and
+    it is by far the largest one a triphibian sees.  A surface sweeping at
+    angular rate ``omega`` presents dynamic pressure ``0.5 * rho * (omega*r)^2``
+    at radius ``r``, so the root moment goes as
+
+        M = 0.5 * rho * omega^2 * Cd * integral( c(r) * r^3 dr )
+
+    -- fourth power in span, square in frequency, and with seawater's density
+    instead of air's.  A 0.3 m paddle sweeping at 2.2 Hz reaches 4 m/s at the
+    tip, which is 8.7 kPa of dynamic pressure and roughly 78 N.m at the root:
+    eighty times what a 16 mm printed spar can carry.
+
+    Checking lift in air and inertia in air, as the earlier version of this
+    report did, passes such a design with margin.  It is the reason the live
+    stress overlay showed 4000% utilisation on a machine whose static report
+    said PASS.
+    """
+    r = np.asarray(span_stations, float)
+    c = np.asarray(chord_distribution, float)
+    integral = float(np.trapezoid(c * r**3, r)) if len(r) > 1 else 0.0
+    _, _, z = tube_section(outer_d, wall)
+
+    # Checked at the sweep rate needed for *useful swimming*, not at the air
+    # flap frequency.  Applying air kinematics underwater is what the first
+    # version of this check did, and it declared every design infeasible --
+    # including ones whose intended behaviour is to hold the wings still in
+    # water and swim on their paddles.  What the surface must survive is being
+    # used, and a tip speed of ~1.5 m/s is what propelling the machine at about
+    # 1 m/s costs.
+    omega = min_tip_speed / max(span, 1e-6)
+    moment = 0.5 * SEAWATER.rho * omega**2 * drag_coefficient * integral
+    sigma = moment / max(z, 1e-12)
+
+    ch = Check(
+        "sweep_load_in_water",
+        applied=sigma,
+        allowable=material.allowable_stress(cycles=1e5),
+        note=(
+            f"at {min_tip_speed:.1f}m/s tip: M={moment:.2f}N.m Z={z*1e9:.0f}mm^3 "
+            f"{material.name.split('(')[0].strip()}"
+        ),
+    )
+    if report is not None:
+        report.add(ch)
+    return ch
+
+
+def max_sweep_tip_speed(
+    *, chord_distribution, span_stations, span: float, outer_d: float, wall: float,
+    material: Material, drag_coefficient: float = 1.9,
+) -> float:
+    """Fastest this surface may be swept through water, m/s at the tip.
+
+    Inverts the sweep check: moment goes as tip speed squared, so the allowable
+    speed goes as the square root of the allowable stress.  The dynamic
+    evaluation compares what the controller actually commands against this, so
+    "can it swim" is a control question and only "can it swim at all" is a
+    geometry one.
+    """
+    r = np.asarray(span_stations, float)
+    c = np.asarray(chord_distribution, float)
+    integral = float(np.trapezoid(c * r**3, r)) if len(r) > 1 else 0.0
+    _, _, z = tube_section(outer_d, wall)
+    if integral <= 0 or z <= 0:
+        return 0.0
+    allow_moment = material.allowable_stress(cycles=1e5) * z
+    # M = 0.5 * rho * (v_tip/span)^2 * Cd * integral
+    omega2 = allow_moment / (0.5 * SEAWATER.rho * drag_coefficient * integral)
+    return float(np.clip(math.sqrt(max(omega2, 0.0)) * span, 0.0, 60.0))
 
 
 def spar_deflection(

@@ -83,8 +83,12 @@ def reference_genome() -> Genome:
     * **Flap frequency 2.2 Hz.**  Inertial root moment scales with f^2, and at
       this span anything above ~3 Hz breaks the spar before it flies.  Large
       flapping animals are all slow for the same reason.
-    * **Carbon spars, 26 mm diameter.**  Printed polymer cannot carry the root
-      moment at this span; this is the one part that must be bought, not made.
+    * **Carbon spars, 26 mm diameter -- on the paddles too.**  Printed polymer
+      cannot carry the root moment at this span.  The paddles are the
+      counter-intuitive part: they are short, so a light printed tube looks
+      adequate, but they work in water where the dynamic pressure of a given
+      sweep is 840x its value in air.  An 8 mm PETG-CF paddle spar limits the
+      sweep to 0.7 m/s at the tip, which is too slow to swim with.
     * **Small hull, big free-flooding fairing.**  The hull is sized for the
       battery and avionics only.  Everything else floods, because sealed volume
       is buoyancy that then has to be carried, pumped out, and structurally
@@ -128,8 +132,12 @@ def reference_genome() -> Genome:
         span=0.30,
         root_chord=0.10,
         length=0.30,
-        radius=0.008,
-        material="petg_cf",
+        # Carbon, and thicker than instinct suggests. A paddle works in water,
+        # where dynamic pressure is 840x what the same motion costs in air, so
+        # it needs a spar in the same class as the wing's -- not the light
+        # printed tube that looks adequate for a 300 mm limb.
+        radius=0.011,
+        material="cfrp",
         surface_cppn=1,
         joint="hinge",
         joint_axis=np.array([0.0, 0.0, 1.0]),  # sweep in the horizontal plane

@@ -217,6 +217,113 @@ def cmd_train(args) -> int:
     return 0
 
 
+def cmd_cohort(args) -> int:
+    """Approve a cohort from an archive, and optionally film each member."""
+    import json
+
+    from ..control.train import train_controller
+    from ..core.phenotype import build
+    from ..evolution.archive import Archive
+    from ..evolution.curator import Curator
+    from ..viz.showcase import render_mission
+
+    run = Path(args.run)
+    archive = Archive.load(run / "archive.pkl")
+    curator = Curator(archive, seed=args.seed)
+    cohort = curator.select_cohort(args.n)
+    if not cohort:
+        print("no feasible, untainted elites to approve")
+        return 1
+
+    rows = curator.cohort_report(cohort)
+    print(f"approved cohort of {len(cohort)} from {len(archive.cells)} elites\n")
+    hdr = f"{'#':>2} {'fitness':>8} {'mass':>7} {'span':>6} {'rho':>5} " \
+          f"{'air':>5} {'water':>5} {'land':>5} {'dof':>4} {'tier':>4}"
+    print(hdr)
+    print("-" * len(hdr))
+    for r in rows:
+        print(f"{r['rank']:>2} {r['fitness']:>8.4f} {r['mass_kg']:>6.1f}kg "
+              f"{r['span_m']:>5.2f}m {r['density_ratio']:>5.2f} {r['air']:>5.2f} "
+              f"{r['water']:>5.2f} {r['land']:>5.2f} {r['dof']:>4} {r['tier']:>4}")
+
+    (run / "cohort.json").write_text(json.dumps(rows, indent=1, default=float))
+    print(f"\nwrote {run / 'cohort.json'}")
+
+    if args.render:
+        for i, elite in enumerate(cohort[: args.render_top]):
+            p = build(elite.genome)
+            controller = None
+            if args.train:
+                print(f"\ntraining controller for cohort member {i}...")
+                controller, res = train_controller(
+                    p, iterations=args.iterations, popsize=args.popsize,
+                    segment_seconds=args.segment_seconds, seed=args.seed,
+                    continuous=True,
+                )
+                print(f"  {res.summary()}")
+            path, mission = render_mission(
+                p, controller, run / "media" / f"cohort{i}_mission.mp4",
+                leg_seconds=args.leg_seconds, cycles=args.cycles, seed=args.seed,
+                label=f"cohort#{i}  {p.mass:.1f}kg",
+            )
+            print(f"  {path}")
+            print(f"  {mission.summary()}")
+    return 0
+
+
+def cmd_showcase(args) -> int:
+    """Train a controller and film one continuous mission with flow and stress."""
+    import pickle
+
+    from ..control.cpg import Policy
+    from ..control.train import train_controller
+    from ..core.phenotype import build
+    from ..core.reference import reference_genome
+    from ..envs.evaluate import Controller
+    from ..envs.triphibian import TriphibianEnv
+    from ..viz.showcase import render_mission
+
+    out = Path(args.run)
+    out.mkdir(parents=True, exist_ok=True)
+    p = build(reference_genome())
+    print(p.summary())
+
+    controller = None
+    if args.controller and Path(args.controller).exists():
+        d = pickle.load(open(args.controller, "rb"))
+        pol = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=4, hidden=16)
+        pol.weights = d["weights"]
+        env = TriphibianEnv(p, seed=args.seed)
+        controller = Controller(params=env.cpg.base, policy=pol, bases=d["bases"])
+        print(f"loaded controller from {args.controller} "
+              f"(score {d.get('baseline', 0):.3f} -> {d.get('score', 0):.3f})")
+    elif args.train:
+        def prog(it, r):
+            print(f"  iter {it:3d} best={r['best']:.4f} mean={r['mean']:.4f} "
+                  f"{r['elapsed']:.0f}s", flush=True)
+
+        controller, res = train_controller(
+            p, iterations=args.iterations, popsize=args.popsize,
+            segment_seconds=args.segment_seconds, seed=args.seed, continuous=True,
+            on_iteration=prog,
+        )
+        print(f"  {res.summary()}")
+
+    path, mission = render_mission(
+        p, controller, out / "mission.mp4", leg_seconds=args.leg_seconds,
+        cycles=args.cycles, seed=args.seed, show_wake=args.wake,
+        show_stress=args.stress,
+    )
+    print(f"\n{path}")
+    print(mission.summary())
+    for leg in mission.legs:
+        print(f"  leg {leg.index+1} {leg.commanded.value:<6s} "
+              f"on-task {leg.on_task_fraction*100:3.0f}%  "
+              f"entry {'-' if leg.entry_time is None else f'{leg.entry_time:.1f}s'}  "
+              f"P {leg.mean_power:.0f} W")
+    return 0
+
+
 def cmd_dashboard(args) -> int:
     from ..viz.dashboard import build_dashboard
 
@@ -290,6 +397,35 @@ def main(argv=None) -> int:
     p.add_argument("--run", default="runs/trained")
     p.add_argument("--no-render", dest="render", action="store_false")
     p.set_defaults(fn=cmd_train, render=True)
+
+    p = sub.add_parser("cohort", help="approve N designs from an archive and film them")
+    p.add_argument("--run", default="runs/latest")
+    p.add_argument("-n", type=int, default=None, help="cohort size; default 6")
+    p.add_argument("--render", action="store_true")
+    p.add_argument("--render-top", type=int, default=3)
+    p.add_argument("--train", action="store_true", help="train a controller per member")
+    p.add_argument("--iterations", type=int, default=18)
+    p.add_argument("--popsize", type=int, default=10)
+    p.add_argument("--segment-seconds", type=float, default=5.0)
+    p.add_argument("--leg-seconds", type=float, default=7.0)
+    p.add_argument("--cycles", type=int, default=1)
+    p.add_argument("--seed", type=int, default=0)
+    p.set_defaults(fn=cmd_cohort)
+
+    p = sub.add_parser("showcase",
+                       help="film one continuous mission with wake and stress overlays")
+    p.add_argument("--run", default="runs/showcase")
+    p.add_argument("--controller", default=None, help="load a trained controller pickle")
+    p.add_argument("--train", action="store_true", help="train one first")
+    p.add_argument("--iterations", type=int, default=22)
+    p.add_argument("--popsize", type=int, default=10)
+    p.add_argument("--segment-seconds", type=float, default=5.0)
+    p.add_argument("--leg-seconds", type=float, default=8.0)
+    p.add_argument("--cycles", type=int, default=1)
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--no-wake", dest="wake", action="store_false")
+    p.add_argument("--no-stress", dest="stress", action="store_false")
+    p.set_defaults(fn=cmd_showcase, wake=True, stress=True)
 
     p = sub.add_parser("dashboard", help="regenerate the dashboard for a run")
     p.add_argument("--run", default="runs/latest")

@@ -286,7 +286,10 @@ def _side_by_side(left: list[np.ndarray], right: list[np.ndarray],
     for i in range(n):
         a = left[min(i, len(left) - 1)]
         b = right[min(i, len(right) - 1)]
-        pad = np.zeros((h, 3, 3), dtype=a.dtype)
+        # Width must stay even: libx264 rejects odd dimensions outright, and
+        # a 3 px divider on two 560 px panels is exactly how you get 1123.
+        pad_w = 4 if (a.shape[1] + b.shape[1]) % 2 == 0 else 3
+        pad = np.zeros((h, pad_w, 3), dtype=a.dtype)
         pad[:, :, :] = (40, 48, 52)
         frame = np.concatenate([a, pad, b], axis=1)
         if have_pil:

@@ -371,6 +371,92 @@ class Curator:
         self.prunes += removed
         return removed
 
+    # ------------------------------------------------------ 7. cohort approval
+
+    #: How many designs are approved per round.
+    #:
+    #: Six, and the number is a judgement rather than a tuning constant.
+    #:
+    #: The archive is a *map*, so an approved cohort should represent the map
+    #: and not merely its peak.  Two slots go to the best verified designs,
+    #: because that is what "best" means; the other four are chosen by
+    #: farthest-point sampling in behaviour space, so the cohort spans the mass
+    #: and buoyancy range that was actually found rather than clustering around
+    #: one body plan.
+    #:
+    #: Below about four the diversity that makes quality-diversity search worth
+    #: running is lost and this becomes an expensive way to do hill climbing.
+    #: Above about eight, Tier-2 verification -- roughly ten times the cost of a
+    #: Tier-1 evaluation -- starts to dominate the budget, and the next round
+    #: gets fewer generations to improve with.
+    COHORT_SIZE = 6
+
+    def select_cohort(
+        self, n: int | None = None, *, require_feasible: bool = True,
+        require_verified: bool = False,
+    ) -> list[Elite]:
+        """Approve a cohort to carry into the next round.
+
+        Not the top *n*.  Taking the top *n* by fitness from a
+        quality-diversity archive reliably returns *n* near-copies of one
+        design, because neighbouring cells hold near-identical genomes -- which
+        throws away the entire reason for keeping a map.
+        """
+        n = n or self.COHORT_SIZE
+        pool = [
+            e for c, e in self.archive.cells.items()
+            if c not in self.archive.tainted
+            and (not require_feasible or e.meta.get("feasible"))
+            and (not require_verified or e.tier >= 2)
+        ]
+        if not pool:
+            return []
+        if len(pool) <= n:
+            return sorted(pool, key=lambda e: -e.fitness)
+
+        by_fitness = sorted(pool, key=lambda e: -e.fitness)
+        chosen = by_fitness[: min(2, n)]
+        remaining = [e for e in pool if e not in chosen]
+
+        # Normalise descriptors so each axis contributes comparably; otherwise
+        # the mass axis (which spans two decades) dominates the distance.
+        lo, hi = self.archive.lo, self.archive.hi
+        rng_ = np.maximum(hi - lo, 1e-9)
+
+        def norm(e: Elite) -> np.ndarray:
+            return (np.asarray(e.descriptor, float) - lo) / rng_
+
+        while len(chosen) < n and remaining:
+            picks = np.array([norm(e) for e in remaining])
+            have = np.array([norm(e) for e in chosen])
+            # Farthest-point: maximise the distance to the nearest already-chosen
+            # design, then break ties on fitness.
+            d = np.linalg.norm(picks[:, None, :] - have[None, :, :], axis=2).min(axis=1)
+            fit = np.array([e.fitness for e in remaining])
+            best = int(np.argmax(d + 0.15 * fit / max(fit.max(), 1e-9)))
+            chosen.append(remaining.pop(best))
+        return chosen
+
+    def cohort_report(self, cohort: list[Elite]) -> list[dict]:
+        """A compact, printable description of an approved cohort."""
+        rows = []
+        for i, e in enumerate(cohort):
+            m = e.meta or {}
+            rows.append({
+                "rank": i,
+                "fitness": round(e.fitness, 4),
+                "tier": e.tier,
+                "cell": list(e.cell),
+                "mass_kg": m.get("mass"),
+                "span_m": m.get("span"),
+                "density_ratio": m.get("density_ratio"),
+                "air": m.get("air"), "water": m.get("water"), "land": m.get("land"),
+                "dof": m.get("dof"),
+                "feasible": m.get("feasible"),
+                "margin": m.get("margin"),
+            })
+        return rows
+
     # ---------------------------------------------------------------- reporting
 
     def generation_report(self) -> dict:
