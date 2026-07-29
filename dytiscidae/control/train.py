@@ -56,23 +56,30 @@ class TrainingResult:
         return self.score - self.baseline_score
 
     def summary(self) -> str:
-        doms = "  ".join(
-            f"{k}={self.per_domain.get(k, 0):.3f}({self.baseline_per_domain.get(k, 0):+.3f}->)"
-            for k in ("air", "water", "land")
+        # The two objectives report different quantities, so show whichever was
+        # actually measured rather than printing three zeros for the other one.
+        keys = [k for k in self.per_domain if not k.startswith("_")]
+        parts = "  ".join(
+            f"{k}={self.baseline_per_domain.get(k, 0):.2f}->{self.per_domain.get(k, 0):.2f}"
+            for k in keys
         )
         return (
             f"score {self.baseline_score:.3f} -> {self.score:.3f} "
-            f"({self.gain:+.3f})   {doms}   {self.wall_time:.0f}s"
+            f"({self.gain:+.3f})   {parts}   {self.wall_time:.0f}s"
         )
 
 
 def _objective(competences: dict[str, float]) -> float:
-    """Mean competence, with the weakest domain weighted extra.
+    """Collapse a competence report to one number.
 
-    ``0.6 * mean + 0.4 * min`` -- enough pressure on the worst domain to stop the
-    optimiser abandoning it, not so much that early progress in any one domain is
-    invisible.
+    The continuous evaluator supplies its own composite under ``_score``; the
+    isolated-leg evaluator gets ``0.6 * mean + 0.4 * min``.  The min term exists
+    because a triphibian that flies well and cannot dive has completed none of
+    the mission, and a plain mean rewards exactly the specialisation this
+    project is trying to avoid.
     """
+    if "_score" in competences:
+        return float(competences["_score"])
     vals = list(competences.values())
     if not vals:
         return 0.0
@@ -90,14 +97,26 @@ def train_controller(
     n_modes: int = 4,
     hidden: int = 16,
     bases: dict | None = None,
+    continuous: bool = True,
+    cycles: int = 1,
     on_iteration=None,
 ):
-    """Optimise a policy for one phenotype.  Returns ``(Controller, TrainingResult)``."""
+    """Optimise a policy for one phenotype.  Returns ``(Controller, TrainingResult)``.
+
+    ``continuous`` selects the objective.  True scores the unbroken mission --
+    the machine has to reach each commanded domain by itself, which is what the
+    task actually is.  False scores each domain in isolation with a reset in
+    between, which is cheaper and less noisy but rewards a competence that does
+    not include getting there.
+    """
     from ..control.cpg import Policy
     from ..envs.evaluate import Controller
     from ..envs.triphibian import DOMAIN_CYCLE, Domain, TriphibianEnv
 
+    from ..envs.triphibian import MissionSpec
+
     t0 = time.time()
+    spec_local = MissionSpec(cycles=cycles)
     env = TriphibianEnv(phenotype, seed=seed)
 
     # The axes have to be identified before anything can be commanded in them.
@@ -109,11 +128,27 @@ def train_controller(
     proto = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=n_modes, hidden=hidden)
     n_w = proto.n_weights
 
-    def evaluate(weights: np.ndarray | None) -> dict[str, float]:
-        pol = None
-        if weights is not None:
-            pol = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=n_modes, hidden=hidden)
-            pol.weights = np.asarray(weights, float)
+    # Structural loading has to be part of the objective, not just the picture:
+    # a controller that reaches every domain by overloading its spars threefold
+    # has not solved the task.
+    probe = None
+    if continuous:
+        from ..physics.wake import attach_wake_probe
+        from ..viz.showcase import StressProbe
+
+        attach_wake_probe(env.solver)  # records the panel forces the probe reads
+        probe = StressProbe(env)
+
+    def make_policy(weights):
+        if weights is None:
+            return None
+        pol = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=n_modes, hidden=hidden)
+        pol.weights = np.asarray(weights, float)
+        return pol
+
+    def evaluate_legs(weights: np.ndarray | None) -> dict[str, float]:
+        """Score each domain in isolation, resetting between them."""
+        pol = make_policy(weights)
         ctrl = Controller(params=env.cpg.base, policy=pol, bases=bases)
         out: dict[str, float] = {}
         for dom in DOMAIN_CYCLE:
@@ -127,6 +162,32 @@ def train_controller(
             )
             out[dom.value] = seg.competence
         return out
+
+    def evaluate_continuous(weights: np.ndarray | None) -> dict[str, float]:
+        """Score the unbroken mission: the machine must *get* to each domain.
+
+        This is the objective that actually matches the task.  Scoring isolated
+        legs rewards a machine that is competent in each domain when placed
+        there, which is a different and much easier thing than one that can
+        cross between them under its own control.
+        """
+        from ..envs.mission import build_schedule, continuous_score, run_continuous
+
+        pol = make_policy(weights)
+        ctrl = Controller(params=env.cpg.base, policy=pol, bases=bases)
+        rng = np.random.default_rng(seed)
+        schedule = build_schedule(spec_local, rng, leg_seconds=segment_seconds)
+        res = run_continuous(env, ctrl, schedule, stress_probe=probe)
+        return {
+            "on_task": res.on_task,
+            "transitions": res.transition_rate,
+            "depth": float(np.clip(res.max_depth / 10.0, 0.0, 1.0)),
+            "survival": 1.0 if res.survived else 0.2,
+            "peak_stress": res.peak_stress,
+            "_score": continuous_score(res, spec_local),
+        }
+
+    evaluate = evaluate_continuous if continuous else evaluate_legs
 
     # The open-loop reference: the same body on its raw rhythm, no policy.
     # Every reported gain is against this, because a controller that does not

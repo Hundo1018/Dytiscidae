@@ -207,6 +207,9 @@ class Phenotype:
     _material_volume: float = 0.0
     #: N/m of buoyancy lost per metre of depth.  Positive means unstable.
     depth_instability: float = 0.0
+    #: Per-segment limit on sweep tip speed in water, m/s.  The controller has
+    #: to stay under it; the dynamic stress probe checks whether it does.
+    max_sweep_speed: dict = field(default_factory=dict)
 
     @property
     def mass(self) -> float:
@@ -542,6 +545,22 @@ def _structural_checks(p: Phenotype) -> None:
             load_factor=3.0,
             cycles=1e5,
             report=p.report,
+        )
+        # Every surface that can end up in water gets checked against the
+        # hydrodynamic sweep load, which is the largest load case in the whole
+        # machine and the one an air-only spar check never sees.
+        structure.hydrodynamic_sweep_check(
+            span=s.span,
+            chord_distribution=s.surface.chord,
+            span_stations=s.surface.u,
+            outer_d=2 * s.radius,
+            wall=wall,
+            material=s.material,
+            report=p.report,
+        )
+        p.max_sweep_speed[s.index] = structure.max_sweep_tip_speed(
+            chord_distribution=s.surface.chord, span_stations=s.surface.u,
+            span=s.span, outer_d=2 * s.radius, wall=wall, material=s.material,
         )
         structure.flapping_inertial_check(
             wing_mass=s.mass,

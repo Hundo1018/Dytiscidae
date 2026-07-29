@@ -329,27 +329,39 @@ class TriphibianEnv:
     def depth(self) -> float:
         return float(self.medium.depth(self.root_pos()[None, :], self.data.time)[0])
 
-    def observation(self) -> np.ndarray:
-        """What the controller sees.
+    def observation(self, target: "Domain | None" = None) -> np.ndarray:
+        """What the controller senses, plus what it is being asked to do.
 
-        Deliberately close to what the real machine could measure: an IMU, a
-        depth sensor, and an estimate of how wet it is.  No global position, no
-        ground-truth velocity in world coordinates.
+        The sensed half is deliberately close to what the real machine could
+        measure: a rate gyro and accelerometer (as a body-frame gravity
+        direction), a depth sensor, and a wetness estimate.  No global position,
+        no ground-truth world velocity -- nothing a real hull could not supply.
+
+        The commanded half is a one-hot of the domain the mission currently
+        wants.  Without it the controller has no way to know whether it is
+        supposed to be climbing away from the water or diving into it, and the
+        best it can do is a single compromise gait.  A mission controller has to
+        be told the mission.
         """
         tw = self.body_twist()
         R = self.data.xmat[self.root_body].reshape(3, 3)
         gravity_body = R.T @ np.array([0.0, 0.0, -1.0])
         d = self.depth()
+        cmd = np.zeros(3)
+        if target is not None:
+            cmd[DOMAIN_CYCLE.index(target)] = 1.0
         return np.concatenate(
             [
                 np.clip(tw[:3] / 5.0, -3, 3),
                 np.clip(tw[3:] / 4.0, -3, 3),
                 gravity_body,
                 [np.tanh(d / 5.0), self.solver.diag.mean_submerged],
+                cmd,
             ]
         )
 
-    OBS_DIM = 11
+    #: 3 linear + 3 angular + 3 gravity + depth + wetness + 3 commanded domain.
+    OBS_DIM = 14
 
     # ------------------------------------------------------------------ stepping
 
@@ -388,7 +400,7 @@ class TriphibianEnv:
 
         for i in range(n_steps):
             if policy is not None and basis is not None and i % control_every == 0:
-                coeffs = policy.act(self.observation())
+                coeffs = policy.act(self.observation(domain))
                 cur = basis.command_params(p, coeffs, self.cpg.n)
             angles = self.cpg.command(cur, self.data.time)
             if not self.step(angles):

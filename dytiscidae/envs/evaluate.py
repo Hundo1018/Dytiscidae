@@ -91,6 +91,12 @@ def _run_transition(
     else:  # land_to_air / land_to_water
         env.reset(Domain.LAND, randomise=False)
 
+    # During a transition the controller is commanded toward the destination.
+    target_dom = {
+        "air_to_water": Domain.WATER, "water_to_air": Domain.AIR,
+        "water_to_land": Domain.LAND, "land_to_water": Domain.WATER,
+        "land_to_air": Domain.AIR, "air_to_land": Domain.LAND,
+    }.get(kind, Domain.AIR)
     basis = controller.basis_for(Domain.WATER if "water" in kind else Domain.AIR)
     n = int(duration / env.timestep)
     control_every = max(1, int(1.0 / (25.0 * env.timestep)))
@@ -102,7 +108,9 @@ def _run_transition(
     for i in range(n):
         if controller.policy is not None and basis is not None and i % control_every == 0:
             cur = basis.command_params(
-                controller.params, controller.policy.act(env.observation()), env.cpg.n
+                controller.params,
+                controller.policy.act(env.observation(target_dom)),
+                env.cpg.n,
             )
         if not env.step(env.cpg.command(cur, env.data.time)):
             return False, peak_entry, "battery exhausted mid-transition"

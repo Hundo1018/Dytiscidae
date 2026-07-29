@@ -337,6 +337,11 @@ class FluidSolver:
         # once at the start of every episode, exactly where it does most damage.
         self._primed = False
         self.diag = FluidDiagnostics()
+        # Opt-in state recording for the wake visualiser.  Off by default: the
+        # search loop calls apply() millions of times and should not pay to
+        # record anything nobody reads.
+        self.record_state = False
+        self.last_state: dict | None = None
         # Scratch buffers reused every step.
         self._nbody = model.nbody
         self._vel6 = np.zeros(6)
@@ -534,6 +539,41 @@ class FluidSolver:
         d.max_alpha = float(np.abs(alpha).max())
         d.max_dynamic_pressure = float(q.max())
         d.slam = slam
+
+        if self.record_state:
+            # Bound circulation, from Kutta-Joukowski: a strip carrying
+            # L' = 0.5 * rho * U^2 * c * CL also satisfies L' = rho * U * Gamma,
+            # so Gamma = 0.5 * CL * U * c.  The wake is shed from *this*, which
+            # is what makes the flow picture derived from the forces in use
+            # rather than drawn alongside them.
+            self.last_state = {
+                "gamma": 0.5 * cl * U * p.chord,
+                "pos": pos.copy(),
+                "chord": p.chord,
+                "dr": p.dr,
+                "kind": p.kind,
+                "span_axis": s_hat.copy(),
+                "chord_axis": c_hat.copy(),
+                "normal_axis": n_hat.copy(),
+                "alpha": alpha.copy(),
+                "submerged": subf.copy(),
+                # Structural force: everything the member physically carries.
+                #
+                # The added-mass gravity compensation is deliberately removed.
+                # It exists only to cancel the weight MuJoCo would otherwise
+                # apply to entrained fluid, and it is not a load any spar
+                # reacts.  Leaving it in is not a small error: a submerged wing
+                # strip carries ~32 kg of added mass, so the compensation is
+                # ~314 N per strip and it swamped the real aerodynamic load,
+                # reporting 3500% structural utilisation for a machine that was
+                # merely floating.
+                "force": F - np.stack(
+                    [np.zeros(p.n), np.zeros(p.n), m_add * GRAVITY], axis=1
+                ),
+                "q": q.copy(),
+                "body_id": p.body_id,
+                "flow_at": lambda xyz, _t=t: self.medium.flow_velocity(np.atleast_2d(xyz), _t),
+            }
         return d
 
     # -------------------------------------------------------------- analysis
