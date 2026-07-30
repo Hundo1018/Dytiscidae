@@ -441,6 +441,59 @@ def test_air_segment_can_be_scored() -> None:
           " ".join(f"{x:.1f}" for x in v))
 
 
+def test_truncated_episodes_cannot_score() -> None:
+    """Ending the episode early must not be a way to win it.
+
+    Found in the archive after 800 generations, not by reading the code.
+    Twenty-one designs with wing loadings up to 480,000 N/m^2 -- objects with
+    no lifting surface at all -- were scoring air competence above 0.9, and
+    twenty of them had an energy margin of -0.98 or worse.  The recipe was to
+    drain the battery on the first step: the two or three samples recorded are
+    all at the launch altitude, so the machine reads as airborne 100% of the
+    time with a measured sink rate of nil and its launch speed intact.
+
+    Every time fraction is now divided by the length the segment was asked for
+    rather than by the samples that happened to exist.
+    """
+    print("\nscore: a segment that stops early scores the stopping")
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, SegmentResult, TriphibianEnv
+
+    env = TriphibianEnv(build(beetle()))
+    dt, dur = env.timestep, 8.0
+    n = int(dur / dt)
+
+    def air(n_samples, sink):
+        r = SegmentResult(domain=Domain.AIR, duration=dur)
+        r.mean_speed = env.launch_speed
+        alts = 30.0 - sink * np.arange(n_samples) * dt
+        return env._score_segment(
+            Domain.AIR, r, np.full(n_samples, -30.0), alts,
+            np.ones(n_samples), np.zeros(n_samples),
+        )
+
+    dead = air(3, 0.0)
+    real = air(n, 0.0)
+    check("a battery that dies on step 3 scores nothing for flight", dead < 0.02,
+          f"{dead:.3f} (this was 1.000)")
+    check("holding altitude for the whole segment still scores full", real > 0.95,
+          f"{real:.3f}")
+    check("and a glide scores less than level flight", air(n, 1.0) < real,
+          f"glide {air(n, 1.0):.3f} vs level {real:.3f}")
+
+    def land(frac):
+        r = SegmentResult(domain=Domain.LAND, duration=dur)
+        r.mean_speed = 0.6
+        k = max(int(frac * n), 2)
+        return env._score_segment(
+            Domain.LAND, r, np.full(k, -0.1), np.full(k, 0.5), np.ones(k), np.ones(k)
+        )
+
+    check("the same hole is closed on land", land(0.02) < 0.05 < land(1.0),
+          f"2% of the segment scores {land(0.02):.3f}, all of it scores {land(1.0):.3f}")
+
+
 def test_free_surface_continuity() -> None:
     """Submerged fraction must sweep smoothly from 0 to 1 across the surface."""
     print("\nmedium: free surface")
@@ -610,6 +663,7 @@ def main() -> int:
     test_land_domain_is_reachable()
     test_machine_does_not_collide_with_itself()
     test_air_segment_can_be_scored()
+    test_truncated_episodes_cannot_score()
     test_free_surface_continuity()
     test_added_mass_dominates_in_water()
     test_lev_extends_stall()

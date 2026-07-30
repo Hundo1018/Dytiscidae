@@ -553,10 +553,32 @@ class TriphibianEnv:
         Each domain is scored on what actually matters there, not on a generic
         "went far" reward -- flying is about not falling, diving is about
         holding depth, walking is about making progress while touching ground.
+
+        Every time-fraction below is divided by the length the segment was
+        *asked* for, never by the number of samples that happened to be
+        recorded.  That distinction is the whole defence against the following
+        exploit, which the search found within 800 generations:
+
+            Build a machine with almost no wing and a battery it drains in a
+            fraction of a second.  The episode terminates on the first step.
+            The two or three samples that were recorded are all at the launch
+            altitude, so the machine was "airborne" 100% of the time, its
+            measured sink rate over that window is nil, and it kept its launch
+            speed.  Air competence: 1.00.
+
+        Twenty-one designs with wing loadings up to 480,000 N/m^2 -- objects
+        with no lifting surface at all -- were scoring above 0.9 this way, and
+        twenty of them had an energy margin of -0.98 or worse.  Dividing by the
+        intended length makes a truncated episode score the truncation.
         """
         if not res.survived or len(alts) == 0:
             return 0.0
         upright = float(np.clip(np.mean(ups), 0.0, 1.0))
+        # Samples the segment should have produced had it run to term.
+        n_want = max(int(round(res.duration / self.timestep)), 1)
+        n_got = len(alts)
+        # Anything that ended early is measured against what it was asked to do.
+        served = min(n_got / n_want, 1.0)
 
         if domain is Domain.AIR:
             # Flight, not slow descent.
@@ -579,9 +601,14 @@ class TriphibianEnv:
             # looser than this scores floating as flying -- which is how a
             # 937 N/m^2 medusa came to outscore a 54 N/m^2 ray at flight.
             airborne = (depths < -0.3) & (np.asarray(contacts) < 0.5)
-            frac = float(np.mean(airborne))
+            frac = float(np.sum(airborne) / n_want)
             if frac < 0.05:
                 return 0.0  # never left the surface: no flight to score
+            # Sink is a rate, and a rate needs a baseline long enough to be one.
+            # Over a tenth of a second every launched object has a sink rate of
+            # nearly zero, including a brick.
+            if np.sum(airborne) * self.timestep < 0.35 * res.duration:
+                return float(frac * 0.25)
 
             # Sink rate measured only over the airborne stretch, and only its
             # later half, by which time a real flyer has settled.  Zero sink is
@@ -609,19 +636,25 @@ class TriphibianEnv:
         if domain is Domain.WATER:
             target = 10.0
             reached = float(np.clip(res.max_depth / target, 0.0, 1.0))
-            submerged = float(np.mean(depths > 0.2))
+            submerged = float(np.sum(depths > 0.2) / n_want)
             # Holding depth matters as much as reaching it: a machine that
             # plummets to 10 m has not demonstrated depth control.
             settled = depths[len(depths) // 2 :]
             err = float(np.mean(np.abs(settled - target))) if len(settled) else target
             res.depth_error = err
             hold = float(np.clip(1.0 - err / target, 0.0, 1.0))
-            return float(0.35 * reached + 0.25 * hold + 0.2 * submerged + 0.2 * upright)
+            # ``served`` closes the same truncation hole here: holding depth and
+            # staying upright for a tenth of a second is not a demonstration of
+            # either, and a machine that ends its episode early has not done the
+            # thing it was asked to do.
+            return served * float(
+                0.35 * reached + 0.25 * hold + 0.2 * submerged + 0.2 * upright
+            )
 
         # LAND
-        contact = res.ground_contact_fraction
+        contact = float(np.sum(np.asarray(contacts) > 0.5) / n_want)
         progress = float(np.clip(res.mean_speed / 0.6, 0.0, 1.0))
-        return float(0.4 * progress + 0.3 * contact + 0.3 * upright)
+        return served * float(0.4 * progress + 0.3 * contact + 0.3 * upright)
 
     # ------------------------------------------------------------- mobility ID
 
