@@ -24,7 +24,12 @@ from pathlib import Path
 import numpy as np
 
 
-@dataclass
+# ``eq=False`` so that ``==`` is identity.  The generated __eq__ compares every
+# field, two of which are numpy arrays, and ``array == array`` is an array --
+# so any use of ``==`` or ``in`` on Elites raised "truth value of an array with
+# more than one element is ambiguous" from deep inside an unrelated call.  That
+# is what it did, five generations into a three-thousand-generation run.
+@dataclass(eq=False)
 class Elite:
     """One occupant of one cell."""
 
@@ -222,7 +227,7 @@ class Archive:
         if len(kept) > self.front_capacity:
             order = np.argsort(-self._crowding(kept))
             kept = [kept[i] for i in order[: self.front_capacity]]
-            if cand not in kept:
+            if not any(e is cand for e in kept):
                 # Survived dominance but lost on crowding: it sits on top of
                 # designs the cell already has.
                 self.fronts[cell] = kept

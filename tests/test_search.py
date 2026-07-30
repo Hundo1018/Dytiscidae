@@ -473,6 +473,8 @@ def test_cells_hold_a_pareto_front_not_a_weighted_sum() -> None:
     purely according to them, and nothing in the run reported which.
     """
     print("\narchive: cells hold a Pareto front")
+    from dataclasses import dataclass, field as dc_field
+
     from dytiscidae.evolution.archive import Archive
     from dytiscidae.evolution.curator import Curator
 
@@ -512,6 +514,47 @@ def test_cells_hold_a_pareto_front_not_a_weighted_sum() -> None:
     spread = max(e.objectives[0] for e in front) - min(e.objectives[0] for e in front)
     check("and what survives spans the trade-off rather than clustering",
           spread > 0.8, f"mission spread {spread:.2f} across the kept front")
+
+    # The overflow branch, with the candidate interior on every objective.
+    #
+    # This crashed a three-thousand-generation run five generations in.  The
+    # branch asked ``if cand not in kept``; ``in`` falls back to ``==``, the
+    # generated dataclass __eq__ compares field tuples, and the comparison
+    # reaches a numpy array -- "truth value of an array with more than one
+    # element is ambiguous", raised from inside an unrelated call.
+    #
+    # Two things had to line up for it, which is why the clean trade-off line
+    # above never saw it.  The candidate must lose on crowding, so it must be
+    # interior on *every* objective -- with random objectives it is almost
+    # always extreme in at least one, gets infinite crowding, and is found by
+    # identity before any comparison happens.  And the genome must itself be a
+    # dataclass holding an array, because tuple comparison short-circuits on the
+    # first unequal field and the genome comes first.  A real Genome is exactly
+    # that, through Part.joint_axis.
+    @dataclass
+    class _ArrayGenome:
+        axis: np.ndarray = dc_field(default_factory=lambda: np.zeros(3))
+
+    c = Archive(axes)
+    for corner in [(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0), (0.9, 0.9, 0.0)]:
+        c.add(_ArrayGenome(), 0.5, [0.5, 0.5], objectives=np.array(corner))
+    st = c.add(_ArrayGenome(), 0.5, [0.5, 0.5], objectives=np.array([0.5, 0.5, 0.5]))
+    check("a candidate that loses on crowding is handled, not raised on",
+          st in ("improved", "rejected"), f"status {st}")
+    check("and the front stays at capacity",
+          len(c.front(c.cell_of([0.5, 0.5]))) == c.front_capacity,
+          f"{len(c.front(c.cell_of([0.5, 0.5])))} designs")
+
+    # Many mutually-competing designs, which is what a real run produces.
+    c = Archive(axes)
+    r2 = np.random.default_rng(0)
+    for _ in range(60):
+        t = r2.random()
+        c.add(_ArrayGenome(), float(r2.random()), [0.5, 0.5],
+              objectives=np.array([t, 1.0 - t, float(r2.random())]))
+    cf = c.front(c.cell_of([0.5, 0.5]))
+    check("sixty mutually-competing designs in one cell do not crash it",
+          0 < len(cf) <= c.front_capacity, f"front holds {len(cf)}")
 
     # Everything kept must be reachable as a parent, or keeping it is pointless.
     cur = Curator(a, seed=0)
