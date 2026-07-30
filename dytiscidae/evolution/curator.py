@@ -273,6 +273,17 @@ class Curator:
         last = self._verified.get(elite.cell, -999)
         return self.archive.generation - last > 60 and elite.fitness > 0.4 * top
 
+    def on_rebin(self) -> None:
+        """Forget everything keyed by cell coordinate.
+
+        A learned-descriptor refit re-files every elite, so a cell index from
+        before the refit names a different region afterwards.  ``_verified``
+        would otherwise suppress Tier-2 promotion for designs that have never
+        been verified, purely because some unrelated design used to sit at those
+        coordinates.
+        """
+        self._verified.clear()
+
     def record_promotion(self, elite: Elite, tier2_fitness: float) -> None:
         self.promotions += 1
         self._verified[elite.cell] = self.archive.generation

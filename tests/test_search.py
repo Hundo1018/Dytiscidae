@@ -378,6 +378,72 @@ def test_cpg_respects_joint_limits() -> None:
           pol.n_weights == 11 * 8 + 8 + 8 * 4 + 4, f"{pol.n_weights}")
 
 
+def test_learned_descriptors_replace_the_hand_picked_axes() -> None:
+    """The archive's axes must be learnable from behaviour, and re-binning must
+    not silently shrink the archive.
+
+    ``BD_AXES`` was a list I wrote -- log mass, density ratio, air competence,
+    water competence -- and each entry silently decided what the search would
+    call a different *kind* of machine.  Two designs differing in a way none of
+    those axes captures collide in one cell and one is discarded, so the axes
+    bound what can be found in the same way a fixed part taxonomy bounds what
+    can be built.
+    """
+    print("\narchive: axes learned from behaviour")
+    from dytiscidae.envs.evaluate import BD_AXES
+    from dytiscidae.evolution.archive import Archive
+    from dytiscidae.evolution.descriptors import FEATURE_DIM, LearnedDescriptors
+
+    rng = np.random.default_rng(0)
+    learner = LearnedDescriptors(n_dims=4, refit_every=100, min_samples=60)
+    archive = Archive(BD_AXES)
+
+    # Three behavioural clusters: an air specialist, a water specialist, a
+    # walker.  Nothing tells the projector they exist.
+    for i in range(300):
+        k = i % 3
+        f = np.zeros(FEATURE_DIM)
+        f[0:3] = np.roll([0.7, 0.2, 0.1], k) + rng.normal(0, 0.05, 3)
+        f[3 + k] = rng.uniform(1, 8)
+        f[6] = rng.uniform(0, 12)
+        f[10 + k] = rng.uniform(20, 300)
+        learner.observe(f)
+        archive.add(
+            genome=f"g{i}", fitness=float(rng.random()),
+            descriptor=np.array([rng.uniform(-0.4, 1.6), rng.uniform(0.15, 1.5),
+                                 rng.random(), rng.random()]),
+            meta={"features": [float(x) for x in f]},
+        )
+
+    before = len(archive.cells)
+    check("the projection fits from the run's own data", learner.fit(), f"{learner.seen} episodes")
+    check("and it is fitted", learner.fitted)
+
+    axes = [(f"latent{i}", float(lo), float(hi), 8) for i, (lo, hi) in enumerate(learner.bounds())]
+    stats = archive.rebin(axes, lambda e: learner.project(np.asarray(e.meta["features"], float)))
+    check("every elite is re-projected, none is dropped by error",
+          stats["before"] == before and stats["after"] > 0.5 * before,
+          f"{stats['before']} -> {stats['after']} ({stats['merged']} merged)")
+    check("the merge count is reported rather than hidden", stats["merged"] >= 0,
+          f"{stats['merged']} designs the new axes call the same")
+
+    # A learned axis with no label is a map with unlabelled coordinates.
+    meanings = learner.report()["axes"]
+    check("each learned axis reports what it is made of", len(meanings) == 4 and all(meanings),
+          meanings[0])
+    # The clusters differ mainly in which domain they spend time in, so at least
+    # one axis must be dominated by a time-fraction feature.
+    check("the axes pick up the structure that is actually in the data",
+          any("time_fraction" in m for m in meanings),
+          " | ".join(m.split()[0] for m in meanings))
+
+    # Re-binning must be idempotent: projecting twice through the same fit
+    # cannot keep merging.
+    again = archive.rebin(axes, lambda e: learner.project(np.asarray(e.meta["features"], float)))
+    check("re-binning twice through one fit changes nothing", again["merged"] == 0,
+          f"{again['merged']} merged on the second pass")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -392,6 +458,7 @@ def main() -> int:
     test_every_mutation_operator_keeps_the_genome_buildable()
     test_phenotype_invariants()
     test_cpg_respects_joint_limits()
+    test_learned_descriptors_replace_the_hand_picked_axes()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

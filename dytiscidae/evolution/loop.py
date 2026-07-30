@@ -46,6 +46,7 @@ from ..ops.telemetry import Telemetry
 from .archive import Archive
 from .cmaes import CMAES, Emitter
 from .curator import Curator
+from .descriptors import LearnedDescriptors, episode_features
 
 
 @dataclass
@@ -80,6 +81,21 @@ class SearchConfig:
     # Output
     run_dir: str = "runs/latest"
     checkpoint_every: int = 20
+
+    #: Learn the archive's axes from behaviour instead of using the hand-picked
+    #: four.  ``BD_AXES`` was a list I wrote -- log mass, density ratio, air
+    #: competence, water competence -- and each entry silently decided what the
+    #: search would consider a different *kind* of machine.  Two designs that
+    #: differ in a way none of those axes captures collide in one cell and one
+    #: is thrown away, so the axes bound what can be found in exactly the way a
+    #: fixed part taxonomy bounds what can be built.
+    #:
+    #: With this on, a generic 16-feature behaviour vector is recorded from
+    #: every episode and a projection of it is fitted from the run's own data
+    #: (AURORA, Cully 2019).  The system decides what behavioural difference
+    #: means, and the definition moves as the population moves.
+    learned_axes: bool = True
+    descriptor_refit_every: int = 400
     event_sample: int = 1
 
 
@@ -94,6 +110,7 @@ class SearchState:
     started: float = field(default_factory=time.time)
     evaluated: int = 0
     tier0_rejected: int = 0
+    descriptors: LearnedDescriptors | None = None
 
 
 # --------------------------------------------------------------------------
@@ -207,7 +224,18 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
         state.curator.note_offspring(parent, "rejected")
         return "rejected"
 
-    bd = behaviour_descriptor(pheno, result)
+    feats = episode_features(result, pheno)
+    if state.descriptors is not None:
+        state.descriptors.observe(feats)
+    # The hand-picked descriptor stays in use until the projection has actually
+    # been fitted.  An unfitted projector returns the first four raw features,
+    # which are time fractions and a speed -- nothing like the ranges the
+    # archive was built with -- so switching before the fit would file every
+    # early design into a corner of the grid for no reason.
+    if state.descriptors is not None and state.descriptors.fitted:
+        bd = state.descriptors.project(feats)
+    else:
+        bd = behaviour_descriptor(pheno, result)
     fit = fitness(pheno, result)
 
     if result.exploit:
@@ -222,7 +250,12 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
 
     cell = state.archive.cell_of(bd)
     previous = state.archive.cells[cell].fitness if cell in state.archive.cells else 0.0
-    status = state.archive.add(genome, fit, bd, _meta(pheno, result, ctrl), tier=result.tier)
+    meta = _meta(pheno, result, ctrl)
+    # The raw feature vector travels with the elite.  A learned projection moves,
+    # and re-binning has to re-project from the features rather than from a
+    # latent coordinate that no longer means the same thing.
+    meta["features"] = [float(x) for x in feats]
+    status = state.archive.add(genome, fit, bd, meta, tier=result.tier)
 
     state.curator.credit(operators, status, fit - previous)
     state.curator.note_offspring(parent, status)
@@ -230,7 +263,7 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
         {"kind": "evaluate", "gen": state.archive.generation, "status": status,
          "fitness": round(fit, 4), "cell": list(cell), "operators": operators,
          "wall": round(result.wall_time, 2), "notes": result.notes[:3],
-         **{k: v for k, v in _meta(pheno, result, ctrl).items() if k != "policy"}}
+         **{k: v for k, v in meta.items() if k not in ("policy", "features")}}
     )
     return status
 
@@ -246,8 +279,12 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
     archive = Archive(BD_AXES)
     curator = Curator(archive, seed=cfg.seed)
     telemetry = Telemetry(cfg.run_dir, event_sample=cfg.event_sample)
+    learned = (
+        LearnedDescriptors(n_dims=len(BD_AXES), refit_every=cfg.descriptor_refit_every)
+        if cfg.learned_axes else None
+    )
     state = SearchState(archive=archive, curator=curator, telemetry=telemetry,
-                        config=cfg, rng=rng)
+                        config=cfg, rng=rng, descriptors=learned)
 
     telemetry.write("generations", {"kind": "run_start", "config": cfg.__dict__,
                                     "spec": spec.__dict__})
@@ -319,6 +356,27 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                     telemetry.event({"kind": "error", "gen": gen, "stage": "tier2",
                                      "error": f"{type(exc).__name__}: {exc}"})
             curator.prune()
+
+        # --- refit the learned descriptor axes -----------------------------
+        # Infrequent on purpose.  A projection that never refits is just a
+        # different set of fixed axes; one that refits constantly destroys the
+        # archive it is supposed to organise, because every refit re-files every
+        # elite and merges any that the new axes call the same.
+        if learned is not None and learned.due_for_refit() and learned.fit():
+            def _reproject(e, _d=learned):
+                f = e.meta.get("features")
+                return _d.project(np.asarray(f, float)) if f else None
+
+            axes = [
+                (f"latent{i}", float(lo), float(hi), 8)
+                for i, (lo, hi) in enumerate(learned.bounds())
+            ]
+            stats = archive.rebin(axes, _reproject)
+            curator.on_rebin()
+            telemetry.event({
+                "kind": "descriptor_refit", "gen": gen, **stats,
+                **learned.report(),
+            })
 
         # --- report -------------------------------------------------------
         report = curator.generation_report()

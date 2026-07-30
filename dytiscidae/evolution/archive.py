@@ -135,6 +135,44 @@ class Archive:
             return "improved"
         return "rejected"
 
+    # ----------------------------------------------------------------- rebin
+
+    def rebin(self, axes: list[tuple[str, float, float, int]], reproject) -> dict:
+        """Rebuild the grid under new axes, re-placing every elite.
+
+        Needed because the descriptor axes are *learned* and therefore move.  An
+        archive built under one projection is not comparable to one built under
+        another, so when the projection is refitted every occupant has to be
+        re-projected and re-filed.
+
+        Collisions are resolved by fitness, which means re-binning can lose
+        elites: two designs that the old axes called different may be the same
+        under the new ones.  That is not a bug to be papered over, it is the
+        cost of letting the system decide what "different" means, and the number
+        lost is returned so a run can report it rather than quietly shrink.
+        """
+        before = len(self.cells)
+        old = self.cells
+        self.axes = axes
+        self.names = [a[0] for a in axes]
+        self.lo = np.array([a[1] for a in axes], float)
+        self.hi = np.array([a[2] for a in axes], float)
+        self.bins = np.array([a[3] for a in axes], int)
+        self.cells = {}
+        for e in old.values():
+            d = reproject(e)
+            if d is None:
+                continue
+            cell = self.cell_of(d)
+            e.descriptor = np.asarray(d, float)
+            e.cell = cell
+            cur = self.cells.get(cell)
+            if cur is None or e.fitness > cur.fitness:
+                self.cells[cell] = e
+        # Taint marks are cell coordinates, which no longer mean anything.
+        self.tainted = {}
+        return {"before": before, "after": len(self.cells), "merged": before - len(self.cells)}
+
     # ------------------------------------------------------------- inspection
 
     def neighbour_density(self, cell: tuple[int, ...], radius: int = 1) -> int:
