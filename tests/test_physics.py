@@ -494,6 +494,98 @@ def test_truncated_episodes_cannot_score() -> None:
           f"2% of the segment scores {land(0.02):.3f}, all of it scores {land(1.0):.3f}")
 
 
+def test_added_mass_is_anisotropic() -> None:
+    """A plate must cost far more to accelerate broadside than edge-on.
+
+    With a flat Ca = 0.5 a plate and a sphere of equal volume cost the same to
+    shake, which erases the reason a fin is a fin: nearly all of a paddle's
+    thrust is the fluid it entrains on the power stroke and does not entrain on
+    the recovery stroke.  A search told those are the same has no reason to
+    invent a paddle.
+    """
+    print("\nfluid: added mass knows which way the body is pointing")
+    rho = SEAWATER.rho
+    xml = """
+    <mujoco><worldbody><body name="b" pos="0 0 -5">
+      <freejoint/><geom type="box" size="0.25 0.25 0.02" density="600"/>
+    </body></worldbody></mujoco>
+    """
+    m = mujoco.MjModel.from_xml_string(xml)
+    d = mujoco.MjData(m)
+    bid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "b")
+    vol = 0.5 * 0.5 * 0.04
+
+    panels = PanelSet(
+        body_id=np.array([bid]),
+        pos_local=np.zeros((1, 3)),
+        span_local=np.array([[1.0, 0.0, 0.0]]),
+        chord_local=np.array([[0.0, -1.0, 0.0]]),
+        chord=np.array([0.5]),
+        dr=np.array([0.5]),
+        volume=np.array([vol]),
+        volume_buoyant=np.array([0.0]),
+        half_height=np.array([0.02]),
+        kind=np.array([BLUFF]),
+        aspect_ratio=np.array([1.0]),
+        cd_bluff=np.array([1.17]),
+        pitch_axis=np.array([0.5]),
+        ext_local=np.array([[0.5, 0.5, 0.04]]),
+    )
+    # One solver, reset between probes: ``apply`` leaves the model's body_mass
+    # inflated by design, so a second solver built on top of it would capture
+    # the first one's added mass as its dry mass.
+    solver = FluidSolver(m, panels, MediumField())
+    dry = float(solver._dry_mass[bid])
+
+    def entrained(vel) -> float:
+        solver.reset()
+        mujoco.mj_resetData(m, d)
+        d.qpos[2] = -5.0
+        d.qvel[:3] = vel
+        mujoco.mj_forward(m, d)
+        d.xfrc_applied[:] = 0.0
+        solver.apply(d, 0.0)
+        out = float(m.body_mass[bid]) - dry
+        solver.reset()
+        return out
+
+    span_on = entrained([2.0, 0.0, 0.0])
+    chord_on = entrained([0.0, 2.0, 0.0])
+    broad = entrained([0.0, 0.0, 2.0])
+
+    check("broadside entrains far more than edge-on", broad > 10.0 * span_on,
+          f"{broad:.1f} kg vs {span_on:.1f} kg ({broad / max(span_on, 1e-9):.0f}x)")
+    check("a square plate is symmetric in its two edge-on directions",
+          abs(span_on - chord_on) < 0.02 * max(span_on, 1e-9),
+          f"{span_on:.2f} vs {chord_on:.2f} kg")
+    # Lamb: a disc of radius R moving normal to itself entrains (8/3) rho R^3.
+    # The square plate circumscribes that disc, so it must exceed it, and not by
+    # a lot -- the area ratio is 4/pi.
+    disc = 8.0 / 3.0 * rho * 0.25**3
+    check("broadside is near the exact disc result", disc < broad < 2.0 * disc,
+          f"{broad:.1f} kg vs {disc:.1f} kg for the inscribed disc")
+    # And a sphere must still come out at the textbook Ca = 0.5.
+    sphere = PanelSet(
+        body_id=np.array([bid]), pos_local=np.zeros((1, 3)),
+        span_local=np.array([[1.0, 0.0, 0.0]]), chord_local=np.array([[0.0, -1.0, 0.0]]),
+        chord=np.array([0.4]), dr=np.array([0.4]), volume=np.array([0.0335]),
+        volume_buoyant=np.array([0.0]), half_height=np.array([0.2]),
+        kind=np.array([BLUFF]), aspect_ratio=np.array([1.0]), cd_bluff=np.array([0.47]),
+        pitch_axis=np.array([0.5]), ext_local=np.array([[0.4, 0.4, 0.4]]),
+    )
+    s2 = FluidSolver(m, sphere, MediumField())
+    dry2 = float(s2._dry_mass[bid])
+    mujoco.mj_resetData(m, d)
+    d.qpos[2] = -5.0
+    d.qvel[:3] = [2.0, 0.0, 0.0]
+    mujoco.mj_forward(m, d)
+    d.xfrc_applied[:] = 0.0
+    s2.apply(d, 0.0)
+    ca = (float(m.body_mass[bid]) - dry2) / (rho * 0.0335)
+    s2.reset()
+    check("a sphere still gets Ca = 0.5", abs(ca - 0.5) < 0.02, f"Ca={ca:.3f}")
+
+
 def test_free_surface_continuity() -> None:
     """Submerged fraction must sweep smoothly from 0 to 1 across the surface."""
     print("\nmedium: free surface")
@@ -664,6 +756,7 @@ def main() -> int:
     test_machine_does_not_collide_with_itself()
     test_air_segment_can_be_scored()
     test_truncated_episodes_cannot_score()
+    test_added_mass_is_anisotropic()
     test_free_surface_continuity()
     test_added_mass_dominates_in_water()
     test_lev_extends_stall()

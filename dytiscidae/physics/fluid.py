@@ -527,11 +527,47 @@ class FluidSolver:
         # that: MuJoCo would otherwise apply gravity to the added mass (added
         # mass has inertia but no weight), and the translational term also has
         # to appear as rotational inertia about the body's CoM.
+        # Bluff added mass is *anisotropic*, and it has to be: a flat body
+        # accelerating broadside entrains far more fluid than the same body
+        # accelerating edge-on, and treating them alike with a flat Ca = 0.5
+        # told the search that a plate and a sphere of equal volume cost the
+        # same to shake.  That erases the whole reason a fin is a fin.
+        #
+        # Directional coefficient from the element's own three extents,
+        #
+        #     Ca_i = 0.5 (e_j + e_k) / (2 e_i)
+        #
+        # which is exact for a sphere (0.5), within 18% of Lamb's result for a
+        # disc moving normal to itself, and correctly small for a slender body
+        # moving along its own axis.  The mass matrix takes a scalar, so what
+        # goes in is the quadratic form of that diagonal tensor along the
+        # instantaneous direction of motion -- the effective entrained mass for
+        # the acceleration the body is actually undergoing.  It is rebuilt every
+        # step, so as the body rotates its added mass changes with it.
         vn = np.einsum("ni,ni->n", v_rel, n_hat)
+        e = np.maximum(p.ext_local, 1e-4)
+        ca_axis = np.clip(
+            0.5 * (e[:, [1, 2, 0]] + e[:, [2, 0, 1]]) / (2.0 * e), 0.05, 10.0
+        )
+        if n_bluff:
+            # Direction cosines in the element's own frame, from the same
+            # relative-velocity direction the drag used.
+            dc = np.stack([
+                np.einsum("ni,ni->n", d_full, s_hat),
+                np.einsum("ni,ni->n", d_full, c_hat),
+                np.einsum("ni,ni->n", d_full, n_hat),
+            ], axis=1) ** 2
+        else:
+            dc = np.zeros((p.n, 3))
+        ca_eff = np.einsum("ni,ni->n", dc, ca_axis)
+        # A body momentarily at rest has no direction of motion to project onto;
+        # fall back to the isotropic mean rather than to zero.
+        ca_eff = np.where(dc.sum(axis=1) > 1e-6, ca_eff, ca_axis.mean(axis=1))
+
         m_add = np.where(
             is_wing,
             rho * np.pi * p.chord**2 * 0.25 * p.dr,
-            0.5 * rho * p.volume,
+            ca_eff * rho * p.volume,
         ) * self.added_mass_scale
 
         m_body = np.zeros(self._nbody)
