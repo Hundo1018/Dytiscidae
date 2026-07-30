@@ -556,6 +556,42 @@ def test_cells_hold_a_pareto_front_not_a_weighted_sum() -> None:
     check("sixty mutually-competing designs in one cell do not crash it",
           0 < len(cf) <= c.front_capacity, f"front holds {len(cf)}")
 
+    # Dropping a cell must drop all of it.  Occupancy lives in two structures
+    # now -- the front and the representative -- and quarantine and pruning both
+    # deleted from ``cells`` alone.  The next candidate landing in that cell
+    # then found a non-empty front with no representative, and the run died on a
+    # KeyError sixty-eight generations in.
+    c = Archive(axes)
+    c.add("a", 0.5, [0.5, 0.5], objectives=np.array([0.5, 1.0, 1.0]))
+    c.add("b", 0.6, [0.5, 0.5], objectives=np.array([0.4, 2.0, 1.0]))
+    cell2 = c.cell_of([0.5, 0.5])
+    check("a cell holds a front and a representative", len(c.front(cell2)) == 2)
+    c.remove(cell2)
+    check("removing a cell empties both", not c.front(cell2) and cell2 not in c.cells,
+          f"front={len(c.front(cell2))} cells={cell2 in c.cells}")
+    st = c.add("d", 0.5, [0.5, 0.5], objectives=np.array([0.5, 1.0, 1.0]))
+    check("and the cell can be refilled afterwards", st == "new", st)
+
+    # The two paths that used to desync it, exercised through the curator.
+    for drop in ("quarantine", "prune"):
+        c = Archive(axes)
+        cur = Curator(c, seed=0)
+        for i in range(3):
+            c.add(f"x{i}", 0.5 + 0.1 * i, [0.5, 0.5],
+                  objectives=np.array([0.5 + 0.1 * i, 1.0, 1.0]))
+        if drop == "quarantine":
+            for _ in range(3):
+                cur.quarantine(np.array([0.5, 0.5]), "test", "g")
+        else:
+            c.remove(c.cell_of([0.5, 0.5]))
+        cell3 = c.cell_of([0.5, 0.5])
+        consistent = (cell3 in c.cells) == bool(c.front(cell3))
+        check(f"{drop} leaves the front and the representative in step", consistent,
+              f"cells={cell3 in c.cells} front={len(c.front(cell3))}")
+        st = c.add("after", 0.9, [0.5, 0.5], objectives=np.array([0.9, 1.0, 1.0]))
+        check(f"and a candidate can still land there after {drop}",
+              st in ("new", "improved", "rejected"), st)
+
     # Everything kept must be reachable as a parent, or keeping it is pointless.
     cur = Curator(a, seed=0)
     a.add("robust2", 0.7, [0.5, 0.5], objectives=np.array([0.55, 3.00, 2.00]))

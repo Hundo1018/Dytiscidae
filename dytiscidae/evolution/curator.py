@@ -321,8 +321,8 @@ class Curator:
         )
         # A cell tainted repeatedly is not a fluke; drop whatever is sitting in
         # it so the search stops breeding from a known trap.
-        if self.archive.tainted[cell] >= 3 and cell in self.archive.cells:
-            del self.archive.cells[cell]
+        if self.archive.tainted[cell] >= 3:
+            self.archive.remove(cell)
 
     # -------------------------------------------------------- 5. regime control
 
@@ -405,7 +405,7 @@ class Curator:
             if neigh and e.fitness < np.percentile(neigh, 25):
                 candidates.append((e.fitness, cell))
         for _, cell in sorted(candidates)[:max_prunes]:
-            del a.cells[cell]
+            a.remove(cell)
             removed += 1
         self.prunes += removed
         return removed

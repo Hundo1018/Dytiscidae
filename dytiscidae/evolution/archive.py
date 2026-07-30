@@ -206,7 +206,12 @@ class Archive:
         # Inherit the cell's exploration bookkeeping: it describes the region,
         # not the individual, and resetting it every time an occupant changes
         # makes every cell look permanently untried to the curator.
-        incumbent = self.cells[cell]
+        incumbent = self.cells.get(cell)
+        if incumbent is None:
+            # A front with no representative should be impossible, but repairing
+            # it is strictly better than raising from inside an evaluation.
+            incumbent = max(front, key=lambda e: e.objectives[0] if e.objectives.size else e.fitness)
+            self.cells[cell] = incumbent
         cand.offspring = incumbent.offspring
         cand.offspring_placed = incumbent.offspring_placed
         cand.improvements = incumbent.improvements + 1
@@ -236,6 +241,22 @@ class Archive:
         self.fronts[cell] = kept
         self.cells[cell] = max(kept, key=lambda e: e.objectives[0])
         return "improved"
+
+    def remove(self, cell: tuple[int, ...]) -> bool:
+        """Empty a cell completely.
+
+        The only supported way to drop a cell.  Occupancy lives in two
+        structures now -- the front and the representative -- and a caller that
+        knows about only one leaves the other behind.  That is exactly what
+        happened: quarantine and pruning both deleted from ``cells`` alone, so
+        the next candidate landing in that cell found a non-empty front with no
+        representative and the run died on a KeyError, sixty-eight generations
+        in.  Deleting through one method is what keeps the two in step.
+        """
+        had = cell in self.cells or cell in self.fronts
+        self.cells.pop(cell, None)
+        self.fronts.pop(cell, None)
+        return had
 
     # ----------------------------------------------------------------- rebin
 
