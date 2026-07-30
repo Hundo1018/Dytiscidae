@@ -342,6 +342,7 @@ def build_model_xml(
     root = scene if scene is not None else scene_xml()
     wb = root.find("worldbody")
     assert wb is not None
+    flap_hz = float(getattr(p.genome, "flap_frequency", 1.5))
 
     segs = p.segments
     if not segs:
@@ -379,22 +380,40 @@ def build_model_xml(
             axis = np.asarray(s.part.joint_axis, float)
             n = np.linalg.norm(axis)
             axis = axis / n if n > 1e-9 else np.array([0.0, 1.0, 0.0])
-            ET.SubElement(
-                body,
-                "joint",
-                {
-                    "name": jname,
-                    "type": "hinge",
-                    "axis": _fmt(axis),
-                    "range": f"{_fmt(min(lo, hi))} {_fmt(max(lo, hi))}",
-                    "damping": _fmt(0.02 + 0.5 * s.mass),
-                    "armature": _fmt(max(1e-4, 0.01 * s.mass)),
-                },
-            )
+            attrs = {
+                "name": jname,
+                "type": "hinge",
+                "axis": _fmt(axis),
+                "range": f"{_fmt(min(lo, hi))} {_fmt(max(lo, hi))}",
+                "damping": _fmt(0.02 + 0.5 * s.mass),
+                "armature": _fmt(max(1e-4, 0.01 * s.mass)),
+            }
+            # Series elasticity.  ``series_stiffness`` is a multiple of the
+            # stiffness that makes this joint resonate at the flap frequency,
+            # k = I w^2, with I the inertia of everything the joint carries.
+            #
+            # A rigid drive pays the whole inertial reversal from the motor
+            # twice a cycle, and that cost goes as f^2 -- which is why every
+            # design in this project converged on about 2 Hz and why nothing
+            # flew.  A tuned spring returns the wing's kinetic energy instead of
+            # the motor braking it and then paying again to accelerate the other
+            # way.  Every insect, every hummingbird and every published flapping
+            # MAV at this scale is built this way, and without the gene that
+            # whole family was not disfavoured by the search, it was unreachable.
+            ratio = float(np.clip(getattr(s.part, "series_stiffness", 0.0), 0.0, 3.0))
+            if ratio > 1e-3 and s.joint_inertia > 1e-9:
+                omega = 2.0 * math.pi * max(flap_hz, 0.05)
+                k = ratio * s.joint_inertia * omega**2
+                attrs["stiffness"] = _fmt(float(np.clip(k, 1e-4, 5e4)))
+                attrs["springref"] = _fmt(0.5 * (lo + hi))
+            ET.SubElement(body, "joint", attrs)
             if s.actuator is not None:
                 aname = f"{s.name}_a"
                 actuator_names.append(aname)
-                act_specs.append((aname, jname, s.actuator.stall_torque))
+                act_specs.append((
+                    aname, jname, s.actuator.stall_torque,
+                    float(getattr(s.part, "drive_compliance", 1.0)),
+                ))
 
         m_extra = extra_root if s.parent < 0 else 0.0
         if not _add_field_geoms(root, body, s, max(s.mass + m_extra, 1e-4)):
@@ -408,20 +427,26 @@ def build_model_xml(
 
     if act_specs:
         act = ET.SubElement(root, "actuator")
-        for name, joint, frange in act_specs:
+        for name, joint, frange, compliance in act_specs:
             fr = float(np.clip(frange, 0.02, 400.0))
             # Position servo: the controller commands angles, MuJoCo produces the
             # torque, and the energy model reads that torque back.  kp is scaled
             # to the actuator's own authority so a small motor cannot fake a
-            # large one through an unrealistically stiff servo.
+            # large one through an unrealistically stiff servo -- and then by
+            # this joint's own ``drive_compliance``, because the multiplier in
+            # front of it was a constant, and a constant there decides whether a
+            # resonant design can exist at all.  Measured on one plan: a spring
+            # tuned to resonance costs 37% more power at the gain that was hard
+            # wired and saves 32% at a seventh of it.
+            gain = float(np.clip(compliance, 0.05, 4.0))
             ET.SubElement(
                 act,
                 "position",
                 {
                     "name": name,
                     "joint": joint,
-                    "kp": _fmt(max(2.0 * fr, 0.5)),
-                    "kv": _fmt(max(0.15 * fr, 0.02)),
+                    "kp": _fmt(max(2.0 * fr * gain, 0.05)),
+                    "kv": _fmt(max(0.15 * fr * gain, 0.005)),
                     "forcerange": f"{_fmt(-fr)} {_fmt(fr)}",
                     "ctrlrange": "-3.2 3.2",
                 },

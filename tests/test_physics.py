@@ -586,6 +586,140 @@ def test_added_mass_is_anisotropic() -> None:
     check("a sphere still gets Ca = 0.5", abs(ca - 0.5) < 0.02, f"Ca={ca:.3f}")
 
 
+def test_bodies_generate_lift_and_a_pitching_moment() -> None:
+    """A body at incidence must produce a force across the stream, not only
+    along it, and a shaped body must produce a moment.
+
+    Bluff elements were given a force along the flow direction only.  That is
+    the resistive part of the load and it is the smaller part: a body at
+    incidence is loaded mainly by the component of the stream *across* its own
+    axis, and that load acts normal to the axis.  Resolving it that way is
+    Munk's slender-body result with the Allen and Perkins cross-flow
+    correction, and without it three things were missing from the search --
+    a body could not contribute lift, so a lifting body was unreachable; a body
+    could not produce a pitching moment, so a tail was pure drag and
+    weathercock stability could not be discovered; and flying sideways cost the
+    same as flying forwards.
+    """
+    print("\nfluid: bodies lift and trim")
+    xml = """
+    <mujoco><option gravity="0 0 0"/><worldbody><body name="b" pos="0 0 200">
+      <freejoint/><geom type="capsule" fromto="0 0 0 0.6 0 0" size="0.05" density="300"/>
+    </body></worldbody></mujoco>
+    """
+    m = mujoco.MjModel.from_xml_string(xml)
+    d = mujoco.MjData(m)
+    bid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "b")
+
+    def probe(aft_h: float, fwd_h: float, deg: float):
+        # +x is the direction of travel, so pos_local 0.45 is forward of the
+        # centre of mass at 0.30 and 0.15 is aft of it.
+        panels = PanelSet(
+            body_id=np.array([bid, bid]),
+            pos_local=np.array([[0.15, 0.0, 0.0], [0.45, 0.0, 0.0]]),
+            span_local=np.tile([1.0, 0.0, 0.0], (2, 1)),
+            chord_local=np.tile([0.0, -1.0, 0.0], (2, 1)),
+            chord=np.array([aft_h, fwd_h]), dr=np.array([0.3, 0.3]),
+            volume=np.array([0.002, 0.002]), volume_buoyant=np.zeros(2),
+            half_height=np.array([aft_h / 2, fwd_h / 2]),
+            kind=np.array([BLUFF, BLUFF]), aspect_ratio=np.ones(2),
+            cd_bluff=np.array([0.2, 0.2]), pitch_axis=np.array([0.5, 0.5]),
+            ext_local=np.array([[0.3, aft_h, aft_h], [0.3, fwd_h, fwd_h]]),
+        )
+        solver = FluidSolver(m, panels, MediumField())
+        mujoco.mj_resetData(m, d)
+        d.qpos[2] = 200.0
+        a = math.radians(-deg)  # nose up
+        d.qpos[3:7] = (math.cos(a / 2), 0.0, math.sin(a / 2), 0.0)
+        d.qvel[:3] = (25.0, 0.0, 0.0)
+        mujoco.mj_forward(m, d)
+        d.xfrc_applied[:] = 0.0
+        solver.apply(d, 0.0)
+        out = (float(-d.xfrc_applied[bid, 0]), float(d.xfrc_applied[bid, 2]),
+               float(d.xfrc_applied[bid, 4]))
+        solver.reset()
+        return out
+
+    drag0, lift0, _ = probe(0.1, 0.1, 0.0)
+    drag20, lift20, _ = probe(0.1, 0.1, 20.0)
+    check("a body at zero incidence makes drag and no lift",
+          drag0 > 0.5 and abs(lift0) < 0.05 * drag0, f"D={drag0:.2f} N L={lift0:+.3f} N")
+    check("a body at incidence makes lift", lift20 > 0.3 * drag20,
+          f"L={lift20:.2f} N D={drag20:.2f} N at 20 deg, L/D={lift20/drag20:.2f}")
+    check("and drag rises with incidence", drag20 > drag0, f"{drag0:.2f} -> {drag20:.2f} N")
+
+    _, _, m_fat_aft = probe(0.16, 0.05, 20.0)
+    _, _, m_uniform = probe(0.10, 0.10, 20.0)
+    _, _, m_fat_fwd = probe(0.05, 0.16, 20.0)
+    # +y torque pitches the nose down, so for a nose-up body it is restoring.
+    check("a body with its area aft is stable in pitch", m_fat_aft > 0.05,
+          f"{m_fat_aft:+.3f} N.m, nose-down")
+    check("a body with its area forward is unstable", m_fat_fwd < -0.05,
+          f"{m_fat_fwd:+.3f} N.m, nose-up")
+    check("a uniform body is neutral", abs(m_uniform) < 0.01, f"{m_uniform:+.3f} N.m")
+
+
+def test_series_elasticity_needs_a_compliant_drive() -> None:
+    """A spring tuned to resonance must reduce the work the motor does -- and
+    it only can if the drive is allowed to be soft.
+
+    A rigid drive pays the wing's whole inertial reversal from the motor twice
+    per cycle, and that cost goes as f^2.  This is what capped every design in
+    this project near 2 Hz.  A tuned spring returns the wing's kinetic energy
+    instead, which is how every insect and every published flapping MAV at this
+    scale works, and the family was not merely disfavoured before -- with no
+    spring gene it was unreachable.
+
+    Adding the spring alone was not enough, which is the part worth keeping.
+    At the servo gain that used to be hard-wired, a resonant spring costs *more*
+    power than no spring: a position servo commands a trajectory and treats a
+    parallel spring as a disturbance to reject.  The gain was a constant I
+    typed, and it happened to be one at which no resonant design can work.
+    """
+    print("\nactuation: resonance needs a soft drive")
+    from dytiscidae.core.bodyplans import ray
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    def probe(stiffness: float, compliance: float, secs: float = 5.0):
+        g = ray()
+        for part in g.parts:
+            if part.joint != "none" and part.actuated:
+                part.series_stiffness = stiffness
+                part.drive_compliance = compliance
+        env = TriphibianEnv(build(g))
+        env.reset(Domain.AIR, randomise=False)
+        q = []
+        for _ in range(int(secs / env.timestep)):
+            env.step(env.cpg.command(env.cpg.base, env.data.time))
+            q.append(env.data.qpos[7:].copy())
+        q = np.array(q)[len(q) // 2:]
+        swing = float(np.mean(q.max(axis=0) - q.min(axis=0))) if q.size else 0.0
+        return env.budget.mean_power, swing
+
+    rigid, swing_rigid = probe(0.0, 1.0)
+    stiff_spring, _ = probe(1.0, 1.0)
+    tuned, swing_tuned = probe(1.0, 0.3)
+    very_soft, swing_very_soft = probe(1.0, 0.1)
+
+    check("a spring under the old hard-wired gain does not help",
+          stiff_spring > 0.95 * rigid,
+          f"{stiff_spring:.0f} W against {rigid:.0f} W rigid")
+    check("the same spring with a compliant drive costs a fraction of the power",
+          tuned < 0.5 * rigid, f"{tuned:.0f} W against {rigid:.0f} W rigid")
+    # The claim only means anything if the machine is still moving.  A soft
+    # servo can always save power by failing to track, and that is not
+    # resonance, it is a broken actuator -- so the swing has to hold up.
+    check("and it is not saving power by moving less",
+          swing_tuned >= swing_rigid,
+          f"{swing_tuned:.2f} rad against {swing_rigid:.2f} rad rigid")
+    # Past the resonant point the drive really does stop tracking, and the
+    # search has to be able to tell the two regimes apart, so record it.
+    check("while an over-compliant drive does trade swing for power",
+          very_soft < tuned and swing_very_soft < swing_rigid,
+          f"kp x0.1: {very_soft:.0f} W but only {swing_very_soft:.2f} rad")
+
+
 def test_free_surface_continuity() -> None:
     """Submerged fraction must sweep smoothly from 0 to 1 across the surface."""
     print("\nmedium: free surface")
@@ -757,6 +891,8 @@ def main() -> int:
     test_air_segment_can_be_scored()
     test_truncated_episodes_cannot_score()
     test_added_mass_is_anisotropic()
+    test_bodies_generate_lift_and_a_pitching_moment()
+    test_series_elasticity_needs_a_compliant_drive()
     test_free_surface_continuity()
     test_added_mass_dominates_in_water()
     test_lev_extends_stall()

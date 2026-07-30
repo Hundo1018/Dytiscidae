@@ -67,6 +67,14 @@ def _cross3(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     )
 
 
+#: Cross-flow drag coefficient of a blunt body, referenced to the side area it
+#: presents to the cross component of the stream.  1.1 is the circular-cylinder
+#: value across the Reynolds range this machine operates in.  It is deliberately
+#: a different number from ``cd_bluff``, which is the axial coefficient: using
+#: one value for both collapses the resultant back onto the flow direction and
+#: with it the body's lift.
+CD_CROSSFLOW = 1.1
+
 # Kinds of element.
 WING = 0  # a lifting strip: generates lift, induced drag, rotational lift
 BLUFF = 1  # a volume: pressure drag, buoyancy, added mass, no circulation
@@ -471,6 +479,23 @@ class FluidSolver:
         # presents little area nose-on and a lot broadside, so elongation costs
         # what it should and the shape the CPPN generated reaches the dynamics
         # instead of stopping at the mass matrix.
+        # The force is *not* aligned with the flow, and that omission was the
+        # bigger half.  A body at incidence is loaded mainly by the component of
+        # the stream across its own axis, and that load acts normal to the axis,
+        # not downstream.  Resolving it that way -- Munk's slender-body result
+        # with Allen and Perkins' cross-flow correction, the standard missile
+        # aerodynamics treatment -- gives a body three things it did not have:
+        #
+        #   * lift.  A tapered hull at 15 degrees generates a force component
+        #     perpendicular to the freestream.  Without it, only the surfaces
+        #     could ever hold a machine up, and the search had no reason to
+        #     shape a body for flight at all -- a lifting body was unreachable.
+        #   * a pitching moment.  The normal force acts at each slice, so a body
+        #     fat forward and fine aft is unstable and one fat aft is stable.
+        #     This is what makes a tail a tail; before, a tail was drag.
+        #   * a reason to point where it is going.  Cross-flow load exceeds
+        #     axial load for anything slender, so flying sideways is expensive,
+        #     which is the whole basis of weathercock stability.
         n_bluff = int((~is_wing).sum())
         if n_bluff:
             b = ~is_wing
@@ -478,23 +503,44 @@ class FluidSolver:
             U_full_safe = np.maximum(U_full, 1e-6)
             d_full = v_rel / U_full_safe[:, None]
             ex, ey, ez = p.ext_local[:, 0], p.ext_local[:, 1], p.ext_local[:, 2]
-            ps = np.abs(np.einsum("ni,ni->n", d_full, s_hat))
-            pc = np.abs(np.einsum("ni,ni->n", d_full, c_hat))
-            pn = np.abs(np.einsum("ni,ni->n", d_full, n_hat))
-            a_proj = ps * ey * ez + pc * ex * ez + pn * ex * ey
-            # Streamwise extent, for the Reynolds number the skin friction sees.
-            l_stream = np.maximum(ps * ex + pc * ey + pn * ez, 1e-4)
-            q_full = 0.5 * rho * U_full**2
-            re_b = rho * U_full * l_stream / np.maximum(mu, 1e-12)
-            # Pressure drag is referenced to frontal area, skin friction to
-            # wetted area.  Keeping them as separate terms rather than folding
-            # one into the other's coefficient avoids a division by a projected
-            # area that goes to zero for a flat chunk edge-on to the flow.
+
+            # Split the stream into flow along the element's own long axis and
+            # flow across it.  ``s_hat`` is that axis: for a body slice it is
+            # the part's centreline, which is the axis the shape is built about.
+            v_ax = np.einsum("ni,ni->n", v_rel, s_hat)
+            v_axial = v_ax[:, None] * s_hat
+            v_cross = v_rel - v_axial
+            u_cross = np.linalg.norm(v_cross, axis=1)
+            d_cross = v_cross / np.maximum(u_cross, 1e-9)[:, None]
+
+            # Axial: base pressure over the frontal area plus friction over the
+            # wetted area.  Slender bodies are cheap this way round, which is
+            # the point of being slender.
             wetted = 2.0 * (ex * ey + ey * ez + ex * ez)
-            D_b = np.where(
-                b, q_full * (p.cd_bluff * a_proj + skin_friction_cd(re_b) * wetted), 0.0
+            re_b = rho * np.abs(v_ax) * ex / np.maximum(mu, 1e-12)
+            f_axial = (
+                0.5 * rho * np.abs(v_ax) * v_ax
+                * (p.cd_bluff * ey * ez + skin_friction_cd(re_b) * wetted)
             )
-            F += D_b[:, None] * d_full
+
+            # Cross-flow: the side area presented to the cross component, with a
+            # blunt-body coefficient.  1.1 is the standard cross-flow drag of a
+            # circular cylinder at the Reynolds numbers this machine lives at,
+            # and it is a genuinely different number from the streamwise cd --
+            # using one coefficient for both is what collapses the force back
+            # onto the flow direction and loses the lift.
+            pc = np.abs(np.einsum("ni,ni->n", d_cross, c_hat))
+            pn = np.abs(np.einsum("ni,ni->n", d_cross, n_hat))
+            a_side = pc * ex * ez + pn * ex * ey
+            f_cross = 0.5 * rho * u_cross**2 * CD_CROSSFLOW * a_side
+
+            # Both act *along* the relative flow, as the wing branch's drag
+            # does: ``v_rel`` is the fluid's velocity seen from the body, so a
+            # resistive force pushes the body the way the fluid is going.
+            # ``f_axial`` carries its own sign through ``|v_ax| v_ax``.
+            F_b = f_axial[:, None] * s_hat + f_cross[:, None] * d_cross
+            F += np.where(b[:, None], F_b, 0.0)
+            D_b = np.where(b, np.abs(f_axial) + f_cross, 0.0)
             D = D + D_b
 
         # Rotational (Kramer) circulation: the force generated by a strip that

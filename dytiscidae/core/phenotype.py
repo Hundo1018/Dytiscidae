@@ -139,6 +139,9 @@ class Segment:
     #: capsule, is what the mass budget, the buoyancy and the fluid panels read.
     field: object | None = None
     actuator: Actuator | None = None
+    #: Moment of inertia of this segment and everything it carries, about its
+    #: own joint axis.  Sizes the series-elastic spring to resonance.
+    joint_inertia: float = 0.0
 
     @property
     def kind(self) -> str:
@@ -593,6 +596,42 @@ def build(genome: Genome) -> Phenotype:
         world_rot[s.index] = R
         extremes.append(p)
         extremes.append(p + R @ np.array([s.axis_length, 0.0, 0.0]))
+
+    # Moment of inertia of everything distal to each joint, about that joint.
+    # Needed to size a series-elastic spring to resonance: k = I w^2.  Computed
+    # here because this is the only place the offset chain has been resolved
+    # into positions, and a spring sized from the segment alone would be wrong
+    # for any limb that carries another limb.
+    children: dict[int, list[int]] = {}
+    for s in segments:
+        if s.parent >= 0:
+            children.setdefault(s.parent, []).append(s.index)
+    by_index = {s.index: s for s in segments}
+
+    def _subtree(i: int) -> list[int]:
+        out = [i]
+        for c in children.get(i, ()):
+            out.extend(_subtree(c))
+        return out
+
+    for s in segments:
+        origin = world_pos[s.index]
+        axis = world_rot[s.index] @ np.asarray(s.part.joint_axis, float)
+        n = np.linalg.norm(axis)
+        axis = axis / n if n > 1e-9 else np.array([0.0, 1.0, 0.0])
+        total = 0.0
+        for j in _subtree(s.index):
+            d = by_index[j]
+            centroid = world_pos[j] + world_rot[j] @ np.array(
+                [0.5 * d.axis_length, 0.0, 0.0]
+            )
+            r = centroid - origin
+            # Distance from the joint axis, not from the joint origin: mass
+            # sitting on the axis contributes nothing to rotation about it.
+            perp = r - float(r @ axis) * axis
+            m_j = d.mass + (d.actuator.mass if d.actuator is not None else 0.0)
+            total += m_j * float(perp @ perp)
+        s.joint_inertia = float(total)
 
     pts = np.array(extremes) if extremes else np.zeros((1, 3))
     max_span = float(pts[:, 1].max() - pts[:, 1].min())

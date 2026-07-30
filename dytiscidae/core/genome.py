@@ -88,6 +88,42 @@ class Part:
     gear_ratio: float = 4.0
     sealed: bool = True  # does this axis cross the pressure boundary?
 
+    #: Series-elastic spring across this joint, as a multiple of the stiffness
+    #: that would make the joint resonate at the machine's flap frequency.
+    #:
+    #: 0 is a rigid drive: the motor supplies the whole inertial reversal every
+    #: half stroke, and reversal cost scales with f^2, which is what caps
+    #: flapping frequency for anything of this size.  1 is tuned resonance: the
+    #: spring returns the kinetic energy the wing had at mid-stroke instead of
+    #: the motor braking it and then paying to accelerate it the other way,
+    #: which is how every insect, every hummingbird and every published
+    #: flapping micro-air-vehicle at this scale works.  Without this gene the
+    #: entire resonant-drive family was outside the search space -- not
+    #: disfavoured, unreachable.
+    #:
+    #: Expressed as a ratio rather than in N.m/rad so that it means the same
+    #: thing on a 20 g fin and a 2 kg wing.  A raw stiffness would have to be
+    #: rediscovered by mutation for every limb size the search tries, which is
+    #: exactly the kind of parameter that never gets found.
+    series_stiffness: float = 0.0
+
+    #: Stiffness of the position servo driving this joint, as a multiple of the
+    #: default gain.  1.0 is the gain that used to be hard-wired.
+    #:
+    #: This is here because measuring the spring above showed the spring alone
+    #: does nothing.  Under the stiff servo the gain was fixed at, a tuned
+    #: spring changed mean actuator power by -2% at best and +37% at worst: the
+    #: servo simply fights it, because a position servo commands a trajectory
+    #: and a parallel spring is a disturbance to be rejected.  Soften the drive
+    #: and the same spring saves 32%.  So the missing physics was never only the
+    #: spring -- it was that ``kp = 2 * stall_torque`` was a constant I typed,
+    #: and it happened to be a value at which no resonant design can work.
+    #:
+    #: Both genes together let the search find the combination rather than being
+    #: handed one half of it.  A compliant drive is not free: it tracks its
+    #: commanded angle worse, which the mission scores directly.
+    drive_compliance: float = 1.0
+
     #: Fraction of this part's internal volume that is sealed gas rather than
     #: free-flooding.  1.0 is a sealed float, 0.0 is an open fairing that fills
     #: with water.  Applies to every kind: a sealed wing is a buoyancy tank, and
@@ -327,6 +363,34 @@ def mut_part_dimensions(g: Genome, rng: np.random.Generator) -> bool:
         p.span = _jitter(p.span, rng, 0.20, 0.03, 2.5)
         p.root_chord = _jitter(p.root_chord, rng, 0.20, 0.02, 0.9)
     p.dry_fraction = float(np.clip(p.dry_fraction + rng.normal(0, 0.10), 0.0, 1.0))
+    return True
+
+
+def mut_drivetrain(g: Genome, rng: np.random.Generator) -> bool:
+    """Move a joint's series spring and its drive compliance together.
+
+    Together, because separately neither is worth anything.  A tuned spring
+    under a stiff servo costs more power than no spring at all; a soft servo
+    without a spring just tracks badly.  Mutating one at a time makes the
+    resonant combination a two-step uphill walk through a valley, which is the
+    kind of thing a search never finds -- so the operator perturbs both, and
+    sometimes jumps straight to tuned resonance so the region is reachable in
+    one move rather than only by luck.
+    """
+    cand = [p for p in g.parts if p.joint != "none" and p.actuated]
+    if not cand:
+        return False
+    p = cand[int(rng.integers(len(cand)))]
+    if rng.random() < 0.25:
+        # Jump to resonance with a compliant drive: the combination that the
+        # physics says should work, offered as one mutation.
+        p.series_stiffness = float(np.clip(rng.normal(1.0, 0.25), 0.0, 3.0))
+        p.drive_compliance = float(np.clip(rng.lognormal(math.log(0.2), 0.5), 0.05, 4.0))
+    else:
+        p.series_stiffness = float(np.clip(
+            p.series_stiffness + rng.normal(0.0, 0.25), 0.0, 3.0))
+        p.drive_compliance = float(np.clip(
+            p.drive_compliance * float(np.exp(rng.normal(0.0, 0.35))), 0.05, 4.0))
     return True
 
 
@@ -664,6 +728,7 @@ MUTATION_OPERATORS: dict[str, callable] = {
     "remove_part": mut_remove_part,
     "part_kind": mut_part_kind,
     "material": mut_material,
+    "drivetrain": mut_drivetrain,
     "body_field": mut_body_field,
     "cppn_weights": mut_cppn_weights,
     "cppn_structure": mut_cppn_structure,
