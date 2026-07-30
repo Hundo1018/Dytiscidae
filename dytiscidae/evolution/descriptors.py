@@ -118,6 +118,7 @@ class LearnedDescriptors:
     _scale: np.ndarray | None = None
     seen: int = 0
     refits: int = 0
+    _last_refit_at: int = -1
 
     # ---------------------------------------------------------------- record
 
@@ -130,10 +131,19 @@ class LearnedDescriptors:
             self._buffer = self._buffer[-2000:]
 
     def due_for_refit(self) -> bool:
-        return (
-            len(self._buffer) >= self.min_samples
-            and self.seen % max(self.refit_every, 1) == 0
-        )
+        """Whether enough new episodes have arrived to justify a refit.
+
+        Counted as *elapsed since the last refit*, not as ``seen % every == 0``.
+        The modulo version was checked once per generation, so it only fired if
+        the running total happened to land exactly on a multiple -- and with a
+        seeding phase contributing an odd number of episodes first, the total
+        was permanently offset and never landed on one.  A 25-generation run
+        that should have refitted five times refitted zero times, silently, and
+        looked exactly like a run whose axes were simply never learned.
+        """
+        if len(self._buffer) < self.min_samples:
+            return False
+        return self.seen - self._last_refit_at >= max(self.refit_every, 1)
 
     # ------------------------------------------------------------------- fit
 
@@ -159,6 +169,7 @@ class LearnedDescriptors:
             return False
         self._components = Vt[: self.n_dims]
         self.refits += 1
+        self._last_refit_at = self.seen
         return True
 
     @property

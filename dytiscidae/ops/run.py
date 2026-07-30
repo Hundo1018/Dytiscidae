@@ -79,6 +79,8 @@ def cmd_search(args) -> int:
         n_reference_seeds=args.reference_seeds,
         n_random_seeds=args.random_seeds,
         checkpoint_every=args.checkpoint_every,
+        learned_axes=not args.fixed_axes,
+        descriptor_refit_every=args.descriptor_refit_every,
     )
     spec = MissionSpec(
         cycles=args.cycles,
@@ -375,6 +377,10 @@ def main(argv=None) -> int:
     p.add_argument("--cycles", type=int, default=3)
     p.add_argument("--seconds-per-domain", type=float, default=300.0)
     p.add_argument("--depth", type=float, default=10.0)
+    p.add_argument("--fixed-axes", action="store_true",
+                   help="use the hand-picked archive axes instead of learning them")
+    p.add_argument("--descriptor-refit-every", type=int, default=400,
+                   help="episodes between refits of the learned archive axes")
     p.set_defaults(fn=cmd_search)
 
     p = sub.add_parser("skills", help="train the actuator skill library")

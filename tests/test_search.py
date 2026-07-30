@@ -443,6 +443,24 @@ def test_learned_descriptors_replace_the_hand_picked_axes() -> None:
     check("re-binning twice through one fit changes nothing", again["merged"] == 0,
           f"{again['merged']} merged on the second pass")
 
+    # The schedule has to fire on the cadence a real run produces.  It used to
+    # test ``seen % refit_every == 0``, checked once per generation -- so it only
+    # fired if the running total landed exactly on a multiple, and a seeding
+    # phase contributing an odd number of episodes offset the total permanently.
+    # A 25-generation run that should have refitted five times refitted zero
+    # times, and looked identical to a run whose axes were never learned.
+    sched = LearnedDescriptors(n_dims=4, refit_every=20, min_samples=60)
+    fired = 0
+    for _ in range(5):                      # an odd-sized seeding phase
+        sched.observe(rng.normal(0, 1, FEATURE_DIM))
+    for _ in range(40):                     # then generations of four
+        for _ in range(4):
+            sched.observe(rng.normal(0, 1, FEATURE_DIM))
+        if sched.due_for_refit() and sched.fit():
+            fired += 1
+    check("refits fire on the cadence a real run produces", fired >= 5,
+          f"{fired} refits over 165 episodes at one per 20")
+
 
 def main() -> int:
     print("=" * 68)
