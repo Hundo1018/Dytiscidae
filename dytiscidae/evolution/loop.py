@@ -261,6 +261,7 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     meta["objectives"] = {n: round(float(v), 4) for n, v in zip(OBJECTIVE_NAMES, obj)}
     status = state.archive.add(genome, fit, bd, meta, tier=result.tier, objectives=obj)
 
+    state.curator.observe_domains(meta)
     state.curator.credit(operators, status, fit - previous)
     state.curator.note_offspring(parent, status)
     state.telemetry.event(

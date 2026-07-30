@@ -522,6 +522,80 @@ def test_cells_hold_a_pareto_front_not_a_weighted_sum() -> None:
           f"sampled {sorted(picked)} from front {sorted(e.genome for e in a.front(cell))}")
 
 
+def test_intervention_is_triggered_by_evidence_not_a_schedule() -> None:
+    """When to intervene must come from the data, not from a number I typed.
+
+    It used to be two constants: a competence floor of 0.35 below which a
+    domain counted as starved, and a patience of 25 generations before acting.
+    Neither had a basis.  0.35 is not a property of flight and 25 generations is
+    not a property of anything -- they produced behaviour that looked reasonable
+    when I watched a few runs, which is the hand-tuning this project exists to
+    remove.
+
+    Both are gone.  Mission fraction is built on ``min(competences)``, so the
+    weakest domain is the binding constraint by construction and no floor is
+    needed to find it.  Whether it is stalled or merely slow is answered by the
+    record process: under exchangeable draws, the chance that none of the next
+    m beats the best of the first n is exactly n/(n+m).
+    """
+    print("\ncurator: intervention follows the evidence")
+    from dytiscidae.evolution.archive import Archive
+    from dytiscidae.evolution.curator import Curator
+
+    rng = np.random.default_rng(0)
+
+    def fresh() -> Curator:
+        return Curator(Archive([("x", 0.0, 1.0, 4), ("y", 0.0, 1.0, 4)]), seed=0)
+
+    # Still improving: never intervene, however long the run.
+    c = fresh()
+    for i in range(300):
+        c.observe_domains({"air": 0.002 * i, "water": 0.8, "land": 0.7})
+    check("a domain still setting records is left alone",
+          c.plateau_p("air") > c.PLATEAU_ALPHA, f"p={c.plateau_p('air'):.3f} after 300 draws")
+
+    # A hard ceiling, then a drought three times as long as it took to get there.
+    c = fresh()
+    for i in range(100):
+        c.observe_domains({"air": 0.003 * i, "water": 0.8, "land": 0.7})
+    for _ in range(400):
+        c.observe_domains({"air": 0.20 * rng.random(), "water": 0.8, "land": 0.7})
+    check("a genuine plateau is detected", c.plateau_p("air") <= c.PLATEAU_ALPHA,
+          f"p={c.plateau_p('air'):.3f} after 400 draws with no new best")
+
+    # The same ceiling but a short drought: bad luck is not yet evidence.
+    c = fresh()
+    for i in range(100):
+        c.observe_domains({"air": 0.003 * i, "water": 0.8, "land": 0.7})
+    for _ in range(120):
+        c.observe_domains({"air": 0.20 * rng.random(), "water": 0.8, "land": 0.7})
+    check("a short drought does not trigger an intervention",
+          c.plateau_p("air") > c.PLATEAU_ALPHA,
+          f"p={c.plateau_p('air'):.3f} after only 120 draws")
+
+    # And it acts on whichever domain is actually weakest, not one I nominated.
+    c = fresh()
+    for i in range(80):
+        c.observe_domains({"air": 0.9, "water": 0.002 * i, "land": 0.7})
+    for _ in range(400):
+        c.observe_domains({"air": 0.9, "water": 0.10 * rng.random(), "land": 0.7})
+    c.archive.add("e", 0.5, [0.5, 0.5], meta={"air": 0.9, "water": 0.16, "land": 0.7},
+                  objectives=np.array([0.5, 1.0, 1.0]))
+    acute = c.check_famine()
+    check("the binding domain is identified without a threshold",
+          acute == ["water"], f"{acute} from bests "
+          f"{ {k: round(v, 2) for k, v in c.domain_bests().items()} }")
+    check("and the run can say why it intervened",
+          "p=" in c.regime.note and "water" in c.regime.note, c.regime.note[:90])
+
+    # Too early to judge anything.
+    c = fresh()
+    for i in range(4):
+        c.observe_domains({"air": 0.1 * i, "water": 0.8, "land": 0.7})
+    check("nothing is called a drought before there is any history",
+          c.plateau_p("air") == 1.0, f"p={c.plateau_p('air'):.3f} after 4 draws")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -538,6 +612,7 @@ def main() -> int:
     test_cpg_respects_joint_limits()
     test_learned_descriptors_replace_the_hand_picked_axes()
     test_cells_hold_a_pareto_front_not_a_weighted_sum()
+    test_intervention_is_triggered_by_evidence_not_a_schedule()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

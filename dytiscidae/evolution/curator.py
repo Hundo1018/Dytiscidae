@@ -179,6 +179,10 @@ class Curator:
         self.prunes = 0
         self._verified: dict[tuple[int, ...], int] = {}
         self._famine: dict[str, int] = {}
+        #: Per-domain record process: best seen, evaluations drawn, and the
+        #: draw index at which the best was set.  This is what makes the
+        #: intervention decision evidence-based rather than scheduled.
+        self._records: dict[str, dict] = {}
         self.starved_domains: list[str] = []
         self.famine_events: list[dict] = []
         self.log: list[dict] = []
@@ -408,10 +412,22 @@ class Curator:
 
     # ------------------------------------------------- 7. domain famine rescue
 
-    #: A domain is "starved" when the best elite in the archive cannot do it.
-    FAMINE_THRESHOLD = 0.35
-    #: Generations of starvation before the curator intervenes rather than waits.
-    FAMINE_PATIENCE = 25
+    #: Significance level for calling a domain stalled.  See ``plateau_p``.
+    #:
+    #: This replaces two constants that were simply typed: a competence floor of
+    #: 0.35 below which a domain counted as starved, and a patience of 25
+    #: generations before acting on it.  Neither had a basis.  0.35 is not a
+    #: property of flight, and 25 generations is not a property of anything --
+    #: they were numbers that produced behaviour I found reasonable when I
+    #: watched a few runs, which is precisely the hand-tuning this project is
+    #: supposed to be getting rid of.
+    #:
+    #: What replaced them needs no floor at all.  Mission fraction is built on
+    #: ``min(competences)``, so the weakest domain *is* the binding constraint by
+    #: construction -- there is always exactly one worth intervening on, and the
+    #: only real question is whether it is stalled or merely slow.  That question
+    #: has an answer from the data rather than from me.
+    PLATEAU_ALPHA = 0.25
 
     def domain_bests(self) -> dict[str, float]:
         """Best competence any elite achieves in each domain."""
@@ -422,6 +438,47 @@ class Curator:
                 if isinstance(v, (int, float)):
                     out[k] = max(out[k], float(v))
         return out
+
+    def observe_domains(self, meta: dict) -> None:
+        """Record one evaluation's per-domain competences.
+
+        Every evaluation counts, not only the ones that make it into the
+        archive: the question being asked is whether the *search* is still
+        finding better performances in a domain, and a design rejected for
+        landing in an occupied cell is still evidence about that.
+        """
+        for d in ("air", "water", "land"):
+            v = (meta or {}).get(d)
+            if not isinstance(v, (int, float)):
+                continue
+            rec = self._records.setdefault(d, {"best": -1.0, "draws": 0, "at_record": 0})
+            rec["draws"] += 1
+            if float(v) > rec["best"]:
+                rec["best"] = float(v)
+                rec["at_record"] = rec["draws"]
+
+    def plateau_p(self, domain: str) -> float:
+        """How surprising the current drought is, if the search were still
+        improving at the rate it has been.
+
+        Under exchangeable draws the probability that none of the next ``m``
+        beats the best of the first ``n`` is exactly ``n / (n + m)``.  So the
+        drought since the last record has a likelihood under "nothing has
+        changed", and that likelihood is the evidence.  Waiting three times as
+        long as the run took to set its last record puts it at 0.25.
+
+        The exchangeability assumption is not true here -- an evolutionary
+        search sets records faster than chance early and slower late -- so this
+        is a proxy, not a hypothesis test.  It is a proxy with a stated basis
+        and no free parameter, which is the point: the alternative was the
+        number 25, chosen because runs looked about right with it.
+        """
+        rec = self._records.get(domain)
+        if not rec or rec["at_record"] < 5:
+            return 1.0  # too early to call anything a drought
+        n = rec["at_record"]
+        m = rec["draws"] - n
+        return float(n / max(n + m, 1))
 
     def check_famine(self) -> list[str]:
         """Detect domains no design in the archive can perform, and act.
@@ -439,14 +496,19 @@ class Curator:
         over.
         """
         bests = self.domain_bests()
-        starved = [d for d, v in bests.items() if v < self.FAMINE_THRESHOLD]
-        for d in ("air", "water", "land"):
-            if d in starved:
-                self._famine[d] = self._famine.get(d, 0) + 1
-            else:
-                self._famine[d] = 0
+        if not bests or not self._records:
+            self.starved_domains = []
+            return []
 
-        acute = [d for d in starved if self._famine.get(d, 0) >= self.FAMINE_PATIENCE]
+        # The weakest domain is the binding constraint: mission fraction is
+        # built on min(competences), so improving anything else cannot help
+        # until this one moves.  No threshold is needed to identify it.
+        weakest = min(bests, key=lambda d: bests[d])
+        p = self.plateau_p(weakest)
+        for d in ("air", "water", "land"):
+            self._famine[d] = self._famine.get(d, 0) + 1 if d == weakest else 0
+
+        acute = [weakest] if p <= self.PLATEAU_ALPHA else []
         if acute:
             # Push hard on structure: the current body plans have been optimised
             # to their local limits in this domain, and only a topology change
@@ -456,14 +518,18 @@ class Curator:
             self.regime.n_mutations = 3
             self.regime.emitter_fraction = 0.1
             self.regime.feasibility_bias = 0.3
+            rec = self._records[weakest]
             self.regime.note = (
-                f"no design can do {', '.join(acute)} after "
-                f"{max(self._famine[d] for d in acute)} generations -- "
-                "forcing structural change and biasing selection toward the "
-                "least-bad performers there"
+                f"{weakest} is the binding domain at {bests[weakest]:.2f} and has "
+                f"gone {rec['draws'] - rec['at_record']} evaluations without a "
+                f"new best after taking {rec['at_record']} to set the last one "
+                f"(p={p:.2f}) -- forcing structural change and biasing "
+                "selection toward the least-bad performers there"
             )
             self.famine_events.append(
                 {"generation": self.archive.generation, "domains": acute,
+                 "p": round(p, 4), "drought": rec["draws"] - rec["at_record"],
+                 "record_at": rec["at_record"],
                  "bests": {k: round(v, 3) for k, v in bests.items()}}
             )
             self.starved_domains = acute
