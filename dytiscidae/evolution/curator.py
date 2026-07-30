@@ -201,8 +201,22 @@ class Curator:
     # ------------------------------------------------------ 2. parent selection
 
     def select_parent(self) -> Elite | None:
-        """Pick who to breed from, weighting four independent signals."""
-        cells = [e for c, e in self.archive.cells.items() if c not in self.archive.tainted]
+        """Pick who to breed from, weighting four independent signals.
+
+        Drawn from the cells' full Pareto fronts, not only from the one
+        representative each cell reports.  A design kept because it trades
+        mission fraction for structural margin is only worth keeping if it can
+        also be bred from; sampling representatives alone would store the
+        trade-off and never explore it.
+        """
+        cells = [
+            e
+            for c, front in self.archive.fronts.items()
+            if c not in self.archive.tainted
+            for e in front
+        ]
+        if not cells:
+            cells = [e for c, e in self.archive.cells.items() if c not in self.archive.tainted]
         if not cells:
             return None
         if len(cells) == 1:
@@ -569,6 +583,7 @@ class Curator:
             "coverage": round(a.coverage, 4),
             "qd_score": round(a.qd_score, 3),
             "filled": len(a.cells),
+            "front_designs": a.front_size,
             "evaluations": self.evaluations,
             "promotions": self.promotions,
             "exploits": len(self.exploits),

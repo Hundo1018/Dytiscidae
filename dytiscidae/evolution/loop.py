@@ -35,11 +35,13 @@ from ..core.phenotype import build
 from ..core.bodyplans import seed_population
 from ..envs.evaluate import (
     BD_AXES,
+    OBJECTIVE_NAMES,
     Controller,
     behaviour_descriptor,
     evaluate_tier1,
     evaluate_tier2,
     fitness,
+    objectives,
 )
 from ..envs.triphibian import MissionSpec, TriphibianEnv, evaluate_tier0
 from ..ops.telemetry import Telemetry
@@ -237,6 +239,7 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     else:
         bd = behaviour_descriptor(pheno, result)
     fit = fitness(pheno, result)
+    obj = objectives(pheno, result)
 
     if result.exploit:
         state.curator.quarantine(bd, result.exploit, genome)
@@ -255,7 +258,8 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     # and re-binning has to re-project from the features rather than from a
     # latent coordinate that no longer means the same thing.
     meta["features"] = [float(x) for x in feats]
-    status = state.archive.add(genome, fit, bd, meta, tier=result.tier)
+    meta["objectives"] = {n: round(float(v), 4) for n, v in zip(OBJECTIVE_NAMES, obj)}
+    status = state.archive.add(genome, fit, bd, meta, tier=result.tier, objectives=obj)
 
     state.curator.credit(operators, status, fit - previous)
     state.curator.note_offspring(parent, status)

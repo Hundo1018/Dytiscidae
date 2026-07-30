@@ -91,6 +91,7 @@ def cmd_search(args) -> int:
     def report(state, r):
         line = (
             f"gen{r['generation']:<4d} {r['regime']:<13s} elites={r['filled']:<4d} "
+            f"front={r.get('front_designs', r['filled']):<4d} "
             f"cov={r['coverage']*100:5.2f}% qd={r['qd_score']:7.2f} "
             f"best={r.get('best_fitness', 0):.3f} evals={r['evaluated']:<5d} "
             f"rej={r['tier0_rejected']:<4d} {r['elapsed']:6.0f}s"

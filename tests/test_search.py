@@ -462,6 +462,66 @@ def test_learned_descriptors_replace_the_hand_picked_axes() -> None:
           f"{fired} refits over 165 episodes at one per 20")
 
 
+def test_cells_hold_a_pareto_front_not_a_weighted_sum() -> None:
+    """A design must not be discarded because of an exchange rate I invented.
+
+    ``fitness`` was a weighted sum: mission fraction plus a tenth of the
+    structural margin plus a tenth of the energy margin plus a tenth of the land
+    competence.  Those coefficients are three numbers I typed, and the cost of
+    typing them was invisible -- a design giving up a hundredth of its mission
+    fraction for three times the structural margin was kept or thrown away
+    purely according to them, and nothing in the run reported which.
+    """
+    print("\narchive: cells hold a Pareto front")
+    from dytiscidae.evolution.archive import Archive
+    from dytiscidae.evolution.curator import Curator
+
+    axes = [("a", 0.0, 1.0, 4), ("b", 0.0, 1.0, 4)]
+    a = Archive(axes)
+    cell = a.cell_of([0.5, 0.5])
+
+    a.add("fast", 0.50, [0.5, 0.5], objectives=np.array([0.50, 0.05, 0.05]))
+    st = a.add("robust", 0.72, [0.5, 0.5], objectives=np.array([0.49, 2.80, 1.90]))
+    names = sorted(e.genome for e in a.front(cell))
+    check("a design that trades mission for margin is kept, not discarded",
+          st == "improved" and names == ["fast", "robust"], f"{st}, front={names}")
+    check("the representative is the one that best does the task",
+          a.cells[cell].genome == "fast", a.cells[cell].genome)
+
+    st = a.add("worse", 0.41, [0.5, 0.5], objectives=np.array([0.40, 0.02, 0.02]))
+    check("a strictly dominated design is still rejected", st == "rejected", st)
+
+    st = a.add("better", 0.90, [0.5, 0.5], objectives=np.array([0.60, 2.90, 2.00]))
+    check("a strictly dominating design collapses the front to itself",
+          st == "improved" and [e.genome for e in a.front(cell)] == ["better"],
+          str([e.genome for e in a.front(cell)]))
+
+    # Coverage must still mean what it meant: one cell is one cell.
+    check("coverage still counts cells, not designs",
+          len(a.cells) == 1 and a.coverage == 1 / a.capacity, f"{a.coverage:.4f}")
+
+    # The front is bounded, and what survives spans the trade-off.
+    b = Archive(axes)
+    rng = np.random.default_rng(1)
+    for i in range(40):
+        t = i / 39.0            # a clean trade-off curve, nothing dominates
+        b.add(f"d{i}", float(rng.random()), [0.5, 0.5],
+              objectives=np.array([t, 1.0 - t, 0.5]))
+    front = b.front(b.cell_of([0.5, 0.5]))
+    check("the front is bounded", len(front) <= b.front_capacity, f"{len(front)} designs")
+    spread = max(e.objectives[0] for e in front) - min(e.objectives[0] for e in front)
+    check("and what survives spans the trade-off rather than clustering",
+          spread > 0.8, f"mission spread {spread:.2f} across the kept front")
+
+    # Everything kept must be reachable as a parent, or keeping it is pointless.
+    cur = Curator(a, seed=0)
+    a.add("robust2", 0.7, [0.5, 0.5], objectives=np.array([0.55, 3.00, 2.00]))
+    picked = {cur.select_parent().genome for _ in range(200)}
+    check("parents are drawn from the whole front",
+          len(picked & {e.genome for e in a.front(cell)}) == len(a.front(cell)),
+          f"sampled {sorted(picked)} from front {sorted(e.genome for e in a.front(cell))}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -477,6 +537,7 @@ def main() -> int:
     test_phenotype_invariants()
     test_cpg_respects_joint_limits()
     test_learned_descriptors_replace_the_hand_picked_axes()
+    test_cells_hold_a_pareto_front_not_a_weighted_sum()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

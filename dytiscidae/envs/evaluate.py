@@ -403,6 +403,42 @@ def behaviour_descriptor(p: Phenotype, r: MissionResult) -> np.ndarray:
     )
 
 
+#: The objectives a design is judged on, all "higher is better".
+#:
+#: These are kept *separate* rather than summed because summing them means
+#: choosing an exchange rate between them, and I have no basis for choosing one.
+#: The 0.10 coefficients in ``fitness`` below say that a tenth of the structural
+#: margin is worth a tenth of the energy margin is worth a tenth of the land
+#: competence.  That is not an engineering judgement, it is three numbers I
+#: typed, and the cost of typing them is invisible: a design that is worse on
+#: the weighted sum but better on an axis the weights undervalue is silently
+#: discarded, and nothing in the run ever reports that it happened.
+OBJECTIVE_NAMES = ("mission", "structure", "energy")
+
+
+def objectives(p: Phenotype, r: MissionResult) -> np.ndarray:
+    """The objective vector used to decide who occupies a cell.
+
+    Feasibility is not an objective, it is a gate: an infeasible design gets a
+    sentinel first component so it can never dominate a feasible one, however
+    good its other numbers look.
+    """
+    if r.exploit:
+        return np.array([-1.0, -1.0, -1.0])
+    mission = r.mission_fraction if r.feasible else -0.5 + 0.5 * r.mission_fraction
+    return np.array([
+        float(mission),
+        float(np.clip(r.structural_margin, -1.0, 3.0)),
+        float(np.clip(r.energy_margin, -1.0, 2.0)),
+    ])
+
+
+def dominates(a: np.ndarray, b: np.ndarray) -> bool:
+    """True when ``a`` is at least as good everywhere and better somewhere."""
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    return bool(np.all(a >= b - 1e-12) and np.any(a > b + 1e-12))
+
+
 def fitness(p: Phenotype, r: MissionResult, spec: MissionSpec | None = None) -> float:
     """Scalar quality within a behaviour cell.
 

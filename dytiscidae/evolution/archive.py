@@ -42,6 +42,10 @@ class Elite:
     offspring_placed: int = 0
     born_at: int = 0
     tier: int = 1
+    #: Objective vector, all higher-is-better.  This, not ``fitness``, decides
+    #: whether a challenger takes the cell.  ``fitness`` survives for reporting
+    #: and for the curator's parent weighting, where a scalar is unavoidable.
+    objectives: np.ndarray = field(default_factory=lambda: np.zeros(0))
 
     @property
     def curiosity(self) -> float:
@@ -68,6 +72,9 @@ class Archive:
         self.hi = np.array([a[2] for a in axes], float)
         self.bins = np.array([a[3] for a in axes], int)
         self.cells: dict[tuple[int, ...], Elite] = {}
+        #: The full non-dominated set per cell.  ``cells`` names one
+        #: representative from each of these.
+        self.fronts: dict[tuple[int, ...], list[Elite]] = {}
         self.generation = 0
         self.history: list[dict] = []
         #: Cells that produced a simulator exploit.  Kept so the curator can
@@ -106,6 +113,47 @@ class Archive:
 
     # -------------------------------------------------------------------- add
 
+    @staticmethod
+    def _dominates(a: np.ndarray, b: np.ndarray) -> bool:
+        """True when ``a`` is at least as good everywhere and better somewhere."""
+        return bool(np.all(a >= b - 1e-12) and np.any(a > b + 1e-12))
+
+    #: How many mutually non-dominated designs one cell may hold.  Small on
+    #: purpose: the point is to stop discarding a design because of an exchange
+    #: rate I invented, not to turn every cell into an archive of its own.
+    front_capacity: int = 4
+
+    @staticmethod
+    def _crowding(front: list["Elite"]) -> np.ndarray:
+        """Crowding distance over the objective vectors (NSGA-II).
+
+        Used to decide who leaves when a cell's front is over capacity, so what
+        survives spans the trade-off rather than clustering on one corner of it.
+        """
+        n = len(front)
+        if n <= 2:
+            return np.full(n, np.inf)
+        obj = np.array([e.objectives for e in front], float)
+        dist = np.zeros(n)
+        for k in range(obj.shape[1]):
+            order = np.argsort(obj[:, k])
+            span = obj[order[-1], k] - obj[order[0], k]
+            dist[order[0]] = dist[order[-1]] = np.inf
+            if span < 1e-12:
+                continue
+            for i in range(1, n - 1):
+                dist[order[i]] += (obj[order[i + 1], k] - obj[order[i - 1], k]) / span
+        return dist
+
+    def front(self, cell: tuple[int, ...]) -> list["Elite"]:
+        """The non-dominated set occupying a cell."""
+        return self.fronts.get(cell, [])
+
+    @property
+    def front_size(self) -> int:
+        """Total designs held across all cells, fronts included."""
+        return sum(len(f) for f in self.fronts.values())
+
     def add(
         self,
         genome,
@@ -113,27 +161,76 @@ class Archive:
         descriptor: np.ndarray,
         meta: dict | None = None,
         tier: int = 1,
+        objectives: np.ndarray | None = None,
     ) -> str:
-        """Insert a candidate.  Returns 'new', 'improved' or 'rejected'."""
+        """Insert a candidate.  Returns 'new', 'improved' or 'rejected'.
+
+        Each cell holds a bounded *Pareto front* rather than one winner
+        (Multi-Objective MAP-Elites; Pierrot et al. 2022).  What it replaced was
+        a weighted sum whose coefficients I chose -- "a tenth of the structural
+        margin is worth a tenth of the energy margin is worth a tenth of the
+        land competence" -- and the cost of choosing them was invisible.  A
+        design that gave up a hundredth of its mission fraction for three times
+        the structural margin was accepted or discarded purely according to
+        three numbers I typed, and nothing in the run ever reported which.
+
+        Under dominance neither of those designs displaces the other: both stay,
+        in the same cell, and the trade-off between them becomes a thing the run
+        can show rather than a thing I decided in advance.  ``cells`` continues
+        to name one representative per cell -- the one with the highest mission
+        fraction, the single component that is unambiguously the task -- so
+        coverage, the QD score and every existing consumer keep working.
+        """
         if not math.isfinite(fitness):
             return "rejected"
+        obj = np.zeros(0) if objectives is None else np.asarray(objectives, float)
         cell = self.cell_of(descriptor)
-        cur = self.cells.get(cell)
-        if cur is None:
-            self.cells[cell] = Elite(
-                genome=genome, fitness=fitness, descriptor=np.asarray(descriptor, float),
-                cell=cell, meta=meta or {}, born_at=self.generation, tier=tier,
-            )
+        front = self.fronts.setdefault(cell, [])
+
+        cand = Elite(
+            genome=genome, fitness=fitness, descriptor=np.asarray(descriptor, float),
+            cell=cell, meta=meta or {}, born_at=self.generation, tier=tier,
+            objectives=obj,
+        )
+
+        if not front:
+            self.fronts[cell] = [cand]
+            self.cells[cell] = cand
             return "new"
-        if fitness > cur.fitness:
-            self.cells[cell] = Elite(
-                genome=genome, fitness=fitness, descriptor=np.asarray(descriptor, float),
-                cell=cell, meta=meta or {}, improvements=cur.improvements + 1,
-                offspring=cur.offspring, offspring_placed=cur.offspring_placed,
-                born_at=self.generation, tier=tier,
-            )
-            return "improved"
-        return "rejected"
+
+        # Inherit the cell's exploration bookkeeping: it describes the region,
+        # not the individual, and resetting it every time an occupant changes
+        # makes every cell look permanently untried to the curator.
+        incumbent = self.cells[cell]
+        cand.offspring = incumbent.offspring
+        cand.offspring_placed = incumbent.offspring_placed
+        cand.improvements = incumbent.improvements + 1
+
+        if obj.size == 0 or any(e.objectives.size != obj.size for e in front):
+            # No objective vector to compare on: fall back to the scalar.
+            if fitness > incumbent.fitness:
+                self.fronts[cell] = [cand]
+                self.cells[cell] = cand
+                return "improved"
+            return "rejected"
+
+        if any(self._dominates(e.objectives, obj) for e in front):
+            return "rejected"
+
+        kept = [e for e in front if not self._dominates(obj, e.objectives)]
+        kept.append(cand)
+        if len(kept) > self.front_capacity:
+            order = np.argsort(-self._crowding(kept))
+            kept = [kept[i] for i in order[: self.front_capacity]]
+            if cand not in kept:
+                # Survived dominance but lost on crowding: it sits on top of
+                # designs the cell already has.
+                self.fronts[cell] = kept
+                self.cells[cell] = max(kept, key=lambda e: e.objectives[0])
+                return "rejected"
+        self.fronts[cell] = kept
+        self.cells[cell] = max(kept, key=lambda e: e.objectives[0])
+        return "improved"
 
     # ----------------------------------------------------------------- rebin
 
@@ -159,6 +256,7 @@ class Archive:
         self.hi = np.array([a[2] for a in axes], float)
         self.bins = np.array([a[3] for a in axes], int)
         self.cells = {}
+        self.fronts = {}
         for e in old.values():
             d = reproject(e)
             if d is None:
@@ -169,6 +267,13 @@ class Archive:
             cur = self.cells.get(cell)
             if cur is None or e.fitness > cur.fitness:
                 self.cells[cell] = e
+            self.fronts.setdefault(cell, []).append(e)
+        # Rebuilding fronts exactly would need a full dominance pass per cell;
+        # trimming to capacity by fitness is enough, because the next insert
+        # into a cell re-establishes the dominance invariant for it.
+        for c, f in self.fronts.items():
+            if len(f) > self.front_capacity:
+                self.fronts[c] = sorted(f, key=lambda e: -e.fitness)[: self.front_capacity]
         # Taint marks are cell coordinates, which no longer mean anything.
         self.tainted = {}
         return {"before": before, "after": len(self.cells), "merged": before - len(self.cells)}
