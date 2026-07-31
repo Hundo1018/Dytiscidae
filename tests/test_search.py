@@ -1079,6 +1079,114 @@ def test_critic_learns_the_exploit_signature() -> None:
           f"calibration {blind.calibration:.2f}, discount x{blind.discount(np.zeros(16)):.3f}")
 
 
+def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> None:
+    """A design that is good at one thing must be distinguishable from a design
+    that is good at nothing.
+
+    Mission fraction is built on ``min(competences)`` times a transition term,
+    so a superb water specialist that cannot leave the water scores essentially
+    zero -- the same essentially zero as a design that is bad at everything.
+    Between those two there is a gradient that matters enormously and the score
+    cannot see it.  That is the sparse-reward trap, and it is also, in biology,
+    why there are almost no triphibian animals: the intermediate is worse than
+    either specialist, so nothing is ever carried across the valley.
+    """
+    print("\ncurriculum and islands: gradient where the mission has none")
+    from dytiscidae.evolution.curriculum import (
+        N_STAGES,
+        STAGES,
+        Curriculum,
+        stage_score,
+    )
+    from dytiscidae.evolution.islands import ISLANDS, Archipelago, island_score
+
+    class Seg:
+        def __init__(self, c, meas=None):
+            self.competence = c
+            self.measurements = meas or {}
+
+    class Trans:
+        def __init__(self, crossed, quality):
+            self._c, self._q = crossed, quality
+            self.results = {}
+
+        def component_means(self):
+            return {"crossed": self._c, "shock": self._q, "control": self._q,
+                    "settle": self._q, "economy": self._q, "exit_state": self._q}
+
+    class Res:
+        def __init__(self, air, water, land, mf, meas=None):
+            self.segments = {"air": Seg(air, (meas or {}).get("air")),
+                             "water": Seg(water, (meas or {}).get("water")),
+                             "land": Seg(land, (meas or {}).get("land"))}
+            self.mission_fraction = mf
+
+    # A water specialist and a uniform failure both score ~0 on the mission.
+    specialist = Res(0.02, 0.85, 0.03, 0.001,
+                     {"water": {"depth_error": 0.8, "max_depth": 10.0}})
+    useless = Res(0.02, 0.03, 0.03, 0.001)
+    t = Trans(0.34, 0.4)
+
+    check("the mission cannot tell them apart",
+          abs(specialist.mission_fraction - useless.mission_fraction) < 1e-6,
+          f"both {specialist.mission_fraction:.4f}")
+    check("stage 0 can", stage_score(0, specialist, t) > 3 * stage_score(0, useless, t),
+          f"{stage_score(0, specialist, t):.3f} against {stage_score(0, useless, t):.3f}")
+    check("and so can the water island",
+          island_score("water", specialist, t) > 3 * island_score("water", useless, t),
+          f"{island_score('water', specialist, t):.3f} against "
+          f"{island_score('water', useless, t):.3f}")
+    check("while the generalist island still says what the mission says",
+          abs(island_score("generalist", specialist, t) - specialist.mission_fraction) < 1e-9)
+
+    # A specialist island must not punish giving up the other media.
+    check("the water island ignores the domains it does not care about",
+          island_score("water", specialist, t)
+          > island_score("water", Res(0.9, 0.85, 0.9, 0.5), t) * 0.9,
+          "a water specialist is not outscored on water by an all-rounder")
+
+    # The curriculum promotes, and demotes when the bar it was earned under
+    # is no longer met.
+    c = Curriculum()
+    cell = (1, 2, 3, 4)
+    check("everything starts at stage 0", c.stage_of(cell) == 0)
+    sr = c.evaluate(cell, specialist, t)
+    check("a design is scored at its stage and shown the next one",
+          "here" in sr.detail and "next" in sr.detail, str(sr.detail))
+    check("and clearing the bar promotes it", sr.passed and c.update(cell, sr) == "promoted",
+          f"stage {c.stage_of(cell)}")
+    for _ in range(N_STAGES + 2):
+        c.update(cell, c.evaluate(cell, specialist, t))
+    check("promotion stops at the top", c.stage_of(cell) <= N_STAGES - 1,
+          f"stage {c.stage_of(cell)} of {N_STAGES - 1}")
+    collapsed = c.evaluate(cell, useless, Trans(0.0, 0.0))
+    before = c.stage_of(cell)
+    c.update(cell, collapsed)
+    check("and a cell that can no longer earn its stage is demoted",
+          c.stage_of(cell) < before, f"{before} -> {c.stage_of(cell)}")
+
+    # The archipelago moves genes between lineages, which biology cannot.
+    from dytiscidae.evolution.archive import Archive
+    from dytiscidae.evolution.curator import Curator
+
+    arc = Archipelago(migrate_every=2, n_migrants=1)
+    for name in ("air", "water", "generalist"):
+        a = Archive([("x", 0.0, 1.0, 4), ("y", 0.0, 1.0, 4)])
+        a.add(f"{name}_best", 0.9, [0.5, 0.5], objectives=np.array([0.9, 1.0, 1.0]))
+        arc.register(name, a, Curator(a, seed=0))
+
+    rng = np.random.default_rng(0)
+    check("migration is periodic, not constant", not arc.due(1) and arc.due(2))
+    moved = arc.migrate(2, rng, crossover=lambda a, b, r: f"({a}+{b})")
+    check("designs move between islands", any(m["kind"] == "migrant" for m in moved),
+          f"{sum(1 for m in moved if m['kind'] == 'migrant')} migrants")
+    check("and specialists are crossed directly -- the move biology cannot make",
+          any(m["kind"] == "hybrid" for m in moved),
+          str([m["genome"] for m in moved if m["kind"] == "hybrid"][:1]))
+    check("an immigrant is sent somewhere other than home",
+          all(m["island"] != m["origin"] for m in moved if m["kind"] == "migrant"))
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -1101,6 +1209,7 @@ def main() -> int:
     test_judge_ladder_is_fixed_and_bar_only_tightens()
     test_auditor_can_invalidate_and_veto()
     test_critic_learns_the_exploit_signature()
+    test_curriculum_and_islands_give_gradient_where_the_mission_gives_none()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
