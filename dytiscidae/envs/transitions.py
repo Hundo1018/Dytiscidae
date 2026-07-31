@@ -58,6 +58,27 @@ import numpy as np
 from .triphibian import Domain, TriphibianEnv
 
 #: Which medium each crossing starts and ends in.
+#: Which crossings the seeds can and cannot make, measured against the six body
+#: plans with no controller, so that the next person starts from the answer.
+#:
+#:     air_to_water    all six      falling into the sea is easy
+#:     water_to_land   five of six  the ramp is reachable from x = 8
+#:     land_to_air     none         nothing gets off the ground
+#:
+#: The last one is not a duration problem, which was the obvious guess: given 6,
+#: 15 or 30 seconds the best clearance any plan reaches is 0.06 m against a bar
+#: of 0.50.  Every one of these designs can *glide* once it is launched at trim
+#: speed -- that is what the air segment tests -- and not one can accelerate
+#: itself from rest to trim speed on the ground.  They have no ground run, no
+#: jump, and not enough flapping thrust to hover out of it.
+#:
+#: So takeoff is the binding constraint on the whole mission, and it is the same
+#: shape of problem as flight was before the gannet: a capability nothing in the
+#: seed set has, which the search must therefore cross a valley to reach rather
+#: than improve its way to.  Adding a seed that can leave the ground is the
+#: obvious answer and is deliberately not done here -- it is a change to what
+#: the search starts from, and that is worth making on purpose rather than in
+#: passing.
 TRANSITION_ENDPOINTS: dict[str, tuple[Domain, Domain]] = {
     "air_to_water": (Domain.AIR, Domain.WATER),
     "water_to_air": (Domain.WATER, Domain.AIR),
