@@ -118,6 +118,10 @@ class SegmentResult:
     peak_slam: float = 0.0
     max_actuator_overload: float = 0.0
     attitude_rms: float = 0.0
+    #: Raw physical quantities the judge's fixed ladder is defined on.  Kept
+    #: separate from ``competence`` because the ladder must stay comparable
+    #: across a whole run while the scoring on top of it moves.
+    measurements: dict = field(default_factory=dict)
 
     @property
     def cost_of_transport(self) -> float:
@@ -732,6 +736,16 @@ class TriphibianEnv:
             # speed it was given, which is what sustaining flight means.
             speed = float(np.clip(res.mean_speed / max(self.launch_speed, 1e-6), 0.0, 1.0))
             res.altitude_held = flight
+            # Turn rate sustained *while* not losing height: manoeuvring and
+            # falling out of a turn are different things.
+            turn = float(np.mean(np.abs(np.diff(np.asarray(ups)[idx])))) / max(
+                self.timestep, 1e-6
+            ) if len(idx) > 2 else 0.0
+            res.measurements.update({
+                "airborne_fraction": frac,
+                "sink_rate": sink,
+                "turn_rate_held": turn if sink < 0.5 else 0.0,
+            })
             # Every term is gated on actually being up there.
             return float(frac * (0.55 * flight + 0.25 + 0.2 * speed))
 
@@ -745,6 +759,11 @@ class TriphibianEnv:
             err = float(np.mean(np.abs(settled - target))) if len(settled) else target
             res.depth_error = err
             hold = float(np.clip(1.0 - err / target, 0.0, 1.0))
+            res.measurements.update({
+                "max_depth": float(res.max_depth),
+                "depth_error": err,
+                "water_speed": float(res.mean_speed) if submerged > 0.5 else 0.0,
+            })
             # ``served`` closes the same truncation hole here: holding depth and
             # staying upright for a tenth of a second is not a demonstration of
             # either, and a machine that ends its episode early has not done the
@@ -756,6 +775,20 @@ class TriphibianEnv:
         # LAND
         contact = float(np.sum(np.asarray(contacts) > 0.5) / n_want)
         progress = float(np.clip(res.mean_speed / 0.6, 0.0, 1.0))
+        # Height gained against the beach's own slope: walking uphill is the
+        # capability, not merely moving.
+        from ..core.mjcf import beach_surface_z
+
+        climbed = 0.0
+        if len(alts) > 2:
+            climbed = float(beach_surface_z(float(self.root_pos()[0])) - beach_surface_z(
+                float(self.root_pos()[0]) - res.distance))
+        res.measurements.update({
+            "upright": upright,
+            "contact_fraction": contact,
+            "land_speed": float(res.mean_speed),
+            "slope_climbed": max(climbed, 0.0),
+        })
         return served * float(0.4 * progress + 0.3 * contact + 0.3 * upright)
 
     # ------------------------------------------------------------- mobility ID

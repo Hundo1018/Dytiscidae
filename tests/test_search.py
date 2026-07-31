@@ -853,6 +853,151 @@ def test_transitions_are_graded_not_pass_fail() -> None:
           two <= one, f"{one:.2f} -> {two:.2f} after adding a second crossing")
 
 
+def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
+    """The standard must get harder as the population improves, without making
+    the record incomparable.
+
+    Every threshold in this project began as a number I typed, and each one
+    decides invisibly where the search stops trying: once a population saturates
+    a threshold the gradient vanishes.  But a bar that simply tracks the
+    population destroys the thing that makes a long run readable -- 0.8 at
+    generation 100 and 0.8 at generation 2000 become different achievements with
+    nothing in the record to say so.
+
+    So the two are separated.  *What* is measured is a fixed ladder of
+    qualitatively different capabilities, declared once.  *Where the bar sits*
+    inside the current rung is a population quantile that ratchets.
+    """
+    print("\njudge: fixed ladder, ratcheting bar")
+    from dytiscidae.evolution.judge import LADDER, Judge, rung_reached
+
+    j = Judge(quantile=0.9, update_every=1)
+
+    # The ladder must be a progression: more capability, more rungs.
+    seq = [
+        ({"airborne_fraction": 0.05}, 0),
+        ({"airborne_fraction": 0.7, "sink_rate": 6.0}, 2),
+        ({"airborne_fraction": 0.7, "sink_rate": 2.0}, 3),
+        ({"airborne_fraction": 0.9, "sink_rate": 0.2}, 4),
+        ({"airborne_fraction": 0.95, "sink_rate": -1.0, "turn_rate_held": 0.0}, 5),
+    ]
+    ok = all(rung_reached("air", m) == k for m, k in seq)
+    check("the ladder orders capability", ok,
+          " ".join(str(rung_reached("air", m)) for m, _ in seq))
+    check("a design cannot skip a rung it failed",
+          rung_reached("air", {"airborne_fraction": 0.05, "sink_rate": -9.0}) == 0,
+          "plummeting-but-never-airborne stays at rung 0")
+
+    # The within-rung bonus must never reach the next rung's score.
+    below = j.score("air", {"airborne_fraction": 0.95, "sink_rate": -1.0,
+                            "turn_rate_held": 0.0})
+    top = j.score("air", {"airborne_fraction": 0.95, "sink_rate": -1.0,
+                          "turn_rate_held": 0.5})
+    check("clearing four rungs never ties with clearing five",
+          below["total"] < top["total"], f"{below['total']:.3f} < {top['total']:.3f}")
+
+    # The bar tightens as the population improves.
+    rng = np.random.default_rng(0)
+    bars = []
+    for gen in range(1, 7):
+        for _ in range(60):
+            j.observe({"air": {"sink_rate": float(rng.normal(6.0 - gen * 0.9, 0.6))}})
+        j.maybe_tighten(gen)
+        bars.append(j.ratchets["air"].bar)
+    check("the bar follows a population that is improving", bars[-1] < bars[0] - 2.0,
+          f"{bars[0]:+.2f} -> {bars[-1]:+.2f} m/s of sink for full marks")
+
+    # And never loosens, however bad the population gets.
+    before = j.ratchets["air"].bar
+    for _ in range(300):
+        j.observe({"air": {"sink_rate": 9.0}})
+    j.maybe_tighten(7)
+    check("and never loosens", j.ratchets["air"].bar == before,
+          f"{before:+.2f} unchanged after 300 terrible samples")
+
+    # The same achievement scores lower once the bar has moved: that is the
+    # point, and the rung is what stays comparable.
+    fresh = Judge(quantile=0.9, update_every=1)
+    m = {"airborne_fraction": 0.9, "sink_rate": 1.0}
+    early = fresh.score("air", m)
+    for _ in range(200):
+        fresh.observe({"air": {"sink_rate": float(rng.normal(0.2, 0.3))}})
+    fresh.maybe_tighten(1)
+    late = fresh.score("air", m)
+    check("the same design scores lower after a breakthrough", late["within"] < early["within"],
+          f"within {early['within']:.2f} -> {late['within']:.2f}")
+    check("while its rung is unchanged, so the record stays comparable",
+          late["rung"] == early["rung"], f"rung {early['rung']} both times")
+
+    # Rollback restores the previous bar exactly.
+    b = j.ratchets["air"]
+    prev = b.history[-1]["from"] if b.history else None
+    check("a tightening can be rolled back", b.rollback() and b.bar == prev,
+          f"rolled back to {b.bar:+.2f}")
+
+
+def test_auditor_can_invalidate_and_veto() -> None:
+    """The third party must be able to act, and must never be able to reward.
+
+    There are two adaptive parties in this loop -- the population trying to
+    score and the judge answering with a higher bar -- and nothing inside that
+    pair can tell genuine progress from the two of them drifting together into a
+    corner of the simulator.  The auditor's authority comes from one property:
+    it does not learn, and nothing it checks is a function of the run's history.
+    """
+    print("\nauditor: audits, vetoes, never rewards")
+    from dytiscidae.evolution.auditor import Auditor, check_scaling
+    from dytiscidae.evolution.judge import Judge
+
+    class Ph:
+        def __init__(self, mass, area):
+            self.mass, self.wing_area = mass, area
+
+    class Res:
+        def __init__(self, mf):
+            self.mission_fraction = mf
+            self.segments = {}
+
+    # The wingless "flyer" that scored 0.75 must be noticed.
+    f = check_scaling(Ph(5.28, 0.0))
+    check("a machine with no lifting surface is flagged", f is not None and "no lifting" in f.detail,
+          f.detail if f else "not flagged")
+    check("and a plausible one is not", check_scaling(Ph(7.28, 0.687)) is None)
+
+    a = Auditor(held_out_seeds=1, perturbations=(("cd_scale", 1.25),))
+
+    # A design that only works at one exact coefficient value is invalidated.
+    def brittle(seed=0, perturb=None):
+        return Res(0.02 if perturb else 0.80)
+
+    rep = a.audit(Ph(5.0, 0.5), Res(0.80), reevaluate=brittle, name="brittle")
+    check("a design that collapses under a perturbed coefficient is invalidated",
+          rep.invalid, "; ".join(x.detail for x in rep.findings) or "not invalidated")
+
+    # A robust design survives.
+    def robust(seed=0, perturb=None):
+        return Res(0.72 if perturb else 0.80)
+
+    rep2 = a.audit(Ph(5.0, 0.5), Res(0.80), reevaluate=robust, name="robust")
+    check("a design that degrades gracefully is not", not rep2.invalid,
+          f"retained {rep2.retained_fraction:.0%}")
+    check("and the audit never raises a score", not hasattr(rep2, "bonus"))
+
+    # The veto rolls the judge back.
+    j = Judge(quantile=0.9, update_every=1)
+    for _ in range(200):
+        j.observe({"water": {"max_depth": 3.0}})
+    moves = j.maybe_tighten(1)
+    raised = j.ratchets["water"].bar
+    check("the judge tightened", moves and raised > 0.0, f"bar now {raised:.2f} m")
+    vetoed = a.review_tightening(j, moves, invalid_designs=1)
+    check("and the auditor can veto that tightening",
+          vetoed and j.ratchets["water"].bar < raised,
+          f"bar rolled back to {j.ratchets['water'].bar:.2f} m")
+    check("a veto with nothing invalid does nothing",
+          not a.review_tightening(j, moves, invalid_designs=0))
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -872,6 +1017,8 @@ def main() -> int:
     test_intervention_is_triggered_by_evidence_not_a_schedule()
     test_no_dataclass_can_raise_on_equality()
     test_transitions_are_graded_not_pass_fail()
+    test_judge_ladder_is_fixed_and_bar_only_tightens()
+    test_auditor_can_invalidate_and_veto()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
