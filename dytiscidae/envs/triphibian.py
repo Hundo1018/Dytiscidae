@@ -279,7 +279,11 @@ class TriphibianEnv:
         timestep: float = 0.004,
         seed: int = 0,
         perturb: dict | None = None,
+        detail: bool = False,
     ) -> None:
+        """``detail`` draws the surfaces as the shape the fluid solver reads
+        rather than as the flat box that collides for them.  Rendering wants it;
+        search does not, and pays about a quarter of its step budget for it."""
         self.p = phenotype
         self.rng = np.random.default_rng(seed)
         self.medium = MediumField(sea_state=sea_state, current=current, wind=wind)
@@ -289,7 +293,7 @@ class TriphibianEnv:
 
         scene = scene_xml(timestep=timestep)
         self.model, self.data, self.act_names, self.panels = compile_phenotype(
-            phenotype, scene=scene
+            phenotype, scene=scene, detail=detail
         )
         # ``perturb`` moves the model's own coefficients.  It exists for the
         # auditor: the only way to find out whether a design depends on the

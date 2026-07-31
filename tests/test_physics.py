@@ -354,6 +354,59 @@ def test_land_domain_is_reachable() -> None:
           f"z={float(env.root_pos()[2]):.2f} m")
 
 
+def test_the_render_shows_the_shape_the_solver_reads() -> None:
+    """Lifting surfaces must draw with their taper, twist and dihedral, and
+    drawing them must not change the dynamics or cost the search anything.
+
+    Every surface used to render as one flat box at the mean chord while the
+    solver read a chord, twist, camber, thickness and dihedral *per station*.
+    The picture and the physics were different objects, and the picture is the
+    one a human looks at -- which is how the reflected half of every symmetric
+    wing pair kept its leading edge at the back for as long as it did.  Both
+    halves drew as identical flat plates, so there was nothing to see.
+
+    The strips carry no mass and no collision, and they are off unless asked
+    for: MuJoCo still places every geom each step, and a ray goes from 24 geoms
+    to 114 and 37 to 46 microseconds.  Search runs without them, rendering with.
+    """
+    print("\nmjcf: the render shows what the solver reads")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.mjcf import compile_phenotype
+    from dytiscidae.core.phenotype import build
+
+    plain_geoms, detail_geoms, worst_mass = {}, {}, 0.0
+    for name, fn in BODY_PLANS.items():
+        p = build(fn())
+        m0, _d0, _a0, _p0 = compile_phenotype(p)
+        m1, _d1, _a1, _p1 = compile_phenotype(p, detail=True)
+        plain_geoms[name], detail_geoms[name] = m0.ngeom, m1.ngeom
+        worst_mass = max(worst_mass, abs(float(m0.body_mass.sum())
+                                         - float(m1.body_mass.sum())))
+        if name == "beetle":
+            # The extra geoms must all be inert: no mass, no contacts.
+            extra = [i for i in range(m1.ngeom)
+                     if m1.geom_contype[i] == 0 and m1.geom_conaffinity[i] == 0]
+            collide0 = sum(1 for i in range(m0.ngeom)
+                           if m0.geom_contype[i] or m0.geom_conaffinity[i])
+            collide1 = sum(1 for i in range(m1.ngeom)
+                           if m1.geom_contype[i] or m1.geom_conaffinity[i])
+            beetle_quats = m1.geom_quat[extra]
+
+    check("detail adds geometry and plain does not",
+          all(detail_geoms[k] > plain_geoms[k] for k in plain_geoms),
+          ", ".join(f"{k} {plain_geoms[k]}->{detail_geoms[k]}" for k in plain_geoms))
+    check("the extra geometry never collides", collide1 == collide0,
+          f"{collide0} colliding geoms either way")
+    check("and never carries mass", worst_mass < 1e-9,
+          f"worst mass difference {worst_mass:.3e} kg")
+    # A washed-out wing must show its washout: at least one strip rotated away
+    # from identity about the span axis.
+    off_axis = float(np.abs(beetle_quats[:, 1]).max())
+    check("a twisted wing draws twisted",
+          off_axis > 0.01,
+          f"largest strip rotation about the span axis: {2*math.degrees(math.asin(off_axis)):.1f} deg")
+
+
 def test_machine_does_not_collide_with_itself() -> None:
     """The machine collides with terrain and never with its own parts."""
     print("\nscene: contact masks")
@@ -1242,6 +1295,7 @@ def main() -> int:
     test_bluff_drag_is_orientation_dependent()
     test_generated_bodies_reach_the_fluid()
     test_land_domain_is_reachable()
+    test_the_render_shows_the_shape_the_solver_reads()
     test_machine_does_not_collide_with_itself()
     test_air_segment_can_be_scored()
     test_truncated_episodes_cannot_score()

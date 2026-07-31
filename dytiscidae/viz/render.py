@@ -422,7 +422,7 @@ def render_learning_comparison(
     label = f"{phenotype.mass:.1f}kg {phenotype.max_span:.2f}m"
     made: list[str] = []
 
-    env = TriphibianEnv(phenotype, seed=0)
+    env = TriphibianEnv(phenotype, seed=0, detail=True)
     for dom in domains:
         env.reset(dom, randomise=False)
         before = capture_episode(env, duration, domain=dom, controller=None,
@@ -505,7 +505,7 @@ def render_design(
     made: list[str] = []
     label = f"{stem}  {phenotype.mass:.1f}kg  {phenotype.max_span:.2f}m span"
 
-    env = TriphibianEnv(phenotype, seed=0)
+    env = TriphibianEnv(phenotype, seed=0, detail=True)
     if turntable:
         got = render_turntable(env, out_path=out_dir / f"{stem}_turntable.mp4",
                                width=width, height=height, label=label)

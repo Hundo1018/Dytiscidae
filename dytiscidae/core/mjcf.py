@@ -320,7 +320,88 @@ def _add_field_geoms(root: ET.Element, body: ET.Element, s: Segment, mass: float
     return made
 
 
-def _add_geoms(body: ET.Element, s: Segment, extra_mass: float) -> None:
+#: Below this much shape variation across a surface, the single collision box
+#: already tells the truth and the per-station strips are not worth drawing.
+_SHAPE_EPS = 0.02
+
+
+def _surface_has_shape(s: Segment) -> bool:
+    """Does this surface differ from the flat box that collides for it?"""
+    sf = s.surface
+    if sf is None or len(sf.u) < 2:
+        return False
+    c = np.asarray(sf.chord, float)
+    taper = float(c.max() - c.min()) / max(float(c.mean()), 1e-9)
+    return (
+        taper > _SHAPE_EPS
+        or float(np.abs(sf.twist).max()) > _SHAPE_EPS
+        or float(np.abs(sf.dihedral).max()) > _SHAPE_EPS
+    )
+
+
+def _fmt_rgba_hidden(rgba: str) -> str:
+    """The same colour with the alpha zeroed."""
+    return " ".join(rgba.split()[:3] + ["0"])
+
+
+def _add_surface_visual(body: ET.Element, s: Segment, rgba: str) -> None:
+    """Draw a lifting surface as the shape the fluid solver actually sees.
+
+    Every surface used to render as one flat box at the mean chord: no taper,
+    no twist, no dihedral, no camber.  The solver meanwhile reads a chord,
+    twist, camber, thickness and dihedral *per station*, so the picture and the
+    physics were different objects, and the picture was the one a human looks at.
+
+    That gap is not cosmetic.  It hid a bug in which the reflected half of every
+    symmetric wing pair had its leading edge at the back -- visible instantly in
+    a render that draws incidence, invisible for as long as both halves drew as
+    identical flat plates.  A visualisation that cannot show a defect is not
+    observability, and this project's whole method rests on being able to look
+    at what it built.
+
+    These strips are visual only: no mass, no collision.  The box beside them
+    keeps both, so the dynamics are untouched and the cost is drawing calls.
+    """
+    sf = s.surface
+    if not _surface_has_shape(s):
+        return
+    u = np.asarray(sf.u, float)
+    chord = np.asarray(sf.chord, float)
+    twist = np.asarray(sf.twist, float)
+    thick = np.asarray(sf.thickness, float) * chord
+    dihedral = np.asarray(sf.dihedral, float)
+    # Station widths, so the strips tile the span without gaps or overlap.
+    edges = np.concatenate(([u[0]], 0.5 * (u[1:] + u[:-1]), [u[-1]]))
+    dr = np.diff(edges)
+    # Dihedral accumulates outboard: each station is lifted by the integral of
+    # the local angle, which is what makes a gull wing look like one.
+    rise = np.concatenate(([0.0], np.cumsum(np.sin(dihedral[:-1]) * np.diff(u))))
+    for i in range(len(u)):
+        if dr[i] <= 1e-6 or chord[i] <= 1e-6:
+            continue
+        # Rotation about the span (+X) axis by the local twist, as a quaternion.
+        half = 0.5 * float(twist[i])
+        ET.SubElement(
+            body,
+            "geom",
+            {
+                "name": f"{s.name}_v{i}",
+                "type": "box",
+                "pos": f"{_fmt(u[i])} {_fmt(-0.25*chord[i])} {_fmt(rise[i])}",
+                "quat": f"{_fmt(math.cos(half))} {_fmt(math.sin(half))} 0 0",
+                "size": f"{_fmt(0.5*dr[i])} {_fmt(0.5*chord[i])} "
+                        f"{_fmt(max(0.5*thick[i], 0.0015))}",
+                "mass": "0",
+                "contype": "0",
+                "conaffinity": "0",
+                "rgba": rgba,
+            },
+        )
+
+
+def _add_geoms(
+    body: ET.Element, s: Segment, extra_mass: float, *, detail: bool = False
+) -> None:
     """Attach collision/visual geometry and pin down the mass explicitly.
 
     Masses come from the phenotype's budget, not from geom density, because the
@@ -333,7 +414,11 @@ def _add_geoms(body: ET.Element, s: Segment, extra_mass: float) -> None:
     if s.is_surface and s.surface is not None:
         c_mean = float(np.mean(s.surface.chord))
         t_mean = float(np.mean(s.surface.thickness)) * c_mean
-        # A thin box spanning +X, chord along Y, thickness along Z.
+        rgba = "0.85 0.5 0.2 0.9" if s.kind == WING_KIND else "0.3 0.6 0.8 0.9"
+        # One thin box spanning +X, chord along Y, thickness along Z.  This
+        # carries the mass and does the colliding: a strip per station would
+        # multiply the contact count by ten for no dynamical gain, because the
+        # fluid loads come from the panel set and not from this geometry.
         ET.SubElement(
             body,
             "geom",
@@ -343,9 +428,12 @@ def _add_geoms(body: ET.Element, s: Segment, extra_mass: float) -> None:
                 "pos": f"{_fmt(0.5*L)} {_fmt(-0.25*c_mean)} 0",
                 "size": f"{_fmt(0.5*L)} {_fmt(0.5*c_mean)} {_fmt(max(0.5*t_mean, 0.002))}",
                 "mass": _fmt(mass),
-                "rgba": "0.85 0.5 0.2 0.9" if s.kind == WING_KIND else "0.3 0.6 0.8 0.9",
+                "rgba": _fmt_rgba_hidden(rgba)
+                        if (detail and _surface_has_shape(s)) else rgba,
             },
         )
+        if detail:
+            _add_surface_visual(body, s, rgba)
     elif s.kind in (HULL, BALLAST):
         ET.SubElement(
             body,
@@ -379,11 +467,20 @@ def build_model_xml(
     *,
     spawn: tuple[float, float, float] = (-6.0, 0.0, 1.5),
     scene: ET.Element | None = None,
+    detail: bool = False,
 ) -> tuple[str, list[str]]:
     """Compile a phenotype into MJCF.
 
     Returns the XML string and the list of actuator names in the same order as
     ``phenotype.actuators``, so the energy model can be indexed consistently.
+
+    ``detail`` draws each lifting surface as the tapered, twisted, dihedralled
+    shape the fluid solver reads, instead of the single flat box that collides
+    for it.  It is off by default and on for rendering, because the strips are
+    not free: they carry no mass and no collision, but MuJoCo still places every
+    geom each step, and a ray goes from 24 geoms to 114 and from 37 to 46
+    microseconds per step.  A quarter of the search budget is a lot to pay for a
+    picture nobody is looking at during a search.
     """
     root = scene if scene is not None else scene_xml()
     wb = root.find("worldbody")
@@ -463,7 +560,7 @@ def build_model_xml(
 
         m_extra = extra_root if s.parent < 0 else 0.0
         if not _add_field_geoms(root, body, s, max(s.mass + m_extra, 1e-4)):
-            _add_geoms(body, s, m_extra)
+            _add_geoms(body, s, m_extra, detail=detail)
 
         for c in children.get(s.index, ()):
             add_segment(c, body)

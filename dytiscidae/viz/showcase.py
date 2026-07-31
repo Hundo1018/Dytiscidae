@@ -260,7 +260,7 @@ def render_mission(
                              target_depth=spec.target_depth)
     rng = np.random.default_rng(seed)
 
-    env = TriphibianEnv(phenotype, seed=seed)
+    env = TriphibianEnv(phenotype, seed=seed, detail=True)
     # Recording is needed for both overlays: the wake sheds from the recorded
     # circulation and the stress probe reads the recorded panel forces.
     attach_wake_probe(env.solver)
