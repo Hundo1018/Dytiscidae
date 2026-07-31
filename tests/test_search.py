@@ -1476,11 +1476,28 @@ def test_a_run_can_be_picked_up_where_it_stopped() -> None:
         # went away mid-write -- must still be recovered.  They are the
         # expensive part: every cell is an evaluation someone paid for.
         (Path(tmp) / "search_state.pkl").unlink()
-        salvaged = run_search(SearchConfig(generations=8, resume=True, **base),
-                              MissionSpec())
+        # Pretend the archives got a long way before the machine went away.  The
+        # generation they carry is the only clue left, and the first version of
+        # this recovery did not copy it across -- so a run recovered from
+        # archives alone restarted near zero and redid everything.  A
+        # two-generation fixture cannot tell 1 from 0, which is why this forces
+        # a number that can.
+        for f in sorted(Path(tmp).glob("archive_*.pkl")):
+            a = Archive.load(f)
+            a.generation = 30
+            a.save(f)
+        salvaged_gen = None
+        cfg3 = SearchConfig(generations=32, resume=True, **base)
+        salvaged = run_search(cfg3, MissionSpec())
         n3 = sum(len(a.cells) for a in salvaged.archipelago.archives.values())
         check("an archive with no state file beside it is still recovered",
               n3 >= n1, f"{n1} elites recovered without the checkpoint")
+        check("and it resumes at the generation the archive records",
+              all(a.generation >= 30
+                  for a in salvaged.archipelago.archives.values() if a.cells),
+              f"archives say generation "
+              f"{ {n: a.generation for n, a in salvaged.archipelago.archives.items()} }")
+        del salvaged_gen
 
         # A fresh directory with --resume is a normal run, not an error.
         fresh = tempfile.mkdtemp(prefix="dyt-resume-fresh-")

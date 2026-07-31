@@ -733,10 +733,18 @@ def load_state(state: SearchState) -> int:
         a_path = run_dir / f"archive_{name}.pkl"
         if a_path.exists():
             restored = Archive.load(a_path)
-            state.archipelago.archives[name].cells = restored.cells
-            state.archipelago.archives[name].fronts = getattr(restored, "fronts", {})
-            state.archipelago.archives[name].tainted = restored.tainted
-            state.archipelago.archives[name].history = restored.history
+            live = state.archipelago.archives[name]
+            live.cells = restored.cells
+            live.fronts = getattr(restored, "fronts", {})
+            live.tainted = restored.tainted
+            live.history = restored.history
+            # Including the generation it was written at.  Leaving this out is
+            # invisible with a state file and ruinous without one: the fallback
+            # below reads it, so a thirty-generation run recovered from archives
+            # alone restarted at generation 1 and redid all of them.  Found only
+            # by running the recovery against a live run's directory rather than
+            # a two-generation fixture.
+            live.generation = restored.generation
 
     state.evaluated = int(d.get("evaluated", 0))
     state.tier0_rejected = int(d.get("tier0_rejected", 0))
