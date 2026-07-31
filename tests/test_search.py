@@ -1070,6 +1070,49 @@ def test_auditor_can_invalidate_and_veto() -> None:
     check("a veto with nothing invalid does nothing",
           not a.review_tightening(j, moves, invalid_designs=0))
 
+    # And the veto has to be *causal*.  It used to take a count of failed
+    # audits and roll back the most recent tightening in every domain, so one
+    # invalid design anywhere undid the air, water, land and transition bars
+    # together -- bars set by hundreds of samples it had no part in.  Audits
+    # find something most rounds; a ratchet reset most rounds never rises, and
+    # the judge would have stopped getting stricter while still reporting that
+    # it had.
+    def fresh_judge():
+        jj = Judge(quantile=0.9, update_every=1)
+        for _ in range(200):
+            jj.observe({"water": {"max_depth": 3.0}, "air": {"sink_rate": 4.0}})
+        mv = jj.maybe_tighten(1)
+        return jj, mv
+
+    j2, mv2 = fresh_judge()
+    water_bar, air_bar = j2.ratchets["water"].bar, j2.ratchets["air"].bar
+    check("two domains tightened together", water_bar > 0.0 and mv2,
+          f"water {water_bar:.2f} m, air {air_bar:.2f} m/s")
+    # A design invalidated on a shallow dive cannot have set the deep-water bar.
+    shallow = [{"water": {"max_depth": 0.4}, "air": {"sink_rate": 9.0}}]
+    vetoed2 = a.review_tightening(j2, mv2, shallow)
+    check("a design that never reached the bar cannot pull it down",
+          not vetoed2
+          and j2.ratchets["water"].bar == water_bar
+          and j2.ratchets["air"].bar == air_bar,
+          f"water still {j2.ratchets['water'].bar:.2f} m, "
+          f"air still {j2.ratchets['air'].bar:.2f} m/s")
+
+    j3, mv3 = fresh_judge()
+    w3 = j3.ratchets["water"].bar
+    # One that dove past the bar is in the tail the quantile came from, so its
+    # invalidation is a reason to undo the water bar -- and only that one.
+    deep = [{"water": {"max_depth": 9.0}, "air": {"sink_rate": 9.0}}]
+    a3_air = j3.ratchets["air"].bar
+    vetoed3 = a.review_tightening(j3, mv3, deep)
+    check("but one that set it does",
+          vetoed3 and j3.ratchets["water"].bar < w3,
+          f"water rolled back to {j3.ratchets['water'].bar:.2f} m")
+    check("and the domains it had nothing to do with are left alone",
+          j3.ratchets["air"].bar == a3_air,
+          f"air still {j3.ratchets['air'].bar:.2f} m/s "
+          f"(sink of 9.0 never met a {a3_air:.2f} bar)")
+
 
 def test_critic_learns_the_exploit_signature() -> None:
     """The critic must learn what cheap evaluation misses, and may only subtract.

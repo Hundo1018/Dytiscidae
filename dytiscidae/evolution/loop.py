@@ -385,6 +385,14 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     meta["stage_name"] = STAGES[sr.stage][0]
     meta["rungs"] = {d: j["rung"] for d, j in judged.items()}
     meta["judged"] = {d: round(j["total"], 3) for d, j in judged.items()}
+    # The raw numbers the judge's bars are quantiles *of*.  Kept so that if this
+    # design is later invalidated, the auditor can ask whether it is one of the
+    # designs that moved a bar, instead of rolling every bar back on the mere
+    # fact that some design somewhere failed an audit.
+    meta["ladder_measurements"] = {
+        **{d: dict(getattr(s, "measurements", {}) or {}) for d, s in result.segments.items()},
+        "transition": dict(tmeas),
+    }
     meta["critic_discount"] = round(discount, 3)
     meta["critic_features"] = [float(x) for x in cfeat]
 
@@ -712,9 +720,13 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
     curator.prune()
 
 
-def _audit(state: SearchState, gen: int, spec, rng) -> int:
-    """Audit the designs the critic is most suspicious of.  Returns how many
-    were invalidated.
+def _audit(state: SearchState, gen: int, spec, rng) -> list:
+    """Audit the designs the critic is most suspicious of.
+
+    Returns the ladder measurements of every design it invalidated -- not a
+    count.  The count was enough to say "something failed an audit" and not
+    enough to say *which bar it moved*, so the veto rolled back every domain
+    whenever any design anywhere was invalidated.
 
     Suspicion is used to *aim* the expensive check, not to punish -- a critic
     that can smell an exploit is most useful for deciding where to spend an
@@ -734,7 +746,7 @@ def _audit(state: SearchState, gen: int, spec, rng) -> int:
 
     ranked = sorted(archive.cells.values(),
                     key=lambda e: (-suspicion(e), -e.fitness))
-    invalid = 0
+    invalid: list[dict] = []
     for elite in ranked[: cfg.audits_per_review]:
         try:
             pheno = build(elite.genome)
@@ -756,7 +768,7 @@ def _audit(state: SearchState, gen: int, spec, rng) -> int:
         state.telemetry.event({"kind": "audit", "gen": gen, "island": state.island,
                                "cell": list(elite.cell), **rep.summary()})
         if rep.invalid:
-            invalid += 1
+            invalid.append(elite.meta.get("ladder_measurements") or {})
             archive.remove(elite.cell)
             if state.critic is not None:
                 f = elite.meta.get("critic_features")

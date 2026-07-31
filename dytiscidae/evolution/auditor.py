@@ -289,23 +289,59 @@ class Auditor:
 
     # ----------------------------------------------------------------- veto
 
-    def review_tightening(self, judge, moves: list, invalid_designs: int) -> list:
+    def review_tightening(self, judge, moves: list, invalid_designs) -> list:
         """Veto a bar that was moved by evidence that did not hold up.
 
         A tightening driven by a design the audit later invalidated makes the
         standard permanently harder for every honest design that follows, on the
         strength of something that never happened.  Rolling it back is the only
         remedy, because a ratchet by construction will not come down on its own.
+
+        The veto has to be *causal*, and it was not.  It took a count of failed
+        audits and rolled back the most recent tightening in every domain, so
+        one invalid design anywhere undid the air, water, land and transition
+        bars together -- including bars set by hundreds of samples the invalid
+        design had no part in.  Audits find something most rounds; a ratchet
+        reset most rounds is a ratchet that never rises, and the judge would
+        have quietly stopped getting stricter while still reporting that it had.
+
+        Now a bar comes down only when an invalidated design's own measurement
+        for that domain is at or past the bar -- that is, when it sat in the
+        tail the quantile was taken from and could actually have moved it.
+        ``invalid_designs`` is the list of those designs' ladder measurements;
+        an integer is still accepted and still means "roll everything back",
+        because that is the honest reading of a caller that cannot say which
+        design did what.
         """
-        if not moves or invalid_designs <= 0:
+        if not moves or not invalid_designs:
             return []
+        blanket = isinstance(invalid_designs, (int, float))
         vetoed = []
         for move in moves:
-            r = judge.ratchets.get(move["domain"])
-            if r is not None and r.rollback():
+            domain = move["domain"]
+            r = judge.ratchets.get(domain)
+            if r is None:
+                continue
+            if not blanket and not self._could_have_moved(r, domain, invalid_designs):
+                continue
+            if r.rollback():
                 vetoed.append(move)
                 self.vetoed_tightenings += 1
         return vetoed
+
+    @staticmethod
+    def _could_have_moved(ratchet, domain: str, invalid_designs: list) -> bool:
+        """Was an invalidated design in the tail that set this bar?"""
+        for meas in invalid_designs:
+            v = (meas or {}).get(domain, {}).get(ratchet.metric)
+            if v is None or not np.isfinite(v):
+                continue
+            if ratchet.lower_is_better:
+                if float(v) <= ratchet.bar:
+                    return True
+            elif float(v) >= ratchet.bar:
+                return True
+        return False
 
     def report(self) -> dict:
         recent = self.reports[-50:]
