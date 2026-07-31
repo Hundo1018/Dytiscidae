@@ -998,6 +998,87 @@ def test_auditor_can_invalidate_and_veto() -> None:
           not a.review_tightening(j, moves, invalid_designs=0))
 
 
+def test_critic_learns_the_exploit_signature() -> None:
+    """The critic must learn what cheap evaluation misses, and may only subtract.
+
+    The population is scored on Tier 1 because Tier 1 is cheap, and Tier 1 is
+    cheap because it is a proxy.  Every proxy has a gap, and the history of this
+    project is that gap being found: a battery drained on the first step to
+    truncate an episode, a hillside skimmed to fake sustained flight, a
+    coefficient the design silently depended on.  Each was caught by something
+    expensive, and each was caught only after hundreds of generations of
+    exploitation, because the expensive checks cannot run on everything.
+
+    So the critic is trained to predict what the expensive check would have
+    said, from the cheap measurements alone.  That makes the loop adversarial in
+    the useful direction: a new way of looking good cheaply and failing
+    expensively becomes training data, and the route closes.
+    """
+    print("\ncritic: learns the gap between cheap and expensive")
+    from dytiscidae.evolution.critic import CRITIC_FEATURES, Critic
+
+    rng = np.random.default_rng(0)
+    c = Critic(min_samples=60, refit_every=20)
+
+    def make(kind):
+        f = np.zeros(len(CRITIC_FEATURES))
+        if kind == "honest":
+            f[0] = rng.uniform(0.2, 0.6)
+            f[8] = rng.uniform(0.3, 2.0)
+            f[11] = np.log10(rng.uniform(60, 300))
+            f[12] = rng.uniform(3, 12)
+            return f, rng.uniform(0.7, 1.0)
+        # The wingless / battery-death family: looks the same cheaply.
+        f[0] = rng.uniform(0.3, 0.7)
+        f[8] = rng.uniform(-1.0, -0.8)
+        f[11] = np.log10(rng.uniform(3000, 500000))
+        f[12] = rng.uniform(0.0, 0.3)
+        return f, rng.uniform(0.0, 0.15)
+
+    check("an unfitted critic abstains entirely",
+          c.discount(make("exploit")[0]) == 1.0 and c.predict(np.zeros(16)) == 1.0)
+
+    for i in range(400):
+        f, retained = make("honest" if i % 2 else "exploit")
+        c.label(f, retained)
+        if c.due():
+            c.fit()
+
+    check("the critic fits and is calibrated", c.fitted and c.calibration > 0.5,
+          f"calibration {c.calibration:.2f} over {len(c._x)} labels")
+
+    honest = np.mean([c.predict(make("honest")[0]) for _ in range(100)])
+    exploit = np.mean([c.predict(make("exploit")[0]) for _ in range(100)])
+    check("it separates the two families", honest > exploit + 0.3,
+          f"predicts {honest:.2f} retention for honest, {exploit:.2f} for exploits")
+
+    d_honest = np.mean([c.discount(make("honest")[0]) for _ in range(100)])
+    d_exploit = np.mean([c.discount(make("exploit")[0]) for _ in range(100)])
+    check("and discounts the exploits harder", d_exploit < d_honest,
+          f"x{d_exploit:.3f} against x{d_honest:.3f}")
+
+    # It found the signature on its own, and can say what it found.
+    names = [d["feature"] for d in c.distrusts(top=2)]
+    check("it can report what it learned to distrust", "log_wing_loading" in names,
+          ", ".join(names))
+
+    # The two invariants that stop it running away.
+    worst = min(c.discount(make("exploit")[0]) for _ in range(200))
+    check("the discount is bounded", worst >= 1.0 - c.max_discount - 1e-9,
+          f"worst multiplier x{worst:.3f}, bound x{1 - c.max_discount:.2f}")
+    best = max(c.discount(make("honest")[0]) for _ in range(200))
+    check("and it can never raise a score", best <= 1.0 + 1e-9, f"best multiplier x{best:.3f}")
+
+    # A critic that has stopped predicting anything must stop mattering.
+    blind = Critic(min_samples=30, refit_every=10)
+    for _ in range(200):
+        blind.label(rng.normal(0, 1, len(CRITIC_FEATURES)), float(rng.uniform(0, 1)))
+    blind.fit()
+    check("a critic with no signal has no influence",
+          blind.calibration < 0.35 or blind.discount(np.zeros(16)) > 0.9,
+          f"calibration {blind.calibration:.2f}, discount x{blind.discount(np.zeros(16)):.3f}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -1019,6 +1100,7 @@ def main() -> int:
     test_transitions_are_graded_not_pass_fail()
     test_judge_ladder_is_fixed_and_bar_only_tightens()
     test_auditor_can_invalidate_and_veto()
+    test_critic_learns_the_exploit_signature()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

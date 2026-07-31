@@ -802,6 +802,73 @@ def test_flight_is_measured_against_the_ground_not_the_waterline() -> None:
           abs(env.clearance()) < 0.25, f"clearance {env.clearance():+.2f} m")
 
 
+def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
+    """A fast, streamlined entry must beat a slow, flat one.
+
+    Entry was scored on the vertical speed of the machine's centre against a
+    single "survivable speed" for the hull.  That cannot tell a gannet from a
+    belly-flop.  A gannet enters at 24 m/s and survives because it enters nose
+    first: the wetted area grows slowly, so the rate at which it entrains water
+    stays low.  A flat hull at a quarter of that speed wets all at once and is
+    destroyed.  Scoring on centre-of-mass speed gets that backwards and
+    penalises exactly the designs worth finding.
+
+    The load is now the von Karman-Wagner slamming force -- |d(m_add)/dt . v_n|,
+    the rate of entrainment times the closing speed -- which the solver was
+    already computing and the score was ignoring.  It reads attitude,
+    slenderness, deadrise and structural compliance for free, because all four
+    change how fast the body wets and all four are already in the dynamics.
+    """
+    print("\nfluid: entry shock reads the flow, not the speedometer")
+    from dytiscidae.core.bodyplans import ray
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    p = build(ray())
+    env = TriphibianEnv(p)
+    check("the hull has a slamming pressure capacity", p.slam_pressure_capacity > 1e4,
+          f"{p.slam_pressure_capacity / 1e3:.0f} kPa")
+
+    window = max(int(0.010 / env.timestep), 1)
+
+    def enter(pitch_deg: float, speed: float) -> float:
+        env.reset(Domain.AIR, randomise=False)
+        env.data.qpos[:3] = (-8.0, 0.0, 1.2)
+        a = math.radians(-pitch_deg)
+        env.data.qpos[3:7] = (math.cos(a / 2), 0.0, math.sin(a / 2), 0.0)
+        env.data.qvel[:] = 0.0
+        env.data.qvel[2] = -speed
+        env.solver.reset()
+        mujoco.mj_forward(env.model, env.data)
+        w, peak = [], 0.0
+        for _ in range(int(1.2 / env.timestep)):
+            env.step(env.cpg.command(env.cpg.base, env.data.time))
+            w.append(float(env.solver.diag.slam))
+            if len(w) > window:
+                w.pop(0)
+            if len(w) == window:
+                peak = max(peak, float(np.mean(w)))
+        pressure = peak / max(p.frontal_area, 1e-3)
+        return float(np.clip(1.0 - (pressure / p.slam_pressure_capacity) ** 2, 0.0, 1.0))
+
+    flat_slow = enter(0.0, 4.0)
+    flat_fast = enter(0.0, 8.0)
+    nose_slow = enter(80.0, 4.0)
+    nose_fast = enter(80.0, 8.0)
+
+    check("entering flat faster is worse", flat_fast < flat_slow,
+          f"{flat_slow:.3f} at 4 m/s -> {flat_fast:.3f} at 8 m/s")
+    check("entering nose-first beats entering flat at the same speed",
+          nose_slow > flat_slow, f"{nose_slow:.3f} against {flat_slow:.3f} at 4 m/s")
+    check(
+        "and a nose-first entry at twice the speed beats a flat one at half of it",
+        nose_fast > flat_slow,
+        f"nose-first at 8 m/s scores {nose_fast:.3f}, flat at 4 m/s scores {flat_slow:.3f}",
+    )
+    check("a flat entry well past the hull limit scores nothing", flat_fast == 0.0,
+          f"{flat_fast:.3f}")
+
+
 def test_free_surface_continuity() -> None:
     """Submerged fraction must sweep smoothly from 0 to 1 across the surface."""
     print("\nmedium: free surface")
@@ -976,6 +1043,7 @@ def main() -> int:
     test_bodies_generate_lift_and_a_pitching_moment()
     test_series_elasticity_needs_a_compliant_drive()
     test_flight_is_measured_against_the_ground_not_the_waterline()
+    test_entry_shock_is_hydrodynamic_not_a_speed_limit()
     test_free_surface_continuity()
     test_added_mass_dominates_in_water()
     test_lev_extends_stall()

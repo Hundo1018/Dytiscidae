@@ -88,6 +88,9 @@ class TransitionResult:
     exit_depth: float = 0.0
     exit_upright: float = 1.0
     exit_speed: float = 0.0
+    #: Peak slamming pressure and the hull's capacity for it, Pa.
+    slam_pressure: float = 0.0
+    slam_capacity: float = 0.0
 
     # Normalised components, all higher-is-better.
     shock: float = 0.0
@@ -166,6 +169,8 @@ def run_transition(
     cross_step = -1
     uprights: list[float] = []
     speeds: list[float] = []
+    slam_window: list[float] = []
+    slam_n = max(int(0.010 / env.timestep), 1)
 
     for i in range(n):
         if controller.policy is not None and basis is not None and i % control_every == 0:
@@ -186,7 +191,20 @@ def run_transition(
         uprights.append(up)
         speeds.append(float(np.linalg.norm(env.body_twist()[:3])))
         r.min_upright = min(r.min_upright, up)
-        r.peak_slam = max(r.peak_slam, float(env.solver.diag.slam))
+        # Slam over a short window, not a single step.
+        #
+        # ``diag.slam`` is a one-step finite difference of the entrained mass,
+        # so as a number it is sharp, timestep-dependent and dominated by
+        # whichever step happens to straddle the surface.  A shell does not
+        # respond to that: it responds over its own natural period, and an
+        # impulse far shorter than that period does not load it.  Averaging over
+        # 10 ms -- the order of a PETG shell's first mode at this size -- is
+        # both the physically meaningful load and a far less noisy estimator.
+        slam_window.append(float(env.solver.diag.slam))
+        if len(slam_window) > slam_n:
+            slam_window.pop(0)
+        if len(slam_window) == slam_n:
+            r.peak_slam = max(r.peak_slam, float(np.mean(slam_window)))
 
         wet = env.depth() > 0.0
         if wet != was_wet:
@@ -230,12 +248,30 @@ def _score(
         return
 
     # --- shock ------------------------------------------------------------
-    # Entry speed against what this hull survives.  Graded rather than a cliff:
-    # arriving at half the limit is genuinely better than arriving at 99% of it,
-    # and the old pass/fail could not say so.  Above the limit it goes to zero,
-    # because past that the hull is broken and there is nothing to grade.
-    limit = max(r.survivable_entry_speed, 0.2)
-    r.shock = float(np.clip(1.0 - (r.peak_entry_speed / limit) ** 2, 0.0, 1.0))
+    # The *hydrodynamic* slam load, not the speed of the machine's centre.
+    #
+    # ``diag.slam`` is |d(m_add)/dt . v_n|, the von Karman-Wagner slamming
+    # force: the rate at which the body entrains fluid, times how fast it is
+    # driving into it.  It was already being computed and recorded, and the
+    # score was ignoring it in favour of the root body's vertical speed.
+    #
+    # That was unfair to exactly the designs worth finding.  A gannet enters at
+    # 24 m/s and survives because it enters *nose first*, so the wetted area
+    # grows slowly and dm/dt stays small; a flat hull at 6 m/s wets all at once
+    # and is destroyed.  Scoring on centre-of-mass speed cannot tell those
+    # apart, and it penalises the fast elegant entry more.  Scoring on the slam
+    # load reads attitude, slenderness, deadrise and structural compliance for
+    # free, because all four change dm/dt and all four are already in the
+    # dynamics.
+    #
+    # Compared as a pressure against the hull's own membrane capacity, since
+    # that is what breaks a shell.
+    area = max(float(getattr(env.p, "frontal_area", 0.0)), 1e-3)
+    capacity = max(float(getattr(env.p, "slam_pressure_capacity", 1e5)), 1e3)
+    r.slam_pressure = float(r.peak_slam / area)
+    r.slam_capacity = capacity
+    util = r.slam_pressure / capacity
+    r.shock = float(np.clip(1.0 - util**2, 0.0, 1.0))
 
     # --- control ----------------------------------------------------------
     # Worst attitude through the crossing.  A machine that goes past 90 degrees

@@ -223,6 +223,12 @@ class Phenotype:
 
     #: Fastest water entry the hull survives, m/s.  Set by the structural pass.
     max_entry_speed: float = 4.0
+    #: Slamming *pressure* the hull survives, Pa.  Thin-shell hoop membrane:
+    #: p = sigma_allow * wall / radius.  This is what the measured hydrodynamic
+    #: slam load is compared against, rather than a speed, because the load a
+    #: hull actually sees depends on how fast it wets -- attitude, slenderness
+    #: and compliance -- and not on how fast its centre is moving.
+    slam_pressure_capacity: float = 1e5
     #: Volume of solid material, m^3.  Sealed gas space is buoyant minus this.
     _material_volume: float = 0.0
     #: N/m of buoyancy lost per metre of depth.  Positive means unstable.
@@ -805,8 +811,14 @@ def _structural_checks(p: Phenotype) -> None:
             report=p.report,
         )
         p.max_entry_speed = _survivable_entry_speed(big_hull, g.deadrise_deg)
+        wall = hull_wall(big_hull.radius)
+        p.slam_pressure_capacity = float(
+            big_hull.material.allowable_stress(cycles=1e3)
+            * wall / max(big_hull.radius, 1e-3)
+        )
     else:
         p.max_entry_speed = 2.0
+        p.slam_pressure_capacity = 2e4
 
     # Buoyancy envelope.  Both of these are stated as volumes rather than as
     # yes/no, so that a design which is close to working reads as *close*.  A
