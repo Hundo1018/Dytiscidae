@@ -192,15 +192,32 @@ class Curriculum:
             return "demoted"
         return "held"
 
+    def forget(self, cell) -> None:
+        """Drop a cell's stage when the cell itself is gone.
+
+        Without this the record outlives the design.  A cell that was promoted
+        and then quarantined, pruned or invalidated left its stage behind, and
+        the summary below reported it forever.
+        """
+        self.stages.pop(tuple(cell), None)
+
     def report(self) -> dict:
         if not self.stages:
-            return {"stages": {}, "promotions": 0, "demotions": 0, "reached": 0}
+            return {"stages": {}, "promotions": 0, "demotions": 0,
+                    "reached": 0, "typical": 0}
         counts = {}
         for s in self.stages.values():
             counts[STAGES[s][0]] = counts.get(STAGES[s][0], 0) + 1
+        vals = sorted(self.stages.values())
         return {
             "stages": counts,
             "promotions": self.promotions,
             "demotions": self.demotions,
-            "reached": max(self.stages.values()) if self.stages else 0,
+            # The furthest any one cell has got, and where the archive actually
+            # is.  Reporting only the first overstates progress badly: an
+            # archive of twenty cells at "single" and one at "directed" was
+            # being summarised as stage 2, because ``max`` was taken over cells
+            # that had since been removed as well as those still present.
+            "reached": vals[-1],
+            "typical": vals[len(vals) // 2],
         }

@@ -470,8 +470,13 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
     curricula: dict = {}
     for name in cfg.islands:
         a = Archive(BD_AXES)
-        archipelago.register(name, a, Curator(a, seed=cfg.seed))
+        cur = Curator(a, seed=cfg.seed)
+        archipelago.register(name, a, cur)
         curricula[name] = Curriculum()
+        # So that pruning or quarantining a cell also drops its stage: the
+        # curriculum is keyed by cell and nothing else was telling it when a
+        # cell stopped existing.
+        cur.curriculum = curricula[name]
 
     learned = (
         LearnedDescriptors(n_dims=len(BD_AXES), refit_every=cfg.descriptor_refit_every)
@@ -770,6 +775,7 @@ def _audit(state: SearchState, gen: int, spec, rng) -> list:
         if rep.invalid:
             invalid.append(elite.meta.get("ladder_measurements") or {})
             archive.remove(elite.cell)
+            state.curriculum.forget(elite.cell)
             if state.critic is not None:
                 f = elite.meta.get("critic_features")
                 if f:

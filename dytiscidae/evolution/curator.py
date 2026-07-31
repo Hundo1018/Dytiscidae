@@ -165,6 +165,10 @@ class Curator:
         crowding_limit: int = 14,
     ) -> None:
         self.archive = archive
+        #: Set by the loop.  When a cell is dropped its curriculum stage has to
+        #: go with it, or the stage record outlives the design and the run
+        #: reports a progress the archive no longer contains.
+        self.curriculum = None
         self.rng = np.random.default_rng(seed)
         self.bandit = OperatorBandit()
         self.tier2_budget_fraction = tier2_budget_fraction
@@ -337,6 +341,13 @@ class Curator:
         # it so the search stops breeding from a known trap.
         if self.archive.tainted[cell] >= 3:
             self.archive.remove(cell)
+            self._forget(cell)
+
+    def _forget(self, cell) -> None:
+        """Tell the curriculum a cell is gone, if one is attached."""
+        c = getattr(self, "curriculum", None)
+        if c is not None:
+            c.forget(cell)
 
     # -------------------------------------------------------- 5. regime control
 
@@ -431,6 +442,7 @@ class Curator:
             if e is not None and id(e) in reserved:
                 continue
             a.remove(cell)
+            self._forget(cell)
             removed += 1
         self.prunes += removed
         return removed

@@ -1281,6 +1281,38 @@ def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> 
     check("and a cell that can no longer earn its stage is demoted",
           c.stage_of(cell) < before, f"{before} -> {c.stage_of(cell)}")
 
+    # What the run reports about the curriculum has to be what the archive
+    # contains.  ``reached`` is a max, it was taken over every cell the
+    # curriculum had ever seen including ones since removed, and it was the only
+    # number the progress line printed -- so an archive of twenty cells at
+    # "single" and one at "directed" was being reported as stage 2, and I read
+    # it that way in my own summaries.
+    c2 = Curriculum()
+    for i in range(6):
+        c2.stages[(i, 0, 0, 0)] = 0
+    c2.stages[(9, 9, 9, 9)] = 3
+    rep = c2.report()
+    check("the report says where the archive typically is, not only its furthest",
+          rep["typical"] == 0 and rep["reached"] == 3,
+          f"typical {rep['typical']}, reached {rep['reached']}")
+    c2.forget((9, 9, 9, 9))
+    rep = c2.report()
+    check("and a stage does not outlive the cell that earned it",
+          rep["reached"] == 0, f"reached {rep['reached']} after the cell was dropped")
+
+    # The curator is what removes cells, so it is what has to say so.
+    from dytiscidae.evolution.archive import Archive as _Archive
+    from dytiscidae.evolution.curator import Curator as _Curator
+
+    a2 = _Archive([("x", 0.0, 1.0, 4), ("y", 0.0, 1.0, 4)])
+    cur2 = _Curator(a2, seed=0)
+    c3 = Curriculum()
+    cur2.curriculum = c3
+    c3.stages[(1, 1)] = 2
+    cur2._forget((1, 1))
+    check("dropping a cell drops its stage with it",
+          c3.report()["reached"] == 0, "curator notifies the curriculum")
+
     # The archipelago moves genes between lineages, which biology cannot.
     from dytiscidae.evolution.archive import Archive
     from dytiscidae.evolution.curator import Curator
