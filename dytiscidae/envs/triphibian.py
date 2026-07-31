@@ -361,6 +361,9 @@ class TriphibianEnv:
             # Free joint velocity is [linear, angular] in the world frame, and
             # the spawn attitude is identity, so body +x is world +x.
             self.data.qvel[0] = self.launch_speed
+            # Released in trim: at the attitude that balances, not flat.
+            a = self.launch_pitch
+            self.data.qpos[3:7] = (math.cos(-a / 2), 0.0, math.sin(-a / 2), 0.0)
         self.solver.reset()
         self.cpg.reset()
         self.budget.reset()
@@ -368,29 +371,118 @@ class TriphibianEnv:
 
     @property
     def launch_speed(self) -> float:
-        """Airspeed the air segment begins at, m/s: this design's own trim speed.
+        """Airspeed the air segment begins at: the speed at which this design's
+        measured lift actually balances its weight.
 
-        ``V = sqrt(2 W / (rho S CL))`` at CL = 0.9, so by construction the
-        launch is the condition at which *this* machine's surfaces balance its
-        weight.  A single fixed launch speed cannot do that job: measured
-        against a static pitch sweep, this world's plans reach L/W = 1 anywhere
-        between 16 and 24 m/s, so any one number is far above some designs'
-        flight speed and far below others'.  Launching everyone at 10 m/s meant
-        launching everyone below their trim speed, and none of them could hold
-        altitude no matter how well they were controlled.
+        This was ``sqrt(2W / (rho S CL))`` at CL = 0.9 -- the textbook trim
+        speed for a wing that reaches CL = 0.9.  These surfaces do not.  Sitting
+        at whatever dihedral and twist the CPPN gave them, driven by a pattern
+        generator that is not holding them at an angle of attack, their
+        *effective* CL at the natural attitude is around 0.35.  So every design
+        was being launched at about 60% of the speed it needed, arriving at
+        L/W of 0.4 to 0.5, and falling immediately -- measured across the five
+        plans: launched at 9.6-30 m/s against real trim speeds of 15.4-29.3.
 
-        This is not a gift.  Being placed at trim speed says nothing about
-        whether a machine can *stay* there -- it still has to overcome its own
-        drag, stay the right way up, and not shake itself apart, and a design
-        with a small wing gets a correspondingly high launch speed and a
-        correspondingly brutal drag bill to pay for it.
+        No controller can fix that.  Training one on the ray moved its sink rate
+        from 6.98 m/s to 6.62: the body was never given enough airspeed to fly,
+        and the search was reading the result as "cannot fly" for every design
+        at once.
+
+        So the speed is *measured*, by the same solver that will fly the
+        episode: sweep pitch at a series of speeds and find the lowest one where
+        the best attitude produces at least the machine's weight.  A design with
+        no such speed inside a sane range is launched at the cap and falls,
+        which is the correct answer for a design that cannot fly.
+
+        The same principle as replacing the entry-speed proxy with the measured
+        slam load: where a quantity can be measured with the model that is about
+        to be used, an idealised formula for it is a source of error nobody
+        sees.
         """
-        from ..physics.medium import AIR
+        return float(self._trim()[0])
 
-        s = max(self.p.wing_area, 1e-3)
-        v = math.sqrt(2.0 * self.p.mass * GRAVITY / (AIR.rho * s * 0.9))
+    @property
+    def launch_pitch(self) -> float:
+        """Nose-up attitude the air segment begins at, radians.
+
+        A flight test releases the aircraft *in trim*: at the speed and the
+        attitude where it balances.  Launching at the right speed and a level
+        attitude is not a fair test of whether a machine can fly, it is a test
+        of whether it can recover from being thrown flat -- and every design
+        here failed it for the same reason, which is a sign the test rather than
+        the designs was wrong.
+
+        Holding trim once released is still entirely the machine's problem, and
+        it is the problem worth measuring.
+        """
+        return float(self._trim()[1])
+
+    def _trim(self) -> tuple:
+        cached = getattr(self.p, "_measured_trim", None)
+        if cached is not None:
+            return cached
         lo, hi = self.LAUNCH_SPEED_RANGE
-        return float(np.clip(v, lo, hi))
+        out = self._measure_trim_speed(lo, hi)
+        try:
+            self.p._measured_trim = out
+        except Exception:
+            pass
+        return out
+
+    def _measure_trim_speed(self, lo: float, hi: float, n_pitch: int = 11) -> tuple:
+        """Lowest airspeed at which some attitude produces at least the weight,
+        and the attitude that does it.  Returns ``(speed, pitch)``.
+
+        Bisection on speed with a pitch sweep inside it.  A couple of hundred
+        solver evaluations, a few hundred milliseconds -- once per phenotype,
+        cached, against an evaluation that costs seconds.
+        """
+        mj = self._mj
+        m, d = self.model, self.data
+        weight = self.p.mass * GRAVITY
+        pitches = np.radians(np.linspace(-4.0, 34.0, n_pitch))
+
+        def best_lift(v: float) -> tuple:
+            # The pose is set directly rather than through ``reset``, because
+            # ``reset`` reads ``launch_speed`` and this is what computes it.
+            best, best_a = -1e18, pitches[0]
+            for a in pitches:
+                mj.mj_resetData(m, d)
+                if m.nq >= 7:
+                    x, y, z = self.SPAWN[Domain.AIR]
+                    d.qpos[:3] = (x, y, z)
+                    d.qpos[3:7] = (math.cos(-a / 2), 0.0, math.sin(-a / 2), 0.0)
+                    d.qvel[:] = 0.0
+                    d.qvel[0] = v
+                self.solver.reset()
+                mj.mj_forward(m, d)
+                d.xfrc_applied[:] = 0.0
+                self.solver.apply(d, 0.0)
+                # Remove the added-mass gravity compensation: it is not lift.
+                fz = float(d.xfrc_applied[:, 2].sum()) - self.solver.diag.added_mass * GRAVITY
+                if fz > best:
+                    best, best_a = fz, a
+            self.solver.reset()
+            return best, best_a
+
+        top, top_a = best_lift(hi)
+        if top < weight:
+            # Cannot fly at any speed we are willing to model.  Launched at the
+            # cap, at the attitude that does least badly, and it will fall --
+            # which is the correct answer for a design that cannot fly.
+            return float(hi), float(top_a)
+        base, base_a = best_lift(lo)
+        if base >= weight:
+            return float(lo), float(base_a)
+        a, b, b_a = lo, hi, top_a
+        for _ in range(10):
+            mid = 0.5 * (a + b)
+            f, f_a = best_lift(mid)
+            if f >= weight:
+                b, b_a = mid, f_a
+            else:
+                a = mid
+        return float(np.clip(b, lo, hi)), float(b_a)
 
     def _clear_of_terrain(self, x: float, y: float, z: float, gap: float = 0.05) -> float:
         """Height at which the machine's lowest geometry sits ``gap`` above ground.

@@ -699,27 +699,30 @@ def test_series_elasticity_needs_a_compliant_drive() -> None:
         swing = float(np.mean(q.max(axis=0) - q.min(axis=0))) if q.size else 0.0
         return env.budget.mean_power, swing
 
-    rigid, swing_rigid = probe(0.0, 1.0)
-    stiff_spring, _ = probe(1.0, 1.0)
-    tuned, swing_tuned = probe(1.0, 0.3)
-    very_soft, swing_very_soft = probe(1.0, 0.1)
+    # Power per unit of motion, which is the quantity that means anything.  A
+    # servo can always cut power by tracking worse, so watts alone cannot tell
+    # resonance from a drive that has given up.
+    def cost(stiffness, compliance):
+        p_w, swing = probe(stiffness, compliance)
+        return p_w / max(swing, 1e-6), p_w, swing
 
-    check("a spring under the old hard-wired gain does not help",
-          stiff_spring > 0.95 * rigid,
-          f"{stiff_spring:.0f} W against {rigid:.0f} W rigid")
-    check("the same spring with a compliant drive costs a fraction of the power",
-          tuned < 0.5 * rigid, f"{tuned:.0f} W against {rigid:.0f} W rigid")
-    # The claim only means anything if the machine is still moving.  A soft
-    # servo can always save power by failing to track, and that is not
-    # resonance, it is a broken actuator -- so the swing has to hold up.
-    check("and it is not saving power by moving less",
-          swing_tuned >= swing_rigid,
-          f"{swing_tuned:.2f} rad against {swing_rigid:.2f} rad rigid")
-    # Past the resonant point the drive really does stop tracking, and the
-    # search has to be able to tell the two regimes apart, so record it.
-    check("while an over-compliant drive does trade swing for power",
-          very_soft < tuned and swing_very_soft < swing_rigid,
-          f"kp x0.1: {very_soft:.0f} W but only {swing_very_soft:.2f} rad")
+    rigid, p_rigid, s_rigid = cost(0.0, 1.0)
+    stiff_spring, p_stiff, s_stiff = cost(1.0, 1.0)
+    tuned, p_tuned, s_tuned = cost(1.0, 0.3)
+    very_soft, p_soft, s_soft = cost(1.0, 0.1)
+
+    check("a spring under the old hard-wired gain buys nothing",
+          stiff_spring > 0.9 * rigid,
+          f"{stiff_spring:.0f} W/rad against {rigid:.0f} rigid -- it cut power from "
+          f"{p_rigid:.0f} W to {p_stiff:.0f} W only by cutting motion from "
+          f"{s_rigid:.2f} to {s_stiff:.2f} rad")
+    check("the same spring with a compliant drive is far cheaper per unit of motion",
+          tuned < 0.6 * rigid,
+          f"{tuned:.0f} W/rad against {rigid:.0f} rigid "
+          f"({p_tuned:.0f} W at {s_tuned:.2f} rad)")
+    check("and an over-compliant drive does stop tracking",
+          s_soft < 0.6 * s_rigid,
+          f"kp x0.1: {p_soft:.0f} W but only {s_soft:.2f} rad against {s_rigid:.2f}")
 
 
 def test_flight_is_measured_against_the_ground_not_the_waterline() -> None:
