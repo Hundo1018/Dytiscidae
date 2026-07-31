@@ -142,6 +142,13 @@ def _energy_phrase(r: "ContinuousResult") -> str:
 #:
 #: So: in the domain for a majority of a half-second window.  Chatter at 26%
 #: does not qualify; a runner at 74% does.
+#:
+#: Scope, because it is the first thing to ask about a scoring bug: this module
+#: is used by controller training and by the showcase film, and by nothing else.
+#: The search never saw it.  Tier 1 scores crossings in ``envs/transitions.py``,
+#: which watches the waterline actually being crossed and demands half a metre
+#: of clearance before calling something airborne; Tier 2 re-places the machine
+#: for each leg and does not score transitions at all.  Both were checked.
 ENTRY_WINDOW = 0.5
 ENTRY_MAJORITY = 0.6
 
