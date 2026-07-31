@@ -948,7 +948,28 @@ class TriphibianEnv:
             "land_speed": float(res.mean_speed),
             "slope_climbed": max(climbed, 0.0),
         })
-        return served * float(0.4 * progress + 0.3 * contact + 0.3 * upright)
+        # Posture *gates* locomotion rather than substituting for it.
+        #
+        # This was ``0.4*progress + 0.3*contact + 0.3*upright``, and measured
+        # across the six plans progress is 0.003 to 0.13 while contact and
+        # upright are both around 0.95.  So six tenths of a locomotion score was
+        # awarded for lying still the right way up, every design scored 0.54 to
+        # 0.60, and the spread between a machine that covered 0.63 m and one
+        # that covered 0.01 m was 0.055.  A rock scores 0.57.
+        #
+        # A machine that falls over or leaves the ground cannot walk, so posture
+        # belongs in front as a precondition -- which is how the air score
+        # already treats being airborne.  And the climb term was computed here,
+        # commented as "walking uphill is the capability, not merely moving",
+        # and then left out of the return: measured, documented as the point,
+        # and never read, which is exactly what the camber gene was doing.
+        #
+        # The absolute numbers drop a long way because nothing walks yet.  The
+        # gradient is what matters and it improves by more than an order of
+        # magnitude: the spread across these six plans goes from 1.1x to 36x.
+        posture = 0.5 * contact + 0.5 * upright
+        climb = float(np.clip(max(climbed, 0.0) / 0.5, 0.0, 1.0))
+        return served * posture * float(0.65 * progress + 0.35 * climb)
 
     # ------------------------------------------------------------- mobility ID
 
