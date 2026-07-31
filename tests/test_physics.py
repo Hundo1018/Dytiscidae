@@ -1215,44 +1215,37 @@ def test_series_elasticity_needs_a_compliant_drive() -> None:
         wings = [i for i, n in enumerate(e.act_names)
                  if any(x.name == n[:-2] and x.kind == "wing" for x in ph.segments)]
         e.reset(Domain.AIR, randomise=False)
-        worst = 0.0
+        q, c = [], []
         for _ in range(int(secs / e.timestep)):
-            u = e.cpg.command(e.cpg.base, e.data.time)
+            u = np.asarray(e.cpg.command(e.cpg.base, e.data.time), float)
             e.step(u)
-            worst = max(worst, float(
-                np.abs(e.data.qpos[7:][wings] - np.asarray(u, float)[wings]).max()))
-        return worst, e.budget.mean_power
+            q.append(e.data.qpos[7:][wings].copy())
+            c.append(u[wings].copy())
+        # Steady state, over the second half.  The worst error over the whole
+        # run is not the servo at all: every joint starts at zero and is
+        # commanded somewhere else, so the maximum is the initial slew and comes
+        # out identical at every gain.  Measured that way this looked like a
+        # gene with no cost, which it is not.
+        q, c = np.array(q), np.array(c)
+        h = len(q) // 2
+        err = float(np.abs(q[h:].mean(axis=0) - c[h:].mean(axis=0)).max())
+        return err, e.budget.mean_power
 
+    # The cost of a soft drive shows up on a surface whose job is to *hold*, and
+    # it shows up in the steady state.  Measured across the reachable range the
+    # trade is monotone in both directions: sag 0.57 deg at kp x4 to 5.09 deg at
+    # kp x0.05, while mean power falls 17.8 W to 6.7 W.  Nine times the sag for
+    # under three times the power, which is a real choice for the search to make
+    # rather than a free lunch.
     hold_stiff, p_hold_stiff = hold_error(1.0)
     hold_soft, p_hold_soft = hold_error(0.05)
-    # What is actually true, stated rather than wished for: within the gain
-    # range a design can reach, softening the drive costs nothing measurable.
-    # It was checked three ways -- swing amplitude on an oscillating fin,
-    # tracking error against the commanded angle, and hold error on a loaded
-    # trim surface -- and on this machine all three are flat from kp x4 to
-    # kp x0.05 while power falls by a factor of two to three.  Raising the
-    # motor does not change it either, so it is not torque saturation.
-    #
-    # That makes ``drive_compliance`` a one-sided gene as it stands: the search
-    # will drive it to the floor and the floor is the only thing stopping it.
-    # So the floor is what gets asserted, because it is what is load-bearing.
-    # Leaving a check here that pretends to measure a cost would be worse than
-    # admitting there is not one -- it would go green while meaning nothing.
     check("softening the drive saves real power",
           p_hold_soft < 0.75 * p_hold_stiff,
           f"{p_hold_soft:.0f} W at kp x0.05 against {p_hold_stiff:.0f} W at full gain")
-    check("and its cost is not visible in how well the surface holds",
-          abs(hold_soft - hold_stiff) < 0.25 * max(hold_stiff, 1e-6),
-          f"{math.degrees(hold_soft):.1f} deg against {math.degrees(hold_stiff):.1f} deg "
-          f"-- so nothing but the clamp bounds this gene")
-    from dytiscidae.core.mjcf import build_model_xml as _bx
-
-    xml_soft, _ = _bx(build(_gannet_with_compliance(0.0)))
-    kps = [float(t.split('kp="')[1].split('"')[0])
-           for t in xml_soft.split("<position")[1:] if 'kp="' in t]
-    check("which the model clamps, so a free lunch is bounded by construction",
-          kps and min(kps) > 0.0,
-          f"lowest servo gain emitted is {min(kps):.3f} at drive_compliance 0")
+    check("and it is paid for in incidence the surface does not keep",
+          hold_soft > 1.5 * hold_stiff,
+          f"a trim wing settles {math.degrees(hold_soft):.1f} deg off its command at "
+          f"kp x0.05 against {math.degrees(hold_stiff):.1f} deg at full gain")
 
 
 def test_flight_is_measured_against_the_ground_not_the_waterline() -> None:
