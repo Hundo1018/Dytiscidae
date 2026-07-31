@@ -34,9 +34,18 @@ def load_run_archive(run_dir):
     Islands are merged by taking each island's archive in turn and keeping the
     better occupant of any cell two islands both filled.  That is not a
     principled cross-island comparison -- the islands score on different
-    objectives, which is the whole point of having them -- so each elite is
-    tagged with the island it came from and the caller can filter.  For picking
-    something to film, "the best thing anywhere" is the right question.
+    objectives, which is the whole point of having them.  For picking something
+    to film, "the best thing anywhere" is the right question; for anything else,
+    read the per-island archives.
+
+    Each elite carries ``meta["island"]``, the island whose copy won the cell,
+    and ``meta["islands"]``, every island that held that cell at all.  Both are
+    needed and the second is the honest one: seeding files the same design on
+    every island, so for a seed the singular tag is whichever archive happened
+    to be read first, and reading it as "where this design lives" is wrong.  It
+    is written down because that is exactly how it was misread an hour after
+    being introduced -- the flyer looked like it was on the land island and
+    absent from the air one, and it was on all six.
     """
     from ..evolution.archive import Archive
 
@@ -57,13 +66,23 @@ def load_run_archive(run_dir):
         for e in a.cells.values():
             e.meta = dict(e.meta or {})
             e.meta.setdefault("island", name)
+            e.meta["islands"] = [name]
         if merged is None:
             merged = a
             continue
         for cell, e in a.cells.items():
             held = merged.cells.get(cell)
-            if held is None or e.fitness > held.fitness:
+            if held is None:
                 merged.cells[cell] = e
+                continue
+            # The cell exists on more than one island; record that before
+            # deciding which copy to keep, or the fact is lost.
+            seen = list(held.meta.get("islands", [])) + [name]
+            if e.fitness > held.fitness:
+                e.meta["islands"] = seen
+                merged.cells[cell] = e
+            else:
+                held.meta["islands"] = seen
         merged.tainted.update(a.tainted)
         merged.generation = max(merged.generation, a.generation)
     return merged, islands
