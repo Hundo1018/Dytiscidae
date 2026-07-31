@@ -75,6 +75,11 @@ class ContinuousResult:
     peak_stress: float = 0.0
     stress_overload_time: float = 0.0
     wall_time: float = 0.0
+    #: What ``energy_wh`` was billed for, in seconds of mission.  A filmed run
+    #: is time-compressed and the battery is not, so the energy is scaled up to
+    #: the duration it represents -- and reporting that scaled figure next to
+    #: the *unscaled* clock implied 4.7 kW for a machine drawing 190 W.
+    billed_seconds: float = 0.0
 
     @property
     def on_task(self) -> float:
@@ -91,15 +96,29 @@ class ContinuousResult:
             return 0.0
         return self.transitions_completed / self.transitions_commanded
 
+    @property
+    def mean_power_w(self) -> float:
+        """Mean draw, on the time base the energy was billed against."""
+        secs = self.billed_seconds or self.total_time
+        return self.energy_wh * 3600.0 / max(secs, 1e-9)
+
     def summary(self) -> str:
         return (
             f"on-task {self.on_task*100:.0f}%   "
             f"transitions {self.transitions_completed}/{self.transitions_commanded}   "
             f"max depth {self.max_depth:.1f} m   "
             f"peak stress {self.peak_stress*100:.0f}%   "
-            f"{self.energy_wh:.1f} Wh over {self.total_time:.0f} s"
+            + _energy_phrase(self)
             + (f"   FAILED: {self.failure}" if not self.survived else "")
         )
+
+
+def _energy_phrase(r: "ContinuousResult") -> str:
+    """Energy and the duration it was actually billed for."""
+    if r.billed_seconds and abs(r.billed_seconds - r.total_time) > 1e-6:
+        return (f"{r.energy_wh:.1f} Wh over {r.billed_seconds:.0f} s of mission "
+                f"({r.mean_power_w:.0f} W, filmed in {r.total_time:.0f} s)")
+    return f"{r.energy_wh:.1f} Wh over {r.total_time:.0f} s ({r.mean_power_w:.0f} W)"
 
 
 def current_domain(env: TriphibianEnv) -> Domain:
@@ -225,6 +244,7 @@ def run_continuous(
 
     result.total_time = clock
     result.energy_wh = env.budget.total_j / 3600.0 * energy_scale
+    result.billed_seconds = clock * energy_scale
     result.wall_time = time.time() - t0
     return result
 
