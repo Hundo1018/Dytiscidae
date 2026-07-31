@@ -429,41 +429,76 @@ class TriphibianEnv:
             pass
         return out
 
-    def _measure_trim_speed(self, lo: float, hi: float, n_pitch: int = 11) -> tuple:
-        """Lowest airspeed at which some attitude produces at least the weight,
-        and the attitude that does it.  Returns ``(speed, pitch)``.
+    #: Margin over the stall-limited minimum speed at which the air segment
+    #: begins.  Launching *at* the minimum is launching at the top of the lift
+    #: curve, which is the one attitude from which any disturbance drops the
+    #: machine; 1.2 Vs is the ordinary approach margin and the same reasoning.
+    LAUNCH_MARGIN = 1.2
 
-        Bisection on speed with a pitch sweep inside it.  A couple of hundred
-        solver evaluations, a few hundred milliseconds -- once per phenotype,
-        cached, against an evaluation that costs seconds.
+    def _measure_trim_speed(self, lo: float, hi: float, n_pitch: int = 25) -> tuple:
+        """Airspeed and attitude the air segment begins at.  Returns
+        ``(speed, pitch)``.
+
+        Two steps, because the answer to "what is the slowest this can fly" is
+        not the answer to "how should it be released".
+
+        First the stall speed: bisect for the lowest airspeed at which *some*
+        attitude produces at least the machine's weight.  The attitude that does
+        it is by construction the one at maximum CL, which for this model is
+        deep in the post-stall regime -- and releasing a machine there is
+        releasing it stalled, at maximum drag, with no lift in reserve.  Every
+        body plan was being launched at 34 degrees nose-up, the ceiling of the
+        pitch sweep, because that is where a stalled plate makes the most lift.
+
+        So the launch is at ``LAUNCH_MARGIN`` times that speed, at the *lowest*
+        pitch that carries the weight there -- the unstalled root of the trim
+        equation rather than the stalled one.  That is a flying trim: on the
+        front side of the drag curve, with margin above stall in both speed and
+        incidence.  Holding it once released remains the machine's problem.
+
+        Bisection on speed with a pitch sweep inside it.  A few hundred solver
+        evaluations, a few hundred milliseconds -- once per phenotype, cached,
+        against an evaluation that costs seconds.
         """
         mj = self._mj
         m, d = self.model, self.data
         weight = self.p.mass * GRAVITY
-        pitches = np.radians(np.linspace(-4.0, 34.0, n_pitch))
+        pitches = np.radians(np.linspace(-4.0, 44.0, n_pitch))
 
-        def best_lift(v: float) -> tuple:
+        def lift_at(v: float, a: float) -> float:
             # The pose is set directly rather than through ``reset``, because
             # ``reset`` reads ``launch_speed`` and this is what computes it.
+            mj.mj_resetData(m, d)
+            if m.nq >= 7:
+                x, y, z = self.SPAWN[Domain.AIR]
+                d.qpos[:3] = (x, y, z)
+                d.qpos[3:7] = (math.cos(-a / 2), 0.0, math.sin(-a / 2), 0.0)
+                d.qvel[:] = 0.0
+                d.qvel[0] = v
+            self.solver.reset()
+            mj.mj_forward(m, d)
+            d.xfrc_applied[:] = 0.0
+            self.solver.apply(d, 0.0)
+            # Remove the added-mass gravity compensation: it is not lift.
+            return float(d.xfrc_applied[:, 2].sum()) - self.solver.diag.added_mass * GRAVITY
+
+        def best_lift(v: float) -> tuple:
             best, best_a = -1e18, pitches[0]
             for a in pitches:
-                mj.mj_resetData(m, d)
-                if m.nq >= 7:
-                    x, y, z = self.SPAWN[Domain.AIR]
-                    d.qpos[:3] = (x, y, z)
-                    d.qpos[3:7] = (math.cos(-a / 2), 0.0, math.sin(-a / 2), 0.0)
-                    d.qvel[:] = 0.0
-                    d.qvel[0] = v
-                self.solver.reset()
-                mj.mj_forward(m, d)
-                d.xfrc_applied[:] = 0.0
-                self.solver.apply(d, 0.0)
-                # Remove the added-mass gravity compensation: it is not lift.
-                fz = float(d.xfrc_applied[:, 2].sum()) - self.solver.diag.added_mass * GRAVITY
+                fz = lift_at(v, a)
                 if fz > best:
                     best, best_a = fz, a
             self.solver.reset()
             return best, best_a
+
+        def lowest_pitch(v: float, fallback: float) -> float:
+            """First attitude in the sweep that carries the weight at ``v``."""
+            for a in pitches:
+                if lift_at(v, a) >= weight:
+                    self.solver.reset()
+                    return float(a)
+            self.solver.reset()
+            return float(fallback)
 
         top, top_a = best_lift(hi)
         if top < weight:
@@ -473,16 +508,19 @@ class TriphibianEnv:
             return float(hi), float(top_a)
         base, base_a = best_lift(lo)
         if base >= weight:
-            return float(lo), float(base_a)
-        a, b, b_a = lo, hi, top_a
-        for _ in range(10):
-            mid = 0.5 * (a + b)
-            f, f_a = best_lift(mid)
-            if f >= weight:
-                b, b_a = mid, f_a
-            else:
-                a = mid
-        return float(np.clip(b, lo, hi)), float(b_a)
+            v_stall = lo
+        else:
+            a, b = lo, hi
+            for _ in range(10):
+                mid = 0.5 * (a + b)
+                f, _f_a = best_lift(mid)
+                if f >= weight:
+                    b = mid
+                else:
+                    a = mid
+            v_stall = b
+        v = float(np.clip(v_stall * self.LAUNCH_MARGIN, lo, hi))
+        return v, lowest_pitch(v, top_a)
 
     def _clear_of_terrain(self, x: float, y: float, z: float, gap: float = 0.05) -> float:
         """Height at which the machine's lowest geometry sits ``gap`` above ground.

@@ -194,9 +194,13 @@ def beetle() -> Genome:
     """Bilateral flapper with swimming paddles.  The diving beetle."""
     g = Genome()
     g.cppns = [
-        # Tapered, washed-out wing: chord falls outboard, twist negative.
-        _cppn({(U, CHORD): -1.30, (BIAS, CHORD): 0.55, (U, TWIST): -0.85,
-               (BIAS, TWIST): 0.10, (BIAS, CAMBER): 0.60, (U, THICK): -0.70,
+        # Tapered wing with mild washout: +8 deg at the root falling to +1 at
+        # the tip, so the root stalls first.  The twist weights here used to be
+        # four times that, which was tuned against an inverted twist sign and
+        # left the tip at -22 deg -- the plan only trimmed by pitching the whole
+        # machine up 34 deg to compensate.
+        _cppn({(U, CHORD): -1.30, (BIAS, CHORD): 0.55, (U, TWIST): -0.20,
+               (BIAS, TWIST): 0.23, (BIAS, CAMBER): 0.60, (U, THICK): -0.70,
                (BIAS, THICK): 0.30, (U, DIHED): 0.35}),
         # Rowing blade: widens outboard, blunt, untwisted.
         _cppn({(U, CHORD): 0.55, (BIAS, CHORD): 0.35, (BIAS, CAMBER): 0.25,
@@ -282,8 +286,8 @@ def bat() -> Genome:
     """
     g = Genome()
     g.cppns = [
-        _cppn({(U, CHORD): -0.35, (BIAS, CHORD): 0.75, (U, TWIST): -0.55,
-               (BIAS, CAMBER): 0.85, (BIAS, THICK): -0.85}),
+        _cppn({(U, CHORD): -0.35, (BIAS, CHORD): 0.75, (U, TWIST): -0.17,
+               (BIAS, TWIST): 0.20, (BIAS, CAMBER): 0.85, (BIAS, THICK): -0.85}),
     ]
     g.body_cppns = [_fusiform(taper=0.95, flatten=0.8)]
     body = Part(kind=HULL, length=0.44, radius=0.062, material="petg", joint="none",
@@ -363,8 +367,9 @@ def ray() -> Genome:
     g = Genome()
     g.cppns = [
         # Broad, thin, strongly cambered: a disc rather than a wing.
-        _cppn({(U, CHORD): -0.55, (BIAS, CHORD): 0.90, (U, TWIST): -0.45,
-               (BIAS, CAMBER): 0.55, (BIAS, THICK): -0.80, (U, DIHED): 0.25}),
+        _cppn({(U, CHORD): -0.55, (BIAS, CHORD): 0.90, (U, TWIST): -0.14,
+               (BIAS, TWIST): 0.17, (BIAS, CAMBER): 0.55, (BIAS, THICK): -0.80,
+               (U, DIHED): 0.25}),
     ]
     g.body_cppns = [_oblate(squash=2.6, taper=0.45)]
     disc = Part(kind=HULL, length=0.40, radius=0.070, material="petg", joint="none",

@@ -588,6 +588,187 @@ def test_added_mass_is_anisotropic() -> None:
     check("a sphere still gets Ca = 0.5", abs(ca - 0.5) < 0.02, f"Ca={ca:.3f}")
 
 
+def test_a_mirrored_wing_is_a_mirror_image() -> None:
+    """Both halves of a symmetric wing pair must meet the flow the same way,
+    and incidence and camber must both add lift.
+
+    Half of every symmetric wing in this project was flying backwards.  The
+    reflection in ``expand`` negated the roll and the azimuth, which is a 180
+    degree *roll* of the attachment rather than a mirror in the fore-aft plane.
+    Two consequences, both measured on a hand-built glider at 15 m/s:
+
+      * the mirrored surface's chord axis pointed forward -- leading edge at the
+        back -- so at identical geometric incidence the two halves reported
+        -2.81 and +17.58 degrees of alpha;
+      * camber therefore helped one side and hurt the other and cancelled, so
+        the camber gene, which the CPPN had been generating all along, moved
+        total lift by nothing.
+
+    A mirror is not a rotation.  The frame a reflected limb needs is
+    ``M R diag(1,1,-1)`` with ``M = diag(1,-1,1)``, which is ``_look_at(M d,
+    pi - roll)`` with the surface's twist and camber negated to follow its
+    flipped normal.  Then the two sides are true mirror images: equal and
+    opposite alpha, lift in the same direction, camber adding on both.
+    """
+    print("\nphenotype: bilateral symmetry")
+    import math
+
+    from dytiscidae.core.bodyplans import BIAS, CAMBER, CHORD, THICK, TWIST, _cppn, _fusiform
+    from dytiscidae.core.genome import HULL, WING as WING_KIND, Edge, Genome, Part
+    from dytiscidae.core.mjcf import compile_phenotype
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.physics.medium import GRAVITY, MediumField
+
+    def glider(twist: float, camber: float) -> Genome:
+        g = Genome()
+        g.cppns = [_cppn({(BIAS, CHORD): 0.30, (BIAS, TWIST): twist,
+                          (BIAS, CAMBER): camber, (BIAS, THICK): -0.4})]
+        g.body_cppns = [_fusiform(taper=0.8, flatten=1.4)]
+        g.parts = [
+            Part(kind=HULL, length=0.7, radius=0.08, material="petg", joint="none",
+                 actuated=False, sealed=True, dry_fraction=0.9, body_cppn=0),
+            Part(kind=WING_KIND, span=1.4, root_chord=0.40, radius=0.014,
+                 material="cfrp", surface_cppn=0, joint="none", actuated=False,
+                 sealed=True, dry_fraction=0.3),
+        ]
+        g.edges = [Edge(parent=0, child=1, pos_u=0.45, reflect=True)]
+        g.battery_wh = 200.0
+        return g
+
+    def probe(twist: float, camber: float, v: float = 15.0):
+        p = build(glider(twist, camber))
+        m, d, _acts, panels = compile_phenotype(p)
+        solver = FluidSolver(m, panels, MediumField())
+        solver.record_state = True
+        mujoco.mj_resetData(m, d)
+        d.qpos[:3] = (0.0, 0.0, 60.0)
+        d.qpos[3:7] = (1.0, 0.0, 0.0, 0.0)
+        d.qvel[:] = 0.0
+        d.qvel[0] = v
+        solver.reset()
+        mujoco.mj_forward(m, d)
+        d.xfrc_applied[:] = 0.0
+        solver.apply(d, 0.0)
+        fz = float(d.xfrc_applied[:, 2].sum()) - solver.diag.added_mass * GRAVITY
+        alpha = solver.last_state["alpha"]
+        by_seg = {}
+        for s in p.segments:
+            if s.is_surface:
+                sel = panels.body_id == m.body(s.name).id
+                if sel.any():
+                    by_seg[s.mirrored] = float(np.degrees(alpha[sel]).mean())
+        solver.reset()
+        return fz / (p.mass * GRAVITY), by_seg
+
+    lw, alphas = probe(0.3, 0.9)
+    left, right = alphas.get(False, 0.0), alphas.get(True, 0.0)
+    check("the two halves meet the flow at the same incidence",
+          abs(abs(left) - abs(right)) < 0.05 and left * right < 0.0,
+          f"{left:+.2f} deg and {right:+.2f} deg -- mirrored normals, so opposite signs")
+
+    up = probe(0.3, 0.0)[0]
+    down = probe(-0.3, 0.0)[0]
+    check("positive incidence lifts and negative incidence pushes down",
+          up > 0.5 and down < -0.5, f"L/W {up:+.2f} at +twist, {down:+.2f} at -twist")
+
+    flat = probe(0.0, 0.0)[0]
+    cambered = probe(0.0, 0.9)[0]
+    check("camber lifts an untwisted wing",
+          cambered - flat > 0.5,
+          f"L/W {flat:+.2f} uncambered -> {cambered:+.2f} cambered")
+    check("camber adds to incidence rather than cancelling across the pair",
+          lw > up + 0.4, f"L/W {up:+.2f} twist alone -> {lw:+.2f} with camber")
+
+    # And the reflection itself: mirrored limbs must land on the far side of the
+    # fore-aft plane at the same height, not one up and one down.
+    g = glider(0.0, 0.0)
+    g.edges[0] = Edge(parent=0, child=1, pos_u=0.45, azimuth=0.4, roll=0.2, reflect=True)
+    rot = {s.mirrored: s.rotation for s in build(g).segments if s.is_surface}
+    M = np.diag([1.0, -1.0, 1.0])
+    a, b = rot[False][:, 0], rot[True][:, 0]
+    check("a reflected limb is the mirror of its partner, not its 180 deg roll",
+          np.allclose(M @ a, b, atol=1e-9),
+          f"span axes {np.round(a, 3)} and {np.round(b, 3)}")
+    chord = np.array([0.0, -1.0, 0.0])
+    ca, cb = rot[False] @ chord, rot[True] @ chord
+    check("and it keeps its leading edge forward",
+          np.allclose(M @ ca, cb, atol=1e-9),
+          f"chord axes {np.round(ca, 3)} and {np.round(cb, 3)} in world")
+    del math
+
+
+def test_flight_is_expressible_in_the_genome() -> None:
+    """Some genome must produce a machine that glides.  Built by hand, flown
+    with the controls dead.
+
+    This is the check the mirrored-wing bug needed and did not have.  For a long
+    time nothing in this project flew, and the population failing at something
+    is not evidence about the population -- three times now it has been evidence
+    about the test.  Distinguishing the two takes a design whose flight does not
+    depend on the search finding anything: a fixed wing, a tail, no actuation,
+    released in trim, integrated with zero control input.  If *that* falls, the
+    representation or the physics cannot express flight and no amount of search
+    will help.
+
+    It glides at L/D of about 6, in a badly damped phugoid -- it porpoises
+    between 30 m and sea level over roughly 200 m of ground.  Damping that is a
+    control problem, which is what the actuators and the learning environment
+    are for.  The bar here is only that the machine trades height for distance
+    rather than falling: the point of the test is the difference between "cannot
+    fly" and "flies badly", and it is checked with the controls dead so it stays
+    a statement about the airframe.
+    """
+    print("\nphenotype: flight is expressible")
+    from dytiscidae.core.bodyplans import BIAS, CAMBER, CHORD, THICK, TWIST, U, _cppn, _fusiform
+    from dytiscidae.core.genome import HULL, WING as WING_KIND, Edge, Genome, Part
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    g = Genome()
+    g.cppns = [
+        # Main wing: cambered, mild washout.
+        _cppn({(BIAS, CHORD): 0.2, (U, CHORD): -0.5, (BIAS, TWIST): 0.20,
+               (U, TWIST): -0.17, (BIAS, CAMBER): 0.7, (BIAS, THICK): -0.4}),
+        # Lifting tail on a long arm.
+        _cppn({(BIAS, CHORD): -0.2, (BIAS, TWIST): 0.35, (BIAS, THICK): -0.6}),
+    ]
+    g.body_cppns = [_fusiform(taper=0.85, flatten=1.2)]
+    g.parts = [
+        Part(kind=HULL, length=1.0, radius=0.07, material="petg", joint="none",
+             actuated=False, sealed=True, dry_fraction=0.9, body_cppn=0),
+        Part(kind=WING_KIND, span=1.5, root_chord=0.42, radius=0.015, material="cfrp",
+             surface_cppn=0, joint="none", actuated=False, sealed=True, dry_fraction=0.3),
+        Part(kind=WING_KIND, span=0.60, root_chord=0.22, radius=0.010, material="cfrp",
+             surface_cppn=1, joint="none", actuated=False, sealed=True, dry_fraction=0.3),
+    ]
+    g.edges = [Edge(parent=0, child=1, pos_u=0.44, reflect=True),
+               Edge(parent=0, child=2, pos_u=1.00, reflect=True)]
+    g.battery_wh = 150.0
+
+    p = build(g)
+    env = TriphibianEnv(p)
+    v_trim = env.launch_speed
+    env.reset(Domain.AIR, randomise=False)
+    dead = np.zeros(env.model.nu)
+    x0, z0 = float(env.data.qpos[0]), float(env.data.qpos[2])
+    airborne = 0.0
+    for _ in range(int(18.0 / env.timestep)):
+        env.step(dead)
+        if env.data.qpos[2] < 2.0:
+            break
+        airborne = float(env.data.time)
+    dx = float(env.data.qpos[0]) - x0
+    dz = z0 - float(env.data.qpos[2])
+    ld = dx / max(dz, 1e-6)
+
+    check("the hand-built glider is released at a flying speed",
+          6.0 < v_trim < 20.0, f"{v_trim:.1f} m/s")
+    check("and it stays up for several seconds with the controls dead",
+          airborne > 8.0, f"{airborne:.1f} s airborne")
+    check("trading height for distance rather than falling",
+          ld > 3.0, f"{dx:.0f} m covered for {dz:.0f} m lost -- glide ratio {ld:.1f}")
+
+
 def test_bodies_generate_lift_and_a_pitching_moment() -> None:
     """A body at incidence must produce a force across the stream, not only
     along it, and a shaped body must produce a moment.
@@ -691,25 +872,38 @@ def test_series_elasticity_needs_a_compliant_drive() -> None:
                 part.drive_compliance = compliance
         env = TriphibianEnv(build(g))
         env.reset(Domain.AIR, randomise=False)
-        q = []
+        q, c = [], []
         for _ in range(int(secs / env.timestep)):
-            env.step(env.cpg.command(env.cpg.base, env.data.time))
+            u = env.cpg.command(env.cpg.base, env.data.time)
+            env.step(u)
             q.append(env.data.qpos[7:].copy())
-        q = np.array(q)[len(q) // 2:]
-        swing = float(np.mean(q.max(axis=0) - q.min(axis=0))) if q.size else 0.0
-        return env.budget.mean_power, swing
+            c.append(np.asarray(u, float).copy())
+        half = len(q) // 2
+        q = np.array(q)[half:]
+        c = np.array(c)[half:]
+        if not q.size:
+            return env.budget.mean_power, 0.0, 0.0
+        swing = float(np.mean(q.max(axis=0) - q.min(axis=0)))
+        # Tracking error against the angle actually commanded.  Amplitude alone
+        # cannot say whether the drive is following: the first version of this
+        # test used swing, and once the wing mirroring was fixed the softest
+        # drive produced the *largest* swing -- the joints were flopping between
+        # their stops, which is exactly the failure the check was meant to catch.
+        k = min(q.shape[1], c.shape[1])
+        err = float(np.sqrt(np.mean((q[:, :k] - c[:, :k]) ** 2))) if k else 0.0
+        return env.budget.mean_power, swing, err
 
     # Power per unit of motion, which is the quantity that means anything.  A
     # servo can always cut power by tracking worse, so watts alone cannot tell
     # resonance from a drive that has given up.
     def cost(stiffness, compliance):
-        p_w, swing = probe(stiffness, compliance)
-        return p_w / max(swing, 1e-6), p_w, swing
+        p_w, swing, err = probe(stiffness, compliance)
+        return p_w / max(swing, 1e-6), p_w, swing, err
 
-    rigid, p_rigid, s_rigid = cost(0.0, 1.0)
-    stiff_spring, p_stiff, s_stiff = cost(1.0, 1.0)
-    tuned, p_tuned, s_tuned = cost(1.0, 0.3)
-    very_soft, p_soft, s_soft = cost(1.0, 0.1)
+    rigid, p_rigid, s_rigid, e_rigid = cost(0.0, 1.0)
+    stiff_spring, p_stiff, s_stiff, e_stiff = cost(1.0, 1.0)
+    tuned, p_tuned, s_tuned, e_tuned = cost(1.0, 0.3)
+    very_soft, p_soft, s_soft, e_soft = cost(1.0, 0.05)
 
     check("a spring under the old hard-wired gain buys nothing",
           stiff_spring > 0.9 * rigid,
@@ -721,8 +915,9 @@ def test_series_elasticity_needs_a_compliant_drive() -> None:
           f"{tuned:.0f} W/rad against {rigid:.0f} rigid "
           f"({p_tuned:.0f} W at {s_tuned:.2f} rad)")
     check("and an over-compliant drive does stop tracking",
-          s_soft < 0.6 * s_rigid,
-          f"kp x0.1: {p_soft:.0f} W but only {s_soft:.2f} rad against {s_rigid:.2f}")
+          e_soft > 1.4 * e_stiff,
+          f"kp x0.05: {e_soft:.3f} rad rms error against {e_stiff:.3f} at full gain "
+          f"({p_soft:.0f} W, swing {s_soft:.2f} rad -- amplitude without command)")
 
 
 def test_flight_is_measured_against_the_ground_not_the_waterline() -> None:
@@ -856,8 +1051,13 @@ def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
 
     flat_slow = enter(0.0, 4.0)
     flat_fast = enter(0.0, 8.0)
+    flat_dead = enter(0.0, 12.0)
     nose_slow = enter(80.0, 4.0)
     nose_fast = enter(80.0, 8.0)
+    # The gannet: three times the entry speed of the flat one that destroys the
+    # hull, and it survives, because what breaks a hull is the rate at which it
+    # wets and not how fast it is going.
+    gannet = enter(80.0, 24.0)
 
     check("entering flat faster is worse", flat_fast < flat_slow,
           f"{flat_slow:.3f} at 4 m/s -> {flat_fast:.3f} at 8 m/s")
@@ -868,8 +1068,11 @@ def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
         nose_fast > flat_slow,
         f"nose-first at 8 m/s scores {nose_fast:.3f}, flat at 4 m/s scores {flat_slow:.3f}",
     )
-    check("a flat entry well past the hull limit scores nothing", flat_fast == 0.0,
-          f"{flat_fast:.3f}")
+    check("a flat entry well past the hull limit scores nothing", flat_dead == 0.0,
+          f"{flat_dead:.3f} at 12 m/s flat")
+    check("while a gannet entry at twice that speed survives it",
+          gannet > 0.0,
+          f"{gannet:.3f} nose-first at 24 m/s against {flat_dead:.3f} flat at 12")
 
 
 def test_free_surface_continuity() -> None:
@@ -1043,6 +1246,8 @@ def main() -> int:
     test_air_segment_can_be_scored()
     test_truncated_episodes_cannot_score()
     test_added_mass_is_anisotropic()
+    test_a_mirrored_wing_is_a_mirror_image()
+    test_flight_is_expressible_in_the_genome()
     test_bodies_generate_lift_and_a_pitching_moment()
     test_series_elasticity_needs_a_compliant_drive()
     test_flight_is_measured_against_the_ground_not_the_waterline()

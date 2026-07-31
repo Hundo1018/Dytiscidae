@@ -20,7 +20,7 @@ the body plan the seed prior starts from.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -376,13 +376,31 @@ def expand(genome: Genome, *, max_segments: int = 22) -> list[Segment]:
             variants = []
             if n_radial > 1:
                 for k in range(n_radial):
-                    variants.append((1.0, mirrored, e.azimuth + 2.0 * math.pi * k / n_radial))
+                    variants.append(
+                        (1.0, mirrored, e.azimuth + 2.0 * math.pi * k / n_radial, e.roll)
+                    )
             else:
-                variants.append((1.0, mirrored, e.azimuth))
+                variants.append((1.0, mirrored, e.azimuth, e.roll))
                 if e.reflect:
-                    variants.append((-1.0, not mirrored, -e.azimuth))
-            for sign, mir, az in variants:
-                roll = e.roll * sign
+                    # Bilateral reflection is a mirror in the fore-aft plane, and
+                    # a mirror is not a rotation: with M = diag(1,-1,1) the frame
+                    # a mirrored limb needs is M R diag(1,1,-1), which works out
+                    # to _look_at(M d, pi - roll).  Two things were wrong here.
+                    #
+                    # The azimuth was negated as well as the y axis, so the
+                    # reflected direction was (dx, -dy, -dz) -- a 180 deg *roll*
+                    # of the attachment, not a mirror.  The beetle's two paddles
+                    # therefore pointed one down and one up.
+                    #
+                    # And the roll was only negated, missing the pi.  That left
+                    # the mirrored surface's chord axis pointing *forward*: its
+                    # leading edge was at the back, so measured at identical
+                    # geometric incidence the two halves of a wing pair reported
+                    # -2.8 deg and +17.6 deg.  Half of every symmetric wing in
+                    # this project was flying backwards, and camber cancelled
+                    # between the sides instead of adding.
+                    variants.append((-1.0, not mirrored, e.azimuth, math.pi - e.roll))
+            for sign, mir, az, roll in variants:
                 # Neutral (az=0, el=0) points the child straight out to the side,
                 # so the default body plan is a winged one.
                 d = np.array(
@@ -422,13 +440,23 @@ def _surface_of(genome: Genome, seg: Segment) -> SurfaceField:
             thickness=np.full(n, 0.08),
             dihedral=np.zeros(n),
         )
-    return sample_surface(
+    sf = sample_surface(
         cppn,
         span=seg.span,
         root_chord=seg.root_chord,
         stations=10,
         lateral_offset=1.0 if seg.mirrored else 0.0,
     )
+    if seg.mirrored:
+        # The mirrored frame is the reflected one turned back upright (see the
+        # reflection in ``expand``), which leaves its normal pointing the other
+        # way.  Incidence and camber are signed against that normal, so they
+        # have to flip with it: negating them here is what makes +5 deg of
+        # washin on the left wing mean +5 deg on the right as well, rather than
+        # the two sides cancelling.  Chord and thickness are unsigned and pass
+        # through untouched.
+        sf = replace(sf, twist=-sf.twist, camber=-sf.camber)
+    return sf
 
 
 def build(genome: Genome) -> Phenotype:
@@ -951,8 +979,13 @@ def build_panels(p: Phenotype, model, body_name_prefix: str = "") -> PanelSet:
             span_ax = np.tile(np.array([1.0, 0.0, 0.0]), (m, 1))
             # Chord axis is local -Y, rotated by the local geometric twist about
             # the span axis.  This is how the CPPN's twist field becomes real.
+            # Sign: positive twist is nose-*up* incidence, the universal
+            # aerodynamic convention.  It was the other way round, so every
+            # hand-written body plan's "washout" was washin and every positive
+            # incidence a negative one -- measured directly, a wing at
+            # twist = +0.6 rad produced L/W of -2.18 and at -0.6 rad +2.18.
             ct, st = np.cos(twist), np.sin(twist)
-            chord_ax = np.stack([np.zeros(m), -ct, -st], axis=1)
+            chord_ax = np.stack([np.zeros(m), -ct, st], axis=1)
 
             ar = s.span**2 / max(float(np.trapezoid(sf.chord, sf.u)), 1e-6)
             sets.append(
@@ -971,6 +1004,7 @@ def build_panels(p: Phenotype, model, body_name_prefix: str = "") -> PanelSet:
                     aspect_ratio=np.full(m, np.clip(ar, 0.5, 25.0)),
                     cd_bluff=np.zeros(m),
                     pitch_axis=np.full(m, 0.25),
+                    camber=sf.camber[keep],
                 )
             )
         else:
