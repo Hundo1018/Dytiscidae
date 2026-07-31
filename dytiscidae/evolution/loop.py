@@ -80,7 +80,7 @@ class SearchConfig:
 
     # Controller refinement
     controller_refine_steps: int = 0  # CMA-ES iterations per child (0 = inherit only)
-    policy_hidden: int = 16
+    policy_hidden: int = 0
     n_modes: int = 4
 
     # Seeding

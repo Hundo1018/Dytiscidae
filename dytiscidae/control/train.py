@@ -50,6 +50,9 @@ class TrainingResult:
     baseline_per_domain: dict[str, float]
     history: list[dict] = field(default_factory=list)
     wall_time: float = 0.0
+    #: Hidden width the weights were trained with, so a saved controller can be
+    #: rebuilt with the right shape rather than whatever the default is today.
+    policy_hidden: int = 0
 
     @property
     def gain(self) -> float:
@@ -95,7 +98,7 @@ def train_controller(
     seed: int = 0,
     sigma0: float = 0.5,
     n_modes: int = 4,
-    hidden: int = 16,
+    hidden: int = 0,
     bases: dict | None = None,
     continuous: bool = True,
     cycles: int = 1,
@@ -234,6 +237,7 @@ def train_controller(
 
     result = TrainingResult(
         policy_weights=es.best_x.copy(),
+        policy_hidden=int(hidden),
         bases=bases,
         score=final,
         baseline_score=baseline,

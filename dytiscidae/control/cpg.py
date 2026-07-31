@@ -247,17 +247,26 @@ def identify_mobility(
 class Policy:
     """Maps observations to intent coefficients in the mobility basis.
 
-    A deliberately tiny network: one hidden layer, tanh.  The heavy lifting is
-    done by the CPG (which supplies the rhythm) and by the mobility basis (which
-    supplies the coordination), so the policy only has to decide *how much of
-    which axis* to ask for.  That leaves a parameter count CMA-ES can actually
-    optimise on a CPU -- typically 200-400 weights instead of the tens of
-    thousands a from-scratch joint-space policy would need.
+    A deliberately tiny network.  The heavy lifting is done by the CPG (which
+    supplies the rhythm) and by the mobility basis (which supplies the
+    coordination), so the policy only has to decide *how much of which axis* to
+    ask for.
+
+    ``hidden = 0`` makes it linear -- a single matrix from observations to
+    intent -- and that is the default, because the one hidden layer that used to
+    be the default was not affordable.  At ``hidden = 16`` this is 308 weights,
+    and CMA-ES on 308 dimensions wants some thousands of evaluations; the
+    default training budget was 180.  Measured on a body that flies, five
+    iterations moved the population best from 0.365 to 0.349 -- which is not a
+    controller failing to learn, it is an optimiser that has barely been asked a
+    question.  Linear is 60 weights for the same problem, which the same budget
+    can genuinely move, and the capacity is still there for anything that
+    saturates it.
     """
 
     n_obs: int
     n_modes: int
-    hidden: int = 16
+    hidden: int = 0
     weights: np.ndarray = field(default=None)  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
@@ -266,15 +275,22 @@ class Policy:
 
     @property
     def n_weights(self) -> int:
+        if self.hidden <= 0:
+            return self.n_obs * self.n_modes + self.n_modes
         return self.n_obs * self.hidden + self.hidden + self.hidden * self.n_modes + self.n_modes
 
     def act(self, obs: np.ndarray) -> np.ndarray:
         w = self.weights
-        i = 0
         n_in, h, n_out = self.n_obs, self.hidden, self.n_modes
+        x = np.asarray(obs, float)
+        if h <= 0:
+            W = w[: n_in * n_out].reshape(n_in, n_out)
+            b = w[n_in * n_out : n_in * n_out + n_out]
+            return np.tanh(x @ W + b)
+        i = 0
         W1 = w[i : i + n_in * h].reshape(n_in, h); i += n_in * h
         b1 = w[i : i + h]; i += h
         W2 = w[i : i + h * n_out].reshape(h, n_out); i += h * n_out
         b2 = w[i : i + n_out]
-        z = np.tanh(np.asarray(obs, float) @ W1 + b1)
+        z = np.tanh(x @ W1 + b1)
         return np.tanh(z @ W2 + b2)

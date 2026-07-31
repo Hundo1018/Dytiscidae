@@ -261,7 +261,9 @@ def cmd_train(args) -> int:
             print(f"      {line}")
 
     with open(out / f"{stem}_controller.pkl", "wb") as f:
-        pickle.dump({"weights": result.policy_weights, "bases": result.bases,
+        pickle.dump({"weights": result.policy_weights,
+                     "hidden": getattr(result, "policy_hidden", 0),
+                     "bases": result.bases,
                      "score": result.score, "baseline": result.baseline_score,
                      "per_domain": result.per_domain,
                      "baseline_per_domain": result.baseline_per_domain,
@@ -390,7 +392,10 @@ def cmd_showcase(args) -> int:
     controller = None
     if args.controller and Path(args.controller).exists():
         d = pickle.load(open(args.controller, "rb"))
-        pol = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=4, hidden=16)
+        # Width comes from the pickle: a controller trained before the default
+        # changed must still load with the shape it was trained at.
+        pol = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=4,
+                     hidden=int(d.get("hidden", 16)))
         pol.weights = d["weights"]
         env = TriphibianEnv(p, seed=args.seed)
         controller = Controller(params=env.cpg.base, policy=pol, bases=d["bases"])
