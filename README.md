@@ -213,8 +213,15 @@ being wrong, which is the failure mode that matters in a generative pipeline.
 | Buoyant volume = outer envelope | Every design came out a balloon (ρ_rel ≈ 0.2) | A free-flooding fairing displaces water but is full of water. Buoyancy is material volume + sealed gas. |
 | Water entry checked as plate bending on a curved hull | No design survived entry above ~1 m/s | Curved shells carry slam in hoop membrane, not bending — ~4x higher survivable speed. Flat panels *do* use bending, which correctly penalises flat bottoms. |
 | Two buoyancy checks were binary | First generation scored zero with no gradient | Every check now returns a graded margin. |
+| **Every motor was weightless** | The gannet's budget says it is 4.5 N negatively buoyant; it floated | `Segment.mass` is spar, skin and hull. Actuator mass went into the budget — which the reports, wing loading, structural checks and energy model all read — and into no body. The simulated machine was 9–24% lighter than the designed one. Motors now ride in the limb they drive. |
+| **Half of every symmetric wing flew backwards** | Two wings at identical incidence reported −2.8° and +17.6° | A mirror is not a rotation. The reflection negated roll and azimuth, which is a 180° *roll* of the attachment, so the reflected surface had its leading edge at the back. |
+| Camber was generated, stored, documented, and never read | The camber gene moved total lift by nothing | Wiring it in exposed that `n = c × s` and lift along `d × s` describe a wing that is upside down: α was reported with the wrong sign, so the one term that read α without a matching flip subtracted lift. |
+| A hinge axis is in the limb's frame | The beetle — named for flapping — had a feathering hinge and never beat its wings | `[1,0,0]` on a wing is *feathering*; `[0,1,0]` is the stroke. Worth air 0.118 → 0.166 and water 0.467 → 0.658. |
+| A walking machine banked the land→air crossing every stride | Contact chatter read as flight 25.7% of a land episode | `current_domain` is instantaneous, and one step is not a crossing. Arrival is now a majority of a half-second window — which also had to *not* reject a running gait's aerial phase. |
+| A rock scored 0.57 for land competence | All six plans between 0.541 and 0.596 while nothing walked | Six tenths of a locomotion score was awarded for lying still the right way up, and the climb term was computed, documented as "the capability", and left out of the return. |
+| The auditor's veto had no link to the bar it undid | — (would have silently frozen the judge) | It took a *count* of failed audits and rolled back every domain's most recent tightening. Audits find something most rounds; a ratchet reset most rounds never rises. |
 
-Verify with `python -m dytiscidae.ops.run verify` (30 checks).
+Verify with `python -m dytiscidae.ops.run verify` (115 checks); the search machinery has its own 194 in `tests/test_search.py`.
 
 ---
 
@@ -226,11 +233,16 @@ dytiscidae/
                energy (motors, battery), structure (spars, hulls, slam)
   core/        cppn, genome, phenotype, mjcf, reference
   control/     cpg (pattern generator + mobility basis identification)
-  envs/        triphibian (mission, 3 tiers), skills (actuator bench), evaluate
-  evolution/   archive (MAP-Elites), cmaes, curator, loop
-  viz/         dashboard (self-contained HTML), render (offscreen video)
+  envs/        triphibian (mission, 3 tiers), skills (actuator bench), evaluate,
+               transitions (graded crossings), mission (one unbroken run)
+  evolution/   archive (MOME), cmaes, curator, loop, judge (ratchets the bar),
+               auditor (the third party), critic, curriculum, islands, scout
+               (predicts potential), descriptors (learned archive axes)
+  viz/         dashboard (self-contained HTML), render (offscreen video),
+               showcase (one mission, wake and stress overlaid)
   ops/         telemetry (JSONL), run (CLI)
-tests/         test_physics.py — 30 checks pinning conventions and magnitudes
+tests/         test_physics.py  — 115 checks pinning conventions and magnitudes
+               test_search.py   — 194 checks on the search machinery
 ```
 
 ---
@@ -244,8 +256,12 @@ Worth knowing before trusting a result:
   for ranking designs and not fine for predicting absolute performance.
 - **Tier-1 extrapolation.** The 45-minute budget comes from a short window. Tier-2
   checks it, but only for promoted elites.
-- **Isotropic added mass.** The full 6×6 added-mass tensor is directional; this
-  uses a scalar per body, which overestimates in-plane inertia.
+- **Added mass is directional but not a full tensor.** Each element gets a
+  per-axis coefficient from its own extents, `Ca_i = 0.5(e_j+e_k)/(2 e_i)`,
+  projected onto its instantaneous direction of motion. Exact for a sphere,
+  within 18% of Lamb's disc, correctly small for a slender body moving
+  end-on — but still a scalar per element rather than the 6×6 tensor, so
+  added-mass *coupling* between translation and rotation is missing.
 - **No structural dynamics.** Spars are checked against static and inertial
   loads but are rigid in the simulation, so flutter and aeroelastic divergence
   are invisible.
