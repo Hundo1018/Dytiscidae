@@ -129,6 +129,8 @@ class SearchConfig:
     #: Designs audited per review, chosen by the critic's suspicion where it has
     #: one and by fitness where it does not.
     audit_every: int = 30
+    #: Continue a run in ``run_dir`` instead of starting over.
+    resume: bool = False
     audits_per_review: int = 2
 
     # --- the scout ---------------------------------------------------------
@@ -501,12 +503,19 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                                     "spec": spec.__dict__,
                                     "islands": {k: ISLANDS[k]["note"] for k in cfg.islands
                                                 if k in ISLANDS}})
-    seed_archipelago(state, spec)
+    start_gen = load_state(state) if getattr(cfg, "resume", False) else 0
+    if start_gen:
+        print(f"resumed {cfg.run_dir} at generation {start_gen} "
+              f"({state.evaluated} evaluations, "
+              f"{sum(len(a.cells) for a in archipelago.archives.values())} elites)",
+              flush=True)
+    else:
+        seed_archipelago(state, spec)
 
     order = list(cfg.islands) or ["generalist"]
     pending: list = []
 
-    for gen in range(cfg.generations):
+    for gen in range(start_gen, cfg.generations):
         state.island = order[gen % len(order)]
         archive = state.archive
         curator = state.curator
@@ -647,12 +656,94 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             for name, a in archipelago.archives.items():
                 a.save(Path(cfg.run_dir) / f"archive_{name}.pkl")
                 a.export_json(Path(cfg.run_dir) / f"archive_{name}.json")
+            save_state(state, gen)
 
     for name, a in archipelago.archives.items():
         a.save(Path(cfg.run_dir) / f"archive_{name}.pkl")
         a.export_json(Path(cfg.run_dir) / f"archive_{name}.json")
+    save_state(state, cfg.generations - 1)
     telemetry.close()
     return state
+
+
+#: Everything that has to survive a container being reclaimed, beyond the
+#: archives themselves.
+#:
+#: The archives were already written every ``checkpoint_every`` generations and
+#: nothing read them back, so a run that was interrupted lost the judge's bars,
+#: the curriculum's stages, the critic, the scout and the generation counter --
+#: which is to say it lost everything except the designs, and had no way to use
+#: even those.  The README promised resumption; the code had checkpointing,
+#: which is not the same thing.
+_STATE_FILE = "search_state.pkl"
+
+
+def save_state(state: SearchState, gen: int) -> None:
+    """Write the learned state beside the archives."""
+    import pickle
+
+    path = Path(state.config.run_dir) / _STATE_FILE
+    payload = {
+        "generation": gen,
+        "evaluated": state.evaluated,
+        "tier0_rejected": state.tier0_rejected,
+        "judge": state.judge,
+        "auditor": state.auditor,
+        "critic": state.critic,
+        "scout": state.scout,
+        "curricula": state.curricula,
+        "descriptors": state.descriptors,
+        "judge_moves": state.judge_moves,
+        "curators": state.archipelago.curators,
+        "islands": list(state.archipelago.names),
+    }
+    tmp = path.with_suffix(".tmp")
+    with open(tmp, "wb") as f:
+        pickle.dump(payload, f)
+    tmp.replace(path)  # atomic: a half-written checkpoint is worse than none
+
+
+def load_state(state: SearchState) -> int:
+    """Restore a previous run into ``state``.  Returns the generation to start at.
+
+    Returns 0 and changes nothing if there is no checkpoint, so ``--resume`` on a
+    fresh directory is simply a normal run rather than an error.
+    """
+    import pickle
+
+    run_dir = Path(state.config.run_dir)
+    path = run_dir / _STATE_FILE
+    if not path.exists():
+        return 0
+    with open(path, "rb") as f:
+        d = pickle.load(f)
+
+    for name in state.archipelago.names:
+        a_path = run_dir / f"archive_{name}.pkl"
+        if a_path.exists():
+            restored = Archive.load(a_path)
+            state.archipelago.archives[name].cells = restored.cells
+            state.archipelago.archives[name].fronts = getattr(restored, "fronts", {})
+            state.archipelago.archives[name].tainted = restored.tainted
+            state.archipelago.archives[name].history = restored.history
+
+    state.evaluated = int(d.get("evaluated", 0))
+    state.tier0_rejected = int(d.get("tier0_rejected", 0))
+    for attr in ("judge", "auditor", "critic", "scout", "descriptors"):
+        if d.get(attr) is not None:
+            setattr(state, attr, d[attr])
+    if d.get("curricula"):
+        state.curricula.update(d["curricula"])
+    state.judge_moves = list(d.get("judge_moves", []))
+    for name, cur in (d.get("curators") or {}).items():
+        if name in state.archipelago.curators:
+            # The curator holds the archive by reference; rebind it to the one
+            # this process just restored rather than the pickled copy.
+            cur.archive = state.archipelago.archives[name]
+            cur.curriculum = state.curricula.get(name)
+            cur.scout = state.scout
+            state.archipelago.curators[name] = cur
+    return int(d.get("generation", 0)) + 1
 
 
 def seed_archipelago(state: SearchState, spec: MissionSpec) -> None:

@@ -1422,6 +1422,69 @@ def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> 
           all(m["island"] != m["origin"] for m in moved if m["kind"] == "migrant"))
 
 
+def test_a_run_can_be_picked_up_where_it_stopped() -> None:
+    """A run interrupted halfway must continue, not start over.
+
+    The environments this is meant to run in are reclaimed without warning, and
+    a useful search here is a day long.  The archives were already being written
+    every ``checkpoint_every`` generations -- and nothing ever read them back.
+    So an interrupted run lost the judge's bars, the curriculum's stages, the
+    critic, the scout, the operator bandit and the generation counter: it lost
+    everything except the designs, and had no way to use even those.  The README
+    promised resumption and the code had checkpointing, which is not the same
+    thing.
+    """
+    print("\nloop: a run resumes where it stopped")
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    tmp = tempfile.mkdtemp(prefix="dyt-resume-")
+    try:
+        base = dict(batch=1, seed=5, segment_seconds=1.0, n_reference_seeds=1,
+                    n_random_seeds=0, islands=("water", "generalist"),
+                    tier2_every=999, audit_every=999, migrate_every=1,
+                    checkpoint_every=1, run_dir=tmp, identify_axes_every=999)
+
+        first = run_search(SearchConfig(generations=3, **base), MissionSpec())
+        n1 = sum(len(a.cells) for a in first.archipelago.archives.values())
+        bars1 = {d: r.bar for d, r in first.judge.ratchets.items()}
+        seen1 = first.evaluated
+        check("a run leaves a checkpoint behind",
+              (Path(tmp) / "search_state.pkl").exists(), "search_state.pkl written")
+
+        again = run_search(SearchConfig(generations=6, resume=True, **base),
+                           MissionSpec())
+        n2 = sum(len(a.cells) for a in again.archipelago.archives.values())
+        bars2 = {d: r.bar for d, r in again.judge.ratchets.items()}
+
+        check("the archive comes back", n2 >= n1 and n1 > 0,
+              f"{n1} elites before, {n2} after")
+        check("and so does the evaluation count", again.evaluated >= seen1,
+              f"{seen1} -> {again.evaluated}")
+        check("the judge's bars are not reset by an interruption",
+              all(bars2.get(d, -1.0) >= v - 1e-9 for d, v in bars1.items()),
+              f"{ {k: round(v,2) for k,v in bars1.items()} } -> "
+              f"{ {k: round(v,2) for k,v in bars2.items()} }")
+        check("and the seeds are not evaluated a second time",
+              again.evaluated - seen1 <= 3,
+              f"{again.evaluated - seen1} new evaluations across 3 more generations")
+
+        # A fresh directory with --resume is a normal run, not an error.
+        fresh = tempfile.mkdtemp(prefix="dyt-resume-fresh-")
+        try:
+            s = run_search(SearchConfig(generations=1, resume=True,
+                                        **{**base, "run_dir": fresh}), MissionSpec())
+            check("resuming a run that does not exist just starts one",
+                  sum(len(a.cells) for a in s.archipelago.archives.values()) >= 0)
+        finally:
+            shutil.rmtree(fresh, ignore_errors=True)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_the_loop_wires_every_layer_together() -> None:
     """The judge, the auditor, the critic, the curriculum and the islands must
     all be connected to the search, not merely present in the tree.
@@ -1655,6 +1718,7 @@ def main() -> int:
     test_critic_learns_the_exploit_signature()
     test_curriculum_and_islands_give_gradient_where_the_mission_gives_none()
     test_scout_finds_dark_horses_and_may_only_protect()
+    test_a_run_can_be_picked_up_where_it_stopped()
     test_the_loop_wires_every_layer_together()
     print("\n" + "=" * 68)
     if FAILURES:

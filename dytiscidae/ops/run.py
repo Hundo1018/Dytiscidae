@@ -151,6 +151,7 @@ def cmd_search(args) -> int:
         use_critic=not args.no_critic,
         audit_every=args.audit_every,
         use_scout=not args.no_scout,
+        resume=bool(getattr(args, "resume", False)),
         scout_reserve=args.scout_reserve,
         **({"islands": tuple(x.strip() for x in args.islands.split(","))}
            if args.islands else {}),
@@ -509,6 +510,8 @@ def main(argv=None) -> int:
     p.add_argument("--no-critic", action="store_true",
                    help="run without the learned critic")
     p.add_argument("--audit-every", type=int, default=30)
+    p.add_argument("--resume", action="store_true",
+                   help="continue the run in --run instead of starting over")
     p.add_argument("--no-scout", action="store_true",
                    help="run without the potential predictor (greedy selection)")
     p.add_argument("--scout-reserve", type=float, default=0.15,
