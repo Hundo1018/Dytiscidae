@@ -443,6 +443,69 @@ class TriphibianEnv:
     def depth(self) -> float:
         return float(self.medium.depth(self.root_pos()[None, :], self.data.time)[0])
 
+    @property
+    def _machine_geoms(self) -> np.ndarray:
+        g = getattr(self, "_mgeoms", None)
+        if g is None:
+            g = np.nonzero(self.model.geom_bodyid != 0)[0]
+            self._mgeoms = g
+        return g
+
+    def ground_height(self, x: float, t: float | None = None) -> float:
+        """Height of whatever is underneath position ``x``: water, or beach.
+
+        The beach rises inland to more than three metres, so "above the water
+        surface" and "off the ground" are different questions on this map, and
+        only the second one is about flying.
+        """
+        from ..core.mjcf import beach_surface_z
+
+        probe = np.array([[x, 0.0, 0.0]])
+        surface = -float(self.medium.depth(probe, self.data.time if t is None else t)[0])
+        return max(surface, beach_surface_z(x))
+
+    def clearance(self) -> float:
+        """Height of the machine above the ground beneath it, metres.
+
+        This exists because ``depth`` measures against the waterline, and the
+        waterline is not the ground.  A machine sitting on the beach ramp
+        thirty metres inland is three metres *above* the waterline, so any test
+        of the form "is it above the water" calls it airborne while it is
+        resting on a hillside.  One design in a live run scored 0.75 for flight
+        that way: no lifting surface at all, launched at the 30 m/s cap because
+        its wing area rounded to zero, lobbed seventy-five metres downrange, and
+        landed on rising terrain -- above the water for 85% of the episode and
+        flying for none of it.
+
+        Measured from the machine's *lowest* geometry, not from its root body.
+        A machine at rest has its root roughly half a metre up, so a
+        root-referenced clearance called the same design airborne while it sat
+        on a hillside -- and because its clearance then stayed constant, the
+        sink-rate term read it as holding altitude and scored it 0.93 for
+        flight.  Referencing the lowest point makes a resting machine read as
+        what it is: clearance zero.
+        """
+        g = self._machine_geoms
+        if g.size == 0:
+            pos = self.root_pos()
+            return float(pos[2] - self.ground_height(float(pos[0])))
+        # Lowest corner of each geom's own bounding box, rotated into the world.
+        # ``geom_rbound`` is a bounding *sphere*, so for anything elongated it
+        # puts the bottom far below the real one -- a machine resting on the
+        # beach measured 0.39 m *underground* that way.
+        aabb = self.model.geom_aabb.reshape(-1, 6)[g]
+        centre_local, half = aabb[:, :3], aabb[:, 3:]
+        R = self.data.geom_xmat[g].reshape(-1, 3, 3)
+        # Lowest z of a box under rotation: centre minus the sum of the
+        # projections of its half-extents onto world -z.
+        centre_z = self.data.geom_xpos[g][:, 2] + np.einsum(
+            "nij,nj->ni", R, centre_local
+        )[:, 2]
+        drop = np.einsum("nj,nj->n", np.abs(R[:, 2, :]), half)
+        bottom = centre_z - drop
+        ground = np.array([self.ground_height(float(x)) for x in self.data.geom_xpos[g][:, 0]])
+        return float(np.min(bottom - ground))
+
     def observation(self, target: "Domain | None" = None) -> np.ndarray:
         """What the controller senses, plus what it is being asked to do.
 
@@ -508,7 +571,7 @@ class TriphibianEnv:
         control_every = max(1, int(1.0 / (control_hz * self.timestep)))
 
         start = self.root_pos().copy()
-        depths, alts, ups, contacts = [], [], [], []
+        depths, alts, ups, contacts, clearances = [], [], [], [], []
         peak_slam = 0.0
         cur = p
 
@@ -527,6 +590,7 @@ class TriphibianEnv:
                 res.failure = "diverged"
                 break
             depths.append(self.medium.depth(pos[None, :], self.data.time)[0])
+            clearances.append(self.clearance())
             alts.append(pos[2])
             R = self.data.xmat[self.root_body].reshape(3, 3)
             ups.append(float(R[2, 2]))
@@ -543,11 +607,14 @@ class TriphibianEnv:
         res.attitude_rms = float(np.std(ups)) if ups else 1.0
         res.ground_contact_fraction = float(np.mean(contacts)) if contacts else 0.0
         res.max_depth = float(max(depths)) if depths else 0.0
-        res.competence = self._score_segment(domain, res, np.array(depths), np.array(alts),
-                                             np.array(ups), np.array(contacts))
+        res.competence = self._score_segment(
+            domain, res, np.array(depths), np.array(alts),
+            np.array(ups), np.array(contacts), np.array(clearances),
+        )
         return res
 
-    def _score_segment(self, domain, res, depths, alts, ups, contacts) -> float:
+    def _score_segment(self, domain, res, depths, alts, ups, contacts,
+                       clearances=None) -> float:
         """Domain competence in [0, 1].
 
         Each domain is scored on what actually matters there, not on a generic
@@ -575,6 +642,8 @@ class TriphibianEnv:
             return 0.0
         upright = float(np.clip(np.mean(ups), 0.0, 1.0))
         # Samples the segment should have produced had it run to term.
+        if clearances is None:
+            clearances = -np.asarray(depths, float)
         n_want = max(int(round(res.duration / self.timestep)), 1)
         n_got = len(alts)
         # Anything that ended early is measured against what it was asked to do.
@@ -600,7 +669,10 @@ class TriphibianEnv:
             # centimetres above the water and no ground contact, so any test
             # looser than this scores floating as flying -- which is how a
             # 937 N/m^2 medusa came to outscore a 54 N/m^2 ray at flight.
-            airborne = (depths < -0.3) & (np.asarray(contacts) < 0.5)
+            # Clear of the *ground*, not merely of the waterline -- see
+            # ``clearance``.  The old test read ``depths < -0.3``, which over a
+            # beach that rises to three metres calls a landed machine airborne.
+            airborne = (np.asarray(clearances) > 0.3) & (np.asarray(contacts) < 0.5)
             frac = float(np.sum(airborne) / n_want)
             if frac < 0.05:
                 return 0.0  # never left the surface: no flight to score
@@ -614,11 +686,21 @@ class TriphibianEnv:
             # later half, by which time a real flyer has settled.  Zero sink is
             # full marks; 1.5 m/s is a glide, which is a real capability but is
             # not flight and no longer scores as if it were.
+            # Sink is the rate of loss of height *above the ground*, not of
+            # world z.  The beach rises inland at 0.12, so a machine skimming up
+            # it gains z at 3.6 m/s while flying at 30 -- and the design that
+            # exposed this had no lifting surface at all.  It was launched at the
+            # speed cap because its wing area rounded to zero, lobbed seventy
+            # five metres downrange, and read as *climbing* over the second half
+            # of its arc because the hill came up to meet it.  Scored 0.75 for
+            # flight.
             idx = np.flatnonzero(airborne)
             late = idx[len(idx) // 2:]
             if len(late) > 1:
                 span_s = (late[-1] - late[0]) * self.timestep
-                sink = float((alts[late[0]] - alts[late[-1]]) / max(span_s, 1e-6))
+                sink = float(
+                    (clearances[late[0]] - clearances[late[-1]]) / max(span_s, 1e-6)
+                )
             else:
                 sink = 9.9
             flight = float(np.clip(1.0 - sink / 1.5, 0.0, 1.0))

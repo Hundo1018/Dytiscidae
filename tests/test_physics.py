@@ -467,10 +467,12 @@ def test_truncated_episodes_cannot_score() -> None:
     def air(n_samples, sink):
         r = SegmentResult(domain=Domain.AIR, duration=dur)
         r.mean_speed = env.launch_speed
-        alts = 30.0 - sink * np.arange(n_samples) * dt
+        # Height above the ground is what the score reads; feed it directly so
+        # the case under test is the one being described.
+        clear = 30.0 - sink * np.arange(n_samples) * dt
         return env._score_segment(
-            Domain.AIR, r, np.full(n_samples, -30.0), alts,
-            np.ones(n_samples), np.zeros(n_samples),
+            Domain.AIR, r, -clear, clear,
+            np.ones(n_samples), np.zeros(n_samples), clear,
         )
 
     dead = air(3, 0.0)
@@ -720,6 +722,82 @@ def test_series_elasticity_needs_a_compliant_drive() -> None:
           f"kp x0.1: {very_soft:.0f} W but only {swing_very_soft:.2f} rad")
 
 
+def test_flight_is_measured_against_the_ground_not_the_waterline() -> None:
+    """Altitude must mean height above whatever is underneath, and the machine
+    must be measured from its lowest point.
+
+    Found by opening the archive of a live run and asking what its best flyer
+    actually was.  The answer: a design with no lifting surface at all, wing
+    area 0.0000 m^2, scoring 0.75 for flight.  Three things stacked up.
+
+      * "Airborne" was ``depth < -0.3`` -- above the *waterline*.  The beach
+        rises inland to over three metres, so a machine sitting on it thirty
+        metres from shore is well above the waterline.
+      * Sink rate was the rate of change of world z.  The beach slopes at 0.12,
+        so skimming inland reads as climbing.
+      * Clearance was measured from the root body, which sits half a metre up on
+        a machine at rest, and the ramp's own half-thickness was another half
+        metre -- so a landed machine still read as 1 m in the air.
+
+    The design was launched at the 30 m/s speed cap (its wing area rounded to
+    zero, so its trim speed clipped), lobbed seventy-five metres downrange, and
+    settled onto rising ground where its height above the ground stayed constant
+    -- which the sink term read as holding altitude.
+    """
+    print("\nscore: flight is measured against the ground")
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.mjcf import beach_surface_z
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, SegmentResult, TriphibianEnv
+
+    env = TriphibianEnv(build(beetle()))
+    dt, dur = env.timestep, 8.0
+    n = int(dur / dt)
+
+    # The scene's own geometry must agree with what the scorer believes.
+    check("the beach surface is above its centre-line", beach_surface_z(12.0) > 0.4,
+          f"z={beach_surface_z(12.0):.2f} m at the shoreline")
+    check("and it rises inland", beach_surface_z(40.0) > beach_surface_z(12.0),
+          f"{beach_surface_z(12.0):.2f} -> {beach_surface_z(40.0):.2f} m")
+
+    def score(clear, depth):
+        r = SegmentResult(domain=Domain.AIR, duration=dur)
+        r.mean_speed = env.launch_speed
+        return env._score_segment(
+            Domain.AIR, r, depth, np.zeros(n), np.ones(n), np.zeros(n), clear
+        )
+
+    t = np.arange(n) * dt
+    # Skimming a rising slope: world z climbs, height above ground does not.
+    slope_z = 3.0 + 0.12 * 25.0 * t / dur          # gaining altitude in world z
+    resting = np.full(n, 0.05)                      # but sitting on the ground
+    # It is above the waterline the whole time, which is what used to matter.
+    above_water = -slope_z
+    check("resting on a rising hillside does not score as flight",
+          score(resting, above_water) < 0.1,
+          f"{score(resting, above_water):.3f}")
+
+    # Genuine level flight over water still scores.
+    level = np.full(n, 20.0)
+    check("holding height above the ground still scores full",
+          score(level, -level) > 0.95, f"{score(level, -level):.3f}")
+
+    # And a real descent still scores as a descent even if the ground falls away
+    # faster, which is the mirror image of the bug.
+    descending = 20.0 - 1.0 * t
+    check("a steady descent scores less than level flight",
+          score(descending, -descending) < score(level, -level),
+          f"{score(descending, -descending):.3f} against {score(level, -level):.3f}")
+
+    # Clearance itself must come from the lowest geometry: a machine resting on
+    # the beach has to read as touching down, not as a metre in the air.
+    env.reset(Domain.LAND, randomise=False)
+    for _ in range(int(3.0 / dt)):
+        env.step(env.cpg.command(env.cpg.base, env.data.time))
+    check("a machine at rest on the beach has near-zero clearance",
+          abs(env.clearance()) < 0.25, f"clearance {env.clearance():+.2f} m")
+
+
 def test_free_surface_continuity() -> None:
     """Submerged fraction must sweep smoothly from 0 to 1 across the surface."""
     print("\nmedium: free surface")
@@ -893,6 +971,7 @@ def main() -> int:
     test_added_mass_is_anisotropic()
     test_bodies_generate_lift_and_a_pitching_moment()
     test_series_elasticity_needs_a_compliant_drive()
+    test_flight_is_measured_against_the_ground_not_the_waterline()
     test_free_surface_continuity()
     test_added_mass_dominates_in_water()
     test_lev_extends_stall()

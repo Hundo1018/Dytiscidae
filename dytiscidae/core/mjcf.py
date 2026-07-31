@@ -67,6 +67,26 @@ def _fmt(v) -> str:
 # --------------------------------------------------------------------------
 
 
+#: Beach geometry.  Exported because the environment has to know where the
+#: ground is in order to say how high above it a machine is, and duplicating
+#: these numbers is what put the walking surface half a metre below where the
+#: scorer thought it was.
+SHORE_X = 12.0
+BEACH_SLOPE = 0.12
+BEACH_HALF_THICKNESS = 0.5
+
+
+def beach_surface_z(x: float) -> float:
+    """World height of the top of the beach ramp at ``x``.
+
+    The ramp is a box, not a plane: its centre-line passes through z = 0 at the
+    shoreline but its *surface* -- the thing a machine rests on -- is half the
+    box thickness above that, measured along the box normal.
+    """
+    ang = math.atan(BEACH_SLOPE)
+    return (x - SHORE_X) * BEACH_SLOPE + BEACH_HALF_THICKNESS / math.cos(ang)
+
+
 def scene_xml(
     *,
     seabed_depth: float = 18.0,
