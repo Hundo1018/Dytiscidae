@@ -713,11 +713,22 @@ def load_state(state: SearchState) -> int:
 
     run_dir = Path(state.config.run_dir)
     path = run_dir / _STATE_FILE
-    if not path.exists():
-        return 0
-    with open(path, "rb") as f:
-        d = pickle.load(f)
+    d: dict = {}
+    if path.exists():
+        try:
+            with open(path, "rb") as f:
+                d = pickle.load(f)
+        except Exception as exc:  # truncated or written by an older version
+            print(f"  (state checkpoint unreadable: {exc}; "
+                  "recovering the archives only)", flush=True)
 
+    # Archives are loaded whether or not the state file is there.  They are the
+    # expensive thing -- every cell is an evaluation someone paid for -- and the
+    # first version of this returned early when the state file was missing,
+    # which threw away a recoverable archive to avoid resuming without a judge.
+    # A run checkpointed by an older build, or one whose state file was being
+    # written when the machine went away, has archives and nothing else, and
+    # that is worth a great deal more than starting over.
     for name in state.archipelago.names:
         a_path = run_dir / f"archive_{name}.pkl"
         if a_path.exists():
@@ -743,7 +754,16 @@ def load_state(state: SearchState) -> int:
             cur.curriculum = state.curricula.get(name)
             cur.scout = state.scout
             state.archipelago.curators[name] = cur
-    return int(d.get("generation", 0)) + 1
+
+    if "generation" in d:
+        return int(d["generation"]) + 1
+    # No state file, but archives exist: they record the generation they were
+    # written at.  Everything learned is gone and has to be relearned, which the
+    # judge and the critic will do from the population that is still there.
+    filled = [a for a in state.archipelago.archives.values() if a.cells]
+    if not filled:
+        return 0
+    return max(a.generation for a in filled) + 1
 
 
 def seed_archipelago(state: SearchState, spec: MissionSpec) -> None:

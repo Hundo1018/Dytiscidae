@@ -1472,6 +1472,16 @@ def test_a_run_can_be_picked_up_where_it_stopped() -> None:
               again.evaluated - seen1 <= 3,
               f"{again.evaluated - seen1} new evaluations across 3 more generations")
 
+        # Archives without a state file -- an older build, or a machine that
+        # went away mid-write -- must still be recovered.  They are the
+        # expensive part: every cell is an evaluation someone paid for.
+        (Path(tmp) / "search_state.pkl").unlink()
+        salvaged = run_search(SearchConfig(generations=8, resume=True, **base),
+                              MissionSpec())
+        n3 = sum(len(a.cells) for a in salvaged.archipelago.archives.values())
+        check("an archive with no state file beside it is still recovered",
+              n3 >= n1, f"{n1} elites recovered without the checkpoint")
+
         # A fresh directory with --resume is a normal run, not an error.
         fresh = tempfile.mkdtemp(prefix="dyt-resume-fresh-")
         try:
