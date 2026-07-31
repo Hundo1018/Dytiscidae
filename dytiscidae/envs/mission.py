@@ -27,6 +27,7 @@ map, and it stays correct when the sea state moves the surface around.
 from __future__ import annotations
 
 import time
+from collections import deque
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -46,7 +47,7 @@ class LegRecord:
     mean_power: float = 0.0
     max_depth: float = 0.0
     distance: float = 0.0
-    entered: bool = False  # did it ever reach the commanded domain
+    entered: bool = False  # did it reach and hold the commanded domain
     entry_time: float | None = None  # seconds after the command to first arrival
 
     @property
@@ -121,6 +122,30 @@ def _energy_phrase(r: "ContinuousResult") -> str:
     return f"{r.energy_wh:.1f} Wh over {r.total_time:.0f} s ({r.mean_power_w:.0f} W)"
 
 
+#: Arrival is judged over a window, not on one step and not on an unbroken run.
+#:
+#: A transition used to count the first single step on which the actual domain
+#: matched the commanded one, and one step is not a crossing.  ``current_domain``
+#: reads AIR whenever nothing is touching and nothing is submerged, so a walking
+#: machine reads AIR every time it lifts its feet: measured on a land episode,
+#: the beetle reads airborne for 25.7% of steps and the gannet for 1.7%, in
+#: bursts of 0.07 to 0.14 s.  Any of those bursts completed the land-to-air
+#: transition, which is worth 35% of the continuous mission score across two
+#: crossings -- so a design that never left the ground could bank half of it on
+#: contact chatter.
+#:
+#: Requiring an *unbroken* half second instead fixes that and breaks something
+#: else: a gait with an aerial phase is a real gait, and the beetle -- on the
+#: ground for 74% of a land leg -- never held it unbroken for half a second, so
+#: it never counted as having arrived anywhere.  Both errors are the same
+#: mistake, treating an instantaneous reading as a state.
+#:
+#: So: in the domain for a majority of a half-second window.  Chatter at 26%
+#: does not qualify; a runner at 74% does.
+ENTRY_WINDOW = 0.5
+ENTRY_MAJORITY = 0.6
+
+
 def current_domain(env: TriphibianEnv) -> Domain:
     """Which domain the machine is physically in right now."""
     submerged = env.solver.diag.mean_submerged
@@ -185,6 +210,8 @@ def run_continuous(
         leg_steps = 0
         start_xy = env.root_pos()[:2].copy()
         power_acc = 0.0
+        window: deque = deque()
+        window_n = max(int(ENTRY_WINDOW / env.timestep), 1)
 
         if leg_i > 0:
             result.transitions_commanded += 1
@@ -208,13 +235,21 @@ def run_continuous(
                 break
 
             actual = current_domain(env)
-            if actual is commanded:
+            in_domain = actual is commanded
+            if in_domain:
                 on_task_steps += 1
-                if not leg.entered:
-                    leg.entered = True
-                    leg.entry_time = clock - leg.start_t
-                    if leg_i > 0:
-                        result.transitions_completed += 1
+            # Time spent in the domain is counted every step -- that is a
+            # fraction of time and chatter averages out of it.  *Arriving* is
+            # judged over a window; see ENTRY_WINDOW.
+            window.append(in_domain)
+            if len(window) > window_n:
+                window.popleft()
+            if (not leg.entered and len(window) == window_n
+                    and sum(window) >= ENTRY_MAJORITY * window_n):
+                leg.entered = True
+                leg.entry_time = max(clock - leg.start_t - ENTRY_WINDOW, 0.0)
+                if leg_i > 0:
+                    result.transitions_completed += 1
             leg_steps += 1
             step_i += 1
             clock += env.timestep

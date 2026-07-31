@@ -843,6 +843,93 @@ def test_no_dataclass_can_raise_on_equality() -> None:
     check("comparing and containment-testing genomes and elites does not raise", ok)
 
 
+def test_arriving_somewhere_is_not_one_lucky_timestep() -> None:
+    """A crossing has to be held, and a gait with an aerial phase is still a gait.
+
+    ``current_domain`` is an instantaneous reading: AIR whenever nothing is
+    touching and nothing is submerged.  A transition counted the first single
+    step on which that reading matched the command, so a walking machine banked
+    the land-to-air crossing every time it picked its feet up.  Measured on a
+    land episode the beetle reads airborne for 25.7% of steps and the gannet for
+    1.7%, in bursts of 0.07 to 0.14 s, and a crossing is worth 35% of the
+    continuous mission score across two of them.
+
+    Demanding an unbroken half second instead trades one error for its mirror:
+    the beetle is on the ground for 74% of a land leg and never holds it
+    unbroken for that long, so a real walker arrives nowhere.  Both are the same
+    mistake -- reading an instantaneous signal as a state -- and the fix is to
+    judge arrival over a window, which is what a majority of half a second is.
+    """
+    print("\nmission: arriving is held, not glimpsed")
+    from dytiscidae.envs.mission import ENTRY_MAJORITY, ENTRY_WINDOW
+
+    dt = 0.004
+    n = max(int(ENTRY_WINDOW / dt), 1)
+
+    def arrives(pattern) -> bool:
+        """Would this sequence of in-domain readings count as arrival?"""
+        from collections import deque
+
+        w: deque = deque()
+        for flag in pattern:
+            w.append(bool(flag))
+            if len(w) > n:
+                w.popleft()
+            if len(w) == n and sum(w) >= ENTRY_MAJORITY * n:
+                return True
+        return False
+
+    rng = np.random.default_rng(0)
+    steps = int(6.0 / dt)
+    # Contact chatter: airborne a quarter of the time in bursts far shorter than
+    # the window.  This is the beetle walking, and it must not read as flight.
+    chatter = np.zeros(steps, dtype=bool)
+    i = 0
+    while i < steps:
+        if rng.random() < 0.25:
+            burst = int(rng.integers(1, max(int(0.14 / dt), 2)))
+            chatter[i:i + burst] = True
+            i += burst
+        i += int(rng.integers(1, 40))
+    check("contact chatter is not a crossing",
+          not arrives(chatter),
+          f"airborne {chatter.mean()*100:.0f}% of steps in bursts, still not arrived")
+
+    # A running gait: on the ground 74% of the time, with regular aerial phases.
+    gait = np.ones(steps, dtype=bool)
+    period = max(int(0.20 / dt), 3)
+    for k in range(0, steps, period):
+        gait[k:k + max(int(0.26 * period), 1)] = False
+    check("but a gait with an aerial phase still arrives",
+          arrives(gait),
+          f"on the ground {gait.mean()*100:.0f}% of the time")
+
+    # And a real crossing, obviously.
+    real = np.zeros(steps, dtype=bool)
+    real[int(1.0 / dt):] = True
+    check("and so does actually going there", arrives(real))
+
+    # End to end, on the two plans the numbers above came from.
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.mission import build_schedule, run_continuous
+    from dytiscidae.envs.triphibian import MissionSpec, TriphibianEnv
+
+    spec = MissionSpec(cycles=1, seconds_per_domain=8.0)
+    for name in ("gannet", "beetle"):
+        env = TriphibianEnv(build(BODY_PLANS[name]()), seed=0)
+        r = run_continuous(env, None,
+                           build_schedule(spec, np.random.default_rng(0), leg_seconds=8.0))
+        air = next((leg for leg in r.legs if leg.commanded.value == "air"), None)
+        land = next((leg for leg in r.legs if leg.commanded.value == "land"), None)
+        check(f"{name}: does not claim the air leg it never flew",
+              air is not None and not air.entered,
+              f"air on-task {air.on_task_fraction*100:.1f}%, entered={air.entered}")
+        check(f"{name}: does claim the land it is standing on",
+              land is not None and land.entered,
+              f"land on-task {land.on_task_fraction*100:.1f}%, entered={land.entered}")
+
+
 def test_transitions_are_graded_not_pass_fail() -> None:
     """A crossing must be scored on how it was done, not only on whether it
     happened.
@@ -1561,6 +1648,7 @@ def main() -> int:
     test_cells_hold_a_pareto_front_not_a_weighted_sum()
     test_intervention_is_triggered_by_evidence_not_a_schedule()
     test_no_dataclass_can_raise_on_equality()
+    test_arriving_somewhere_is_not_one_lucky_timestep()
     test_transitions_are_graded_not_pass_fail()
     test_judge_ladder_is_fixed_and_bar_only_tightens()
     test_auditor_can_invalidate_and_veto()
