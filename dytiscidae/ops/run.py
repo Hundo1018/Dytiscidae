@@ -375,6 +375,14 @@ def cmd_showcase(args) -> int:
               f"{f' (island {args.island})' if args.island else ''}: "
               f"fitness {elite.fitness:.4f}, island "
               f"{(elite.meta or {}).get('island', '-')}, tier {elite.tier}")
+    elif args.plan:
+        from ..core.bodyplans import BODY_PLANS
+
+        if args.plan not in BODY_PLANS:
+            print(f"unknown plan {args.plan!r}; known: {', '.join(BODY_PLANS)}")
+            return 1
+        p = build(BODY_PLANS[args.plan]())
+        print(f"filming the {args.plan} body plan")
     else:
         p = build(reference_genome())
     print(p.summary())
@@ -525,6 +533,8 @@ def main(argv=None) -> int:
                         "(default: the hand-built reference)")
     p.add_argument("--island", default=None,
                    help="restrict --design to one island's archive")
+    p.add_argument("--plan", default=None,
+                   help="film a named body plan instead (beetle, gannet, ...)")
     p.add_argument("--controller", default=None, help="load a trained controller pickle")
     p.add_argument("--train", action="store_true", help="train one first")
     p.add_argument("--iterations", type=int, default=22)
