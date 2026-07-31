@@ -378,6 +378,79 @@ def test_cpg_respects_joint_limits() -> None:
           pol.n_weights == 11 * 8 + 8 + 8 * 4 + 4, f"{pol.n_weights}")
 
 
+def test_a_rare_capability_survives_the_learned_projection() -> None:
+    """A capability two designs in a hundred have must still get its own cell.
+
+    This is the failure mode learned descriptors are known for and the one that
+    would quietly undo the rest of this project's work on flight.  The archive's
+    axes are fitted by PCA over sixteen behaviour features; PCA keeps the
+    directions with the most variance, and "almost nobody does this" looks a lot
+    like noise.  If flight is projected away, the one design that flies shares a
+    cell with the ninety-eight that fall, loses it to whichever of them has the
+    better aggregate score, and every fix in this session is averaged out.
+
+    Measured on a synthetic population -- 96 fallers, 2 flyers -- it survives,
+    and the reason it survives is worth stating: the features that go with
+    flying (staying up, holding height, going fast while up there) move
+    *together*, so they form a real correlated direction rather than a lone
+    outlier in one coordinate.  PCA finds correlated directions, so a rare
+    capability that shows up in several features at once is exactly the kind it
+    keeps.  A rare capability visible in only one feature would not be, which is
+    the honest limit of this check.
+    """
+    print("\ndescriptors: a rare capability keeps its own cell")
+    from dytiscidae.evolution.descriptors import FEATURE_DIM, LearnedDescriptors
+
+    rng = np.random.default_rng(0)
+
+    def faller():
+        f = np.zeros(FEATURE_DIM)
+        f[0:3] = (0.36, 0.32, 0.32)
+        f[3:6] = (6.0, 0.8, 0.3)
+        f[6] = 1.2
+        f[7] = 0.05            # holds no altitude
+        f[8:10] = (2.5, 2.0)
+        f[10:13] = (40.0, 30.0, 20.0)
+        f[13:16] = (0.5, 1.0, 0.2)
+        return f + rng.normal(0, 0.05, FEATURE_DIM) * np.abs(f).clip(0.05)
+
+    def flyer():
+        f = faller()
+        f[0], f[3], f[7], f[8] = 0.95, 13.0, 0.90, 0.4
+        return f
+
+    n_fall, n_fly = 96, 2
+    pop = [faller() for _ in range(n_fall)] + [flyer() for _ in range(n_fly)]
+    d = LearnedDescriptors(n_dims=4, min_samples=60)
+    for f in pop:
+        d.observe(f)
+    check("the projection fits", d.fit() and d.fitted)
+
+    P = np.array([d.project(f) for f in pop])
+    bounds = np.asarray(d.bounds(), float)
+
+    def cell(p, bins: int = 8):
+        idx = np.floor((p - bounds[:, 0])
+                       / np.maximum(bounds[:, 1] - bounds[:, 0], 1e-9) * bins)
+        return tuple(int(np.clip(v, 0, bins - 1)) for v in idx)
+
+    cells_fall = {cell(P[i]) for i in range(n_fall)}
+    cells_fly = {cell(P[i]) for i in range(n_fall, n_fall + n_fly)}
+    check("the flyers do not share a cell with anything that falls",
+          not (cells_fly & cells_fall),
+          f"{len(cells_fall)} faller cells, flyer cells {sorted(cells_fly)}")
+
+    sig = (P[n_fall] - P[:n_fall].mean(axis=0)) / np.maximum(P[:n_fall].std(axis=0), 1e-9)
+    check("and they are far out along a learned axis, not marginally off one",
+          float(np.abs(sig).max()) > 5.0,
+          f"{float(np.abs(sig).max()):.0f} sigma from the cloud on axis "
+          f"{int(np.argmax(np.abs(sig)))}")
+    check("which the run can name, so the archive is not a map with blank axes",
+          "air_time_fraction" in d.axis_meaning(int(np.argmax(np.abs(sig))))
+          or "net_altitude_change" in d.axis_meaning(int(np.argmax(np.abs(sig)))),
+          d.axis_meaning(int(np.argmax(np.abs(sig)))))
+
+
 def test_learned_descriptors_replace_the_hand_picked_axes() -> None:
     """The archive's axes must be learnable from behaviour, and re-binning must
     not silently shrink the archive.
@@ -1408,6 +1481,7 @@ def main() -> int:
     test_every_mutation_operator_keeps_the_genome_buildable()
     test_phenotype_invariants()
     test_cpg_respects_joint_limits()
+    test_a_rare_capability_survives_the_learned_projection()
     test_learned_descriptors_replace_the_hand_picked_axes()
     test_cells_hold_a_pareto_front_not_a_weighted_sum()
     test_intervention_is_triggered_by_evidence_not_a_schedule()
