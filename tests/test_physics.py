@@ -1194,6 +1194,15 @@ def test_series_elasticity_needs_a_compliant_drive() -> None:
     # trim surface carrying real aerodynamic load is where servo stiffness is
     # the whole story, and that only became testable once a surface could be
     # told to hold still at all.
+    def _gannet_with_compliance(compliance: float):
+        from dytiscidae.core.bodyplans import gannet
+
+        g = gannet()
+        for part in g.parts:
+            if part.joint != "none" and part.actuated:
+                part.drive_compliance = compliance
+        return g
+
     def hold_error(compliance: float, secs: float = 3.0) -> tuple:
         from dytiscidae.core.bodyplans import gannet
 
@@ -1216,12 +1225,34 @@ def test_series_elasticity_needs_a_compliant_drive() -> None:
 
     hold_stiff, p_hold_stiff = hold_error(1.0)
     hold_soft, p_hold_soft = hold_error(0.05)
-    check("and an over-compliant drive cannot hold a loaded surface still",
-          hold_soft > 1.5 * hold_stiff,
-          f"a trim wing sags {math.degrees(hold_soft):.0f} deg at kp x0.05 against "
-          f"{math.degrees(hold_stiff):.0f} deg at full gain "
-          f"({p_hold_soft:.0f} W against {p_hold_stiff:.0f} W -- the power it saves "
-          f"is paid for in incidence it does not keep)")
+    # What is actually true, stated rather than wished for: within the gain
+    # range a design can reach, softening the drive costs nothing measurable.
+    # It was checked three ways -- swing amplitude on an oscillating fin,
+    # tracking error against the commanded angle, and hold error on a loaded
+    # trim surface -- and on this machine all three are flat from kp x4 to
+    # kp x0.05 while power falls by a factor of two to three.  Raising the
+    # motor does not change it either, so it is not torque saturation.
+    #
+    # That makes ``drive_compliance`` a one-sided gene as it stands: the search
+    # will drive it to the floor and the floor is the only thing stopping it.
+    # So the floor is what gets asserted, because it is what is load-bearing.
+    # Leaving a check here that pretends to measure a cost would be worse than
+    # admitting there is not one -- it would go green while meaning nothing.
+    check("softening the drive saves real power",
+          p_hold_soft < 0.75 * p_hold_stiff,
+          f"{p_hold_soft:.0f} W at kp x0.05 against {p_hold_stiff:.0f} W at full gain")
+    check("and its cost is not visible in how well the surface holds",
+          abs(hold_soft - hold_stiff) < 0.25 * max(hold_stiff, 1e-6),
+          f"{math.degrees(hold_soft):.1f} deg against {math.degrees(hold_stiff):.1f} deg "
+          f"-- so nothing but the clamp bounds this gene")
+    from dytiscidae.core.mjcf import build_model_xml as _bx
+
+    xml_soft, _ = _bx(build(_gannet_with_compliance(0.0)))
+    kps = [float(t.split('kp="')[1].split('"')[0])
+           for t in xml_soft.split("<position")[1:] if 'kp="' in t]
+    check("which the model clamps, so a free lunch is bounded by construction",
+          kps and min(kps) > 0.0,
+          f"lowest servo gain emitted is {min(kps):.3f} at drive_compliance 0")
 
 
 def test_flight_is_measured_against_the_ground_not_the_waterline() -> None:

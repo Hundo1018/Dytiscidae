@@ -504,6 +504,8 @@ def build_model_xml(
     act_specs: list[tuple[str, str, float]] = []  # (name, joint, forcerange)
 
     # Non-structural mass (battery, avionics, seals) rides in the root segment.
+    # Motors do *not*: they ride in the limb they drive, which is where they
+    # physically are and where their inertia matters.
     extra_root = p.budget.battery + p.budget.avionics + p.budget.seals
 
     def add_segment(s: Segment, parent_el: ET.Element) -> None:
@@ -573,7 +575,21 @@ def build_model_xml(
                     float(getattr(s.part, "drive_compliance", 1.0)),
                 ))
 
+        # Every motor in the machine was weightless.  ``Segment.mass`` is spar,
+        # skin and hull structure; the actuator mass went into the budget --
+        # which is what the reports, the wing loading and the structural checks
+        # all read -- and into no body at all, so the thing MuJoCo integrated
+        # was 9 to 24% lighter than the design it was supposed to be.
+        #
+        # It showed up as a machine that would not dive.  The gannet's budget
+        # says it is 4.5 N negatively buoyant and it floated, because the model
+        # weighed 3.62 kg against a 4.49 kg design and 0.87 kg of missing motor
+        # is 8.6 N -- enough to change the sign.  Everything else was wrong more
+        # quietly: limbs with no motor at their joint are cheap to swing, so
+        # every flapping power figure was optimistic too.
         m_extra = extra_root if s.parent < 0 else 0.0
+        if s.actuator is not None:
+            m_extra += float(s.actuator.mass)
         if not _add_field_geoms(root, body, s, max(s.mass + m_extra, 1e-4)):
             _add_geoms(body, s, m_extra, detail=detail)
 

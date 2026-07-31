@@ -522,7 +522,11 @@ def gannet() -> Genome:
                 sealed=True, phase_offset=math.pi)
     g.parts = [fuselage, wing, tail, leg, foot]
     g.edges = [
-        Edge(parent=0, child=1, pos_u=0.34, reflect=True),
+        # Wing station, retuned after the motors were given their mass.  The
+        # balance is sharp and it is sharp asymmetrically: 0.38 still glides at
+        # 3.9 and 0.36 at 2.9, but 0.44 falls to 2.1 and 0.46 to 0.7.  Sitting
+        # at the peak with the forgiving side below it is the deliberate choice.
+        Edge(parent=0, child=1, pos_u=0.40, reflect=True),
         Edge(parent=0, child=2, pos_u=1.00, reflect=True),
         Edge(parent=0, child=3, pos_u=0.70, azimuth=-1.1, reflect=True),
         Edge(parent=3, child=4, pos_u=1.0, elevation=0.8),
