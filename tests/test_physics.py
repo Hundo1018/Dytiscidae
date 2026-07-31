@@ -746,7 +746,7 @@ def test_flight_is_measured_against_the_ground_not_the_waterline() -> None:
     """
     print("\nscore: flight is measured against the ground")
     from dytiscidae.core.bodyplans import beetle
-    from dytiscidae.core.mjcf import beach_surface_z
+    from dytiscidae.core.mjcf import beach_extent, beach_surface_z
     from dytiscidae.core.phenotype import build
     from dytiscidae.envs.triphibian import Domain, SegmentResult, TriphibianEnv
 
@@ -757,8 +757,12 @@ def test_flight_is_measured_against_the_ground_not_the_waterline() -> None:
     # The scene's own geometry must agree with what the scorer believes.
     check("the beach surface is above its centre-line", beach_surface_z(12.0) > 0.4,
           f"z={beach_surface_z(12.0):.2f} m at the shoreline")
-    check("and it rises inland", beach_surface_z(40.0) > beach_surface_z(12.0),
-          f"{beach_surface_z(12.0):.2f} -> {beach_surface_z(40.0):.2f} m")
+    check("and it rises inland", beach_surface_z(35.0) > beach_surface_z(12.0),
+          f"{beach_surface_z(12.0):.2f} -> {beach_surface_z(35.0):.2f} m")
+    lo, hi = beach_extent()
+    check("and it is finite -- no phantom ground out at sea",
+          beach_surface_z(lo - 5.0) < -10.0 and beach_surface_z(hi + 5.0) < -10.0,
+          f"ramp spans x {lo:.1f}..{hi:.1f}")
 
     def score(clear, depth):
         r = SegmentResult(domain=Domain.AIR, duration=dur)

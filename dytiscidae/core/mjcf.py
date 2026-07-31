@@ -76,13 +76,39 @@ BEACH_SLOPE = 0.12
 BEACH_HALF_THICKNESS = 0.5
 
 
+#: How far the ramp runs below the waterline, and how long it is.  Mirrors
+#: ``scene_xml``; see ``beach_surface_z``.
+BEACH_SUBMERGED_RUN = 12.0
+BEACH_RAMP_LEN = 40.0
+SEABED_DEPTH = 18.0
+
+
+def beach_extent() -> tuple[float, float]:
+    """The world x range over which the beach ramp actually exists."""
+    ang = math.atan(BEACH_SLOPE)
+    t0 = BEACH_SUBMERGED_RUN - 0.5 * BEACH_RAMP_LEN
+    cx = SHORE_X - t0 * math.cos(ang)
+    reach = 0.5 * BEACH_RAMP_LEN * math.cos(ang)
+    return cx - reach, cx + reach
+
+
 def beach_surface_z(x: float) -> float:
     """World height of the top of the beach ramp at ``x``.
 
+    Two things this has to get right, both of which were wrong before.
+
     The ramp is a box, not a plane: its centre-line passes through z = 0 at the
     shoreline but its *surface* -- the thing a machine rests on -- is half the
-    box thickness above that, measured along the box normal.
+    box thickness above that, measured along the box normal.  Missing that put
+    the walking surface half a metre below where the scorer believed it was.
+
+    And the ramp is finite.  Extrapolating it as an infinite plane put phantom
+    ground under the open sea, forty metres out and two metres down, which is
+    exactly where a water-to-air crossing begins.
     """
+    lo, hi = beach_extent()
+    if x < lo or x > hi:
+        return -SEABED_DEPTH
     ang = math.atan(BEACH_SLOPE)
     return (x - SHORE_X) * BEACH_SLOPE + BEACH_HALF_THICKNESS / math.cos(ang)
 

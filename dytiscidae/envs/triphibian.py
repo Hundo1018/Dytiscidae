@@ -136,6 +136,11 @@ class MissionResult:
     structural_margin: float = 0.0
     segments: dict[str, SegmentResult] = field(default_factory=dict)
     transition_ok: dict[str, bool] = field(default_factory=dict)
+    #: The graded record of every crossing attempted.  ``transition_ok`` is kept
+    #: as the boolean summary because the curator and the telemetry read it, but
+    #: the score comes from here.
+    transitions: "object" = field(default_factory=lambda: __import__(
+        "dytiscidae.envs.transitions", fromlist=["TransitionSet"]).TransitionSet())
     energy_required_wh: float = 0.0
     energy_available_wh: float = 0.0
     mission_fraction: float = 0.0
@@ -374,7 +379,7 @@ class TriphibianEnv:
         return float(np.clip(v, lo, hi))
 
     def _clear_of_terrain(self, x: float, y: float, z: float, gap: float = 0.05) -> float:
-        """Raise a land spawn until the machine's lowest geometry clears ground.
+        """Height at which the machine's lowest geometry sits ``gap`` above ground.
 
         The spawn height was a constant, so a machine larger than that constant
         started *inside* the beach.  A medusa began its land episode with 99
@@ -383,22 +388,16 @@ class TriphibianEnv:
         search is free to invent machines of any size, the spawn has to be
         derived from the machine rather than assumed.
 
-        Measured from the compiled geometry with the pose already written, using
-        ``geom_rbound`` so it is correct for meshes as well as primitives.
+        Written in terms of ``clearance``, which already knows both the terrain
+        and the machine's own extent.  The previous version mixed the requested
+        ``z`` with whatever pose ``data`` happened to hold, so calling it with a
+        z different from the current one lifted the machine metres into the air.
         """
-        self._mj.mj_forward(self.model, self.data)
-        g = self.model.geom_bodyid != 0
-        if not g.any():
+        if self.model.nq < 7:
             return z
-        lowest = float((self.data.geom_xpos[g][:, 2] - self.model.geom_rbound[g]).min())
-        # Probe the terrain directly below the root by dropping a ray.
-        ray = np.zeros(1, dtype=np.int32)
-        hit = self._mj.mj_ray(
-            self.model, self.data, np.array([x, y, z + 60.0]), np.array([0.0, 0.0, -1.0]),
-            None, 1, -1, ray,
-        )
-        ground = (z + 60.0 - float(hit)) if hit >= 0 else 0.0
-        return z + max(ground + gap - lowest, 0.0)
+        self.data.qpos[0], self.data.qpos[1], self.data.qpos[2] = x, y, z
+        self._mj.mj_forward(self.model, self.data)
+        return float(z + (gap - self.clearance()))
 
     def snapshot(self) -> tuple:
         return (self.data.qpos.copy(), self.data.qvel.copy(), self.data.time)
@@ -467,7 +466,7 @@ class TriphibianEnv:
         and per-call wave evaluation showed up as a 75% slowdown of the whole
         search.  One call for the whole machine instead.
         """
-        from ..core.mjcf import BEACH_SLOPE, SHORE_X, beach_surface_z
+        from ..core.mjcf import BEACH_SLOPE, SHORE_X, beach_extent, beach_surface_z
 
         xs = np.asarray(xs, float)
         probe = np.zeros((xs.size, 3))
@@ -475,7 +474,10 @@ class TriphibianEnv:
         surface = -np.asarray(
             self.medium.depth(probe, self.data.time if t is None else t), float
         )
-        beach = (xs - SHORE_X) * BEACH_SLOPE + (beach_surface_z(SHORE_X) - 0.0)
+        lo, hi = beach_extent()
+        beach = (xs - SHORE_X) * BEACH_SLOPE + (beach_surface_z(SHORE_X))
+        # The ramp is finite: no phantom ground out at sea or far inland.
+        beach = np.where((xs >= lo) & (xs <= hi), beach, -np.inf)
         return np.maximum(surface, beach)
 
     def clearance(self) -> float:

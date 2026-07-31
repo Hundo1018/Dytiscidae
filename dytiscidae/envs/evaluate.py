@@ -26,6 +26,7 @@ import numpy as np
 from ..control.cpg import CPGParams, MobilityBasis, Policy
 from ..core.phenotype import Phenotype
 from ..physics.energy import transition_energy
+from .transitions import TransitionSet, run_transition
 from .triphibian import (
     DOMAIN_CYCLE,
     Domain,
@@ -58,79 +59,6 @@ class Controller:
 # --------------------------------------------------------------------------
 # Transitions
 # --------------------------------------------------------------------------
-
-
-def _run_transition(
-    env: TriphibianEnv, kind: str, controller: Controller, duration: float = 6.0
-) -> tuple[bool, float, str]:
-    """Simulate one domain transition.  Returns (survived, peak entry speed, note).
-
-    Water entry is the one that matters structurally: the phenotype knows the
-    fastest entry its hull survives, and this measures the speed actually flown.
-    A machine that dives in at twice its survivable speed has not completed a
-    transition, it has had an accident.
-    """
-    p = env.p
-    if kind == "air_to_water":
-        env.reset(Domain.AIR, randomise=False)
-        if env.model.nq >= 7:
-            env.data.qpos[2] = 2.5
-            env.data.qvel[2] = -1.5  # committed descent
-        env._mj.mj_forward(env.model, env.data)
-    elif kind == "water_to_air":
-        env.reset(Domain.WATER, randomise=False)
-        if env.model.nq >= 7:
-            env.data.qpos[2] = -2.0
-        env._mj.mj_forward(env.model, env.data)
-    elif kind == "water_to_land":
-        env.reset(Domain.WATER, randomise=False)
-        if env.model.nq >= 7:
-            env.data.qpos[0] = 10.0
-            env.data.qpos[2] = -1.0
-        env._mj.mj_forward(env.model, env.data)
-    else:  # land_to_air / land_to_water
-        env.reset(Domain.LAND, randomise=False)
-
-    # During a transition the controller is commanded toward the destination.
-    target_dom = {
-        "air_to_water": Domain.WATER, "water_to_air": Domain.AIR,
-        "water_to_land": Domain.LAND, "land_to_water": Domain.WATER,
-        "land_to_air": Domain.AIR, "air_to_land": Domain.LAND,
-    }.get(kind, Domain.AIR)
-    basis = controller.basis_for(Domain.WATER if "water" in kind else Domain.AIR)
-    n = int(duration / env.timestep)
-    control_every = max(1, int(1.0 / (25.0 * env.timestep)))
-    cur = controller.params
-    peak_entry = 0.0
-    was_dry = env.depth() < 0.0
-    crossed = False
-
-    for i in range(n):
-        if controller.policy is not None and basis is not None and i % control_every == 0:
-            cur = basis.command_params(
-                controller.params,
-                controller.policy.act(env.observation(target_dom)),
-                env.cpg.n,
-            )
-        if not env.step(env.cpg.command(cur, env.data.time)):
-            return False, peak_entry, "battery exhausted mid-transition"
-        pos = env.root_pos()
-        if not np.all(np.isfinite(pos)) or np.abs(pos).max() > 400:
-            return False, peak_entry, "diverged"
-        d = env.depth()
-        now_dry = d < 0.0
-        if was_dry and not now_dry:
-            crossed = True
-            peak_entry = max(peak_entry, abs(float(env.body_twist()[2])))
-        if now_dry != was_dry:
-            crossed = True
-        was_dry = now_dry
-
-    if kind == "air_to_water" and peak_entry > p.max_entry_speed:
-        return False, peak_entry, (
-            f"entry at {peak_entry:.1f} m/s exceeds hull limit {p.max_entry_speed:.1f} m/s"
-        )
-    return crossed, peak_entry, "" if crossed else "never crossed the boundary"
 
 
 # --------------------------------------------------------------------------
@@ -193,10 +121,11 @@ def evaluate_tier1(
         r.segments[dom.value] = seg
 
     for kind in ("air_to_water", "water_to_air", "water_to_land"):
-        ok, entry, note = _run_transition(env, kind, ctrl)
-        r.transition_ok[kind] = ok
-        if note:
-            r.notes.append(f"{kind}: {note}")
+        tr = run_transition(env, kind, ctrl)
+        r.transitions.results[kind] = tr
+        r.transition_ok[kind] = tr.crossed
+        if tr.failure:
+            r.notes.append(f"{kind}: {tr.failure}")
 
     # Energy: measured steady power extrapolated over the domain durations, plus
     # simulated transition costs.
@@ -211,8 +140,20 @@ def evaluate_tier1(
     energy_fraction = float(
         np.clip(r.energy_available_wh / max(r.energy_required_wh, 1e-6), 0.0, 1.0)
     )
-    transition_fraction = (
-        sum(r.transition_ok.values()) / max(len(r.transition_ok), 1) if r.transition_ok else 0.0
+    # Graded, not binary.  A crossing used to contribute 1 or 0 depending only
+    # on whether the depth changed sign, so a tumbling arrival at twice the
+    # hull's survivable speed counted the same as a clean one.  The quality
+    # terms are conditioned on having crossed at all, so refusing the hard
+    # crossing cannot raise the average.
+    tc = r.transitions.component_means()
+    transition_fraction = float(
+        tc["crossed"] * (
+            0.40
+            + 0.60 * float(np.mean([
+                tc["shock"], tc["control"], tc["settle"], tc["economy"],
+                tc["exit_state"],
+            ]))
+        )
     )
     # The mission is only as good as its weakest domain: a machine that flies
     # beautifully and cannot dive has completed none of the cycles, so this is a

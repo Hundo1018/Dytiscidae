@@ -770,6 +770,89 @@ def test_no_dataclass_can_raise_on_equality() -> None:
     check("comparing and containment-testing genomes and elites does not raise", ok)
 
 
+def test_transitions_are_graded_not_pass_fail() -> None:
+    """A crossing must be scored on how it was done, not only on whether it
+    happened.
+
+    It used to return a boolean: True if the machine's depth changed sign at any
+    point in six seconds.  Under that rule a machine that fell through the
+    surface tumbling, at twice the speed its hull survives, scored exactly what
+    a clean controlled entry scored.  The crossings are where every real
+    triphibian machine spends its structure and its energy, and handing all of
+    that to one bit left the search no gradient to climb toward doing it well.
+    """
+    print("\ntransitions: scored, not merely survived")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.transitions import (
+        TRANSITION_ENDPOINTS,
+        TransitionSet,
+        _place_for,
+        run_transition,
+    )
+    from dytiscidae.envs.triphibian import TriphibianEnv
+
+    env = TriphibianEnv(build(BODY_PLANS["ray"]()))
+    ctrl = Controller(params=env.cpg.base)
+
+    # Every crossing must start from a state that is physically valid: outside
+    # the terrain.  Starting a water-to-land crossing at a fixed depth put the
+    # machine inside the submerged ramp, which is the same mistake that made the
+    # land domain unreachable for the whole project.
+    from dytiscidae.core.mjcf import beach_surface_z
+
+    for kind in TRANSITION_ENDPOINTS:
+        _place_for(env, kind)
+        # Solid ground only.  Being below the *water* surface is the whole point
+        # of a crossing that starts submerged, so the check is against the beach
+        # ramp, not against the waterline.
+        g = env._machine_geoms
+        aabb = env.model.geom_aabb.reshape(-1, 6)[g]
+        R = env.data.geom_xmat[g].reshape(-1, 3, 3)
+        centre_z = env.data.geom_xpos[g][:, 2] + np.einsum("nij,nj->ni", R, aabb[:, :3])[:, 2]
+        bottom = centre_z - np.einsum("nj,nj->n", np.abs(R[:, 2, :]), aabb[:, 3:])
+        rock = np.array([beach_surface_z(float(x)) for x in env.data.geom_xpos[g][:, 0]])
+        into_rock = float(np.min(bottom - rock))
+        check(f"{kind} starts outside solid ground", into_rock > -0.05,
+              f"lowest geometry sits {into_rock:+.3f} m above the ramp")
+
+    r = run_transition(env, "air_to_water", ctrl, duration=5.0)
+    comp = r.components
+    check("a crossing reports separable components", set(comp) == {
+        "crossed", "shock", "control", "settle", "economy", "exit_state"},
+        ", ".join(sorted(comp)))
+    check("all components are normalised", all(0.0 <= v <= 1.0 for v in comp.values()),
+          str({k: round(v, 2) for k, v in comp.items()}))
+    check("and the raw physics is kept alongside them",
+          r.survivable_entry_speed > 0.0 and r.duration > 0.0,
+          f"entry {r.peak_entry_speed:.1f} m/s against a {r.survivable_entry_speed:.1f} m/s limit")
+
+    # Entry shock has to be a slope, not a cliff: half the hull limit must beat
+    # nine tenths of it.
+    from dytiscidae.envs.transitions import TransitionResult
+
+    def shock_at(speed, limit=10.0):
+        t = TransitionResult(kind="air_to_water", crossed=True)
+        t.peak_entry_speed, t.survivable_entry_speed = speed, limit
+        t.shock = float(np.clip(1.0 - (speed / limit) ** 2, 0.0, 1.0))
+        return t.shock
+
+    check("entering slowly beats entering fast", shock_at(5.0) > shock_at(9.0) > 0.0,
+          f"5 m/s -> {shock_at(5.0):.2f}, 9 m/s -> {shock_at(9.0):.2f}")
+    check("and exceeding the hull limit scores nothing", shock_at(11.0) == 0.0,
+          f"{shock_at(11.0):.2f}")
+
+    # Refusing the hard crossing must not raise the average.
+    ts = TransitionSet()
+    ts.results["air_to_water"] = run_transition(env, "air_to_water", ctrl, duration=4.0)
+    one = ts.component_means()["crossed"]
+    ts.results["water_to_air"] = run_transition(env, "water_to_air", ctrl, duration=4.0)
+    two = ts.component_means()["crossed"]
+    check("a failed crossing drags the mean down rather than being skipped",
+          two <= one, f"{one:.2f} -> {two:.2f} after adding a second crossing")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -788,6 +871,7 @@ def main() -> int:
     test_cells_hold_a_pareto_front_not_a_weighted_sum()
     test_intervention_is_triggered_by_evidence_not_a_schedule()
     test_no_dataclass_can_raise_on_equality()
+    test_transitions_are_graded_not_pass_fail()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
