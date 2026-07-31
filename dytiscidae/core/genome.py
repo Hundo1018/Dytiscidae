@@ -63,7 +63,7 @@ MATERIAL_CHOICES = ["petg", "petg_cf", "cfrp", "alu", "membrane", "foam"]
 MOTOR_CHOICES = ["bldc", "geared", "coreless"]
 
 
-@dataclass
+@dataclass(eq=False)
 class Part:
     """One module type.  May be instantiated many times by the expansion."""
 
@@ -184,7 +184,7 @@ class Edge:
         return replace(self)
 
 
-@dataclass
+@dataclass(eq=False)
 class Genome:
     """A complete design.
 

@@ -101,7 +101,7 @@ class SearchConfig:
     event_sample: int = 1
 
 
-@dataclass
+@dataclass(eq=False)
 class SearchState:
     archive: Archive
     curator: Curator

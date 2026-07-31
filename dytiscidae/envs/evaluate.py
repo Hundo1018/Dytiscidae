@@ -37,7 +37,7 @@ from .triphibian import (
 )
 
 
-@dataclass
+@dataclass(eq=False)
 class Controller:
     """Everything needed to drive one machine: rhythm, axes, and intent."""
 

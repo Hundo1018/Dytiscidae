@@ -97,7 +97,7 @@ def _look_at(direction: np.ndarray, roll: float) -> np.ndarray:
     return R @ Rx
 
 
-@dataclass
+@dataclass(eq=False)
 class Segment:
     """One instantiated module in the expanded body."""
 
@@ -198,7 +198,7 @@ class MassBudget:
         }
 
 
-@dataclass
+@dataclass(eq=False)
 class Phenotype:
     """A fully sized machine, ready to be compiled to MJCF and evaluated."""
 

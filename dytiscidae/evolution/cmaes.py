@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 
-@dataclass
+@dataclass(eq=False)
 class CMAES:
     """Covariance matrix adaptation evolution strategy.
 
@@ -175,7 +175,7 @@ class CMAES:
         }
 
 
-@dataclass
+@dataclass(eq=False)
 class Emitter:
     """A CMA-ES instance whose objective is *archive improvement*.
 

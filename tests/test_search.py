@@ -675,6 +675,101 @@ def test_intervention_is_triggered_by_evidence_not_a_schedule() -> None:
           c.plateau_p("air") == 1.0, f"p={c.plateau_p('air'):.3f} after 4 draws")
 
 
+def test_no_dataclass_can_raise_on_equality() -> None:
+    """No dataclass in the package may reach a numpy array through ``==``.
+
+    This bit twice in one day, in two unrelated places, and both times the
+    failure surfaced far from the cause: "the truth value of an array with more
+    than one element is ambiguous", raised from inside an archive insertion that
+    never mentions equality.
+
+    The mechanism is that ``@dataclass`` generates an ``__eq__`` comparing the
+    tuple of all fields, and tuple comparison walks into whatever those fields
+    contain.  One numpy array anywhere in that graph -- ``Part.joint_axis``,
+    four levels below the object actually being compared -- makes ``==`` and
+    therefore ``in``, ``list.remove``, ``dict`` lookups by value and
+    ``assertEqual`` all raise.  Nothing in the type checker or the test suite
+    sees it, because it depends on the *values* lining up: comparison
+    short-circuits at the first unequal field, so the array is only reached when
+    everything before it happens to match.
+
+    Every one of these classes is mutable state, not a value, so identity is the
+    correct equality anyway.  ``eq=False`` also restores ``__hash__``, which
+    makes them usable in sets and as dict keys.
+
+    Scanning for it is better than remembering it: a new dataclass with an array
+    field is the most ordinary thing to write in this codebase.
+    """
+    print("\npackage: equality never touches an array")
+    import dataclasses
+    import importlib
+    import inspect
+    import pkgutil
+    import sys
+    import typing
+
+    import dytiscidae
+
+    for m in pkgutil.walk_packages(dytiscidae.__path__, "dytiscidae."):
+        try:
+            importlib.import_module(m.name)
+        except Exception:
+            pass
+
+    found: dict[str, type] = {}
+    for mod in list(sys.modules.values()):
+        if not getattr(mod, "__name__", "").startswith("dytiscidae"):
+            continue
+        for obj in vars(mod).values():
+            if dataclasses.is_dataclass(obj) and inspect.isclass(obj):
+                found[f"{obj.__module__}.{obj.__qualname__}"] = obj
+
+    def reaches_array(cls, stack=()) -> bool:
+        if cls in stack or len(stack) > 6:
+            return False
+        try:
+            hints = typing.get_type_hints(cls)
+        except Exception:
+            hints = {f.name: f.type for f in dataclasses.fields(cls)}
+        for f in dataclasses.fields(cls):
+            t = hints.get(f.name, f.type)
+            for sub in [t, *typing.get_args(t)]:
+                if "ndarray" in str(sub):
+                    return True
+                if (dataclasses.is_dataclass(sub) and inspect.isclass(sub)
+                        and reaches_array(sub, stack + (cls,))):
+                    return True
+        return False
+
+    check("the scan finds dataclasses at all", len(found) > 20, f"{len(found)} dataclasses")
+    array_holders = {n: c for n, c in found.items() if reaches_array(c)}
+    check("and finds the ones that hold arrays", len(array_holders) > 10,
+          f"{len(array_holders)} of {len(found)}")
+
+    unsafe = sorted(n for n, c in array_holders.items() if c.__dataclass_params__.eq)
+    check("none of them generates an __eq__ that walks into one", not unsafe,
+          "; ".join(unsafe) if unsafe else f"all {len(array_holders)} use identity")
+
+    # And the two objects that actually crashed must survive the operations that
+    # crashed on them.
+    from dytiscidae.core.genome import random_genome
+    from dytiscidae.evolution.archive import Elite
+
+    rng = np.random.default_rng(0)
+    g1, g2 = random_genome(rng), random_genome(rng)
+    ok = True
+    try:
+        _ = g1 == g2
+        _ = g1 in [g2, g1]
+        e1 = Elite(genome=g1, fitness=1.0, descriptor=np.zeros(4), cell=(0, 0, 0, 0))
+        e2 = Elite(genome=g2, fitness=1.0, descriptor=np.zeros(4), cell=(0, 0, 0, 0))
+        _ = e1 in [e2, e1]
+        _ = {e1, e2}
+    except ValueError:
+        ok = False
+    check("comparing and containment-testing genomes and elites does not raise", ok)
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -692,6 +787,7 @@ def main() -> int:
     test_learned_descriptors_replace_the_hand_picked_axes()
     test_cells_hold_a_pareto_front_not_a_weighted_sum()
     test_intervention_is_triggered_by_evidence_not_a_schedule()
+    test_no_dataclass_can_raise_on_equality()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

@@ -37,7 +37,7 @@ import numpy as np
 from .fluid import WING
 
 
-@dataclass
+@dataclass(eq=False)
 class VortexWake:
     """A cloud of shed vortex particles.
 

@@ -381,7 +381,7 @@ def new_surface_cppn(rng: np.random.Generator) -> CPPN:
     return CPPN.minimal(SURFACE_INPUTS, SURFACE_OUTPUTS, rng)
 
 
-@dataclass
+@dataclass(eq=False)
 class SurfaceField:
     """A CPPN evaluated over one surface, mapped into physical units."""
 

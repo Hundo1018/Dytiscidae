@@ -528,7 +528,7 @@ SKILL_TASKS: dict[str, type[SkillTask]] = {
 # --------------------------------------------------------------------------
 
 
-@dataclass
+@dataclass(eq=False)
 class LinearSkillPolicy:
     """A one-hidden-layer tanh policy, small enough for CMA-ES to solve fast."""
 

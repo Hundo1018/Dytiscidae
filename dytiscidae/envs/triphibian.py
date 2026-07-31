@@ -127,7 +127,7 @@ class SegmentResult:
         return self.mean_power * self.duration / max(self.distance, 1e-6)
 
 
-@dataclass
+@dataclass(eq=False)
 class MissionResult:
     """Aggregate of a whole evaluation, at whatever fidelity produced it."""
 

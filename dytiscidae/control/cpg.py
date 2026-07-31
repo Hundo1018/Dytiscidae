@@ -40,7 +40,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 
-@dataclass
+@dataclass(eq=False)
 class CPGParams:
     """Open parameters of the pattern generator.
 
@@ -120,7 +120,7 @@ class CPG:
         return 3 * self.n + 1
 
 
-@dataclass
+@dataclass(eq=False)
 class MobilityBasis:
     """The control axes a particular body actually has, in a particular medium.
 
@@ -243,7 +243,7 @@ def identify_mobility(
     return MobilityBasis(modes=modes, effects=effects, authority=S[:r], medium=medium)
 
 
-@dataclass
+@dataclass(eq=False)
 class Policy:
     """Maps observations to intent coefficients in the mobility basis.
 

@@ -91,7 +91,7 @@ def episode_features(result, phenotype) -> np.ndarray:
     ], dtype=float)
 
 
-@dataclass
+@dataclass(eq=False)
 class LearnedDescriptors:
     """Projects raw behaviour features onto a learned low-dimensional space.
 

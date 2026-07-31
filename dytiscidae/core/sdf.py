@@ -62,7 +62,7 @@ def new_body_cppn(rng: np.random.Generator) -> CPPN:
     return CPPN.minimal(BODY_INPUTS, BODY_OUTPUTS, rng)
 
 
-@dataclass
+@dataclass(eq=False)
 class BodyField:
     """A free-form volume, discretised."""
 

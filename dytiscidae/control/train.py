@@ -38,7 +38,7 @@ import numpy as np
 from ..evolution.cmaes import CMAES
 
 
-@dataclass
+@dataclass(eq=False)
 class TrainingResult:
     """A trained controller and the record of how it got there."""
 

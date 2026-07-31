@@ -41,7 +41,7 @@ import numpy as np
 from .medium import MediumField
 
 
-@dataclass
+@dataclass(eq=False)
 class JetSet:
     """All the pulsed-jet cavities on one machine.
 

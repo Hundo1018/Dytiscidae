@@ -80,7 +80,7 @@ WING = 0  # a lifting strip: generates lift, induced drag, rotational lift
 BLUFF = 1  # a volume: pressure drag, buoyancy, added mass, no circulation
 
 
-@dataclass
+@dataclass(eq=False)
 class PanelSet:
     """The fluid-facing discretisation of a machine.
 
