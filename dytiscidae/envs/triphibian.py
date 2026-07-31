@@ -330,10 +330,23 @@ class TriphibianEnv:
         # and a travelling wave along a serial chain -- the entire anguilliform
         # and batoid family of gaits -- stays unreachable no matter what the
         # search does.
-        phases = []
-        for name in self.act_names:
+        phases, amps, offs = [], [], []
+        lo, hi = self.cpg.lo, self.cpg.hi
+        for k, name in enumerate(self.act_names):
             seg_name = name[:-2]  # strip the "_a" suffix
             seg = next((x for x in phenotype.segments if x.name == seg_name), None)
+            # Stroke amplitude and neutral position, likewise.  Both were
+            # constants -- 0.45 of half-travel about the midpoint, for every
+            # joint of every design -- which put every fixed-wing and every
+            # folding-wing configuration outside the search space, because the
+            # only way to stop a surface being shaken was to leave it
+            # unactuated and an unactuated surface cannot fold or take weight.
+            part = seg.part if seg is not None else None
+            frac = float(getattr(part, "stroke_amplitude", 0.45)) if part else 0.45
+            neut = float(getattr(part, "neutral", 0.5)) if part else 0.5
+            half = 0.5 * (hi[k] - lo[k])
+            amps.append(np.clip(frac, 0.0, 1.0) * half)
+            offs.append(lo[k] + np.clip(neut, 0.0, 1.0) * (hi[k] - lo[k]))
             # Multiplied by chain depth, because ``phase_offset`` is a *phase
             # advance per link*, not an absolute phase.  Every segment in a
             # recursive chain shares one Part, so a flat offset makes the whole
@@ -343,6 +356,8 @@ class TriphibianEnv:
             phases.append(seg.part.phase_offset * max(seg.depth, 1) if seg is not None else 0.0)
         if phases:
             self.cpg.base.phase = np.array(phases, float)
+            self.cpg.base.amplitude = np.array(amps, float)
+            self.cpg.base.offset = np.array(offs, float)
         self.actuators = getattr(phenotype, "actuators", [])
         self.budget = PowerBudget(battery=phenotype.battery, actuators=self.actuators)
         self._saved = None

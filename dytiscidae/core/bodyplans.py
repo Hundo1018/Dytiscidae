@@ -15,12 +15,12 @@ axes it is given, and only between regions it can reach.  Seeding several
 distinct plans is how the archive gets footholds in basins that mutation would
 otherwise never cross into.
 
-The five here are chosen because they solve the *same* problem -- move through
+The six here are chosen because they solve the *same* problem -- move through
 a fluid -- with mechanically incompatible strategies, and because each one is
 strong in a different domain of this mission:
 
-    beetle   bilateral flapper + swimming paddles.  The namesake.  Good in air,
-             adequate in water, walks.
+    beetle   bilateral flapper + swimming paddles.  The namesake.  Adequate in
+             water, walks, and does not fly -- see below.
     medusa   radial bell, pulsed jet.  Excellent in water, cannot fly at all,
              and is here to occupy the far end of the density axis.
     bat      membrane on articulated digits.  Continuously variable camber and
@@ -30,10 +30,28 @@ strong in a different domain of this mission:
              thrust comes from the reverse Karman street the wave sheds.
     ray      wide undulating pectoral membrane.  The batoid solution -- flies
              underwater on the same surfaces it swims with.
+    gannet   fixed high-aspect wing, lifting tail, folding shoulder.  The only
+             one that flies.
 
 None of them is expected to complete the mission as given.  They are starting
 points, and the interesting result is which parts of which plans survive when
 the archive mixes them.
+
+A correction, because it was load-bearing and it was wrong.  This list used to
+say the beetle was "good in air".  Measured on the air segment it scores 0.118,
+and so does everything else that was here: 0.116 to 0.129 across all five,
+against 1.000 for a plain fixed-wing machine of the same mass.  Every one of
+the original plans is a flapping or undulating solution and not one of them
+flies, so the search was being asked to cross from 0.12 to 1.0 with no foothold
+anywhere on the far side -- which is exactly the deep valley this file exists to
+bridge, and there was nothing to bridge from.  The gannet is that foothold.
+
+Two other things had to be true before it could be one, and neither was.  A
+mirrored hinge needs a mirrored axis or a symmetric command rolls the machine
+instead of flapping it; and a surface had to be able to be *told* to hold still,
+which took a gene, because the pattern generator beat every joint of every
+design at 45% of its travel.  Until both were fixed, a fixed wing was not a
+thing this representation could express.
 """
 
 from __future__ import annotations
@@ -403,12 +421,89 @@ def ray() -> Genome:
     return g
 
 
+def gannet() -> Genome:
+    """Fixed high-aspect wing with a lifting tail, folding at the shoulder.
+
+    Added because the five plans above are all flapping or undulating solutions
+    and *none of them flies*.  Measured on the air segment: beetle 0.113, bat
+    0.135, ray 0.138, against 1.000 for a fixed-wing machine of the same mass.
+    The module docstring claimed the beetle was "good in air", and it was not
+    true of anything here -- the search was being asked to cross from 0.12 to
+    1.0 with no foothold anywhere on the far side, which is exactly the deep
+    valley this file exists to bridge.
+
+    The wing does not flap.  It hinges at the root instead, which is a shoulder
+    for folding rather than a stroke: extended it is a soaring wing, swept back
+    it is a diving one.  That is the gannet's actual trick, and it is what makes
+    this a triphibian donor rather than a model aeroplane -- an aerial diver
+    needs a wing it can get out of the way at entry, and none of the other plans
+    has one.  The tail is the pitch control the fixed-wing configuration needs,
+    since a glider with no elevator holds trim only until the first disturbance.
+    """
+    g = Genome()
+    g.cppns = [
+        # Soaring wing: tapered, cambered, mild washout so the root stalls first.
+        _cppn({(BIAS, CHORD): 0.20, (U, CHORD): -0.50, (BIAS, TWIST): 0.20,
+               (U, TWIST): -0.17, (BIAS, CAMBER): 0.70, (BIAS, THICK): -0.40}),
+        # Lifting tail on a long arm, small and thin.  Its incidence and the
+        # wing station below are a matched pair: they set where this thing
+        # trims, and off that pair it does not glide at all -- 4.9 at the
+        # balance below, 0.6 six centimetres of wing station away.
+        _cppn({(BIAS, CHORD): -0.20, (BIAS, TWIST): 0.60, (BIAS, THICK): -0.60}),
+        # Webbed foot: broad, blunt, untwisted.  Paddles and takes weight.
+        _cppn({(U, CHORD): 0.45, (BIAS, CHORD): 0.30, (BIAS, THICK): -0.30}),
+    ]
+    g.body_cppns = [_fusiform(taper=0.85, flatten=1.2)]
+    fuselage = Part(kind=HULL, length=1.00, radius=0.070, material="petg",
+                    joint="none", actuated=False, sealed=True, dry_fraction=0.90,
+                    body_cppn=0)
+    # Shoulder hinge with a wide range: this is a fold, not a flap, so the
+    # range is asymmetric about extended and the gearing is slow and strong.
+    wing = Part(kind=WING, span=1.50, root_chord=0.42, radius=0.015,
+                material="cfrp", surface_cppn=0, joint="hinge",
+                joint_axis=np.array([0.0, 1.0, 0.0]), joint_range=(-1.5, 0.25),
+                motor_class="geared", motor_mass=0.34, gear_ratio=40.0,
+                sealed=True, dry_fraction=0.25,
+                # A trim surface, not an oscillator: held extended, and folded
+                # only when something decides to fold it.
+                stroke_amplitude=0.0, neutral=1.0)
+    tail = Part(kind=WING, span=0.60, root_chord=0.22, radius=0.010,
+                material="cfrp", surface_cppn=1, joint="hinge",
+                joint_axis=np.array([0.0, 1.0, 0.0]), joint_range=(-0.35, 0.35),
+                motor_class="geared", motor_mass=0.08, gear_ratio=24.0,
+                sealed=True, dry_fraction=0.3,
+                stroke_amplitude=0.0, neutral=0.5)
+    leg = Part(kind=STRUT, length=0.16, radius=0.009, material="cfrp",
+               joint="hinge", joint_axis=np.array([0.0, 1.0, 0.0]),
+               joint_range=(-0.9, 0.9), motor_class="geared", motor_mass=0.06,
+               gear_ratio=25.0, sealed=True, neutral=0.75)
+    foot = Part(kind=PADDLE, span=0.18, root_chord=0.13, length=0.18, radius=0.007,
+                material="cfrp", surface_cppn=2, joint="hinge",
+                joint_axis=np.array([0.0, 0.0, 1.0]), joint_range=(-0.8, 0.8),
+                motor_class="geared", motor_mass=0.05, gear_ratio=22.0,
+                sealed=True, phase_offset=math.pi)
+    g.parts = [fuselage, wing, tail, leg, foot]
+    g.edges = [
+        Edge(parent=0, child=1, pos_u=0.34, reflect=True),
+        Edge(parent=0, child=2, pos_u=1.00, reflect=True),
+        Edge(parent=0, child=3, pos_u=0.70, azimuth=-1.1, reflect=True),
+        Edge(parent=3, child=4, pos_u=1.0, elevation=0.8),
+    ]
+    g.battery_wh, g.battery_chem = 210.0, "lipo"
+    # Low flap frequency: the shoulder folds, it does not beat.
+    g.flap_frequency, g.gas_volume = 0.6, 0.0025
+    g.ballast_fraction, g.deadrise_deg = 0.88, 52.0
+    g.lineage = ["gannet"]
+    return g
+
+
 BODY_PLANS = {
     "beetle": beetle,
     "medusa": medusa,
     "bat": bat,
     "eel": eel,
     "ray": ray,
+    "gannet": gannet,
 }
 
 

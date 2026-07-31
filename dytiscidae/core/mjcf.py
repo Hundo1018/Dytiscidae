@@ -523,6 +523,21 @@ def build_model_xml(
             axis = np.asarray(s.part.joint_axis, float)
             n = np.linalg.norm(axis)
             axis = axis / n if n > 1e-9 else np.array([0.0, 1.0, 0.0])
+            if s.mirrored:
+                # A rotation axis is a pseudovector: reflect a hinge and the
+                # same commanded angle turns the mirror image the *other* way.
+                # So a bilateral pair must have mirrored axes if one command is
+                # to flap both wings up together rather than roll the machine.
+                #
+                # The mirrored frame is ``M R diag(1,1,-1)``, so producing a
+                # world axis of ``-M(R v)`` from it takes ``diag(-1,-1,1) v``.
+                # This fell out when the reflection itself was fixed: the old
+                # broken frame happened to give the right hinge behaviour and
+                # the wrong aerodynamics, and correcting the aerodynamics
+                # swapped which one was wrong.  Measured on a wing pair holding
+                # station, the two hinges sat at 0.239 and 0.172 rad under
+                # identical load, because the command was rolling them.
+                axis = axis * np.array([-1.0, -1.0, 1.0])
             attrs = {
                 "name": jname,
                 "type": "hinge",

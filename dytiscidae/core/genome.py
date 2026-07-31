@@ -136,6 +136,25 @@ class Part:
     #: the phase to a linspace, as the first version did, put every undulatory
     #: gait outside the search space.
     phase_offset: float = 0.0
+    #: Fraction of the joint's half-travel this part's oscillator sweeps.
+    #:
+    #: The pattern generator beat *every* joint at 0.45 of half-travel about the
+    #: middle of its range, and neither number was a gene.  So a machine could
+    #: not hold a surface still: the only way to stop a wing flapping was to
+    #: leave it unactuated, and an unactuated wing cannot fold for a dive or
+    #: take weight on land.  A fixed-wing configuration was therefore outside
+    #: the search space altogether -- measured, a fixed-wing glider scores 1.00
+    #: on the air segment and the same airframe with driven hinges scores 0.17,
+    #: because the driver folds the wings 36 degrees back and shakes them.
+    #:
+    #: 0 means "trim surface": held at ``neutral``, moved only by whatever
+    #: higher-level control the design has.  The default reproduces the old
+    #: fixed behaviour exactly.
+    stroke_amplitude: float = 0.45
+    #: Where in its travel the part sits at rest, 0 at the lower limit and 1 at
+    #: the upper.  0.5 is the midpoint, which is what was hard-wired.  A folding
+    #: shoulder needs its neutral at the *extended* end, not halfway folded.
+    neutral: float = 0.5
     #: For BELL: orifice area as a fraction of the bell's frontal area.  Jet
     #: thrust goes as 1/A, so a small orifice trades flow rate for velocity.
     jet_area_ratio: float = 0.18
@@ -484,6 +503,34 @@ def mut_phase_gradient(g: Genome, rng: np.random.Generator) -> bool:
     return True
 
 
+def mut_stroke(g: Genome, rng: np.random.Generator) -> bool:
+    """Change how far a part strokes, and where it sits at rest.
+
+    Separate from ``mut_phase`` because these two genes decide something the
+    phase cannot: whether a surface oscillates *at all*.  A wing held still is a
+    wing, a wing beaten at 45% of its travel is a flapper, and the difference is
+    the difference between gliding and not.  Sometimes the useful move is to
+    silence one limb rather than retime it -- so an explicit zero comes up often
+    enough to be worth drawing directly instead of waiting for a random walk to
+    reach it.
+    """
+    movable = [p for p in g.parts if p.joint != "none" and p.actuated]
+    if not movable:
+        return False
+    part = movable[int(rng.integers(len(movable)))]
+    r = rng.random()
+    if r < 0.2:
+        part.stroke_amplitude = 0.0            # make it a trim surface
+    elif r < 0.35:
+        part.stroke_amplitude = float(rng.uniform(0.25, 0.9))   # wake it back up
+    elif r < 0.7:
+        part.stroke_amplitude = float(np.clip(
+            part.stroke_amplitude + rng.normal(0, 0.15), 0.0, 1.0))
+    else:
+        part.neutral = float(np.clip(part.neutral + rng.normal(0, 0.18), 0.0, 1.0))
+    return True
+
+
 def mut_jet(g: Genome, rng: np.random.Generator) -> bool:
     """Tune a bell's nozzle and stroke.
 
@@ -552,6 +599,11 @@ def mut_add_part(g: Genome, rng: np.random.Generator) -> bool:
         sealed=bool(rng.random() < 0.7),
         dry_fraction=float(rng.uniform(0.0, 0.9)),
         phase_offset=float(rng.uniform(0.0, 2 * math.pi)),
+        # A fifth of new parts are trim surfaces rather than oscillators, so a
+        # fixed wing is something a random genome can be, not only something a
+        # long chain of mutations can arrive at.
+        stroke_amplitude=0.0 if rng.random() < 0.2 else float(rng.uniform(0.15, 0.9)),
+        neutral=float(rng.uniform(0.2, 0.8)),
         jet_area_ratio=float(rng.uniform(0.05, 0.5)),
         stroke_fraction=float(rng.uniform(0.15, 0.6)),
     )
@@ -718,6 +770,7 @@ def mut_scale(g: Genome, rng: np.random.Generator) -> bool:
 MUTATION_OPERATORS: dict[str, callable] = {
     "radial_symmetry": mut_radial_symmetry,
     "phase_gradient": mut_phase_gradient,
+    "stroke": mut_stroke,
     "jet": mut_jet,
     "part_dimensions": mut_part_dimensions,
     "joint": mut_joint,

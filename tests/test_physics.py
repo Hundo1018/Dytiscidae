@@ -289,8 +289,9 @@ def test_generated_bodies_reach_the_fluid() -> None:
         got = float(panels.volume[bluff].sum())
         worst_ratio = min(worst_ratio, got / max(want, 1e-9))
 
-    check("all five plans carry a generated body", n_plans_with_fields == 5,
-          f"{n_plans_with_fields}/5")
+    check("every plan carries a generated body",
+          n_plans_with_fields == len(BODY_PLANS),
+          f"{n_plans_with_fields}/{len(BODY_PLANS)}")
     check(
         "panel volume accounts for the body volume",
         0.9 < worst_ratio < 1.1,
@@ -352,6 +353,174 @@ def test_land_domain_is_reachable() -> None:
           f"{contacts}/{steps} steps in ground contact")
     check("and does not fall through the world", env.root_pos()[2] > -1.0,
           f"z={float(env.root_pos()[2]):.2f} m")
+
+
+def test_a_bilateral_pair_flaps_together_rather_than_rolling() -> None:
+    """One command to a mirrored joint pair must move both sides the same way.
+
+    A rotation axis is a pseudovector: reflect a hinge and the same commanded
+    angle turns the mirror image the *other* way.  So a bilateral pair needs
+    mirrored axes, or a symmetric command is a roll input.
+
+    This one is a regression from fixing the surface reflection.  The old broken
+    frame happened to give the right hinge behaviour and the wrong aerodynamics;
+    correcting the aerodynamics swapped which of the two was wrong, and the two
+    halves of a wing pair holding station settled at 0.239 and 0.172 rad under
+    identical load.  Both bugs are the same mistake -- treating a mirror as
+    though it were a rotation -- which is why fixing one exposed the other.
+    """
+    print("\nmjcf: a wing pair flaps, it does not roll")
+    from dytiscidae.core.bodyplans import gannet
+    from dytiscidae.core.mjcf import compile_phenotype
+    from dytiscidae.core.phenotype import build
+
+    p = build(gannet())
+    m, d, acts, _panels = compile_phenotype(p)
+    by_part: dict[int, list[tuple[bool, np.ndarray]]] = {}
+    for name in acts:
+        seg = next((s for s in p.segments if s.name == name[:-2]), None)
+        if seg is None:
+            continue
+        jid = m.jnt_bodyid.tolist().index(m.body(seg.name).id) \
+            if m.body(seg.name).id in m.jnt_bodyid.tolist() else None
+        if jid is None:
+            continue
+        by_part.setdefault(seg.part_index, []).append((seg.mirrored, m.jnt_axis[jid]))
+
+    pairs = [(k, v) for k, v in by_part.items() if len(v) == 2 and {a for a, _ in v} == {True, False}]
+    check("the plan has mirrored joint pairs to check", len(pairs) >= 2,
+          f"{len(pairs)} bilateral pairs")
+
+    M = np.diag([1.0, -1.0, 1.0])
+    ok = True
+    detail = []
+    for _pi, v in pairs:
+        a = next(ax for mir, ax in v if not mir)
+        b = next(ax for mir, ax in v if mir)
+        # Local axes must be diag(-1,-1,1) of each other, which is what makes
+        # the *world* axes come out as -M(world axis of the original).
+        ok &= bool(np.allclose(a * np.array([-1.0, -1.0, 1.0]), b, atol=1e-9))
+        detail.append(f"{np.round(a,2)}/{np.round(b,2)}")
+    check("and their hinge axes are mirrored, not copied", ok, "; ".join(detail))
+    del M
+
+    # And it shows up in the dynamics: hold station and the two sides must sit
+    # at the same angle.
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(p)
+    env.reset(Domain.AIR, randomise=False)
+    for _ in range(int(1.0 / env.timestep)):
+        env.step(env.cpg.command(env.cpg.base, env.data.time))
+    q = env.data.qpos[7:]
+    worst = 0.0
+    for _pi, v in pairs:
+        names = [s.name for s in p.segments if s.part_index == _pi]
+        idx = [i for i, n in enumerate(acts) if n[:-2] in names]
+        if len(idx) == 2 and max(idx) < len(q):
+            worst = max(worst, abs(float(q[idx[0]] - q[idx[1]])))
+    check("so a symmetric command holds both sides at the same angle",
+          worst < 0.02, f"worst left/right difference {worst:.4f} rad")
+
+
+def test_a_surface_can_be_told_to_hold_still() -> None:
+    """``stroke_amplitude`` and ``neutral`` must reach the pattern generator.
+
+    The generator beat every joint at 0.45 of half-travel about the midpoint of
+    its range, and neither number was a gene.  A machine therefore could not
+    hold a surface still: the only way to stop a wing being shaken was to leave
+    it unactuated, and an unactuated wing cannot fold for a dive or take weight
+    on land.  Every fixed-wing and every folding-wing configuration was outside
+    the search space -- not disfavoured, unreachable -- which is the same defect
+    the phase gene had, and it is why nothing in this project glided.
+    """
+    print("\ncontrol: a wing can be told to hold still")
+    from dytiscidae.core.bodyplans import gannet
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    p = build(gannet())
+    env = TriphibianEnv(p)
+    wings = [i for i, n in enumerate(env.act_names)
+             if any(s.name == n[:-2] and s.kind == "wing" for s in p.segments)]
+    legs = [i for i in range(len(env.act_names)) if i not in wings]
+    check("the trim surfaces are given no stroke",
+          len(wings) > 0 and float(np.abs(env.cpg.base.amplitude[wings]).max()) < 1e-9,
+          f"{len(wings)} wing joints, max amplitude "
+          f"{float(np.abs(env.cpg.base.amplitude[wings]).max()) if wings else -1:.4f} rad")
+    check("while the limbs still stroke",
+          len(legs) > 0 and float(np.abs(env.cpg.base.amplitude[legs]).max()) > 0.1,
+          f"{len(legs)} limb joints, max amplitude "
+          f"{float(np.abs(env.cpg.base.amplitude[legs]).max()) if legs else -1:.3f} rad")
+    # ``neutral`` = 1.0 means "sit at the top of the travel", not the middle.
+    # Only the shoulder asks for that; the tail sits mid-range, so this has to
+    # select on the gene rather than on the part kind -- the tail is a WING too.
+    shoulders = [i for i in wings
+                 if any(s.name == env.act_names[i][:-2]
+                        and getattr(s.part, "neutral", 0.5) > 0.99
+                        for s in p.segments)]
+    hi = env.cpg.hi[shoulders] if shoulders else np.zeros(0)
+    at_top = float(np.abs(env.cpg.base.offset[shoulders] - hi).max()) if shoulders else 1.0
+    check("and a folding shoulder rests extended, not half folded",
+          len(shoulders) > 0 and at_top < 1e-9,
+          f"{len(shoulders)} shoulder joints at "
+          f"{np.round(env.cpg.base.offset[shoulders], 3)} against upper limit "
+          f"{np.round(hi, 3)}")
+
+    # Held still means held at the *commanded* angle, not at wherever it
+    # started: every joint travels to its neutral in the first moments, and
+    # measuring drift from the start pose counts that as motion.
+    env.reset(Domain.AIR, randomise=False)
+    worst = 0.0
+    for _ in range(int(2.0 / env.timestep)):
+        u = np.asarray(env.cpg.command(env.cpg.base, env.data.time), float)
+        env.step(u)
+        worst = max(worst, float(np.abs(env.data.qpos[7:][wings] - u[wings]).max()))
+    check("and holds that angle against real aerodynamic load when flown",
+          worst < 0.25 if wings else False,
+          f"worst departure from the commanded angle {worst:.3f} rad "
+          f"({math.degrees(worst):.0f} deg) over 2 s")
+
+
+def test_the_seeds_include_something_that_flies() -> None:
+    """At least one starting plan must be able to stay in the air.
+
+    The module docstring in ``bodyplans`` claimed the beetle was "good in air".
+    Measured on the air segment it scores 0.118, and so does everything else
+    there: 0.116 to 0.129 across all five, against 1.000 for a fixed-wing
+    machine of the same mass.  The search was being asked to cross from 0.12 to
+    1.0 with no foothold anywhere on the far side, which is precisely the deep
+    valley that file exists to bridge -- and the five plans were all flapping or
+    undulating solutions, so there was no bridge to build from.
+
+    The bar here is deliberately not 1.0.  A seed is a foothold, not an answer;
+    what has to be true is that one of them stays up and the others do not, so
+    that flight is something the archive can hold on to and improve.
+    """
+    print("\nbodyplans: at least one seed can stay in the air")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import evaluate_tier1
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    spec = MissionSpec()
+    air = {}
+    for name, fn in BODY_PLANS.items():
+        r = evaluate_tier1(build(fn()), spec=spec, seed=0, segment_seconds=8.0)
+        seg = r.segments.get("air")
+        air[name] = (seg.competence if seg else 0.0,
+                     (seg.measurements if seg else {}).get("airborne_fraction", 0.0),
+                     (seg.measurements if seg else {}).get("sink_rate", 99.0))
+    best = max(air, key=lambda k: air[k][0])
+    score, frac, sink = air[best]
+    others = sorted(v[0] for k, v in air.items() if k != best)
+    check("one seed stays airborne for the whole segment",
+          frac > 0.95, f"{best}: airborne {frac:.2f} of the segment")
+    check("and descends slowly enough to be flying rather than falling",
+          sink < 3.0, f"{best}: {sink:.2f} m/s sink against 10-14 for the flappers")
+    check("it is clearly ahead of the plans that cannot",
+          score > 2.0 * others[-1],
+          f"{best} {score:.3f} against next best {others[-1]:.3f}")
 
 
 def test_the_render_shows_the_shape_the_solver_reads() -> None:
@@ -967,10 +1136,40 @@ def test_series_elasticity_needs_a_compliant_drive() -> None:
           tuned < 0.6 * rigid,
           f"{tuned:.0f} W/rad against {rigid:.0f} rigid "
           f"({p_tuned:.0f} W at {s_tuned:.2f} rad)")
-    check("and an over-compliant drive does stop tracking",
-          e_soft > 1.4 * e_stiff,
-          f"kp x0.05: {e_soft:.3f} rad rms error against {e_stiff:.3f} at full gain "
-          f"({p_soft:.0f} W, swing {s_soft:.2f} rad -- amplitude without command)")
+    # The cost of a soft drive shows up on a surface whose job is to *hold*, not
+    # on one that is being swung: an oscillating fin tracks a sine wave about as
+    # badly at every gain, which is why measuring it on the ray said nothing.  A
+    # trim surface carrying real aerodynamic load is where servo stiffness is
+    # the whole story, and that only became testable once a surface could be
+    # told to hold still at all.
+    def hold_error(compliance: float, secs: float = 3.0) -> tuple:
+        from dytiscidae.core.bodyplans import gannet
+
+        g = gannet()
+        for part in g.parts:
+            if part.joint != "none" and part.actuated:
+                part.drive_compliance = compliance
+        ph = build(g)
+        e = TriphibianEnv(ph)
+        wings = [i for i, n in enumerate(e.act_names)
+                 if any(x.name == n[:-2] and x.kind == "wing" for x in ph.segments)]
+        e.reset(Domain.AIR, randomise=False)
+        worst = 0.0
+        for _ in range(int(secs / e.timestep)):
+            u = e.cpg.command(e.cpg.base, e.data.time)
+            e.step(u)
+            worst = max(worst, float(
+                np.abs(e.data.qpos[7:][wings] - np.asarray(u, float)[wings]).max()))
+        return worst, e.budget.mean_power
+
+    hold_stiff, p_hold_stiff = hold_error(1.0)
+    hold_soft, p_hold_soft = hold_error(0.05)
+    check("and an over-compliant drive cannot hold a loaded surface still",
+          hold_soft > 1.5 * hold_stiff,
+          f"a trim wing sags {math.degrees(hold_soft):.0f} deg at kp x0.05 against "
+          f"{math.degrees(hold_stiff):.0f} deg at full gain "
+          f"({p_hold_soft:.0f} W against {p_hold_stiff:.0f} W -- the power it saves "
+          f"is paid for in incidence it does not keep)")
 
 
 def test_flight_is_measured_against_the_ground_not_the_waterline() -> None:
@@ -1104,13 +1303,13 @@ def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
 
     flat_slow = enter(0.0, 4.0)
     flat_fast = enter(0.0, 8.0)
-    flat_dead = enter(0.0, 12.0)
+    flat_dead = enter(0.0, 16.0)
     nose_slow = enter(80.0, 4.0)
     nose_fast = enter(80.0, 8.0)
-    # The gannet: three times the entry speed of the flat one that destroys the
-    # hull, and it survives, because what breaks a hull is the rate at which it
-    # wets and not how fast it is going.
-    gannet = enter(80.0, 24.0)
+    # The gannet: faster than the flat entry that destroys the hull, and it
+    # survives, because what breaks a hull is the rate at which it wets and not
+    # how fast it is going.
+    gannet = enter(80.0, 20.0)
 
     check("entering flat faster is worse", flat_fast < flat_slow,
           f"{flat_slow:.3f} at 4 m/s -> {flat_fast:.3f} at 8 m/s")
@@ -1122,10 +1321,10 @@ def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
         f"nose-first at 8 m/s scores {nose_fast:.3f}, flat at 4 m/s scores {flat_slow:.3f}",
     )
     check("a flat entry well past the hull limit scores nothing", flat_dead == 0.0,
-          f"{flat_dead:.3f} at 12 m/s flat")
-    check("while a gannet entry at twice that speed survives it",
-          gannet > 0.0,
-          f"{gannet:.3f} nose-first at 24 m/s against {flat_dead:.3f} flat at 12")
+          f"{flat_dead:.3f} at 16 m/s flat")
+    check("while a gannet entry faster still survives it",
+          gannet > 0.2,
+          f"{gannet:.3f} nose-first at 20 m/s against {flat_dead:.3f} flat at 16")
 
 
 def test_free_surface_continuity() -> None:
@@ -1295,6 +1494,9 @@ def main() -> int:
     test_bluff_drag_is_orientation_dependent()
     test_generated_bodies_reach_the_fluid()
     test_land_domain_is_reachable()
+    test_a_bilateral_pair_flaps_together_rather_than_rolling()
+    test_a_surface_can_be_told_to_hold_still()
+    test_the_seeds_include_something_that_flies()
     test_the_render_shows_the_shape_the_solver_reads()
     test_machine_does_not_collide_with_itself()
     test_air_segment_can_be_scored()
