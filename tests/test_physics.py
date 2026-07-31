@@ -423,6 +423,58 @@ def test_a_bilateral_pair_flaps_together_rather_than_rolling() -> None:
           worst < 0.02, f"worst left/right difference {worst:.4f} rad")
 
 
+def test_each_plan_moves_the_way_it_says_it_does() -> None:
+    """A hinge axis is written in the part's own frame, and the part's frame is
+    not the world's.  Every plan's headline mechanism has to survive that.
+
+    ``joint_axis`` is expressed in the child's frame, whose +X is the limb's own
+    span or length.  So ``[1,0,0]`` on a wing is a *feathering* hinge -- it
+    changes incidence and never strokes -- and ``[0,1,0]`` is the stroke.  This
+    is easy to get backwards and nothing caught it: the beetle, documented here
+    and in its own docstring as a bilateral flapper, had a feathering hinge and
+    could not flap.  Giving it the stroke axis moved air 0.118 -> 0.166 and
+    water 0.467 -> 0.658.  The gannet's tailplane had the same mistake in
+    reverse: a fold axis where an elevator belongs, so the whole range of the
+    surface moved glide ratio by 0.02 rather than from 0.26 to 4.91.
+
+    Checked as a world-frame direction rather than by matching the literal, so
+    it keeps meaning something if the placement changes.
+    """
+    print("\nbodyplans: each plan moves the way it says it does")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+
+    def world_axis(p, part_index: int):
+        for s in p.segments:
+            if s.part_index == part_index and not s.mirrored:
+                a = np.asarray(s.part.joint_axis, float)
+                a = a / max(float(np.linalg.norm(a)), 1e-9)
+                return s.rotation @ a
+        return None
+
+    # part index, which world axis the mechanism needs, and what to call it.
+    # 0 = fore-aft (stroke/fold), 1 = lateral (incidence, since span is lateral),
+    # 2 = vertical (sweep).
+    wanted = {
+        "beetle": (1, 0, "the flapper's shoulder strokes"),
+        "bat": (1, 2, "the bat's digit sweeps to change area"),
+        "gannet": (1, 0, "the gannet's shoulder folds"),
+    }
+    for name, (pi, axis, why) in wanted.items():
+        p = build(BODY_PLANS[name]())
+        w = world_axis(p, pi)
+        got = int(np.argmax(np.abs(w))) if w is not None else -1
+        check(why, got == axis,
+              f"world axis {np.round(w, 2)} -> "
+              f"{['fore-aft', 'lateral', 'vertical'][got] if got >= 0 else 'missing'}")
+
+    p = build(BODY_PLANS["gannet"]())
+    w = world_axis(p, 2)
+    check("and its tailplane is an elevator, not a second fold",
+          w is not None and int(np.argmax(np.abs(w))) == 1,
+          f"world axis {np.round(w, 2)} -- along the span, so the hinge is incidence")
+
+
 def test_a_surface_can_be_told_to_hold_still() -> None:
     """``stroke_amplitude`` and ``neutral`` must reach the pattern generator.
 
@@ -1495,6 +1547,7 @@ def main() -> int:
     test_generated_bodies_reach_the_fluid()
     test_land_domain_is_reachable()
     test_a_bilateral_pair_flaps_together_rather_than_rolling()
+    test_each_plan_moves_the_way_it_says_it_does()
     test_a_surface_can_be_told_to_hold_still()
     test_the_seeds_include_something_that_flies()
     test_the_render_shows_the_shape_the_solver_reads()

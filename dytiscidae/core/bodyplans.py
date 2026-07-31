@@ -52,6 +52,30 @@ instead of flapping it; and a surface had to be able to be *told* to hold still,
 which took a gene, because the pattern generator beat every joint of every
 design at 45% of its travel.  Until both were fixed, a fixed wing was not a
 thing this representation could express.
+
+Hinge axes
+----------
+``joint_axis`` is written in the *part's own* frame, whose +X is that limb's
+span or length.  On a wing, therefore:
+
+    [1, 0, 0]   about its own span      -> feathering: changes incidence
+    [0, 1, 0]   about the fore-aft axis -> the stroke, or a fold
+    [0, 0, 1]   about the vertical      -> sweep
+
+This is easy to get backwards and for a long time two plans had it backwards in
+opposite directions.  The beetle -- named for flapping, described above as a
+flapper -- was given ``[1,0,0]``, so its wings changed incidence in place and
+never beat; the stroke axis is worth air 0.118 -> 0.166 and water 0.467 ->
+0.658.  The gannet's tailplane had the mirror-image mistake, a fold axis where
+an elevator belongs, which gave a tail whose entire range moved glide ratio by
+0.02 instead of from 0.26 to 4.91.
+
+The other plans were checked against the same question and left alone.  The
+eel's and the ray's axes are not the ones that score best, and that is on
+purpose: these plans are here to be *different from each other*, and retuning
+an anguilliform swimmer into a feathering one because it gains 0.1 in water
+spends the diversity they exist to provide.  A plan gets corrected when its
+mechanism and its axis disagree, not when a number goes up.
 """
 
 from __future__ import annotations
@@ -227,8 +251,13 @@ def beetle() -> Genome:
     g.body_cppns = [_fusiform(taper=0.80, flatten=1.6)]
     hull = Part(kind=HULL, length=0.62, radius=0.078, material="petg", joint="none",
                 actuated=False, sealed=False, dry_fraction=0.88, body_cppn=0)
+    # Axis about the fore-aft direction, so the shoulder *strokes*.  It was
+    # along the wing's own span, which is a feathering hinge: the wings changed
+    # incidence in place and never beat, so the plan documented here as a
+    # bilateral flapper could not flap.  Measured, the stroke axis is worth air
+    # 0.118 -> 0.166 and water 0.467 -> 0.658.
     wing = Part(kind=WING, span=1.15, root_chord=0.34, radius=0.013, material="cfrp",
-                surface_cppn=0, joint="hinge", joint_axis=np.array([1.0, 0.0, 0.0]),
+                surface_cppn=0, joint="hinge", joint_axis=np.array([0.0, 1.0, 0.0]),
                 joint_range=(-0.62, 0.62), motor_class="geared", motor_mass=0.42,
                 gear_ratio=12.0, sealed=True, dry_fraction=0.25)
     paddle = Part(kind=PADDLE, span=0.30, root_chord=0.10, length=0.30, radius=0.011,
@@ -311,8 +340,12 @@ def bat() -> Genome:
     body = Part(kind=HULL, length=0.44, radius=0.062, material="petg", joint="none",
                 actuated=False, sealed=False, dry_fraction=0.9, body_cppn=0)
     # Three digits per side, each shorter than the last, each carrying membrane.
+    # The digit sweeps fore and aft rather than twisting about its own length,
+    # which is what changes the membrane's area and camber -- the property this
+    # plan exists to contribute.  Twisting the digit does nothing of the sort;
+    # measured, sweeping is worth water 0.503 -> 0.623.
     digit = Part(kind=STRUT, length=0.46, radius=0.010, material="cfrp", joint="hinge",
-                 joint_axis=np.array([1.0, 0.0, 0.0]), joint_range=(-0.9, 0.55),
+                 joint_axis=np.array([0.0, 0.0, 1.0]), joint_range=(-0.9, 0.55),
                  motor_class="geared", motor_mass=0.16, gear_ratio=14.0, sealed=True,
                  dry_fraction=0.0)
     web = Part(kind=MEMBRANE, span=0.44, root_chord=0.30, radius=0.002,
@@ -467,9 +500,14 @@ def gannet() -> Genome:
                 # A trim surface, not an oscillator: held extended, and folded
                 # only when something decides to fold it.
                 stroke_amplitude=0.0, neutral=1.0)
+    # Axis along the tail's own span, so the hinge changes *incidence*: this is
+    # an elevator.  Written as (0,1,0) first, which is the fold axis the
+    # shoulder wants and gives a tailplane with dihedral authority and no pitch
+    # authority at all -- measured, the whole range moved glide ratio by 0.02.
+    # About the span it moves it from 0.26 to 4.91.
     tail = Part(kind=WING, span=0.60, root_chord=0.22, radius=0.010,
                 material="cfrp", surface_cppn=1, joint="hinge",
-                joint_axis=np.array([0.0, 1.0, 0.0]), joint_range=(-0.35, 0.35),
+                joint_axis=np.array([1.0, 0.0, 0.0]), joint_range=(-0.35, 0.35),
                 motor_class="geared", motor_mass=0.08, gear_ratio=24.0,
                 sealed=True, dry_fraction=0.3,
                 stroke_amplitude=0.0, neutral=0.5)
