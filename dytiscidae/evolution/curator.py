@@ -183,6 +183,10 @@ class Curator:
         #: draw index at which the best was set.  This is what makes the
         #: intervention decision evidence-based rather than scheduled.
         self._records: dict[str, dict] = {}
+        #: Set by the loop.  The curator asks it two questions: which designs
+        #: deserve extra weight as parents despite their score, and which must
+        #: not be pruned however low that score is.
+        self.scout = None
         self.starved_domains: list[str] = []
         self.famine_events: list[dict] = []
         self.log: list[dict] = []
@@ -257,6 +261,16 @@ class Curator:
 
         # When a domain is starved, tilt hard toward whoever is least bad at it.
         w = w * self._famine_weight(cells)
+        # The scout argues for designs nobody else wants.  Multiplicative and
+        # never below 1, so it can raise a dark horse's chances and cannot be
+        # used to suppress a rival -- which matters when the thing making the
+        # argument is a learned model.
+        if self.scout is not None:
+            w = w * np.array([
+                self.scout.selection_weight(np.asarray(f, float))
+                if (f := e.meta.get("scout_features")) is not None else 1.0
+                for e in cells
+            ])
 
         w = np.maximum(w, 1e-6)
         w = w / w.sum()
@@ -404,7 +418,18 @@ class Curator:
             ]
             if neigh and e.fitness < np.percentile(neigh, 25):
                 candidates.append((e.fitness, cell))
+        # The scout's reserve.  A quota rather than a threshold: a fixed share of
+        # the archive is held on predicted potential regardless of how the
+        # scores happen to be distributed.  A threshold would protect everything
+        # early and nothing late, which is backwards -- a dark horse matters
+        # more once selection has sharpened, not less.
+        reserved = set()
+        if self.scout is not None:
+            reserved = self.scout.reserve_ids(list(a.cells.values()))
         for _, cell in sorted(candidates)[:max_prunes]:
+            e = a.cells.get(cell)
+            if e is not None and id(e) in reserved:
+                continue
             a.remove(cell)
             removed += 1
         self.prunes += removed

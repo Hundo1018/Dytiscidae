@@ -55,6 +55,7 @@ from .curriculum import STAGES, Curriculum
 from .descriptors import LearnedDescriptors, episode_features
 from .islands import ISLANDS, Archipelago, island_score
 from .judge import Judge
+from .scout import Scout, novelty_of, scout_features
 
 
 @dataclass
@@ -130,6 +131,14 @@ class SearchConfig:
     audit_every: int = 30
     audits_per_review: int = 2
 
+    # --- the scout ---------------------------------------------------------
+    #: Predicts a lineage's future lift, so a design that scores badly now but
+    #: is going somewhere is not bred out by a selection pressure that can only
+    #: see the present.
+    use_scout: bool = True
+    scout_horizon: int = 40
+    scout_reserve: float = 0.15
+
 
 @dataclass(eq=False)
 class SearchState:
@@ -144,6 +153,7 @@ class SearchState:
     judge: Judge = None  # type: ignore[assignment]
     auditor: Auditor = None  # type: ignore[assignment]
     critic: Critic | None = None
+    scout: Scout | None = None
     island: str = "generalist"
     emitters: list[Emitter] = field(default_factory=list)
     started: float = field(default_factory=time.time)
@@ -377,8 +387,38 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     meta["judged"] = {d: round(j["total"], 3) for d, j in judged.items()}
     meta["critic_discount"] = round(discount, 3)
     meta["critic_features"] = [float(x) for x in cfeat]
+
+    # What was knowable about this design at birth, for the scout.  Novelty is
+    # computed against the archive *before* the design is filed, otherwise every
+    # design is zero distance from itself.
+    if state.scout is not None:
+        meta["novelty"] = round(novelty_of(bd, state.archive), 4)
+        meta["fitness"] = fit
+        meta["n_parts"] = len(genome.parts)
+        meta["cppn_complexity"] = sum(len(c.connections) for c in genome.cppns)
+        meta["distance_to_next_rung"] = round(
+            1.0 - float(np.mean([j["within"] for j in judged.values()])), 4
+        )
+        sfeat = scout_features(
+            meta,
+            novelty=meta["novelty"],
+            parent_fitness=float(parent.fitness) if parent is not None else None,
+            mobility=result.mobility,
+        )
+        meta["scout_features"] = [float(x) for x in sfeat]
+
     status = state.archive.add(genome, fit, bd, meta, tier=result.tier, objectives=obj)
     state.curriculum.update(cell, sr)
+
+    if state.scout is not None:
+        state.scout.record(
+            design_id=f"{state.island}:{genome.genome_id}",
+            parent_id=(f"{state.island}:{parent.genome.genome_id}"
+                       if parent is not None and getattr(parent.genome, "genome_id", None)
+                       else None),
+            generation=state.archive.generation,
+            fitness=fit, island=state.island, features=sfeat,
+        )
 
     state.curator.observe_domains(meta)
     state.curator.credit(operators, status, fit - previous)
@@ -387,7 +427,8 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
         {"kind": "evaluate", "gen": state.archive.generation, "status": status,
          "fitness": round(fit, 4), "cell": list(cell), "operators": operators,
          "wall": round(result.wall_time, 2), "notes": result.notes[:3],
-         **{k: v for k, v in meta.items() if k not in ("policy", "features")}}
+         **{k: v for k, v in meta.items()
+            if k not in ("policy", "features", "critic_features", "scout_features")}}
     )
     return status
 
@@ -434,9 +475,14 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         judge=Judge(quantile=cfg.judge_quantile, update_every=cfg.judge_update_every),
         auditor=Auditor(),
         critic=Critic(refit_every=cfg.critic_refit_every) if cfg.use_critic else None,
+        scout=(Scout(horizon=cfg.scout_horizon, reserve=cfg.scout_reserve, seed=cfg.seed)
+               if cfg.use_scout else None),
         island=cfg.islands[-1] if cfg.islands else "generalist",
         descriptors=learned, spec=spec,
     )
+
+    for c in archipelago.curators.values():
+        c.scout = state.scout
 
     telemetry.write("generations", {"kind": "run_start", "config": cfg.__dict__,
                                     "spec": spec.__dict__,
@@ -522,6 +568,17 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             telemetry.event({"kind": "judge_tighten", "gen": gen, "moves": moved,
                              **state.judge.report()})
 
+        # --- the scout harvests matured lineages ------------------------------
+        #
+        # Potential is observable in arrears: for a design that has been in the
+        # archive a while, the best score any of its descendants reached is a
+        # fact, not an opinion.  That is the label.
+        if state.scout is not None:
+            new = state.scout.harvest(gen)
+            if state.scout.due() and state.scout.fit():
+                telemetry.event({"kind": "scout_fit", "gen": gen,
+                                 "new_labels": new, **state.scout.report()})
+
         # --- the critic refits ----------------------------------------------
         if state.critic is not None and state.critic.due() and state.critic.fit():
             telemetry.event({"kind": "critic_fit", "gen": gen, **state.critic.report()})
@@ -559,12 +616,14 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         report["auditor"] = state.auditor.report()
         if state.critic is not None:
             report["critic"] = state.critic.report()
+        if state.scout is not None:
+            report["scout"] = state.scout.report()
         report["archipelago"] = archipelago.report()
         best = archive.best
         if best is not None:
             report["best"] = {k: v for k, v in best.meta.items()
                               if k not in ("policy", "mobility_axes", "features",
-                                           "critic_features")}
+                                           "critic_features", "scout_features")}
             report["best_fitness"] = round(best.fitness, 4)
         archive.history.append(archive.snapshot())
         telemetry.generation(report)

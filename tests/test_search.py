@@ -1256,6 +1256,123 @@ def test_the_loop_wires_every_layer_together() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_scout_finds_dark_horses_and_may_only_protect() -> None:
+    """A design that scores badly now but is going somewhere must survive.
+
+    Every other selection pressure here reads the design in front of it: the
+    curator prefers fitness, the judge scores what was measured, the critic
+    discounts what will not survive.  All of them ask "how good is this" and
+    none can ask "what will this become".  A design with a superb body and a
+    controller that has not learned to use it scores near zero and is worth more
+    than a mediocre design already at its ceiling, and greedy selection breeds
+    the second.
+
+    Six islands, a promoting curriculum and a ratcheting bar all sharpen
+    selection, which is exactly what kills a dark horse faster -- so the
+    counterweight has to be explicit.
+
+    Potential is trainable because it is observable in arrears: the best score
+    any descendant reached is a fact.
+    """
+    print("\nscout: potential, not score")
+    from dytiscidae.evolution.scout import SCOUT_DIM, Scout, novelty_of
+
+    rng = np.random.default_rng(0)
+    scout = Scout(horizon=5, min_samples=80, refit_every=40, hidden=24, seed=0)
+
+    # Two families with *identical* score distributions.  The dark horse has
+    # unused control authority and structural headroom and sits just below a
+    # rung; the dead end is at its ceiling.
+    def feat(kind):
+        f = np.zeros(SCOUT_DIM)
+        f[0] = rng.uniform(0.05, 0.20)   # fitness: the same for both
+        f[1] = rng.uniform(0.1, 0.6)     # novelty
+        if kind == "darkhorse":
+            f[2] = rng.uniform(0.8, 1.5)
+            f[4] = f[2] * (1 - f[0])
+            f[5] = rng.uniform(0.8, 2.5)
+            f[10] = rng.uniform(0.0, 0.2)
+        else:
+            f[2] = rng.uniform(0.0, 0.15)
+            f[4] = f[2] * (1 - f[0])
+            f[5] = rng.uniform(-0.2, 0.3)
+            f[10] = rng.uniform(0.7, 1.0)
+        return f
+
+    check("an unfitted scout falls back to novelty, not to nothing",
+          scout.potential(np.array([0.1, 0.9] + [0.0] * (SCOUT_DIM - 2))) > 0.0,
+          "novelty prior")
+
+    gen = 0
+    for r in range(30):
+        for i in range(20):
+            kind = "darkhorse" if i % 2 else "deadend"
+            f = feat(kind)
+            pid = f"p{r}_{i}"
+            scout.record(pid, None, gen, float(f[0]), "t", f)
+            lift = rng.uniform(0.35, 0.7) if kind == "darkhorse" else rng.uniform(0.0, 0.05)
+            scout.record(f"c{r}_{i}", pid, gen + 1, float(f[0] + lift), "t", f)
+        gen += 6
+        scout.harvest(gen)
+        if scout.due():
+            scout.fit()
+
+    check("the scout trains on realised lift", scout.fitted and len(scout._x) > 500,
+          f"{len(scout._x)} labels from lineages that matured")
+    check("and is calibrated on held-out designs", scout.calibration > 0.3,
+          f"calibration {scout.calibration:.2f}")
+
+    dh = float(np.mean([scout.potential(feat("darkhorse")) for _ in range(300)]))
+    de = float(np.mean([scout.potential(feat("deadend")) for _ in range(300)]))
+    check("it separates two families with identical scores", dh > 5 * de,
+          f"predicted lift {dh:.3f} against {de:.3f}")
+    check("and turns that into selection weight",
+          scout.selection_weight(feat("darkhorse")) > 1.0,
+          f"x{np.mean([scout.selection_weight(feat('darkhorse')) for _ in range(50)]):.2f}")
+
+    # The invariant that keeps it safe: it may only ever argue *for*.
+    worst = min(scout.selection_weight(feat("deadend")) for _ in range(200))
+    check("the scout can never argue against a design", worst >= 1.0 - 1e-9,
+          f"lowest weight x{worst:.3f}")
+
+    # A childless node must not be labelled as a negative example.  Seeding
+    # best_descendant at zero made every childless design a negative label
+    # proportional to how good it was, which swamped the signal and left
+    # calibration at exactly 0.
+    s2 = Scout(horizon=1, min_samples=10, refit_every=5)
+    s2.record("lonely", None, 0, 0.8, "t", np.zeros(SCOUT_DIM))
+    s2.harvest(5)
+    check("a design with no descendants has no lift, not negative lift",
+          s2._y and s2._y[0] == 0.0, f"label {s2._y[0] if s2._y else None}")
+
+    # The reserve is a quota, so it protects something whatever the scores are.
+    class E:
+        def __init__(self, f):
+            self.meta = {"scout_features": [float(x) for x in f]}
+
+    elites = [E(feat("deadend")) for _ in range(18)] + [E(feat("darkhorse")) for _ in range(2)]
+    reserved = scout.reserve_ids(elites)
+    check("the reserve holds a fixed share of the archive",
+          len(reserved) == max(1, int(round(scout.reserve * len(elites)))),
+          f"{len(reserved)} of {len(elites)} protected")
+    dark_ids = {id(e) for e in elites[18:]}
+    check("and it spends that share on the dark horses",
+          len(reserved & dark_ids) >= 1,
+          f"{len(reserved & dark_ids)} of the 2 dark horses protected")
+
+    # Novelty, the non-learned half, must behave.
+    from dytiscidae.evolution.archive import Archive
+
+    a = Archive([("x", 0.0, 1.0, 8), ("y", 0.0, 1.0, 8)])
+    check("an empty archive makes everything novel",
+          novelty_of([0.5, 0.5], a) == 1.0)
+    a.add("g", 0.5, [0.5, 0.5], objectives=np.array([0.5, 1.0, 1.0]))
+    near = novelty_of([0.52, 0.52], a)
+    far = novelty_of([0.95, 0.05], a)
+    check("and distance from what exists is what novelty means", far > near,
+          f"far {far:.3f} against near {near:.3f}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -1279,6 +1396,7 @@ def main() -> int:
     test_auditor_can_invalidate_and_veto()
     test_critic_learns_the_exploit_signature()
     test_curriculum_and_islands_give_gradient_where_the_mission_gives_none()
+    test_scout_finds_dark_horses_and_may_only_protect()
     test_the_loop_wires_every_layer_together()
     print("\n" + "=" * 68)
     if FAILURES:
