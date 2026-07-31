@@ -327,11 +327,18 @@ class FluidSolver:
         *,
         c_rot: float | None = None,
         added_mass_scale: float = 1.0,
+        cd_scale: float = 1.0,
+        lift_scale: float = 1.0,
     ) -> None:
         self.model = model
         self.panels = panels
         self.medium = medium
         self.added_mass_scale = added_mass_scale
+        # Deliberate handles for the auditor to move.  A design that only works
+        # at one exact value of a coefficient has found a hole in the model, and
+        # the only way to find that out is to move the coefficient.
+        self.cd_scale = cd_scale
+        self.lift_scale = lift_scale
         # Kramer rotational circulation coefficient, pi * (0.75 - x0).
         self.c_rot = (
             np.pi * (0.75 - panels.pitch_axis) if c_rot is None else np.full(panels.n, c_rot)
@@ -457,8 +464,8 @@ class FluidSolver:
         # Circulatory lift and drag, on the lifting strips only.
         cl = np.where(is_wing, lift_coefficient(alpha, re, p.aspect_ratio, reduced_freq), 0.0)
         cd = np.where(is_wing, drag_coefficient(alpha, re, p.aspect_ratio, cl), 0.0)
-        L = q * p.area * cl
-        D = q * p.area * cd
+        L = q * p.area * cl * self.lift_scale
+        D = q * p.area * cd * self.cd_scale
         F += L[:, None] * lift_axis + D[:, None] * d_hat
 
         # --- bluff-body drag ------------------------------------------------
@@ -518,7 +525,7 @@ class FluidSolver:
             # the point of being slender.
             wetted = 2.0 * (ex * ey + ey * ez + ex * ez)
             re_b = rho * np.abs(v_ax) * ex / np.maximum(mu, 1e-12)
-            f_axial = (
+            f_axial = self.cd_scale * (
                 0.5 * rho * np.abs(v_ax) * v_ax
                 * (p.cd_bluff * ey * ez + skin_friction_cd(re_b) * wetted)
             )
@@ -532,7 +539,7 @@ class FluidSolver:
             pc = np.abs(np.einsum("ni,ni->n", d_cross, c_hat))
             pn = np.abs(np.einsum("ni,ni->n", d_cross, n_hat))
             a_side = pc * ex * ez + pn * ex * ey
-            f_cross = 0.5 * rho * u_cross**2 * CD_CROSSFLOW * a_side
+            f_cross = self.cd_scale * 0.5 * rho * u_cross**2 * CD_CROSSFLOW * a_side
 
             # Both act *along* the relative flow, as the wing branch's drag
             # does: ``v_rel`` is the fluid's velocity seen from the body, so a

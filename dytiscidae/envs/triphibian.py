@@ -278,6 +278,7 @@ class TriphibianEnv:
         wind: np.ndarray | None = None,
         timestep: float = 0.004,
         seed: int = 0,
+        perturb: dict | None = None,
     ) -> None:
         self.p = phenotype
         self.rng = np.random.default_rng(seed)
@@ -290,7 +291,16 @@ class TriphibianEnv:
         self.model, self.data, self.act_names, self.panels = compile_phenotype(
             phenotype, scene=scene
         )
-        self.solver = FluidSolver(self.model, self.panels, self.medium)
+        # ``perturb`` moves the model's own coefficients.  It exists for the
+        # auditor: the only way to find out whether a design depends on the
+        # model being exactly right is to make the model wrong on purpose.
+        pert = dict(perturb or {})
+        self.solver = FluidSolver(
+            self.model, self.panels, self.medium,
+            added_mass_scale=float(pert.get("added_mass_scale", 1.0)),
+            cd_scale=float(pert.get("cd_scale", 1.0)),
+            lift_scale=float(pert.get("lift_scale", 1.0)),
+        )
 
         import mujoco
 

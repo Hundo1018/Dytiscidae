@@ -81,6 +81,11 @@ def cmd_search(args) -> int:
         checkpoint_every=args.checkpoint_every,
         learned_axes=not args.fixed_axes,
         descriptor_refit_every=args.descriptor_refit_every,
+        migrate_every=args.migrate_every,
+        use_critic=not args.no_critic,
+        audit_every=args.audit_every,
+        **({"islands": tuple(x.strip() for x in args.islands.split(","))}
+           if args.islands else {}),
     )
     spec = MissionSpec(
         cycles=args.cycles,
@@ -90,11 +95,14 @@ def cmd_search(args) -> int:
 
     def report(state, r):
         line = (
-            f"gen{r['generation']:<4d} {r['regime']:<13s} elites={r['filled']:<4d} "
-            f"front={r.get('front_designs', r['filled']):<4d} "
+            f"gen{r['generation']:<4d} {r.get('island','-')[:9]:<9s} "
+            f"{r['regime']:<12s} elites={r['filled']:<4d} "
             f"cov={r['coverage']*100:5.2f}% qd={r['qd_score']:7.2f} "
-            f"best={r.get('best_fitness', 0):.3f} evals={r['evaluated']:<5d} "
-            f"rej={r['tier0_rejected']:<4d} {r['elapsed']:6.0f}s"
+            f"best={r.get('best_fitness', 0):.3f} "
+            f"stage{r.get('curriculum', {}).get('reached', 0)} "
+            f"crit={r.get('critic', {}).get('calibration', 0):.2f} "
+            f"inv={r.get('auditor', {}).get('invalidated', 0):<3d} "
+            f"evals={r['evaluated']:<5d} {r['elapsed']:6.0f}s"
         )
         print(line, flush=True)
         if r["generation"] % 5 == 0:
@@ -382,6 +390,12 @@ def main(argv=None) -> int:
                    help="use the hand-picked archive axes instead of learning them")
     p.add_argument("--descriptor-refit-every", type=int, default=400,
                    help="episodes between refits of the learned archive axes")
+    p.add_argument("--islands", default=None,
+                   help="comma-separated islands to run (default: all)")
+    p.add_argument("--migrate-every", type=int, default=60)
+    p.add_argument("--no-critic", action="store_true",
+                   help="run without the learned critic")
+    p.add_argument("--audit-every", type=int, default=30)
     p.set_defaults(fn=cmd_search)
 
     p = sub.add_parser("skills", help="train the actuator skill library")

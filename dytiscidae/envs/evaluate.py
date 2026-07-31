@@ -75,8 +75,14 @@ def evaluate_tier1(
     identify_axes: bool = False,
     seed: int = 0,
     sea_state=None,
+    perturb: dict | None = None,
 ) -> MissionResult:
-    """Short dynamic episodes in each domain, plus transitions."""
+    """Short dynamic episodes in each domain, plus transitions.
+
+    ``perturb`` scales the fluid model's own coefficients.  The auditor uses it
+    to ask whether a design's score depends on those coefficients being exactly
+    right; a real machine degrades, an exploit collapses.
+    """
     spec = spec or MissionSpec()
     t0 = time.time()
 
@@ -90,7 +96,7 @@ def evaluate_tier1(
         return r
 
     try:
-        env = TriphibianEnv(p, seed=seed, sea_state=sea_state)
+        env = TriphibianEnv(p, seed=seed, sea_state=sea_state, perturb=perturb)
     except Exception as exc:  # a genome that will not compile is simply dead
         r.notes.append(f"compile failed: {type(exc).__name__}: {exc}")
         r.wall_time = time.time() - t0

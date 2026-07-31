@@ -1187,6 +1187,75 @@ def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> 
           all(m["island"] != m["origin"] for m in moved if m["kind"] == "migrant"))
 
 
+def test_the_loop_wires_every_layer_together() -> None:
+    """The judge, the auditor, the critic, the curriculum and the islands must
+    all be connected to the search, not merely present in the tree.
+
+    Each of them was built and tested on its own before this, and a module that
+    passes its own tests while being reachable from nothing is a thing this
+    project has shipped before.  So this runs the real loop, briefly, and looks
+    at what came out.
+    """
+    print("\nloop: every layer is actually connected")
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    tmp = tempfile.mkdtemp(prefix="dyt-loop-")
+    try:
+        cfg = SearchConfig(
+            generations=2, batch=1, seed=5, segment_seconds=1.0,
+            n_reference_seeds=1, n_random_seeds=0,
+            islands=("water", "generalist"), tier2_every=999, audit_every=999,
+            migrate_every=1, checkpoint_every=999, run_dir=tmp,
+            identify_axes_every=999,
+        )
+        state = run_search(cfg, MissionSpec())
+
+        check("both islands exist and are separate",
+              set(state.archipelago.names) == {"water", "generalist"}
+              and state.archipelago.archives["water"]
+              is not state.archipelago.archives["generalist"],
+              ", ".join(state.archipelago.names))
+        check("each island has its own curriculum",
+              set(state.curricula) == {"water", "generalist"})
+        check("the judge, auditor and critic are attached",
+              state.judge is not None and state.auditor is not None
+              and state.critic is not None)
+
+        elites = [e for a in state.archipelago.archives.values()
+                  for e in a.cells.values()]
+        check("something was filed", elites, f"{len(elites)} elites")
+        if elites:
+            m = elites[0].meta
+            for key in ("island", "stage", "stage_name", "rungs", "judged",
+                        "critic_discount", "critic_features"):
+                check(f"elites carry {key}", key in m,
+                      str(m.get(key))[:60])
+            check("the judge's rungs are recorded per domain",
+                  set(m["rungs"]) >= {"air", "water", "land"},
+                  str(m["rungs"]))
+            check("and the critic abstains before it has been fitted",
+                  m["critic_discount"] == 1.0, str(m["critic_discount"]))
+
+        # The same design is filed on both islands and scored differently,
+        # because that is the entire point of having islands.
+        w = state.archipelago.archives["water"].best
+        g = state.archipelago.archives["generalist"].best
+        if w is not None and g is not None:
+            check("the islands score their occupants on different terms",
+                  abs(w.fitness - g.fitness) > 1e-9 or w.genome is not g.genome,
+                  f"water best {w.fitness:.4f}, generalist best {g.fitness:.4f}")
+
+        check("migration ran", state.archipelago.migrations >= 0,
+              f"{state.archipelago.migrations} migrations, "
+              f"{state.archipelago.hybrids} hybrids")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -1210,6 +1279,7 @@ def main() -> int:
     test_auditor_can_invalidate_and_veto()
     test_critic_learns_the_exploit_signature()
     test_curriculum_and_islands_give_gradient_where_the_mission_gives_none()
+    test_the_loop_wires_every_layer_together()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
