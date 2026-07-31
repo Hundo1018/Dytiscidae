@@ -1252,6 +1252,27 @@ def test_the_loop_wires_every_layer_together() -> None:
         check("migration ran", state.archipelago.migrations >= 0,
               f"{state.archipelago.migrations} migrations, "
               f"{state.archipelago.hybrids} hybrids")
+
+        # And what it wrote must be readable by the commands that consume it.
+        # An archipelago writes one archive per island and no combined file,
+        # while render, cohort and showcase all opened ``archive.pkl`` -- so
+        # every one of them exited with "no archive" for every run since the
+        # islands landed.  The search was reachable; its output was not.
+        from dytiscidae.ops.run import load_run_archive
+
+        merged, islands = load_run_archive(tmp)
+        check("the run's output is loadable by the tools that consume it",
+              merged is not None and len(merged.cells) > 0,
+              f"{0 if merged is None else len(merged.cells)} elites "
+              f"from {len(islands)} island(s): {', '.join(islands)}")
+        check("and every elite says which island it came from",
+              merged is not None
+              and all((e.meta or {}).get("island") in islands
+                      for e in merged.cells.values()),
+              f"islands present: "
+              f"{sorted({(e.meta or {}).get('island') for e in merged.cells.values()})}")
+        check("a run directory with no archive is reported, not crashed on",
+              load_run_archive(Path(tmp) / "nothing-here") == (None, []))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

@@ -22,6 +22,53 @@ from pathlib import Path
 import numpy as np
 
 
+def load_run_archive(run_dir):
+    """The archive of a run, however that run stored it.
+
+    A single-population run writes ``archive.pkl``.  An archipelago writes one
+    per island and no combined file, so every downstream command that hard-coded
+    ``archive.pkl`` -- render, cohort, and anything filming a result -- has been
+    exiting with "no archive" for every run since the islands landed.  The
+    search was reachable and its output was not.
+
+    Islands are merged by taking each island's archive in turn and keeping the
+    better occupant of any cell two islands both filled.  That is not a
+    principled cross-island comparison -- the islands score on different
+    objectives, which is the whole point of having them -- so each elite is
+    tagged with the island it came from and the caller can filter.  For picking
+    something to film, "the best thing anywhere" is the right question.
+    """
+    from ..evolution.archive import Archive
+
+    run_dir = Path(run_dir)
+    single = run_dir / "archive.pkl"
+    if single.exists():
+        return Archive.load(single), ["default"]
+
+    parts = sorted(run_dir.glob("archive_*.pkl"))
+    if not parts:
+        return None, []
+
+    merged, islands = None, []
+    for path in parts:
+        name = path.stem[len("archive_"):]
+        islands.append(name)
+        a = Archive.load(path)
+        for e in a.cells.values():
+            e.meta = dict(e.meta or {})
+            e.meta.setdefault("island", name)
+        if merged is None:
+            merged = a
+            continue
+        for cell, e in a.cells.items():
+            held = merged.cells.get(cell)
+            if held is None or e.fitness > held.fitness:
+                merged.cells[cell] = e
+        merged.tainted.update(a.tainted)
+        merged.generation = max(merged.generation, a.generation)
+    return merged, islands
+
+
 def cmd_verify(args) -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from tests.test_physics import main as physics_main
@@ -243,7 +290,12 @@ def cmd_cohort(args) -> int:
     from ..viz.showcase import render_mission
 
     run = Path(args.run)
-    archive = Archive.load(run / "archive.pkl")
+    archive, islands = load_run_archive(run)
+    if archive is None:
+        print(f"no archive in {run}")
+        return 1
+    print(f"{len(archive.cells)} elites from {len(islands)} island(s): "
+          f"{', '.join(islands)}")
     curator = Curator(archive, seed=args.seed)
     cohort = curator.select_cohort(args.n)
     if not cohort:
@@ -300,7 +352,31 @@ def cmd_showcase(args) -> int:
 
     out = Path(args.run)
     out.mkdir(parents=True, exist_ok=True)
-    p = build(reference_genome())
+
+    # The showcase filmed the hand-built reference and nothing else, so the one
+    # video this project exists to produce could not show a design the search
+    # found.  ``--design`` names a run whose archive to take the best elite
+    # from, optionally restricted to one island.
+    if args.design:
+        archive, islands = load_run_archive(args.design)
+        if archive is None:
+            print(f"no archive in {args.design}")
+            return 1
+        pool = [e for e in archive.cells.values()
+                if not args.island or (e.meta or {}).get("island") == args.island]
+        if not pool:
+            print(f"no elites in {args.design}"
+                  + (f" from island {args.island!r} (have: {', '.join(islands)})"
+                     if args.island else ""))
+            return 1
+        elite = max(pool, key=lambda e: e.fitness)
+        p = build(elite.genome)
+        print(f"filming the best of {len(pool)} elites from {args.design}"
+              f"{f' (island {args.island})' if args.island else ''}: "
+              f"fitness {elite.fitness:.4f}, island "
+              f"{(elite.meta or {}).get('island', '-')}, tier {elite.tier}")
+    else:
+        p = build(reference_genome())
     print(p.summary())
 
     controller = None
@@ -347,14 +423,14 @@ def cmd_dashboard(args) -> int:
 
 
 def cmd_render(args) -> int:
-    from ..evolution.archive import Archive
     from ..viz.render import render_elites
 
-    path = Path(args.run) / "archive.pkl"
-    if not path.exists():
-        print(f"no archive at {path}")
+    archive, islands = load_run_archive(args.run)
+    if archive is None:
+        print(f"no archive in {args.run}")
         return 1
-    archive = Archive.load(path)
+    print(f"{len(archive.cells)} elites from {len(islands)} island(s): "
+          f"{', '.join(islands)}")
     made = render_elites(archive, args.run, top=args.top, duration=args.duration)
     if not made:
         print("nothing rendered (no GL context and no matplotlib?)")
@@ -444,6 +520,11 @@ def main(argv=None) -> int:
     p = sub.add_parser("showcase",
                        help="film one continuous mission with wake and stress overlays")
     p.add_argument("--run", default="runs/showcase")
+    p.add_argument("--design", default=None,
+                   help="run directory to take the best archive elite from "
+                        "(default: the hand-built reference)")
+    p.add_argument("--island", default=None,
+                   help="restrict --design to one island's archive")
     p.add_argument("--controller", default=None, help="load a trained controller pickle")
     p.add_argument("--train", action="store_true", help="train one first")
     p.add_argument("--iterations", type=int, default=22)
