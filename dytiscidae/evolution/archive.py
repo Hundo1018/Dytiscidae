@@ -29,6 +29,32 @@ import numpy as np
 # so any use of ``==`` or ``in`` on Elites raised "truth value of an array with
 # more than one element is ambiguous" from deep inside an unrelated call.  That
 # is what it did, five generations into a three-thousand-generation run.
+#: A caution about everything below, measured and not yet acted on.
+#:
+#: A cell is claimed on *one* evaluation, at one random seed, and the seed
+#: matters more than it looks.  Measured on the air island of a live run, the
+#: two top-scoring flyers against the third:
+#:
+#:     archived 0.621   over 8 seeds: 0.108 .. 0.635   mean 0.210 +- 0.164
+#:     archived 0.603   over 8 seeds: 0.113 .. 0.652   mean 0.219 +- 0.166
+#:     archived 0.450   over 8 seeds: 0.450 .. 0.450   mean 0.450 +- 0.000
+#:
+#: The first two hold their cells on a score near the top of their own
+#: distribution -- they rolled well once and the archive kept the roll.  Their
+#: honest mean is *below* the third, which is deterministic.
+#:
+#: So the archive is selecting partly for luck, and worse, luck here is a proxy
+#: for instability: the deterministic design is a stable glider that flies the
+#: same trajectory every time, and the variable ones tumble or glide depending
+#: on where the spawn noise puts them.  Rewarding the high roll therefore
+#: rewards being unstable.
+#:
+#: This is the known failure of quality-diversity search under noisy fitness and
+#: it is not fixed here.  The obvious remedies -- re-evaluate on several seeds
+#: before filing, or keep a running mean per cell, or penalise the spread --
+#: all cost evaluations, which is the budget this whole tier cascade exists to
+#: protect.  Tier-2 promotion re-checks elites but on another single sample, so
+#: it confirms rather than averages.  Worth deciding deliberately.
 @dataclass(eq=False)
 class Elite:
     """One occupant of one cell."""
