@@ -193,7 +193,47 @@ def hydrodynamic_sweep_check(
     """Root bending of a surface swept through *water*.
 
     This is the load case that the lift-based spar check completely misses, and
-    it is by far the largest one a triphibian sees.  A surface sweeping at
+    it is by far the largest one a triphibian sees.
+
+    It is also, measured, the constraint that closes the only route to takeoff,
+    and it does so while ignoring the one gene that would open it again.
+
+    Takeoff needs a low wing loading -- a 7 to 46 m ground run at the loadings
+    the seeds have.  Doubling the gannet's wing takes W/S from 86 to 25 and the
+    run from 9.1 m to 2.7 m, and fails *here* at a margin of -0.86.  Tripling
+    the spar to carry it passes, at 12.5 kg instead of 4.5, which puts W/S back
+    to 59 and the run to 6.4 m -- worse than where it started.  Every fix to the
+    structure undoes the aerodynamic gain.  That is the square-cube law, and it
+    is why the great flight diagram has the slope it does.
+
+    So the wing is sized by water, not by air, and the triphibian requirement is
+    itself what blocks flight.  Which is the thesis this project started from,
+    arriving as measured physics rather than as an analogy.
+
+    The escape is to *fold*, which is what a real gannet does and what the
+    gannet plan's shoulder joint exists for -- a wing that is large in air and
+    tucked in water.  Stress here goes as the square of the effective span
+    (omega = tip_speed / span, so M ~ omega^2 * integral(c r^3) ~ span^2), and
+    folding a 3 m wing to a quarter of its span takes it from 4580 MPa to
+    286 MPa.  Sixteen times, on the binding constraint.
+
+    This function does not know about any of that.  It is handed the fully
+    extended surface and checks it as though the machine swims with its wings
+    out, so a design whose entire strategy is to fold before entering the water
+    is judged as if it never folds.  That is the same defect as the camber gene
+    and the climb term: a capability the genome expresses and the evaluation
+    cannot see.
+
+    Fixing it is not a one-liner, and that is why it is written down rather than
+    done.  The conservative reading is right in the absence of evidence -- a
+    design could claim a fold and never use it, since whether it folds is a
+    control decision and not a morphological one.  The honest fix is the one
+    this project has reached for before: measure it.  The air-to-water
+    transition is already simulated; the swept load the wing actually sees
+    during it is measurable there, and that number, not the fully-extended
+    worst case, is what the structure should be held to.
+
+    A surface sweeping at
     angular rate ``omega`` presents dynamic pressure ``0.5 * rho * (omega*r)^2``
     at radius ``r``, so the root moment goes as
 
