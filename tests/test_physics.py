@@ -709,10 +709,34 @@ def test_air_segment_can_be_scored() -> None:
         f"{min(loadings):.0f}..{max(loadings):.0f} N/m^2",
     )
     # A heavier-loaded design must be launched faster: that is what trim means.
-    order = np.argsort(loadings)
-    v = np.array(launches)[order]
-    check("launch speed rises with wing loading", bool(np.all(np.diff(v) >= -1e-9)),
-          " ".join(f"{x:.1f}" for x in v))
+    #
+    # Held *within* an airframe, not across them.  Sorting all the plans by W/S
+    # and requiring the measured launch speeds to rise with it assumes every
+    # design reaches the same lift coefficient, and ``launch_speed`` exists
+    # precisely because they do not -- its docstring is about how effective CL
+    # sits near 0.35 and varies with whatever dihedral and twist the CPPN gave
+    # the surface.  Two plans can therefore share a wing loading and trim tens
+    # of percent apart: gannet at 85.6 N/m^2 launches at 13.3 m/s and bat at
+    # 86.3 launches at 15.8.  That pair was already a near-tie ordered by luck,
+    # and the cross-plan check duly broke on the seventh plan while both of its
+    # own numbers were correct.
+    #
+    # Adding battery changes mass and leaves the wing alone, so within one
+    # airframe CL is fixed and the relation is the clean physical one.
+    for name in ("gannet", "ray", "beetle"):
+        light = BODY_PLANS[name]()
+        heavy = BODY_PLANS[name]()
+        heavy.battery_wh = light.battery_wh * 2.5
+        pl, ph = build(light), build(heavy)
+        el, eh = TriphibianEnv(pl), TriphibianEnv(ph)
+        el.reset(Domain.AIR, randomise=False)
+        eh.reset(Domain.AIR, randomise=False)
+        wl = pl.mass * 9.80665 / max(pl.wing_area, 1e-3)
+        wh = ph.mass * 9.80665 / max(ph.wing_area, 1e-3)
+        check(f"launch speed rises with wing loading ({name})",
+              eh.launch_speed >= el.launch_speed - 1e-9,
+              f"W/S {wl:.0f} -> {wh:.0f} N/m^2 gives "
+              f"{el.launch_speed:.1f} -> {eh.launch_speed:.1f} m/s")
 
 
 def test_truncated_episodes_cannot_score() -> None:
