@@ -1013,6 +1013,67 @@ def test_transitions_are_graded_not_pass_fail() -> None:
           two <= one, f"{one:.2f} -> {two:.2f} after adding a second crossing")
 
 
+def test_an_attempted_takeoff_outscores_never_leaving_the_ground() -> None:
+    """Getting partway off the ground must be worth more than not trying.
+
+    ``land_to_air`` asks for clearance above half a metre *at the end* of the
+    episode, which is sustained flight rather than a leap, and the gate it
+    feeds is multiplicative.  So while the gate read ``crossed`` directly,
+    every design that failed it scored the same zero: a machine that leapt
+    0.566 m and came down was worth exactly what a machine that never moved
+    was worth, and the search had no gradient to climb toward takeoff.
+
+    The fix must give a gradient without giving away the crossing, so this
+    pins both directions at once.
+    """
+    print("\nenvs: an attempted takeoff beats sitting still")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.transitions import TransitionResult, run_transition
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    scores = {}
+    for name in ("gannet", "teal"):
+        env = TriphibianEnv(build(BODY_PLANS[name]()))
+        ctrl = Controller(params=env.cpg.base)
+        scores[name] = run_transition(env, "land_to_air", ctrl, duration=6.0)
+
+    sit, leap = scores["gannet"], scores["teal"]
+    check("the leaper actually leaves the ground and the other does not",
+          leap.peak_clearance > 5.0 * sit.peak_clearance,
+          f"peak clearance {sit.peak_clearance:.3f} m vs {leap.peak_clearance:.3f} m")
+    check("neither of them completes the crossing",
+          not sit.crossed and not leap.crossed,
+          f"crossed {sit.crossed} / {leap.crossed}")
+    check("yet the leap scores strictly more than sitting still",
+          leap.approach > sit.approach + 0.1,
+          f"approach {sit.approach:.3f} vs {leap.approach:.3f} -- both were 0.000")
+    check("and both stay below what completing the crossing pays",
+          max(sit.approach, leap.approach) <= 0.6 + 1e-9,
+          f"capped at {max(sit.approach, leap.approach):.3f} against 1.0 for a crossing")
+
+    # Height alone must not buy it, and neither must hang time: a single
+    # ballistic hop that lands at once, and a machine that never quite touches
+    # while going nowhere, are both things this should refuse to pay for.
+    hop = TransitionResult(kind="land_to_air")
+    hop.peak_clearance, hop.airborne_fraction = 0.6, 0.02
+    drift = TransitionResult(kind="land_to_air")
+    drift.peak_clearance, drift.airborne_fraction = 0.02, 0.9
+    from dytiscidae.envs.transitions import _score
+
+    for res in (hop, drift):
+        _score(TriphibianEnv(build(BODY_PLANS["gannet"]())), res, -1,
+               np.array([1.0]), np.array([0.0]), Domain.AIR)
+    check("one term alone cannot earn a full approach",
+          max(hop.approach, drift.approach) < 0.35,
+          f"height-only {hop.approach:.3f}, hangtime-only {drift.approach:.3f}, "
+          f"both against {leap.approach:.3f} for a real leap")
+    check("a completed crossing is still worth exactly one",
+          TransitionResult(kind="x", crossed=True, approach=1.0).components["crossed"] == 1.0,
+          "the gate is unchanged where it mattered")
+
+
 def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     """The standard must get harder as the population improves, without making
     the record incomparable.
@@ -1740,6 +1801,7 @@ def main() -> int:
     test_no_dataclass_can_raise_on_equality()
     test_arriving_somewhere_is_not_one_lucky_timestep()
     test_transitions_are_graded_not_pass_fail()
+    test_an_attempted_takeoff_outscores_never_leaving_the_ground()
     test_judge_ladder_is_fixed_and_bar_only_tightens()
     test_auditor_can_invalidate_and_veto()
     test_critic_learns_the_exploit_signature()
