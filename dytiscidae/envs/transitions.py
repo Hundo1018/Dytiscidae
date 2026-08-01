@@ -72,6 +72,34 @@ from .triphibian import Domain, TriphibianEnv
 #: itself from rest to trim speed on the ground.  They have no ground run, no
 #: jump, and not enough flapping thrust to hover out of it.
 #:
+#: What takeoff would take, measured rather than argued:
+#:
+#:     plan      W/S   v_trim   助跑@T/W=1   靜止拍翅升力
+#:     ray        51    11.8      7.1 m         0.03 W
+#:     gannet     86    13.3      9.1 m         0.06 W
+#:     bat        86    15.8     12.8 m         0.01 W
+#:     beetle    167    17.8     16.2 m         0.07 W
+#:
+#: Reaching trim speed costs 333 to 4701 J, which even at a thrust equal to the
+#: machine's own weight is a 7 to 46 m ground run.  Nothing here produces
+#: anything like that thrust: standing still and flapping, the best of them
+#: lifts 7% of its weight.
+#:
+#: The obvious escape -- flap harder -- does not exist.  Swept on the beetle,
+#: the only real flapper, at full stroke amplitude:
+#:
+#:     2.2 Hz  0.19 W   219 W   structure ok
+#:     5.0 Hz  0.17 W   484 W   structure ok
+#:    10.0 Hz  0.11 W   673 W   structure ok
+#:    16.0 Hz  0.07 W   750 W   spar fails, margin -0.36
+#:
+#: Amplitude roughly triples lift; frequency *reduces* it while quadrupling the
+#: power and eventually breaking the spar, which is the f^2 inertial load doing
+#: exactly what the structural check exists to catch.  So the two knobs the
+#: genome has are already at their best at 0.19 W, five times short of hovering,
+#: and no amount of tuning gets there.  Takeoff needs a different machine --
+#: far lower wing loading or far lighter -- not a better-tuned one.
+#:
 #: So takeoff is the binding constraint on the whole mission, and it is the same
 #: shape of problem as flight was before the gannet: a capability nothing in the
 #: seed set has, which the search must therefore cross a valley to reach rather
