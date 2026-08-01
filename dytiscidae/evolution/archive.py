@@ -351,14 +351,27 @@ class Archive:
     # --------------------------------------------------------------- storage
 
     def save(self, path: str | Path) -> None:
+        """Write the archive, atomically.
+
+        Through a temp file and a rename, because this is the one artefact of a
+        run that cannot be recomputed -- every cell in it is an evaluation
+        somebody paid seconds of simulation for -- and the environments this
+        runs in are reclaimed without warning.  A plain ``open(path, "wb")``
+        truncates the previous checkpoint before writing the new one, so a
+        machine that goes away mid-write leaves neither: a run that has been
+        going for hours is destroyed by an interruption that lands in the
+        wrong millisecond.  A rename cannot half-happen.
+        """
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "wb") as f:
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        with open(tmp, "wb") as f:
             pickle.dump(
                 {"axes": self.axes, "cells": self.cells, "generation": self.generation,
                  "history": self.history, "tainted": self.tainted},
                 f,
             )
+        tmp.replace(path)
 
     @staticmethod
     def load(path: str | Path) -> "Archive":
