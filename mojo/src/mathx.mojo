@@ -198,6 +198,27 @@ def sind(x: Float64) -> Float64:
 
 
 @always_inline
+def cosd(x: Float64) -> Float64:
+    """cos for device code, double precision.
+
+    Same reduction as `sind` with the quadrant table rotated, rather than
+    sind(x + pi/2) -- adding pi/2 first would round the argument before the
+    Cody-Waite split could protect it.
+    """
+    var n = Int(round(x * TWO_OVER_PI))
+    var qn = Float64(n)
+    var r = (x - qn * PIO2_HI) - qn * PIO2_LO
+    var quad = n & 3
+    if quad == 0:
+        return _cos_poly(r)
+    if quad == 1:
+        return -_sin_poly(r)
+    if quad == 2:
+        return -_cos_poly(r)
+    return _sin_poly(r)
+
+
+@always_inline
 def expd(x: Float64) -> Float64:
     """exp for device code, double precision."""
     if x > 709.0:
@@ -304,6 +325,19 @@ def logd(x: Float64) -> Float64:
 @always_inline
 def log10d(x: Float64) -> Float64:
     return logd(x) * INV_LN10
+
+
+@always_inline
+def powd(x: Float64, y: Float64) -> Float64:
+    """x**y for positive x.  Only used for re**0.2, so no negative-base case."""
+    if x <= 0.0:
+        return 0.0
+    return expd(y * logd(x))
+
+
+@always_inline
+def clampd(x: Float64, lo: Float64, hi: Float64) -> Float64:
+    return lo if x < lo else (hi if x > hi else x)
 
 
 @always_inline

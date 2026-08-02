@@ -25,7 +25,7 @@ from std.gpu import global_idx
 from std.gpu.host import DeviceContext, DeviceBuffer
 from std.math import ceildiv, sqrt, abs
 from std.python import PythonObject
-from mathx import atan2d
+from mathx import atan2d, sind, cosd, expd, logd, log10d, powd, clampd
 from std.python.bindings import PythonModuleBuilder
 
 comptime BLOCK = 128
@@ -94,6 +94,79 @@ def kin_kernel(
     normal_w[unsafe_offset=j + 1] = m3 * nx + m4 * ny + m5 * nz
     normal_w[unsafe_offset=j + 2] = m6 * nx + m7 * ny + m8 * nz
 
+
+
+comptime PI_D: Float64 = 3.14159265358979323846
+comptime DEG: Float64 = PI_D / 180.0
+
+
+@always_inline
+def _skin_friction_cd(re_in: Float64) -> Float64:
+    """`fluid.py:241-253`.  Blasius blended into the 1/7-power law."""
+    var re = re_in if re_in > 1.0 else 1.0
+    var lam = 1.328 / sqrt(re)
+    var turb = 0.074 / powd(re, 0.2)
+    var w = 1.0 / (1.0 + expd(-(log10d(re) - 5.7) * 4.0))
+    return 2.0 * ((1.0 - w) * lam + w * turb)
+
+
+@always_inline
+def _lift_coefficient(
+    alpha: Float64, re: Float64, ar: Float64, reduced_freq: Float64
+) -> Float64:
+    """`fluid.py:256-289`.  Attached, LEV-augmented and post-stall."""
+    var lev = clampd(reduced_freq / 0.30, 0.0, 1.0)
+    var cl_max = 1.10 + 0.80 * lev
+    var re_c = re if re > 10.0 else 10.0
+    var stall = (11.0 + 26.0 * lev) * DEG
+    stall = stall * clampd(0.55 + 0.45 * log10d(re_c) / 5.0, 0.5, 1.0)
+
+    var ar_c = ar if ar > 0.5 else 0.5
+    var cl_linear = (2.0 * PI_D / (1.0 + 2.0 / ar_c)) * alpha
+    var cl_plate = cl_max * sind(2.0 * alpha)
+
+    var blend = 6.0 * DEG
+    var w = 1.0 / (1.0 + expd(-(abs(alpha) - stall) / blend))
+    var cl = (1.0 - w) * cl_linear + w * cl_plate
+    return clampd(cl, -1.2 * cl_max, 1.2 * cl_max)
+
+
+@always_inline
+def _drag_coefficient(
+    alpha: Float64, re: Float64, ar: Float64, cl: Float64
+) -> Float64:
+    """`fluid.py:292-305`.  Profile, induced and separated."""
+    var ar_c = ar if ar > 0.5 else 0.5
+    var cd_i = cl * cl / (PI_D * 0.75 * ar_c)
+    var cd_p = 1.98 * (1.0 - cosd(2.0 * alpha)) * 0.5
+    return _skin_friction_cd(re) + cd_i + cd_p
+
+
+def coeff_kernel(
+    alpha: UnsafePointer[Float64, MutAnyOrigin],
+    re: UnsafePointer[Float64, MutAnyOrigin],
+    ar: UnsafePointer[Float64, MutAnyOrigin],
+    rf: UnsafePointer[Float64, MutAnyOrigin],
+    is_wing: UnsafePointer[Int32, MutAnyOrigin],
+    cl_out: UnsafePointer[Float64, MutAnyOrigin],
+    cd_out: UnsafePointer[Float64, MutAnyOrigin],
+    n: Int32,
+):
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    # np.where(is_wing, ..., 0.0): bluff elements get their drag from the
+    # cross-flow model instead, not from strip theory.
+    if is_wing[unsafe_offset=i] == 0:
+        cl_out[unsafe_offset=i] = 0.0
+        cd_out[unsafe_offset=i] = 0.0
+        return
+    var a = alpha[unsafe_offset=i]
+    var r = re[unsafe_offset=i]
+    var arv = ar[unsafe_offset=i]
+    var cl = _lift_coefficient(a, r, arv, rf[unsafe_offset=i])
+    cl_out[unsafe_offset=i] = cl
+    cd_out[unsafe_offset=i] = _drag_coefficient(a, r, arv, cl)
 
 
 @always_inline
@@ -348,12 +421,53 @@ def strip_theory(desc: PythonObject) raises -> PythonObject:
     return PythonObject(n)
 
 
+def coefficients(desc: PythonObject) raises -> PythonObject:
+    """Lift and drag coefficients on the GPU.
+
+    `desc` (int64): alpha, re, ar, reduced_freq, is_wing, cl_out, cd_out, n
+    """
+    var d = UnsafePointer[Int64, MutAnyOrigin](
+        unsafe_from_address=Int(py=desc.ctypes.data)
+    )
+    var n = Int(d[unsafe_offset=7])
+    var ctx = DeviceContext()
+
+    var alpha = _f64(ctx, Int(d[unsafe_offset=0]), n)
+    var re = _f64(ctx, Int(d[unsafe_offset=1]), n)
+    var ar = _f64(ctx, Int(d[unsafe_offset=2]), n)
+    var rf = _f64(ctx, Int(d[unsafe_offset=3]), n)
+
+    var wing = ctx.enqueue_create_buffer[DType.int32](n)
+    ctx.enqueue_copy(
+        dst_buf=wing,
+        src_ptr=UnsafePointer[Int32, MutAnyOrigin](
+            unsafe_from_address=Int(d[unsafe_offset=4])
+        ),
+    )
+
+    var cl = ctx.enqueue_create_buffer[DType.float64](n)
+    var cd = ctx.enqueue_create_buffer[DType.float64](n)
+
+    ctx.enqueue_function[coeff_kernel](
+        alpha.unsafe_ptr(), re.unsafe_ptr(), ar.unsafe_ptr(), rf.unsafe_ptr(),
+        wing.unsafe_ptr(), cl.unsafe_ptr(), cd.unsafe_ptr(),
+        Int32(n),
+        grid_dim=ceildiv(n, BLOCK),
+        block_dim=BLOCK,
+    )
+    _dl(ctx, cl, Int(d[unsafe_offset=5]))
+    _dl(ctx, cd, Int(d[unsafe_offset=6]))
+    ctx.synchronize()
+    return PythonObject(n)
+
+
 @export
 def PyInit_fluid_gpu() abi("C") -> PythonObject:
     try:
         var m = PythonModuleBuilder("fluid_gpu")
         m.def_function[body_to_world]("body_to_world")
         m.def_function[strip_theory]("strip_theory")
+        m.def_function[coefficients]("coefficients")
         return m.finalize()
     except e:
         abort(String("failed to create module: ", e))
