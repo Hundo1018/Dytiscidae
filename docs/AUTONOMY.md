@@ -125,6 +125,14 @@ deformation, then wake coupling.
 
 ---
 
+## Related
+
+Four of the items here were also constrained by the four-core container rather
+than by the idea, and the learned descriptors in §3 appear on both lists. The
+compute-driven decisions are separated out in
+[CPU_LEGACY.md](CPU_LEGACY.md), because "not done yet" and "could not afford it"
+want different arguments to reopen.
+
 ## Order of work
 
 1. Continuous traits replacing the kind taxonomy (unblocks 2 and most of 4).

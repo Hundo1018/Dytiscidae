@@ -38,7 +38,12 @@ genome  ──►  phenotype  ──►  MJCF + panels  ──►  three-tier ev
 * **Everything is observable**: JSONL telemetry, a self-contained HTML
   dashboard, and offscreen video of elites.
 
-Nothing requires a GPU. Developed and tested on 4 CPU cores.
+Developed and tested on 4 CPU cores with no accelerator. That constraint shaped
+more of the design than it appears to, and it no longer holds — every decision
+that was made for it is listed as outstanding work in
+[docs/CPU_LEGACY.md](docs/CPU_LEGACY.md). The largest is that the controller is
+not trained at all in the loop (`controller_refine_steps` defaults to 0), so the
+runs so far selected bodies on the strength of an untrained controller.
 
 ---
 
