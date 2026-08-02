@@ -99,10 +99,34 @@ Done:
   seven morphologies concatenated into a single 554-panel launch**, which is
   the batching premise demonstrated rather than assumed.
 
+- `fluid_gpu.strip_theory` — `fluid.py:462-487`. All seven outputs at machine
+  epsilon (worst 7.9e-16 relative).
+- `mathx.atan2d` — double-precision `atan2`, 4.4e-16 rad.
+
+### Device math, measured
+
+| | float32 | float64 |
+|---|---|---|
+| `sin` `cos` `exp` `log` `log10` `sqrt` | links | **compile error** |
+| `atan` `atan2` | link error | link error |
+
+Float64 *arithmetic* is fine — only the transcendentals are absent, which is
+why `mathx` can hold double precision by using polynomials instead of calls.
+
+This decides the shape of the next slice. `lift_coefficient` needs `log10`,
+`sin` and `exp`; `drag_coefficient` needs more. Either they run in float32,
+costing ~1e-7 relative where the solver itself is good to ~30%, or `mathx`
+grows float64 versions of all three. The first is cheap and physically
+irrelevant; the second keeps the machine-epsilon validation standard that has
+caught two real bugs so far — the epsilon-placement error in `alpha`, and
+before that a whole class of sign bug in the Python. The standard is worth more
+than the precision.
+
 Next, in dependency order:
 
-1. The rest of `fluid.apply` — strip theory, lift/drag coefficients, added
-   mass, the body scatter. `np.add.at` at `fluid.py:698` becomes an atomic.
+1. Float64 `sin`, `exp`, `log10` in `mathx`, each pinned like `atan2d`.
+2. `lift_coefficient` and `drag_coefficient`, then bluff-body drag, added mass
+   and the body scatter — `np.add.at` at `fluid.py:698` becomes an atomic.
 2. **The batched evaluator.** Until N machines step in lockstep in one process
    this port cannot pay: per call it allocates buffers, launches, and round
    trips for one machine's ~70 panels, which is far below break-even. This is
