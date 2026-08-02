@@ -23,8 +23,9 @@ fp64 at 1/32 rate, so this is a correctness-first choice, not a speed one.
 from std.os import abort
 from std.gpu import global_idx
 from std.gpu.host import DeviceContext, DeviceBuffer
-from std.math import ceildiv
+from std.math import ceildiv, sqrt, abs
 from std.python import PythonObject
+from mathx import atan2d
 from std.python.bindings import PythonModuleBuilder
 
 comptime BLOCK = 128
@@ -92,6 +93,119 @@ def kin_kernel(
     normal_w[unsafe_offset=j + 0] = m0 * nx + m1 * ny + m2 * nz
     normal_w[unsafe_offset=j + 1] = m3 * nx + m4 * ny + m5 * nz
     normal_w[unsafe_offset=j + 2] = m6 * nx + m7 * ny + m8 * nz
+
+
+
+@always_inline
+def _dl(ctx: DeviceContext, buf: DeviceBufferF64, addr: Int) raises:
+    """Download a device buffer straight into a host address."""
+    ctx.enqueue_copy(
+        dst_ptr=UnsafePointer[Float64, MutAnyOrigin](unsafe_from_address=addr),
+        src_buf=buf,
+    )
+
+
+def strip_kernel(
+    v_rel: UnsafePointer[Float64, MutAnyOrigin],
+    s_hat: UnsafePointer[Float64, MutAnyOrigin],
+    c_hat: UnsafePointer[Float64, MutAnyOrigin],
+    n_hat: UnsafePointer[Float64, MutAnyOrigin],
+    omega: UnsafePointer[Float64, MutAnyOrigin],
+    rho: UnsafePointer[Float64, MutAnyOrigin],
+    mu: UnsafePointer[Float64, MutAnyOrigin],
+    chord: UnsafePointer[Float64, MutAnyOrigin],
+    camber: UnsafePointer[Float64, MutAnyOrigin],
+    u_out: UnsafePointer[Float64, MutAnyOrigin],
+    d_hat: UnsafePointer[Float64, MutAnyOrigin],
+    q_out: UnsafePointer[Float64, MutAnyOrigin],
+    re_out: UnsafePointer[Float64, MutAnyOrigin],
+    alpha_out: UnsafePointer[Float64, MutAnyOrigin],
+    rf_out: UnsafePointer[Float64, MutAnyOrigin],
+    lift_axis: UnsafePointer[Float64, MutAnyOrigin],
+    n: Int32,
+):
+    """Strip theory, `fluid.py:462-487`.  One thread per panel."""
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    var j = i * 3
+
+    var vx = v_rel[unsafe_offset=j + 0]
+    var vy = v_rel[unsafe_offset=j + 1]
+    var vz = v_rel[unsafe_offset=j + 2]
+    var sx = s_hat[unsafe_offset=j + 0]
+    var sy = s_hat[unsafe_offset=j + 1]
+    var sz = s_hat[unsafe_offset=j + 2]
+
+    # Project the spanwise component out: strip theory is a 2D section, and
+    # flow along the span does not turn the section.
+    var vs = vx * sx + vy * sy + vz * sz
+    var ax = vx - vs * sx
+    var ay = vy - vs * sy
+    var az = vz - vs * sz
+
+    var uu = sqrt(ax * ax + ay * ay + az * az)
+    var u_safe = uu if uu > 1e-6 else 1e-6
+    u_out[unsafe_offset=i] = uu
+
+    var dx = ax / u_safe
+    var dy = ay / u_safe
+    var dz = az / u_safe
+    d_hat[unsafe_offset=j + 0] = dx
+    d_hat[unsafe_offset=j + 1] = dy
+    d_hat[unsafe_offset=j + 2] = dz
+
+    var r = rho[unsafe_offset=i]
+    var m = mu[unsafe_offset=i]
+    var ch = chord[unsafe_offset=i]
+    q_out[unsafe_offset=i] = 0.5 * r * uu * uu
+    re_out[unsafe_offset=i] = r * uu * ch / (m if m > 1e-12 else 1e-12)
+
+    var cos_a = (
+        ax * c_hat[unsafe_offset=j + 0]
+        + ay * c_hat[unsafe_offset=j + 1]
+        + az * c_hat[unsafe_offset=j + 2]
+    ) / u_safe
+    var sin_a = (
+        ax * n_hat[unsafe_offset=j + 0]
+        + ay * n_hat[unsafe_offset=j + 1]
+        + az * n_hat[unsafe_offset=j + 2]
+    ) / u_safe
+
+    # The Python folds incidence into [-pi/2, pi/2] as
+    #     atan2(sin(atan2(s,c)), |cos(atan2(s,c))| + eps)
+    # which collapses exactly to atan2(s, |c| + eps): atan2 is invariant under
+    # positive scaling, and sin/cos of an atan2 are just its arguments over
+    # their hypotenuse.  Worth collapsing rather than transcribing -- sin and
+    # cos do not link in float64 on device, and this needs neither.
+    # ...but the epsilon has to be added to the *normalised* cosine, which is
+    # what sin()/cos() of the first atan2 return.  Adding it to the raw dot
+    # product instead scales it by the hypotenuse -- atan2(s/r, |c|/r + e) is
+    # atan2(s, |c| + e*r), not atan2(s, |c| + e) -- and near 90 degrees of
+    # incidence, where the cosine vanishes, that moved alpha by up to 1e-9 rad.
+    # Harmless physically, but it is a difference with a cause, so it is
+    # removed rather than absorbed into a tolerance.
+    var hyp = sqrt(sin_a * sin_a + cos_a * cos_a)
+    var hyp_safe = hyp if hyp > 1e-300 else 1e-300
+    var alpha = atan2d(sin_a / hyp_safe, abs(cos_a) / hyp_safe + 1e-12)
+    alpha_out[unsafe_offset=i] = alpha + 2.0 * camber[unsafe_offset=i]
+
+    var ws = (
+        omega[unsafe_offset=j + 0] * sx
+        + omega[unsafe_offset=j + 1] * sy
+        + omega[unsafe_offset=j + 2] * sz
+    )
+    rf_out[unsafe_offset=i] = abs(ws) * ch / (2.0 * u_safe)
+
+    # lift acts normal to both the span and the flow
+    var lx = sy * dz - sz * dy
+    var ly = sz * dx - sx * dz
+    var lz = sx * dy - sy * dx
+    var ln = sqrt(lx * lx + ly * ly + lz * lz)
+    var ln_safe = ln if ln > 1e-12 else 1e-12
+    lift_axis[unsafe_offset=j + 0] = lx / ln_safe
+    lift_axis[unsafe_offset=j + 1] = ly / ln_safe
+    lift_axis[unsafe_offset=j + 2] = lz / ln_safe
 
 
 @always_inline
@@ -179,11 +293,67 @@ def body_to_world(desc: PythonObject) raises -> PythonObject:
     return PythonObject(n)
 
 
+def strip_theory(desc: PythonObject) raises -> PythonObject:
+    """Run strip theory on the GPU.
+
+    `desc` layout (int64):
+        0..8   v_rel, s_hat, c_hat, n_hat, omega, rho, mu, chord, camber
+        9..15  U, d_hat, q, re, alpha, reduced_freq, lift_axis
+        16     n
+    """
+    var d = UnsafePointer[Int64, MutAnyOrigin](
+        unsafe_from_address=Int(py=desc.ctypes.data)
+    )
+    var n = Int(d[unsafe_offset=16])
+    var ctx = DeviceContext()
+
+    var v_rel = _f64(ctx, Int(d[unsafe_offset=0]), n * 3)
+    var s_hat = _f64(ctx, Int(d[unsafe_offset=1]), n * 3)
+    var c_hat = _f64(ctx, Int(d[unsafe_offset=2]), n * 3)
+    var n_hat = _f64(ctx, Int(d[unsafe_offset=3]), n * 3)
+    var omega = _f64(ctx, Int(d[unsafe_offset=4]), n * 3)
+    var rho = _f64(ctx, Int(d[unsafe_offset=5]), n)
+    var mu = _f64(ctx, Int(d[unsafe_offset=6]), n)
+    var chord = _f64(ctx, Int(d[unsafe_offset=7]), n)
+    var camber = _f64(ctx, Int(d[unsafe_offset=8]), n)
+
+    var u_o = ctx.enqueue_create_buffer[DType.float64](n)
+    var d_o = ctx.enqueue_create_buffer[DType.float64](n * 3)
+    var q_o = ctx.enqueue_create_buffer[DType.float64](n)
+    var re_o = ctx.enqueue_create_buffer[DType.float64](n)
+    var a_o = ctx.enqueue_create_buffer[DType.float64](n)
+    var rf_o = ctx.enqueue_create_buffer[DType.float64](n)
+    var la_o = ctx.enqueue_create_buffer[DType.float64](n * 3)
+
+    ctx.enqueue_function[strip_kernel](
+        v_rel.unsafe_ptr(), s_hat.unsafe_ptr(), c_hat.unsafe_ptr(),
+        n_hat.unsafe_ptr(), omega.unsafe_ptr(), rho.unsafe_ptr(),
+        mu.unsafe_ptr(), chord.unsafe_ptr(), camber.unsafe_ptr(),
+        u_o.unsafe_ptr(), d_o.unsafe_ptr(), q_o.unsafe_ptr(),
+        re_o.unsafe_ptr(), a_o.unsafe_ptr(), rf_o.unsafe_ptr(),
+        la_o.unsafe_ptr(),
+        Int32(n),
+        grid_dim=ceildiv(n, BLOCK),
+        block_dim=BLOCK,
+    )
+
+    _dl(ctx, u_o, Int(d[unsafe_offset=9]))
+    _dl(ctx, d_o, Int(d[unsafe_offset=10]))
+    _dl(ctx, q_o, Int(d[unsafe_offset=11]))
+    _dl(ctx, re_o, Int(d[unsafe_offset=12]))
+    _dl(ctx, a_o, Int(d[unsafe_offset=13]))
+    _dl(ctx, rf_o, Int(d[unsafe_offset=14]))
+    _dl(ctx, la_o, Int(d[unsafe_offset=15]))
+    ctx.synchronize()
+    return PythonObject(n)
+
+
 @export
 def PyInit_fluid_gpu() abi("C") -> PythonObject:
     try:
         var m = PythonModuleBuilder("fluid_gpu")
         m.def_function[body_to_world]("body_to_world")
+        m.def_function[strip_theory]("strip_theory")
         return m.finalize()
     except e:
         abort(String("failed to create module: ", e))

@@ -8,7 +8,7 @@ these tests together rather than loosening them.
 from std.math import abs, atan2
 from std.testing import assert_true, TestSuite
 
-from mathx import atan2f, PI
+from mathx import atan2f, atan2d, PI
 
 
 def _worst_error() -> Float32:
@@ -48,6 +48,27 @@ def test_atan2_quadrants() raises:
     assert_true(atan2f(1.0, -1.0) > PI / 2.0, "Q2")
     assert_true(atan2f(-1.0, -1.0) < -PI / 2.0, "Q3")
     assert_true(atan2f(-1.0, 1.0) < 0.0, "Q4")
+
+
+def test_atan2d_is_double_precision() raises:
+    """The float64 path exists so the ported solver can stay bit-comparable."""
+    var worst: Float64 = 0.0
+    comptime N = 20000
+    for i in range(N):
+        # Sweep magnitudes as well as angles: the pi/8 reduction and the swap
+        # both have seams, and a uniform sweep misses them.
+        var x = Float64((i % 211) - 105) * (1.0 + Float64(i % 7))
+        var y = Float64(((i * 13) % 223) - 111) * (1.0 + Float64(i % 5))
+        var got = atan2d(y, x)
+        var expected = atan2(y, x)
+        var e = abs(got - expected)
+        var wrapped = abs(e - 2.0 * Float64(PI))
+        if wrapped < e:
+            e = wrapped
+        if e > worst:
+            worst = e
+    print("worst atan2d error:", worst, "rad")
+    assert_true(worst < 1e-14, "atan2d is not double precision")
 
 
 def main() raises:
