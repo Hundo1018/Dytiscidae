@@ -1343,6 +1343,67 @@ def test_critic_learns_the_exploit_signature() -> None:
           f"calibration {blind.calibration:.2f}, discount x{blind.discount(np.zeros(16)):.3f}")
 
 
+def test_the_island_objective_takes_its_weight_back() -> None:
+    """The blend between curriculum and island objective must not be a constant.
+
+    It was a flat 0.5 below stage 4, and on the 500-generation runs that meant
+    the *air* island was selecting almost entirely on a score that does not read
+    air.  Measured: its champion had air competence 0.107, so the island
+    objective -- competence**1.5 -- could contribute at most 0.035 against a
+    stored fitness of 0.5019.  96% of the pressure came from the island-blind
+    half, and the island filled with wingless water specialists.
+
+    Islands are an early device: grow terrain-adapted genes fast, keep a dark
+    horse alive long enough to show itself.  By the end the target is a
+    triphibian again, so the island's own objective has to come back.
+    """
+    print("\ncurriculum: the island objective takes its weight back")
+    from dytiscidae.evolution.curriculum import N_STAGES, Curriculum
+
+    c = Curriculum()
+    check("with no evidence the blend still starts on the curriculum",
+          c.handover(0) == 0.0,
+          f"stage 0 hands over {c.handover(0):.2f} of the weight")
+    check("and the top of the ladder is the island's outright",
+          c.handover(N_STAGES - 1) == 1.0, "stage 4 -> 1.0")
+    check("the stage ramp is monotone",
+          all(c.handover(s) <= c.handover(s + 1) for s in range(N_STAGES - 1)),
+          " ".join(f"{c.handover(s):.2f}" for s in range(N_STAGES)))
+
+    # The pathological case, with the real numbers: an island objective pinned
+    # near 0.03 with no spread, against a curriculum score that varies.  The
+    # island has earned nothing and must not be handed the weight.
+    flat = Curriculum()
+    for i in range(64):
+        flat.observe_blend(0.035, 0.2 + 0.8 * (i % 8) / 7.0)
+    check("an island objective that discriminates nothing earns nothing",
+          flat.handover(1) <= 0.25 + 1e-9,
+          f"stage-1 handover {flat.handover(1):.3f}, i.e. the stage floor only")
+
+    # And the case it exists for: the island objective is now the thing telling
+    # designs apart, so it should take the weight even at a low stage.
+    sharp = Curriculum()
+    for i in range(64):
+        sharp.observe_blend(0.05 + 0.9 * (i % 8) / 7.0, 0.98)
+    check("an island objective that does discriminate takes the weight early",
+          sharp.handover(1) > 0.7,
+          f"stage-1 handover {sharp.handover(1):.3f} on a flat curriculum")
+
+    # Ratchet, matching the judge: handing back would let a population dip
+    # re-earn the easy score.
+    before = sharp.handover(1)
+    for _ in range(300):
+        sharp.observe_blend(0.05, 0.98)
+    check("and having handed over it does not hand back",
+          sharp.handover(1) >= before - 1e-9,
+          f"{before:.3f} -> {sharp.handover(1):.3f} after the spread collapses")
+
+    check("the blend is in the record, since it moves",
+          {"handover", "handover_typical"} <= set(
+              Curriculum(stages={(0, 0, 0, 0): 1}).report()),
+          "report() carries handover")
+
+
 def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> None:
     """A design that is good at one thing must be distinguishable from a design
     that is good at nothing.
@@ -1805,6 +1866,7 @@ def main() -> int:
     test_judge_ladder_is_fixed_and_bar_only_tightens()
     test_auditor_can_invalidate_and_veto()
     test_critic_learns_the_exploit_signature()
+    test_the_island_objective_takes_its_weight_back()
     test_curriculum_and_islands_give_gradient_where_the_mission_gives_none()
     test_scout_finds_dark_horses_and_may_only_protect()
     test_a_run_can_be_picked_up_where_it_stopped()

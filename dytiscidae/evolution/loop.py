@@ -355,8 +355,14 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     # curriculum's projection replaces the island's, because the island's
     # objective is the *final* question and asking it of a design three stages
     # away is the sparse-reward trap this exists to avoid.
-    if sr.stage < 4:
-        base = float(0.5 * base + 0.5 * sr.score)
+    # How much of the blend the island's own objective has earned, rather than a
+    # flat half.  See Curriculum.handover: the islands are an early device and
+    # the search is looking for a triphibian again by the end, so the weight has
+    # to move.  A fixed 0.5 left the air island selecting 96% on a score that
+    # does not read air.
+    state.curriculum.observe_blend(base, sr.score)
+    w = state.curriculum.handover(sr.stage)
+    base = float(w * base + (1.0 - w) * sr.score)
     cfeat = critic_features(_meta_light(pheno, result), result)
     discount = state.critic.discount(cfeat) if state.critic is not None else 1.0
     fit = float(base * discount)
@@ -753,6 +759,21 @@ def load_state(state: SearchState) -> int:
             setattr(state, attr, d[attr])
     if d.get("curricula"):
         state.curricula.update(d["curricula"])
+        # A checkpoint written before the blend became a moving quantity has
+        # Curriculum objects with no handover state at all -- unpickling a
+        # dataclass restores the attributes it was saved with, not the ones the
+        # class has now, so the defaults never run.  Resuming such a run would
+        # die on the first scoring call.  Restoring at zero is also the right
+        # answer rather than merely a safe one: the handover is evidence about
+        # the population, that evidence was never gathered, and it re-earns
+        # itself within a window.
+        for cur in state.curricula.values():
+            if not hasattr(cur, "_handover"):
+                cur._handover = 0.0
+            if not hasattr(cur, "_recent"):
+                cur._recent = []
+            if not hasattr(cur, "window"):
+                cur.window = 256
     state.judge_moves = list(d.get("judge_moves", []))
     for name, cur in (d.get("curators") or {}).items():
         if name in state.archipelago.curators:

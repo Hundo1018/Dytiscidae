@@ -156,8 +156,72 @@ class Curriculum:
     promotions: int = 0
     demotions: int = 0
 
+    #: Recent (island_score, curriculum_score) pairs, used to decide how much of
+    #: the blend the island's own objective has earned.  Bounded window: this is
+    #: a question about the population now, not about the whole run.
+    _recent: list = field(default_factory=list)
+    #: The handover, ratcheted.  See ``handover``.
+    _handover: float = 0.0
+    window: int = 256
+
     def stage_of(self, cell) -> int:
         return int(self.stages.get(tuple(cell), 0))
+
+    def observe_blend(self, island_score: float, curriculum_score: float) -> None:
+        """Record what each half of the blend said about one design."""
+        self._recent.append((float(island_score), float(curriculum_score)))
+        if len(self._recent) > self.window:
+            del self._recent[: len(self._recent) - self.window]
+
+    def handover(self, stage: int) -> float:
+        """How much weight the island's own objective has earned, in [0, 1].
+
+        The islands are an *early* device.  They exist to grow terrain-adapted
+        genes quickly and to stop a dark horse -- good at nothing yet, promising
+        -- from being culled before it can show what it is.  Late in a run the
+        thing being searched for is a triphibian again, so the island's own
+        objective has to take the weight back.
+
+        It used to be a flat 0.5 below stage 4, and that constant was doing real
+        damage.  Measured on the 500-generation runs, the air island's champion
+        had air competence 0.107 while its stored fitness was 0.5019: the island
+        objective, ``competence**1.5``, could contribute at most 0.035, so 96% of
+        the selection pressure on the *air* island came from a score that does
+        not look at air at all.  Every stage below 4 reads the design's *best*
+        medium regardless of island, and since water competence reaches 0.9 where
+        air reaches 0.1, the island-blind half rewarded water everywhere.  The
+        air island filled with wingless water specialists.
+
+        So the weight is evidence now, in the shape the judge already uses: a
+        fixed ladder for what is measured, a population statistic for where the
+        line sits, and a ratchet so it only ever moves one way.
+
+        The evidence is which half is actually *discriminating*.  A score that
+        gives every design the same number selects nothing, whatever its
+        magnitude.  Comparing the two spreads is deliberately scale-free --
+        island scores here live near 0.03 and curriculum scores near 1.0, so any
+        absolute threshold would have been another typed constant, and choosing
+        it would have been the same mistake in a new place.
+
+        The stage ramp is the floor rather than the whole rule, so a cell that
+        has climbed the ladder hands over even if the spreads have not yet
+        separated, and evidence can only ever hand over *faster*.
+        """
+        if stage >= N_STAGES - 1:
+            return 1.0
+        floor = stage / float(N_STAGES - 1)
+        if len(self._recent) >= 16:
+            isl = np.array([a for a, _ in self._recent], float)
+            cur = np.array([b for _, b in self._recent], float)
+            # p90-p10 rather than std: robust to the outliers a MAP-Elites
+            # population always has, and it is the spread that matters, not the
+            # shape.
+            si = float(np.percentile(isl, 90) - np.percentile(isl, 10))
+            sc = float(np.percentile(cur, 90) - np.percentile(cur, 10))
+            if si + sc > 1e-12:
+                earned = si / (si + sc)
+                self._handover = max(self._handover, earned)
+        return float(np.clip(max(floor, self._handover), 0.0, 1.0))
 
     def evaluate(self, cell, result, transitions=None) -> StageResult:
         """Score a design at its cell's stage, and at the next one up."""
@@ -220,4 +284,8 @@ class Curriculum:
             # that had since been removed as well as those still present.
             "reached": vals[-1],
             "typical": vals[len(vals) // 2],
+            # The blend is now a moving quantity, so it has to be in the record
+            # or a later reading of a run cannot tell what it was scored on.
+            "handover": round(self._handover, 4),
+            "handover_typical": round(self.handover(vals[len(vals) // 2]), 4),
         }
