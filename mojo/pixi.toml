@@ -1,0 +1,20 @@
+[workspace]
+name = "dytiscidae-mojo"
+channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+# `max` is required, not just `mojo-compiler`: the `layout` package that
+# provides TileTensor ships with MAX, and without it every GPU source fails
+# with "unable to locate module 'layout'".
+mojo-compiler = ">=1.0.0b"
+max = "*"
+python = "3.12.*"
+numpy = "*"
+
+[tasks]
+# Always go through pixi.  Invoking .pixi/envs/default/bin/mojo directly does
+# not load the prelude -- even `print` comes back as "use of unknown
+# declaration", which reads like a syntax error and is not one.
+probe = "mojo run -I src src/gpu_probe.mojo"
+test = "mojo run -I src tests/test_mathx.mojo"
