@@ -16,7 +16,7 @@ import fluid_gpu
 
 from dytiscidae.core.bodyplans import BODY_PLANS
 from dytiscidae.core.phenotype import build
-from dytiscidae.envs.triphibian import TriphibianEnv
+from dytiscidae.envs.triphibian import Domain, TriphibianEnv
 
 
 def numpy_reference(xpos, xmat, body_id, loc, span, chord, normal):
@@ -43,6 +43,33 @@ def run_gpu(xpos, xmat, body_id, loc, span, chord, normal):
     return outs
 
 
+def pose(env, seed):
+    """Put the machine in a real, non-degenerate attitude.
+
+    Without this the test is worthless: a freshly constructed TriphibianEnv has
+    never had mj_forward called, so `data.xmat` is all zeros and every rotation
+    in the comparison is a multiplication by zero.  The first version of this
+    test reported bit-exact agreement on all seven plans while proving nothing
+    -- it was comparing zeros to zeros.  Joint angles are randomised too, so the
+    bodies do not all share the root's orientation.
+    """
+    import mujoco
+
+    rng = np.random.default_rng(seed)
+    env.reset(Domain.WATER, randomise=False)
+    nq = env.model.nq
+    if nq >= 7:
+        # random unit quaternion for the free joint, random angles below it
+        q = rng.normal(size=4)
+        env.data.qpos[3:7] = q / np.linalg.norm(q)
+        env.data.qpos[0:3] = rng.normal(scale=2.0, size=3)
+    if nq > 7:
+        env.data.qpos[7:] = rng.uniform(-0.7, 0.7, nq - 7)
+    mujoco.mj_forward(env.model, env.data)
+    assert np.abs(env.data.xmat).max() > 0.5, "xmat still degenerate"
+    return env
+
+
 def case(name, env):
     p = env.solver.panels
     body_id = np.ascontiguousarray(p.body_id, dtype=np.int32)
@@ -67,11 +94,11 @@ def main():
     print(f"{'plan':10s} {'panels':>7s} {'max abs err':>12s}")
     envs = {}
     for nm, plan in BODY_PLANS.items():
-        env = TriphibianEnv(build(plan()))
+        env = pose(TriphibianEnv(build(plan())), seed=hash(nm) % 10000)
         envs[nm] = env
         n, worst = case(nm, env)
-        flag = "" if worst < 1e-12 else "   <-- MISMATCH"
-        if worst >= 1e-12:
+        flag = "" if worst < 1e-13 else "   <-- MISMATCH"
+        if worst >= 1e-13:
             failures.append(nm)
         print(f"{nm:10s} {n:7d} {worst:12.3e}{flag}")
 
@@ -105,14 +132,14 @@ def main():
     worst = max(float(np.abs(r - g).max()) for r, g in zip(ref, got))
     print(f"{len(names)} morphologies concatenated: {len(BI)} panels in one "
           f"launch, max abs err {worst:.3e}")
-    if worst >= 1e-12:
+    if worst >= 1e-13:
         failures.append("batched")
 
     print()
     if failures:
         print(f"FAILED: {', '.join(failures)}")
         return 1
-    print("all GPU kinematics checks passed (bit-exact against numpy)")
+    print("all GPU kinematics checks passed (< 1e-13 vs numpy einsum)")
     return 0
 
 

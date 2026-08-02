@@ -95,9 +95,14 @@ Done:
 
 - `mathx.atan2f` — device `atan2`, accuracy pinned at 1.17e-05 rad.
 - `fluid_gpu.body_to_world` — the kinematics block (`fluid.py:428-432`) on the
-  GPU. Bit-exact against numpy on all seven body plans, and **bit-exact on
-  seven morphologies concatenated into a single 554-panel launch**, which is
+  GPU. Agrees with numpy to 4.4e-16 on all seven body plans, and to 4.4e-16 on
+  **seven morphologies concatenated into a single 554-panel launch**, which is
   the batching premise demonstrated rather than assumed.
+
+  It is not bit-exact and cannot be: `np.einsum` does not sum left-to-right
+  (verified on numpy 2.5.1 for both `ni,ni->n` and `nij,nj->ni`), so a
+  three-term dot differs from the kernel's in the last bit. `np.linalg.norm`
+  *is* left-to-right, so norms do match bitwise.
 
 - `fluid_gpu.strip_theory` — `fluid.py:462-487`. All seven outputs at machine
   epsilon (worst 7.9e-16 relative).
