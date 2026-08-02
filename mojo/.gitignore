@@ -1,2 +1,4 @@
 .pixi/
 *.mojopkg
+build/
+__mojocache__/

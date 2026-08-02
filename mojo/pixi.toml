@@ -18,3 +18,6 @@ numpy = "*"
 # declaration", which reads like a syntax error and is not one.
 probe = "mojo run -I src src/gpu_probe.mojo"
 test = "mojo run -I src tests/test_mathx.mojo"
+# Build the Python extension.  The module name must match PyInit_<name> and the
+# filename, or the import fails with a bare "dynamic module does not define".
+build = "mojo build --emit shared-lib -I src src/fluid_gpu.mojo -o build/fluid_gpu.so"

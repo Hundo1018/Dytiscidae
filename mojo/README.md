@@ -76,3 +76,39 @@ underneath is good to perhaps 30%. It is pinned by `tests/test_mathx.mojo` at a
 conventions, buoyancy, orientation-dependent bluff drag and anisotropic added
 mass. The port is finished when those pass against the Mojo solver, which makes
 this a machine-checkable migration rather than a rewrite on faith.
+
+## Running the GPU validation
+
+```bash
+cd mojo && pixi run build          # produces build/fluid_gpu.so
+cd .. && PYTHONPATH=.:mojo/build .venv/bin/python mojo/tests/test_fluid_gpu.py
+```
+
+Two Pythons are in play and they are not interchangeable: the extension is
+built against the pixi environment's 3.12, and the test imports `dytiscidae`
+from the project venv. They happen to be ABI-compatible 3.12 builds, which is
+why one `PYTHONPATH` spanning both works.
+
+## Status
+
+Done:
+
+- `mathx.atan2f` — device `atan2`, accuracy pinned at 1.17e-05 rad.
+- `fluid_gpu.body_to_world` — the kinematics block (`fluid.py:428-432`) on the
+  GPU. Bit-exact against numpy on all seven body plans, and **bit-exact on
+  seven morphologies concatenated into a single 554-panel launch**, which is
+  the batching premise demonstrated rather than assumed.
+
+Next, in dependency order:
+
+1. The rest of `fluid.apply` — strip theory, lift/drag coefficients, added
+   mass, the body scatter. `np.add.at` at `fluid.py:698` becomes an atomic.
+2. **The batched evaluator.** Until N machines step in lockstep in one process
+   this port cannot pay: per call it allocates buffers, launches, and round
+   trips for one machine's ~70 panels, which is far below break-even. This is
+   the piece that turns a correct port into a fast one.
+3. Persistent device buffers owned by that evaluator, replacing the
+   allocate-per-call in `body_to_world`.
+
+Not moving: MuJoCo, `mj_objectVelocity`, and the `body_mass` write-back stay on
+the CPU.
