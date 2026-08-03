@@ -778,3 +778,57 @@ def PyInit_fluid_gpu() abi("C") -> PythonObject:
         return m.finalize()
     except e:
         abort(String("failed to create module: ", e))
+
+
+def velocity_kernel(
+    vel6: UnsafePointer[Float64, MutAnyOrigin],
+    xpos: UnsafePointer[Float64, MutAnyOrigin],
+    pos_w: UnsafePointer[Float64, MutAnyOrigin],
+    u_flow: UnsafePointer[Float64, MutAnyOrigin],
+    body_id: UnsafePointer[Int32, MutAnyOrigin],
+    omega_out: UnsafePointer[Float64, MutAnyOrigin],
+    vrel_out: UnsafePointer[Float64, MutAnyOrigin],
+    n: Int32,
+):
+    """Panel relative flow, `fluid.py:441-457`.
+
+    `vel6` is one 6-vector per body from mj_objectVelocity -- angular in 0..2,
+    linear in 3..5, both world frame at the body frame origin.  That call is a
+    per-body CPU loop and stays on the host; everything downstream of it is
+    per-panel and lands here.
+
+    The Python's comment at fluid.py:435-440 explains why data.cvel is not used
+    instead: its linear part is referenced to a com-based frame whose origin is
+    not the body frame origin, and reconstructing element velocity from it
+    disagreed with mj_objectVelocity by ~0.5 m/s.  Same reasoning applies here;
+    this kernel consumes what that loop produced rather than trying to be
+    clever with cvel on the device.
+    """
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    var j = i * 3
+    var b = Int(body_id[unsafe_offset=i])
+    var v6 = b * 6
+
+    var wx = vel6[unsafe_offset=v6 + 0]
+    var wy = vel6[unsafe_offset=v6 + 1]
+    var wz = vel6[unsafe_offset=v6 + 2]
+    omega_out[unsafe_offset=j + 0] = wx
+    omega_out[unsafe_offset=j + 1] = wy
+    omega_out[unsafe_offset=j + 2] = wz
+
+    # r = element centroid minus the body frame origin
+    var rx = pos_w[unsafe_offset=j + 0] - xpos[unsafe_offset=b * 3 + 0]
+    var ry = pos_w[unsafe_offset=j + 1] - xpos[unsafe_offset=b * 3 + 1]
+    var rz = pos_w[unsafe_offset=j + 2] - xpos[unsafe_offset=b * 3 + 2]
+
+    # v_elem = v_org + omega x r
+    var ex = vel6[unsafe_offset=v6 + 3] + (wy * rz - wz * ry)
+    var ey = vel6[unsafe_offset=v6 + 4] + (wz * rx - wx * rz)
+    var ez = vel6[unsafe_offset=v6 + 5] + (wx * ry - wy * rx)
+
+    # v_rel is the fluid seen from the element, so the sign is flow minus body.
+    vrel_out[unsafe_offset=j + 0] = u_flow[unsafe_offset=j + 0] - ex
+    vrel_out[unsafe_offset=j + 1] = u_flow[unsafe_offset=j + 1] - ey
+    vrel_out[unsafe_offset=j + 2] = u_flow[unsafe_offset=j + 2] - ez
