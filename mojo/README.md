@@ -28,6 +28,31 @@ So the GPU is the second win and it only pays once evaluation is restructured
 so that N machines step in lockstep in one process. Ported but unbatched, the
 kernel launch and the round trip will eat the gain.
 
+### Measured, with persistent buffers (`fluid_state.GpuFluid`)
+
+| panels | ~machines | alloc/call | persistent | numpy | speedup |
+|---|---|---|---|---|---|
+| 70 | 1 | 83.4 | 36.9 | 29.6 | 0.80x |
+| 280 | 4 | 85.7 | 41.7 | 42.9 | **1.03x** |
+| 1120 | 16 | 91.3 | 49.1 | 88.1 | 1.79x |
+| 4480 | 64 | 119.3 | 100.8 | 292.3 | 2.90x |
+| 17920 | 256 | 305.9 | 282.3 | 1164.4 | 4.13x |
+| 71680 | 1024 | 1181.6 | 1053.6 | 5024.0 | 4.77x |
+
+(microseconds per call)
+
+Break-even is **~280 panels, about 4 machines** — not the ~1600 quoted earlier
+in this file's history. That earlier figure came from a benchmark whose first
+GPU call in the process paid CUDA initialisation and pool growth; warm, the
+per-call allocation cost is 84 us rather than 520. Persisting the buffers still
+roughly halves the fixed cost, and it is the difference between breaking even at
+4 machines and at 12.
+
+The allocation cost is real and worth removing — warm, one 8192-element float64
+buffer costs 97.5 us to allocate against 6.0 us to create a whole
+`DeviceContext`. The context is not worth persisting; the buffers are all of
+it.
+
 A note on what does *not* block this. Batching whole MuJoCo models under MJX
 is blocked by morphology: an archive of 102 elites holds 52 distinct
 (dof, n_parts, body_plan) combinations, and vmap needs one shared graph. The
