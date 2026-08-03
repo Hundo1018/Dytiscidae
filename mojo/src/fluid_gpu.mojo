@@ -27,6 +27,7 @@ from std.math import ceildiv, sqrt, abs
 from std.python import PythonObject
 from mathx import atan2d, sind, cosd, expd, logd, log10d, powd, clampd
 from std.python.bindings import PythonModuleBuilder
+from std.atomic import Atomic
 
 comptime BLOCK = 128
 comptime DeviceBufferF64 = DeviceBuffer[DType.float64]
@@ -237,6 +238,104 @@ def bluff_kernel(
     f_out[unsafe_offset=j + 1] = f_axial * sy + f_cross * dcy
     f_out[unsafe_offset=j + 2] = f_axial * sz + f_cross * dcz
     d_out[unsafe_offset=i] = abs(f_axial) + f_cross
+
+
+comptime GRAVITY: Float64 = 9.80665
+
+
+def added_mass_kernel(
+    v_rel: UnsafePointer[Float64, MutAnyOrigin],
+    s_hat: UnsafePointer[Float64, MutAnyOrigin],
+    c_hat: UnsafePointer[Float64, MutAnyOrigin],
+    n_hat: UnsafePointer[Float64, MutAnyOrigin],
+    d_full: UnsafePointer[Float64, MutAnyOrigin],
+    rho: UnsafePointer[Float64, MutAnyOrigin],
+    ext: UnsafePointer[Float64, MutAnyOrigin],
+    chord: UnsafePointer[Float64, MutAnyOrigin],
+    dr: UnsafePointer[Float64, MutAnyOrigin],
+    volume: UnsafePointer[Float64, MutAnyOrigin],
+    is_wing: UnsafePointer[Int32, MutAnyOrigin],
+    body_id: UnsafePointer[Int32, MutAnyOrigin],
+    m_add: UnsafePointer[Float64, MutAnyOrigin],
+    vn_out: UnsafePointer[Float64, MutAnyOrigin],
+    m_body: UnsafePointer[Float64, MutAnyOrigin],
+    fz: UnsafePointer[Float64, MutAnyOrigin],
+    scale: Float64,
+    has_bluff: Int32,
+    n: Int32,
+):
+    """Anisotropic added mass and its scatter, `fluid.py:627-661`.
+
+    The scatter is `np.add.at(m_body, body_id, m_add)`: many panels share a
+    body, so the collisions are the rule and not the exception.  Float64
+    `Atomic.fetch_add` handles it directly -- verified on this card at 100000
+    additions into 16 buckets, exact.
+
+    What this deliberately does NOT do is write `model.body_mass`.  That is a
+    MuJoCo model array read by `mj_step` on the very next line, so it stays on
+    the host; this kernel only produces the per-body sum it is built from.
+    """
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    var j = i * 3
+
+    var vx = v_rel[unsafe_offset=j + 0]
+    var vy = v_rel[unsafe_offset=j + 1]
+    var vz = v_rel[unsafe_offset=j + 2]
+    var nx = n_hat[unsafe_offset=j + 0]
+    var ny = n_hat[unsafe_offset=j + 1]
+    var nz = n_hat[unsafe_offset=j + 2]
+    vn_out[unsafe_offset=i] = vx * nx + vy * ny + vz * nz
+
+    # Ca_i = 0.5 * (e_j + e_k) / (2 e_i): exact for a sphere, within 18% of
+    # Lamb's disc, and correctly small for a slender body moving end-on.
+    var e0 = ext[unsafe_offset=j + 0]
+    var e1 = ext[unsafe_offset=j + 1]
+    var e2 = ext[unsafe_offset=j + 2]
+    e0 = e0 if e0 > 1e-4 else 1e-4
+    e1 = e1 if e1 > 1e-4 else 1e-4
+    e2 = e2 if e2 > 1e-4 else 1e-4
+    var ca0 = clampd(0.5 * (e1 + e2) / (2.0 * e0), 0.05, 10.0)
+    var ca1 = clampd(0.5 * (e2 + e0) / (2.0 * e1), 0.05, 10.0)
+    var ca2 = clampd(0.5 * (e0 + e1) / (2.0 * e2), 0.05, 10.0)
+
+    var ca_eff: Float64
+    if has_bluff != 0:
+        var dx = d_full[unsafe_offset=j + 0]
+        var dy = d_full[unsafe_offset=j + 1]
+        var dz = d_full[unsafe_offset=j + 2]
+        var ds = dx * s_hat[unsafe_offset=j + 0] + dy * s_hat[unsafe_offset=j + 1] + dz * s_hat[unsafe_offset=j + 2]
+        var dcc = dx * c_hat[unsafe_offset=j + 0] + dy * c_hat[unsafe_offset=j + 1] + dz * c_hat[unsafe_offset=j + 2]
+        var dn = dx * nx + dy * ny + dz * nz
+        var q0 = ds * ds
+        var q1 = dcc * dcc
+        var q2 = dn * dn
+        # A body momentarily at rest has no direction to project onto; fall
+        # back to the isotropic mean rather than to zero.
+        if q0 + q1 + q2 > 1e-6:
+            ca_eff = q0 * ca0 + q1 * ca1 + q2 * ca2
+        else:
+            ca_eff = (ca0 + ca1 + ca2) / 3.0
+    else:
+        # dc is all zeros, so the sum is 0 and the fallback always fires.
+        ca_eff = (ca0 + ca1 + ca2) / 3.0
+
+    var r = rho[unsafe_offset=i]
+    var ma: Float64
+    if is_wing[unsafe_offset=i] != 0:
+        var ch = chord[unsafe_offset=i]
+        ma = r * PI_D * ch * ch * 0.25 * dr[unsafe_offset=i]
+    else:
+        ma = ca_eff * r * volume[unsafe_offset=i]
+    ma = ma * scale
+    m_add[unsafe_offset=i] = ma
+
+    # Cancel the weight MuJoCo will apply to the entrained fluid: added mass has
+    # inertia but no weight.
+    fz[unsafe_offset=i] = ma * GRAVITY
+
+    _ = Atomic.fetch_add(m_body + Int(body_id[unsafe_offset=i]), ma)
 
 
 def coeff_kernel(
@@ -608,6 +707,65 @@ def bluff_drag(desc: PythonObject, cd_scale: PythonObject) raises -> PythonObjec
     return PythonObject(n)
 
 
+def added_mass(desc: PythonObject, scale: PythonObject,
+               has_bluff: PythonObject) raises -> PythonObject:
+    """Added mass and its per-body scatter on the GPU.
+
+    `desc` (int64): v_rel, s_hat, c_hat, n_hat, d_full, rho, ext, chord, dr,
+    volume, is_wing, body_id, m_add_out, vn_out, m_body_out, fz_out, n, nbody
+    """
+    var d = UnsafePointer[Int64, MutAnyOrigin](
+        unsafe_from_address=Int(py=desc.ctypes.data)
+    )
+    var n = Int(d[unsafe_offset=16])
+    var nbody = Int(d[unsafe_offset=17])
+    var ctx = DeviceContext()
+
+    var v_rel = _f64(ctx, Int(d[unsafe_offset=0]), n * 3)
+    var s_hat = _f64(ctx, Int(d[unsafe_offset=1]), n * 3)
+    var c_hat = _f64(ctx, Int(d[unsafe_offset=2]), n * 3)
+    var n_hat = _f64(ctx, Int(d[unsafe_offset=3]), n * 3)
+    var dfull = _f64(ctx, Int(d[unsafe_offset=4]), n * 3)
+    var rho = _f64(ctx, Int(d[unsafe_offset=5]), n)
+    var ext = _f64(ctx, Int(d[unsafe_offset=6]), n * 3)
+    var chord = _f64(ctx, Int(d[unsafe_offset=7]), n)
+    var dr = _f64(ctx, Int(d[unsafe_offset=8]), n)
+    var vol = _f64(ctx, Int(d[unsafe_offset=9]), n)
+
+    var wing = ctx.enqueue_create_buffer[DType.int32](n)
+    ctx.enqueue_copy(dst_buf=wing, src_ptr=UnsafePointer[Int32, MutAnyOrigin](
+        unsafe_from_address=Int(d[unsafe_offset=10])))
+    var bid = ctx.enqueue_create_buffer[DType.int32](n)
+    ctx.enqueue_copy(dst_buf=bid, src_ptr=UnsafePointer[Int32, MutAnyOrigin](
+        unsafe_from_address=Int(d[unsafe_offset=11])))
+
+    var ma_o = ctx.enqueue_create_buffer[DType.float64](n)
+    var vn_o = ctx.enqueue_create_buffer[DType.float64](n)
+    var mb_o = ctx.enqueue_create_buffer[DType.float64](nbody)
+    var fz_o = ctx.enqueue_create_buffer[DType.float64](n)
+    # The scatter accumulates, so the destination has to start at zero -- the
+    # Python allocates a fresh np.zeros(nbody) every step for the same reason.
+    mb_o.enqueue_fill(0.0)
+
+    ctx.enqueue_function[added_mass_kernel](
+        v_rel.unsafe_ptr(), s_hat.unsafe_ptr(), c_hat.unsafe_ptr(),
+        n_hat.unsafe_ptr(), dfull.unsafe_ptr(), rho.unsafe_ptr(),
+        ext.unsafe_ptr(), chord.unsafe_ptr(), dr.unsafe_ptr(),
+        vol.unsafe_ptr(), wing.unsafe_ptr(), bid.unsafe_ptr(),
+        ma_o.unsafe_ptr(), vn_o.unsafe_ptr(), mb_o.unsafe_ptr(),
+        fz_o.unsafe_ptr(),
+        Float64(py=scale), Int32(Int(py=has_bluff)), Int32(n),
+        grid_dim=ceildiv(n, BLOCK),
+        block_dim=BLOCK,
+    )
+    _dl(ctx, ma_o, Int(d[unsafe_offset=12]))
+    _dl(ctx, vn_o, Int(d[unsafe_offset=13]))
+    _dl(ctx, mb_o, Int(d[unsafe_offset=14]))
+    _dl(ctx, fz_o, Int(d[unsafe_offset=15]))
+    ctx.synchronize()
+    return PythonObject(n)
+
+
 @export
 def PyInit_fluid_gpu() abi("C") -> PythonObject:
     try:
@@ -616,6 +774,7 @@ def PyInit_fluid_gpu() abi("C") -> PythonObject:
         m.def_function[strip_theory]("strip_theory")
         m.def_function[coefficients]("coefficients")
         m.def_function[bluff_drag]("bluff_drag")
+        m.def_function[added_mass]("added_mass")
         return m.finalize()
     except e:
         abort(String("failed to create module: ", e))
