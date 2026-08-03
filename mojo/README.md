@@ -152,17 +152,37 @@ caught two real bugs so far — the epsilon-placement error in `alpha`, and
 before that a whole class of sign bug in the Python. The standard is worth more
 than the precision.
 
-Next, in dependency order:
+### The three-stage lesson
 
-1. Float64 `sin`, `exp`, `log10` in `mathx`, each pinned like `atan2d`.
-2. `lift_coefficient` and `drag_coefficient`, then bluff-body drag, added mass
-   and the body scatter — `np.add.at` at `fluid.py:698` becomes an atomic.
-2. **The batched evaluator.** Until N machines step in lockstep in one process
-   this port cannot pay: per call it allocates buffers, launches, and round
-   trips for one machine's ~70 panels, which is far below break-even. This is
-   the piece that turns a correct port into a fast one.
-3. Persistent device buffers owned by that evaluator, replacing the
-   allocate-per-call in `body_to_world`.
+Each stage was necessary and none was sufficient, which is the whole story of
+this port:
+
+| | 7 machines | 28 | 112 |
+|---|---|---|---|
+| numpy | 241 us | 723 | 2536 |
+| GPU, one machine at a time | — | — | ~105000 |
+| GPU, batched but staged | 748 | 1032 | 2646 |
+| **GPU, batched and fused** | **231** | **372** | **1079** |
+| **vs numpy** | **1.05x** | **1.94x** | **2.35x** |
+
+Batching alone *lost* to numpy up to ~100 machines: five entry points meant five
+host round trips per step, with `s_hat` copied out by one stage and straight
+back in by the next. Fusing them — static geometry uploaded once, per-step state
+once, five kernels over device-resident intermediates, one download — is worth
+2.5-3.2x on top of batching and is what puts the port ahead.
+
+Fusing without batching would not have helped either: one machine is ~70 panels,
+and the kernels finish that in tens of microseconds against a round trip of
+hundreds.
+
+### Known issue
+
+Constructing more than one `Pipeline` in a single process hangs with the GPU
+idle. The benchmarks above run each size in its own process. Not diagnosed; a
+rollout needs one Pipeline, so it has not blocked anything, but a batched
+evaluator that re-packs survivors mid-run will need it fixed or will need to
+reuse a single over-sized Pipeline.
+
 
 Not moving: MuJoCo, `mj_objectVelocity`, and the `body_mass` write-back stay on
 the CPU.
