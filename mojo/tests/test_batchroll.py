@@ -64,13 +64,24 @@ def main():
         print(f"{it[0]:10s} {eq:11.3e} {ev:11.3e}")
 
     print()
-    # Not exact, and should not be expected to be: the reference runs the numpy
-    # FluidSolver through env.step while the batched path runs the GPU kernels,
-    # and those differ in the last bit (numpy's einsum does not sum
-    # left-to-right). Four hundred steps of a chaotic system amplifies that.
-    # Landing at 1e-14..6e-10 after 400 steps means the two are the same
-    # physics; a transcription error would have diverged visibly by step 50.
-    ok = worst < 1e-9
+    # Two separate reasons this is not exact, and the second is the one that
+    # matters.
+    #
+    # First, the reference runs the numpy FluidSolver through env.step while
+    # the batch runs the GPU kernels, and those differ in the last bit --
+    # numpy's einsum does not sum left-to-right. Four hundred steps of a
+    # chaotic system amplifies that.
+    #
+    # Second, and this is a genuine behavioural change: the GPU path is NOT
+    # bit-reproducible run to run. The scatter uses Atomic.fetch_add, which
+    # accumulates in whatever order the warps arrive, so identical seeds and
+    # identical code give slightly different last bits each time. Measured over
+    # five runs of this test: 6.0e-10, 6.7e-10, 6.9e-10, 1.2e-9, 2.4e-9.
+    #
+    # The bound therefore has to cover that spread rather than pin one run. A
+    # transcription error would have diverged visibly by step 50, which is what
+    # this is actually guarding against.
+    ok = worst < 2e-8
     print("batched rollout matches solo" if ok else f"FAILED (worst {worst:.3e})")
     return 0 if ok else 1
 
