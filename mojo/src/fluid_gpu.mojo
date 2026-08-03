@@ -142,6 +142,103 @@ def _drag_coefficient(
     return _skin_friction_cd(re) + cd_i + cd_p
 
 
+comptime CD_CROSSFLOW: Float64 = 1.1
+
+
+def bluff_kernel(
+    v_rel: UnsafePointer[Float64, MutAnyOrigin],
+    s_hat: UnsafePointer[Float64, MutAnyOrigin],
+    c_hat: UnsafePointer[Float64, MutAnyOrigin],
+    n_hat: UnsafePointer[Float64, MutAnyOrigin],
+    rho: UnsafePointer[Float64, MutAnyOrigin],
+    mu: UnsafePointer[Float64, MutAnyOrigin],
+    ext: UnsafePointer[Float64, MutAnyOrigin],
+    cd_bluff: UnsafePointer[Float64, MutAnyOrigin],
+    is_wing: UnsafePointer[Int32, MutAnyOrigin],
+    f_out: UnsafePointer[Float64, MutAnyOrigin],
+    d_out: UnsafePointer[Float64, MutAnyOrigin],
+    dfull_out: UnsafePointer[Float64, MutAnyOrigin],
+    cd_scale: Float64,
+    n: Int32,
+):
+    """Munk slender-body plus Allen-Perkins cross-flow, `fluid.py:533-578`.
+
+    `d_full` is written for every panel, wing or not: it is computed over all N
+    in the Python (the `~is_wing` mask is only applied at the accumulate), and
+    the added-mass block downstream reads it for wing panels too.
+    """
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    var j = i * 3
+
+    var vx = v_rel[unsafe_offset=j + 0]
+    var vy = v_rel[unsafe_offset=j + 1]
+    var vz = v_rel[unsafe_offset=j + 2]
+
+    # np.linalg.norm IS plain left-to-right, unlike einsum.
+    var u_full = sqrt(vx * vx + vy * vy + vz * vz)
+    var u_full_safe = u_full if u_full > 1e-6 else 1e-6
+    dfull_out[unsafe_offset=j + 0] = vx / u_full_safe
+    dfull_out[unsafe_offset=j + 1] = vy / u_full_safe
+    dfull_out[unsafe_offset=j + 2] = vz / u_full_safe
+
+    if is_wing[unsafe_offset=i] != 0:
+        f_out[unsafe_offset=j + 0] = 0.0
+        f_out[unsafe_offset=j + 1] = 0.0
+        f_out[unsafe_offset=j + 2] = 0.0
+        d_out[unsafe_offset=i] = 0.0
+        return
+
+    var sx = s_hat[unsafe_offset=j + 0]
+    var sy = s_hat[unsafe_offset=j + 1]
+    var sz = s_hat[unsafe_offset=j + 2]
+
+    # ext_local is (span, chord, normal) extents, in that order.
+    var ex = ext[unsafe_offset=j + 0]
+    var ey = ext[unsafe_offset=j + 1]
+    var ez = ext[unsafe_offset=j + 2]
+
+    var v_ax = vx * sx + vy * sy + vz * sz          # signed
+    var cxv = vx - v_ax * sx
+    var cyv = vy - v_ax * sy
+    var czv = vz - v_ax * sz
+    var u_cross = sqrt(cxv * cxv + cyv * cyv + czv * czv)
+    var u_cross_safe = u_cross if u_cross > 1e-9 else 1e-9
+    var dcx = cxv / u_cross_safe
+    var dcy = cyv / u_cross_safe
+    var dcz = czv / u_cross_safe
+
+    var r = rho[unsafe_offset=i]
+    var m = mu[unsafe_offset=i]
+    var wetted = 2.0 * (ex * ey + ey * ez + ex * ez)
+    # Length scale is ex, the span-axis extent, not the chord; velocity scale is
+    # the axial component, not the full speed.
+    var re_b = r * abs(v_ax) * ex / (m if m > 1e-12 else 1e-12)
+    var f_axial = cd_scale * (
+        0.5 * r * abs(v_ax) * v_ax
+        * (cd_bluff[unsafe_offset=i] * ey * ez + _skin_friction_cd(re_b) * wetted)
+    )
+
+    # pc weights ex*ez and pn weights ex*ey: each cosine multiplies the area of
+    # the face whose normal it belongs to.  Swapping them is the easy bug.
+    var pc = abs(dcx * c_hat[unsafe_offset=j + 0]
+                 + dcy * c_hat[unsafe_offset=j + 1]
+                 + dcz * c_hat[unsafe_offset=j + 2])
+    var pn = abs(dcx * n_hat[unsafe_offset=j + 0]
+                 + dcy * n_hat[unsafe_offset=j + 1]
+                 + dcz * n_hat[unsafe_offset=j + 2])
+    var a_side = pc * ex * ez + pn * ex * ey
+    # u_cross unclamped here, deliberately: the 1e-9 floor is only for the
+    # direction, and squaring the floored value would invent a force at rest.
+    var f_cross = cd_scale * 0.5 * r * u_cross * u_cross * CD_CROSSFLOW * a_side
+
+    f_out[unsafe_offset=j + 0] = f_axial * sx + f_cross * dcx
+    f_out[unsafe_offset=j + 1] = f_axial * sy + f_cross * dcy
+    f_out[unsafe_offset=j + 2] = f_axial * sz + f_cross * dcz
+    d_out[unsafe_offset=i] = abs(f_axial) + f_cross
+
+
 def coeff_kernel(
     alpha: UnsafePointer[Float64, MutAnyOrigin],
     re: UnsafePointer[Float64, MutAnyOrigin],
@@ -461,6 +558,56 @@ def coefficients(desc: PythonObject) raises -> PythonObject:
     return PythonObject(n)
 
 
+def bluff_drag(desc: PythonObject, cd_scale: PythonObject) raises -> PythonObject:
+    """Bluff-body drag on the GPU.
+
+    `desc` (int64): v_rel, s_hat, c_hat, n_hat, rho, mu, ext_local, cd_bluff,
+    is_wing, F_out, D_out, d_full_out, n
+    """
+    var d = UnsafePointer[Int64, MutAnyOrigin](
+        unsafe_from_address=Int(py=desc.ctypes.data)
+    )
+    var n = Int(d[unsafe_offset=12])
+    var ctx = DeviceContext()
+
+    var v_rel = _f64(ctx, Int(d[unsafe_offset=0]), n * 3)
+    var s_hat = _f64(ctx, Int(d[unsafe_offset=1]), n * 3)
+    var c_hat = _f64(ctx, Int(d[unsafe_offset=2]), n * 3)
+    var n_hat = _f64(ctx, Int(d[unsafe_offset=3]), n * 3)
+    var rho = _f64(ctx, Int(d[unsafe_offset=4]), n)
+    var mu = _f64(ctx, Int(d[unsafe_offset=5]), n)
+    var ext = _f64(ctx, Int(d[unsafe_offset=6]), n * 3)
+    var cdb = _f64(ctx, Int(d[unsafe_offset=7]), n)
+
+    var wing = ctx.enqueue_create_buffer[DType.int32](n)
+    ctx.enqueue_copy(
+        dst_buf=wing,
+        src_ptr=UnsafePointer[Int32, MutAnyOrigin](
+            unsafe_from_address=Int(d[unsafe_offset=8])
+        ),
+    )
+
+    var f_o = ctx.enqueue_create_buffer[DType.float64](n * 3)
+    var d_o = ctx.enqueue_create_buffer[DType.float64](n)
+    var df_o = ctx.enqueue_create_buffer[DType.float64](n * 3)
+
+    ctx.enqueue_function[bluff_kernel](
+        v_rel.unsafe_ptr(), s_hat.unsafe_ptr(), c_hat.unsafe_ptr(),
+        n_hat.unsafe_ptr(), rho.unsafe_ptr(), mu.unsafe_ptr(),
+        ext.unsafe_ptr(), cdb.unsafe_ptr(), wing.unsafe_ptr(),
+        f_o.unsafe_ptr(), d_o.unsafe_ptr(), df_o.unsafe_ptr(),
+        Float64(py=cd_scale),
+        Int32(n),
+        grid_dim=ceildiv(n, BLOCK),
+        block_dim=BLOCK,
+    )
+    _dl(ctx, f_o, Int(d[unsafe_offset=9]))
+    _dl(ctx, d_o, Int(d[unsafe_offset=10]))
+    _dl(ctx, df_o, Int(d[unsafe_offset=11]))
+    ctx.synchronize()
+    return PythonObject(n)
+
+
 @export
 def PyInit_fluid_gpu() abi("C") -> PythonObject:
     try:
@@ -468,6 +615,7 @@ def PyInit_fluid_gpu() abi("C") -> PythonObject:
         m.def_function[body_to_world]("body_to_world")
         m.def_function[strip_theory]("strip_theory")
         m.def_function[coefficients]("coefficients")
+        m.def_function[bluff_drag]("bluff_drag")
         return m.finalize()
     except e:
         abort(String("failed to create module: ", e))
