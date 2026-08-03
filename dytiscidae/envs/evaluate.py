@@ -66,6 +66,62 @@ class Controller:
 # --------------------------------------------------------------------------
 
 
+def finalise_tier1(r: MissionResult, clamped_any: bool) -> None:
+    """Turn measured segments and transitions into mission_fraction, and flag
+    exploits.
+
+    Extracted so the batched evaluator in ``envs/batchroll.py`` shares it rather
+    than carrying a second copy.  Two copies of a scoring rule is how the copies
+    stop agreeing.
+    """
+    competences = [s.competence for s in r.segments.values()]
+    energy_fraction = float(
+        np.clip(r.energy_available_wh / max(r.energy_required_wh, 1e-6), 0.0, 1.0)
+    )
+    # Graded, not binary.  A crossing used to contribute 1 or 0 depending only
+    # on whether the depth changed sign, so a tumbling arrival at twice the
+    # hull's survivable speed counted the same as a clean one.  The quality
+    # terms are conditioned on having crossed at all, so refusing the hard
+    # crossing cannot raise the average.
+    tc = r.transitions.component_means()
+    transition_fraction = float(
+        tc["crossed"] * (
+            0.40
+            + 0.60 * float(np.mean([
+                tc["shock"], tc["control"], tc["settle"], tc["economy"],
+                tc["exit_state"],
+            ]))
+        )
+    )
+    # The mission is only as good as its weakest domain: a machine that flies
+    # beautifully and cannot dive has completed none of the cycles, so this is a
+    # geometric-style aggregate rather than a mean.
+    r.mission_fraction = float(
+        min(competences) ** 0.5
+        * float(np.mean(competences))
+        * energy_fraction
+        * max(transition_fraction, 0.05)
+    )
+
+    # Exploit detection.
+    #
+    # The force limiter engaging is not by itself evidence of cheating: an
+    # uncontrolled machine tumbling out of the sky trips it too, and that is
+    # simply a design that fails.  What makes it an exploit is scoring *well*
+    # while outside the model's valid envelope -- that is a candidate whose
+    # performance depends on extrapolated coefficients.  So the flag is
+    # conditioned on the score, and mere clamping is a proportional penalty.
+    if clamped_any:
+        if r.mission_fraction > 0.35:
+            r.exploit = "scored well while outside the fluid model's valid envelope"
+        else:
+            r.mission_fraction *= 0.7
+            r.notes.append("force limiter engaged (penalised, not disqualified)")
+    if any(s.max_actuator_overload > 3.0 for s in r.segments.values()):
+        r.exploit = "actuators run far past their thermal rating"
+
+
+
 def evaluate_tier1(
     p: Phenotype,
     *,
@@ -142,52 +198,7 @@ def evaluate_tier1(
     r.energy_required_wh = (cruise_j + trans_j) / 3600.0
     r.energy_available_wh = p.genome.battery_wh * 0.85
 
-    competences = [s.competence for s in r.segments.values()]
-    energy_fraction = float(
-        np.clip(r.energy_available_wh / max(r.energy_required_wh, 1e-6), 0.0, 1.0)
-    )
-    # Graded, not binary.  A crossing used to contribute 1 or 0 depending only
-    # on whether the depth changed sign, so a tumbling arrival at twice the
-    # hull's survivable speed counted the same as a clean one.  The quality
-    # terms are conditioned on having crossed at all, so refusing the hard
-    # crossing cannot raise the average.
-    tc = r.transitions.component_means()
-    transition_fraction = float(
-        tc["crossed"] * (
-            0.40
-            + 0.60 * float(np.mean([
-                tc["shock"], tc["control"], tc["settle"], tc["economy"],
-                tc["exit_state"],
-            ]))
-        )
-    )
-    # The mission is only as good as its weakest domain: a machine that flies
-    # beautifully and cannot dive has completed none of the cycles, so this is a
-    # geometric-style aggregate rather than a mean.
-    r.mission_fraction = float(
-        min(competences) ** 0.5
-        * float(np.mean(competences))
-        * energy_fraction
-        * max(transition_fraction, 0.05)
-    )
-
-    # Exploit detection.
-    #
-    # The force limiter engaging is not by itself evidence of cheating: an
-    # uncontrolled machine tumbling out of the sky trips it too, and that is
-    # simply a design that fails.  What makes it an exploit is scoring *well*
-    # while outside the model's valid envelope -- that is a candidate whose
-    # performance depends on extrapolated coefficients.  So the flag is
-    # conditioned on the score, and mere clamping is a proportional penalty.
-    if clamped_any:
-        if r.mission_fraction > 0.35:
-            r.exploit = "scored well while outside the fluid model's valid envelope"
-        else:
-            r.mission_fraction *= 0.7
-            r.notes.append("force limiter engaged (penalised, not disqualified)")
-    if any(s.max_actuator_overload > 3.0 for s in r.segments.values()):
-        r.exploit = "actuators run far past their thermal rating"
-
+    finalise_tier1(r, clamped_any)
     r.wall_time = time.time() - t0
     return r
 

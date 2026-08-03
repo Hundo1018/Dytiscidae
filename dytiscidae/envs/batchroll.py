@@ -201,3 +201,183 @@ def step_batch(envs, angles_list, bf: BatchedFluid, active=None):
         if not alive:
             active[i] = False
     return active
+
+
+def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
+                  domain, control_hz: float = 25.0, policies=None,
+                  bases=None):
+    """`TriphibianEnv.rollout` for a whole batch, one GPU call per timestep.
+
+    Mirrors the single-machine version step for step, including which sample
+    goes into which list, because `_score_segment` divides its time fractions by
+    the length the segment was *asked* for rather than by the number of samples
+    recorded -- that is the defence against the truncated-episode exploit and it
+    only works if the recording matches.
+
+    Returns one SegmentResult per environment, scored by that environment's own
+    `_score_segment`, so the scoring is untouched by batching.
+    """
+    from .triphibian import SegmentResult
+
+    k = len(envs)
+    res = [SegmentResult(domain=domain, duration=duration) for _ in envs]
+    n_steps = int(duration / envs[0].timestep)
+    control_every = max(1, int(1.0 / (control_hz * envs[0].timestep)))
+
+    starts = [e.root_pos().copy() for e in envs]
+    rec = [dict(depths=[], alts=[], ups=[], contacts=[], clears=[], slam=0.0)
+           for _ in envs]
+    cur = list(params_list)
+    active = np.ones(k, dtype=bool)
+
+    for i in range(n_steps):
+        angles = []
+        for m, e in enumerate(envs):
+            if active[m]:
+                if (policies is not None and policies[m] is not None
+                        and bases is not None and bases[m] is not None
+                        and i % control_every == 0):
+                    coeffs = policies[m].act(e.observation(domain))
+                    cur[m] = bases[m].command_params(
+                        params_list[m], coeffs, e.cpg.n)
+                angles.append(e.cpg.command(cur[m], e.data.time))
+            else:
+                angles.append(None)
+
+        was = active.copy()
+        active = step_batch(envs, angles, bf, active)
+        for m in range(k):
+            if was[m] and not active[m]:
+                res[m].failure = "battery exhausted"
+
+        for m, e in enumerate(envs):
+            if not active[m]:
+                continue
+            pos = e.root_pos()
+            if not np.all(np.isfinite(pos)) or np.abs(pos).max() > 400.0:
+                res[m].survived = False
+                res[m].failure = "diverged"
+                active[m] = False
+                continue
+            r = rec[m]
+            r["depths"].append(e.medium.depth(pos[None, :], e.data.time)[0])
+            r["clears"].append(e.clearance())
+            r["alts"].append(pos[2])
+            R = e.data.xmat[e.root_body].reshape(3, 3)
+            r["ups"].append(float(R[2, 2]))
+            r["contacts"].append(1.0 if e._touching_ground() else 0.0)
+            r["slam"] = max(r["slam"], e.solver.diag.slam)
+
+        if not active.any():
+            break
+
+    for m, e in enumerate(envs):
+        r = rec[m]
+        end = e.root_pos().copy()
+        res[m].distance = float(np.linalg.norm((end - starts[m])[:2]))
+        res[m].mean_speed = res[m].distance / max(duration, 1e-6)
+        res[m].mean_power = e.budget.mean_power
+        res[m].peak_slam = r["slam"]
+        res[m].max_actuator_overload = e.budget.max_overload
+        res[m].attitude_rms = float(np.std(r["ups"])) if r["ups"] else 1.0
+        res[m].ground_contact_fraction = (
+            float(np.mean(r["contacts"])) if r["contacts"] else 0.0)
+        res[m].max_depth = float(max(r["depths"])) if r["depths"] else 0.0
+        res[m].competence = e._score_segment(
+            domain, res[m], np.array(r["depths"]), np.array(r["alts"]),
+            np.array(r["ups"]), np.array(r["contacts"]), np.array(r["clears"]))
+    return res
+
+
+def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
+                         segment_seconds: float = 10.0, seed: int = 0,
+                         sea_state=None, perturb: dict | None = None):
+    """`evaluate_tier1` for a whole generation, sharing one GPU pipeline.
+
+    The three domain segments are batched -- they are the bulk of the work and
+    all three run the same kernels.  The transitions are still one machine at a
+    time: `run_transition` has its own stepping loop and its own placement per
+    crossing, and batching it is a separate piece of work.  That caps the gain
+    here at roughly 1.6x rather than the 3.6x the segments alone reach, which
+    is worth knowing before reading the numbers.
+
+    Falls back to nothing: a phenotype that fails to compile is returned as a
+    dead MissionResult in its slot, exactly as the unbatched version does, so
+    the caller's indexing is never disturbed.
+    """
+    import time as _time
+
+    from .evaluate import (
+        Controller, evaluate_tier0, finalise_tier1, transition_energy)
+    from .transitions import run_transition
+    from .triphibian import DOMAIN_CYCLE, MissionResult, MissionSpec, TriphibianEnv
+
+    spec = spec or MissionSpec()
+    t0 = _time.time()
+    k = len(phenos)
+    results = [MissionResult(tier=1) for _ in range(k)]
+    envs, live = [None] * k, []
+
+    for i, p in enumerate(phenos):
+        r = results[i]
+        t0_r = evaluate_tier0(p, spec)
+        r.structural_margin = t0_r.structural_margin
+        r.feasible = t0_r.feasible
+        if not p.segments:
+            r.notes.append("empty phenotype")
+            continue
+        try:
+            envs[i] = TriphibianEnv(p, seed=seed, sea_state=sea_state,
+                                    perturb=perturb)
+            live.append(i)
+        except Exception as exc:
+            r.notes.append(f"compile failed: {type(exc).__name__}: {exc}")
+
+    if not live:
+        for r in results:
+            r.wall_time = _time.time() - t0
+        return results
+
+    ctrls = [None] * k
+    clamped = [False] * k
+    for i in live:
+        ctrls[i] = (controllers[i] if controllers and controllers[i] is not None
+                    else Controller(params=envs[i].cpg.base))
+
+    group = [envs[i] for i in live]
+    bf = BatchedFluid(group)
+
+    for dom in DOMAIN_CYCLE:
+        for i in live:
+            envs[i].reset(dom)
+        segs = rollout_batch(
+            group, bf, segment_seconds, [ctrls[i].params for i in live], dom,
+            policies=[ctrls[i].policy for i in live],
+            bases=[ctrls[i].basis_for(dom) for i in live])
+        for slot, i in enumerate(live):
+            results[i].segments[dom.value] = segs[slot]
+            clamped[i] = clamped[i] or bool(envs[i].solver.diag.clamped)
+
+    # Transitions stay per-machine.  See the docstring.
+    for i in live:
+        for kind in ("air_to_water", "water_to_air", "water_to_land"):
+            tr = run_transition(envs[i], kind, ctrls[i])
+            results[i].transitions.results[kind] = tr
+            results[i].transition_ok[kind] = tr.crossed
+            if tr.failure:
+                results[i].notes.append(f"{kind}: {tr.failure}")
+
+    for i in live:
+        r, p = results[i], phenos[i]
+        cruise_j = sum(s.mean_power * spec.seconds_per_domain * spec.cycles
+                       for s in r.segments.values())
+        trans_j = sum(transition_energy(p.mass, kk) for kk in spec.transitions)
+        r.energy_required_wh = (cruise_j + trans_j) / 3600.0
+        r.energy_available_wh = p.genome.battery_wh * 0.85
+        # Shared with evaluate_tier1 rather than reimplemented: two copies of a
+        # scoring rule is how the copies stop agreeing.
+        finalise_tier1(r, clamped[i])
+
+    for r in results:
+        r.wall_time = _time.time() - t0
+    return results
