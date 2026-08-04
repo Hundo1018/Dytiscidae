@@ -9,7 +9,13 @@
 
 Every long-running command checkpoints as it goes and can be resumed, because
 the environments this is meant to run in are frequently reclaimed without
-warning.  Nothing here needs a GPU.
+warning.
+
+`search` uses the GPU when the Mojo extension is importable, evaluating a whole
+generation of candidates in one set of kernel launches.  It falls back to the
+numpy solver when the extension is missing, which is correct but several times
+slower; see docs/CPU_LEGACY.md for what else was decided under that assumption
+and has not been revisited.
 """
 
 from __future__ import annotations
