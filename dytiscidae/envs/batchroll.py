@@ -40,6 +40,28 @@ import numpy as np
 from ..physics.medium import GRAVITY
 from .triphibian import Domain
 
+def _add_build_dir_to_path() -> None:
+    """Put mojo/build on sys.path so the extension imports without PYTHONPATH.
+
+    It used to be found only when the caller exported PYTHONPATH=.:mojo/build.
+    The test suites do; the CLI does not.  A search run therefore imported
+    nothing, set AVAILABLE = False, and fell back to numpy without a word --
+    two full timing probes were collected on the CPU before nvidia-smi showed
+    0% utilisation and gave it away.  A fallback this quiet is worse than no
+    fallback: the run still finishes and the numbers still look plausible.
+    """
+    import os
+    import sys
+
+    build = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "mojo", "build")
+    if os.path.isdir(build) and build not in sys.path:
+        sys.path.insert(0, build)
+
+
+_add_build_dir_to_path()
+
 try:  # pragma: no cover - depends on a built extension
     import full_pipeline as _fp
     import mujoco as _mj

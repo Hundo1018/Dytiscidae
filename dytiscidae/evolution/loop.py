@@ -227,6 +227,31 @@ def evaluate_candidate(
     return pheno, result, ctrl
 
 
+_WARNED_CPU = False
+
+
+def _warn_cpu_fallback() -> None:
+    """Say once, on stderr, that this run is not using the GPU.
+
+    Printed rather than warnings.warn because a search run's stderr is what
+    gets read afterwards, and the default warning filter shows a given warning
+    once per location and then hides it.
+    """
+    global _WARNED_CPU
+    if _WARNED_CPU:
+        return
+    _WARNED_CPU = True
+    import sys
+
+    from ..envs import batchroll
+    print(
+        "\n*** GPU fluid extension not importable; this run is on the CPU. ***\n"
+        f"    reason: {batchroll.UNAVAILABLE_REASON}\n"
+        "    Build it with `cd mojo && pixi run build`.  Every timing and\n"
+        "    every wall-clock estimate below is the CPU path.\n",
+        file=sys.stderr, flush=True)
+
+
 def evaluate_candidates(
     genomes,
     cfg: SearchConfig,
@@ -241,7 +266,9 @@ def evaluate_candidates(
     Same contract as ``evaluate_candidate`` but for a list, returning one
     ``(phenotype, result, controller)`` per input in the same order.  Falls back
     to the per-candidate path when the GPU extension is not importable, so a
-    CPU-only checkout behaves exactly as it did.
+    CPU-only checkout behaves exactly as it did -- but says so, once, loudly.
+    The fallback used to be silent, and a search launched without the extension
+    on sys.path ran to completion on the CPU looking entirely normal.
 
     The Tier-0 gate is applied first and independently, as it is per candidate:
     a genome that fails it never reaches Tier-1 and never joins the batch, which
@@ -267,6 +294,7 @@ def evaluate_candidates(
         return out
 
     if not batchroll.AVAILABLE:
+        _warn_cpu_fallback()
         for i in passed:
             out[i] = evaluate_candidate(
                 genomes[i], cfg, inherited_policy=inherited[i],
