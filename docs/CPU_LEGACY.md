@@ -17,7 +17,7 @@ corrections table. This file is only for decisions that a GPU changes.
 
 ---
 
-## 1. The controller is not trained at all
+## 1. The controller is not trained at all — and is never executed either
 
 `controller_refine_steps: int = 0` — [`evolution/loop.py`](../dytiscidae/evolution/loop.py)
 
@@ -36,9 +36,36 @@ That distinction decides how much work item 1 is. It is not a config change to
 be made before the next run; it is writing the refinement loop, choosing what it
 optimises against, and paying for it in evaluations.
 
+### The policy is not merely untrained; it never runs
+
+Following the call chain end to end, at default settings the `Policy` object is
+built, inherited, stored in the archive — and never evaluated:
+
+| step | file | what it does |
+|---|---|---|
+| `identify_axes_every: int = 1` | `loop.py:77` | default |
+| `identify = (counter % max(cfg.identify_axes_every, 1)) == 0` | `loop.py:661` | `% 1` is always 0, so always `True` |
+| `identify=any(b[2] for b in built)` | `loop.py:670` | one candidate wanting it forces the whole batch |
+| `controllers=[None if identify else c for c in ctrls]` | `loop.py:311` | so every controller becomes `None` |
+| `ctrl = controller or Controller(params=env.cpg.base)` | `evaluate.py:161` | a fresh `Controller`, whose `policy` field defaults to `None` |
+| `policy=ctrl.policy` | `evaluate.py:177` | `None` reaches `env.rollout` |
+
+There is one `evaluate_candidates` call per generation and no second pass, so no
+evaluation anywhere in the search ever executes a policy. `_controller_for`'s
+careful weight-inheritance logic — matching shapes, falling back to zeros — runs
+on an object that is then discarded at the rollout boundary.
+
+So item 1 is two defects, not one. Writing the refinement loop alone would
+optimise weights that the evaluation still ignores. The `identify`/controller
+coupling has to be separated first: identifying mobility axes and running a
+policy are independent things that this flag currently forces to be mutually
+exclusive.
+
 This is the largest single item here, and it is not a subtle one: the search has
 been selecting bodies on the strength of an untrained controller, which
-systematically favours designs that work *without* control.
+systematically favours designs that work *without* control. Since the policy is
+not even executed, that is not an approximation of the effect — it is exactly
+the effect.
 
 **What a GPU changes:** the reason to leave it unwritten was that each
 refinement step costs a full Tier-1 evaluation. That is the cost the port
