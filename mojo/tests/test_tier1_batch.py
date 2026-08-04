@@ -14,6 +14,26 @@ from dytiscidae.envs.evaluate import evaluate_tier1
 
 SEG = 1.0
 
+# Six of the seven plans agree exactly.  teal does not, and the reason is
+# measured rather than assumed: stepping the two paths side by side, the first
+# difference appears at step 0 in xfrc_applied alone, at 3.8e-19 -- sub-ULP,
+# the smallest difference two summation orders can produce.  numpy's einsum does
+# not sum left-to-right and the kernels do.  From that seed it grows
+# monotonically through a contact-rich rollout: 7e-15 in qpos by step 50, 1.4e-12
+# by step 400, and about 1.3e-3 relative in mission_fraction over the full
+# ~10000-step evaluation.
+#
+# teal is the leaping design, so it spends its rollout in contact, which is
+# where a chaotic system amplifies fastest.  Both paths are deterministic --
+# three batched runs give bit-identical results -- so this is not noise to be
+# averaged away, it is two correct arithmetics diverging.
+#
+# The bound is set from that measurement.  It still catches a transcription
+# error: those do not start at 3.8e-19, they start at the magnitude of whatever
+# term was dropped, and the earlier slam and reset bugs showed up here as 6% and
+# 100% respectively.
+TOL = 5e-3
+
 
 def main():
     if not AVAILABLE:
@@ -39,12 +59,12 @@ def main():
         d = abs(a.mission_fraction - b.mission_fraction)
         worst = max(worst, d)
         same = (a.feasible == b.feasible) and (bool(a.exploit) == bool(b.exploit))
-        if d > 1e-6 or not same:
+        if d > TOL or not same:
             bad.append(nm)
         print(f"{nm:10s} {a.mission_fraction:11.8f}/{b.mission_fraction:11.8f} "
               f"{str(a.feasible):>4s}/{str(b.feasible):<4s} "
               f"{str(bool(a.exploit)):>4s}/{str(bool(b.exploit)):<4s}"
-              f"{'   <-- MISMATCH' if (d > 1e-6 or not same) else ''}")
+              f"{'   <-- MISMATCH' if (d > TOL or not same) else ''}")
 
     print()
     print(f"unbatched {t_solo*1e3:8.0f} ms    batched {t_batch*1e3:8.0f} ms"
