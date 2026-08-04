@@ -259,7 +259,8 @@ struct FullPipeline(Movable, Writable):
     def step(self_ptr: UnsafePointer[Self, MutAnyOrigin], desc: PythonObject,
              scalars: PythonObject) raises -> PythonObject:
         """in : xpos, xmat, xipos, vel6
-        out: xfrc, m_body, clamped, m_add, subf, alpha, q, lift, drag, buoy
+        out: xfrc, m_body, clamped, m_add, subf, alpha, q, lift, drag, buoy,
+             vn
         then n, nbody, nmachine, has_bluff
 
         scalars (19): 0 amplitude, 1 wavelength, 2 period, 3 khat_x,
@@ -269,10 +270,10 @@ struct FullPipeline(Movable, Writable):
         """
         var d = UnsafePointer[Int64, MutAnyOrigin](
             unsafe_from_address=Int(py=desc.ctypes.data))
-        var n = Int(d[unsafe_offset=14])
-        var nb = Int(d[unsafe_offset=15])
-        var nm = Int(d[unsafe_offset=16])
-        var has_bluff = Int(d[unsafe_offset=17])
+        var n = Int(d[unsafe_offset=15])
+        var nb = Int(d[unsafe_offset=16])
+        var nm = Int(d[unsafe_offset=17])
+        var has_bluff = Int(d[unsafe_offset=18])
         ref s = self_ptr[]
         if n > s.cap_p or nb > s.cap_b or nm > s.cap_m:
             raise Error("FullPipeline: batch exceeds capacity")
@@ -378,6 +379,11 @@ struct FullPipeline(Movable, Writable):
         _dn_f64(ctx, s.lift, Int(d[unsafe_offset=11]), n)
         _dn_f64(ctx, s.drag, Int(d[unsafe_offset=12]), n)
         _dn_f64(ctx, s.buoy, Int(d[unsafe_offset=13]), n)
+        # vn is the normal-velocity component the slam diagnostic differences
+        # against.  It is cheap to carry and expensive to be without: the
+        # transition score reads slam as the entry load, so omitting it zeroes
+        # every crossing's shock term without any error being raised.
+        _dn_f64(ctx, s.vn, Int(d[unsafe_offset=14]), n)
         ctx.synchronize()
         return PythonObject(n)
 

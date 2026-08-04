@@ -77,7 +77,8 @@ class Batch:
         self.xipos = np.zeros((nb, 3)); self.vel6 = np.zeros((nb, 6))
         self.out = {k: np.zeros(s) for k, s in (
             ("xfrc", (nb, 6)), ("m_body", nb), ("m_add", n), ("subf", n),
-            ("alpha", n), ("q", n), ("lift", n), ("drag", n), ("buoy", n))}
+            ("alpha", n), ("q", n), ("lift", n), ("drag", n), ("buoy", n),
+            ("vn", n))}
         self.clamped = np.zeros(nm, dtype=np.int32)
 
     def step(self, t):
@@ -100,7 +101,7 @@ class Batch:
             + [o[k].ctypes.data for k in ("xfrc", "m_body")]
             + [self.clamped.ctypes.data]
             + [o[k].ctypes.data for k in
-               ("m_add", "subf", "alpha", "q", "lift", "drag", "buoy")]
+               ("m_add", "subf", "alpha", "q", "lift", "drag", "buoy", "vn")]
             + [self.n, self.nb, self.nm, int((self.is_wing == 0).any())],
             dtype=np.int64)
         self.p.step(desc, (

@@ -116,10 +116,32 @@ class BatchedFluid:
         self.xipos = np.zeros((nb, 3)); self.vel6 = np.zeros((nb, 6))
         self.out = {k: np.zeros(s) for k, s in (
             ("xfrc", (nb, 6)), ("m_body", nb), ("m_add", n), ("subf", n),
-            ("alpha", n), ("q", n), ("lift", n), ("drag", n), ("buoy", n))}
+            ("alpha", n), ("q", n), ("lift", n), ("drag", n), ("buoy", n),
+            ("vn", n))}
         self.clamped = np.zeros(nm, dtype=np.int32)
         self._has_bluff = int((self.is_wing == 0).any())
         self._v6 = np.zeros(6)
+        # Slam is a one-step finite difference of the entrained mass, so it
+        # needs the previous step's values and a primed flag, exactly as
+        # FluidSolver keeps them.  It is a *diagnostic*, but not an optional
+        # one: the transition score reads it as the hydrodynamic entry load, so
+        # leaving it at zero silently zeroed every crossing's shock term.
+        self._prev_ma = np.zeros(n)
+        self._prev_t = [None] * nm
+        self._primed = [False] * nm
+
+    def reset_slam(self):
+        """Clear the slam history, as `FluidSolver.reset` does.
+
+        The single-machine solver clears _prev_ma/_prev_t/_primed on every
+        env.reset(), which happens at the start of each segment and each
+        transition placement.  Without matching that, the first step of a new
+        segment differences against the last step of the previous one -- across
+        a teleport -- and invents an entry load out of the discontinuity.  It
+        cost eel 6% of its mission_fraction."""
+        self._prev_ma[:] = 0.0
+        self._prev_t = [None] * self.nm
+        self._primed = [False] * self.nm
 
     def apply(self, t: float, active=None) -> None:
         """Run the fluid for every environment and write their xfrc_applied.
@@ -150,7 +172,7 @@ class BatchedFluid:
             + [o["xfrc"].ctypes.data, o["m_body"].ctypes.data,
                self.clamped.ctypes.data]
             + [o[k].ctypes.data for k in
-               ("m_add", "subf", "alpha", "q", "lift", "drag", "buoy")]
+               ("m_add", "subf", "alpha", "q", "lift", "drag", "buoy", "vn")]
             + [self.n, self.nb, self.nm, self._has_bluff], dtype=np.int64)
         self.pipe.step(desc, (
             s.amplitude, s.wavelength, s.period,
@@ -172,6 +194,17 @@ class BatchedFluid:
             e.model.body_inertia[:] = (
                 self.dry_inertia[i] + (mb * self.lever2[i])[:, None])
             e.solver.diag.clamped = bool(self.clamped[i])
+            pa, pb = self.poff[i], self.poff[i + 1]
+            if self._primed[i] and self._prev_t[i] is not None:
+                dt = max(t - self._prev_t[i], 1e-6)
+                e.solver.diag.slam = float(np.abs(
+                    (o["m_add"][pa:pb] - self._prev_ma[pa:pb]) / dt
+                    * o["vn"][pa:pb]).max()) if pb > pa else 0.0
+            else:
+                e.solver.diag.slam = 0.0
+                self._primed[i] = True
+            self._prev_t[i] = t
+        self._prev_ma[:] = o["m_add"]
 
 
 def step_batch(envs, angles_list, bf: BatchedFluid, active=None):
@@ -190,7 +223,14 @@ def step_batch(envs, angles_list, bf: BatchedFluid, active=None):
             e.data.ctrl[: len(angles_list[i])] = angles_list[i]
         e.data.xfrc_applied[:] = 0.0
 
-    bf.apply(envs[0].data.time, active=active)
+    # The wave phase is a function of time, and every *active* machine is in
+    # lockstep, so any of them carries the batch clock.  It must not be envs[0]
+    # unconditionally: a machine whose battery has gone flat stops being
+    # stepped, its clock freezes, and everyone else would then be handed a
+    # stale phase.  That showed up as mission_fraction drifting by up to 6%
+    # once episodes started terminating early.
+    live_i = int(np.argmax(active)) if active.any() else 0
+    bf.apply(envs[live_i].data.time, active=active)
 
     for i, e in enumerate(envs):
         if not active[i]:
@@ -295,12 +335,10 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                          sea_state=None, perturb: dict | None = None):
     """`evaluate_tier1` for a whole generation, sharing one GPU pipeline.
 
-    The three domain segments are batched -- they are the bulk of the work and
-    all three run the same kernels.  The transitions are still one machine at a
-    time: `run_transition` has its own stepping loop and its own placement per
-    crossing, and batching it is a separate piece of work.  That caps the gain
-    here at roughly 1.6x rather than the 3.6x the segments alone reach, which
-    is worth knowing before reading the numbers.
+    Both the three domain segments and the three transitions are batched. What
+    is not, and cannot be, is the mobility identification: it drives each CPG
+    with random perturbations and fits a Jacobian from the result, so every
+    machine is running a different experiment with no shared timestep.
 
     Falls back to nothing: a phenotype that fails to compile is returned as a
     dead MissionResult in its slot, exactly as the unbatched version does, so
@@ -310,7 +348,6 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
 
     from .evaluate import (
         Controller, evaluate_tier0, finalise_tier1, transition_energy)
-    from .transitions import run_transition
     from .triphibian import DOMAIN_CYCLE, MissionResult, MissionSpec, TriphibianEnv
 
     spec = spec or MissionSpec()
@@ -370,6 +407,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     for dom in DOMAIN_CYCLE:
         for i in live:
             envs[i].reset(dom)
+        bf.reset_slam()
         segs = rollout_batch(
             group, bf, segment_seconds, [ctrls[i].params for i in live], dom,
             policies=[ctrls[i].policy for i in live],
@@ -378,10 +416,10 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
             results[i].segments[dom.value] = segs[slot]
             clamped[i] = clamped[i] or bool(envs[i].solver.diag.clamped)
 
-    # Transitions stay per-machine.  See the docstring.
-    for i in live:
-        for kind in ("air_to_water", "water_to_air", "water_to_land"):
-            tr = run_transition(envs[i], kind, ctrls[i])
+    for kind in ("air_to_water", "water_to_air", "water_to_land"):
+        trs = run_transition_batch(group, bf, kind, [ctrls[i] for i in live])
+        for slot, i in enumerate(live):
+            tr = trs[slot]
             results[i].transitions.results[kind] = tr
             results[i].transition_ok[kind] = tr.crossed
             if tr.failure:
@@ -401,3 +439,117 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     for r in results:
         r.wall_time = _time.time() - t0
     return results
+
+
+def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
+                         duration: float = 6.0):
+    """`run_transition` for a whole batch, one GPU call per timestep.
+
+    Mirrors the single-machine version exactly, including the two post-loop
+    crossing checks and the fact that they read the *final* state rather than a
+    peak.  The land->air bar in particular is terminal, not peak -- a machine
+    that leaps and comes down has not crossed -- and getting that wrong here
+    would quietly change what the search is rewarded for.
+    """
+    import numpy as _np
+
+    from .transitions import (
+        TRANSITION_ENDPOINTS, TransitionResult, _place_for, _score)
+    from .triphibian import Domain as _D
+
+    k = len(envs)
+    _, target = TRANSITION_ENDPOINTS[kind]
+    res = [TransitionResult(kind=kind, duration=duration) for _ in envs]
+
+    for m, e in enumerate(envs):
+        _place_for(e, kind)
+        res[m].survivable_entry_speed = float(e.p.max_entry_speed)
+    bf.reset_slam()
+
+    bases = [c.basis_for(_D.WATER if "water" in kind else _D.AIR) for c in ctrls]
+    n = int(duration / envs[0].timestep)
+    control_every = max(1, int(1.0 / (25.0 * envs[0].timestep)))
+    cur = [c.params for c in ctrls]
+
+    energy0 = [float(e.budget.total_j) for e in envs]
+    was_wet = [e.depth() > 0.0 for e in envs]
+    cross_step = [-1] * k
+    ups = [[] for _ in range(k)]
+    sps = [[] for _ in range(k)]
+    slamw = [[] for _ in range(k)]
+    slam_n = max(int(0.010 / envs[0].timestep), 1)
+    airborne = [0] * k
+    for m, e in enumerate(envs):
+        res[m].peak_clearance = float(e.clearance())
+
+    active = _np.ones(k, dtype=bool)
+    for i in range(n):
+        angles = []
+        for m, e in enumerate(envs):
+            if not active[m]:
+                angles.append(None)
+                continue
+            c = ctrls[m]
+            if (c.policy is not None and bases[m] is not None
+                    and i % control_every == 0):
+                cur[m] = bases[m].command_params(
+                    c.params, c.policy.act(e.observation(target)), e.cpg.n)
+            angles.append(e.cpg.command(cur[m], e.data.time))
+
+        was = active.copy()
+        active = step_batch(envs, angles, bf, active)
+        for m in range(k):
+            if was[m] and not active[m]:
+                res[m].failure = "battery exhausted mid-transition"
+
+        for m, e in enumerate(envs):
+            if not active[m]:
+                continue
+            pos = e.root_pos()
+            if not _np.all(_np.isfinite(pos)) or _np.abs(pos).max() > 400:
+                res[m].failure = "diverged"
+                active[m] = False
+                continue
+            up = float(e.data.xmat[e.root_body].reshape(3, 3)[2, 2])
+            ups[m].append(up)
+            sps[m].append(float(_np.linalg.norm(e.body_twist()[:3])))
+            res[m].min_upright = min(res[m].min_upright, up)
+            cl = float(e.clearance())
+            if cl > res[m].peak_clearance:
+                res[m].peak_clearance = cl
+            if int(e.data.ncon) == 0:
+                airborne[m] += 1
+            slamw[m].append(float(e.solver.diag.slam))
+            if len(slamw[m]) > slam_n:
+                slamw[m].pop(0)
+            if len(slamw[m]) == slam_n:
+                res[m].peak_slam = max(res[m].peak_slam,
+                                       float(_np.mean(slamw[m])))
+            wet = e.depth() > 0.0
+            if wet != was_wet[m]:
+                if cross_step[m] < 0:
+                    cross_step[m] = i
+                    res[m].peak_entry_speed = max(
+                        res[m].peak_entry_speed, abs(float(e.body_twist()[2])))
+                was_wet[m] = wet
+
+        if not active.any():
+            break
+
+    for m, e in enumerate(envs):
+        r = res[m]
+        if cross_step[m] < 0 and target is _D.LAND and e._touching_ground():
+            cross_step[m] = max(len(ups[m]) - 1, 0)
+        # Terminal, not peak: a machine that leapt and came down has not crossed.
+        if cross_step[m] < 0 and target is _D.AIR and e.clearance() > 0.5:
+            cross_step[m] = max(len(ups[m]) - 1, 0)
+        r.crossed = cross_step[m] >= 0 and not r.failure
+        r.airborne_fraction = airborne[m] / max(len(ups[m]), 1)
+        r.energy_j = float(e.budget.total_j - energy0[m])
+        r.exit_depth = float(e.depth())
+        r.exit_upright = float(ups[m][-1]) if ups[m] else 0.0
+        r.exit_speed = float(sps[m][-1]) if sps[m] else 0.0
+        _score(e, r, cross_step[m], _np.array(ups[m]), _np.array(sps[m]), target)
+        if not r.crossed and not r.failure:
+            r.failure = "never crossed the boundary"
+    return res
