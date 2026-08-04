@@ -51,6 +51,43 @@ except Exception as exc:  # pragma: no cover
     UNAVAILABLE_REASON = f"{type(exc).__name__}: {exc}"
 
 
+#: One pipeline for the whole process, reused.
+#:
+#: Constructing a second FullPipeline in the same process hangs -- the call
+#: never returns and the GPU sits idle.  That was noted as a curiosity when the
+#: pipeline was built, on the reasoning that a rollout only needs one.  It is
+#: not a curiosity: evaluate_tier1_batch builds a BatchedFluid per call, which
+#: is once per generation, so a training run completed generation 0 and then
+#: hung for fifteen hours on generation 1.
+#:
+#: Reusing one pipeline sidesteps it and is the right shape regardless -- the
+#: allocation is the expensive part, and the panel geometry has to be
+#: re-uploaded per batch anyway.  Capacity is taken generously on first use
+#: because it cannot grow afterwards; exceeding it raises rather than quietly
+#: constructing a second one and hanging.
+_POOL = {"pipe": None, "cap": (0, 0, 0)}
+
+MIN_CAP_PANELS = 16384
+MIN_CAP_BODIES = 2048
+MIN_CAP_MACHINES = 256
+
+
+def _get_pipeline(n: int, nb: int, nm: int):
+    cap = _POOL["cap"]
+    if _POOL["pipe"] is None:
+        cap = (max(n, MIN_CAP_PANELS), max(nb, MIN_CAP_BODIES),
+               max(nm, MIN_CAP_MACHINES))
+        _POOL["pipe"] = _fp.FullPipeline(*cap)
+        _POOL["cap"] = cap
+    elif n > cap[0] or nb > cap[1] or nm > cap[2]:
+        raise RuntimeError(
+            f"batch of {n} panels / {nb} bodies / {nm} machines exceeds the "
+            f"pipeline capacity {cap}, and it cannot be grown: constructing a "
+            "second FullPipeline in one process hangs. Raise MIN_CAP_* and "
+            "restart the run.")
+    return _POOL["pipe"]
+
+
 class BatchedFluid:
     """One GPU pipeline serving N environments stepped in lockstep.
 
@@ -103,7 +140,7 @@ class BatchedFluid:
         self.dry_inertia = [e.solver._dry_inertia.copy() for e in self.envs]
         self.lever2 = [e.solver._lever2.copy() for e in self.envs]
 
-        self.pipe = _fp.FullPipeline(n, nb, nm)
+        self.pipe = _get_pipeline(n, nb, nm)
         self.pipe.upload_static(np.array(
             [a.ctypes.data for a in (
                 self.body_id, self.machine, self.is_wing, self.pos_local,
