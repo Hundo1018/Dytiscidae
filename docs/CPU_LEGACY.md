@@ -21,17 +21,29 @@ corrections table. This file is only for decisions that a GPU changes.
 
 `controller_refine_steps: int = 0` — [`evolution/loop.py`](../dytiscidae/evolution/loop.py)
 
-Zero means "inherit only": a child's controller is its parent's weights, and no
-optimisation happens in the loop. The 500-generation runs (`arch19`–`arch28`)
-all ran this way, so **no controller learning occurred in them at any point**.
-Morphology evolved; control did not.
+A child's controller is its parent's weights, and no optimisation happens in the
+loop. The 500-generation runs (`arch19`–`arch28`) all ran this way, so **no
+controller learning occurred in them at any point**. Morphology evolved; control
+did not.
+
+This entry originally described the field as a dial set to zero. It is not a
+dial. `controller_refine_steps` occurs exactly once in the codebase — the
+declaration above — and nothing reads it. Setting it to 20 changes nothing at
+all. The loop's own module docstring says "the child's controller is inherited
+and locally refined", and the second half of that sentence has never been true.
+
+That distinction decides how much work item 1 is. It is not a config change to
+be made before the next run; it is writing the refinement loop, choosing what it
+optimises against, and paying for it in evaluations.
 
 This is the largest single item here, and it is not a subtle one: the search has
 been selecting bodies on the strength of an untrained controller, which
 systematically favours designs that work *without* control.
 
-**What a GPU changes:** the reason for 0 was that each refinement step costs a
-full Tier-1 evaluation. That is the cost the port is removing.
+**What a GPU changes:** the reason to leave it unwritten was that each
+refinement step costs a full Tier-1 evaluation. That is the cost the port
+removes — a generation of candidates now evaluates in one set of kernel
+launches, so refinement steps batch the same way.
 
 ## 2. The policy is linear
 
