@@ -227,6 +227,67 @@ def evaluate_candidate(
     return pheno, result, ctrl
 
 
+def evaluate_candidates(
+    genomes,
+    cfg: SearchConfig,
+    *,
+    inherited=None,
+    identify: bool = True,
+    spec: MissionSpec | None = None,
+    seeds=None,
+):
+    """Tier-0 gate then a shared Tier-1 for the whole group.
+
+    Same contract as ``evaluate_candidate`` but for a list, returning one
+    ``(phenotype, result, controller)`` per input in the same order.  Falls back
+    to the per-candidate path when the GPU extension is not importable, so a
+    CPU-only checkout behaves exactly as it did.
+
+    The Tier-0 gate is applied first and independently, as it is per candidate:
+    a genome that fails it never reaches Tier-1 and never joins the batch, which
+    also keeps the batch free of designs that would only waste device memory.
+    """
+    from ..envs import batchroll
+
+    k = len(genomes)
+    inherited = inherited or [None] * k
+    seeds = seeds or [0] * k
+    out = [None] * k
+    phenos = [build(g) for g in genomes]
+
+    passed = []
+    for i, pheno in enumerate(phenos):
+        t0 = evaluate_tier0(pheno, spec)
+        if pheno.report.min_margin < cfg.tier0_gate or t0.mission_fraction <= 0.0:
+            out[i] = (pheno, t0, None)
+        else:
+            passed.append(i)
+
+    if not passed:
+        return out
+
+    if not batchroll.AVAILABLE:
+        for i in passed:
+            out[i] = evaluate_candidate(
+                genomes[i], cfg, inherited_policy=inherited[i],
+                identify=identify, spec=spec, seed=seeds[i])
+        return out
+
+    ctrls = []
+    for i in passed:
+        policy = _controller_for(phenos[i], genomes[i], cfg, inherited[i])
+        ctrls.append(Controller(params=None, policy=policy))
+
+    results = batchroll.evaluate_tier1_batch(
+        [phenos[i] for i in passed], spec=spec,
+        controllers=[None if identify else c for c in ctrls],
+        segment_seconds=cfg.segment_seconds, identify_axes=identify,
+        seed=seeds[passed[0]])
+    for slot, i in enumerate(passed):
+        out[i] = (phenos[i], results[slot], ctrls[slot])
+    return out
+
+
 def seed_archive(state: SearchState, spec: MissionSpec) -> None:
     """Populate the archive with the reference design and its neighbourhood."""
     cfg = state.config
@@ -529,6 +590,20 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             a.generation = gen
         regime = curator.update_regime()
 
+        # The generation's candidates are built first and evaluated together, so
+        # their panels share one GPU launch.  Built strictly in the order the
+        # sequential version built them, and placed in that same order, so the
+        # curator sees the same sequence of outcomes.
+        #
+        # `state.evaluated` used to advance between candidates within a
+        # generation, feeding both `genome_id` and the identify cadence.  It
+        # cannot now, so a local counter stands in.  The one visible difference:
+        # a candidate that throws no longer holds the number back for the next
+        # one, so ids within a generation can skip.  That is a naming detail --
+        # ids are for tracing, and the identify cadence is a "% every N" that
+        # does not care where the phase sits.
+        built = []
+        counter = state.evaluated
         for _ in range(cfg.batch):
             # Immigrants and hybrids are evaluated before anything home-grown,
             # because the whole point of moving them is to find out whether they
@@ -554,20 +629,30 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                             operators = operators + ["crossover"]
 
             child.generation = gen
-            child.genome_id = f"{state.island[:2]}{gen}_{state.evaluated}"
-            identify = (state.evaluated % max(cfg.identify_axes_every, 1)) == 0
+            child.genome_id = f"{state.island[:2]}{gen}_{counter}"
+            identify = (counter % max(cfg.identify_axes_every, 1)) == 0
+            counter += 1
+            built.append((child, inherited, identify, operators, parent,
+                          int(rng.integers(1 << 30))))
 
-            try:
-                pheno, result, ctrl = evaluate_candidate(
-                    child, cfg, inherited_policy=inherited, identify=identify,
-                    spec=spec, seed=int(rng.integers(1 << 30))
-                )
-            except Exception as exc:
-                telemetry.event({"kind": "error", "gen": gen, "island": state.island,
-                                 "error": f"{type(exc).__name__}: {exc}"})
+        try:
+            evaluated = evaluate_candidates(
+                [b[0] for b in built], cfg,
+                inherited=[b[1] for b in built],
+                identify=any(b[2] for b in built), spec=spec,
+                seeds=[b[5] for b in built])
+        except Exception as exc:
+            telemetry.event({"kind": "error", "gen": gen, "island": state.island,
+                             "error": f"{type(exc).__name__}: {exc}"})
+            for _c, _i, _id, operators, _p, _s in built:
+                curator.credit(operators, "rejected", 0.0)
+            evaluated = []
+
+        for (child, _inh, _idf, operators, parent, _sd), got in zip(built, evaluated):
+            if got is None:
                 curator.credit(operators, "rejected", 0.0)
                 continue
-
+            pheno, result, ctrl = got
             state.evaluated += 1
             curator.evaluations += 1
             _place(state, child, pheno, result, ctrl, parent, operators)

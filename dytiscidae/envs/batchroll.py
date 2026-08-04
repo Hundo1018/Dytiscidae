@@ -290,7 +290,8 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
 
 
 def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
-                         segment_seconds: float = 10.0, seed: int = 0,
+                         segment_seconds: float = 10.0,
+                         identify_axes: bool = False, seed: int = 0,
                          sea_state=None, perturb: dict | None = None):
     """`evaluate_tier1` for a whole generation, sharing one GPU pipeline.
 
@@ -343,6 +344,25 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     for i in live:
         ctrls[i] = (controllers[i] if controllers and controllers[i] is not None
                     else Controller(params=envs[i].cpg.base))
+
+    # Mobility identification, if asked for.  Per machine and sequential: it
+    # drives the CPG with random parameter perturbations and fits a Jacobian
+    # from the resulting body twist, so every machine is running a *different*
+    # experiment and there is no shared timestep to batch across.  Left on the
+    # CPU rather than pretended away, and it is a real part of the cost --
+    # identify_axes_every is 1 in every run config so far, meaning every
+    # candidate pays it.
+    if identify_axes:
+        from .triphibian import Domain as _D
+        for i in live:
+            for dom in (_D.AIR, _D.WATER):
+                try:
+                    results[i].mobility[dom.value] = envs[i].identify(dom, seed=seed)
+                except Exception as exc:
+                    results[i].notes.append(
+                        f"mobility id failed in {dom.value}: {exc}")
+            if ctrls[i].bases is None:
+                ctrls[i].bases = results[i].mobility
 
     group = [envs[i] for i in live]
     bf = BatchedFluid(group)
