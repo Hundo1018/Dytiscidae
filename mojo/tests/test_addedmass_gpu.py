@@ -23,8 +23,12 @@ def reference(v_rel, s_hat, c_hat, n_hat, d_full, rho, ext, chord, dr, volume,
     m_add = np.where(is_wing.astype(bool),
                      rho * np.pi * chord**2 * 0.25 * dr,
                      ca_eff * rho * volume) * scale
+    # m_body is no longer this kernel's job: the per-body sum moved to
+    # scatter_gpu.gather_body_kernel, which forms it in panel-index order so
+    # the result does not depend on warp arrival.  The atomic version made a
+    # whole evaluation irreproducible.  Kept here as a reference only so the
+    # shape of the test is unchanged; the kernel writes zeros.
     m_body = np.zeros(nbody)
-    np.add.at(m_body, body_id, m_add)
     return m_add, vn, m_body, m_add * GRAVITY
 
 
@@ -78,7 +82,8 @@ def case(n, nbody, has_bluff, seed, all_wing=False, still=False):
 
 
 def main():
-    print(f"{'case':28s} {'m_add':>10s} {'vn':>10s} {'m_body':>10s} {'F_z':>10s}")
+    print(f"{'case':28s} {'m_add':>10s} {'vn':>10s} {'m_body':>10s} {'F_z':>10s}"
+          "   (m_body now zero here; see gather_body_kernel)")
     cases = [
         ("mixed, bluff present", dict(n=200000, nbody=64, has_bluff=True, seed=1)),
         ("all wing", dict(n=100000, nbody=32, has_bluff=True, seed=2, all_wing=True)),

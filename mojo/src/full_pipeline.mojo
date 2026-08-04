@@ -33,7 +33,7 @@ from fluid_gpu import (
 )
 from medium_gpu import medium_kernel
 from assembly_gpu import assembly_kernel
-from scatter_gpu import fmag_kernel, limit_scatter_kernel
+from scatter_gpu import fmag_kernel, gather_body_kernel
 
 comptime BLOCK = 128
 comptime F64 = DType.float64
@@ -80,6 +80,7 @@ struct FullPipeline(Movable, Writable):
 
     # static geometry
     var body_id: DeviceBuffer[I32]
+    var body_start: DeviceBuffer[I32]
     var machine: DeviceBuffer[I32]
     var is_wing: DeviceBuffer[I32]
     var pos_local: DeviceBuffer[F64]
@@ -150,6 +151,7 @@ struct FullPipeline(Movable, Writable):
         self.cap_m = cap_m
         var c = self.ctx
         self.body_id = c.enqueue_create_buffer[I32](cap_p)
+        self.body_start = c.enqueue_create_buffer[I32](cap_b + 1)
         self.machine = c.enqueue_create_buffer[I32](cap_p)
         self.is_wing = c.enqueue_create_buffer[I32](cap_p)
         self.pos_local = c.enqueue_create_buffer[F64](cap_p * 3)
@@ -225,11 +227,13 @@ struct FullPipeline(Movable, Writable):
                       desc: PythonObject) raises -> PythonObject:
         """body_id, machine, is_wing, pos_local, span_local, chord_local,
         normal_local, ext, chord, camber, dr, area, volume, vol_buoy,
-        half_height, cd_bluff, ar, c_rot, limit, n, nmachine"""
+        half_height, cd_bluff, ar, c_rot, limit, body_start,
+        then n, nmachine, nbody"""
         var d = UnsafePointer[Int64, MutAnyOrigin](
             unsafe_from_address=Int(py=desc.ctypes.data))
-        var n = Int(d[unsafe_offset=19])
-        var nm = Int(d[unsafe_offset=20])
+        var n = Int(d[unsafe_offset=20])
+        var nm = Int(d[unsafe_offset=21])
+        var nb_static = Int(d[unsafe_offset=22])
         ref s = self_ptr[]
         if n > s.cap_p or nm > s.cap_m:
             raise Error("FullPipeline: batch exceeds capacity")
@@ -252,6 +256,9 @@ struct FullPipeline(Movable, Writable):
         _up_f64(s.ctx, s.ar, Int(d[unsafe_offset=16]), n)
         _up_f64(s.ctx, s.c_rot, Int(d[unsafe_offset=17]), n)
         _up_f64(s.ctx, s.limit, Int(d[unsafe_offset=18]), nm)
+        # CSR offsets, one per body plus a terminator.  Panels are contiguous
+        # per body, so this is all the structure the deterministic gather needs.
+        _up_i32(s.ctx, s.body_start, Int(d[unsafe_offset=19]), nb_static + 1)
         s.ctx.synchronize()
         return PythonObject(n)
 
@@ -363,11 +370,16 @@ struct FullPipeline(Movable, Writable):
         ctx.enqueue_function[fmag_kernel](
             s.force.unsafe_ptr(), s.machine.unsafe_ptr(), s.fmag.unsafe_ptr(),
             s.fmax.unsafe_ptr(), Int32(n), grid_dim=g, block_dim=BLOCK)
-        ctx.enqueue_function[limit_scatter_kernel](
-            s.force.unsafe_ptr(), s.fmag.unsafe_ptr(), s.machine.unsafe_ptr(),
-            s.limit.unsafe_ptr(), s.fmax.unsafe_ptr(), s.pos_w.unsafe_ptr(),
-            s.xipos.unsafe_ptr(), s.body_id.unsafe_ptr(), s.xfrc.unsafe_ptr(),
-            s.clamped.unsafe_ptr(), Int32(n), grid_dim=g, block_dim=BLOCK)
+        # One thread per body, summing its own panels in index order.  Replaces
+        # two atomic scatters whose accumulation order was decided by warp
+        # arrival, which made a whole evaluation irreproducible.
+        ctx.enqueue_function[gather_body_kernel](
+            s.m_add.unsafe_ptr(), s.force.unsafe_ptr(), s.fmag.unsafe_ptr(),
+            s.machine.unsafe_ptr(), s.limit.unsafe_ptr(), s.fmax.unsafe_ptr(),
+            s.pos_w.unsafe_ptr(), s.xipos.unsafe_ptr(),
+            s.body_start.unsafe_ptr(), s.m_body.unsafe_ptr(),
+            s.xfrc.unsafe_ptr(), s.clamped.unsafe_ptr(), Int32(nb),
+            grid_dim=ceildiv(nb, BLOCK), block_dim=BLOCK)
 
         _dn_f64(ctx, s.xfrc, Int(d[unsafe_offset=4]), nb * 6)
         _dn_f64(ctx, s.m_body, Int(d[unsafe_offset=5]), nb)

@@ -335,7 +335,11 @@ def added_mass_kernel(
     # inertia but no weight.
     fz[unsafe_offset=i] = ma * GRAVITY
 
-    _ = Atomic.fetch_add(m_body + Int(body_id[unsafe_offset=i]), ma)
+    # The per-body sum is formed by gather_body_kernel instead, in index
+    # order.  Doing it with an atomic here made the result depend on warp
+    # arrival, which propagated into every score.
+    _ = m_body
+    _ = body_id
 
 
 def coeff_kernel(

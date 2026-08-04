@@ -188,3 +188,88 @@ def PyInit_scatter_gpu() abi("C") -> PythonObject:
         return m.finalize()
     except e:
         abort(String("failed to create module: ", e))
+
+
+def gather_body_kernel(
+    m_add: UnsafePointer[Float64, MutAnyOrigin],
+    f: UnsafePointer[Float64, MutAnyOrigin],
+    fmag: UnsafePointer[Float64, MutAnyOrigin],
+    machine: UnsafePointer[Int32, MutAnyOrigin],
+    limit: UnsafePointer[Float64, MutAnyOrigin],
+    fmax: UnsafePointer[Float64, MutAnyOrigin],
+    pos: UnsafePointer[Float64, MutAnyOrigin],
+    xipos: UnsafePointer[Float64, MutAnyOrigin],
+    body_start: UnsafePointer[Int32, MutAnyOrigin],
+    m_body: UnsafePointer[Float64, MutAnyOrigin],
+    xfrc: UnsafePointer[Float64, MutAnyOrigin],
+    clamped: UnsafePointer[Int32, MutAnyOrigin],
+    nbody: Int32,
+):
+    """Deterministic replacement for the two atomic scatters.
+
+    One thread per *body*, summing that body's own panels in index order, so
+    the result does not depend on which warp arrives first.
+
+    This exists because the atomic version was not reproducible and that was
+    not a cosmetic problem.  Running the same seven-machine batch three times
+    gave one design a mission_fraction of 0.01478594, then 0.00640494, then
+    0.01473896 -- two attractors a factor of 2.3 apart, selected by scheduling.
+    The judge ratchets its bars on population quantiles and the curator credits
+    operators on outcomes, so a score that flips like that feeds both: a design
+    could be credited or culled by warp order.
+
+    Panels are contiguous per body -- PanelSet builds them in body order and
+    concatenating machines preserves it, since bodies are rebased in order --
+    so `body_start` is a plain CSR offset array of length nbody+1 and no sort
+    or permutation is needed.
+    """
+    var b = Int(global_idx.x)
+    if Int32(b) >= nbody:
+        return
+    var lo = Int(body_start[unsafe_offset=b])
+    var hi = Int(body_start[unsafe_offset=b + 1])
+
+    var ma_sum: Float64 = 0.0
+    var fx: Float64 = 0.0
+    var fy: Float64 = 0.0
+    var fz: Float64 = 0.0
+    var tx: Float64 = 0.0
+    var ty: Float64 = 0.0
+    var tz: Float64 = 0.0
+
+    for i in range(lo, hi):
+        ma_sum += m_add[unsafe_offset=i]
+
+        var mi = Int(machine[unsafe_offset=i])
+        var lim = limit[unsafe_offset=mi]
+        var scale: Float64 = 1.0
+        if fmax[unsafe_offset=mi] > lim:
+            var m = fmag[unsafe_offset=i]
+            var denom = m if m > 1e-9 else 1e-9
+            var s = lim / denom
+            scale = s if s < 1.0 else 1.0
+            clamped[unsafe_offset=mi] = 1
+
+        var j = i * 3
+        var px = f[unsafe_offset=j + 0] * scale
+        var py = f[unsafe_offset=j + 1] * scale
+        var pz = f[unsafe_offset=j + 2] * scale
+        fx += px
+        fy += py
+        fz += pz
+
+        var ax = pos[unsafe_offset=j + 0] - xipos[unsafe_offset=b * 3 + 0]
+        var ay = pos[unsafe_offset=j + 1] - xipos[unsafe_offset=b * 3 + 1]
+        var az = pos[unsafe_offset=j + 2] - xipos[unsafe_offset=b * 3 + 2]
+        tx += ay * pz - az * py
+        ty += az * px - ax * pz
+        tz += ax * py - ay * px
+
+    m_body[unsafe_offset=b] = ma_sum
+    var o = b * 6
+    xfrc[unsafe_offset=o + 0] = fx
+    xfrc[unsafe_offset=o + 1] = fy
+    xfrc[unsafe_offset=o + 2] = fz
+    xfrc[unsafe_offset=o + 3] = tx
+    xfrc[unsafe_offset=o + 4] = ty
+    xfrc[unsafe_offset=o + 5] = tz

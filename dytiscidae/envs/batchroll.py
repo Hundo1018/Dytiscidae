@@ -136,6 +136,11 @@ class BatchedFluid:
         self.limit = C(np.array([
             60.0 * (float(e.solver._dry_mass.sum()) * GRAVITY + 1.0)
             for e in self.envs]))
+        # CSR offsets: where each body's panels start in the concatenated
+        # array.  Panels are contiguous per body (PanelSet builds them in body
+        # order, and rebasing preserves it), so a searchsorted is exact.
+        self.body_start = C(np.searchsorted(
+            self.body_id, np.arange(nb + 1), side="left").astype(np.int32))
         self.dry_mass = [e.solver._dry_mass.copy() for e in self.envs]
         self.dry_inertia = [e.solver._dry_inertia.copy() for e in self.envs]
         self.lever2 = [e.solver._lever2.copy() for e in self.envs]
@@ -147,7 +152,8 @@ class BatchedFluid:
                 self.span_local, self.chord_local, self.normal_local, self.ext,
                 self.chord, self.camber, self.dr, self.area, self.volume,
                 self.vol_buoy, self.half_height, self.cd_bluff, self.ar,
-                self.c_rot, self.limit)] + [n, nm], dtype=np.int64))
+                self.c_rot, self.limit, self.body_start)]
+            + [n, nm, nb], dtype=np.int64))
 
         self.xpos = np.zeros((nb, 3)); self.xmat = np.zeros((nb, 9))
         self.xipos = np.zeros((nb, 3)); self.vel6 = np.zeros((nb, 6))
