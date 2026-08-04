@@ -14,25 +14,26 @@ from dytiscidae.envs.evaluate import evaluate_tier1
 
 SEG = 1.0
 
-# Six of the seven plans agree exactly.  teal does not, and the reason is
-# measured rather than assumed: stepping the two paths side by side, the first
-# difference appears at step 0 in xfrc_applied alone, at 3.8e-19 -- sub-ULP,
-# the smallest difference two summation orders can produce.  numpy's einsum does
-# not sum left-to-right and the kernels do.  From that seed it grows
-# monotonically through a contact-rich rollout: 7e-15 in qpos by step 50, 1.4e-12
-# by step 400, and about 1.3e-3 relative in mission_fraction over the full
-# ~10000-step evaluation.
+# All seven plans now agree to within 1.5e-6 in mission_fraction, and two full
+# runs of this test give bit-identical numbers.  Getting there took removing the
+# atomic accumulations from the GPU scatter: warp arrival order was selecting
+# between two attractors for bat -- 0.01478594, 0.00640494, 0.01473896 on three
+# runs of identical code.  A gather that sums each body's panels in index order
+# costs nothing measurable (2.65x against 2.68x) and removed that entirely.
 #
-# teal is the leaping design, so it spends its rollout in contact, which is
-# where a chaotic system amplifies fastest.  Both paths are deterministic --
-# three batched runs give bit-identical results -- so this is not noise to be
-# averaged away, it is two correct arithmetics diverging.
+# What remains is the summation-order difference that this port started with:
+# numpy's einsum does not sum left-to-right and the kernels do.  Stepping the two
+# paths side by side, the first difference appears at step 0 in xfrc_applied
+# alone, at 3.8e-19 -- sub-ULP, the smallest difference two orders can produce.
+# It grows through a contact-rich rollout, and teal is the leaping design so it
+# spends its rollout in contact, which is where a chaotic system amplifies
+# fastest.  1.4e-6 over ~10000 steps is that growth, not an error.
 #
-# The bound is set from that measurement.  It still catches a transcription
-# error: those do not start at 3.8e-19, they start at the magnitude of whatever
-# term was dropped, and the earlier slam and reset bugs showed up here as 6% and
-# 100% respectively.
-TOL = 5e-3
+# The bound is set an order of magnitude above the worst observed gap.  It still
+# catches a transcription error: those do not start at 3.8e-19, they start at the
+# magnitude of whatever term was dropped, and the earlier slam, reset and atomic
+# bugs showed up here as 6%, 100% and 130% respectively.
+TOL = 1e-5
 
 
 def main():
