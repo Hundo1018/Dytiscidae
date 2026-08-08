@@ -159,6 +159,8 @@ def evaluate_tier1(
         return r
 
     ctrl = controller or Controller(params=env.cpg.base)
+    if ctrl.params is None:  # see batchroll: the rhythm belongs to the body
+        ctrl.params = env.cpg.base
 
     if identify_axes:
         for dom in (Domain.AIR, Domain.WATER):
@@ -166,8 +168,10 @@ def evaluate_tier1(
                 r.mobility[dom.value] = env.identify(dom, seed=seed)
             except Exception as exc:
                 r.notes.append(f"mobility id failed in {dom.value}: {exc}")
-        if ctrl.bases is None:
-            ctrl.bases = r.mobility
+        # Overwrite: a basis belongs to the body it was measured on, and an
+        # inherited controller carries its parent's.  See batchroll for the
+        # same correction on the batched path.
+        ctrl.bases = r.mobility
 
     clamped_any = False
     for dom in DOMAIN_CYCLE:
@@ -254,6 +258,8 @@ def evaluate_tier2(
         return r
 
     ctrl = controller or Controller(params=env.cpg.base)
+    if ctrl.params is None:  # see batchroll: the rhythm belongs to the body
+        ctrl.params = env.cpg.base
 
     # Random starting domain, then cycle -- as specified.
     start = int(rng.integers(len(DOMAIN_CYCLE)))

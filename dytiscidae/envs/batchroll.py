@@ -446,6 +446,12 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     for i in live:
         ctrls[i] = (controllers[i] if controllers and controllers[i] is not None
                     else Controller(params=envs[i].cpg.base))
+        # A caller-supplied controller arrives with params=None -- the rhythm
+        # belongs to the body, which the caller does not have until it is built
+        # here.  Nothing used to fill it in because the supplied controller was
+        # discarded before this point; now that it is honoured, it must be.
+        if ctrls[i].params is None:
+            ctrls[i].params = envs[i].cpg.base
 
     # Mobility identification, if asked for.  Per machine and sequential: it
     # drives the CPG with random parameter perturbations and fits a Jacobian
@@ -463,8 +469,12 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                 except Exception as exc:
                     results[i].notes.append(
                         f"mobility id failed in {dom.value}: {exc}")
-            if ctrls[i].bases is None:
-                ctrls[i].bases = results[i].mobility
+            # Overwrite rather than fill-if-empty.  A mobility basis is a
+            # property of the body it was measured on, and an inherited
+            # controller arrives carrying its parent's.  Keeping those would
+            # drive a child through its parent's axes, which is precisely the
+            # thing the identification exists to prevent.
+            ctrls[i].bases = results[i].mobility
 
     group = [envs[i] for i in live]
     bf = BatchedFluid(group)

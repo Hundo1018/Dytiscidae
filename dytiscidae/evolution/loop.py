@@ -78,8 +78,10 @@ class SearchConfig:
     tier0_gate: float = -0.85  # reject below this structural margin
     tier2_every: int = 15
 
-    # Controller refinement
-    controller_refine_steps: int = 0  # CMA-ES iterations per child (0 = inherit only)
+    # Controller refinement.  Each step is one extra batched Tier-1 for the
+    # whole generation, so a generation costs (1 + steps) evaluations.
+    controller_refine_steps: int = 0  # (1+1)-ES steps per candidate; 0 = inherit only
+    controller_refine_sigma: float = 0.1  # perturbation scale on policy weights
     policy_hidden: int = 0
     n_modes: int = 4
 
@@ -219,7 +221,7 @@ def evaluate_candidate(
     result = evaluate_tier1(
         pheno,
         spec=spec,
-        controller=None if identify else ctrl,
+        controller=ctrl,  # see evaluate_candidates: identify is not a policy switch
         segment_seconds=cfg.segment_seconds,
         identify_axes=identify,
         seed=seed,
@@ -280,11 +282,22 @@ def evaluate_candidates(
     inherited = inherited or [None] * k
     seeds = seeds or [0] * k
     out = [None] * k
-    phenos = [build(g) for g in genomes]
 
+    # Build and gate one at a time.  A genome that will not build is one dead
+    # candidate, not a dead group -- as a list comprehension here would have
+    # made it.  That distinction is invisible in the generation loop, which
+    # catches the exception and credits the whole batch as rejected, but it is
+    # fatal during seeding: one bad random genome would leave every island
+    # empty and the run would proceed against a blank archive.
+    phenos: list = [None] * k
     passed = []
-    for i, pheno in enumerate(phenos):
-        t0 = evaluate_tier0(pheno, spec)
+    for i, g in enumerate(genomes):
+        try:
+            pheno = build(g)
+            t0 = evaluate_tier0(pheno, spec)
+        except Exception:
+            continue
+        phenos[i] = pheno
         if pheno.report.min_margin < cfg.tier0_gate or t0.mission_fraction <= 0.0:
             out[i] = (pheno, t0, None)
         else:
@@ -308,12 +321,98 @@ def evaluate_candidates(
 
     results = batchroll.evaluate_tier1_batch(
         [phenos[i] for i in passed], spec=spec,
-        controllers=[None if identify else c for c in ctrls],
+        # The controller goes in whether or not axes are being identified.
+        # These used to be the same switch -- `None if identify else c` -- and
+        # since identify_axes_every defaults to 1, that made it None always, so
+        # no evaluation in the search ever ran a policy.  Identifying a body's
+        # mobility axes and driving it with a policy are independent; the
+        # batched evaluator has always accepted both in one call.
+        controllers=ctrls,
         segment_seconds=cfg.segment_seconds, identify_axes=identify,
         seed=seeds[passed[0]])
+
+    results = _refine_controllers(
+        [phenos[i] for i in passed], ctrls, results, cfg,
+        spec=spec, seed=seeds[passed[0]])
+
     for slot, i in enumerate(passed):
         out[i] = (phenos[i], results[slot], ctrls[slot])
     return out
+
+
+def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed):
+    """Local search on policy weights, every candidate advanced in one batch.
+
+    A (1+1) evolution strategy: perturb, evaluate, keep the perturbation if the
+    mission fraction improved.  It is the cheapest thing that is honestly a
+    search, and more importantly it is the shape the GPU wants -- one perturbed
+    weight vector per candidate means each refinement step is a single batched
+    evaluation, the same call the generation itself uses.  A per-candidate
+    CMA-ES would need one batch per candidate per step and would not fit.
+
+    Refinement never re-identifies axes.  The bases were measured on these exact
+    bodies in the call above and are already on the controllers; identification
+    is per-machine and sequential, so repeating it every step would cost more
+    than the refinement.
+
+    Weights start at zero for a candidate whose shape did not match its parent,
+    and a zero policy commands nothing -- so a refinement step is also the only
+    thing that ever gives such a candidate a non-zero controller.
+    """
+    steps = int(getattr(cfg, "controller_refine_steps", 0))
+    if steps <= 0 or not ctrls:
+        return results
+
+    sigma = float(getattr(cfg, "controller_refine_sigma", 0.1))
+    rng = np.random.default_rng(seed ^ 0x9E3779B9)
+    best = [float(r.mission_fraction) for r in results]
+
+    for _ in range(steps):
+        trials, sizes = [], []
+        for c in ctrls:
+            w = c.policy.weights if c.policy is not None else None
+            if w is None or w.size == 0:
+                trials.append(c)
+                sizes.append(None)
+                continue
+            step = rng.normal(0.0, sigma, size=w.shape)
+            trial = Controller(params=c.params,
+                               policy=_copy_policy(c.policy, w + step),
+                               bases=c.bases)
+            trials.append(trial)
+            sizes.append(step)
+
+        if all(s is None for s in sizes):
+            break
+
+        trial_results = batchroll_eval(
+            phenos, trials, cfg, spec=spec, seed=seed)
+
+        for i, (tr, step) in enumerate(zip(trial_results, sizes)):
+            if step is None or tr is None:
+                continue
+            score = float(tr.mission_fraction)
+            if score > best[i]:
+                best[i] = score
+                ctrls[i].policy = trials[i].policy
+                results[i] = tr
+
+    return results
+
+
+def _copy_policy(policy, weights):
+    """A policy with the same shape and different weights."""
+    twin = Policy(n_obs=policy.n_obs, n_modes=policy.n_modes, hidden=policy.hidden)
+    twin.weights = np.asarray(weights, float)
+    return twin
+
+
+def batchroll_eval(phenos, ctrls, cfg, *, spec, seed):
+    """One batched Tier-1 with given controllers and no axis identification."""
+    from ..envs import batchroll
+    return batchroll.evaluate_tier1_batch(
+        phenos, spec=spec, controllers=ctrls,
+        segment_seconds=cfg.segment_seconds, identify_axes=False, seed=seed)
 
 
 def seed_archive(state: SearchState, spec: MissionSpec) -> None:
@@ -915,19 +1014,31 @@ def seed_archipelago(state: SearchState, spec: MissionSpec) -> None:
     *reward*, not in what they start from, so any divergence between them after
     a few hundred generations is attributable to the objective rather than to
     the draw.
+
+    The seeds go through the batched evaluator, like every other generation.
+    They used to go one at a time through ``evaluate_candidate``, which meant
+    the whole seeding phase ran on the numpy solver with no GPU batching at all:
+    175 s of a run's 228 s pre-loop cost, at 8.75 s per seed against 4.8 s per
+    candidate once batched.  Nothing about seeding needs the singular path --
+    it was simply written before there was a batched one.
     """
     cfg = state.config
     seeds: list[Genome] = list(seed_population(state.rng, cfg.n_reference_seeds))
     seeds += [random_genome(state.rng) for _ in range(cfg.n_random_seeds)]
-
     for i, g in enumerate(seeds):
         g.genome_id = f"seed{i}"
-        try:
-            pheno, result, ctrl = evaluate_candidate(
-                g, cfg, identify=True, spec=spec, seed=int(state.rng.integers(1 << 30))
-            )
-        except Exception:
+
+    seed_seeds = [int(state.rng.integers(1 << 30)) for _ in seeds]
+    try:
+        evaluated = evaluate_candidates(
+            seeds, cfg, identify=True, spec=spec, seeds=seed_seeds)
+    except Exception:
+        return
+
+    for g, got in zip(seeds, evaluated):
+        if got is None:
             continue
+        pheno, result, ctrl = got
         state.evaluated += 1
         # One evaluation, filed on every island: the physics is the same, only
         # the scoring differs, so re-simulating per island would buy nothing.
