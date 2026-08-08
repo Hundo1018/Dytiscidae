@@ -146,6 +146,9 @@ def cmd_search(args) -> int:
         batch=args.batch,
         seed=args.seed,
         segment_seconds=args.segment_seconds,
+        controller_refine_steps=args.refine_steps,
+        controller_refine_sigma=args.refine_sigma,
+        policy_hidden=args.policy_hidden,
         run_dir=args.run,
         tier2_every=args.tier2_every,
         n_reference_seeds=args.reference_seeds,
@@ -498,6 +501,18 @@ def main(argv=None) -> int:
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--segment-seconds", type=float, default=8.0,
                    help="Tier-1 episode length; the main cost/fidelity dial")
+    p.add_argument("--refine-steps", type=int, default=0,
+                   help="(1+1)-ES steps refining each candidate's policy. Each "
+                        "step is one more batched Tier-1 for the whole "
+                        "generation, so a generation costs (1 + steps) "
+                        "evaluations. 0 leaves the policy at its inherited "
+                        "weights, which for a fresh candidate means zeros, "
+                        "which command nothing.")
+    p.add_argument("--refine-sigma", type=float, default=0.1,
+                   help="perturbation scale on policy weights during refinement")
+    p.add_argument("--policy-hidden", type=int, default=0,
+                   help="hidden units in the policy; 0 is linear (60 weights), "
+                        "16 is 308")
     p.add_argument("--run", default="runs/latest")
     p.add_argument("--tier2-every", type=int, default=15)
     p.add_argument("--reference-seeds", type=int, default=12)
