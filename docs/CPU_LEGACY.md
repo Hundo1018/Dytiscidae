@@ -84,10 +84,21 @@ All three defects fixed together, because none of them is useful alone:
    keep if the mission fraction improved. One perturbed vector per candidate
    makes a refinement step exactly one batched evaluation.
 
-A refinement step costs ~8.4 s against ~79.6 s for a full generation at batch
-16, because refinement does not re-identify axes and identification is the
-sequential per-machine part that dominates. That is what makes a useful step
-count affordable.
+A refinement step is far cheaper than a full evaluation because it does not
+re-identify axes, and identification is the sequential per-machine part that
+dominates. How much cheaper depends on the policy width, which is easy to
+measure at one width and then over-generalise:
+
+| | s / refinement step |
+|---|---|
+| `policy_hidden=0`, measured in isolation | 8.4 |
+| `policy_hidden=16`, measured in `arch29` | 21.7 |
+
+against ~79.6 s for a full generation at batch 16. The second number was
+recovered from the running search — generations 1 and 2 took 223 s and 200 s
+against a predicted 130 s. Quoting the first number as if it were a property of
+refinement, rather than of refinement at one width, put a run's projected
+duration out by 60%.
 
 Measured, three seeds at `segment_seconds=0.4`:
 
