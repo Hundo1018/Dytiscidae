@@ -17,7 +17,7 @@ corrections table. This file is only for decisions that a GPU changes.
 
 ---
 
-## 1. The controller is not trained at all — and is never executed either
+## 1. ~~The controller is not trained at all — and is never executed either~~ RESOLVED 2026-08-05
 
 `controller_refine_steps: int = 0` — [`evolution/loop.py`](../dytiscidae/evolution/loop.py)
 
@@ -72,7 +72,31 @@ refinement step costs a full Tier-1 evaluation. That is the cost the port
 removes — a generation of candidates now evaluates in one set of kernel
 launches, so refinement steps batch the same way.
 
-## 2. The policy is linear
+### Resolution (2026-08-05, `ffb61d4`)
+
+All three defects fixed together, because none of them is useful alone:
+
+1. `identify` no longer gates the controller. It means only "identify axes".
+2. `Controller(params=None)` is filled from the body by both evaluation paths.
+   Nothing filled it before; honouring the controller turned that into an
+   `AttributeError` on the first run, which is how it surfaced.
+3. `controller_refine_steps` is implemented as a (1+1)-ES — perturb, evaluate,
+   keep if the mission fraction improved. One perturbed vector per candidate
+   makes a refinement step exactly one batched evaluation.
+
+A refinement step costs ~8.4 s against ~79.6 s for a full generation at batch
+16, because refinement does not re-identify axes and identification is the
+sequential per-machine part that dominates. That is what makes a useful step
+count affordable.
+
+Measured, three seeds at `segment_seconds=0.4`:
+
+| | mission_fraction |
+|---|---|
+| `steps=0` | 0.093049, 0.101488, 0.012699 (all weights zero) |
+| `steps=4` | 0.093049, 0.109723, 0.056915 |
+
+## 2. ~~The policy is linear~~ RESOLVED 2026-08-05 (`--policy-hidden`)
 
 `Policy(hidden=0)` — [`control/cpg.py:247`](../dytiscidae/control/cpg.py)
 
@@ -88,8 +112,24 @@ It also records the measurement that forced it: five iterations moved the
 population best from 0.365 to 0.349, "not a controller failing to learn, it is
 an optimiser that has barely been asked a question."
 
-**Outstanding:** with the evaluation budget raised, re-open the hidden layer, and
-separately ask whether CMA-ES is still the right optimiser at that width.
+### Resolution (2026-08-05, `9de9a3f`)
+
+`--policy-hidden` reaches the field. Re-opened and measured, three seeds:
+
+| steps | hidden=0 | hidden=16 |
+|---|---|---|
+| 4 | sum 0.25969 | sum 0.24411 |
+| 12 | sum 0.27008 | **sum 0.28145** |
+
+The capacity is worth having, but only past a step budget: 308 weights need
+more samples than 60 before they pay. `--policy-hidden 16` with too few
+`--refine-steps` is worse than staying linear. This is a real coupling between
+two flags, not a free upgrade.
+
+**Still outstanding:** the second half of the original question — whether an ES
+is the right optimiser at 308 weights, or whether item 3's policy-gradient
+route is. The crossover measured above is evidence that it is being asked at
+the width where the answer starts to matter.
 
 ## 3. CMA-ES instead of a policy-gradient method
 
