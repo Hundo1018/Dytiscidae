@@ -308,6 +308,81 @@ def step_batch(envs, angles_list, bf: BatchedFluid, active=None):
     return active
 
 
+def identify_batch(envs, domain, *, probe_time: float = 1.2, n_probes: int = 8,
+                   seed: int = 0, probe_scale: float = 0.35, max_modes: int = 4):
+    """`TriphibianEnv.identify` for a whole batch, one GPU call per timestep.
+
+    This was the last part of an evaluation still running the numpy solver, and
+    it was the largest single cost in a generation: 26.7% of wall clock at batch
+    16, of which 84.1% was `FluidSolver.apply` -- so 22.4% of every generation
+    was still executing the code the Mojo port replaced.
+
+    It was left unbatched on the stated grounds that "every machine is running a
+    different experiment", which is true and turns out not to matter. The
+    difference between machines is the probe delta, and a delta is an *input* to
+    the rollout, not a branch in it. Every machine can run its probe k, sign +1,
+    against a shared timestep, exactly as the segment rollouts already do; the
+    fluid solver batches across heterogeneous morphologies because it sees a
+    flat panel array indexed by body_id, and that is as true here as anywhere.
+
+    So the loop is inverted. It was `for machine: for probe:`, sequential in
+    both. It is now `for probe: for sign:` with every machine stepping together
+    inside, which is 16 batched rollouts instead of 16*k sequential ones.
+
+    Returns one MobilityBasis per environment, fitted by the same
+    `basis_from_probes` the unbatched path uses, so the fitting is untouched.
+    """
+    from ..control.cpg import CPGParams, basis_from_probes
+
+    k = len(envs)
+    n_steps = int(probe_time / envs[0].timestep)
+
+    # Per-machine probe directions. Drawn with the same generator call as the
+    # unbatched path so a machine identified alone and in a batch gets the same
+    # deltas -- otherwise the two paths could not be compared at all.
+    deltas = [np.random.default_rng(seed).normal(
+        0.0, probe_scale, size=(n_probes, e.cpg.n_params)) for e in envs]
+    responses = [np.zeros((n_probes, 6)) for _ in envs]
+
+    for e in envs:
+        e.reset(domain, randomise=False)
+    snaps = [e.snapshot() for e in envs]
+    bases = [e.cpg.base for e in envs]
+
+    bf = BatchedFluid(envs)
+
+    for p in range(n_probes):
+        for sign in (1.0, -1.0):
+            for i, e in enumerate(envs):
+                e.restore(snaps[i])
+                e.budget.reset()
+            bf.reset_slam()
+            acc = np.zeros((k, 6))
+            live = np.ones(k, dtype=bool)
+            params = [CPGParams.from_flat(
+                bases[i].flat() + sign * deltas[i][p], envs[i].cpg.n)
+                for i in range(k)]
+
+            for _ in range(n_steps):
+                angles = [envs[i].cpg.command(params[i], envs[i].data.time)
+                          for i in range(k)]
+                live = step_batch(envs, angles, bf, live)
+                for i, e in enumerate(envs):
+                    acc[i] += e.body_twist()
+
+            for i, e in enumerate(envs):
+                mean = acc[i] / max(n_steps, 1)
+                # Same divergence guard as the unbatched probe: a machine that
+                # has thrown itself to infinity reports no response rather than
+                # a NaN that would poison the least-squares for that machine.
+                if not np.all(np.isfinite(e.root_pos())):
+                    mean = np.zeros(6)
+                responses[i][p] += 0.5 * sign * mean
+
+    return [basis_from_probes(deltas[i], responses[i], medium=domain.value,
+                              max_modes=max_modes) for i in range(k)]
+
+
 def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                   domain, control_hz: float = 25.0, policies=None,
                   bases=None):
@@ -453,27 +528,32 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         if ctrls[i].params is None:
             ctrls[i].params = envs[i].cpg.base
 
-    # Mobility identification, if asked for.  Per machine and sequential: it
-    # drives the CPG with random parameter perturbations and fits a Jacobian
-    # from the resulting body twist, so every machine is running a *different*
-    # experiment and there is no shared timestep to batch across.  Left on the
-    # CPU rather than pretended away, and it is a real part of the cost --
-    # identify_axes_every is 1 in every run config so far, meaning every
-    # candidate pays it.
+    # Mobility identification, if asked for.  Batched, one GPU call per
+    # timestep, like everything else here.  It used to be a sequential
+    # per-machine loop on the grounds that every machine runs a different
+    # experiment -- see identify_batch for why that does not prevent batching.
+    # It was 26.7% of a generation and the last thing still calling the numpy
+    # solver.
     if identify_axes:
         from .triphibian import Domain as _D
-        for i in live:
-            for dom in (_D.AIR, _D.WATER):
-                try:
-                    results[i].mobility[dom.value] = envs[i].identify(dom, seed=seed)
-                except Exception as exc:
+        group = [envs[i] for i in live]
+        for dom in (_D.AIR, _D.WATER):
+            try:
+                found = identify_batch(group, dom, seed=seed)
+            except Exception as exc:
+                for i in live:
                     results[i].notes.append(
                         f"mobility id failed in {dom.value}: {exc}")
-            # Overwrite rather than fill-if-empty.  A mobility basis is a
-            # property of the body it was measured on, and an inherited
-            # controller arrives carrying its parent's.  Keeping those would
-            # drive a child through its parent's axes, which is precisely the
-            # thing the identification exists to prevent.
+                continue
+            for slot, i in enumerate(live):
+                results[i].mobility[dom.value] = found[slot]
+
+        # Overwrite rather than fill-if-empty, and only once both domains are
+        # in.  A mobility basis is a property of the body it was measured on,
+        # and an inherited controller arrives carrying its parent's.  Keeping
+        # those would drive a child through its parent's axes, which is
+        # precisely the thing the identification exists to prevent.
+        for i in live:
             ctrls[i].bases = results[i].mobility
 
     group = [envs[i] for i in live]

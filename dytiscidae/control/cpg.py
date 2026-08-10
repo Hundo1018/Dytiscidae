@@ -225,6 +225,27 @@ def identify_mobility(
         # Central difference: cancels drift that is independent of the command.
         responses[k] = 0.5 * (plus - minus)
 
+    return basis_from_probes(deltas, responses, medium=medium, max_modes=max_modes)
+
+
+def basis_from_probes(deltas, responses, *, medium: str = "air",
+                      max_modes: int = 4) -> MobilityBasis:
+    """Fit the mobility basis from probe deltas and their measured responses.
+
+    Split out of ``identify_mobility`` so that the probing and the fitting can
+    be driven separately.  The probing is the expensive part -- 8 directions,
+    both signs, 1.2 s of simulation each -- and it batches across machines,
+    because a machine's probe delta is an *input* to the rollout and not a
+    branch in it.  The fitting is a least-squares and an SVD on a (P, 6) matrix
+    and is not worth moving anywhere.
+
+    ``identify_mobility`` still exists and still drives one machine, because the
+    unbatched evaluation path uses it and it is the reference the batched
+    version is checked against.
+    """
+    deltas = np.asarray(deltas, float)
+    responses = np.asarray(responses, float)
+
     # Scale twist components so that rotation and translation are comparable;
     # without this the SVD is dominated by whichever has the larger raw units.
     scale = np.array([1.0, 1.0, 1.0, 0.3, 0.3, 0.3])
