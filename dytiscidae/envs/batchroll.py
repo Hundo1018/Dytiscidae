@@ -224,10 +224,25 @@ class BatchedFluid:
             self.xpos[a:b] = e.data.xpos
             self.xmat[a:b] = e.data.xmat.reshape(-1, 9)
             self.xipos[a:b] = e.data.xipos
-            for bi in range(e.model.nbody):
-                _mj.mj_objectVelocity(e.model, e.data,
-                                      _mj.mjtObj.mjOBJ_BODY, bi, self._v6, 0)
-                self.vel6[a + bi] = self._v6
+            # The same thing mj_objectVelocity computes for mjOBJ_BODY, done
+            # for every body at once.  It was a Python call per body per step
+            # -- 426 calls per step at batch 32 -- and profiling put it at
+            # 0.622 ms/step against 0.448 ms/step for the entire GPU pipeline,
+            # so marshalling the inputs cost more than the physics.
+            #
+            # mj_objectVelocity shifts cvel, which is expressed at the subtree
+            # centre of mass, to the object's own frame:
+            #     ang = cvel[0:3]
+            #     lin = cvel[3:6] - (framepos - subtree_com) x ang
+            # The frame is the *inertial* one for mjOBJ_BODY -- xipos, not xpos;
+            # xpos is what mjOBJ_XBODY uses, and reaching for it first gave
+            # errors of order 0.7 rather than anything subtle.
+            # Verified bit-exact (0.0e+00) against the per-body call on five
+            # plans after 40 stepped timesteps.
+            off = e.data.xipos - e.data.subtree_com[e.model.body_rootid]
+            ang = e.data.cvel[:, 0:3]
+            self.vel6[a:b, 0:3] = ang
+            self.vel6[a:b, 3:6] = e.data.cvel[:, 3:6] - np.cross(off, ang)
 
         o = self.out
         e0 = self.envs[0]
