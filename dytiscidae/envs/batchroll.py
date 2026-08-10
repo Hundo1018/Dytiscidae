@@ -400,7 +400,7 @@ def identify_batch(envs, domain, *, probe_time: float = 1.2, n_probes: int = 8,
 
 def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                   domain, control_hz: float = 25.0, policies=None,
-                  bases=None):
+                  bases=None, shared=None, collector=None):
     """`TriphibianEnv.rollout` for a whole batch, one GPU call per timestep.
 
     Mirrors the single-machine version step for step, including which sample
@@ -429,10 +429,19 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
         angles = []
         for m, e in enumerate(envs):
             if active[m]:
-                if (policies is not None and policies[m] is not None
-                        and bases is not None and bases[m] is not None
-                        and i % control_every == 0):
-                    coeffs = policies[m].act(e.observation(domain))
+                if (bases is not None and bases[m] is not None
+                        and i % control_every == 0
+                        and ((policies is not None and policies[m] is not None)
+                             or shared is not None)):
+                    obs = e.observation(domain)
+                    coeffs = np.zeros(bases[m].modes.shape[0])
+                    if policies is not None and policies[m] is not None:
+                        coeffs = coeffs + policies[m].act(obs)
+                    if shared is not None:
+                        a, logp, val = shared.act(obs)
+                        coeffs = coeffs + a[:coeffs.shape[0]]
+                        if collector is not None:
+                            collector.record(m, obs, a, logp, val)
                     cur[m] = bases[m].command_params(
                         params_list[m], coeffs, e.cpg.n)
                 angles.append(e.cpg.command(cur[m], e.data.time))
@@ -487,7 +496,8 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
 def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                          segment_seconds: float = 10.0,
                          identify_axes: bool = False, seed: int = 0,
-                         sea_state=None, perturb: dict | None = None):
+                         sea_state=None, perturb: dict | None = None,
+                         shared=None, buffer=None):
     """`evaluate_tier1` for a whole generation, sharing one GPU pipeline.
 
     Both the three domain segments and the three transitions are batched. What
@@ -578,13 +588,23 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         for i in live:
             envs[i].reset(dom)
         bf.reset_slam()
+        collector = None
+        if shared is not None and buffer is not None:
+            from ..learning.ppo import SegmentCollector
+            collector = SegmentCollector(len(group))
         segs = rollout_batch(
             group, bf, segment_seconds, [ctrls[i].params for i in live], dom,
             policies=[ctrls[i].policy for i in live],
-            bases=[ctrls[i].basis_for(dom) for i in live])
+            bases=[ctrls[i].basis_for(dom) for i in live],
+            shared=shared, collector=collector)
         for slot, i in enumerate(live):
             results[i].segments[dom.value] = segs[slot]
             clamped[i] = clamped[i] or bool(envs[i].solver.diag.clamped)
+        if collector is not None:
+            # The reward is the segment's own competence -- the number the
+            # search selects on -- delivered once, at the end. See ppo.py for
+            # why nothing denser is invented here.
+            collector.finish(buffer, [s.competence for s in segs])
 
     for kind in ("air_to_water", "water_to_air", "water_to_land"):
         trs = run_transition_batch(group, bf, kind, [ctrls[i] for i in live])

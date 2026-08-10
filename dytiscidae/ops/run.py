@@ -149,6 +149,8 @@ def cmd_search(args) -> int:
         controller_refine_steps=args.refine_steps,
         controller_refine_sigma=args.refine_sigma,
         policy_hidden=args.policy_hidden,
+        use_shared_policy=args.shared_policy,
+        shared_hidden=args.shared_hidden,
         run_dir=args.run,
         tier2_every=args.tier2_every,
         n_reference_seeds=args.reference_seeds,
@@ -510,6 +512,14 @@ def main(argv=None) -> int:
                         "which command nothing.")
     p.add_argument("--refine-sigma", type=float, default=0.1,
                    help="perturbation scale on policy weights during refinement")
+    p.add_argument("--shared-policy", action="store_true",
+                   help="train one PPO policy across every morphology, on the "
+                        "transitions the whole generation produces. Coexists "
+                        "with --refine-steps: the shared policy generalises, "
+                        "the per-candidate (1+1)-ES adapts, the intents are "
+                        "summed. Needs torch.")
+    p.add_argument("--shared-hidden", type=int, default=64,
+                   help="width of the shared PPO policy")
     p.add_argument("--policy-hidden", type=int, default=0,
                    help="hidden units in the policy; 0 is linear (60 weights), "
                         "16 is 308")

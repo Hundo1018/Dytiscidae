@@ -1,0 +1,100 @@
+"""The shared PPO learner: does it run, and does it actually learn?
+
+A test that only checks shapes would pass on a policy whose gradient is
+disconnected from its loss, which is the failure mode that matters. So the last
+check trains against a reward with a known optimum and asserts the policy moves
+toward it.
+"""
+import numpy as np
+
+from dytiscidae.learning.ppo import (AVAILABLE, UNAVAILABLE_REASON,
+                                     RolloutBuffer, SharedPolicy, Trajectory,
+                                     ppo_update)
+
+N_OBS, N_MODES = 14, 4
+
+
+def _rollout(policy, rng, n_steps, reward_fn):
+    t = Trajectory()
+    for _ in range(n_steps):
+        o = rng.normal(size=N_OBS)
+        a, lp, v = policy.act(o)
+        t.obs.append(o)
+        t.act.append(a)
+        t.logp.append(lp)
+        t.val.append(v)
+    t.terminal_reward = reward_fn(np.asarray(t.act))
+    return t
+
+
+def main() -> int:
+    if not AVAILABLE:
+        print(f"SKIP: torch unavailable ({UNAVAILABLE_REASON})")
+        return 0
+
+    import torch
+    torch.manual_seed(0)
+    rng = np.random.default_rng(0)
+    ok = True
+
+    p = SharedPolicy(N_OBS, N_MODES, hidden=32)
+    a, lp, v = p.act(rng.normal(size=N_OBS))
+    shape_ok = a.shape == (N_MODES,) and np.isfinite(lp) and np.isfinite(v)
+    print(f"  [{'ok  ' if shape_ok else 'FAIL'}] one decision has the right shape"
+          f"  -- action {a.shape}, logp {lp:.3f}, value {v:.3f}")
+    ok &= shape_ok
+
+    # Bounded intent: the mean is a tanh, so no coefficient can run away.
+    many = np.array([p.act(rng.normal(size=N_OBS), deterministic=True)[0]
+                     for _ in range(200)])
+    bounded = bool(np.all(np.abs(many) <= 1.0))
+    print(f"  [{'ok  ' if bounded else 'FAIL'}] deterministic intent stays in "
+          f"[-1, 1]  -- max |a| = {np.abs(many).max():.4f}")
+    ok &= bounded
+
+    # GAE on a reward that is zero until the last step must still credit the
+    # earlier steps, or a sparse-terminal task cannot be learned at all.
+    buf = RolloutBuffer()
+    buf.add(_rollout(p, rng, 32, lambda acts: 1.0))
+    _o, _a, _l, adv, ret = buf.build()
+    credited = bool(np.count_nonzero(adv) == len(adv))
+    print(f"  [{'ok  ' if credited else 'FAIL'}] sparse terminal reward reaches "
+          f"every step  -- {np.count_nonzero(adv)}/{len(adv)} nonzero advantages")
+    ok &= credited
+
+    # An update on a near-empty buffer is a no-op rather than a crash: a
+    # generation where every candidate failed Tier-0 produces exactly that.
+    empty = ppo_update(p, RolloutBuffer())
+    skipped = empty.get("skipped") is True
+    print(f"  [{'ok  ' if skipped else 'FAIL'}] an empty generation is skipped, "
+          f"not crashed on  -- {empty}")
+    ok &= skipped
+
+    # The one that matters: reward the policy for driving mode 0 positive and
+    # check it does. If the gradient were disconnected this stays at zero.
+    torch.manual_seed(1)
+    learner = SharedPolicy(N_OBS, N_MODES, hidden=32)
+    opt = torch.optim.Adam(learner.parameters(), lr=3e-3)
+    before = float(np.mean([learner.act(rng.normal(size=N_OBS),
+                                        deterministic=True)[0][0]
+                            for _ in range(100)]))
+    for _ in range(12):
+        b = RolloutBuffer()
+        for _ in range(8):
+            b.add(_rollout(learner, rng, 64, lambda acts: float(acts[:, 0].mean())))
+        ppo_update(learner, b, epochs=4, minibatch=256, optimiser=opt)
+    after = float(np.mean([learner.act(rng.normal(size=N_OBS),
+                                       deterministic=True)[0][0]
+                           for _ in range(100)]))
+    learned = after > before + 0.05
+    print(f"  [{'ok  ' if learned else 'FAIL'}] it learns a reward with a known "
+          f"optimum  -- mode 0 mean {before:+.4f} -> {after:+.4f}")
+    ok &= learned
+
+    print()
+    print("shared PPO checks passed" if ok else "FAILED")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

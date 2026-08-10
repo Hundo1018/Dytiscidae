@@ -85,6 +85,17 @@ class SearchConfig:
     policy_hidden: int = 0
     n_modes: int = 4
 
+    #: A policy shared by every morphology, trained by PPO on the transitions
+    #: the whole generation produces.  It coexists with the per-candidate
+    #: policy rather than replacing it: the shared one supplies competence that
+    #: generalises across bodies, the per-candidate (1+1)-ES adapts to the one
+    #: body it lives on, and the two intents are summed.  Per-candidate PPO is
+    #: not an option -- see learning/ppo.py for the arithmetic.
+    use_shared_policy: bool = False
+    shared_hidden: int = 64
+    shared_lr: float = 3e-4
+    shared_epochs: int = 4
+
     # Seeding
     n_reference_seeds: int = 20
     n_random_seeds: int = 8
@@ -169,6 +180,9 @@ class SearchState:
     #: auditor can veto a tightening that turned out to rest on a design it
     #: subsequently invalidated.
     judge_moves: list = field(default_factory=list)
+    #: The policy shared by every morphology, or None when not in use.
+    shared: object = None
+    shared_opt: object = None
 
     @property
     def archive(self) -> Archive:
@@ -262,6 +276,8 @@ def evaluate_candidates(
     identify: bool = True,
     spec: MissionSpec | None = None,
     seeds=None,
+    shared=None,
+    buffer=None,
 ):
     """Tier-0 gate then a shared Tier-1 for the whole group.
 
@@ -321,6 +337,7 @@ def evaluate_candidates(
 
     results = batchroll.evaluate_tier1_batch(
         [phenos[i] for i in passed], spec=spec,
+        shared=shared, buffer=buffer,
         # The controller goes in whether or not axes are being identified.
         # These used to be the same switch -- `None if identify else c` -- and
         # since identify_axes_every defaults to 1, that made it None always, so
@@ -690,6 +707,22 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         descriptors=learned, spec=spec,
     )
 
+    if cfg.use_shared_policy:
+        from ..learning import ppo as _ppo
+        if not _ppo.AVAILABLE:
+            raise RuntimeError(
+                "--shared-policy needs torch, which is not importable "
+                f"({_ppo.UNAVAILABLE_REASON}). Install it with "
+                "`uv pip install --python .venv/bin/python "
+                "--index-url https://download.pytorch.org/whl/cpu torch`. "
+                "Refusing to run silently without the thing that was asked "
+                "for -- see the CPU-fallback note in envs/batchroll.py.")
+        import torch as _torch
+        state.shared = _ppo.SharedPolicy(
+            TriphibianEnv.OBS_DIM, cfg.n_modes, hidden=cfg.shared_hidden)
+        state.shared_opt = _torch.optim.Adam(
+            state.shared.parameters(), lr=cfg.shared_lr)
+
     for c in archipelago.curators.values():
         c.scout = state.scout
 
@@ -763,11 +796,16 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                           int(rng.integers(1 << 30))))
 
         try:
+            buffer = None
+            if state.shared is not None:
+                from ..learning.ppo import RolloutBuffer
+                buffer = RolloutBuffer()
             evaluated = evaluate_candidates(
                 [b[0] for b in built], cfg,
                 inherited=[b[1] for b in built],
                 identify=any(b[2] for b in built), spec=spec,
-                seeds=[b[5] for b in built])
+                seeds=[b[5] for b in built],
+                shared=state.shared, buffer=buffer)
         except Exception as exc:
             telemetry.event({"kind": "error", "gen": gen, "island": state.island,
                              "error": f"{type(exc).__name__}: {exc}"})
@@ -783,6 +821,15 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             state.evaluated += 1
             curator.evaluations += 1
             _place(state, child, pheno, result, ctrl, parent, operators)
+
+        # --- the shared policy learns from everything the generation saw ----
+        if state.shared is not None and buffer is not None:
+            from ..learning.ppo import ppo_update
+            info = ppo_update(state.shared, buffer, lr=cfg.shared_lr,
+                              epochs=cfg.shared_epochs,
+                              optimiser=state.shared_opt)
+            telemetry.event({"kind": "ppo", "gen": gen, "island": state.island,
+                             **{k: v for k, v in info.items()}})
 
         # --- verification, and the critic's only source of truth ------------
         if gen % max(cfg.tier2_every, 1) == 0 and archive.cells:
