@@ -247,3 +247,37 @@ device change removes.
 and the other entries under the README's "Known limits" are modelling
 simplifications. Some are expensive to lift, but they were chosen for what they
 approximate, not for what they cost.
+
+---
+
+## Why GPU utilisation stays in single digits (measured 2026-08-10)
+
+The fluid solver is on the GPU and validates to 3e-16. Mobility identification
+is now batched through it too, and the per-body velocity gather is vectorised.
+After all of that, `nvidia-smi` sampled at its 1 Hz refresh over 100 s of a real
+search reads: **0% of seconds fully idle** (down from 30%), mean 6.2%, max 8%.
+The GPU is continuously engaged and almost entirely unloaded.
+
+That is not a defect left to fix. It is what the measured split implies:
+
+| part of a batched step | share |
+|---|---|
+| `mj_step` + energy, CPU | 60% |
+| `bf.apply` | 37% (of which the GPU kernel is 11% of the whole step) |
+| observation / prep | 3% |
+
+Raising utilisation requires moving rigid-body integration to the GPU, i.e.
+MJX. MJX cannot `vmap` across different kinematic trees, so the only route is to
+group candidates by topology and vectorise within a group. **Measured, and it
+does not work:** mutating archive parents into generations of 16 gives 13, 16
+and 14 distinct topologies in three trials, largest group 3, nearly all
+singletons. Grouping would produce ~1.1 machines per group.
+
+So the honest position is that this architecture is CPU-bound in MuJoCo, and the
+GPU port has taken everything that was takeable. Two things could change it, and
+neither is a tuning exercise:
+
+- MuJoCo Warp (`mjwarp`), which is designed for heterogeneous models. **Not
+  evaluated** — do not assume it helps until measured.
+- A custom GPU rigid-body integrator, which is a far larger project than the
+  fluid port was.
