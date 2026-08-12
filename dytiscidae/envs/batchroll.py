@@ -14,24 +14,28 @@ remain strictly sequential, as they must.
 Import is guarded: the GPU extension is optional and this module degrades to
 telling the caller it is unavailable rather than breaking a CPU-only install.
 
-Not bit-reproducible
---------------------
-This path gives slightly different numbers on every run, including with the same
-seed. The added-mass and force scatters use `Atomic.fetch_add`, which sums in
-whatever order the warps arrive, so the last bits move; over a few hundred steps
-of a chaotic simulation that reaches around 1e-9 relative. Measured across five
-identical runs: 6.0e-10, 6.7e-10, 6.9e-10, 1.2e-9, 2.4e-9.
+Reproducible
+------------
+Two runs of the same batch give the same numbers to the digit.  That was not
+true when this module was written: the added-mass and force scatters used
+`Atomic.fetch_add`, which sums in whatever order the warps arrive, and one
+design's mission_fraction flipped between 0.01478594 and 0.00640494 across runs
+of identical code -- two attractors a factor of 2.3 apart, not the 1e-9 the
+original note here estimated.
 
-The CPU path does not behave this way, so this is a real change and not merely a
-tolerance. What it costs: a run can no longer be replayed exactly from its seed,
-and a resumed run will not retrace the trajectory the original took. What it does
-not cost: anything physical -- 1e-9 is nine orders below the quasi-steady model's
-own accuracy, and the search is already stochastic in its sampling.
+That mattered more than a tolerance.  The judge ratchets its bars on population
+quantiles and the curator credits operators on outcomes, so a design could be
+promoted or culled by warp scheduling.  Both scatters are now gathers: one
+thread per body, summing that body's own panels in index order.  No sort is
+needed, because PanelSet builds panels in body order and concatenating machines
+preserves it, so CSR offsets are the whole structure required.  Speed was
+unchanged -- 2.65x against 2.68x -- so the cost that was assumed to justify
+atomics did not exist.
 
-If exact replay is ever wanted back, the fix is to make the scatter
-deterministic -- sort panels by body and use a segmented reduction instead of
-atomics -- at some cost in speed. That has not been done because nothing has
-asked for it yet.
+What remains is a summation-order difference against the *unbatched* numpy path,
+which is a different thing from run-to-run variation: numpy's einsum does not sum
+left-to-right and the kernels do.  It starts at 3.8e-19 in xfrc_applied at step 0
+and grows to about 1.4e-6 in mission_fraction over a full evaluation.
 """
 from __future__ import annotations
 
