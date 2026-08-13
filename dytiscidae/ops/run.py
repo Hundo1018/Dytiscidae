@@ -151,6 +151,9 @@ def cmd_search(args) -> int:
         policy_hidden=args.policy_hidden,
         use_shared_policy=args.shared_policy,
         shared_hidden=args.shared_hidden,
+        shared_lr=args.shared_lr,
+        shared_epochs=args.shared_epochs,
+        shared_target_kl=args.shared_target_kl,
         run_dir=args.run,
         tier2_every=args.tier2_every,
         n_reference_seeds=args.reference_seeds,
@@ -520,6 +523,15 @@ def main(argv=None) -> int:
                         "summed. Needs torch.")
     p.add_argument("--shared-hidden", type=int, default=64,
                    help="width of the shared PPO policy")
+    p.add_argument("--shared-lr", type=float, default=1e-3,
+                   help="PPO learning rate. arch30 ran at 3e-4 and reported a "
+                        "mean KL of 0.0008 against the 0.01-0.02 an update "
+                        "normally aims for -- the policy was barely asked to "
+                        "move.")
+    p.add_argument("--shared-epochs", type=int, default=10,
+                   help="PPO passes over each generation's batch")
+    p.add_argument("--shared-target-kl", type=float, default=0.015,
+                   help="stop an update once its mean KL exceeds this")
     p.add_argument("--policy-hidden", type=int, default=0,
                    help="hidden units in the policy; 0 is linear (60 weights), "
                         "16 is 308")

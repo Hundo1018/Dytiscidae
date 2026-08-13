@@ -206,11 +206,27 @@ class SegmentCollector:
         self.live = [Trajectory() for _ in range(self.k)]
 
 
-def ppo_update(policy, buffer, *, lr: float = 3e-4, epochs: int = 4,
-               minibatch: int = 4096, clip: float = 0.2,
+def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
+               minibatch: int = 2048, clip: float = 0.2,
                vf_coef: float = 0.5, ent_coef: float = 0.0,
-               max_grad_norm: float = 0.5, optimiser=None) -> dict:
+               max_grad_norm: float = 0.5, target_kl: float = 0.015,
+               optimiser=None) -> dict:
     """One PPO update over everything the generation collected.
+
+    The defaults were raised after the first full run that used this.  At
+    lr=3e-4, 4 epochs and a 4096 minibatch, arch30 pushed 2.93 million
+    transitions through 336 updates and reported a mean KL of 0.000818 against a
+    maximum of 0.003535 -- an order of magnitude below the 0.01-0.02 a PPO update
+    normally aims for.  Nine thousand samples over a 4096 minibatch is three
+    minibatches, so four epochs bought twelve gradient steps per generation and
+    about four thousand across the whole run.  The policy was not failing to
+    learn; it was barely being asked to.
+
+    Raising the rate without a bound on how far one update may move is the
+    standard way to destroy a policy, so `target_kl` stops the epoch loop once
+    the batch's mean KL exceeds it.  That makes the rate safe to raise: updates
+    that would have overshot end early instead, and the diagnostics say so via
+    `stopped_early`.
 
     Returns the diagnostics worth logging: how many transitions it saw, the
     clipped-surrogate and value losses, and the approximate KL.  A run that
@@ -237,8 +253,12 @@ def ppo_update(policy, buffer, *, lr: float = 3e-4, epochs: int = 4,
     idx = np.arange(n)
     stats = {"pi_loss": 0.0, "v_loss": 0.0, "kl": 0.0, "n_batches": 0}
 
+    stopped_early = False
     for _ in range(epochs):
+        if stopped_early:
+            break
         np.random.shuffle(idx)
+        epoch_kl, epoch_batches = 0.0, 0
         for s in range(0, n, minibatch):
             b = torch.as_tensor(idx[s:s + minibatch].copy())
             dist = policy.distribution(obs[b])
@@ -256,10 +276,20 @@ def ppo_update(policy, buffer, *, lr: float = 3e-4, epochs: int = 4,
             torch.nn.utils.clip_grad_norm_(policy.parameters(), max_grad_norm)
             opt.step()
 
+            kl = float((logp_old[b] - logp).mean().item())
             stats["pi_loss"] += float(pi_loss.item())
             stats["v_loss"] += float(v_loss.item())
-            stats["kl"] += float((logp_old[b] - logp).mean().item())
+            stats["kl"] += kl
             stats["n_batches"] += 1
+            epoch_kl += kl
+            epoch_batches += 1
+
+        # Stop once this pass has moved the policy as far as it is allowed to.
+        # Checked per epoch rather than per minibatch: a single minibatch's KL
+        # is noisy enough that stopping on it would end most updates after one
+        # step, which is the failure the raised rate was meant to fix.
+        if target_kl and epoch_batches and epoch_kl / epoch_batches > target_kl:
+            stopped_early = True
 
     k = max(stats["n_batches"], 1)
     return {
@@ -268,5 +298,7 @@ def ppo_update(policy, buffer, *, lr: float = 3e-4, epochs: int = 4,
         "pi_loss": stats["pi_loss"] / k,
         "v_loss": stats["v_loss"] / k,
         "kl": stats["kl"] / k,
+        "grad_steps": stats["n_batches"],
+        "stopped_early": stopped_early,
         "skipped": False,
     }

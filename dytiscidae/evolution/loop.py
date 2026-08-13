@@ -93,8 +93,12 @@ class SearchConfig:
     #: not an option -- see learning/ppo.py for the arithmetic.
     use_shared_policy: bool = False
     shared_hidden: int = 64
-    shared_lr: float = 3e-4
-    shared_epochs: int = 4
+    shared_lr: float = 1e-3
+    shared_epochs: int = 10
+    shared_minibatch: int = 2048
+    #: Stop an update once it has moved the policy this far.  Without it,
+    #: raising the rate is how a policy gets destroyed.
+    shared_target_kl: float = 0.015
 
     # Seeding
     n_reference_seeds: int = 20
@@ -827,6 +831,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             from ..learning.ppo import ppo_update
             info = ppo_update(state.shared, buffer, lr=cfg.shared_lr,
                               epochs=cfg.shared_epochs,
+                              minibatch=cfg.shared_minibatch,
+                              target_kl=cfg.shared_target_kl,
                               optimiser=state.shared_opt)
             telemetry.event({"kind": "ppo", "gen": gen, "island": state.island,
                              **{k: v for k, v in info.items()}})
