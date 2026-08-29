@@ -139,7 +139,6 @@ class Regime:
     name: str = "exploring"
     structural_bias: float = 1.4
     n_mutations: int = 2
-    emitter_fraction: float = 0.3
     feasibility_bias: float = 0.5
     note: str = ""
 
@@ -371,19 +370,16 @@ class Curator:
         if len(a.cells) < 20:
             r.name = "bootstrapping"
             r.structural_bias, r.n_mutations = 1.6, 2
-            r.emitter_fraction = 0.0  # nothing worth refining yet
             r.feasibility_bias = 0.7
             r.note = "too few elites to refine; widen the net"
         elif cov_growth > 0.004:
             r.name = "exploring"
             r.structural_bias, r.n_mutations = 1.5, 2
-            r.emitter_fraction = 0.25
             r.feasibility_bias = 0.4
             r.note = f"coverage climbing (+{cov_growth*100:.2f}pp)"
         elif qd_growth > 0.01:
             r.name = "refining"
             r.structural_bias, r.n_mutations = 0.7, 1
-            r.emitter_fraction = 0.55
             r.feasibility_bias = 0.6
             r.note = f"quality climbing (+{qd_growth*100:.1f}%) with flat coverage"
         else:
@@ -392,7 +388,6 @@ class Curator:
             # topology change gets out of that.
             r.name = "stagnant"
             r.structural_bias, r.n_mutations = 2.2, 3
-            r.emitter_fraction = 0.15
             r.feasibility_bias = 0.25
             r.note = "coverage and quality both flat; forcing structural change"
 
@@ -553,7 +548,6 @@ class Curator:
             self.regime.name = "famine"
             self.regime.structural_bias = 2.6
             self.regime.n_mutations = 3
-            self.regime.emitter_fraction = 0.1
             self.regime.feasibility_bias = 0.3
             rec = self._records[weakest]
             self.regime.note = (
@@ -681,7 +675,6 @@ class Curator:
             "regime_note": self.regime.note,
             "structural_bias": round(self.regime.structural_bias, 2),
             "n_mutations": self.regime.n_mutations,
-            "emitter_fraction": round(self.regime.emitter_fraction, 2),
             "feasibility_bias": round(self.regime.feasibility_bias, 2),
             "coverage": round(a.coverage, 4),
             "qd_score": round(a.qd_score, 3),

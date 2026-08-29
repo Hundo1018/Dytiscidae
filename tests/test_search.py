@@ -189,7 +189,9 @@ def test_curator_regimes_respond_to_the_run() -> None:
 
     r = c.update_regime()
     check("an empty archive bootstraps", r.name == "bootstrapping", r.name)
-    check("bootstrapping runs no emitters", r.emitter_fraction == 0.0)
+    check("bootstrapping widens the net rather than refining",
+          r.feasibility_bias >= 0.7 and r.n_mutations >= 2,
+          f"feasibility_bias={r.feasibility_bias} n_mutations={r.n_mutations}")
 
     rng = np.random.default_rng(0)
     for i in range(40):

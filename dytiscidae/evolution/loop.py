@@ -48,7 +48,6 @@ from ..ops.telemetry import Telemetry
 from ..envs.transitions import TransitionSet
 from .archive import Archive
 from .auditor import Auditor
-from .cmaes import CMAES, Emitter
 from .critic import Critic, critic_features
 from .curator import Curator
 from .curriculum import STAGES, Curriculum
@@ -182,7 +181,6 @@ class SearchState:
     critic: Critic | None = None
     scout: Scout | None = None
     island: str = "generalist"
-    emitters: list[Emitter] = field(default_factory=list)
     started: float = field(default_factory=time.time)
     evaluated: int = 0
     tier0_rejected: int = 0
