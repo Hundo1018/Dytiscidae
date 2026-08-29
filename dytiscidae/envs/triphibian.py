@@ -329,13 +329,18 @@ class TriphibianEnv:
             self.model, mujoco.mjtObj.mjOBJ_BODY, phenotype.segments[0].name
         ) if phenotype.segments else 0
 
-        # Joint travel limits for the CPG.
-        ranges = []
+        # Joint travel limits for the CPG, plus the state addresses of the same
+        # actuated joints so the observation can report stroke phase.
+        ranges, qadr, vadr = [], [], []
         for name in self.act_names:
             aid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, name)
             jid = self.model.actuator_trnid[aid, 0]
             ranges.append(self.model.jnt_range[jid])
+            qadr.append(self.model.jnt_qposadr[jid])
+            vadr.append(self.model.jnt_dofadr[jid])
         self.joint_range = np.array(ranges) if ranges else np.zeros((0, 2))
+        self._act_qadr = np.array(qadr, int)
+        self._act_vadr = np.array(vadr, int)
         self.cpg = CPG(
             len(self.act_names),
             base_frequency=phenotype.genome.flap_frequency,
@@ -718,6 +723,22 @@ class TriphibianEnv:
         supposed to be climbing away from the water or diving into it, and the
         best it can do is a single compromise gait.  A mission controller has to
         be told the mission.
+
+        Four senses a real hull also has, added when measurement showed the
+        controller could not act on what the mission scores:
+
+        * depth *error* to the mission's own target.  ``tanh(d/5)`` reads 0.96
+          at the 10 m target -- the one place the depth channel must have
+          gradient is the one place it had none, so holding depth had to be
+          inferred from the reward alone.  This channel is zero exactly at the
+          target.
+        * ground contact (a bump switch), without which walking and the land
+          arrival cannot be sensed at all.
+        * battery fraction remaining (a coulomb counter), without which economy
+          is invisible to the thing being asked to economise.
+        * stroke phase: the mean normalised actuated-joint position and its
+          rate (joint encoders).  Resonant drive is a phase relationship; a
+          controller that cannot sense its own stroke cannot seek resonance.
         """
         tw = self.body_twist()
         R = self.data.xmat[self.root_body].reshape(3, 3)
@@ -726,6 +747,19 @@ class TriphibianEnv:
         cmd = np.zeros(3)
         if target is not None:
             cmd[DOMAIN_CYCLE.index(target)] = 1.0
+        b = self.budget.battery
+        if len(self._act_qadr):
+            mid = self.joint_range.mean(axis=1)
+            half = np.maximum(
+                0.5 * (self.joint_range[:, 1] - self.joint_range[:, 0]), 1e-6)
+            qn = (self.data.qpos[self._act_qadr] - mid) / half
+            stroke = float(np.clip(np.mean(qn), -1.0, 1.0))
+            omega = 2.0 * np.pi * max(self.cpg.base.frequency, 0.1)
+            stroke_rate = float(np.clip(
+                np.mean(self.data.qvel[self._act_vadr] / half) / omega,
+                -3.0, 3.0))
+        else:
+            stroke = stroke_rate = 0.0
         return np.concatenate(
             [
                 np.clip(tw[:3] / 5.0, -3, 3),
@@ -733,11 +767,23 @@ class TriphibianEnv:
                 gravity_body,
                 [np.tanh(d / 5.0), self.solver.diag.mean_submerged],
                 cmd,
+                [
+                    np.tanh((d - self.TARGET_DEPTH) / 3.0),
+                    1.0 if self._touching_ground() else 0.0,
+                    float(b.energy_j / max(b.capacity_j, 1e-9)),
+                    stroke,
+                    stroke_rate,
+                ],
             ]
         )
 
-    #: 3 linear + 3 angular + 3 gravity + depth + wetness + 3 commanded domain.
-    OBS_DIM = 14
+    #: 3 linear + 3 angular + 3 gravity + depth + wetness + 3 commanded domain
+    #: + depth error + contact + battery + stroke phase and rate.
+    OBS_DIM = 19
+
+    #: The scorer's depth target, shared with the observation's error channel
+    #: so the sensed error and the scored error cannot drift apart.
+    TARGET_DEPTH = 10.0
 
     # ------------------------------------------------------------------ stepping
 
@@ -935,7 +981,7 @@ class TriphibianEnv:
             return float(frac * (0.55 * flight + 0.25 + 0.2 * speed))
 
         if domain is Domain.WATER:
-            target = 10.0
+            target = self.TARGET_DEPTH
             reached = float(np.clip(res.max_depth / target, 0.0, 1.0))
             submerged = float(np.sum(depths > 0.2) / n_want)
             # Holding depth matters as much as reaching it: a machine that

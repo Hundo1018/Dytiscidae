@@ -1706,6 +1706,48 @@ def test_a_failing_sweep_gates_only_the_last_swimmer() -> None:
           f"{ref.report.gate_margin:+.2f}")
 
 
+def test_the_controller_senses_what_the_mission_scores() -> None:
+    """The four senses added for the mission's own quantities behave.
+
+    ``tanh(d/5)`` reads 0.96 at the 10 m target -- the one place the depth
+    channel must discriminate is the one place it saturated, so depth-hold had
+    to be inferred from reward alone.  The error channel is zero exactly at
+    the target.  Battery, contact and stroke phase existed in the simulation
+    and were invisible to the controller.
+    """
+    print("\nsensing: the controller senses what the mission scores")
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(beetle()))
+    env.reset(Domain.WATER)
+    obs = env.observation(Domain.WATER)
+    check("the observation matches its declared width",
+          len(obs) == TriphibianEnv.OBS_DIM,
+          f"{len(obs)} vs OBS_DIM={TriphibianEnv.OBS_DIM}")
+
+    # Teleport the root to the mission's target depth: the error channel must
+    # read zero there, where the absolute channel is already saturated.
+    env.data.qpos[2] = -TriphibianEnv.TARGET_DEPTH
+    mujoco.mj_forward(env.model, env.data)
+    at_target = env.observation(Domain.WATER)
+    check("the depth-error channel is zero at the target",
+          abs(at_target[14]) < 0.05, f"error channel {at_target[14]:+.3f}")
+    check("where the absolute depth channel is nearly blind",
+          at_target[9] > 0.9, f"tanh(d/5) = {at_target[9]:.3f}")
+
+    env.reset(Domain.WATER)
+    before = env.observation(Domain.WATER)[16]
+    env.rollout(0.5, domain=Domain.WATER)
+    after = env.observation(Domain.WATER)[16]
+    check("the battery channel drains as energy is spent", after < before,
+          f"{before:.5f} -> {after:.5f}")
+    check("stroke phase and rate stay in their declared ranges",
+          -1.0 <= after and abs(env.observation(Domain.WATER)[17]) <= 1.0
+          and abs(env.observation(Domain.WATER)[18]) <= 3.0)
+
+
 def test_an_auto_reset_rollout_is_not_trusted() -> None:
     """A segment whose physics blew up must fail, not be scored.
 
@@ -1779,6 +1821,7 @@ def main() -> int:
     test_wave_field()
     test_jet_thrust_matches_momentum_flux()
     test_a_failing_sweep_gates_only_the_last_swimmer()
+    test_the_controller_senses_what_the_mission_scores()
     test_an_auto_reset_rollout_is_not_trusted()
     print("\n" + "=" * 68)
     if FAILURES:
