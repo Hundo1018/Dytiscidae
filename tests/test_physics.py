@@ -1748,6 +1748,51 @@ def test_the_controller_senses_what_the_mission_scores() -> None:
           and abs(env.observation(Domain.WATER)[18]) <= 3.0)
 
 
+def test_flap_frequency_is_commandable_in_the_loop() -> None:
+    """The identified basis can move flap frequency, so resonance is reachable.
+
+    ``resonance_seek`` on the skill bench argues that a compliant wing driven at
+    resonance costs a fraction of the power, and that the resonance *moves* when
+    the machine enters water.  The bench's weights cannot transfer to a vehicle
+    -- different observation and action widths over different dynamics -- so the
+    question that matters is whether a mission policy can do the same thing in
+    the loop.  It needs three things, and this pins the one that was never
+    checked: frequency is the last entry of ``CPGParams.flat()``, and the
+    mobility basis spans it.
+    """
+    print("\ncontrol: flap frequency is commandable through the mobility basis")
+    from dytiscidae.control.cpg import CPGParams
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.batchroll import identify_batch
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(beetle()))
+    n = env.cpg.n
+    check("the CPG parameter vector carries frequency last",
+          env.cpg.n_params == 3 * n + 1, f"n_params={env.cpg.n_params}, n={n}")
+
+    basis = identify_batch([env], Domain.WATER, seed=1)[0]
+    freq_weight = float(np.max(np.abs(basis.modes[:, -1])))
+    check("the identified water basis spans the frequency dimension",
+          freq_weight > 0.05,
+          f"largest frequency component across modes: {freq_weight:.3f}")
+
+    # And commanding it actually changes the rhythm, rather than the component
+    # being present in the matrix and discarded downstream.
+    base = env.cpg.base
+    mode = int(np.argmax(np.abs(basis.modes[:, -1])))
+    coeffs = np.zeros(basis.modes.shape[0])
+    coeffs[mode] = 1.0
+    moved = basis.command_params(base, coeffs, n)
+    check("commanding that mode moves the flap frequency",
+          abs(moved.frequency - base.frequency) > 1e-6,
+          f"{base.frequency:.4f} -> {moved.frequency:.4f} Hz")
+    check("and the observation carries the stroke phase to time it against",
+          TriphibianEnv.OBS_DIM == 19)
+    del CPGParams
+
+
 def test_an_auto_reset_rollout_is_not_trusted() -> None:
     """A segment whose physics blew up must fail, not be scored.
 
@@ -1822,6 +1867,7 @@ def main() -> int:
     test_jet_thrust_matches_momentum_flux()
     test_a_failing_sweep_gates_only_the_last_swimmer()
     test_the_controller_senses_what_the_mission_scores()
+    test_flap_frequency_is_commandable_in_the_loop()
     test_an_auto_reset_rollout_is_not_trusted()
     print("\n" + "=" * 68)
     if FAILURES:

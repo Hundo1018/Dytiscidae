@@ -28,8 +28,37 @@ more than they look:
   motor wins for thirty seconds and then has no actuator at all.
 
 Every task exposes the same interface, so the same optimiser trains all of them,
-and every learned skill is saved with the observation it needs so the mission
-controller can call it.
+and every learned skill is saved with the observation it needs.
+
+What this bench is not
+----------------------
+
+**Nothing in the search reads it.**  ``python -m dytiscidae.ops.run skills``
+writes ``skills.json`` and no other module imports this one -- not the loop, not
+the evaluator, not the mission environment.  The sentence that used to end this
+docstring, "so the mission controller can call it", described an intention.  It
+was read as a description of the pipeline for long enough to matter, so it is
+stated plainly here instead: these are standalone analyses of whether each
+control problem is learnable at all, and their weights never reach a vehicle.
+
+Nor could they, as written: each task has its own observation and action widths
+over its own simplified dynamics, while a mission policy emits ``n_modes``
+mobility-basis coefficients.  There is no shape in which these weights transfer.
+
+For resonance specifically, the mechanism is now reachable inside the search
+itself, which is the outcome this bench was arguing for:
+
+* the drivetrain spring is in the vehicle simulation (``series_stiffness`` ->
+  real MuJoCo joint stiffness, commit 05b8625);
+* frequency is the last entry of ``CPGParams.flat()``, so the identified
+  mobility basis can command it -- measured on the reference plans, the
+  frequency component is 24-42% of a mode's norm in water;
+* the policy senses stroke phase and rate, wetness, and the commanded domain,
+  which is what re-finding a resonance that moves with the medium requires.
+
+So a mission policy can now do in the loop what ``resonance_seek`` does on the
+bench.  The bench keeps its value as the cheap experiment that says whether a
+control problem is solvable before an expensive search is pointed at it.
 """
 
 from __future__ import annotations

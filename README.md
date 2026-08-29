@@ -133,10 +133,17 @@ steps per candidate:
 | 1 | ~2–8 s | Short episodes per domain plus transitions. Measures controllability and steady power; extrapolates the 45-minute budget. |
 | 2 | ~10–90 s | The real schedule with waves, current and wind. Run only on promoted elites — and it *checks the Tier-1 extrapolation*, flagging elites whose short window was not steady state. |
 
-**`envs/skills.py`** — the actuator bench. Component-level control, learned to
-convergence in seconds, transferable to any morphology carrying the component:
+**`envs/skills.py`** — the actuator bench. Component-level control over
+simplified dynamics, learned to convergence in seconds. **Nothing in the search
+reads it**: `run skills` writes `skills.json`, no other module imports it, and
+each task's own observation and action widths could not transfer to a mission
+policy in any case. It is the cheap experiment that says whether a control
+problem is solvable before an expensive search is pointed at it — and for
+resonance, that argument has since been answered inside the search itself (the
+drivetrain spring is simulated, flap frequency is commandable through the
+identified mobility basis, and the policy senses stroke phase and wetness).
 
-- `resonance_seek` — **the highest-value skill in the project.** A compliant
+- `resonance_seek` — **the argument that started the elastic drivetrain.** A compliant
   flapping wing driven at resonance costs a fraction of the power of the same
   wing driven off it, because the spring returns the wing's kinetic energy at
   each reversal instead of the motor paying for it twice per cycle. The
