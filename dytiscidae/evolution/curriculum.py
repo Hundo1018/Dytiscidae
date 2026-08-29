@@ -196,32 +196,60 @@ class Curriculum:
         fixed ladder for what is measured, a population statistic for where the
         line sits, and a ratchet so it only ever moves one way.
 
-        The evidence is which half is actually *discriminating*.  A score that
-        gives every design the same number selects nothing, whatever its
-        magnitude.  Comparing the two spreads is deliberately scale-free --
-        island scores here live near 0.03 and curriculum scores near 1.0, so any
-        absolute threshold would have been another typed constant, and choosing
-        it would have been the same mistake in a new place.
+        It used to add a second term: weight whichever half was *discriminating*
+        more, measured as the ratio of the two p90-p10 spreads.  That rule is
+        removed, because measurement showed it does the opposite of its purpose.
 
-        The stage ramp is the floor rather than the whole rule, so a cell that
-        has climbed the ladder hands over even if the spreads have not yet
-        separated, and evidence can only ever hand over *faster*.
+        A hard objective has a small spread precisely because nothing can do it
+        yet.  `mission_fraction` across arch30's archive spans 0.0437 from p10 to
+        p90 while the curriculum score spans 0.5092, so the rule concluded the
+        mission "does not discriminate" and handed its weight away -- which
+        guarantees the search never learns to do the thing it is for.  Over
+        arch30 it averaged 0.197, *below* the 0.25 stage floor it was meant to
+        improve on, so it was strictly worse than the ramp it was added to.
+        The result was corr(fitness, mission_fraction) = 0.1413 across 653
+        elites: 98% of the selection pressure was deciding something other than
+        the mission.
+
+        What remains is the stage ramp alone.  It is a scaffold's proper shape:
+        the curriculum answers an easier question while a cell cannot answer the
+        real one, and hands back as the cell climbs.
         """
         if stage >= N_STAGES - 1:
             return 1.0
-        floor = stage / float(N_STAGES - 1)
-        if len(self._recent) >= 16:
-            isl = np.array([a for a, _ in self._recent], float)
-            cur = np.array([b for _, b in self._recent], float)
-            # p90-p10 rather than std: robust to the outliers a MAP-Elites
-            # population always has, and it is the spread that matters, not the
-            # shape.
-            si = float(np.percentile(isl, 90) - np.percentile(isl, 10))
-            sc = float(np.percentile(cur, 90) - np.percentile(cur, 10))
-            if si + sc > 1e-12:
-                earned = si / (si + sc)
-                self._handover = max(self._handover, earned)
-        return float(np.clip(max(floor, self._handover), 0.0, 1.0))
+        return float(np.clip(stage / float(N_STAGES - 1), 0.0, 1.0))
+
+    def standing(self, island_score: float, curriculum_score: float):
+        """Both halves of the blend as population quantiles in [0, 1].
+
+        The blend is a convex combination, so it compares the two halves'
+        *magnitudes* -- and they are not on the same scale.  Measured over
+        arch30: the island half spans 0.0437 from p10 to p90 and the curriculum
+        half spans 0.5092, an 11.7x mismatch, so at the weight the ramp actually
+        applied (0.2794 mean) the mission contributed 0.0086 against 0.40, about
+        2% of the selection variance.  That figure was arrived at two ways --
+        from the weights and spreads, and independently as r-squared of the
+        measured correlation -- and they agree to 0.001.
+
+        Ranking each half within the recent population removes the mismatch at
+        its source: a quantile is on [0, 1] by construction whatever the raw
+        scale, so a weight of 0.25 means a quarter of the influence rather than
+        a fortieth.
+
+        The cost is honest and worth stating: a quantile is relative to the
+        window, so an elite's stored fitness is not comparable across a long run
+        the way an absolute score would be.  MAP-Elites compares a challenger
+        against the cell's current occupant, and both are scored against
+        populations from different times.  The window is long enough that this
+        drifts slowly, and the judge already ratchets population quantiles for
+        the same reason, but it is a change in what a stored fitness means.
+        """
+        if len(self._recent) < 16:
+            return float(island_score), float(curriculum_score)
+        isl = np.array([a for a, _ in self._recent], float)
+        cur = np.array([b for _, b in self._recent], float)
+        return (float(np.mean(isl <= island_score)),
+                float(np.mean(cur <= curriculum_score)))
 
     def evaluate(self, cell, result, transitions=None) -> StageResult:
         """Score a design at its cell's stage, and at the next one up."""

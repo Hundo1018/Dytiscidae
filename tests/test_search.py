@@ -1370,33 +1370,50 @@ def test_the_island_objective_takes_its_weight_back() -> None:
           all(c.handover(s) <= c.handover(s + 1) for s in range(N_STAGES - 1)),
           " ".join(f"{c.handover(s):.2f}" for s in range(N_STAGES)))
 
-    # The pathological case, with the real numbers: an island objective pinned
-    # near 0.03 with no spread, against a curriculum score that varies.  The
-    # island has earned nothing and must not be handed the weight.
+    # The spread-based "evidence" term is gone.  It weighted whichever half
+    # discriminated more, which silences a hard objective exactly when it
+    # matters: mission_fraction has a small spread *because* nothing can do the
+    # mission yet.  Over arch30 it averaged 0.197, below the 0.25 stage floor it
+    # was meant to improve on, and selection ended up correlating with mission
+    # capability at r = 0.1413.  So the ramp is now the whole rule.
     flat = Curriculum()
     for i in range(64):
         flat.observe_blend(0.035, 0.2 + 0.8 * (i % 8) / 7.0)
-    check("an island objective that discriminates nothing earns nothing",
-          flat.handover(1) <= 0.25 + 1e-9,
-          f"stage-1 handover {flat.handover(1):.3f}, i.e. the stage floor only")
+    check("a flat island objective still gets its stage share, not less",
+          abs(flat.handover(1) - 0.25) < 1e-9,
+          f"stage-1 handover {flat.handover(1):.3f}")
 
-    # And the case it exists for: the island objective is now the thing telling
-    # designs apart, so it should take the weight even at a low stage.
     sharp = Curriculum()
     for i in range(64):
         sharp.observe_blend(0.05 + 0.9 * (i % 8) / 7.0, 0.98)
-    check("an island objective that does discriminate takes the weight early",
-          sharp.handover(1) > 0.7,
-          f"stage-1 handover {sharp.handover(1):.3f} on a flat curriculum")
+    check("and a sharp one gets the same share: the ramp ignores spread",
+          abs(sharp.handover(1) - flat.handover(1)) < 1e-9,
+          f"flat {flat.handover(1):.3f} vs sharp {sharp.handover(1):.3f}")
 
-    # Ratchet, matching the judge: handing back would let a population dip
-    # re-earn the easy score.
-    before = sharp.handover(1)
-    for _ in range(300):
-        sharp.observe_blend(0.05, 0.98)
-    check("and having handed over it does not hand back",
-          sharp.handover(1) >= before - 1e-9,
-          f"{before:.3f} -> {sharp.handover(1):.3f} after the spread collapses")
+    # The property that actually fixes the bug: the two halves reach the blend
+    # on the same scale.  Raw, the island half spans 0.0437 p10-p90 against the
+    # curriculum's 0.5092 -- an 11.7x mismatch that hands the decision to the
+    # curriculum whatever weight is nominally applied.
+    mixed = Curriculum()
+    for i in range(64):
+        frac = (i % 8) / 7.0
+        mixed.observe_blend(0.02 + 0.04 * frac, 0.2 + 0.9 * frac)
+    lo_i, lo_c = mixed.standing(0.021, 0.21)
+    hi_i, hi_c = mixed.standing(0.059, 1.09)
+    check("a tiny-scale island score still spans the standing range",
+          (hi_i - lo_i) > 0.7,
+          f"island standing {lo_i:.2f} -> {hi_i:.2f} over a raw span of 0.04")
+    check("and the large-scale curriculum score spans no more than it",
+          abs((hi_c - lo_c) - (hi_i - lo_i)) < 0.2,
+          f"curriculum standing {lo_c:.2f} -> {hi_c:.2f} over a raw span of 0.9")
+
+    # Before there is a population to rank against, standings pass through
+    # unchanged rather than inventing an ordering from four samples.
+    young = Curriculum()
+    young.observe_blend(0.03, 0.9)
+    check("with too little history the raw scores pass through",
+          young.standing(0.5, 0.7) == (0.5, 0.7),
+          "fewer than 16 observations -> no ranking")
 
     check("the blend is in the record, since it moves",
           {"handover", "handover_typical"} <= set(

@@ -570,8 +570,14 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     # to move.  A fixed 0.5 left the air island selecting 96% on a score that
     # does not read air.
     state.curriculum.observe_blend(base, sr.score)
+    # Blend the two halves as population standings, not raw scores.  They are
+    # not on the same scale -- measured over arch30 the island half spans 0.0437
+    # p10-p90 and the curriculum half 0.5092 -- so a convex combination of the
+    # raw values hands the decision to whichever half happens to be larger,
+    # whatever weight is nominally applied.  See Curriculum.standing.
+    isl_q, cur_q = state.curriculum.standing(base, sr.score)
     w = state.curriculum.handover(sr.stage)
-    base = float(w * base + (1.0 - w) * sr.score)
+    base = float(w * isl_q + (1.0 - w) * cur_q)
     cfeat = critic_features(_meta_light(pheno, result), result)
     discount = state.critic.discount(cfeat) if state.critic is not None else 1.0
     fit = float(base * discount)
