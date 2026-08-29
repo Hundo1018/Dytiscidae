@@ -120,6 +120,14 @@ def finalise_tier1(r: MissionResult, clamped_any: bool) -> None:
     if any(s.max_actuator_overload > 3.0 for s in r.segments.values()):
         r.exploit = "actuators run far past their thermal rating"
 
+    r.diverged_rollouts = (
+        sum(1 for s in r.segments.values()
+            if s.failure in ("diverged", "unstable"))
+        + sum(1 for t in r.transitions.results.values()
+              if t.failure == "diverged")
+    )
+    r.n_rollouts = len(r.segments) + len(r.transitions.results)
+
 
 
 def evaluate_tier1(

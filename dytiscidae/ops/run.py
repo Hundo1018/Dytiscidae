@@ -188,6 +188,7 @@ def cmd_search(args) -> int:
             f"inv={r.get('auditor', {}).get('invalidated', 0):<3d} "
             f"scout={r.get('scout', {}).get('calibration', 0):.2f}/"
             f"{r.get('scout', {}).get('protected', 0):<2d} "
+            f"div={100.0 * r.get('diverged_rollouts', 0) / max(r.get('rollouts', 0), 1):4.1f}% "
             f"evals={r['evaluated']:<5d} {r['elapsed']:6.0f}s"
         )
         print(line, flush=True)

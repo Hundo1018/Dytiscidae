@@ -108,6 +108,12 @@ class SegmentResult:
     mean_power: float = 0.0
     survived: bool = True
     failure: str = ""
+    #: MuJoCo bad-qacc events during this segment.  MuJoCo 3.x *auto-resets*
+    #: the state to the initial pose when qacc goes non-finite, so a blowup
+    #: does not trip the position-divergence guard -- the machine teleports to
+    #: spawn mid-rollout and keeps being scored.  A segment with any of these
+    #: is marked unstable rather than trusted.
+    bad_qacc: int = 0
     # Domain-specific competence, all in [0, 1].
     competence: float = 0.0
     max_depth: float = 0.0
@@ -154,6 +160,14 @@ class MissionResult:
     #: Set when the evaluation detected the candidate exploiting the simulator
     #: rather than solving the task.  The curator culls these on sight.
     exploit: str = ""
+    #: How many of this evaluation's rollouts (domain segments and transition
+    #: legs) ended in numerical divergence, against how many were run.  A
+    #: diverged rollout zeroes its competence, and mission_fraction is gated on
+    #: the *minimum* competence -- so the divergence rate bounds how much of the
+    #: selection signal is numerics rather than behaviour, and it has to be
+    #: visible per generation to be managed at all.
+    diverged_rollouts: int = 0
+    n_rollouts: int = 0
 
     @property
     def energy_margin(self) -> float:
@@ -759,6 +773,8 @@ class TriphibianEnv:
         control_every = max(1, int(1.0 / (control_hz * self.timestep)))
 
         start = self.root_pos().copy()
+        bad0 = int(self.data.warning[
+            self._mj.mjtWarning.mjWARN_BADQACC].number)
         depths, alts, ups, contacts, clearances = [], [], [], [], []
         peak_slam = 0.0
         cur = p
@@ -786,6 +802,11 @@ class TriphibianEnv:
             peak_slam = max(peak_slam, self.solver.diag.slam)
 
         end = self.root_pos().copy()
+        res.bad_qacc = int(self.data.warning[
+            self._mj.mjtWarning.mjWARN_BADQACC].number) - bad0
+        if res.bad_qacc > 0 and res.survived:
+            res.survived = False
+            res.failure = res.failure or "unstable"
         n = max(len(alts), 1)
         res.distance = float(np.linalg.norm((end - start)[:2]))
         res.mean_speed = res.distance / max(duration, 1e-6)

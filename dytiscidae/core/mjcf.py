@@ -180,7 +180,16 @@ def scene_xml(
     ET.SubElement(
         default,
         "geom",
-        {"friction": "0.9 0.02 0.001", "condim": "4", "solref": "0.004 1",
+        # Contact timeconst rides the timestep: MuJoCo wants timeconst >= 2x
+        # the step or the constraint is stiffer than the integrator can
+        # resolve, and this was a constant 0.004 while the mission env also
+        # runs at timestep 0.004.  Measured against the bad-qacc blowups in
+        # arch30's population it is NOT their cause -- 18 events under the
+        # 1x ratio, 17 under 2x, three resumed generations each -- so this is
+        # guidance compliance, not the stability fix; the blowups come from
+        # somewhere in the fluid coupling.
+        {"friction": "0.9 0.02 0.001", "condim": "4",
+         "solref": f"{_fmt(max(2.0 * timestep, 0.004))} 1",
          "margin": "0.001", "contype": "1", "conaffinity": "2"},
     )
     ET.SubElement(default, "joint", {"damping": "0.05", "armature": "0.002", "limited": "true"})

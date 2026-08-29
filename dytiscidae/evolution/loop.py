@@ -823,6 +823,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 curator.credit(operators, "rejected", 0.0)
             evaluated = []
 
+        gen_diverged = gen_rollouts = 0
         for (child, _inh, _idf, operators, parent, _sd), got in zip(built, evaluated):
             if got is None:
                 curator.credit(operators, "rejected", 0.0)
@@ -830,6 +831,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             pheno, result, ctrl = got
             state.evaluated += 1
             curator.evaluations += 1
+            gen_diverged += result.diverged_rollouts
+            gen_rollouts += result.n_rollouts
             _place(state, child, pheno, result, ctrl, parent, operators)
 
         # --- the shared policy learns from everything the generation saw ----
@@ -916,6 +919,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         report["island"] = state.island
         report["evaluated"] = state.evaluated
         report["tier0_rejected"] = state.tier0_rejected
+        report["diverged_rollouts"] = gen_diverged
+        report["rollouts"] = gen_rollouts
         report["elapsed"] = round(time.time() - state.started, 1)
         report["curriculum"] = state.curriculum.report()
         report["judge"] = state.judge.report()

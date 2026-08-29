@@ -431,6 +431,8 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
     control_every = max(1, int(1.0 / (control_hz * envs[0].timestep)))
 
     starts = [e.root_pos().copy() for e in envs]
+    bad0 = [int(e.data.warning[e._mj.mjtWarning.mjWARN_BADQACC].number)
+            for e in envs]
     rec = [dict(depths=[], alts=[], ups=[], contacts=[], clears=[], slam=0.0)
            for _ in envs]
     cur = list(params_list)
@@ -489,6 +491,11 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
     for m, e in enumerate(envs):
         r = rec[m]
         end = e.root_pos().copy()
+        res[m].bad_qacc = int(e.data.warning[
+            e._mj.mjtWarning.mjWARN_BADQACC].number) - bad0[m]
+        if res[m].bad_qacc > 0 and res[m].survived:
+            res[m].survived = False
+            res[m].failure = res[m].failure or "unstable"
         res[m].distance = float(np.linalg.norm((end - starts[m])[:2]))
         res[m].mean_speed = res[m].distance / max(duration, 1e-6)
         res[m].mean_power = e.budget.mean_power

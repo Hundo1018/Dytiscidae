@@ -1667,6 +1667,46 @@ def test_jet_thrust_matches_momentum_flux() -> None:
           f"joint ids {built.joint_id.tolist()}")
 
 
+def test_an_auto_reset_rollout_is_not_trusted() -> None:
+    """A segment whose physics blew up must fail, not be scored.
+
+    MuJoCo 3.x auto-resets the state to the initial pose when qacc goes
+    non-finite, so a blowup never trips the position-divergence guard: the
+    machine teleports to spawn mid-rollout and keeps being scored as if the
+    trajectory were real.  arch30's resumed population produced 18 such events
+    in three generations with zero rollouts marked diverged -- an entirely
+    silent score-corruption channel.
+    """
+    print("\nstability: an auto-reset rollout is marked unstable")
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(beetle()))
+    env.reset(Domain.AIR)
+    clean = env.rollout(0.1, domain=Domain.AIR)
+    check("a clean rollout records no bad-qacc events",
+          clean.bad_qacc == 0 and clean.failure != "unstable",
+          f"bad_qacc={clean.bad_qacc}")
+
+    bad_enum = mujoco.mjtWarning.mjWARN_BADQACC
+    original = env.step
+
+    def step_with_warning(angles):
+        env.data.warning[bad_enum].number += 1
+        return original(angles)
+
+    env.reset(Domain.AIR)
+    env.step = step_with_warning
+    res = env.rollout(0.1, domain=Domain.AIR)
+    env.step = original
+    check("a rollout with bad-qacc events is marked unstable",
+          (not res.survived) and res.failure == "unstable",
+          f"survived={res.survived} failure={res.failure!r}")
+    check("and the event count is recorded", res.bad_qacc > 0,
+          f"bad_qacc={res.bad_qacc}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -1699,6 +1739,7 @@ def main() -> int:
     test_structure_rejects_impossible_wings()
     test_wave_field()
     test_jet_thrust_matches_momentum_flux()
+    test_an_auto_reset_rollout_is_not_trusted()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
