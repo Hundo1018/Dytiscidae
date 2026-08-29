@@ -1093,6 +1093,33 @@ def load_state(state: SearchState) -> int:
                 cur._recent = []
             if not hasattr(cur, "window"):
                 cur.window = 256
+    # Say so when a resumed archive's controllers cannot be inherited.
+    #
+    # `_controller_for` transfers stored weights only when the shape matches and
+    # silently starts from zeros when it does not, which is right per candidate
+    # -- weights fitted against a different observation mean nothing here.  Held
+    # across a whole archive it is a different event: widening the observation
+    # from 14 channels to 19 makes every policy in every run before it
+    # untransferable, and 240 discarded controllers should not look like a
+    # normal resume.
+    want = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=state.config.n_modes,
+                  hidden=state.config.policy_hidden).n_weights
+    stored, mismatched = 0, 0
+    for a in state.archipelago.archives.values():
+        for e in a.cells.values():
+            w = (e.meta or {}).get("policy")
+            if w:
+                stored += 1
+                mismatched += len(w) != want
+    if mismatched:
+        print(f"  ({mismatched} of {stored} stored controllers do not fit this "
+              f"policy shape ({want} weights) and start from zeros; "
+              f"--promotion-refine-steps re-earns them at verification)",
+              flush=True)
+        state.telemetry.event({"kind": "policy_shape_mismatch",
+                               "stored": stored, "mismatched": mismatched,
+                               "want": want})
+
     state.judge_moves = list(d.get("judge_moves", []))
     for name, cur in (d.get("curators") or {}).items():
         if name in state.archipelago.curators:

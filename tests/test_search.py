@@ -1775,6 +1775,57 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_a_resume_says_when_controllers_cannot_be_inherited() -> None:
+    """Widening the observation orphans every stored controller; say so.
+
+    ``_controller_for`` starts from zeros when a stored weight vector does not
+    fit, which is right per candidate -- weights fitted against a different
+    observation space mean nothing.  Across a whole archive it is a different
+    event: the 14-to-19 channel widening made every policy in every earlier run
+    untransferable, and 240 discarded controllers must not look like a normal
+    resume.
+    """
+    print("\nloop: a resume says when controllers cannot be inherited")
+    import json
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    tmp = tempfile.mkdtemp(prefix="dyt-orphan-")
+    try:
+        base = dict(batch=1, seed=4, segment_seconds=0.5, n_reference_seeds=1,
+                    n_random_seeds=0, islands=("generalist",), tier2_every=999,
+                    audit_every=999, migrate_every=999, checkpoint_every=1,
+                    run_dir=tmp, identify_axes_every=999,
+                    promotion_refine_steps=0)
+        first = run_search(SearchConfig(generations=1, **base), MissionSpec())
+        arch = first.archipelago.archives["generalist"]
+        check("the run stored controllers to orphan",
+              any(e.meta.get("policy") for e in arch.cells.values()))
+
+        # Corrupt the stored width the way a change of observation space does.
+        for e in arch.cells.values():
+            if e.meta.get("policy"):
+                e.meta["policy"] = list(e.meta["policy"]) + [0.0]
+        arch.save(Path(tmp) / "archive_generalist.pkl")
+
+        run_search(SearchConfig(generations=2, resume=True, **base),
+                   MissionSpec())
+        events = [json.loads(l) for l in open(Path(tmp) / "events.jsonl")]
+        warned = [e for e in events
+                  if e.get("kind") == "policy_shape_mismatch"]
+        check("the resume reports the orphaned controllers", warned,
+              f"{warned[-1] if warned else 'no event'}")
+        check("and counts them rather than merely flagging",
+              warned and warned[-1]["mismatched"] >= 1,
+              f"{warned[-1]['mismatched']} of {warned[-1]['stored']}"
+              if warned else "")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_learned_axes_survive_resume() -> None:
     """A refit that moved the archive onto latent axes must survive ``--resume``.
 
@@ -2078,6 +2129,7 @@ def main() -> int:
     test_promotion_needs_a_nonzero_answer_to_the_next_question()
     test_the_headline_is_the_mission()
     test_promotion_spends_refinement_and_keeps_what_it_buys()
+    test_a_resume_says_when_controllers_cannot_be_inherited()
     test_learned_axes_survive_resume()
     test_the_loop_wires_every_layer_together()
     print("\n" + "=" * 68)
