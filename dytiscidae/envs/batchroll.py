@@ -451,7 +451,12 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                     if policies is not None and policies[m] is not None:
                         coeffs = coeffs + policies[m].act(obs)
                     if shared is not None:
-                        a, logp, val = shared.act(obs)
+                        # Sample only when this rollout is feeding the learner.
+                        # The exploration noise exists to generate on-policy
+                        # data; a rollout that banks no trajectory has nothing
+                        # to explore for, and its score goes into the archive.
+                        a, logp, val = shared.act(
+                            obs, deterministic=collector is None)
                         coeffs = coeffs + a[:coeffs.shape[0]]
                         if collector is not None:
                             collector.record(m, obs, a, logp, val)
@@ -729,7 +734,8 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
                 if c.policy is not None:
                     coeffs = coeffs + c.policy.act(obs)
                 if shared is not None:
-                    a, logp, val = shared.act(obs)
+                    a, logp, val = shared.act(
+                        obs, deterministic=collector is None)
                     coeffs = coeffs + a[:coeffs.shape[0]]
                     if collector is not None:
                         collector.record(m, obs, a, logp, val)

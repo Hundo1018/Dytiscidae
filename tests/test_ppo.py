@@ -115,6 +115,38 @@ def main() -> int:
           f"{len(phenos)} machines")
     ok &= wired
 
+    # Exploration noise exists to generate on-policy data.  A rollout that
+    # banks no trajectory has nothing to explore for, and its score is what the
+    # archive stores -- so a scoring rollout must be the policy's mean.
+    # Measured cost of getting this wrong: crossings 0.600 -> 0.558 with
+    # sampling, 0.642 with the mean, on the same eight bodies at one seed.
+    from dytiscidae.envs.batchroll import evaluate_tier1_batch as _eval
+
+    torch.manual_seed(3)
+    scorer = SharedPolicy(TriphibianEnv.OBS_DIM, N_MODES, hidden=16)
+    calls = {"sampled": 0, "mean": 0}
+    inner = scorer.act
+
+    def counting_act(obs, *, deterministic=False):
+        calls["mean" if deterministic else "sampled"] += 1
+        return inner(obs, deterministic=deterministic)
+
+    scorer.act = counting_act
+    _eval([build(beetle())], segment_seconds=0.4, identify_axes=True, seed=5,
+          shared=scorer)          # no buffer: this is a scoring pass
+    scoring_clean = calls["sampled"] == 0 and calls["mean"] > 0
+    print(f"  [{'ok  ' if scoring_clean else 'FAIL'}] a scoring rollout uses the "
+          f"policy mean  -- {calls['mean']} mean, {calls['sampled']} sampled")
+    ok &= scoring_clean
+
+    calls["sampled"] = calls["mean"] = 0
+    _eval([build(beetle())], segment_seconds=0.4, identify_axes=True, seed=5,
+          shared=scorer, buffer=RolloutBuffer())   # learning pass
+    learning_explores = calls["sampled"] > 0 and calls["mean"] == 0
+    print(f"  [{'ok  ' if learning_explores else 'FAIL'}] a learning rollout still "
+          f"explores  -- {calls['sampled']} sampled, {calls['mean']} mean")
+    ok &= learning_explores
+
     print()
     print("shared PPO checks passed" if ok else "FAILED")
     return 0 if ok else 1
