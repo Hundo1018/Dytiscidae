@@ -1667,6 +1667,45 @@ def test_jet_thrust_matches_momentum_flux() -> None:
           f"joint ids {built.joint_id.tolist()}")
 
 
+def test_a_failing_sweep_gates_only_the_last_swimmer() -> None:
+    """A wing that cannot sweep in water is fatal only when nothing else swims.
+
+    Tier-0 rejected on ``min_margin`` over every check, and the hydrodynamic
+    sweep check was 40 of arch24's 81 rejects -- nearly every newly grown wing
+    died at the door for a load case the machine could avoid by holding that
+    wing still and swimming on its paddles, which is what a real gannet does.
+    The check stays in the report and in feasibility; it stops gating when
+    other water propulsion remains.
+    """
+    print("\nstructure: a failing sweep gates only the last swimmer")
+    from dytiscidae.core.bodyplans import gannet
+    from dytiscidae.core.genome import WING as PART_WING
+    from dytiscidae.core.phenotype import build
+
+    g = gannet()
+    for part in g.parts:
+        if part.kind == PART_WING:
+            part.span *= 1.6
+    p = build(g)
+    sweeps = [c for c in p.report.checks if c.name == "sweep_load_in_water"]
+    failing = [c for c in sweeps if not c.ok]
+    check("the oversized wing fails its sweep check", len(failing) >= 1,
+          f"{len(failing)} of {len(sweeps)} sweep checks failing")
+    check("while another surface still passes", any(c.ok for c in sweeps))
+    check("the failing sweep no longer gates",
+          all(not c.gating for c in failing))
+    check("so the gate margin recovers while the true margin does not",
+          p.report.gate_margin > 0.0 > p.report.min_margin,
+          f"gate {p.report.gate_margin:+.2f} vs true {p.report.min_margin:+.2f}")
+    check("and feasibility still tells the truth", not p.report.ok)
+
+    # The reference gannet is untouched: everything passes, both margins agree.
+    ref = build(gannet())
+    check("a passing design's two margins agree",
+          abs(ref.report.gate_margin - ref.report.min_margin) < 1e-12,
+          f"{ref.report.gate_margin:+.2f}")
+
+
 def test_an_auto_reset_rollout_is_not_trusted() -> None:
     """A segment whose physics blew up must fail, not be scored.
 
@@ -1739,6 +1778,7 @@ def main() -> int:
     test_structure_rejects_impossible_wings()
     test_wave_field()
     test_jet_thrust_matches_momentum_flux()
+    test_a_failing_sweep_gates_only_the_last_swimmer()
     test_an_auto_reset_rollout_is_not_trusted()
     print("\n" + "=" * 68)
     if FAILURES:

@@ -718,6 +718,7 @@ def _structural_checks(p: Phenotype) -> None:
                             note="no lifting surface and no jet")
         )
     by_index = {seg.index: seg for seg in p.segments}
+    sweep_checks: dict = {}
     for s in surfaces:
         # Which member actually reacts this surface's loads?
         #
@@ -777,7 +778,7 @@ def _structural_checks(p: Phenotype) -> None:
         # against its own geometry reports a 300x overload for every membraned
         # design and silently deletes the bat and ray body plans from the search.
         # The load goes into the digit.
-        structure.hydrodynamic_sweep_check(
+        sweep_checks[s.index] = structure.hydrodynamic_sweep_check(
             span=s.span,
             chord_distribution=s.surface.chord,
             span_stations=s.surface.u,
@@ -802,6 +803,22 @@ def _structural_checks(p: Phenotype) -> None:
             material=carrier.material,
             report=p.report,
         )
+
+    # A surface that cannot survive being swept in water is only fatal when the
+    # design has nothing else to swim with.  The check's own philosophy is
+    # "what the surface must survive is being used" -- and a machine with
+    # passing paddles can hold its wings still in the water, which is exactly
+    # what a gannet does.  Tier-0 was rejecting on this check alone (40 of
+    # arch24's 81 rejects), which killed nearly every newly grown wing at the
+    # door and starved the search of the one structural innovation the mission
+    # needs most.  The failing check stays in the report and in the fitness
+    # margin; it just stops being grounds for never scoring the design.
+    other_swimmers = [i for i, ch in sweep_checks.items() if ch.ok]
+    driven_jets = [s for s in jets if s.part.joint != "none"]
+    for i, ch in sweep_checks.items():
+        if not ch.ok and (other_swimmers or driven_jets):
+            ch.gating = False
+            ch.note += "; non-gating: other water propulsion remains"
 
     hulls = [s for s in p.segments if s.kind in (HULL, BALLAST)]
     for s in hulls:

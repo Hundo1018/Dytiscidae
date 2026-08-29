@@ -231,7 +231,7 @@ def evaluate_candidate(
     """Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``."""
     pheno = build(genome)
     t0 = evaluate_tier0(pheno, spec)
-    if pheno.report.min_margin < cfg.tier0_gate or t0.mission_fraction <= 0.0:
+    if pheno.report.gate_margin < cfg.tier0_gate or t0.mission_fraction <= 0.0:
         return pheno, t0, None
 
     policy = _controller_for(pheno, genome, cfg, inherited_policy)
@@ -318,7 +318,7 @@ def evaluate_candidates(
         except Exception:
             continue
         phenos[i] = pheno
-        if pheno.report.min_margin < cfg.tier0_gate or t0.mission_fraction <= 0.0:
+        if pheno.report.gate_margin < cfg.tier0_gate or t0.mission_fraction <= 0.0:
             out[i] = (pheno, t0, None)
         else:
             passed.append(i)

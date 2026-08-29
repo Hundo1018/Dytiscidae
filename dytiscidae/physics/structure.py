@@ -31,6 +31,12 @@ class Check:
     allowable: float
     unit: str = "Pa"
     note: str = ""
+    #: Whether a failure here may reject the design before dynamics.  A check
+    #: whose load case the design can simply not use -- a wing that must not be
+    #: swept in water while paddles do the swimming -- stays in the report and
+    #: in the fitness margin, but does not gate.  Tier-0 killed 40 of arch24's
+    #: 81 rejects on exactly that case, which starved the search of new wings.
+    gating: bool = True
 
     @property
     def margin(self) -> float:
@@ -64,6 +70,17 @@ class StructuralReport:
     @property
     def min_margin(self) -> float:
         return min((c.margin for c in self.checks), default=10.0)
+
+    @property
+    def gate_margin(self) -> float:
+        """``min_margin`` over only the checks that may reject outright.
+
+        Feasibility (``ok``) and the fitness margin keep reading every check;
+        this is only for the Tier-0 gate, where a non-gating failure means
+        "score it and let the dynamics show what it cannot do" rather than
+        "never look at it".
+        """
+        return min((c.margin for c in self.checks if c.gating), default=10.0)
 
     def summary(self) -> str:
         w = self.worst
@@ -256,10 +273,10 @@ def max_sweep_tip_speed(
     """Fastest this surface may be swept through water, m/s at the tip.
 
     Inverts the sweep check: moment goes as tip speed squared, so the allowable
-    speed goes as the square root of the allowable stress.  The dynamic
-    evaluation compares what the controller actually commands against this, so
-    "can it swim" is a control question and only "can it swim at all" is a
-    geometry one.
+    speed goes as the square root of the allowable stress.  The intent is for
+    the dynamic evaluation to compare commanded sweep against this, so "can it
+    swim" becomes a control question and only "can it swim at all" a geometry
+    one -- but as of 2026-08-29 nothing reads the stored value yet.
     """
     r = np.asarray(span_stations, float)
     c = np.asarray(chord_distribution, float)
