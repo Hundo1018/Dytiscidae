@@ -1775,6 +1775,61 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_every_path_agrees_on_the_control_law() -> None:
+    """Refinement and verification must see the policy they will be scored with.
+
+    The two policies' intents are *summed* at the point of use, and only the
+    batched evaluator knew that.  Refinement optimised the per-candidate half
+    with the shared half absent and then stored the result to be scored with it
+    present; Tier-2 ran the single-machine path, which takes one policy, so it
+    verified a design under a control law that was not the one its Tier-1 score
+    was earned with -- and the critic is trained on exactly that ratio, so the
+    missing half was charged to the design.
+    """
+    print("\nloop: refinement and verification see the real control law")
+    import inspect
+
+    from dytiscidae.envs.evaluate import SummedPolicy
+    from dytiscidae.evolution import loop as loop_mod
+
+    class Fixed:
+        """Stands in for a policy: a constant intent, mean and sampled apart."""
+        def __init__(self, mean, sampled):
+            self.mean, self.sampled = mean, sampled
+
+        def act(self, obs, deterministic=False):
+            v = self.mean if deterministic else self.sampled
+            return np.full(4, v), 0.0, 0.0
+
+    class Own:
+        def act(self, obs):
+            return np.full(4, 0.25)
+
+    summed = SummedPolicy(own=Own(), shared=Fixed(0.5, 99.0), n_modes=4)
+    got = summed.act(np.zeros(19))
+    check("the summed policy adds both halves",
+          np.allclose(got, 0.75), f"{got}")
+    check("and takes the shared half at its mean, never a sample",
+          float(np.max(got)) < 1.0, f"max {float(np.max(got)):.3f}")
+
+    only_own = SummedPolicy(own=Own(), shared=None, n_modes=4)
+    check("with no shared policy it is just the candidate's own",
+          np.allclose(only_own.act(np.zeros(19)), 0.25))
+
+    # The refinement path must thread the shared policy through, or it
+    # optimises one half of a sum against the other half being zero.
+    for fn in (loop_mod._refine_controllers, loop_mod.batchroll_eval):
+        check(f"{fn.__name__} accepts the shared policy",
+              "shared" in inspect.signature(fn).parameters,
+              f"parameters: {list(inspect.signature(fn).parameters)}")
+    src = inspect.getsource(loop_mod._refined_controller_for)
+    check("promotion-time refinement passes it on",
+          "shared=state.shared" in src)
+    check("and Tier-2 verification is given the summed law",
+          "_with_shared(state, ctrl2)"
+          in inspect.getsource(loop_mod._verify_and_label))
+
+
 def test_the_shared_policy_survives_a_resume() -> None:
     """The most expensive learned thing in the run must outlive an interruption.
 
@@ -2178,6 +2233,7 @@ def main() -> int:
     test_promotion_needs_a_nonzero_answer_to_the_next_question()
     test_the_headline_is_the_mission()
     test_promotion_spends_refinement_and_keeps_what_it_buys()
+    test_every_path_agrees_on_the_control_law()
     test_the_shared_policy_survives_a_resume()
     test_a_resume_says_when_controllers_cannot_be_inherited()
     test_learned_axes_survive_resume()

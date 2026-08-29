@@ -56,6 +56,38 @@ class Controller:
         return self.bases.get(key)
 
 
+@dataclass(eq=False)
+class SummedPolicy:
+    """The per-candidate policy plus the shared one, as a single policy.
+
+    The batched evaluator sums the two intents at the point of use.  The
+    single-machine paths -- Tier-2 verification, the continuous mission, the
+    showcase -- take one policy object, so before this they could only run the
+    per-candidate half, and verified a design under a control law that was not
+    the one its Tier-1 score was earned with.  The critic reads exactly that
+    gap and would have charged the difference to the design.
+
+    The shared half is evaluated at its mean.  These paths bank no trajectory,
+    so there is nothing for exploration noise to be for, and a verification
+    pass is the last place a stored number should carry any.
+    """
+
+    own: object = None
+    shared: object = None
+    n_modes: int = 4
+
+    def act(self, obs) -> np.ndarray:
+        c = np.zeros(self.n_modes)
+        if self.own is not None:
+            a = np.asarray(self.own.act(obs), float)
+            c[: min(len(a), self.n_modes)] += a[: self.n_modes]
+        if self.shared is not None:
+            a, _logp, _v = self.shared.act(obs, deterministic=True)
+            a = np.asarray(a, float)
+            c[: min(len(a), self.n_modes)] += a[: self.n_modes]
+        return c
+
+
 # --------------------------------------------------------------------------
 # Transitions
 # --------------------------------------------------------------------------
