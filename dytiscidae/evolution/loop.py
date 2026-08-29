@@ -921,6 +921,24 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         report["tier0_rejected"] = state.tier0_rejected
         report["diverged_rollouts"] = gen_diverged
         report["rollouts"] = gen_rollouts
+        # The mission headline.  ``best`` below is whichever island's champion
+        # scored highest, which for ten runs in a row was the water island's
+        # wingless specialist -- an intentionally partial objective presented
+        # as the headline.  What this search is *for* is mission_fraction on
+        # the generalist archive, so that is what gets a column of its own,
+        # with the fitness<->mission correlation beside it: the number that
+        # measured 0.14 on arch30 and prompted the standings blend.
+        g_arch = archipelago.archives.get("generalist")
+        if g_arch is not None and g_arch.cells:
+            pairs = [(e.fitness,
+                      float((e.meta or {}).get("mission_fraction", 0.0)))
+                     for e in g_arch.cells.values()]
+            fits, mfs = zip(*pairs)
+            report["mission_best"] = round(max(mfs), 4)
+            if (len(pairs) >= 16 and float(np.std(fits)) > 1e-9
+                    and float(np.std(mfs)) > 1e-9):
+                report["mission_corr"] = round(
+                    float(np.corrcoef(fits, mfs)[0, 1]), 4)
         report["elapsed"] = round(time.time() - state.started, 1)
         report["curriculum"] = state.curriculum.report()
         report["judge"] = state.judge.report()

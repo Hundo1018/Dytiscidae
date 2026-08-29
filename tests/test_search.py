@@ -1697,6 +1697,39 @@ def test_promotion_needs_a_nonzero_answer_to_the_next_question() -> None:
           f"next={sr.detail['next']}")
 
 
+def test_the_headline_is_the_mission() -> None:
+    """The generation report carries the generalist's mission_fraction.
+
+    ``best_fitness`` is whichever island's champion scored highest -- for ten
+    runs in a row that was the water island's wingless specialist, and reading
+    it as the run's headline hid that mission_fraction never moved.
+    """
+    print("\nloop: the headline is the mission")
+    import json
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    tmp = tempfile.mkdtemp(prefix="dyt-headline-")
+    try:
+        run_search(SearchConfig(
+            generations=1, batch=1, seed=11, segment_seconds=1.0,
+            n_reference_seeds=1, n_random_seeds=0, islands=("generalist",),
+            tier2_every=999, audit_every=999, migrate_every=999,
+            checkpoint_every=999, run_dir=tmp, identify_axes_every=999,
+        ), MissionSpec())
+        rows = [json.loads(l) for l in open(Path(tmp) / "generations.jsonl")]
+        gen_rows = [r for r in rows if "mission_best" in r]
+        check("the report carries mission_best", len(gen_rows) >= 1,
+              f"{len(gen_rows)} rows carry it")
+        check("and it is a fraction, not a fitness",
+              all(0.0 <= r["mission_best"] <= 1.0 for r in gen_rows))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_learned_axes_survive_resume() -> None:
     """A refit that moved the archive onto latent axes must survive ``--resume``.
 
@@ -1998,6 +2031,7 @@ def main() -> int:
     test_scout_finds_dark_horses_and_may_only_protect()
     test_a_run_can_be_picked_up_where_it_stopped()
     test_promotion_needs_a_nonzero_answer_to_the_next_question()
+    test_the_headline_is_the_mission()
     test_learned_axes_survive_resume()
     test_the_loop_wires_every_layer_together()
     print("\n" + "=" * 68)
