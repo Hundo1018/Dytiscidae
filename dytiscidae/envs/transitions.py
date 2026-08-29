@@ -97,6 +97,9 @@ class TransitionResult:
     kind: str
     crossed: bool = False
     failure: str = ""
+    #: MuJoCo bad-qacc events during the crossing; same auto-reset channel the
+    #: segment rollouts guard against (see SegmentResult.bad_qacc).
+    bad_qacc: int = 0
 
     # Raw measurements, kept so the record survives any change to the scoring.
     peak_entry_speed: float = 0.0

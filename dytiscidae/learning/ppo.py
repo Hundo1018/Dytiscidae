@@ -46,6 +46,15 @@ competence, delivered once at the end of the segment, and PPO gets it through
 GAE like any other sparse-terminal task.  Sparse costs sample efficiency, and
 sample efficiency is the thing sharing the policy just bought.
 
+Two later changes widened the signal without touching that decision.  The
+transitions now contribute trajectories too, rewarded with the same graded
+crossing score `finalise_tier1` already folds into mission_fraction -- the part
+of the mission the policy most needs to learn was the one rollout it never saw.
+And the observation now carries the quantities the scorers read (depth error to
+the target, contact, battery, stroke phase), so the value function has state to
+regress a sparse return against rather than having to infer the mission from
+body rates.
+
 CPU by choice
 -------------
 

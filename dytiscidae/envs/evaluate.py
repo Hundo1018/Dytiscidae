@@ -124,7 +124,7 @@ def finalise_tier1(r: MissionResult, clamped_any: bool) -> None:
         sum(1 for s in r.segments.values()
             if s.failure in ("diverged", "unstable"))
         + sum(1 for t in r.transitions.results.values()
-              if t.failure == "diverged")
+              if t.failure in ("diverged", "unstable"))
     )
     r.n_rollouts = len(r.segments) + len(r.transitions.results)
 

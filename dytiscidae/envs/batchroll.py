@@ -625,13 +625,29 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
             collector.finish(buffer, [s.competence for s in segs])
 
     for kind in ("air_to_water", "water_to_air", "water_to_land"):
-        trs = run_transition_batch(group, bf, kind, [ctrls[i] for i in live])
+        tcollector = None
+        if shared is not None and buffer is not None:
+            from ..learning.ppo import SegmentCollector
+            tcollector = SegmentCollector(len(group))
+        trs = run_transition_batch(group, bf, kind, [ctrls[i] for i in live],
+                                   shared=shared, collector=tcollector)
         for slot, i in enumerate(live):
             tr = trs[slot]
             results[i].transitions.results[kind] = tr
             results[i].transition_ok[kind] = tr.crossed
             if tr.failure:
                 results[i].notes.append(f"{kind}: {tr.failure}")
+        if tcollector is not None:
+            # The reward is the same graded quantity ``finalise_tier1`` folds
+            # into mission_fraction -- crossed, scaled by the crossing's
+            # quality -- not a new formulation.  See ppo.py for why nothing
+            # denser is invented here.
+            tcollector.finish(buffer, [
+                float(t.crossed) * (0.40 + 0.60 * float(np.mean([
+                    t.components.get(c, 0.0)
+                    for c in ("shock", "control", "settle",
+                              "economy", "exit_state")])))
+                for t in trs])
 
     for i in live:
         r, p = results[i], phenos[i]
@@ -650,7 +666,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
 
 
 def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
-                         duration: float = 6.0):
+                         duration: float = 6.0, shared=None, collector=None):
     """`run_transition` for a whole batch, one GPU call per timestep.
 
     Mirrors the single-machine version exactly, including the two post-loop
@@ -658,6 +674,12 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
     peak.  The land->air bar in particular is terminal, not peak -- a machine
     that leaps and comes down has not crossed -- and getting that wrong here
     would quietly change what the search is rewarded for.
+
+    ``shared``/``collector`` mirror `rollout_batch`: the shared policy acts
+    during crossings and its decisions are recorded.  Transitions are the part
+    of the mission the policy most needs to learn and were the one rollout it
+    never saw -- every crossing datum was thrown away while the buffer filled
+    with steady-state swimming.
     """
     import numpy as _np
 
@@ -679,6 +701,8 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
     control_every = max(1, int(1.0 / (25.0 * envs[0].timestep)))
     cur = [c.params for c in ctrls]
 
+    bad0 = [int(e.data.warning[e._mj.mjtWarning.mjWARN_BADQACC].number)
+            for e in envs]
     energy0 = [float(e.budget.total_j) for e in envs]
     was_wet = [e.depth() > 0.0 for e in envs]
     cross_step = [-1] * k
@@ -698,10 +722,18 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
                 angles.append(None)
                 continue
             c = ctrls[m]
-            if (c.policy is not None and bases[m] is not None
-                    and i % control_every == 0):
-                cur[m] = bases[m].command_params(
-                    c.params, c.policy.act(e.observation(target)), e.cpg.n)
+            if (bases[m] is not None and i % control_every == 0
+                    and (c.policy is not None or shared is not None)):
+                obs = e.observation(target)
+                coeffs = _np.zeros(bases[m].modes.shape[0])
+                if c.policy is not None:
+                    coeffs = coeffs + c.policy.act(obs)
+                if shared is not None:
+                    a, logp, val = shared.act(obs)
+                    coeffs = coeffs + a[:coeffs.shape[0]]
+                    if collector is not None:
+                        collector.record(m, obs, a, logp, val)
+                cur[m] = bases[m].command_params(c.params, coeffs, e.cpg.n)
             angles.append(e.cpg.command(cur[m], e.data.time))
 
         was = active.copy()
@@ -746,6 +778,10 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
 
     for m, e in enumerate(envs):
         r = res[m]
+        r.bad_qacc = int(e.data.warning[
+            e._mj.mjtWarning.mjWARN_BADQACC].number) - bad0[m]
+        if r.bad_qacc > 0 and not r.failure:
+            r.failure = "unstable"
         if cross_step[m] < 0 and target is _D.LAND and e._touching_ground():
             cross_step[m] = max(len(ups[m]) - 1, 0)
         # Terminal, not peak: a machine that leapt and came down has not crossed.

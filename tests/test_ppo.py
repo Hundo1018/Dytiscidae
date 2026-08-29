@@ -91,6 +91,30 @@ def main() -> int:
           f"optimum  -- mode 0 mean {before:+.4f} -> {after:+.4f}")
     ok &= learned
 
+    # Transitions feed the buffer too.  They are the part of the mission the
+    # policy most needs to learn, and until this was wired every crossing
+    # datum was thrown away while the buffer filled with steady swimming.
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.batchroll import evaluate_tier1_batch
+    from dytiscidae.envs.triphibian import TriphibianEnv
+
+    torch.manual_seed(2)
+    shared = SharedPolicy(TriphibianEnv.OBS_DIM, N_MODES, hidden=16)
+    buf = RolloutBuffer()
+    phenos = [build(beetle()), build(beetle())]
+    evaluate_tier1_batch(phenos, segment_seconds=0.4, identify_axes=True,
+                         seed=3, shared=shared, buffer=buf)
+    n_traj = len(buf.trajectories)
+    # 3 domain segments + 3 transitions per machine, minus any that recorded
+    # nothing; strictly more than the 6 segment trajectories proves the
+    # transitions contributed.
+    wired = n_traj > 3 * len(phenos)
+    print(f"  [{'ok  ' if wired else 'FAIL'}] transitions contribute "
+          f"trajectories beyond the segments  -- {n_traj} trajectories from "
+          f"{len(phenos)} machines")
+    ok &= wired
+
     print()
     print("shared PPO checks passed" if ok else "FAILED")
     return 0 if ok else 1
