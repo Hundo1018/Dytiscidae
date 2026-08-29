@@ -1651,6 +1651,70 @@ def test_a_run_can_be_picked_up_where_it_stopped() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_learned_axes_survive_resume() -> None:
+    """A refit that moved the archive onto latent axes must survive ``--resume``.
+
+    Two silent failures, found by forensics on arch24's checkpoint rather than
+    by any test: the restored archive kept its cells but woke up on the
+    constructor's hand-picked axes, and the refit trigger read an alias of the
+    descriptors captured before ``load_state`` replaced them -- so the restored
+    object accumulated samples (seen 3049) while the alias it checked stayed
+    empty, and a 500-generation run refit zero times after its first resume.
+    """
+    print("\nloop: learned axes survive a resume")
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution.loop import SearchConfig, run_search, save_state
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    tmp = tempfile.mkdtemp(prefix="dyt-axes-resume-")
+    try:
+        base = dict(batch=1, seed=7, segment_seconds=1.0, n_reference_seeds=1,
+                    n_random_seeds=0, islands=("generalist",),
+                    tier2_every=999, audit_every=999, migrate_every=999,
+                    checkpoint_every=1, run_dir=tmp, identify_axes_every=999)
+        first = run_search(SearchConfig(generations=2, **base), MissionSpec())
+
+        # Stand in for the long run this fixture cannot afford: enough observed
+        # behaviour to fit, one refit, and the rebin the loop performs after one.
+        rng = np.random.default_rng(0)
+        d = first.descriptors
+        for _ in range(d.min_samples):
+            d.observe(rng.normal(size=16))
+        check("the projection fits once fed", d.fit())
+        d.refit_every = 1  # the next refit falls due inside the resumed run
+        refits_before = d.refits
+        latent = [(f"latent{i}", float(lo), float(hi), 8)
+                  for i, (lo, hi) in enumerate(d.bounds())]
+        n_latent = len(latent)
+        fronts_saved = 0
+        for name, a in first.archipelago.archives.items():
+            a.rebin(latent, lambda e: np.asarray(e.descriptor, float)[:n_latent])
+            fronts_saved += sum(len(f) for f in a.fronts.values())
+            a.save(Path(tmp) / f"archive_{name}.pkl")
+        save_state(first, first.archipelago.archives["generalist"].generation)
+
+        again = run_search(SearchConfig(generations=5, resume=True, **base),
+                           MissionSpec())
+        a2 = again.archipelago.archives["generalist"]
+        check("the archive wakes up on the axes it was saved with",
+              [n for n, *_ in a2.axes][:n_latent]
+              == [f"latent{i}" for i in range(n_latent)],
+              f"axes after resume: {[n for n, *_ in a2.axes]}")
+        check("the fronts come back with it",
+              sum(len(f) for f in a2.fronts.values()) >= min(fronts_saved, 1),
+              f"{fronts_saved} front members saved")
+        check("the restored descriptors keep their memory",
+              again.descriptors.seen >= d.min_samples,
+              f"seen={again.descriptors.seen}")
+        check("and the refit trigger reads the restored object, not a stale alias",
+              again.descriptors.refits > refits_before,
+              f"refits {refits_before} -> {again.descriptors.refits}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_the_loop_wires_every_layer_together() -> None:
     """The judge, the auditor, the critic, the curriculum and the islands must
     all be connected to the search, not merely present in the tree.
@@ -1887,6 +1951,7 @@ def main() -> int:
     test_curriculum_and_islands_give_gradient_where_the_mission_gives_none()
     test_scout_finds_dark_horses_and_may_only_protect()
     test_a_run_can_be_picked_up_where_it_stopped()
+    test_learned_axes_survive_resume()
     test_the_loop_wires_every_layer_together()
     print("\n" + "=" * 68)
     if FAILURES:

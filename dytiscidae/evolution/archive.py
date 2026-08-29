@@ -368,7 +368,10 @@ class Archive:
         with open(tmp, "wb") as f:
             pickle.dump(
                 {"axes": self.axes, "cells": self.cells, "generation": self.generation,
-                 "history": self.history, "tainted": self.tainted},
+                 "history": self.history, "tainted": self.tainted,
+                 # The fronts are evaluations too: dropping them here quietly
+                 # reduced every resumed run from MOME to plain MAP-Elites.
+                 "fronts": self.fronts},
                 f,
             )
         tmp.replace(path)
@@ -382,6 +385,7 @@ class Archive:
         a.generation = d["generation"]
         a.history = d.get("history", [])
         a.tainted = d.get("tainted", {})
+        a.fronts = d.get("fronts", {})
         return a
 
     def export_json(self, path: str | Path) -> None:

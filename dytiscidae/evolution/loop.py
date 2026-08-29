@@ -701,10 +701,6 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         # cell stopped existing.
         cur.curriculum = curricula[name]
 
-    learned = (
-        LearnedDescriptors(n_dims=len(BD_AXES), refit_every=cfg.descriptor_refit_every)
-        if cfg.learned_axes else None
-    )
     state = SearchState(
         telemetry=telemetry, config=cfg, rng=rng,
         archipelago=archipelago, curricula=curricula,
@@ -714,7 +710,11 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         scout=(Scout(horizon=cfg.scout_horizon, reserve=cfg.scout_reserve, seed=cfg.seed)
                if cfg.use_scout else None),
         island=cfg.islands[-1] if cfg.islands else "generalist",
-        descriptors=learned, spec=spec,
+        descriptors=(
+            LearnedDescriptors(n_dims=len(BD_AXES),
+                               refit_every=cfg.descriptor_refit_every)
+            if cfg.learned_axes else None),
+        spec=spec,
     )
 
     if cfg.use_shared_policy:
@@ -883,6 +883,13 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             telemetry.event({"kind": "critic_fit", "gen": gen, **state.critic.report()})
 
         # --- learned descriptor axes ----------------------------------------
+        #
+        # Read through ``state.descriptors``, never an alias captured before the
+        # loop: ``load_state`` replaces the object on resume, and an alias kept
+        # pointing at the fresh, empty one -- so a resumed run observed into the
+        # restored object and checked the empty one for refits, forever (arch24:
+        # seen 3049 against a last refit at 1204, zero refits after resume).
+        learned = state.descriptors
         if learned is not None and learned.due_for_refit() and learned.fit():
             def _reproject(e, _d=learned):
                 f = e.meta.get("features")
@@ -1022,6 +1029,16 @@ def load_state(state: SearchState) -> int:
             # by running the recovery against a live run's directory rather than
             # a two-generation fixture.
             live.generation = restored.generation
+            # The grid itself is learned state.  A descriptor refit moved the
+            # axes and re-filed every elite; restoring the cells onto the
+            # constructor's hand-picked axes silently undoes that, so every
+            # resumed run searched on the grid `learned_axes` was meant to
+            # replace (arch24 at gen 500 still carried the hand-picked axes).
+            live.axes = restored.axes
+            live.names = restored.names
+            live.lo = restored.lo
+            live.hi = restored.hi
+            live.bins = restored.bins
 
     state.evaluated = int(d.get("evaluated", 0))
     state.tier0_rejected = int(d.get("tier0_rejected", 0))
