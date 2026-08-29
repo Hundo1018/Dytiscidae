@@ -1068,3 +1068,61 @@ def build_panels(p: Phenotype, model, body_name_prefix: str = "") -> PanelSet:
                 )
             )
     return PanelSet.concat(sets)
+
+
+def build_jets(p: Phenotype, model, body_name_prefix: str = ""):
+    """Collect the pulsed-jet cavities so the dynamics can actually fire them.
+
+    The mass pass already computed each BELL's cavity volume and orifice area,
+    and the structural gate accepts a jet as a propulsor ("it is a squid") --
+    but until this existed nothing connected those numbers to a force, so a
+    medusa passed screening and then could not move: an admitted body-plan
+    family that was dynamically unwinnable.
+
+    A bell whose part has no joint gets ``joint_id = -1`` and produces no
+    thrust.  That is a behavioural failure the search can score and mutate its
+    way out of, which is different from being structurally lied to.
+    """
+    import mujoco
+
+    from ..physics.jet import JetSet
+
+    body_id: list[int] = []
+    joint_id: list[int] = []
+    axis: list[list[float]] = []
+    vol: list[float] = []
+    stroke: list[float] = []
+    area: list[float] = []
+    jrange: list = []
+    for s in p.segments:
+        if s.kind != BELL or s.bell_volume <= 0:
+            continue
+        bid = mujoco.mj_name2id(
+            model, mujoco.mjtObj.mjOBJ_BODY, body_name_prefix + s.name)
+        if bid < 0:
+            continue
+        jid = mujoco.mj_name2id(
+            model, mujoco.mjtObj.mjOBJ_JOINT, f"{body_name_prefix}{s.name}_j")
+        body_id.append(bid)
+        joint_id.append(jid)
+        # The orifice faces away from the attachment along the segment's own
+        # long axis -- an umbrella held by its handle -- so expelled fluid
+        # leaves along local +X and JetSet applies thrust opposite it.  If a
+        # plan wants the jet the other way, the part's orientation genes can
+        # turn the whole bell; the convention only has to be consistent.
+        axis.append([1.0, 0.0, 0.0])
+        vol.append(float(s.bell_volume))
+        stroke.append(float(np.clip(s.part.stroke_fraction, 0.05, 0.95)))
+        area.append(float(s.orifice_area))
+        jrange.append(model.jnt_range[jid] if jid >= 0 else np.array([0.0, 1.0]))
+    if not body_id:
+        return JetSet.empty()
+    return JetSet(
+        body_id=np.asarray(body_id, int),
+        joint_id=np.asarray(joint_id, int),
+        axis_local=np.asarray(axis, float),
+        volume=np.asarray(vol, float),
+        stroke_fraction=np.asarray(stroke, float),
+        orifice_area=np.asarray(area, float),
+        joint_range=np.asarray(jrange, float),
+    )

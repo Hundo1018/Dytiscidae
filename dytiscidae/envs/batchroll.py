@@ -273,6 +273,13 @@ class BatchedFluid:
                 continue
             a, b = self.boff[i], self.boff[i + 1]
             e.data.xfrc_applied[:] = o["xfrc"][a:b]
+            # Jet thrust is CPU-side in both paths: a handful of bells per
+            # machine against thousands of panels, so it stays out of the
+            # kernel, but it must come after the xfrc overwrite above or the
+            # scatter erases it.
+            if e.jets.n:
+                e.jets.apply(e.model, e.data, e.solver.medium, t,
+                             e.model.opt.timestep)
             mb = o["m_body"][a:b]
             e.model.body_mass[:] = self.dry_mass[i] + mb
             e.model.body_inertia[:] = (

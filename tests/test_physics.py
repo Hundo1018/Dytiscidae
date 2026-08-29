@@ -1585,6 +1585,88 @@ def test_wave_field() -> None:
           f"{np.linalg.norm(shallow):.3f} -> {np.linalg.norm(deep):.4f} m/s")
 
 
+def test_jet_thrust_matches_momentum_flux() -> None:
+    """Pulsed-jet thrust is rho Q^2/A opposite the orifice, in water only.
+
+    The model existed unwired: a medusa passed the has_propulsor gate and then
+    could not produce a newton, so a whole body-plan family was admitted to the
+    search and dynamically unwinnable.  This pins the wiring: magnitude from
+    momentum flux, direction opposite the expelled flow, nothing in air, refill
+    charged at the reduced coefficient.
+    """
+    print("\njet: thrust is momentum flux, water only, refill discounted")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.mjcf import compile_phenotype
+    from dytiscidae.core.phenotype import build, build_jets
+    from dytiscidae.physics.jet import JetSet
+
+    def bell_model(z: float):
+        xml = f"""
+        <mujoco>
+          <option timestep="0.004" gravity="0 0 0" density="0" viscosity="0"/>
+          <worldbody>
+            <body name="bell" pos="0 0 {z}">
+              <joint name="bell_j" type="hinge" axis="0 1 0" range="0 1"
+                     limited="true"/>
+              <geom type="sphere" size="0.06" density="400"/>
+            </body>
+          </worldbody>
+        </mujoco>"""
+        model = mujoco.MjModel.from_xml_string(xml)
+        data = mujoco.MjData(model)
+        return model, data
+
+    medium = MediumField()
+    volume, stroke_frac, orifice = 1e-3, 0.6, 2e-4
+    jets = JetSet(
+        body_id=np.array([1]), joint_id=np.array([0]),
+        axis_local=np.array([[1.0, 0.0, 0.0]]),
+        volume=np.array([volume]), stroke_fraction=np.array([stroke_frac]),
+        orifice_area=np.array([orifice]), joint_range=np.array([[0.0, 1.0]]),
+    )
+
+    # Contracting at omega = 2 rad/s over a 1 rad range sweeps
+    # Q = V * stroke * omega / span = 1.2e-3 m^3/s.
+    model, data = bell_model(-2.0)
+    data.qpos[0], data.qvel[0] = 0.0, 2.0
+    mujoco.mj_forward(model, data)
+    jets.apply(model, data, medium, 0.0, model.opt.timestep)
+    q = volume * stroke_frac * 2.0
+    expected = medium.water.rho * q * q / orifice
+    fx = float(data.xfrc_applied[1, 0])
+    check("thrust magnitude is rho Q^2 / A",
+          np.isclose(-fx, expected, rtol=1e-9),
+          f"{-fx:.3f} N against {expected:.3f} N by hand")
+    check("and it points opposite the expelled flow", fx < 0.0, f"fx={fx:.3f}")
+
+    model, data = bell_model(-2.0)
+    data.qpos[0], data.qvel[0] = 0.0, -2.0
+    mujoco.mj_forward(model, data)
+    jets.apply(model, data, medium, 0.0, model.opt.timestep)
+    fx_refill = float(data.xfrc_applied[1, 0])
+    check("refill is charged at the reduced coefficient, reversed",
+          np.isclose(fx_refill, jets.refill_efficiency * expected, rtol=1e-9),
+          f"{fx_refill:.3f} N against {jets.refill_efficiency * expected:.3f}")
+
+    model, data = bell_model(10.0)
+    data.qpos[0], data.qvel[0] = 0.0, 2.0
+    mujoco.mj_forward(model, data)
+    jets.apply(model, data, medium, 0.0, model.opt.timestep)
+    check("a bell out of the water produces nothing",
+          abs(float(data.xfrc_applied[1, 0])) < 1e-12,
+          f"{float(data.xfrc_applied[1, 0]):.2e} N in air")
+
+    # The wiring end: the medusa plan's own bells must reach the dynamics.
+    p = build(BODY_PLANS["medusa"]())
+    model, _data, _names, _panels = compile_phenotype(p)
+    built = build_jets(p, model)
+    check("the medusa's bells reach the jet model", built.n > 0,
+          f"{built.n} bells")
+    check("and at least one of them is driven by a real joint",
+          bool((built.joint_id >= 0).any()),
+          f"joint ids {built.joint_id.tolist()}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -1616,6 +1698,7 @@ def main() -> int:
     test_actuator_never_regenerates()
     test_structure_rejects_impossible_wings()
     test_wave_field()
+    test_jet_thrust_matches_momentum_flux()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

@@ -305,6 +305,8 @@ class TriphibianEnv:
             cd_scale=float(pert.get("cd_scale", 1.0)),
             lift_scale=float(pert.get("lift_scale", 1.0)),
         )
+        from ..core.phenotype import build_jets
+        self.jets = build_jets(phenotype, self.model)
 
         import mujoco
 
@@ -731,6 +733,9 @@ class TriphibianEnv:
             self.data.ctrl[: len(target_angles)] = target_angles
         self.data.xfrc_applied[:] = 0.0
         self.solver.apply(self.data, self.data.time)
+        if self.jets.n:
+            self.jets.apply(self.model, self.data, self.medium,
+                            self.data.time, self.timestep)
         self._mj.mj_step(self.model, self.data)
         alive = self.budget.step(
             np.abs(self.data.actuator_force), np.abs(self.data.actuator_velocity), self.timestep
