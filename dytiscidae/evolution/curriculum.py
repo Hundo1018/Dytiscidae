@@ -268,10 +268,22 @@ class Curriculum:
         )
 
     def update(self, cell, sr: StageResult) -> str:
-        """Promote or demote the cell.  Returns what happened."""
+        """Promote or demote the cell.  Returns what happened.
+
+        Promotion needs two things: passing this stage's bar, and a *nonzero*
+        answer to the next stage's question.  The bar alone let a cell climb on
+        its best medium and then face-plant on a question it had never touched:
+        arch30 logged 764 promotions against 17 demotions while the typical
+        cell sat at stage 1 and five cells ever reached "chain" -- swimmers
+        passing "directed" on depth-hold, being promoted into "crossing", and
+        scoring zero there forever.  Zero is not a tunable: a design that has
+        never once crossed a boundary gains nothing from being asked about
+        crossings, and one that has -- however badly -- has something for the
+        gradient in ``evaluate`` to climb.
+        """
         key = tuple(cell)
         s = self.stage_of(key)
-        if sr.passed and s < N_STAGES - 1:
+        if sr.passed and s < N_STAGES - 1 and sr.detail.get("next", 0.0) > 0.0:
             self.stages[key] = s + 1
             self.promotions += 1
             return "promoted"

@@ -1651,6 +1651,52 @@ def test_a_run_can_be_picked_up_where_it_stopped() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_promotion_needs_a_nonzero_answer_to_the_next_question() -> None:
+    """A cell climbs the ladder only once it has touched the next rung.
+
+    Stage bars alone let a swimmer pass "directed" on depth-hold and be
+    promoted into "crossing" without ever having crossed anything: arch30
+    logged 764 promotions against 17 demotions while the typical cell sat at
+    stage 1 and five cells ever reached "chain".  Zero on the next stage's
+    question is not a bar to tune -- it is the difference between "has
+    something to climb" and "was pushed off a cliff".
+    """
+    print("\ncurriculum: promotion needs a nonzero answer to the next question")
+    from types import SimpleNamespace
+
+    from dytiscidae.evolution.curriculum import Curriculum
+
+    def result_water_specialist():
+        seg = SimpleNamespace(
+            competence=0.9,
+            measurements={"depth_error": 0.5, "max_depth": 9.0,
+                          "water_speed": 0.5},
+        )
+        return SimpleNamespace(segments={"water": seg}, mission_fraction=0.0)
+
+    def transitions(crossed: float):
+        comps = {k: (0.5 if crossed > 0 else 0.0)
+                 for k in ("shock", "control", "settle", "economy",
+                           "exit_state")}
+        comps["crossed"] = crossed
+        return SimpleNamespace(component_means=lambda: comps)
+
+    cur = Curriculum()
+    cell = (1, 2, 3, 4)
+    cur.stages[cell] = 1
+
+    sr = cur.evaluate(cell, result_water_specialist(), transitions(0.0))
+    check("the stage bar itself is passed", sr.passed,
+          f"here={sr.detail['here']} bar={sr.detail['bar']}")
+    check("but a cell that never crossed is held, not promoted",
+          cur.update(cell, sr) == "held" and cur.stage_of(cell) == 1)
+
+    sr = cur.evaluate(cell, result_water_specialist(), transitions(0.5))
+    check("one real crossing, however rough, earns the promotion",
+          cur.update(cell, sr) == "promoted" and cur.stage_of(cell) == 2,
+          f"next={sr.detail['next']}")
+
+
 def test_learned_axes_survive_resume() -> None:
     """A refit that moved the archive onto latent axes must survive ``--resume``.
 
@@ -1951,6 +1997,7 @@ def main() -> int:
     test_curriculum_and_islands_give_gradient_where_the_mission_gives_none()
     test_scout_finds_dark_horses_and_may_only_protect()
     test_a_run_can_be_picked_up_where_it_stopped()
+    test_promotion_needs_a_nonzero_answer_to_the_next_question()
     test_learned_axes_survive_resume()
     test_the_loop_wires_every_layer_together()
     print("\n" + "=" * 68)
