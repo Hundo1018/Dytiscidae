@@ -1775,6 +1775,55 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_the_shared_policy_survives_a_resume() -> None:
+    """The most expensive learned thing in the run must outlive an interruption.
+
+    Every generation's transitions go into the shared policy, and it was the one
+    piece of learned state ``save_state`` did not carry -- so an interrupted
+    ``--shared-policy`` run resumed with a randomly initialised network while the
+    archive kept the scores the trained one had earned, and nothing said so.
+    """
+    print("\nloop: the shared policy survives a resume")
+    import shutil
+    import tempfile
+
+    from dytiscidae.learning.ppo import AVAILABLE, SharedPolicy
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    if not AVAILABLE:
+        check("torch is available to test the shared policy", True,
+              "skipped: torch not importable")
+        return
+
+    tmp = tempfile.mkdtemp(prefix="dyt-shared-resume-")
+    try:
+        base = dict(batch=1, seed=6, segment_seconds=0.4, n_reference_seeds=1,
+                    n_random_seeds=0, islands=("generalist",), tier2_every=999,
+                    audit_every=999, migrate_every=999, checkpoint_every=1,
+                    run_dir=tmp, identify_axes_every=999,
+                    use_shared_policy=True, promotion_refine_steps=0)
+        first = run_search(SearchConfig(generations=1, **base), MissionSpec())
+        w1 = first.shared.state_dict()["actor.0.weight"].detach().numpy().copy()
+
+        again = run_search(SearchConfig(generations=2, resume=True, **base),
+                           MissionSpec())
+        w2 = again.shared.state_dict()["actor.0.weight"].detach().numpy()
+
+        fresh = SharedPolicy(first.shared.n_obs, first.shared.n_modes,
+                             hidden=64)
+        wf = fresh.state_dict()["actor.0.weight"].detach().numpy()
+        d_resumed = float(np.linalg.norm(w2 - w1))
+        d_fresh = float(np.linalg.norm(wf - w1))
+        check("the resumed policy starts from the checkpointed weights",
+              d_resumed < 1e-6,
+              f"distance to checkpoint {d_resumed:.6f}")
+        check("which a fresh network would not",
+              d_fresh > 1.0, f"a fresh network sits {d_fresh:.3f} away")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_a_resume_says_when_controllers_cannot_be_inherited() -> None:
     """Widening the observation orphans every stored controller; say so.
 
@@ -2129,6 +2178,7 @@ def main() -> int:
     test_promotion_needs_a_nonzero_answer_to_the_next_question()
     test_the_headline_is_the_mission()
     test_promotion_spends_refinement_and_keeps_what_it_buys()
+    test_the_shared_policy_survives_a_resume()
     test_a_resume_says_when_controllers_cannot_be_inherited()
     test_learned_axes_survive_resume()
     test_the_loop_wires_every_layer_together()

@@ -1012,6 +1012,17 @@ def save_state(state: SearchState, gen: int) -> None:
         "curators": state.archipelago.curators,
         "islands": list(state.archipelago.names),
     }
+    # The shared policy is the most expensive learned thing in the run -- every
+    # generation's transitions went into it -- and it was the one piece of
+    # learned state the checkpoint did not carry, so an interrupted run resumed
+    # with a randomly initialised network and no sign that it had.  Stored as a
+    # state_dict rather than the module: a pickled nn.Module is a hostage to the
+    # torch version that wrote it.
+    if state.shared is not None:
+        payload["shared_state"] = {
+            k: v.detach().cpu().numpy() for k, v in state.shared.state_dict().items()
+        }
+        payload["shared_shape"] = (state.shared.n_obs, state.shared.n_modes)
     tmp = path.with_suffix(".tmp")
     with open(tmp, "wb") as f:
         pickle.dump(payload, f)
@@ -1093,6 +1104,26 @@ def load_state(state: SearchState) -> int:
                 cur._recent = []
             if not hasattr(cur, "window"):
                 cur.window = 256
+    # The shared policy, if this run has one and the checkpoint carried one of
+    # the same shape.  Without this a resumed --shared-policy run restarts PPO
+    # from a random network while every other learned thing continues, which is
+    # the worst of both: the archive keeps scores earned by a trained policy and
+    # the policy that earned them is gone.
+    if state.shared is not None and d.get("shared_state"):
+        import torch as _torch
+        shape = tuple(d.get("shared_shape") or ())
+        if shape == (state.shared.n_obs, state.shared.n_modes):
+            state.shared.load_state_dict(
+                {k: _torch.as_tensor(v) for k, v in d["shared_state"].items()})
+        else:
+            print(f"  (checkpointed shared policy is {shape}, this run wants "
+                  f"({state.shared.n_obs}, {state.shared.n_modes}); "
+                  f"starting it from scratch)", flush=True)
+            state.telemetry.event({"kind": "shared_policy_shape_mismatch",
+                                   "stored": list(shape),
+                                   "want": [state.shared.n_obs,
+                                            state.shared.n_modes]})
+
     # Say so when a resumed archive's controllers cannot be inherited.
     #
     # `_controller_for` transfers stored weights only when the shape matches and
