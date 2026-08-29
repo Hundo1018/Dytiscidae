@@ -82,6 +82,14 @@ class SearchConfig:
     # whole generation, so a generation costs (1 + steps) evaluations.
     controller_refine_steps: int = 0  # (1+1)-ES steps per candidate; 0 = inherit only
     controller_refine_sigma: float = 0.1  # perturbation scale on policy weights
+    #: Refinement steps spent on an elite at the moment it is promoted to
+    #: Tier-2.  Refining every candidate every generation costs a full batched
+    #: evaluation per step and was left at zero for that reason; promotion is
+    #: where the search has already decided a design is worth spending on, and
+    #: there are at most three per verification round.  So the cost is bounded
+    #: by promotions rather than by population, which is what makes a nonzero
+    #: default affordable.
+    promotion_refine_steps: int = 6
     policy_hidden: int = 0
     n_modes: int = 4
 
@@ -361,7 +369,8 @@ def evaluate_candidates(
     return out
 
 
-def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed):
+def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
+                        steps: int | None = None):
     """Local search on policy weights, every candidate advanced in one batch.
 
     A (1+1) evolution strategy: perturb, evaluate, keep the perturbation if the
@@ -380,7 +389,8 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed):
     and a zero policy commands nothing -- so a refinement step is also the only
     thing that ever gives such a candidate a non-zero controller.
     """
-    steps = int(getattr(cfg, "controller_refine_steps", 0))
+    if steps is None:
+        steps = int(getattr(cfg, "controller_refine_steps", 0))
     if steps <= 0 or not ctrls:
         return results
 
@@ -1147,6 +1157,55 @@ def seed_archipelago(state: SearchState, spec: MissionSpec) -> None:
             _place(state, g.copy(), pheno, result, ctrl, parent=None, operators=["seed"])
 
 
+def _refined_controller_for(state: SearchState, elite, pheno, spec, rng):
+    """The elite's controller, refined at the moment it is promoted.
+
+    Refining every candidate every generation costs a full batched Tier-1 per
+    step, which is why ``controller_refine_steps`` defaults to zero and why the
+    500-generation runs selected bodies on the strength of a controller nothing
+    had optimised.  Promotion is the affordable place to spend that budget: the
+    search has already decided this design is worth a Tier-2, and there are at
+    most three per verification round, so the cost scales with promotions
+    rather than with population.
+
+    It also puts the refinement where its result is worth most.  A refined
+    controller found here is stored back on the elite, so the archive's record
+    of what a design can do is made with a controller that was actually tuned
+    for it, and every child that inherits from this cell starts from those
+    weights rather than from its parent's untuned ones.
+
+    Returns ``None`` when there is nothing to refine, which makes the caller
+    behave exactly as it did before this existed.
+    """
+    cfg = state.config
+    steps = int(getattr(cfg, "promotion_refine_steps", 0))
+    if steps <= 0:
+        return None
+
+    from ..envs import batchroll
+
+    policy = _controller_for(pheno, elite.genome, cfg, elite.meta.get("policy"))
+    if policy is None or policy.weights.size == 0:
+        return None
+    ctrl = Controller(params=None, policy=policy)
+
+    # The stored elite carries weights but not the basis they were measured
+    # against -- it is a matrix per domain, too large to keep on every cell --
+    # so identification has to run once here before refinement can command
+    # anything.  ``evaluate_tier1_batch`` does both in one call.
+    base = batchroll.evaluate_tier1_batch(
+        [pheno], spec=spec, controllers=[ctrl],
+        segment_seconds=cfg.segment_seconds, identify_axes=True,
+        seed=int(rng.integers(1 << 30)))
+    ctrl.bases = base[0].mobility
+    if not ctrl.bases:
+        return ctrl
+
+    _refine_controllers([pheno], [ctrl], base, cfg, spec=spec,
+                        seed=int(rng.integers(1 << 30)), steps=steps)
+    return ctrl
+
+
 def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
     """Tier-2 the best of this island, and teach the critic what it found.
 
@@ -1161,9 +1220,17 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
             continue
         try:
             p2 = build(elite.genome)
-            r2 = evaluate_tier2(p2, spec=spec, seed=int(rng.integers(1 << 30)))
+            ctrl2 = _refined_controller_for(state, elite, p2, spec, rng)
+            r2 = evaluate_tier2(p2, spec=spec, controller=ctrl2,
+                                seed=int(rng.integers(1 << 30)))
             f2 = fitness(p2, r2)
             curator.record_promotion(elite, f2)
+            if ctrl2 is not None and ctrl2.policy is not None:
+                # Keep what the refinement found.  Verification is the one
+                # place the search pays for a design twice, and discarding the
+                # better controller it just bought would make the second
+                # payment worthless to everyone except the critic.
+                elite.meta["policy"] = ctrl2.policy.weights.tolist()
             cheap = float(elite.meta.get("mission_fraction", 0.0))
             if state.critic is not None and cheap > 1e-4:
                 feats = elite.meta.get("critic_features")

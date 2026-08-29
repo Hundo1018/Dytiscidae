@@ -148,6 +148,7 @@ def cmd_search(args) -> int:
         segment_seconds=args.segment_seconds,
         controller_refine_steps=args.refine_steps,
         controller_refine_sigma=args.refine_sigma,
+        promotion_refine_steps=args.promotion_refine_steps,
         policy_hidden=args.policy_hidden,
         use_shared_policy=args.shared_policy,
         shared_hidden=args.shared_hidden,
@@ -518,6 +519,12 @@ def main(argv=None) -> int:
                         "which command nothing.")
     p.add_argument("--refine-sigma", type=float, default=0.1,
                    help="perturbation scale on policy weights during refinement")
+    p.add_argument("--promotion-refine-steps", type=int, default=6,
+                   help="(1+1)-ES steps spent on an elite when it is promoted "
+                        "to Tier-2. Bounded by promotions (at most three per "
+                        "verification round) rather than by population, so "
+                        "unlike --refine-steps it is affordable by default. 0 "
+                        "verifies the elite exactly as the archive stored it.")
     p.add_argument("--shared-policy", action="store_true",
                    help="train one PPO policy across every morphology, on the "
                         "transitions the whole generation produces. Coexists "

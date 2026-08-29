@@ -1730,6 +1730,49 @@ def test_the_headline_is_the_mission() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
+    """Verification refines the elite's controller, and stores the result.
+
+    ``controller_refine_steps`` defaults to zero because refining every
+    candidate costs a full batched Tier-1 per step -- so the 500-generation
+    runs verified designs against a controller nothing had ever optimised.
+    Promotion is the affordable place: at most three per verification round,
+    and the search has already decided the design is worth a Tier-2.  Keeping
+    the refined weights on the elite is what makes the second payment worth
+    anything to the archive rather than only to the critic.
+    """
+    print("\nloop: promotion spends refinement and keeps what it buys")
+    import json
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    tmp = tempfile.mkdtemp(prefix="dyt-promote-")
+    try:
+        state = run_search(SearchConfig(
+            generations=2, batch=2, seed=3, segment_seconds=0.5,
+            n_reference_seeds=2, n_random_seeds=0, islands=("generalist",),
+            tier2_every=1, audit_every=999, migrate_every=999,
+            checkpoint_every=999, run_dir=tmp, identify_axes_every=999,
+            promotion_refine_steps=2), MissionSpec())
+        events = [json.loads(l) for l in open(Path(tmp) / "events.jsonl")]
+        promotions = [e for e in events if e.get("kind") == "promote"]
+        errors = [e for e in events if e.get("kind") == "error"]
+        check("verification still promotes", len(promotions) >= 1,
+              f"{len(promotions)} promotions")
+        check("and refinement at promotion raises no errors", not errors,
+              f"{[e.get('error') for e in errors[:2]]}")
+        stored = [e for e in state.archive.cells.values()
+                  if e.meta.get("policy")]
+        check("elites carry policy weights forward",
+              len(stored) == len(state.archive.cells) and stored,
+              f"{len(stored)} of {len(state.archive.cells)}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_learned_axes_survive_resume() -> None:
     """A refit that moved the archive onto latent axes must survive ``--resume``.
 
@@ -2032,6 +2075,7 @@ def main() -> int:
     test_a_run_can_be_picked_up_where_it_stopped()
     test_promotion_needs_a_nonzero_answer_to_the_next_question()
     test_the_headline_is_the_mission()
+    test_promotion_spends_refinement_and_keeps_what_it_buys()
     test_learned_axes_survive_resume()
     test_the_loop_wires_every_layer_together()
     print("\n" + "=" * 68)
