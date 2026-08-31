@@ -1046,8 +1046,14 @@ class TriphibianEnv:
     # ------------------------------------------------------------- mobility ID
 
     def identify(self, domain: Domain, *, probe_time: float = 1.2,
-                 n_probes: int = 8, seed: int = 0) -> MobilityBasis:
-        """Discover this body's control axes in one medium."""
+                 n_probes: int = 24, seed: int = 0,
+                 max_modes: int = 6) -> MobilityBasis:
+        """Discover this body's control axes in one medium.
+
+        ``n_probes`` and ``max_modes`` match `identify_batch`'s defaults on
+        purpose: the same body identified through the two paths has to get the
+        same basis, and they were 8/4 here against 24/6 there.
+        """
         self.reset(domain, randomise=False)
         snap = self.snapshot()
         base = self.cpg.base
@@ -1075,4 +1081,5 @@ class TriphibianEnv:
             n_probes=n_probes,
             medium=domain.value,
             rng=np.random.default_rng(seed),
+            max_modes=max_modes,
         )
