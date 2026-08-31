@@ -266,6 +266,10 @@ That is not a defect left to fix. It is what the measured split implies:
 | `bf.apply` | 37% (of which the GPU kernel is 11% of the whole step) |
 | observation / prep | 3% |
 
+**That split is superseded — see the re-measurement below.** It was taken on
+hand-written body plans; profiled on bodies drawn from a real archive, the
+CPU half is not where it said.
+
 Raising utilisation requires moving rigid-body integration to the GPU, i.e.
 MJX. MJX cannot `vmap` across different kinematic trees, so the only route is to
 group candidates by topology and vectorise within a group. **Measured, and it
@@ -281,3 +285,41 @@ neither is a tuning exercise:
   evaluated** — do not assume it helps until measured.
 - A custom GPU rigid-body integrator, which is a far larger project than the
   fluid port was.
+
+---
+
+## Where a step actually goes (re-measured 2026-08-31)
+
+The split above was taken on hand-written body plans. Re-profiled on bodies
+drawn from `runs/arch31`'s archive — which is what the search actually
+evaluates — the CPU half is not where it said:
+
+| part of a batched step | batch 16 | batch 32 |
+|---|---|---|
+| `bf.apply` (fluid, GPU) | 55.8% | 51.9% |
+| **energy model, CPU** | **33.3%** | **35.9%** |
+| `mj_step`, CPU | 9.7% | 10.9% |
+| prep | 1.2% | 1.3% |
+
+Two things follow, and both contradict what item 8 above implies.
+
+**Parallelising `mj_step` is not the lever.** It is a tenth of the step, and it
+is already fast: 4.3 µs per environment per step on a six-DOF body. Threads
+make it *worse* — measured 0.33× at four threads, 0.26× at eight, 0.22× at
+sixteen — because dispatching the call costs more than the call. A process pool
+would have to pay for pickling `MjModel`/`MjData` and for splitting the shared
+GPU pipeline, to chase a tenth.
+
+**The energy model was the reachable third**, and it was a Python loop calling
+vectorised functions with scalars. Fixed in `8d425eb`: 43.6 µs → 11.9 µs per
+call, and the step from 81.6 → 72.4 µs/env at batch 16.
+
+**Batch size is a real dial and it bottoms out at 32.** µs per environment per
+step: 72.4 at batch 16, 58.8 at 32, 60.7 at 48, 61.3 at 64. The fixed costs
+have finished amortising by 32, and beyond it the fluid's own per-panel work
+dominates.
+
+After all of that the fluid solver is 64–70% of a step. It is on the GPU, it
+validates to 3e-16, and there is no Python-level hotspot left behind it — so the
+next honest throughput question is the one at the top of this section, `mjwarp`,
+which remains unevaluated.
