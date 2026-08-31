@@ -1706,6 +1706,66 @@ def test_a_failing_sweep_gates_only_the_last_swimmer() -> None:
           f"{ref.report.gate_margin:+.2f}")
 
 
+def test_the_power_budget_vectorises_without_changing_the_answer() -> None:
+    """The batched budget must equal the per-actuator loop it replaced.
+
+    ``PowerBudget.step`` called ``electrical_power`` and ``thermal_overload``
+    once per actuator with a *scalar*, so every timestep paid a numpy round
+    trip per actuator per quantity.  Profiled on real evolved bodies that was
+    33-36% of a batched step, against 10% for ``mj_step``.
+
+    The trap this pins: ``electrical_power`` adds shaft-seal friction and
+    ``thermal_overload`` deliberately does not, so the two cannot share one
+    torque.  Folding the seal into both moved the overload by 1.8e-2 -- small
+    enough to look like rounding, large enough to shift the exploit threshold
+    at ``max_actuator_overload > 3.0``.
+    """
+    print("\nenergy: the vectorised budget equals the loop it replaced")
+    rng = np.random.default_rng(0)
+    acts = [
+        Actuator(motor_class=str(c), mass=float(m), gear_ratio=float(g),
+                 sealed=bool(s))
+        for c, m, g, s in zip(rng.choice(["bldc", "coreless", "geared"], 13),
+                              rng.uniform(0.04, 0.3, 13),
+                              rng.uniform(1.0, 12.0, 13),
+                              rng.random(13) < 0.4)
+    ]
+
+    def scalar(budget, tq, sp):
+        p, overload = budget.avionics_w, 0.0
+        for i, a in enumerate(budget.actuators):
+            if i >= len(tq):
+                break
+            p += float(a.electrical_power(tq[i], sp[i]))
+            overload = max(overload, float(a.thermal_overload(tq[i], sp[i])))
+        return p, overload
+
+    worst_p = worst_o = 0.0
+    for _ in range(200):
+        tq, sp = rng.normal(0, 3, 13), rng.normal(0, 20, 13)
+        b = PowerBudget(battery=Battery(wh=260), actuators=acts)
+        ref_p, ref_o = scalar(b, tq, sp)
+        b.step(tq, sp, 0.004)
+        worst_p = max(worst_p, abs(b.total_j / 0.004 - ref_p) / max(abs(ref_p), 1e-9))
+        worst_o = max(worst_o, abs(b.max_overload - ref_o) / max(abs(ref_o), 1e-9))
+
+    check("power matches the scalar loop to floating point",
+          worst_p < 1e-12, f"max relative error {worst_p:.2e}")
+    check("and the overload matches exactly, seal friction excluded",
+          worst_o == 0.0, f"max relative error {worst_o:.2e}")
+
+    # Fewer actuators than torques, and none at all, are both real cases.
+    short = PowerBudget(battery=Battery(wh=260), actuators=acts[:3])
+    short.step(rng.normal(0, 3, 13), rng.normal(0, 20, 13), 0.004)
+    check("a short actuator list charges only its own actuators",
+          short.total_j > 0.0)
+    empty = PowerBudget(battery=Battery(wh=260), actuators=[])
+    empty.step(np.zeros(0), np.zeros(0), 0.004)
+    check("a machine with no actuators still pays the hotel load",
+          np.isclose(empty.total_j, empty.avionics_w * 0.004),
+          f"{empty.total_j:.6f} J")
+
+
 def test_the_controller_senses_what_the_mission_scores() -> None:
     """The four senses added for the mission's own quantities behave.
 
@@ -1866,6 +1926,7 @@ def main() -> int:
     test_wave_field()
     test_jet_thrust_matches_momentum_flux()
     test_a_failing_sweep_gates_only_the_last_swimmer()
+    test_the_power_budget_vectorises_without_changing_the_answer()
     test_the_controller_senses_what_the_mission_scores()
     test_flap_frequency_is_commandable_in_the_loop()
     test_an_auto_reset_rollout_is_not_trusted()
