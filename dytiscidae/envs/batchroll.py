@@ -334,8 +334,8 @@ def step_batch(envs, angles_list, bf: BatchedFluid, active=None):
     return active
 
 
-def identify_batch(envs, domain, *, probe_time: float = 1.2, n_probes: int = 8,
-                   seed: int = 0, probe_scale: float = 0.35, max_modes: int = 4):
+def identify_batch(envs, domain, *, probe_time: float = 1.2, n_probes: int = 24,
+                   seed: int = 0, probe_scale: float = 0.35, max_modes: int = 6):
     """`TriphibianEnv.identify` for a whole batch, one GPU call per timestep.
 
     This was the last part of an evaluation still running the numpy solver, and
@@ -449,7 +449,9 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                     obs = e.observation(domain)
                     coeffs = np.zeros(bases[m].modes.shape[0])
                     if policies is not None and policies[m] is not None:
-                        coeffs = coeffs + policies[m].act(obs)
+                        own = np.asarray(policies[m].act(obs), float)
+                        w = min(len(own), len(coeffs))
+                        coeffs[:w] += own[:w]
                     if shared is not None:
                         # Sample only when this rollout is feeding the learner.
                         # The exploration noise exists to generate on-policy
@@ -457,7 +459,11 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                         # to explore for, and its score goes into the archive.
                         a, logp, val = shared.act(
                             obs, deterministic=collector is None)
-                        coeffs = coeffs + a[:coeffs.shape[0]]
+                        # The shared policy commands a body *twist*, not a mode
+                        # index: mode k means something different on every body
+                        # (see MobilityBasis), so a shared action indexed by
+                        # mode averaged to nothing.
+                        coeffs = coeffs + bases[m].coeffs_for_twist(a)
                         if collector is not None:
                             collector.record(m, obs, a, logp, val)
                     cur[m] = bases[m].command_params(
@@ -520,7 +526,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                          segment_seconds: float = 10.0,
                          identify_axes: bool = False, seed: int = 0,
                          sea_state=None, perturb: dict | None = None,
-                         shared=None, buffer=None):
+                         shared=None, buffer=None, n_modes: int = 6):
     """`evaluate_tier1` for a whole generation, sharing one GPU pipeline.
 
     Both the three domain segments and the three transitions are batched. What
@@ -587,7 +593,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         group = [envs[i] for i in live]
         for dom in (_D.AIR, _D.WATER):
             try:
-                found = identify_batch(group, dom, seed=seed)
+                found = identify_batch(group, dom, seed=seed,
+                                       max_modes=n_modes)
             except Exception as exc:
                 for i in live:
                     results[i].notes.append(
@@ -732,11 +739,13 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
                 obs = e.observation(target)
                 coeffs = _np.zeros(bases[m].modes.shape[0])
                 if c.policy is not None:
-                    coeffs = coeffs + c.policy.act(obs)
+                    own = _np.asarray(c.policy.act(obs), float)
+                    w = min(len(own), len(coeffs))
+                    coeffs[:w] += own[:w]
                 if shared is not None:
                     a, logp, val = shared.act(
                         obs, deterministic=collector is None)
-                    coeffs = coeffs + a[:coeffs.shape[0]]
+                    coeffs = coeffs + bases[m].coeffs_for_twist(a)
                     if collector is not None:
                         collector.record(m, obs, a, logp, val)
                 cur[m] = bases[m].command_params(c.params, coeffs, e.cpg.n)

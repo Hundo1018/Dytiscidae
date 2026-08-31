@@ -29,7 +29,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..control.cpg import CPGParams, Policy
+from ..control.cpg import TWIST_DIM, CPGParams, Policy
 from ..core.genome import Genome, crossover, mutate, random_genome
 from ..core.phenotype import build
 from ..core.bodyplans import seed_population
@@ -90,7 +90,7 @@ class SearchConfig:
     #: default affordable.
     promotion_refine_steps: int = 6
     policy_hidden: int = 0
-    n_modes: int = 4
+    n_modes: int = 6
 
     #: A policy shared by every morphology, trained by PPO on the transitions
     #: the whole generation produces.  It coexists with the per-candidate
@@ -347,7 +347,7 @@ def evaluate_candidates(
 
     results = batchroll.evaluate_tier1_batch(
         [phenos[i] for i in passed], spec=spec,
-        shared=shared, buffer=buffer,
+        shared=shared, buffer=buffer, n_modes=cfg.n_modes,
         # The controller goes in whether or not axes are being identified.
         # These used to be the same switch -- `None if identify else c` -- and
         # since identify_axes_every defaults to 1, that made it None always, so
@@ -471,7 +471,7 @@ def batchroll_eval(phenos, ctrls, cfg, *, spec, seed, shared=None):
     return batchroll.evaluate_tier1_batch(
         phenos, spec=spec, controllers=ctrls,
         segment_seconds=cfg.segment_seconds, identify_axes=False, seed=seed,
-        shared=shared)
+        shared=shared, n_modes=cfg.n_modes)
 
 
 def seed_archive(state: SearchState, spec: MissionSpec) -> None:
@@ -766,8 +766,11 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 "Refusing to run silently without the thing that was asked "
                 "for -- see the CPU-fallback note in envs/batchroll.py.")
         import torch as _torch
+        # TWIST_DIM, not n_modes: the shared policy commands a body twist,
+        # which is the same six axes on every machine, where a mode index is a
+        # private coordinate that means something different on each.
         state.shared = _ppo.SharedPolicy(
-            TriphibianEnv.OBS_DIM, cfg.n_modes, hidden=cfg.shared_hidden)
+            TriphibianEnv.OBS_DIM, TWIST_DIM, hidden=cfg.shared_hidden)
         state.shared_opt = _torch.optim.Adam(
             state.shared.parameters(), lr=cfg.shared_lr)
 
@@ -1254,8 +1257,8 @@ def _with_shared(state: SearchState, ctrl):
     """
     if state.shared is None or ctrl is None:
         return ctrl
-    from ..envs.evaluate import SummedPolicy
-    return Controller(
+    from ..envs.evaluate import SharedController, SummedPolicy
+    return SharedController(
         params=ctrl.params, bases=ctrl.bases,
         policy=SummedPolicy(own=ctrl.policy, shared=state.shared,
                             n_modes=state.config.n_modes))
@@ -1300,7 +1303,8 @@ def _refined_controller_for(state: SearchState, elite, pheno, spec, rng):
     base = batchroll.evaluate_tier1_batch(
         [pheno], spec=spec, controllers=[ctrl],
         segment_seconds=cfg.segment_seconds, identify_axes=True,
-        seed=int(rng.integers(1 << 30)), shared=state.shared)
+        seed=int(rng.integers(1 << 30)), shared=state.shared,
+        n_modes=cfg.n_modes)
     ctrl.bases = base[0].mobility
     if not ctrl.bases:
         return ctrl

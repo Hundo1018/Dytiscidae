@@ -1775,6 +1775,96 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_a_shared_command_means_the_same_thing_on_every_body() -> None:
+    """A mode index is a private coordinate; a body twist is not.
+
+    Modes come out of an SVD, so their order is by authority and their sign is
+    arbitrary, and what mode 0 physically *is* depends on the body.  Measured
+    across twelve elites from arch31, the mean pairwise cosine between their
+    water mode-0 directions was +0.094 -- mode 0 was yaw on four of them, heave
+    on three, roll on two.  A policy shared across bodies and indexed by mode
+    therefore commands unrelated things on different machines, and its gradients
+    average toward nothing.  Commanding a twist and letting each body's basis
+    invert for the coefficients puts every machine back in the same units.
+
+    Two bases here describe the *same* physical machine with the modes permuted
+    and sign-flipped, which is exactly what an SVD is free to do.
+    """
+    print("\ncpg: a shared command means the same thing on every body")
+    from dytiscidae.control.cpg import MobilityBasis
+
+    # Three clean axes: surge, heave, yaw.
+    eff = np.zeros((3, 6))
+    eff[0, 0] = 1.0     # surge
+    eff[1, 2] = 1.0     # heave
+    eff[2, 5] = 1.0     # yaw
+    modes = np.eye(3, 7)
+    a = MobilityBasis(modes=modes, effects=eff.copy(),
+                      authority=np.array([3.0, 2.0, 1.0]), medium="water")
+    # Same machine, different SVD: modes reordered and two signs flipped.
+    perm = [2, 0, 1]
+    b = MobilityBasis(modes=modes[perm], effects=-eff[perm],
+                      authority=np.array([1.0, 3.0, 2.0])[perm], medium="water")
+
+    heave = np.zeros(6)
+    heave[2] = 1.0
+    ta = a.twist_of(a.coeffs_for_twist(heave))
+    tb = b.twist_of(b.coeffs_for_twist(heave))
+    cos = float(np.dot(ta, tb) / max(np.linalg.norm(ta) * np.linalg.norm(tb), 1e-12))
+    check("commanding heave gives the same motion through both bases",
+          cos > 0.99, f"cosine {cos:+.4f}")
+    check("and it really is heave", abs(ta[2]) > 10 * abs(ta[0]) + 1e-9,
+          f"twist {np.round(ta, 3).tolist()}")
+
+    # The same request indexed by mode does not survive the relabelling.
+    ca = np.zeros(3); ca[1] = 1.0
+    ma, mb = a.twist_of(ca), b.twist_of(ca)
+    mode_cos = float(np.dot(ma, mb)
+                     / max(np.linalg.norm(ma) * np.linalg.norm(mb), 1e-12))
+    check("where commanding mode 1 does not",
+          mode_cos < 0.5, f"cosine {mode_cos:+.4f}")
+
+    # An axis the body does not have must come back small, not enormous.
+    roll = np.zeros(6); roll[3] = 1.0
+    c_roll = a.coeffs_for_twist(roll)
+    c_heave = a.coeffs_for_twist(heave)
+    check("asking for an axis this body lacks returns almost nothing",
+          np.linalg.norm(c_roll) < 0.05 * np.linalg.norm(c_heave),
+          f"||c_roll|| {np.linalg.norm(c_roll):.2e} vs "
+          f"||c_heave|| {np.linalg.norm(c_heave):.3f}")
+
+    empty = MobilityBasis(modes=np.zeros((0, 7)), effects=np.zeros((0, 6)),
+                          authority=np.zeros(0))
+    check("a body with no identified axes commands nothing, and does not raise",
+          empty.coeffs_for_twist(heave).shape == (0,))
+
+
+def test_the_identification_width_reaches_the_policy() -> None:
+    """``n_modes`` must drive the identification, not merely the policy.
+
+    They were two independent defaults that had to agree and nothing connected
+    them: `identify_batch` took `max_modes=4` and never saw the config, so
+    `--n-modes 6` raised `operands could not be broadcast together with shapes
+    (4,) (6,)` in the middle of a rollout.  A config field that can only hold
+    one value is worse than no field.
+    """
+    print("\nloop: the identification width follows the configured one")
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.loop import SearchConfig, evaluate_candidates
+
+    for width in (4, 6):
+        cfg = SearchConfig(segment_seconds=0.3, controller_refine_steps=0,
+                           n_modes=width)
+        out = evaluate_candidates([beetle()], cfg, identify=True,
+                                  spec=MissionSpec(), seeds=[1])
+        _p, result, _c = out[0]
+        widths = {k: v.modes.shape[0] for k, v in result.mobility.items()}
+        check(f"n_modes={width} identifies {width} modes",
+              widths and all(w == width for w in widths.values()),
+              f"{widths}")
+
+
 def test_every_path_agrees_on_the_control_law() -> None:
     """Refinement and verification must see the policy they will be scored with.
 
@@ -1789,32 +1879,49 @@ def test_every_path_agrees_on_the_control_law() -> None:
     print("\nloop: refinement and verification see the real control law")
     import inspect
 
+    from dytiscidae.control.cpg import MobilityBasis
     from dytiscidae.envs.evaluate import SummedPolicy
     from dytiscidae.evolution import loop as loop_mod
 
     class Fixed:
-        """Stands in for a policy: a constant intent, mean and sampled apart."""
+        """Stands in for the shared policy: a twist, mean and sampled apart."""
         def __init__(self, mean, sampled):
             self.mean, self.sampled = mean, sampled
 
         def act(self, obs, deterministic=False):
             v = self.mean if deterministic else self.sampled
-            return np.full(4, v), 0.0, 0.0
+            return np.full(6, v), 0.0, 0.0
 
     class Own:
         def act(self, obs):
-            return np.full(4, 0.25)
+            return np.full(3, 0.25)
 
-    summed = SummedPolicy(own=Own(), shared=Fixed(0.5, 99.0), n_modes=4)
+    # A basis with three clean, equally strong axes, so a commanded twist maps
+    # back to coefficients that are easy to read.
+    eff = np.zeros((3, 6))
+    eff[0, 0] = eff[1, 1] = eff[2, 2] = 1.0
+    basis = MobilityBasis(modes=np.eye(3, 7), effects=eff,
+                          authority=np.ones(3), medium="air")
+
+    summed = SummedPolicy(own=Own(), shared=Fixed(0.5, 99.0), n_modes=3,
+                          basis=basis)
     got = summed.act(np.zeros(19))
     check("the summed policy adds both halves",
-          np.allclose(got, 0.75), f"{got}")
+          float(np.min(got)) > 0.25 + 1e-9, f"{np.round(got, 4).tolist()}")
     check("and takes the shared half at its mean, never a sample",
           float(np.max(got)) < 1.0, f"max {float(np.max(got)):.3f}")
 
-    only_own = SummedPolicy(own=Own(), shared=None, n_modes=4)
+    only_own = SummedPolicy(own=Own(), shared=None, n_modes=3, basis=basis)
     check("with no shared policy it is just the candidate's own",
           np.allclose(only_own.act(np.zeros(19)), 0.25))
+
+    # Without a basis the shared half cannot be honoured -- it commands a twist
+    # and nothing can turn that into coefficients -- so it is dropped rather
+    # than added raw, which would mean something different on every body.
+    no_basis = SummedPolicy(own=Own(), shared=Fixed(0.5, 99.0), n_modes=3)
+    check("and with no basis the shared half is dropped, not misread",
+          np.allclose(no_basis.act(np.zeros(19)), 0.25),
+          f"{np.round(no_basis.act(np.zeros(19)), 4).tolist()}")
 
     # The refinement path must thread the shared policy through, or it
     # optimises one half of a sum against the other half being zero.
@@ -2233,6 +2340,8 @@ def main() -> int:
     test_promotion_needs_a_nonzero_answer_to_the_next_question()
     test_the_headline_is_the_mission()
     test_promotion_spends_refinement_and_keeps_what_it_buys()
+    test_a_shared_command_means_the_same_thing_on_every_body()
+    test_the_identification_width_reaches_the_policy()
     test_every_path_agrees_on_the_control_law()
     test_the_shared_policy_survives_a_resume()
     test_a_resume_says_when_controllers_cannot_be_inherited()

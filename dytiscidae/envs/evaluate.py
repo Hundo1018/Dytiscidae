@@ -74,7 +74,10 @@ class SummedPolicy:
 
     own: object = None
     shared: object = None
-    n_modes: int = 4
+    n_modes: int = 6
+    #: The basis this controller is driving.  Needed because the shared half
+    #: commands a body twist and only the basis knows how to deliver one.
+    basis: object = None
 
     def act(self, obs) -> np.ndarray:
         c = np.zeros(self.n_modes)
@@ -83,9 +86,34 @@ class SummedPolicy:
             c[: min(len(a), self.n_modes)] += a[: self.n_modes]
         if self.shared is not None:
             a, _logp, _v = self.shared.act(obs, deterministic=True)
-            a = np.asarray(a, float)
+            if self.basis is not None:
+                a = np.asarray(self.basis.coeffs_for_twist(a), float)
+            else:
+                # No basis to invert through: the shared half cannot be
+                # honoured in mode coordinates, and adding it raw would mean
+                # something different on every body.  Dropping it is the
+                # conservative reading.
+                a = np.zeros(0)
             c[: min(len(a), self.n_modes)] += a[: self.n_modes]
         return c
+
+
+@dataclass(eq=False)
+class SharedController(Controller):
+    """A controller carrying a `SummedPolicy`, kept pointed at the right basis.
+
+    The shared half commands a twist, and only a basis can turn a twist into
+    coefficients -- but the basis is per medium and `act(obs)` is not told which
+    medium it is in.  ``basis_for`` is: it is the one place the domain is known,
+    and every single-machine path calls it immediately before the rollout that
+    uses its result, so it is the natural place to bind.
+    """
+
+    def basis_for(self, domain: Domain) -> MobilityBasis | None:
+        basis = super().basis_for(domain)
+        if isinstance(self.policy, SummedPolicy):
+            self.policy.basis = basis
+        return basis
 
 
 # --------------------------------------------------------------------------
@@ -172,6 +200,7 @@ def evaluate_tier1(
     seed: int = 0,
     sea_state=None,
     perturb: dict | None = None,
+    n_modes: int = 6,
 ) -> MissionResult:
     """Short dynamic episodes in each domain, plus transitions.
 
@@ -205,7 +234,8 @@ def evaluate_tier1(
     if identify_axes:
         for dom in (Domain.AIR, Domain.WATER):
             try:
-                r.mobility[dom.value] = env.identify(dom, seed=seed)
+                r.mobility[dom.value] = env.identify(
+                    dom, seed=seed, max_modes=n_modes)
             except Exception as exc:
                 r.notes.append(f"mobility id failed in {dom.value}: {exc}")
         # Overwrite: a basis belongs to the body it was measured on, and an

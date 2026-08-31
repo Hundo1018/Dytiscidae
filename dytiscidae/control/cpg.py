@@ -120,6 +120,12 @@ class CPG:
         return 3 * self.n + 1
 
 
+#: Degrees of freedom of a body twist: surge, sway, heave, roll, pitch, yaw.
+#: This is the width a *shared* policy commands in, and unlike the mode count
+#: it is a property of space rather than of a body, which is the whole point.
+TWIST_DIM = 6
+
+
 @dataclass(eq=False)
 class MobilityBasis:
     """The control axes a particular body actually has, in a particular medium.
@@ -181,17 +187,100 @@ class MobilityBasis:
         delta = self.modes[:r].T @ c[:r] if r > 0 else np.zeros(base.flat().shape)
         return CPGParams.from_flat(base.flat() + delta, n)
 
+    # ------------------------------------------------------- the inverse model
+    #
+    # A mode index is a private coordinate.  Modes come out of an SVD, so they
+    # are ordered by how much twist they produce and their sign is arbitrary,
+    # and what mode 0 physically *is* depends entirely on the body: measured
+    # across twelve elites from arch31, the mean pairwise cosine between their
+    # water mode-0 directions is +0.094, and mode 0 is yaw on four of them,
+    # heave on three, roll on two.
+    #
+    # That is fine for a controller that lives on one body, and fatal for one
+    # shared across bodies: the same output means unrelated things on different
+    # machines, so the gradients average toward nothing.  The fix is to let a
+    # shared policy command in the units every body has in common -- a body
+    # twist -- and to make each body's basis solve for the coefficients that
+    # best deliver it.  That is what the basis was always for; the mode index
+    # was never meant to be an interface.
+
+    @property
+    def _inverse(self):
+        """``((r,6) damped inverse, (6,) reachable magnitude)``, cached.
+
+        Lazy so that a basis unpickled from an older run still works.
+        """
+        cached = getattr(self, "_inv_cache", None)
+        if cached is not None:
+            return cached
+        r = self.modes.shape[0] if self.modes.size else 0
+        if r == 0:
+            cached = (np.zeros((0, 6)), np.zeros(6))
+        else:
+            # Twist produced per unit of coefficient.  ``effects`` are unit
+            # directions and ``authority`` is the gain, both in the scaled
+            # twist space `basis_from_probes` fitted in -- rotations are
+            # already weighted there so they are comparable with translation,
+            # and that scaling is a constant, so it stays consistent across
+            # bodies.
+            A = self.effects * self.authority[:, None]          # (r, 6)
+            G = A @ A.T                                          # (r, r)
+            # Damping sized from the problem rather than as an absolute: it is
+            # what turns "asking for an axis this body does not have" into a
+            # small coefficient instead of an enormous one.  Measured cond(A)
+            # is 13-50 across arch31 elites, so this is well inside the regime
+            # where a modest ridge is enough.
+            lam = 0.01 * float(np.trace(G)) / max(r, 1)
+            inv = np.linalg.solve(G + lam * np.eye(r), A)        # (r, 6)
+            cached = (inv, np.linalg.norm(A, axis=0))
+        self._inv_cache = cached
+        return cached
+
+    def coeffs_for_twist(self, intent: np.ndarray) -> np.ndarray:
+        """Coefficients that best deliver a commanded body twist.
+
+        ``intent`` is six numbers in [-1, 1] -- surge, sway, heave, roll,
+        pitch, yaw -- read as a *fraction of what this body can do on that
+        axis*.  Absolute units would not travel: the leading authority across
+        arch31's elites spans 1.3 to 22.0 in air and 0.044 to 1.24 in water, so
+        a fixed twist would ask one machine for a nudge and another for
+        everything it has.  As a fraction, "+1 heave" means "climb as hard as
+        this body climbs" on every one of them.
+
+        A body has three or four controllable axes, not six, so the returned
+        coefficients deliver the closest reachable twist rather than the one
+        asked for.  That is the honest answer: a machine with no pitch
+        authority should not be able to fake pitch, and the damping means it
+        does not try.
+        """
+        inv, reach = self._inverse
+        if inv.shape[0] == 0:
+            return np.zeros(0)
+        w = np.zeros(6)
+        v = np.clip(np.asarray(intent, float).ravel(), -1.0, 1.0)
+        w[: min(6, len(v))] = v[:6]
+        return inv @ (w * reach)
+
+    def twist_of(self, coeffs: np.ndarray) -> np.ndarray:
+        """The twist a coefficient vector produces.  The forward model."""
+        c = np.asarray(coeffs, float)
+        r = min(len(c), self.modes.shape[0])
+        if r == 0:
+            return np.zeros(6)
+        A = self.effects[:r] * self.authority[:r, None]
+        return A.T @ c[:r]
+
 
 def identify_mobility(
     step_fn,
     reset_fn,
     n_params: int,
     *,
-    n_probes: int = 10,
+    n_probes: int = 24,
     probe_scale: float = 0.35,
     medium: str = "air",
     rng: np.random.Generator | None = None,
-    max_modes: int = 4,
+    max_modes: int = 6,
 ) -> MobilityBasis:
     """Empirically identify a body's control axes.
 
@@ -229,7 +318,7 @@ def identify_mobility(
 
 
 def basis_from_probes(deltas, responses, *, medium: str = "air",
-                      max_modes: int = 4) -> MobilityBasis:
+                      max_modes: int = 6) -> MobilityBasis:
     """Fit the mobility basis from probe deltas and their measured responses.
 
     Split out of ``identify_mobility`` so that the probing and the fitting can
