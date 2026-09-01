@@ -615,8 +615,18 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     bf = BatchedFluid(group)
 
     for dom in DOMAIN_CYCLE:
+        # One draw per domain, shared by every machine: candidates in a
+        # generation must face the same conditions to be comparable with each
+        # other, and deriving it from the evaluation seed keeps a score
+        # reproducible.  Built from the domain's *index* rather than
+        # ``hash(name)``, which is salted per process and would have made a
+        # score depend on which interpreter ran it.  See TriphibianEnv.scatter
+        # for why the canonical pose alone was not a training set.
+        scatter_seed = (int(seed) * 6364136223846793005
+                        + 0x9E3779B9 * (DOMAIN_CYCLE.index(dom) + 1)) & 0x7FFFFFFF
         for i in live:
             envs[i].reset(dom)
+            envs[i].scatter(np.random.default_rng(scatter_seed))
         bf.reset_slam()
         collector = None
         if shared is not None and buffer is not None:
@@ -703,8 +713,17 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
     _, target = TRANSITION_ENDPOINTS[kind]
     res = [TransitionResult(kind=kind, duration=duration) for _ in envs]
 
+    # Stable across processes: an index into a fixed list, never hash(str).
+    _KINDS = ("air_to_water", "water_to_air", "water_to_land", "land_to_air",
+              "land_to_water", "air_to_land")
+    scatter_seed = (0x9E3779B9 * (_KINDS.index(kind) + 1
+                                  if kind in _KINDS else 7)) & 0x7FFFFFFF
     for m, e in enumerate(envs):
         _place_for(e, kind)
+        # Each crossing kind used to present exactly one entry state, with no
+        # noise at all, to every machine of every generation.  A real arrival
+        # carries whatever speed and attitude the previous leg left behind.
+        e.scatter(_np.random.default_rng(scatter_seed))
         res[m].survivable_entry_speed = float(e.p.max_entry_speed)
     bf.reset_slam()
 

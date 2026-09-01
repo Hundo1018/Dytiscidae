@@ -1766,6 +1766,54 @@ def test_the_power_budget_vectorises_without_changing_the_answer() -> None:
           f"{empty.total_j:.6f} J")
 
 
+def test_training_states_are_a_distribution_not_a_pose() -> None:
+    """Rollouts must not all begin from the same state.
+
+    Every rollout the policy learned from started at one spawn pose per domain
+    with a few centimetres of noise, identity attitude, no velocity, a full
+    battery and a stroke phase of exactly zero -- and the crossings had no noise
+    at all.  Two of the channels added to the observation were therefore
+    constant across the whole training set: a battery that is always full and a
+    stroke that always starts at the same point cannot be learned from.
+    """
+    print("\nsensing: training states are a distribution, not a pose")
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(beetle()))
+    tilt, stroke, battery = [], [], []
+    for k in range(60):
+        env.reset(Domain.WATER)
+        env.scatter(np.random.default_rng(k))
+        o = env.observation(Domain.WATER)
+        tilt.append(math.degrees(math.acos(min(1.0, max(-1.0, -o[8])))))
+        battery.append(o[16])
+        stroke.append(o[17])
+
+    check("attitude is perturbed, but not into a tumble",
+          2.0 < float(np.mean(tilt)) < 20.0 and max(tilt) < 45.0,
+          f"mean {np.mean(tilt):.1f} deg, max {max(tilt):.1f} deg")
+    check("the battery channel actually varies",
+          float(np.std(battery)) > 0.05,
+          f"sd {np.std(battery):.3f}, range "
+          f"{min(battery):.2f}-{max(battery):.2f}")
+    check("and so does the stroke phase",
+          float(np.std(stroke)) > 1e-3, f"sd {np.std(stroke):.4f}")
+
+    # Same generator, same state.  ``randomise=False`` isolates the scatter
+    # from reset's own spawn noise, which draws from the env's generator and
+    # therefore advances between calls -- the first version of this check
+    # conflated the two and failed on the wrong thing.
+    env.reset(Domain.WATER, randomise=False)
+    env.scatter(np.random.default_rng(11))
+    a = env.observation(Domain.WATER).copy()
+    env.reset(Domain.WATER, randomise=False)
+    env.scatter(np.random.default_rng(11))
+    check("the same draw gives the same state",
+          np.allclose(a, env.observation(Domain.WATER)))
+
+
 def test_the_controller_senses_what_the_mission_scores() -> None:
     """The four senses added for the mission's own quantities behave.
 
@@ -1927,6 +1975,7 @@ def main() -> int:
     test_jet_thrust_matches_momentum_flux()
     test_a_failing_sweep_gates_only_the_last_swimmer()
     test_the_power_budget_vectorises_without_changing_the_answer()
+    test_training_states_are_a_distribution_not_a_pose()
     test_the_controller_senses_what_the_mission_scores()
     test_flap_frequency_is_commandable_in_the_loop()
     test_an_auto_reset_rollout_is_not_trusted()

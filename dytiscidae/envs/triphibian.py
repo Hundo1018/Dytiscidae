@@ -409,6 +409,63 @@ class TriphibianEnv:
         self.budget.reset()
         self._mj.mj_forward(self.model, self.data)
 
+    def scatter(self, rng, *, strength: float = 1.0) -> None:
+        """Widen the initial condition, from a caller-supplied generator.
+
+        Every rollout the policy learns from used to begin at the same point:
+        one spawn pose per domain with a few centimetres of noise, identity
+        attitude, zero velocity (or one fixed launch speed), a full battery and
+        a stroke phase of exactly zero -- and the transitions had no noise at
+        all, so each kind presented one entry state, repeated for every machine
+        of every generation.
+
+        Two of the channels added to the observation were constant across the
+        whole training set because of it.  A battery that is always full and a
+        stroke that always starts at the same point carry no information, so a
+        policy cannot learn to act on either.  And the states a continuous
+        mission actually presents -- arriving at the surface carrying the speed
+        and attitude the previous leg left behind -- were never in the data.
+
+        The generator is supplied rather than taken from ``self.rng`` so the
+        caller decides what is shared: the batched evaluator gives every machine
+        in a generation the same draw, which keeps candidates comparable with
+        each other, and derives it from the evaluation seed, which keeps a score
+        reproducible.
+        """
+        if self.model.nq >= 7:
+            # A small random rotation, as an axis-angle applied to the current
+            # attitude.  Bounded: this is meant to require a correction, not to
+            # ask every design to recover from a tumble.
+            axis = rng.normal(size=3)
+            axis /= max(np.linalg.norm(axis), 1e-9)
+            ang = float(rng.normal(0.0, 0.18 * strength))
+            half = 0.5 * ang
+            dq = np.array([math.cos(half), *(math.sin(half) * axis)])
+            q = self.data.qpos[3:7]
+            self.data.qpos[3:7] = np.array([
+                dq[0]*q[0] - dq[1]*q[1] - dq[2]*q[2] - dq[3]*q[3],
+                dq[0]*q[1] + dq[1]*q[0] + dq[2]*q[3] - dq[3]*q[2],
+                dq[0]*q[2] - dq[1]*q[3] + dq[2]*q[0] + dq[3]*q[1],
+                dq[0]*q[3] + dq[1]*q[2] - dq[2]*q[1] + dq[3]*q[0],
+            ])
+        if self.model.nv >= 6:
+            # Scale whatever velocity the pose was set up with, then add to it,
+            # so a deliberate entry speed stays an entry speed and stops being
+            # the *only* entry speed.
+            self.data.qvel[:3] *= 1.0 + float(rng.normal(0.0, 0.15 * strength))
+            self.data.qvel[:3] += rng.normal(0.0, 0.35 * strength, 3)
+            self.data.qvel[3:6] += rng.normal(0.0, 0.25 * strength, 3)
+        b = self.budget.battery
+        b.energy_j = float(rng.uniform(0.4, 1.0)) * b.capacity_j
+        self.cpg.phase_offset = float(rng.uniform(0.0, 2.0 * math.pi))
+        # Put the joints where that phase says they should be.  Offsetting the
+        # phase alone leaves every episode starting from the same joint angles
+        # and only diverging afterwards, and it is the angles the observation
+        # reports.
+        if len(self._act_qadr):
+            self.data.qpos[self._act_qadr] = self.cpg.command(self.cpg.base, 0.0)
+        self._mj.mj_forward(self.model, self.data)
+
     @property
     def launch_speed(self) -> float:
         """Airspeed the air segment begins at: the speed at which this design's

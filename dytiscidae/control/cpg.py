@@ -106,6 +106,11 @@ class CPG:
             frequency=base_frequency,
         )
         self.t = 0.0
+        #: Added to every joint's phase.  Rollouts used to begin at exactly the
+        #: same point in the stroke every time, so the phase the observation
+        #: reports was the same number at the same moment of every episode the
+        #: policy ever saw.
+        self.phase_offset = 0.0
 
     def reset(self) -> None:
         self.t = 0.0
@@ -113,7 +118,8 @@ class CPG:
     def command(self, params: CPGParams, t: float) -> np.ndarray:
         """Target joint angles at time ``t``."""
         p = params.clipped(self.lo, self.hi)
-        return p.offset + p.amplitude * np.sin(2.0 * np.pi * p.frequency * t + p.phase)
+        return p.offset + p.amplitude * np.sin(
+            2.0 * np.pi * p.frequency * t + p.phase + self.phase_offset)
 
     @property
     def n_params(self) -> int:
