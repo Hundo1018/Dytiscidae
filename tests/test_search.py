@@ -1828,6 +1828,15 @@ def test_a_shared_command_means_the_same_thing_on_every_body() -> None:
     roll = np.zeros(6); roll[3] = 1.0
     c_roll = a.coeffs_for_twist(roll)
     c_heave = a.coeffs_for_twist(heave)
+    # Saturation must not spend everything the body has.
+    from dytiscidae.control.cpg import INTENT_AUTHORITY
+    full = a.twist_of(a.coeffs_for_twist(heave))[2]
+    _inv, reach = a._inverse
+    check("a saturated intent asks for a fraction of the body's reach, not all",
+          abs(full - INTENT_AUTHORITY * reach[2]) < 0.05 * reach[2],
+          f"delivered {full:.4f} of reach {reach[2]:.4f} "
+          f"(authority {INTENT_AUTHORITY})")
+
     check("asking for an axis this body lacks returns almost nothing",
           np.linalg.norm(c_roll) < 0.05 * np.linalg.norm(c_heave),
           f"||c_roll|| {np.linalg.norm(c_roll):.2e} vs "
@@ -1837,6 +1846,22 @@ def test_a_shared_command_means_the_same_thing_on_every_body() -> None:
                           authority=np.zeros(0))
     check("a body with no identified axes commands nothing, and does not raise",
           empty.coeffs_for_twist(heave).shape == (0,))
+
+    # A machine that cannot move has modes but no authority, so a ridge
+    # proportional to the problem is zero and the solve is singular.  Such a
+    # body is rare among the best elites and common in a random draw, which is
+    # how this got through the first time.
+    inert = MobilityBasis(modes=np.eye(3, 7), effects=eff.copy(),
+                          authority=np.zeros(3), medium="water")
+    got = inert.coeffs_for_twist(heave)
+    check("a body with no authority commands nothing, and does not raise",
+          got.shape == (3,) and np.allclose(got, 0.0), f"{got}")
+    faint = MobilityBasis(modes=np.eye(3, 7), effects=eff.copy(),
+                          authority=np.array([1e-9, 1e-10, 0.0]), medium="water")
+    out = faint.coeffs_for_twist(heave)
+    check("and a barely-mobile one does not answer with enormous coefficients",
+          np.all(np.isfinite(out)) and np.linalg.norm(out) < 10.0,
+          f"||c|| {np.linalg.norm(out):.3e}")
 
 
 def test_the_identification_width_reaches_the_policy() -> None:

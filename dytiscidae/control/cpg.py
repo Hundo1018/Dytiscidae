@@ -125,6 +125,26 @@ class CPG:
 #: it is a property of space rather than of a body, which is the whole point.
 TWIST_DIM = 6
 
+#: What a saturated intent asks for, as a fraction of a body's own reach.
+#:
+#: A policy's output is a tanh, so it saturates constantly, and reading
+#: saturation as "everything this body has" leaves no headroom and makes every
+#: strong opinion a full-authority command.  Measured on 48 bodies drawn at
+#: random from arch30 and arch31, paired (the same body scored with the policy
+#: off and on), against a policy trained 14 generations:
+#:
+#:     intent x1.0   delta -0.00387 +/- 0.00173 (SE)   t = -2.23   13/48 better
+#:     intent x0.5   delta -0.00075 +/- 0.00170        t = -0.44   16/48 better
+#:
+#: So full authority is measurably harmful and half is indistinguishable from
+#: doing nothing.  This is the honest reading of that: it makes an undertrained
+#: policy harmless rather than useful.  Whether it becomes useful is a question
+#: about a training budget nobody has spent yet, not about this constant.
+#:
+#: Ten-body samples gave +25.4% for this same value on one archive and +1.3% on
+#: another, which is why the number above is from 48.
+INTENT_AUTHORITY = 0.5
+
 
 @dataclass(eq=False)
 class MobilityBasis:
@@ -230,8 +250,17 @@ class MobilityBasis:
             # small coefficient instead of an enormous one.  Measured cond(A)
             # is 13-50 across arch31 elites, so this is well inside the regime
             # where a modest ridge is enough.
-            lam = 0.01 * float(np.trace(G)) / max(r, 1)
-            inv = np.linalg.solve(G + lam * np.eye(r), A)        # (r, 6)
+            #
+            # The absolute floor is not decoration.  A body that cannot move at
+            # all has zero authority, so a purely proportional ridge is also
+            # zero and the solve raises on a singular matrix -- found by drawing
+            # 48 bodies at random from two archives rather than the dozen best,
+            # which is where such a machine actually lives.
+            lam = 0.01 * float(np.trace(G)) / max(r, 1) + 1e-12
+            try:
+                inv = np.linalg.solve(G + lam * np.eye(r), A)    # (r, 6)
+            except np.linalg.LinAlgError:
+                inv = np.linalg.pinv(A.T)
             cached = (inv, np.linalg.norm(A, axis=0))
         self._inv_cache = cached
         return cached
@@ -259,7 +288,7 @@ class MobilityBasis:
         w = np.zeros(6)
         v = np.clip(np.asarray(intent, float).ravel(), -1.0, 1.0)
         w[: min(6, len(v))] = v[:6]
-        return inv @ (w * reach)
+        return inv @ (w * reach * INTENT_AUTHORITY)
 
     def twist_of(self, coeffs: np.ndarray) -> np.ndarray:
         """The twist a coefficient vector produces.  The forward model."""
