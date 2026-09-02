@@ -1363,8 +1363,13 @@ def test_the_island_objective_takes_its_weight_back() -> None:
     from dytiscidae.evolution.curriculum import N_STAGES, Curriculum
 
     c = Curriculum()
-    check("with no evidence the blend still starts on the curriculum",
-          c.handover(0) == 0.0,
+    # The ramp now has a floor.  At ``stage/4`` alone the island half carried
+    # *zero* weight for the 69.1% of arch31's evaluations that sat at stage 0,
+    # so on the generalist island -- whose island objective is the mission
+    # itself -- the mission contributed nothing at all to most of the run.  The
+    # weighted-mean weight applied across the whole 600 generations was 0.1027.
+    check("the blend still starts mostly on the curriculum, but not entirely",
+          0.0 < c.handover(0) <= 0.3,
           f"stage 0 hands over {c.handover(0):.2f} of the weight")
     check("and the top of the ladder is the island's outright",
           c.handover(N_STAGES - 1) == 1.0, "stage 4 -> 1.0")
@@ -1380,14 +1385,14 @@ def test_the_island_objective_takes_its_weight_back() -> None:
     # capability at r = 0.1413.  So the ramp is now the whole rule.
     flat = Curriculum()
     for i in range(64):
-        flat.observe_blend(0.035, 0.2 + 0.8 * (i % 8) / 7.0)
+        flat.observe_blend(0.035, 0.2 + 0.8 * (i % 8) / 7.0, 1)
     check("a flat island objective still gets its stage share, not less",
           abs(flat.handover(1) - 0.25) < 1e-9,
           f"stage-1 handover {flat.handover(1):.3f}")
 
     sharp = Curriculum()
     for i in range(64):
-        sharp.observe_blend(0.05 + 0.9 * (i % 8) / 7.0, 0.98)
+        sharp.observe_blend(0.05 + 0.9 * (i % 8) / 7.0, 0.98, 1)
     check("and a sharp one gets the same share: the ramp ignores spread",
           abs(sharp.handover(1) - flat.handover(1)) < 1e-9,
           f"flat {flat.handover(1):.3f} vs sharp {sharp.handover(1):.3f}")
@@ -1399,9 +1404,9 @@ def test_the_island_objective_takes_its_weight_back() -> None:
     mixed = Curriculum()
     for i in range(64):
         frac = (i % 8) / 7.0
-        mixed.observe_blend(0.02 + 0.04 * frac, 0.2 + 0.9 * frac)
-    lo_i, lo_c = mixed.standing(0.021, 0.21)
-    hi_i, hi_c = mixed.standing(0.059, 1.09)
+        mixed.observe_blend(0.02 + 0.04 * frac, 0.2 + 0.9 * frac, 2)
+    lo_i, lo_c = mixed.standing(0.021, 0.21, 2)
+    hi_i, hi_c = mixed.standing(0.059, 1.09, 2)
     check("a tiny-scale island score still spans the standing range",
           (hi_i - lo_i) > 0.7,
           f"island standing {lo_i:.2f} -> {hi_i:.2f} over a raw span of 0.04")
@@ -1409,18 +1414,44 @@ def test_the_island_objective_takes_its_weight_back() -> None:
           abs((hi_c - lo_c) - (hi_i - lo_i)) < 0.2,
           f"curriculum standing {lo_c:.2f} -> {hi_c:.2f} over a raw span of 0.9")
 
-    # Before there is a population to rank against, standings pass through
-    # unchanged rather than inventing an ordering from four samples.
+    # Before there is a population to rank against, both halves come back
+    # neutral rather than raw.  Raw would put an unrankable design onto the same
+    # axis as ranked ones at whatever scale it happens to have, which is the
+    # mismatch this whole mechanism exists to remove; 0.5 says "cannot rank
+    # this yet" and lets the other terms decide.
     young = Curriculum()
-    young.observe_blend(0.03, 0.9)
-    check("with too little history the raw scores pass through",
-          young.standing(0.5, 0.7) == (0.5, 0.7),
-          "fewer than 16 observations -> no ranking")
+    young.observe_blend(0.03, 0.9, 0)
+    check("with too little history neither half claims to rank",
+          young.standing(0.5, 0.7, 0) == (0.5, 0.5),
+          f"fewer than {young.min_rank_samples} observations -> neutral")
+
+    # The windows are per stage.  Pooling them meant a stage-2 design, whose
+    # score is a smaller quantity by construction, landed in the bottom
+    # quantile for having been promoted: corr(fitness, stage) = -0.35.
+    split = Curriculum()
+    for i in range(64):
+        split.observe_blend(0.9, 0.9, 0)          # an easy stage scores high
+        split.observe_blend(0.05, 0.05, 2)        # a hard one scores low
+    top_of_hard = split.standing(0.06, 0.06, 2)[1]
+    same_in_easy = split.standing(0.06, 0.06, 0)[1]
+    check("a design is ranked against its own stage, not against an easier one",
+          top_of_hard > 0.9 and same_in_easy < 0.1,
+          f"0.06 ranks {top_of_hard:.2f} at stage 2 and {same_in_easy:.2f} at stage 0")
+
+    # And the mission arrives on the same scale as the other two, because a
+    # blend of raw magnitudes hands the decision to whichever is largest.
+    for i in range(64):
+        split.observe_blend(0.5, 0.5, 1, mission=0.001 * i)
+    check("the mission enters the blend as a standing too",
+          split.mission_standing(0.062, 1) > 0.9
+          and split.mission_standing(0.001, 1) < 0.2,
+          f"mission 0.062 -> {split.mission_standing(0.062, 1):.2f}, "
+          f"0.001 -> {split.mission_standing(0.001, 1):.2f}")
 
     check("the blend is in the record, since it moves",
-          {"handover", "handover_typical"} <= set(
-              Curriculum(stages={(0, 0, 0, 0): 1}).report()),
-          "report() carries handover")
+          {"handover_floor", "handover_typical", "handover_mean", "rank_windows"}
+          <= set(Curriculum(stages={(0, 0, 0, 0): 1}).report()),
+          "report() carries the weight actually applied, not a field nothing writes")
 
 
 def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> None:
@@ -2333,6 +2364,91 @@ def test_scout_finds_dark_horses_and_may_only_protect() -> None:
           f"far {far:.3f} against near {near:.3f}")
 
 
+def test_the_search_is_pointed_at_the_mission_and_compounds() -> None:
+    """The five defects the arch31 forensics found, each pinned by a check.
+
+    Every number quoted here was measured over that run's 9,384 evaluations and
+    1,451 surviving elites, and every one of them is a property of the machinery
+    rather than of the physics, so it belongs in a test rather than in a
+    postmortem.
+    """
+    print("\nsearch: pointed at the mission, and compounding")
+    from dytiscidae.core.genome import MUTATION_OPERATORS, mutate, random_genome
+    from dytiscidae.evolution.archive import Archive
+    from dytiscidae.evolution.curator import Curator, OperatorBandit
+    from dytiscidae.evolution.curriculum import Curriculum
+
+    # 1. A new cell starts where its parent got to.  58.9% of arch31's children
+    #    landed in an unoccupied cell and every one of them restarted at stage
+    #    0, which is why 69.1% of all evaluations were asked the easiest
+    #    question no matter what the lineage could already do.
+    c = Curriculum()
+    c.stages[(1, 1, 1, 1)] = 3
+    check("an unvisited cell inherits its parent's stage",
+          c.seed_stage((2, 2, 2, 2), c.stage_of((1, 1, 1, 1))) == 3,
+          "parent at 'chain' -> child's cell starts at 'chain'")
+    check("and a cell that already has a stage keeps it",
+          c.seed_stage((1, 1, 1, 1), 0) == 3, "seeding never demotes")
+
+    # 2. A multi-mutation child gets different operators.  6,198 of arch31's
+    #    6,284 multi-mutation children were one operator applied two or three
+    #    times, because the bandit's argmax was called n times with no state
+    #    change in between.
+    b = OperatorBandit()
+    rng = np.random.default_rng(7)
+    picked = []
+    for _ in range(3):
+        picked.append(b.select(rng, structural_bias=2.2, exclude=tuple(picked)))
+    check("three mutations means three different operators",
+          len(set(picked)) == 3, ", ".join(picked))
+
+    # 3. And the plan the bandit made is the plan that gets applied, rather than
+    #    a fresh uniform draw from it.
+    g = random_genome(np.random.default_rng(3))
+    plan = ["global_energy", "global_energy", "global_energy"]
+    _, applied = mutate(g, np.random.default_rng(4), operators=plan, n_ops=3)
+    check("mutate applies the plan it was handed",
+          applied == plan, f"{applied}")
+
+    # 4. Credit is improvement, not arrival.  Paying a flat 1.0 for landing in
+    #    an empty cell left all twenty-four operators scoring 0.60-0.73 -- a
+    #    bandit choosing between arms it cannot tell apart, which drifted into
+    #    growth until 31.4% of the population sat on the eight-part cap.
+    a = Archive([("x", 0.0, 1.0, 5), ("y", 0.0, 1.0, 5)])
+    cur = Curator(a, seed=0)
+    for i in range(40):
+        cur.credit(["cppn_weights"], "improved", 0.002)
+    for i in range(40):
+        cur.credit(["add_part"], "new", 0.30)
+    weak = cur.bandit.stats["cppn_weights"].mean_reward
+    strong = cur.bandit.stats["add_part"].mean_reward
+    check("an operator that improves outscores one that merely arrives",
+          strong > weak + 0.2, f"add_part {strong:.3f} against cppn_weights {weak:.3f}")
+    cur2 = Curator(a, seed=0)
+    for i in range(40):
+        cur2.credit(["scale"], "new", 0.0)
+    check("and arriving with no improvement is worth only the novelty share",
+          abs(cur2.bandit.stats["scale"].mean_reward - cur2.novelty_credit) < 1e-9,
+          f"{cur2.bandit.stats['scale'].mean_reward:.3f} == novelty_credit")
+
+    # 5. Pruning compares designs asked the same question.  Ranking a promoted
+    #    design against its unpromoted neighbours culled the ones that had
+    #    advanced: crossing-stage designs were 8.5% of arch31's evaluations and
+    #    3.4% of its surviving elites.
+    a2 = Archive([("x", 0.0, 1.0, 8), ("y", 0.0, 1.0, 8)])
+    cur3 = Curator(a2, seed=0, crowding_limit=0)
+    obj = np.array([0.5, 1.0, 1.0])
+    for i in range(6):
+        a2.add(f"easy{i}", 0.90, [0.50 + 0.02 * i, 0.50], {"stage": 0}, objectives=obj)
+    # one advanced design, weak *only* by the standard of the easy question
+    a2.add("hard", 0.30, [0.52, 0.52], {"stage": 2}, objectives=obj)
+    hard_cell = a2.cell_of(np.array([0.52, 0.52]))
+    cur3.prune(max_prunes=3)
+    check("a promoted design is not culled for being ranked against easier ones",
+          hard_cell in a2.cells,
+          "the only stage-2 occupant has no same-stage neighbourhood to lose to")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -2367,6 +2483,7 @@ def main() -> int:
     test_promotion_spends_refinement_and_keeps_what_it_buys()
     test_a_shared_command_means_the_same_thing_on_every_body()
     test_the_identification_width_reaches_the_policy()
+    test_the_search_is_pointed_at_the_mission_and_compounds()
     test_every_path_agrees_on_the_control_law()
     test_the_shared_policy_survives_a_resume()
     test_a_resume_says_when_controllers_cannot_be_inherited()

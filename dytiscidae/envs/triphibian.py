@@ -252,6 +252,11 @@ def evaluate_tier0(p: Phenotype, spec: MissionSpec | None = None) -> MissionResu
 # --------------------------------------------------------------------------
 
 
+#: Channels of body identity appended to every observation.  See
+#: ``TriphibianEnv.morphology_context``.
+MORPHOLOGY_DIM = 8
+
+
 class TriphibianEnv:
     """A compiled machine in the triphibian world, steppable by a controller."""
 
@@ -299,6 +304,7 @@ class TriphibianEnv:
         rather than as the flat box that collides for them.  Rendering wants it;
         search does not, and pays about a quarter of its step budget for it."""
         self.p = phenotype
+        self._morph_ctx = None
         self.rng = np.random.default_rng(seed)
         self.medium = MediumField(sea_state=sea_state, current=current, wind=wind)
         self.timestep = timestep
@@ -767,6 +773,51 @@ class TriphibianEnv:
         ground = self.ground_heights(self.data.geom_xpos[g][:, 0])
         return float(np.min(bottom - ground))
 
+    @property
+    def morphology_context(self) -> np.ndarray:
+        """Who this machine *is*, as eight bounded numbers.
+
+        Everything else in the observation is a state; none of it says which
+        body the state belongs to.  A policy shared across morphologies is then
+        a function that must return the same command for two machines in the
+        same measured state, however differently they are built -- and measured
+        on twelve arch31 elites driven by eight constant twist commands, nine of
+        the twelve had a command worth +0.0095 of mission fraction over
+        commanding nothing, while *every* command's population mean was below
+        commanding nothing.  Per-body optima exist and are large; a shared
+        optimum does not.  The gap is exactly this information.
+
+        So the policy is conditioned on the body, which is what the universal-
+        controller literature converged on: MetaMorph (Gupta et al. 2022) feeds
+        morphology as a context embedding, ModuMorph (Xiong et al. 2023)
+        modulates the shared trunk by it.  Eight scalars is the cheap end of
+        that idea and it fits an MLP; a limb-token transformer is the expensive
+        end and needs a different policy class.
+
+        Constant for the machine's lifetime, so it is computed once.  Every
+        channel is scaled to roughly [-1, 1] by a *fixed* transform rather than
+        by population statistics, because a normalisation that moves would make
+        a stored policy mean something different in a later generation.
+        """
+        if self._morph_ctx is None:
+            p = self.p
+            mass = float(max(p.mass, 1e-3))
+            wing = float(max(p.wing_area, 0.0))
+            span = float(max(p.max_span, 0.0))
+            cap = float(getattr(p.genome, "battery_wh", 0.0))
+            self._morph_ctx = np.array([
+                np.clip((np.log10(mass) - np.log10(0.4))
+                        / (np.log10(40.0) - np.log10(0.4)) * 2.0 - 1.0, -1.5, 1.5),
+                np.clip(np.tanh(float(p.density_ratio) - 1.0), -1.0, 1.0),
+                np.clip(np.tanh(wing / 0.5), 0.0, 1.0),
+                np.clip(span / 3.0, 0.0, 1.5),
+                np.clip(float(p.aspect_ratio) / 20.0, 0.0, 1.5),
+                np.clip(np.log10(max(float(p.wing_loading), 1.0)) / 3.0 - 1.0, -1.5, 1.5),
+                np.clip(len(self.act_names) / 16.0, 0.0, 1.5),
+                np.clip(cap / (100.0 * mass), 0.0, 1.5),
+            ], float)
+        return self._morph_ctx
+
     def observation(self, target: "Domain | None" = None) -> np.ndarray:
         """What the controller senses, plus what it is being asked to do.
 
@@ -831,12 +882,13 @@ class TriphibianEnv:
                     stroke,
                     stroke_rate,
                 ],
+                self.morphology_context,
             ]
         )
 
     #: 3 linear + 3 angular + 3 gravity + depth + wetness + 3 commanded domain
-    #: + depth error + contact + battery + stroke phase and rate.
-    OBS_DIM = 19
+    #: + depth error + contact + battery + stroke phase and rate + 8 morphology.
+    OBS_DIM = 19 + MORPHOLOGY_DIM
 
     #: The scorer's depth target, shared with the observation's error channel
     #: so the sensed error and the scored error cannot drift apart.

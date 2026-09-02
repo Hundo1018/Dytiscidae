@@ -1873,7 +1873,8 @@ def test_flap_frequency_is_commandable_in_the_loop() -> None:
     from dytiscidae.core.bodyplans import beetle
     from dytiscidae.core.phenotype import build
     from dytiscidae.envs.batchroll import identify_batch
-    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+    from dytiscidae.envs.triphibian import (
+        MORPHOLOGY_DIM, Domain, TriphibianEnv)
 
     env = TriphibianEnv(build(beetle()))
     n = env.cpg.n
@@ -1897,7 +1898,8 @@ def test_flap_frequency_is_commandable_in_the_loop() -> None:
           abs(moved.frequency - base.frequency) > 1e-6,
           f"{base.frequency:.4f} -> {moved.frequency:.4f} Hz")
     check("and the observation carries the stroke phase to time it against",
-          TriphibianEnv.OBS_DIM == 19)
+          TriphibianEnv.OBS_DIM == 19 + MORPHOLOGY_DIM,
+          f"19 sensed + {MORPHOLOGY_DIM} morphology = {TriphibianEnv.OBS_DIM}")
     del CPGParams
 
 

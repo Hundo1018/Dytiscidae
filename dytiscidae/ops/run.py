@@ -168,6 +168,10 @@ def cmd_search(args) -> int:
         use_scout=not args.no_scout,
         resume=bool(getattr(args, "resume", False)),
         scout_reserve=args.scout_reserve,
+        mission_weight=args.mission_weight,
+        descriptor_bins=args.descriptor_bins,
+        reward_shaping=args.reward_shaping,
+        n_modes=args.n_modes,
         **({"islands": tuple(x.strip() for x in args.islands.split(","))}
            if args.islands else {}),
     )
@@ -183,6 +187,7 @@ def cmd_search(args) -> int:
             f"{r['regime']:<12s} elites={r['filled']:<4d} "
             f"cov={r['coverage']*100:5.2f}% qd={r['qd_score']:7.2f} "
             f"best={r.get('best_fitness', 0):.3f} "
+            f"lin={r.get('scout', {}).get('depth_mean', 0):.1f} "
             f"stage{r.get('curriculum', {}).get('typical', 0)}"
             f"/{r.get('curriculum', {}).get('reached', 0)} "
             f"crit={r.get('critic', {}).get('calibration', 0):.2f} "
@@ -573,6 +578,27 @@ def main(argv=None) -> int:
                    help="run without the potential predictor (greedy selection)")
     p.add_argument("--scout-reserve", type=float, default=0.15,
                    help="share of each archive protected on predicted potential")
+    p.add_argument("--mission-weight", type=float, default=0.30,
+                   help="share of the archive's scalar that is the mission "
+                        "itself, as a population quantile, rather than the "
+                        "island/curriculum blend. At 0 -- every run before "
+                        "2026-09-01 -- corr(fitness, mission_fraction) "
+                        "measured 0.159 and the search spent 36%% of its energy "
+                        "fraction buying 32%% more competence.")
+    p.add_argument("--descriptor-bins", type=int, default=5,
+                   help="bins per learned archive axis. Four axes at 8 bins is "
+                        "4096 cells per island, 24,576 across six, against "
+                        "arch31's entire budget of 9,620 evaluations -- so "
+                        "81.9%% of cells were never improved on. Size the map "
+                        "to the budget.")
+    p.add_argument("--reward-shaping", type=float, default=0.2,
+                   help="weight on potential-based shaping in the PPO reward. "
+                        "0 is the terminal-only reward, which delivered one "
+                        "scalar per 161 decisions. Shaping of this form cannot "
+                        "change the optimal policy.")
+    p.add_argument("--n-modes", type=int, default=6,
+                   help="mobility modes identified per body per domain, and "
+                        "the width the shared policy commands through")
     p.set_defaults(fn=cmd_search)
 
     p = sub.add_parser("skills", help="train the actuator skill library")

@@ -465,7 +465,10 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                         # mode averaged to nothing.
                         coeffs = coeffs + bases[m].coeffs_for_twist(a)
                         if collector is not None:
-                            collector.record(m, obs, a, logp, val)
+                            from ..learning.ppo import potential_of
+                            collector.record(
+                                m, obs, a, logp, val,
+                                potential_of(obs, getattr(domain, "value", str(domain))))
                     cur[m] = bases[m].command_params(
                         params_list[m], coeffs, e.cpg.n)
                 angles.append(e.cpg.command(cur[m], e.data.time))
@@ -644,7 +647,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
             # The reward is the segment's own competence -- the number the
             # search selects on -- delivered once, at the end. See ppo.py for
             # why nothing denser is invented here.
-            collector.finish(buffer, [s.competence for s in segs])
+            collector.finish(buffer, [s.competence for s in segs], tag=dom.value)
 
     for kind in ("air_to_water", "water_to_air", "water_to_land"):
         tcollector = None
@@ -669,7 +672,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                     t.components.get(c, 0.0)
                     for c in ("shock", "control", "settle",
                               "economy", "exit_state")])))
-                for t in trs])
+                for t in trs], tag=f"transition:{kind}")
 
     for i in live:
         r, p = results[i], phenos[i]
@@ -766,7 +769,10 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
                         obs, deterministic=collector is None)
                     coeffs = coeffs + bases[m].coeffs_for_twist(a)
                     if collector is not None:
-                        collector.record(m, obs, a, logp, val)
+                        from ..learning.ppo import potential_of
+                        collector.record(
+                            m, obs, a, logp, val,
+                            potential_of(obs, getattr(target, "value", "transition")))
                 cur[m] = bases[m].command_params(c.params, coeffs, e.cpg.n)
             angles.append(e.cpg.command(cur[m], e.data.time))
 

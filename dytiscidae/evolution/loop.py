@@ -80,6 +80,25 @@ class SearchConfig:
     # Controller refinement.  Each step is one extra batched Tier-1 for the
     # whole generation, so a generation costs (1 + steps) evaluations.
     controller_refine_steps: int = 0  # (1+1)-ES steps per candidate; 0 = inherit only
+    #: Share of the archive's scalar that is the mission itself, as a
+    #: population quantile, rather than the island/curriculum blend.  Measured
+    #: over arch31: at 0.0 (which is what every run before 2026-09-01 was)
+    #: corr(archive fitness, mission_fraction) = 0.159 and the search traded
+    #: 36% of its energy fraction for 32% more competence, because energy is a
+    #: factor of the mission and appeared nowhere in the score.
+    mission_weight: float = 0.30
+    #: Weight on the potential-based shaping term in the PPO reward.  Zero
+    #: reproduces the terminal-only reward every run before 2026-09-01 used.
+    #: Shaping of this form cannot change what is optimal (Ng, Harada & Russell
+    #: 1999); it changes only when credit arrives, which for a scalar delivered
+    #: once every 161 decisions is the whole problem.
+    reward_shaping: float = 0.2
+    #: Bins per learned descriptor axis.  Four axes at 8 bins is 4096 cells per
+    #: island and 24,576 across six -- 2.6x arch31's *entire* evaluation budget
+    #: of 9,620, so 81.9% of surviving cells were never improved on and
+    #: MAP-Elites degenerated into novelty sampling.  An archive has to be
+    #: scaled to the budget that will be spent filling it.
+    descriptor_bins: int = 5
     controller_refine_sigma: float = 0.1  # perturbation scale on policy weights
     #: Refinement steps spent on an elite at the moment it is promoted to
     #: Tier-2.  Refining every candidate every generation costs a full batched
@@ -595,6 +614,15 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     })
 
     cell = state.archive.cell_of(bd)
+    # An unvisited cell starts at the stage its parent had earned, not at zero.
+    # 58.9% of arch31's children landed in an empty cell and every one of them
+    # was asked the easiest question regardless of what its lineage could
+    # already do, which is why 69.1% of all evaluations sat at stage 0 and the
+    # handover ramp never left the floor.  See Curriculum.seed_stage.
+    state.curriculum.seed_stage(
+        cell,
+        state.curriculum.stage_of(parent.cell) if parent is not None else 0,
+    )
     base = island_score(state.island, result, tset)
     sr = state.curriculum.evaluate(cell, result, tset)
     # A cell that has been promoted is asked a harder question, and the answer
@@ -607,15 +635,25 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     # the search is looking for a triphibian again by the end, so the weight has
     # to move.  A fixed 0.5 left the air island selecting 96% on a score that
     # does not read air.
-    state.curriculum.observe_blend(base, sr.score)
+    state.curriculum.observe_blend(base, sr.score, sr.stage,
+                                   float(result.mission_fraction))
     # Blend the two halves as population standings, not raw scores.  They are
     # not on the same scale -- measured over arch30 the island half spans 0.0437
     # p10-p90 and the curriculum half 0.5092 -- so a convex combination of the
     # raw values hands the decision to whichever half happens to be larger,
     # whatever weight is nominally applied.  See Curriculum.standing.
-    isl_q, cur_q = state.curriculum.standing(base, sr.score)
+    isl_q, cur_q = state.curriculum.standing(base, sr.score, sr.stage)
+    mis_q = state.curriculum.mission_standing(result.mission_fraction, sr.stage)
     w = state.curriculum.handover(sr.stage)
-    base = float(w * isl_q + (1.0 - w) * cur_q)
+    # Three quantiles, not two.  The first two answer "how well did this design
+    # answer the question its cell was asked"; the third answers "how much of
+    # the mission did it actually do", and measurement says those are nearly
+    # unrelated -- corr(archive fitness, mission_fraction) = 0.159 over arch31's
+    # 9384 evaluations, with corr against the weakest competence at 0.003 and
+    # against the energy margin at 0.056, both of which are factors of the
+    # mission the score could not see.  See Curriculum.mission_standing.
+    mw = float(np.clip(getattr(state.config, "mission_weight", 0.30), 0.0, 1.0))
+    base = float((1.0 - mw) * (w * isl_q + (1.0 - w) * cur_q) + mw * mis_q)
     cfeat = critic_features(_meta_light(pheno, result), result)
     discount = state.critic.discount(cfeat) if state.critic is not None else 1.0
     fit = float(base * discount)
@@ -656,6 +694,13 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     }
     meta["critic_discount"] = round(discount, 3)
     meta["critic_features"] = [float(x) for x in cfeat]
+    # Every term of the scalar that decided this design's fate, so that a run
+    # can be decomposed afterwards instead of re-derived from the code.
+    meta["score_parts"] = {
+        "island_q": round(isl_q, 4), "curriculum_q": round(cur_q, 4),
+        "mission_q": round(mis_q, 4), "handover": round(w, 4),
+        "mission_weight": round(mw, 4), "blend": round(base, 4),
+    }
 
     # What was knowable about this design at birth, for the scout.  Novelty is
     # computed against the archive *before* the design is filed, otherwise every
@@ -690,7 +735,12 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
         )
 
     state.curator.observe_domains(meta)
-    state.curator.credit(operators, status, fit - previous)
+    # What the operator has to beat: whatever already held the cell *and* the
+    # parent it was applied to.  ``previous`` alone is zero for an unoccupied
+    # cell, which made "landed somewhere empty" indistinguishable from a real
+    # improvement -- see Curator.credit.
+    reference = max(previous, float(parent.fitness) if parent is not None else 0.0)
+    state.curator.credit(operators, status, fit - reference)
     state.curator.note_offspring(parent, status)
     state.telemetry.event(
         {"kind": "evaluate", "gen": state.archive.generation, "status": status,
@@ -729,8 +779,13 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
 
     archipelago = Archipelago(migrate_every=cfg.migrate_every, n_migrants=cfg.n_migrants)
     curricula: dict = {}
+    # The hand-picked axes are only the bootstrap grid -- the learned ones
+    # replace them at the first refit -- but their resolution has to match the
+    # budget from the first generation, not from the first refit.
+    boot_axes = [(n, lo, hi, min(b, int(cfg.descriptor_bins)))
+                 for (n, lo, hi, b) in BD_AXES]
     for name in cfg.islands:
-        a = Archive(BD_AXES)
+        a = Archive(boot_axes)
         cur = Curator(a, seed=cfg.seed)
         archipelago.register(name, a, cur)
         curricula[name] = Curriculum()
@@ -850,7 +905,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             buffer = None
             if state.shared is not None:
                 from ..learning.ppo import RolloutBuffer
-                buffer = RolloutBuffer()
+                buffer = RolloutBuffer(shaping=cfg.reward_shaping)
             evaluated = evaluate_candidates(
                 [b[0] for b in built], cfg,
                 inherited=[b[1] for b in built],
@@ -884,7 +939,20 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                               minibatch=cfg.shared_minibatch,
                               target_kl=cfg.shared_target_kl,
                               optimiser=state.shared_opt)
+            # The reward the update actually saw, per segment kind, so a later
+            # reading can tell a policy that stopped learning from one that was
+            # never given a gradient.  arch31's ppo line reported neither, and
+            # the fact that 84.1% of the reward's variance was the domain
+            # one-hot had to be recovered from the evaluation events instead.
+            rstats = {}
+            for t in buffer.trajectories:
+                rstats.setdefault(t.tag, []).append(t.terminal_reward)
             telemetry.event({"kind": "ppo", "gen": gen, "island": state.island,
+                             "reward_by_tag": {
+                                 k: [round(float(np.mean(v)), 4),
+                                     round(float(np.std(v)), 4), len(v)]
+                                 for k, v in sorted(rstats.items())},
+                             "shaping": cfg.reward_shaping,
                              **{k: v for k, v in info.items()}})
 
         # --- verification, and the critic's only source of truth ------------
@@ -940,12 +1008,17 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 return _d.project(np.asarray(f, float)) if f else None
 
             axes = [
-                (f"latent{i}", float(lo), float(hi), 8)
+                (f"latent{i}", float(lo), float(hi), int(cfg.descriptor_bins))
                 for i, (lo, hi) in enumerate(learned.bounds())
             ]
             for name, a in archipelago.archives.items():
                 stats = a.rebin(axes, _reproject)
                 archipelago.curators[name].on_rebin()
+                # The curriculum is keyed by cell too, and nothing was re-keying
+                # it: arch31 finished with 1,040 stage entries against 251 live
+                # cells, 9.6% of them naming a cell that still existed.
+                if name in state.curricula:
+                    stats.update(state.curricula[name].rebuild_from(a))
             telemetry.event({"kind": "descriptor_refit", "gen": gen, **stats,
                              **learned.report()})
 
@@ -1056,6 +1129,18 @@ def save_state(state: SearchState, gen: int) -> None:
             k: v.detach().cpu().numpy() for k, v in state.shared.state_dict().items()
         }
         payload["shared_shape"] = (state.shared.n_obs, state.shared.n_modes)
+        # A dated copy beside the rolling checkpoint.  ``search_state.pkl`` is
+        # overwritten every time, so a finished run says what the policy ended
+        # as and nothing about how it got there -- and the question arch31
+        # could not answer was exactly whether the policy was converging or
+        # random-walking under a gradient that turned every generation (99% of
+        # its updates past generation 400 stopped on the KL bound while nothing
+        # improved).  A few thousand floats per checkpoint makes that
+        # answerable afterwards.
+        snaps = Path(state.config.run_dir) / "policy_snapshots"
+        snaps.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(snaps / f"gen{gen:05d}.npz",
+                            **payload["shared_state"])
     tmp = path.with_suffix(".tmp")
     with open(tmp, "wb") as f:
         pickle.dump(payload, f)
@@ -1133,10 +1218,20 @@ def load_state(state: SearchState) -> int:
         for cur in state.curricula.values():
             if not hasattr(cur, "_handover"):
                 cur._handover = 0.0
-            if not hasattr(cur, "_recent"):
-                cur._recent = []
+            # The ranking window became per-stage on 2026-09-01.  A checkpoint
+            # from before that holds a flat list of (island, curriculum) pairs,
+            # which the new code would index by stage and die on.  The pairs
+            # are not recoverable into stages -- nothing recorded which stage
+            # each came from -- so they are dropped, and the windows re-earn
+            # themselves within ``window`` evaluations.
+            if not isinstance(getattr(cur, "_recent", None), dict):
+                cur._recent = {}
             if not hasattr(cur, "window"):
                 cur.window = 256
+            for attr, default in (("min_rank_samples", 12),
+                                  ("handover_floor", 0.25)):
+                if not hasattr(cur, attr):
+                    setattr(cur, attr, default)
     # The shared policy, if this run has one and the checkpoint carried one of
     # the same shape.  Without this a resumed --shared-policy run restarts PPO
     # from a random network while every other learned thing continues, which is

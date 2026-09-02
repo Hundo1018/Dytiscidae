@@ -806,14 +806,25 @@ def mutate(
     operators: list[str] | None = None,
     n_ops: int = 1,
 ) -> tuple[Genome, list[str]]:
-    """Apply ``n_ops`` named operators.  Returns the child and what was applied."""
+    """Apply the named operators.  Returns the child and what was applied.
+
+    When ``operators`` is given it is a *plan*, applied in order -- the caller
+    (the curator's bandit) has already decided what this child should be
+    subjected to.  The first version resampled that list uniformly with
+    replacement ``n_ops`` times, which quietly threw the plan away.
+    ``n_ops`` now only sizes a draw from the full operator set, which is what
+    callers without a bandit want.
+    """
     child = g.copy()
     child.parent_id = g.genome_id
     child.genome_id = ""
-    names = list(operators or MUTATION_OPERATORS)
+    if operators:
+        plan = list(operators)
+    else:
+        names = list(MUTATION_OPERATORS)
+        plan = [names[int(rng.integers(len(names)))] for _ in range(n_ops)]
     applied: list[str] = []
-    for _ in range(n_ops):
-        name = names[int(rng.integers(len(names)))]
+    for name in plan:
         if MUTATION_OPERATORS[name](child, rng):
             applied.append(name)
     child.lineage = (g.lineage + applied)[-24:]

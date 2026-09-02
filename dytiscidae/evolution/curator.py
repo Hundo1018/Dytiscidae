@@ -90,17 +90,31 @@ class OperatorBandit:
         self.c = c
         self.total = 0
 
-    def select(self, rng: np.random.Generator, *, structural_bias: float = 1.0) -> str:
-        """Pick an operator by UCB, tilted by the current structural appetite."""
+    def select(self, rng: np.random.Generator, *, structural_bias: float = 1.0,
+               exclude: tuple = ()) -> str:
+        """Pick an operator by UCB, tilted by the current structural appetite.
+
+        ``exclude`` is what makes a multi-mutation child get *different*
+        operators.  This is a deterministic argmax, and ``choose_operators``
+        calls it once per mutation with no state change in between, so without
+        an exclusion set it returned the same name every time: 6,198 of
+        arch31's 6,284 multi-mutation children were one operator applied two or
+        three times, and the three-operator recombination the regime thought it
+        was requesting never happened once.
+        """
         self.total += 1
         scores = {}
         for name, s in self.stats.items():
+            if name in exclude:
+                continue
             if s.tries == 0:
                 scores[name] = 1e6 + rng.random()  # try everything once
                 continue
             bonus = self.c * math.sqrt(math.log(self.total + 1) / s.tries)
             tilt = structural_bias if name in STRUCTURAL_OPERATORS else 1.0
             scores[name] = (s.mean_reward + bonus) * tilt
+        if not scores:
+            return max(self.stats, key=lambda n: self.stats[n].mean_reward)
         return max(scores, key=scores.get)
 
     def update(self, names: list[str], reward: float) -> None:
@@ -180,6 +194,13 @@ class Curator:
         self.promotions = 0
         self.evaluations = 0
         self.prunes = 0
+        #: Rolling window of positive improvements, used to put operator credit
+        #: on a scale the population itself sets.  See ``credit``.
+        self._gains: list = []
+        #: What discovering an unoccupied cell is worth on top of the
+        #: improvement.  Exploration is real work and should be paid; it should
+        #: not be the whole wage.
+        self.novelty_credit = 0.15
         self._verified: dict[tuple[int, ...], int] = {}
         self._famine: dict[str, int] = {}
         #: Per-domain record process: best seen, evaluations drawn, and the
@@ -198,15 +219,47 @@ class Curator:
 
     def choose_operators(self) -> list[str]:
         n = max(1, self.regime.n_mutations)
-        return [
-            self.bandit.select(self.rng, structural_bias=self.regime.structural_bias)
-            for _ in range(n)
-        ]
+        picked: list[str] = []
+        for _ in range(n):
+            picked.append(self.bandit.select(
+                self.rng, structural_bias=self.regime.structural_bias,
+                exclude=tuple(picked)))
+        return picked
 
     def credit(self, operators: list[str], status: str, gain: float) -> None:
-        reward = {"new": 1.0, "improved": 0.35, "rejected": -0.03}.get(status, 0.0)
-        if status == "improved":
-            reward += float(np.clip(gain, 0.0, 1.0))
+        """Pay an operator for the improvement it produced.
+
+        The first version paid ``new = 1.0``, ``improved = 0.35 + gain``,
+        ``rejected = -0.03``.  58.9% of arch31's children landed in an empty
+        cell, so "new" was the modal outcome and the flat 1.0 swamped the gain
+        term: the estimated mean credit of all twenty-four operators fell in
+        0.60-0.73 (``part_dimensions`` 0.731 *above* ``add_part`` 0.713) and
+        acceptance was 79-89% for every one of them.  A bandit whose arms all
+        report the same number is choosing at random, and what it happened to
+        choose was growth -- n_parts 3.95 to 5.66, with the share of the
+        population pinned against the eight-part cap going 3.2% to 31.4%, while
+        corr(n_parts, energy_margin) measured -0.50.
+
+        ``gain`` is now the child's score minus the better of its parent and
+        whatever already held the cell, so an operator is paid for making
+        something better than what it was given -- the fitness-improvement
+        credit assignment the adaptive-operator-selection literature settled on
+        (Fialho, Da Costa, Schoenauer & Sebag, GECCO 2008).  It is normalised
+        by a rolling scale rather than an absolute one, because the fitness is
+        a quantile and its spread changes as the population does.  Novelty
+        still pays, but a bounded amount, and it can no longer drown the signal.
+        """
+        if status == "rejected":
+            reward = 0.0
+        else:
+            g = float(max(gain, 0.0))
+            self._gains.append(g)
+            if len(self._gains) > 256:
+                del self._gains[: len(self._gains) - 256]
+            scale = float(np.percentile(self._gains, 90)) if len(self._gains) >= 16 else 0.0
+            reward = float(np.clip(g / scale, 0.0, 1.0)) if scale > 1e-9 else 0.0
+            if status == "new":
+                reward += self.novelty_credit
         self.bandit.update(operators, reward)
 
     # ------------------------------------------------------ 2. parent selection
@@ -342,6 +395,10 @@ class Curator:
             self.archive.remove(cell)
             self._forget(cell)
 
+    @staticmethod
+    def _stage_of(elite) -> int:
+        return int((getattr(elite, "meta", None) or {}).get("stage", 0))
+
     def _forget(self, cell) -> None:
         """Tell the curriculum a cell is gone, if one is attached."""
         c = getattr(self, "curriculum", None)
@@ -418,11 +475,22 @@ class Curator:
             d = a.neighbour_density(cell)
             if d <= self.crowding_limit:
                 continue
+            # Compare like with like.  The fitness is a within-stage quantile,
+            # and a promoted design is answering a harder question than its
+            # neighbours, so ranking it against all of them culled exactly the
+            # designs that had advanced: crossing-stage designs were 8.5% of
+            # arch31's evaluations and 3.4% of its surviving elites, and the
+            # archive's mean mission_fraction (0.01658) ended up *below* that
+            # of the population which produced it (0.01816).
+            stage = self._stage_of(e)
             neigh = [
                 o.fitness for c, o in a.cells.items()
                 if c != cell and all(abs(x - y) <= 1 for x, y in zip(cell, c))
+                and self._stage_of(o) == stage
             ]
-            if neigh and e.fitness < np.percentile(neigh, 25):
+            if len(neigh) < 4:
+                continue
+            if e.fitness < np.percentile(neigh, 25):
                 candidates.append((e.fitness, cell))
         # The scout's reserve.  A quota rather than a threshold: a fixed share of
         # the archive is held on predicted potential regardless of how the
