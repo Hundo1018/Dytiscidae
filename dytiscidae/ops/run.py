@@ -9,7 +9,13 @@
 
 Every long-running command checkpoints as it goes and can be resumed, because
 the environments this is meant to run in are frequently reclaimed without
-warning.  Nothing here needs a GPU.
+warning.
+
+`search` uses the GPU when the Mojo extension is importable, evaluating a whole
+generation of candidates in one set of kernel launches.  It falls back to the
+numpy solver when the extension is missing, which is correct but several times
+slower; see docs/CPU_LEGACY.md for what else was decided under that assumption
+and has not been revisited.
 """
 
 from __future__ import annotations
@@ -139,7 +145,18 @@ def cmd_search(args) -> int:
         generations=args.generations,
         batch=args.batch,
         seed=args.seed,
+        workers=args.workers,
+        min_shard=args.min_shard,
         segment_seconds=args.segment_seconds,
+        controller_refine_steps=args.refine_steps,
+        controller_refine_sigma=args.refine_sigma,
+        promotion_refine_steps=args.promotion_refine_steps,
+        policy_hidden=args.policy_hidden,
+        use_shared_policy=args.shared_policy,
+        shared_hidden=args.shared_hidden,
+        shared_lr=args.shared_lr,
+        shared_epochs=args.shared_epochs,
+        shared_target_kl=args.shared_target_kl,
         run_dir=args.run,
         tier2_every=args.tier2_every,
         n_reference_seeds=args.reference_seeds,
@@ -153,6 +170,10 @@ def cmd_search(args) -> int:
         use_scout=not args.no_scout,
         resume=bool(getattr(args, "resume", False)),
         scout_reserve=args.scout_reserve,
+        mission_weight=args.mission_weight,
+        descriptor_bins=args.descriptor_bins,
+        reward_shaping=args.reward_shaping,
+        n_modes=args.n_modes,
         **({"islands": tuple(x.strip() for x in args.islands.split(","))}
            if args.islands else {}),
     )
@@ -168,12 +189,16 @@ def cmd_search(args) -> int:
             f"{r['regime']:<12s} elites={r['filled']:<4d} "
             f"cov={r['coverage']*100:5.2f}% qd={r['qd_score']:7.2f} "
             f"best={r.get('best_fitness', 0):.3f} "
+            f"lin={r.get('scout', {}).get('depth_mean', 0):.1f} "
             f"stage{r.get('curriculum', {}).get('typical', 0)}"
             f"/{r.get('curriculum', {}).get('reached', 0)} "
             f"crit={r.get('critic', {}).get('calibration', 0):.2f} "
             f"inv={r.get('auditor', {}).get('invalidated', 0):<3d} "
             f"scout={r.get('scout', {}).get('calibration', 0):.2f}/"
             f"{r.get('scout', {}).get('protected', 0):<2d} "
+            f"div={100.0 * r.get('diverged_rollouts', 0) / max(r.get('rollouts', 0), 1):4.1f}% "
+            f"mf={r.get('mission_best', 0.0):.3f} "
+            f"corr={r.get('mission_corr', 0.0):+.2f} "
             f"evals={r['evaluated']:<5d} {r['elapsed']:6.0f}s"
         )
         print(line, flush=True)
@@ -284,6 +309,7 @@ def cmd_train(args) -> int:
     with open(out / f"{stem}_controller.pkl", "wb") as f:
         pickle.dump({"weights": result.policy_weights,
                      "hidden": getattr(result, "policy_hidden", 0),
+                     "n_modes": getattr(result, "n_modes", None),
                      "bases": result.bases,
                      "score": result.score, "baseline": result.baseline_score,
                      "per_domain": result.per_domain,
@@ -414,8 +440,11 @@ def cmd_showcase(args) -> int:
     if args.controller and Path(args.controller).exists():
         d = pickle.load(open(args.controller, "rb"))
         # Width comes from the pickle: a controller trained before the default
-        # changed must still load with the shape it was trained at.
-        pol = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=4,
+        # changed must still load with the shape it was trained at.  The mode
+        # count said that in a comment and then hard-coded 4, so a controller
+        # trained at any other width loaded into the wrong shape.
+        pol = Policy(n_obs=TriphibianEnv.OBS_DIM,
+                     n_modes=int(d.get("n_modes") or 4),
                      hidden=int(d.get("hidden", 16)))
         pol.weights = d["weights"]
         env = TriphibianEnv(p, seed=args.seed)
@@ -474,6 +503,23 @@ def cmd_render(args) -> int:
     return 0
 
 
+def cmd_distill(args) -> int:
+    """Is a shared controller reachable at all?  Answered from stored policies."""
+    from ..learning.distill import distil
+
+    res = distil(args.run, n_states=args.states, hidden=args.hidden,
+                 epochs=args.epochs, held_out=args.held_out, seed=args.seed,
+                 refined_only=args.refined_only)
+    print(f"distillation study of {args.run}")
+    print("-" * 60)
+    print("\n".join(res.lines()))
+    if res.per_body:
+        print("\nworst held-out bodies (name, R2, tier-1 mission fraction):")
+        for row in res.per_body[:5]:
+            print(f"  {row[0]:<28} {row[1]:+.3f}  {row[2]:.4f}")
+    return 0 if res.scores else 1
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="dytiscidae", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -490,8 +536,56 @@ def main(argv=None) -> int:
     p.add_argument("--generations", type=int, default=200)
     p.add_argument("--batch", type=int, default=4)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--workers", type=int, default=1,
+                   help="worker processes stepping machines in parallel. 1 is "
+                        "the single-process path every stored run used. "
+                        "Measured: 16 workers of 8 machines return 12.7x the "
+                        "throughput of one. A shard smaller than --min-shard "
+                        "is not worth a batch's fixed cost, so the pool never "
+                        "makes more than --batch // --min-shard of them: to "
+                        "use more cores, raise --batch.")
+    p.add_argument("--min-shard", type=int, default=8,
+                   help="fewest machines a worker is given at once. Measured "
+                        "per machine-step: 238 us alone, 149 in a shard of "
+                        "four, 105 in eight, 89 in sixteen -- so a smaller "
+                        "shard spends the parallelism it gains")
     p.add_argument("--segment-seconds", type=float, default=8.0,
                    help="Tier-1 episode length; the main cost/fidelity dial")
+    p.add_argument("--refine-steps", type=int, default=0,
+                   help="(1+1)-ES steps refining each candidate's policy. Each "
+                        "step is one more batched Tier-1 for the whole "
+                        "generation, so a generation costs (1 + steps) "
+                        "evaluations. 0 leaves the policy at its inherited "
+                        "weights, which for a fresh candidate means zeros, "
+                        "which command nothing.")
+    p.add_argument("--refine-sigma", type=float, default=0.1,
+                   help="perturbation scale on policy weights during refinement")
+    p.add_argument("--promotion-refine-steps", type=int, default=6,
+                   help="(1+1)-ES steps spent on an elite when it is promoted "
+                        "to Tier-2. Bounded by promotions (at most three per "
+                        "verification round) rather than by population, so "
+                        "unlike --refine-steps it is affordable by default. 0 "
+                        "verifies the elite exactly as the archive stored it.")
+    p.add_argument("--shared-policy", action="store_true",
+                   help="train one PPO policy across every morphology, on the "
+                        "transitions the whole generation produces. Coexists "
+                        "with --refine-steps: the shared policy generalises, "
+                        "the per-candidate (1+1)-ES adapts, the intents are "
+                        "summed. Needs torch.")
+    p.add_argument("--shared-hidden", type=int, default=64,
+                   help="width of the shared PPO policy")
+    p.add_argument("--shared-lr", type=float, default=1e-3,
+                   help="PPO learning rate. arch30 ran at 3e-4 and reported a "
+                        "mean KL of 0.0008 against the 0.01-0.02 an update "
+                        "normally aims for -- the policy was barely asked to "
+                        "move.")
+    p.add_argument("--shared-epochs", type=int, default=10,
+                   help="PPO passes over each generation's batch")
+    p.add_argument("--shared-target-kl", type=float, default=0.015,
+                   help="stop an update once its mean KL exceeds this")
+    p.add_argument("--policy-hidden", type=int, default=0,
+                   help="hidden units in the policy; 0 is linear (60 weights), "
+                        "16 is 308")
     p.add_argument("--run", default="runs/latest")
     p.add_argument("--tier2-every", type=int, default=15)
     p.add_argument("--reference-seeds", type=int, default=12)
@@ -516,6 +610,27 @@ def main(argv=None) -> int:
                    help="run without the potential predictor (greedy selection)")
     p.add_argument("--scout-reserve", type=float, default=0.15,
                    help="share of each archive protected on predicted potential")
+    p.add_argument("--mission-weight", type=float, default=0.30,
+                   help="share of the archive's scalar that is the mission "
+                        "itself, as a population quantile, rather than the "
+                        "island/curriculum blend. At 0 -- every run before "
+                        "2026-09-01 -- corr(fitness, mission_fraction) "
+                        "measured 0.159 and the search spent 36%% of its energy "
+                        "fraction buying 32%% more competence.")
+    p.add_argument("--descriptor-bins", type=int, default=5,
+                   help="bins per learned archive axis. Four axes at 8 bins is "
+                        "4096 cells per island, 24,576 across six, against "
+                        "arch31's entire budget of 9,620 evaluations -- so "
+                        "81.9%% of cells were never improved on. Size the map "
+                        "to the budget.")
+    p.add_argument("--reward-shaping", type=float, default=0.2,
+                   help="weight on potential-based shaping in the PPO reward. "
+                        "0 is the terminal-only reward, which delivered one "
+                        "scalar per 161 decisions. Shaping of this form cannot "
+                        "change the optimal policy.")
+    p.add_argument("--n-modes", type=int, default=6,
+                   help="mobility modes identified per body per domain, and "
+                        "the width the shared policy commands through")
     p.set_defaults(fn=cmd_search)
 
     p = sub.add_parser("skills", help="train the actuator skill library")
@@ -584,6 +699,21 @@ def main(argv=None) -> int:
     p.add_argument("--top", type=int, default=3)
     p.add_argument("--duration", type=float, default=8.0)
     p.set_defaults(fn=cmd_render)
+
+    p = sub.add_parser(
+        "distill",
+        help="can one conditioned network match the per-body controllers?")
+    p.add_argument("--run", default="runs/latest")
+    p.add_argument("--states", type=int, default=256,
+                   help="observations sampled per teacher")
+    p.add_argument("--hidden", type=int, default=128)
+    p.add_argument("--epochs", type=int, default=4000)
+    p.add_argument("--held-out", type=float, default=0.3, dest="held_out",
+                   help="fraction of *bodies* the student never sees")
+    p.add_argument("--refined-only", action="store_true", dest="refined_only",
+                   help="only policies a promotion actually fitted to their body")
+    p.add_argument("--seed", type=int, default=0)
+    p.set_defaults(fn=cmd_distill)
 
     args = ap.parse_args(argv)
     return args.fn(args)

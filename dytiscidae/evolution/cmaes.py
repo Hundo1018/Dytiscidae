@@ -185,6 +185,22 @@ class Emitter:
     archive, filling it.  The two behaviours are wanted at different times, so
     the curator runs a mix and adjusts the ratio from how the archive is
     actually growing.
+
+    **Not wired, and blocked on the representation rather than on effort.**  The
+    search does not run emitters.  It used to look as though it might:
+    ``Curator.Regime`` carried an ``emitter_fraction`` that was recomputed every
+    generation, printed in every log line and read by nobody, and the loop
+    declared a ``state.emitters`` list that was never filled.  Both are gone --
+    a dial that controls nothing is worse than an absent feature, because it
+    reads as evidence in a log.
+
+    What is missing is an encoding.  CMA-ES samples a fixed-length continuous
+    vector, and this project's genome is a recursive module graph whose parts
+    carry a discrete ``kind`` from a hand-written taxonomy -- there is no
+    genome-to-vector map anywhere in the tree, which is why every live CMA-ES
+    here optimises *policy weights* instead.  Continuous morphological traits
+    (``docs/AUTONOMY.md`` item 1) are what would supply that vector, so they come
+    first and this becomes cheap afterwards.
     """
 
     optimiser: CMAES

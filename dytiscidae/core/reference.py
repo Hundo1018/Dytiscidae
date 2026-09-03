@@ -187,6 +187,7 @@ def reference_genome() -> Genome:
     g.ballast_fraction = 0.92
     g.deadrise_deg = 34.0
     g.lineage = ["reference"]
+    g.body_plan = "reference"
     g.genome_id = "reference"
     return g
 

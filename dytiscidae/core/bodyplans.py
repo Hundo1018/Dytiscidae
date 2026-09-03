@@ -539,13 +539,121 @@ def gannet() -> Genome:
     return g
 
 
+def teal() -> Genome:
+    """Gannet airframe on a two-segment leaping leg: gets off the ground.
+
+    Added because no plan above leaves the ground at all.  Measured on the
+    land->air placement with no controller, peak clearance: beetle 0.050,
+    medusa 0.050, bat 0.050, eel 0.050, ray 0.050 -- all of which is the spawn
+    gap, meaning they never move -- and gannet 0.060.  This plan reaches 0.566
+    m with zero ground contacts at the apex, and is airborne for 49.5% of the
+    episode.  Named for the dabbling ducks, which spring off the water in one
+    leap instead of taking a run.
+
+    What makes the leap possible is that the wing does not beat.  Held at
+    ``stroke_amplitude=0`` it pays no inertial-reversal cost, so the shared CPG
+    frequency is free to go to 5 Hz for the legs -- which a flapping plan
+    cannot do, because root bending from the wing's own mass scales as f^2 and
+    caps a 1.5 m span near 2 Hz.
+
+    The leg is two segments, not one, and the knee leads the hip by 2.4 rad.
+    Both matter and both were measured: at a single hinge the best reachable
+    clearance was 0.241 m, and with the two extensions in phase rather than
+    overlapping it falls to 0.157 m.  Tip speed is 2*pi*f*H*L and the two
+    joints only add their speeds if their strokes overlap.  Torque is not the
+    constraint anywhere in this design -- sweeping stall torque from 16.5 to
+    76.6 N.m moved clearance by 0.04 m, while joint range from 1.5 to 2.1 rad
+    moved it by 0.08.
+
+    What this plan does *not* do is cross land->air, and the reason is worth
+    writing down because the measurement in ``transitions.py`` is easy to
+    misread.  That bar is ``clearance() > 0.5`` evaluated **once, after the
+    episode ends** -- it is a terminal condition, not a peak one.  So it asks
+    for sustained flight, not for a leap: this plan peaks at 0.566 m and ends
+    at -0.012 m, back on the ground, and scores ``crossed=False``.  At this
+    airframe's wing loading of 29.3 N/m^2 the trim speed is 6.9 m/s and a
+    standing leap delivers 3.3 m/s, so no amount of leg buys the crossing --
+    halving trim speed would need four times the wing area, which is not
+    compatible with diving to ten metres.  The capability still missing is
+    thrust in air, not legs.
+
+    It is seeded anyway because a leap is the half of takeoff that nothing else
+    here has, and it is visible to selection: ``airborne_fraction`` on the air
+    segment reads it directly, where every other plan reads zero.
+    """
+    g = gannet()
+    # Shorter fuselage: the legs are long, and the machine has to fold onto
+    # them rather than drag its tail through the crouch.
+    g.parts[0].length = 0.90
+    thigh = Part(kind=STRUT, length=0.50, radius=0.012, material="cfrp",
+                 joint="hinge", joint_axis=np.array([0.0, 1.0, 0.0]),
+                 joint_range=(-2.1, 2.1), motor_class="bldc", motor_mass=0.20,
+                 gear_ratio=20.0, sealed=True, neutral=0.5,
+                 stroke_amplitude=1.0)
+    shank = Part(kind=STRUT, length=0.44, radius=0.010, material="cfrp",
+                 joint="hinge", joint_axis=np.array([0.0, 1.0, 0.0]),
+                 joint_range=(-2.1, 2.1), motor_class="bldc", motor_mass=0.20,
+                 gear_ratio=20.0, sealed=True, neutral=0.5,
+                 stroke_amplitude=1.0,
+                 # The knee leads the hip.  In phase, the two extensions
+                 # alternate and the clearance falls to 0.157 m.
+                 phase_offset=2.4)
+    foot = Part(kind=PADDLE, span=0.18, root_chord=0.13, length=0.16,
+                radius=0.007, material="cfrp", surface_cppn=2, joint="hinge",
+                joint_axis=np.array([0.0, 1.0, 0.0]), joint_range=(-0.9, 0.9),
+                motor_class="geared", motor_mass=0.05, gear_ratio=22.0,
+                sealed=True, stroke_amplitude=0.5, neutral=0.5)
+    # Wing, tail and fuselage carry over from the gannet; the leg replaces its
+    # single strut-and-foot pair.
+    g.parts = [g.parts[0], g.parts[1], g.parts[2], thigh, shank, foot]
+    g.edges = [
+        Edge(parent=0, child=1, pos_u=0.40, reflect=True),
+        Edge(parent=0, child=2, pos_u=1.00, reflect=True),
+        Edge(parent=0, child=3, pos_u=0.62, azimuth=-1.1, reflect=True),
+        Edge(parent=3, child=4, pos_u=1.0, elevation=0.5),
+        Edge(parent=4, child=5, pos_u=1.0, elevation=0.6),
+    ]
+    # 150 Wh, not the gannet's 210: the README's own budget puts the whole
+    # mission near 150, and mass is what a leap is spending.
+    g.battery_wh = 150.0
+    # 5 Hz drives the legs.  Safe only because the wing is held, not beaten.
+    g.flap_frequency = 5.0
+    g.lineage = ["teal"]
+    return g
+
+
+def _stamped(name: str, make):
+    """A plan constructor that records which plan it built.
+
+    The stamp is applied here rather than inside each constructor so that no
+    caller can obtain an unstamped archetype -- ``meta["body_plan"]`` used to be
+    recovered from ``genome.lineage[0]``, which is a rolling window of mutation
+    operator names, so it reported the plan only until a design had accumulated
+    24 mutations and reported an operator name afterwards.
+    """
+
+    def build() -> Genome:
+        g = make()
+        g.body_plan = name
+        return g
+
+    build.__name__ = make.__name__
+    build.__qualname__ = make.__qualname__
+    build.__doc__ = make.__doc__
+    return build
+
+
 BODY_PLANS = {
-    "beetle": beetle,
-    "medusa": medusa,
-    "bat": bat,
-    "eel": eel,
-    "ray": ray,
-    "gannet": gannet,
+    name: _stamped(name, make)
+    for name, make in {
+        "beetle": beetle,
+        "medusa": medusa,
+        "bat": bat,
+        "eel": eel,
+        "ray": ray,
+        "gannet": gannet,
+        "teal": teal,
+    }.items()
 }
 
 

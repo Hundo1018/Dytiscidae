@@ -38,7 +38,12 @@ genome  ──►  phenotype  ──►  MJCF + panels  ──►  three-tier ev
 * **Everything is observable**: JSONL telemetry, a self-contained HTML
   dashboard, and offscreen video of elites.
 
-Nothing requires a GPU. Developed and tested on 4 CPU cores.
+Developed and tested on 4 CPU cores with no accelerator. That constraint shaped
+more of the design than it appears to, and it no longer holds — every decision
+that was made for it is listed as outstanding work in
+[docs/CPU_LEGACY.md](docs/CPU_LEGACY.md). The largest is that the controller is
+not trained at all in the loop (`controller_refine_steps` defaults to 0), so the
+runs so far selected bodies on the strength of an untrained controller.
 
 ---
 
@@ -47,12 +52,17 @@ Nothing requires a GPU. Developed and tested on 4 CPU cores.
 ```bash
 pip install -r requirements.txt
 
-python -m dytiscidae.ops.run verify              # 30 physics checks
+python -m dytiscidae.ops.run verify              # 162 physics checks
 python -m dytiscidae.ops.run reference           # inspect the hand design
-python -m dytiscidae.ops.run search --generations 200 --run runs/first
+python -m dytiscidae.ops.run search --generations 200 --run runs/first \
+       --batch 32 --workers 4          # 2.2x on this machine; see below
 python -m dytiscidae.ops.run dashboard --run runs/first
 python -m dytiscidae.ops.run skills              # train the actuator skills
+python -m dytiscidae.ops.run distill --run runs/first   # is a shared controller reachable?
 ```
+
+[docs/ROADMAP.md](docs/ROADMAP.md) is the current work list, with the
+measurement behind each item and the number each finished one produced.
 
 `search` prints one line per generation and refreshes
 `runs/first/dashboard.html` every five generations, so you can watch it live by
@@ -61,6 +71,15 @@ generation.
 
 The main cost dial is `--segment-seconds` (default 8). Halving it roughly halves
 the run time and roughly doubles the variance of every Tier-1 score.
+
+`--workers` steps machines in several processes, each with its own GPU pipeline.
+It trades against `--batch`: the pool never makes a shard smaller than
+`--min-shard` (8), because a shard of four costs 149 µs per machine-step against
+89 in a shard of sixteen. On a generation of 32, four workers is 2.18x and eight
+is 2.20x — to use more cores, raise `--batch`. Raw stepping throughput scales
+further than that (12.7x at sixteen workers of eight machines); the difference is
+shard size, not contention. Sharding cannot change a score: the same designs
+score bit-identically at 1, 2, 4 and 8 workers, and a test pins it.
 
 ---
 
@@ -128,10 +147,17 @@ steps per candidate:
 | 1 | ~2–8 s | Short episodes per domain plus transitions. Measures controllability and steady power; extrapolates the 45-minute budget. |
 | 2 | ~10–90 s | The real schedule with waves, current and wind. Run only on promoted elites — and it *checks the Tier-1 extrapolation*, flagging elites whose short window was not steady state. |
 
-**`envs/skills.py`** — the actuator bench. Component-level control, learned to
-convergence in seconds, transferable to any morphology carrying the component:
+**`envs/skills.py`** — the actuator bench. Component-level control over
+simplified dynamics, learned to convergence in seconds. **Nothing in the search
+reads it**: `run skills` writes `skills.json`, no other module imports it, and
+each task's own observation and action widths could not transfer to a mission
+policy in any case. It is the cheap experiment that says whether a control
+problem is solvable before an expensive search is pointed at it — and for
+resonance, that argument has since been answered inside the search itself (the
+drivetrain spring is simulated, flap frequency is commandable through the
+identified mobility basis, and the policy senses stroke phase and wetness).
 
-- `resonance_seek` — **the highest-value skill in the project.** A compliant
+- `resonance_seek` — **the argument that started the elastic drivetrain.** A compliant
   flapping wing driven at resonance costs a fraction of the power of the same
   wing driven off it, because the spring returns the wing's kinetic energy at
   each reversal instead of the motor paying for it twice per cycle. The
@@ -221,7 +247,7 @@ being wrong, which is the failure mode that matters in a generative pipeline.
 | A rock scored 0.57 for land competence | All six plans between 0.541 and 0.596 while nothing walked | Six tenths of a locomotion score was awarded for lying still the right way up, and the climb term was computed, documented as "the capability", and left out of the return. |
 | The auditor's veto had no link to the bar it undid | — (would have silently frozen the judge) | It took a *count* of failed audits and rolled back every domain's most recent tightening. Audits find something most rounds; a ratchet reset most rounds never rises. |
 
-Verify with `python -m dytiscidae.ops.run verify` (115 checks); the search machinery has its own 194 in `tests/test_search.py`.
+Verify with `python -m dytiscidae.ops.run verify` (162 checks); the search machinery has its own 305 in `tests/test_search.py`, and the shared learner 8 in `tests/test_ppo.py`.
 
 ---
 
@@ -234,15 +260,18 @@ dytiscidae/
   core/        cppn, genome, phenotype, mjcf, reference
   control/     cpg (pattern generator + mobility basis identification)
   envs/        triphibian (mission, 3 tiers), skills (actuator bench), evaluate,
-               transitions (graded crossings), mission (one unbroken run)
+               transitions (graded crossings), mission (one unbroken run),
+               batchroll (one GPU call per timestep), actors (worker processes)
   evolution/   archive (MOME), cmaes, curator, loop, judge (ratchets the bar),
                auditor (the third party), critic, curriculum, islands, scout
                (predicts potential), descriptors (learned archive axes)
+  learning/    ppo (the shared policy), distill (is a shared policy reachable?)
   viz/         dashboard (self-contained HTML), render (offscreen video),
                showcase (one mission, wake and stress overlaid)
   ops/         telemetry (JSONL), run (CLI)
-tests/         test_physics.py  — 115 checks pinning conventions and magnitudes
-               test_search.py   — 194 checks on the search machinery
+tests/         test_physics.py  — 162 checks pinning conventions and magnitudes
+               test_search.py   — 305 checks on the search machinery
+               test_ppo.py      — 8 checks on the shared PPO learner
 ```
 
 ---
@@ -255,7 +284,24 @@ Worth knowing before trusting a result:
   wing–wing interaction. Good to maybe ±30% for a flapping wing, which is fine
   for ranking designs and not fine for predicting absolute performance.
 - **Tier-1 extrapolation.** The 45-minute budget comes from a short window. Tier-2
-  checks it, but only for promoted elites.
+  checks it, but only for promoted elites, and over arch33's 180 promotions
+  corr(tier1_fraction, tier2_fraction) was +0.077 — the cheap score carried
+  almost no information about the verified one. A 60 s single leg now runs at
+  each promotion (`evaluate_tier1_5`) and reports its retention, which is the
+  measurement that will say whether that has changed.
+- **Air scores before and after 2026-09-03 are different quantities.** The air
+  score used to pay 0.25 for being off the ground and 0.2 for the launch
+  velocity the environment supplied, and released a design with no trim speed at
+  the 30 m/s cap — so wingless machines scored 0.136 against winged 0.144. Every
+  term now describes the trajectory the machine flew. Raw measurements travel
+  with each design, so older runs stay analysable; their air *scores* do not
+  compare to arch34's. See ROADMAP Phase 1.1.
+- **No shared controller is reachable on the present conditioning.** A
+  morphology-conditioned student trained on 550 stored per-body controllers
+  fits the bodies it saw (train R² 0.66, 0.99 on the refined subset) and does
+  not beat commanding the population mean on bodies it did not (held-out R²
+  −0.05). `ops.run distill` reproduces it. Capacity is not the constraint;
+  generalisation across morphologies is.
 - **Added mass is directional but not a full tensor.** Each element gets a
   per-axis coefficient from its own extents, `Ca_i = 0.5(e_j+e_k)/(2 e_i)`,
   projected onto its instantaneous direction of motion. Exact for a sphere,

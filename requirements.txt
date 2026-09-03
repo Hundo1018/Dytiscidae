@@ -9,8 +9,10 @@ imageio>=2.34
 imageio-ffmpeg>=0.4.9
 
 # Optional accelerators -- the system runs without them.
-#   torch          : only needed for the PPO learner (learning/ppo.py).
+#   torch          : needed for --shared-policy (learning/ppo.py). CPU build
+#                    is the right one: the network is ~1200 weights, where a
+#                    CUDA launch costs more than the arithmetic.
 #                    CPU wheel is fine; CUDA wheel is used automatically if present.
 #   ray            : only needed for multi-machine parallel evaluation.
-# torch>=2.2
+torch>=2.2  # --index-url https://download.pytorch.org/whl/cpu
 # ray>=2.9

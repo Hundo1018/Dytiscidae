@@ -156,8 +156,181 @@ class Curriculum:
     promotions: int = 0
     demotions: int = 0
 
+    #: Recent (island_score, curriculum_score) pairs *per stage*.  Bounded
+    #: window: this is a question about the population now, not about the whole
+    #: run.
+    #:
+    #: Keyed by stage because the stages ask different questions and their
+    #: answers are not on one scale.  Pooling them, which is what the first
+    #: version did, meant a stage-2 design (``crossed * quality``, usually zero)
+    #: was ranked inside a window dominated by stage-0 designs (``max
+    #: competence``, around 0.6), so it landed in the bottom quantile for having
+    #: been promoted.  Measured over arch31's 9384 evaluations: mean fitness by
+    #: stage 0.568 / 0.414 / 0.302 / 0.380 and corr(fitness, stage) = -0.35 --
+    #: the search docked a design for advancing, and ``Curator.prune`` then
+    #: dropped whatever sat below its neighbourhood's 25th percentile.
+    _recent: dict = field(default_factory=dict)
+    #: Unused.  Kept only so that unpickling a pre-2026-09 state does not fail;
+    #: the applied weight has always been ``stage / (N_STAGES - 1)`` and the
+    #: telemetry now reports that instead of this field, which nothing writes.
+    _handover: float = 0.0
+    window: int = 256
+    #: Samples a stage's window needs before its quantiles mean anything.
+    min_rank_samples: int = 12
+    #: Floor under the island half's weight.  At ``stage/4`` alone the weight
+    #: was 0 for the 69% of arch31's evaluations that sat at stage 0, so the
+    #: island objective -- which for the generalist island *is* the mission --
+    #: contributed nothing at all to most of the run.
+    handover_floor: float = 0.25
+
     def stage_of(self, cell) -> int:
         return int(self.stages.get(tuple(cell), 0))
+
+    def seed_stage(self, cell, stage: int) -> int:
+        """Give an unvisited cell the stage its parent had earned.
+
+        Stages are held per cell, and 58.9% of arch31's children landed in a
+        cell nobody had occupied -- which started at stage 0 however advanced
+        the parent was.  So 69.1% of all evaluations were asked the *easiest*
+        question no matter what the lineage had already shown it could do, the
+        handover ramp never left its floor, and the mission's share of the
+        score stayed at 1.7% for six hundred generations.
+
+        A region is not a lineage, so this is a starting guess and not a grant:
+        the cell is still demoted the moment an occupant cannot hold the stage,
+        which is what ``update`` already does.
+        """
+        key = tuple(cell)
+        if key in self.stages:
+            return int(self.stages[key])
+        s = int(np.clip(stage, 0, N_STAGES - 1))
+        self.stages[key] = s
+        return s
+
+    def observe_blend(self, island_score: float, curriculum_score: float,
+                      stage: int = 0, mission: float = 0.0) -> None:
+        """Record what each half of the blend said about one design.
+
+        Filed under the stage the design was asked about, because that is the
+        only population it is comparable with.
+        """
+        w = self._recent.setdefault(int(stage), [])
+        w.append((float(island_score), float(curriculum_score), float(mission)))
+        if len(w) > self.window:
+            del w[: len(w) - self.window]
+
+    def handover(self, stage: int) -> float:
+        """How much weight the island's own objective has earned, in [0, 1].
+
+        The islands are an *early* device.  They exist to grow terrain-adapted
+        genes quickly and to stop a dark horse -- good at nothing yet, promising
+        -- from being culled before it can show what it is.  Late in a run the
+        thing being searched for is a triphibian again, so the island's own
+        objective has to take the weight back.
+
+        It used to be a flat 0.5 below stage 4, and that constant was doing real
+        damage.  Measured on the 500-generation runs, the air island's champion
+        had air competence 0.107 while its stored fitness was 0.5019: the island
+        objective, ``competence**1.5``, could contribute at most 0.035, so 96% of
+        the selection pressure on the *air* island came from a score that does
+        not look at air at all.  Every stage below 4 reads the design's *best*
+        medium regardless of island, and since water competence reaches 0.9 where
+        air reaches 0.1, the island-blind half rewarded water everywhere.  The
+        air island filled with wingless water specialists.
+
+        So the weight is evidence now, in the shape the judge already uses: a
+        fixed ladder for what is measured, a population statistic for where the
+        line sits, and a ratchet so it only ever moves one way.
+
+        It used to add a second term: weight whichever half was *discriminating*
+        more, measured as the ratio of the two p90-p10 spreads.  That rule is
+        removed, because measurement showed it does the opposite of its purpose.
+
+        A hard objective has a small spread precisely because nothing can do it
+        yet.  `mission_fraction` across arch30's archive spans 0.0437 from p10 to
+        p90 while the curriculum score spans 0.5092, so the rule concluded the
+        mission "does not discriminate" and handed its weight away -- which
+        guarantees the search never learns to do the thing it is for.  Over
+        arch30 it averaged 0.197, *below* the 0.25 stage floor it was meant to
+        improve on, so it was strictly worse than the ramp it was added to.
+        The result was corr(fitness, mission_fraction) = 0.1413 across 653
+        elites: 98% of the selection pressure was deciding something other than
+        the mission.
+
+        What remains is the stage ramp alone.  It is a scaffold's proper shape:
+        the curriculum answers an easier question while a cell cannot answer the
+        real one, and hands back as the cell climbs.
+        """
+        if stage >= N_STAGES - 1:
+            return 1.0
+        ramp = stage / float(N_STAGES - 1)
+        return float(np.clip(max(ramp, self.handover_floor), 0.0, 1.0))
+
+    def standing(self, island_score: float, curriculum_score: float,
+                 stage: int = 0):
+        """Both halves of the blend as population quantiles in [0, 1].
+
+        The blend is a convex combination, so it compares the two halves'
+        *magnitudes* -- and they are not on the same scale.  Measured over
+        arch30: the island half spans 0.0437 from p10 to p90 and the curriculum
+        half spans 0.5092, an 11.7x mismatch, so at the weight the ramp actually
+        applied (0.2794 mean) the mission contributed 0.0086 against 0.40, about
+        2% of the selection variance.  That figure was arrived at two ways --
+        from the weights and spreads, and independently as r-squared of the
+        measured correlation -- and they agree to 0.001.
+
+        Ranking each half within the recent population removes the mismatch at
+        its source: a quantile is on [0, 1] by construction whatever the raw
+        scale, so a weight of 0.25 means a quarter of the influence rather than
+        a fortieth.
+
+        The window is *per stage*.  A quantile only means anything against
+        answers to the same question, and the stages ask different ones -- see
+        ``_recent``.  A stage with too few samples to rank returns 0.5 for that
+        half rather than a number: "cannot rank this yet" is the honest answer,
+        and it neither rewards nor punishes the design for being rare, which is
+        what pooling did.
+
+        The cost is honest and worth stating: a quantile is relative to the
+        window, so an elite's stored fitness is not comparable across a long run
+        the way an absolute score would be.  MAP-Elites compares a challenger
+        against the cell's current occupant, and both are scored against
+        populations from different times.  The window is long enough that this
+        drifts slowly, and the judge already ratchets population quantiles for
+        the same reason, but it is a change in what a stored fitness means.
+        """
+        w = self._recent.get(int(stage), [])
+        if len(w) < self.min_rank_samples:
+            return 0.5, 0.5
+        isl = np.array([a for a, _, _ in w], float)
+        cur = np.array([b for _, b, _ in w], float)
+        return (float(np.mean(isl <= island_score)),
+                float(np.mean(cur <= curriculum_score)))
+
+    def mission_standing(self, mission: float, stage: int = 0) -> float:
+        """``mission_fraction`` as a population quantile, on the same scale.
+
+        The blend's two halves decide *how well this design answered the
+        question its cell was asked*, and measurement says that is not the same
+        thing as the mission: over arch31's 9384 evaluations corr(archive
+        fitness, mission_fraction) = 0.159, corr with the *weakest* competence --
+        which is what ``mission_fraction`` is built on -- was 0.003, and corr
+        with the energy margin 0.056.  The scalar that drives replacement,
+        parent choice and pruning could not see two of the four factors in its
+        own objective.
+
+        Injecting the mission as a third quantile is the smallest change that
+        fixes that: it arrives on [0, 1] like the other two, and because
+        ``mission_fraction`` is already ``min(comp)^0.5 * mean(comp) *
+        energy_fraction * transition_fraction`` it carries the weakest medium,
+        the battery and the crossings in the proportions the task itself
+        defines, rather than in weights someone typed.
+        """
+        w = self._recent.get(int(stage), [])
+        if len(w) < self.min_rank_samples:
+            return 0.5
+        m = np.array([c for _, _, c in w], float)
+        return float(np.mean(m <= float(mission)))
 
     def evaluate(self, cell, result, transitions=None) -> StageResult:
         """Score a design at its cell's stage, and at the next one up."""
@@ -176,10 +349,22 @@ class Curriculum:
         )
 
     def update(self, cell, sr: StageResult) -> str:
-        """Promote or demote the cell.  Returns what happened."""
+        """Promote or demote the cell.  Returns what happened.
+
+        Promotion needs two things: passing this stage's bar, and a *nonzero*
+        answer to the next stage's question.  The bar alone let a cell climb on
+        its best medium and then face-plant on a question it had never touched:
+        arch30 logged 764 promotions against 17 demotions while the typical
+        cell sat at stage 1 and five cells ever reached "chain" -- swimmers
+        passing "directed" on depth-hold, being promoted into "crossing", and
+        scoring zero there forever.  Zero is not a tunable: a design that has
+        never once crossed a boundary gains nothing from being asked about
+        crossings, and one that has -- however badly -- has something for the
+        gradient in ``evaluate`` to climb.
+        """
         key = tuple(cell)
         s = self.stage_of(key)
-        if sr.passed and s < N_STAGES - 1:
+        if sr.passed and s < N_STAGES - 1 and sr.detail.get("next", 0.0) > 0.0:
             self.stages[key] = s + 1
             self.promotions += 1
             return "promoted"
@@ -191,6 +376,33 @@ class Curriculum:
             self.demotions += 1
             return "demoted"
         return "held"
+
+    def rebuild_from(self, archive) -> dict:
+        """Re-key the stage record after the descriptor axes have moved.
+
+        ``stages`` is keyed by cell coordinate, and a learned-descriptor refit
+        re-files every elite, so after a refit the old keys name regions that no
+        longer exist while the surviving elites have coordinates nobody has a
+        stage for.  Measured on arch31's generalist island at generation 599:
+        **1,040 stage entries against 251 live cells, of which only 100 (9.6%)
+        named a cell that still existed, and 60.2% of live cells had no entry at
+        all** -- so every one of them was asked the stage-0 question again.
+        With twenty-three refits over the run, the curriculum was being reset
+        underneath the population on a schedule.
+
+        The stage travels on the elite (``meta["stage"]``), so it can simply be
+        re-read from the archive under the new coordinates.  Where two designs
+        merge into one cell the higher stage wins: the region has demonstrably
+        produced an answer to the harder question, and ``update`` will demote it
+        again within a generation if its occupant cannot hold it.
+        """
+        before = len(self.stages)
+        fresh: dict = {}
+        for cell, e in archive.cells.items():
+            s = int((getattr(e, "meta", None) or {}).get("stage", 0))
+            fresh[tuple(cell)] = max(fresh.get(tuple(cell), 0), s)
+        self.stages = fresh
+        return {"stages_before": before, "stages_after": len(fresh)}
 
     def forget(self, cell) -> None:
         """Drop a cell's stage when the cell itself is gone.
@@ -220,4 +432,16 @@ class Curriculum:
             # that had since been removed as well as those still present.
             "reached": vals[-1],
             "typical": vals[len(vals) // 2],
+            # The blend is now a moving quantity, so it has to be in the record
+            # or a later reading of a run cannot tell what it was scored on.
+            #
+            # This used to log ``_handover``, a field nothing ever writes, so
+            # every arch31 generation line reported handover 0.0 while the
+            # weight actually applied was ``stage/4``.  A telemetry field that
+            # reports a constant no code reads is worse than no field.
+            "handover_floor": round(self.handover_floor, 4),
+            "handover_typical": round(self.handover(vals[len(vals) // 2]), 4),
+            "handover_mean": round(
+                float(np.mean([self.handover(s) for s in self.stages.values()])), 4),
+            "rank_windows": {STAGES[s][0]: len(w) for s, w in sorted(self._recent.items())},
         }

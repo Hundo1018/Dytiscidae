@@ -53,6 +53,9 @@ class TrainingResult:
     #: Hidden width the weights were trained with, so a saved controller can be
     #: rebuilt with the right shape rather than whatever the default is today.
     policy_hidden: int = 0
+    #: Width of the intent vector, so a saved controller reloads at the
+    #: shape it was trained at rather than at whatever the default is now.
+    n_modes: int = 6
 
     @property
     def gain(self) -> float:
@@ -97,7 +100,7 @@ def train_controller(
     segment_seconds: float = 5.0,
     seed: int = 0,
     sigma0: float = 0.5,
-    n_modes: int = 4,
+    n_modes: int = 6,
     hidden: int = 0,
     bases: dict | None = None,
     continuous: bool = True,
@@ -126,7 +129,7 @@ def train_controller(
     if bases is None:
         bases = {}
         for dom in (Domain.AIR, Domain.WATER):
-            bases[dom.value] = env.identify(dom, seed=seed)
+            bases[dom.value] = env.identify(dom, seed=seed, max_modes=n_modes)
 
     proto = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=n_modes, hidden=hidden)
     n_w = proto.n_weights
@@ -238,6 +241,7 @@ def train_controller(
     result = TrainingResult(
         policy_weights=es.best_x.copy(),
         policy_hidden=int(hidden),
+        n_modes=int(n_modes),
         bases=bases,
         score=final,
         baseline_score=baseline,

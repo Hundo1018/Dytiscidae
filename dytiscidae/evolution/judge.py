@@ -72,6 +72,11 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         ("stays_up", "airborne_fraction", 0.60),
         ("glides", "sink_rate", 3.0),          # sink below 3 m/s
         ("holds_height", "sink_rate", 0.5),    # sink below 0.5 m/s
+        # Holding *a* height, not losing one slowly.  A machine gliding down at
+        # 0.4 m/s clears ``holds_height`` for a whole segment while never
+        # holding anything, which is why the two are separate rungs: this one
+        # asks the machine to still be at the height it settled at.
+        ("holds_station", "station_keeping", 0.6),
         ("climbs", "sink_rate", -0.5),         # net climb
         ("manoeuvres", "turn_rate_held", 0.2),  # turns while holding height
     ],

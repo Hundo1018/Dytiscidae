@@ -56,6 +56,66 @@ class Controller:
         return self.bases.get(key)
 
 
+@dataclass(eq=False)
+class SummedPolicy:
+    """The per-candidate policy plus the shared one, as a single policy.
+
+    The batched evaluator sums the two intents at the point of use.  The
+    single-machine paths -- Tier-2 verification, the continuous mission, the
+    showcase -- take one policy object, so before this they could only run the
+    per-candidate half, and verified a design under a control law that was not
+    the one its Tier-1 score was earned with.  The critic reads exactly that
+    gap and would have charged the difference to the design.
+
+    The shared half is evaluated at its mean.  These paths bank no trajectory,
+    so there is nothing for exploration noise to be for, and a verification
+    pass is the last place a stored number should carry any.
+    """
+
+    own: object = None
+    shared: object = None
+    n_modes: int = 6
+    #: The basis this controller is driving.  Needed because the shared half
+    #: commands a body twist and only the basis knows how to deliver one.
+    basis: object = None
+
+    def act(self, obs) -> np.ndarray:
+        c = np.zeros(self.n_modes)
+        if self.own is not None:
+            a = np.asarray(self.own.act(obs), float)
+            c[: min(len(a), self.n_modes)] += a[: self.n_modes]
+        if self.shared is not None:
+            a, _logp, _v = self.shared.act(obs, deterministic=True)
+            if self.basis is not None:
+                a = np.asarray(self.basis.coeffs_for_twist(a), float)
+            else:
+                # No basis to invert through: the shared half cannot be
+                # honoured in mode coordinates, and adding it raw would mean
+                # something different on every body.  Dropping it is the
+                # conservative reading.
+                a = np.zeros(0)
+            c[: min(len(a), self.n_modes)] += a[: self.n_modes]
+        return c
+
+
+@dataclass(eq=False)
+class SharedController(Controller):
+    """A controller carrying a `SummedPolicy`, kept pointed at the right basis.
+
+    The shared half commands a twist, and only a basis can turn a twist into
+    coefficients -- but the basis is per medium and `act(obs)` is not told which
+    medium it is in.  ``basis_for`` is: it is the one place the domain is known,
+    and every single-machine path calls it immediately before the rollout that
+    uses its result, so it is the natural place to bind.
+    """
+
+    def basis_for(self, domain: Domain) -> MobilityBasis | None:
+        basis = super().basis_for(domain)
+        if isinstance(self.policy, SummedPolicy):
+            self.policy.basis = basis
+        return basis
+
+
 # --------------------------------------------------------------------------
 # Transitions
 # --------------------------------------------------------------------------
@@ -66,82 +126,14 @@ class Controller:
 # --------------------------------------------------------------------------
 
 
-def evaluate_tier1(
-    p: Phenotype,
-    *,
-    spec: MissionSpec | None = None,
-    controller: Controller | None = None,
-    segment_seconds: float = 10.0,
-    identify_axes: bool = False,
-    seed: int = 0,
-    sea_state=None,
-    perturb: dict | None = None,
-) -> MissionResult:
-    """Short dynamic episodes in each domain, plus transitions.
+def finalise_tier1(r: MissionResult, clamped_any: bool) -> None:
+    """Turn measured segments and transitions into mission_fraction, and flag
+    exploits.
 
-    ``perturb`` scales the fluid model's own coefficients.  The auditor uses it
-    to ask whether a design's score depends on those coefficients being exactly
-    right; a real machine degrades, an exploit collapses.
+    Extracted so the batched evaluator in ``envs/batchroll.py`` shares it rather
+    than carrying a second copy.  Two copies of a scoring rule is how the copies
+    stop agreeing.
     """
-    spec = spec or MissionSpec()
-    t0 = time.time()
-
-    tier0 = evaluate_tier0(p, spec)
-    r = MissionResult(tier=1)
-    r.structural_margin = tier0.structural_margin
-    r.feasible = tier0.feasible
-    if not p.segments:
-        r.notes.append("empty phenotype")
-        r.wall_time = time.time() - t0
-        return r
-
-    try:
-        env = TriphibianEnv(p, seed=seed, sea_state=sea_state, perturb=perturb)
-    except Exception as exc:  # a genome that will not compile is simply dead
-        r.notes.append(f"compile failed: {type(exc).__name__}: {exc}")
-        r.wall_time = time.time() - t0
-        return r
-
-    ctrl = controller or Controller(params=env.cpg.base)
-
-    if identify_axes:
-        for dom in (Domain.AIR, Domain.WATER):
-            try:
-                r.mobility[dom.value] = env.identify(dom, seed=seed)
-            except Exception as exc:
-                r.notes.append(f"mobility id failed in {dom.value}: {exc}")
-        if ctrl.bases is None:
-            ctrl.bases = r.mobility
-
-    clamped_any = False
-    for dom in DOMAIN_CYCLE:
-        env.reset(dom)
-        seg = env.rollout(
-            segment_seconds,
-            params=ctrl.params,
-            policy=ctrl.policy,
-            basis=ctrl.basis_for(dom),
-            domain=dom,
-        )
-        clamped_any |= env.solver.diag.clamped
-        r.segments[dom.value] = seg
-
-    for kind in ("air_to_water", "water_to_air", "water_to_land"):
-        tr = run_transition(env, kind, ctrl)
-        r.transitions.results[kind] = tr
-        r.transition_ok[kind] = tr.crossed
-        if tr.failure:
-            r.notes.append(f"{kind}: {tr.failure}")
-
-    # Energy: measured steady power extrapolated over the domain durations, plus
-    # simulated transition costs.
-    cruise_j = sum(
-        s.mean_power * spec.seconds_per_domain * spec.cycles for s in r.segments.values()
-    )
-    trans_j = sum(transition_energy(p.mass, k) for k in spec.transitions)
-    r.energy_required_wh = (cruise_j + trans_j) / 3600.0
-    r.energy_available_wh = p.genome.battery_wh * 0.85
-
     competences = [s.competence for s in r.segments.values()]
     energy_fraction = float(
         np.clip(r.energy_available_wh / max(r.energy_required_wh, 1e-6), 0.0, 1.0)
@@ -188,8 +180,177 @@ def evaluate_tier1(
     if any(s.max_actuator_overload > 3.0 for s in r.segments.values()):
         r.exploit = "actuators run far past their thermal rating"
 
+    r.diverged_rollouts = (
+        sum(1 for s in r.segments.values()
+            if s.failure in ("diverged", "unstable"))
+        + sum(1 for t in r.transitions.results.values()
+              if t.failure in ("diverged", "unstable"))
+    )
+    r.n_rollouts = len(r.segments) + len(r.transitions.results)
+
+
+
+def evaluate_tier1(
+    p: Phenotype,
+    *,
+    spec: MissionSpec | None = None,
+    controller: Controller | None = None,
+    segment_seconds: float = 10.0,
+    identify_axes: bool = False,
+    seed: int = 0,
+    sea_state=None,
+    perturb: dict | None = None,
+    n_modes: int = 6,
+) -> MissionResult:
+    """Short dynamic episodes in each domain, plus transitions.
+
+    ``perturb`` scales the fluid model's own coefficients.  The auditor uses it
+    to ask whether a design's score depends on those coefficients being exactly
+    right; a real machine degrades, an exploit collapses.
+    """
+    spec = spec or MissionSpec()
+    t0 = time.time()
+
+    tier0 = evaluate_tier0(p, spec)
+    r = MissionResult(tier=1)
+    r.structural_margin = tier0.structural_margin
+    r.feasible = tier0.feasible
+    r.air_gates = list(tier0.air_gates)
+    if not p.segments:
+        r.notes.append("empty phenotype")
+        r.wall_time = time.time() - t0
+        return r
+
+    try:
+        env = TriphibianEnv(p, seed=seed, sea_state=sea_state, perturb=perturb)
+    except Exception as exc:  # a genome that will not compile is simply dead
+        r.notes.append(f"compile failed: {type(exc).__name__}: {exc}")
+        r.wall_time = time.time() - t0
+        return r
+
+    ctrl = controller or Controller(params=env.cpg.base)
+    if ctrl.params is None:  # see batchroll: the rhythm belongs to the body
+        ctrl.params = env.cpg.base
+
+    if identify_axes:
+        for dom in (Domain.AIR, Domain.WATER):
+            try:
+                r.mobility[dom.value] = env.identify(
+                    dom, seed=seed, max_modes=n_modes)
+            except Exception as exc:
+                r.notes.append(f"mobility id failed in {dom.value}: {exc}")
+        # Overwrite: a basis belongs to the body it was measured on, and an
+        # inherited controller carries its parent's.  See batchroll for the
+        # same correction on the batched path.
+        ctrl.bases = r.mobility
+
+    clamped_any = False
+    for dom in DOMAIN_CYCLE:
+        env.reset(dom)
+        seg = env.rollout(
+            segment_seconds,
+            params=ctrl.params,
+            policy=ctrl.policy,
+            basis=ctrl.basis_for(dom),
+            domain=dom,
+        )
+        clamped_any |= env.solver.diag.clamped
+        r.segments[dom.value] = seg
+
+    for kind in ("air_to_water", "water_to_air", "water_to_land"):
+        tr = run_transition(env, kind, ctrl)
+        r.transitions.results[kind] = tr
+        r.transition_ok[kind] = tr.crossed
+        if tr.failure:
+            r.notes.append(f"{kind}: {tr.failure}")
+
+    # Energy: measured steady power extrapolated over the domain durations, plus
+    # simulated transition costs.
+    cruise_j = sum(
+        s.mean_power * spec.seconds_per_domain * spec.cycles for s in r.segments.values()
+    )
+    trans_j = sum(transition_energy(p.mass, k) for k in spec.transitions)
+    r.energy_required_wh = (cruise_j + trans_j) / 3600.0
+    r.energy_available_wh = p.genome.battery_wh * 0.85
+
+    finalise_tier1(r, clamped_any)
     r.wall_time = time.time() - t0
     return r
+
+
+# --------------------------------------------------------------------------
+# Tier 1.5
+# --------------------------------------------------------------------------
+
+
+def weakest_domain(competences: dict) -> Domain:
+    """The domain a design is worst at, which is the one the mission turns on.
+
+    ``mission_fraction`` is ``min(competence)**0.5 * mean(competence) * ...``,
+    so the minimum is the binding term twice over.  If a cheap score is going to
+    fail to survive a long leg anywhere, this is where.
+    """
+    best = None
+    for dom in DOMAIN_CYCLE:
+        v = float(competences.get(dom.value, 0.0) or 0.0)
+        if best is None or v < best[1]:
+            best = (dom, v)
+    return best[0] if best else Domain.AIR
+
+
+def evaluate_tier1_5(
+    p: Phenotype,
+    *,
+    spec: MissionSpec | None = None,
+    controller: Controller | None = None,
+    seconds: float = 60.0,
+    seed: int = 0,
+    domain: Domain | None = None,
+    competences: dict | None = None,
+    sea_state=None,
+) -> SegmentResult:
+    """One long leg, run only on designs the search has decided to promote.
+
+    A Tier-1 segment is 8 s against a 300 s mission leg -- 2.7% of it -- so
+    nothing that *accumulates* is visible to selection at all: a battery that
+    drains, a controller that drifts, an attitude that diverges slowly, silt on
+    a hull.  Measured over 180 promotions in arch33, the correlation between the
+    cheap mission fraction and the verified one was +0.077, which is to say the
+    search's own score carries almost no information about the thing it is
+    selecting for.
+
+    Sixty seconds is 7.5 Tier-1 segments and a fifth of a mission leg, long
+    enough for a drift to show and short enough that the cost scales with
+    promotions rather than with population: at most three promotions per
+    verification round against a batch of sixteen candidates per generation.
+
+    One leg, not three, and it is the weakest one -- see ``weakest_domain``.
+
+    Returns the scored segment.  Comparing its competence against the Tier-1
+    competence for the same domain is the retention number this exists to make
+    measurable.
+    """
+    spec = spec or MissionSpec()
+    if not p.segments:
+        return SegmentResult(domain=Domain.AIR, duration=seconds,
+                             survived=False, failure="empty phenotype")
+    dom = domain or weakest_domain(competences or {})
+    try:
+        env = TriphibianEnv(p, seed=seed, sea_state=sea_state)
+    except Exception as exc:
+        return SegmentResult(domain=dom, duration=seconds, survived=False,
+                             failure=f"compile failed: {type(exc).__name__}: {exc}")
+    ctrl = controller or Controller(params=env.cpg.base)
+    if ctrl.params is None:  # the rhythm belongs to the body
+        ctrl.params = env.cpg.base
+    env.reset(dom)
+    return env.rollout(
+        seconds,
+        params=ctrl.params,
+        policy=ctrl.policy,
+        basis=ctrl.basis_for(dom),
+        domain=dom,
+    )
 
 
 # --------------------------------------------------------------------------
@@ -243,6 +404,8 @@ def evaluate_tier2(
         return r
 
     ctrl = controller or Controller(params=env.cpg.base)
+    if ctrl.params is None:  # see batchroll: the rhythm belongs to the body
+        ctrl.params = env.cpg.base
 
     # Random starting domain, then cycle -- as specified.
     start = int(rng.integers(len(DOMAIN_CYCLE)))

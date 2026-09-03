@@ -236,6 +236,19 @@ class Genome:
 
     # --- bookkeeping --------------------------------------------------------
     lineage: list[str] = field(default_factory=list)
+    #: Which archetype this design's graph descends from.
+    #:
+    #: Separate from ``lineage`` because they answer different questions and
+    #: sharing one field made the answer to both wrong.  ``lineage`` is a
+    #: rolling window of the last 24 *mutation operator* names, kept for the
+    #: curator's bandit; the body plan is set once at birth and never changes,
+    #: because a mutation cannot turn a bat into an eel.  Reading the plan off
+    #: ``lineage[0]`` -- which is what ``meta["body_plan"]`` used to do --
+    #: returns the plan only for the first 24 mutations of a design's history
+    #: and an operator name (``jitter_cppn``, ``add_part``) for every design
+    #: after that.  Every diversity claim made from that field in arch30,
+    #: arch31 and arch33 was reading a mixture of the two.
+    body_plan: str = ""
     generation: int = 0
     parent_id: str | None = None
     genome_id: str = ""
@@ -257,6 +270,7 @@ class Genome:
             ballast_fraction=self.ballast_fraction,
             deadrise_deg=self.deadrise_deg,
             lineage=list(self.lineage),
+            body_plan=getattr(self, "body_plan", ""),
             generation=self.generation,
             parent_id=self.parent_id,
             genome_id=self.genome_id,
@@ -355,6 +369,7 @@ def random_genome(rng: np.random.Generator, *, target_scale: float = 1.0) -> Gen
     g.ballast_fraction = float(rng.uniform(0.1, 0.9))
     g.deadrise_deg = float(rng.uniform(5.0, 50.0))
     g.lineage = ["seed"]
+    g.body_plan = "random"
     return g
 
 
@@ -574,9 +589,94 @@ def mut_edge_topology(g: Genome, rng: np.random.Generator) -> bool:
     return True
 
 
+#: Most parts a graph may hold.
+#:
+#: This was 8, and 8 was a compute-era number: every extra part is more panels,
+#: more bodies and a longer MuJoCo step, and the machine this was written on had
+#: four cores.  It was never binding on quality -- arch33's population mean sat
+#: at 3.95 parts from the first generation to the last -- so raising it does not
+#: by itself make anything bigger.  What it does is stop the cap from being the
+#: reason a duplication-and-divergence lineage cannot extend a limb series.
+#:
+#: The real resource is *bodies*, not parts: one part with ``radial=6`` and
+#: ``reflect`` becomes twelve rigid bodies per level of recursion, and the
+#: batched pipeline's capacity is 2,048 bodies for a whole generation.  So the
+#: figure below is set from the measured parts-to-bodies relation rather than
+#: from taste, and ``estimated_bodies`` is the guard that actually binds.
+MAX_PARTS = 24
+
+#: Ceiling on ``estimated_bodies``, which is a *lower* bound on the truth.
+#:
+#: Measured over 207 designs (the seven archetypes plus perturbed and random
+#: graphs), real segments over estimated bodies has median 1.00, 95th percentile
+#: 2.44 and maximum 11.0 -- a surface part can expand into several spanwise
+#: segments that the graph walk cannot see.  So the ceiling is set an order of
+#: magnitude below the resource it protects: 64 estimated bodies is about 156
+#: real ones at the 95th percentile, against a batched pipeline that holds
+#: 8,192 for a whole generation.
+#:
+#: The backstop is real rather than nominal: ``batchroll._get_pipeline`` raises
+#: with a message naming the capacity, because a second pipeline in one process
+#: hangs and quietly constructing one is worse than stopping.
+MAX_BODIES = 64
+
+
+def descendants(g: Genome, start: int) -> list[int]:
+    """Part indices reachable from ``start``, itself included, each once.
+
+    Guarded against revisiting, because ``mut_edge_topology`` can repoint an
+    edge's parent and make the graph cyclic; the phenotype builder tolerates
+    that through its recursion limit and so must anything walking the graph.
+    """
+    seen, stack, order = {start}, [start], [start]
+    while stack:
+        cur = stack.pop()
+        for e in g.edges:
+            if e.parent == cur and e.child not in seen:
+                seen.add(e.child)
+                order.append(e.child)
+                stack.append(e.child)
+    return order
+
+
+def estimated_bodies(g: Genome, *, cap: int = 4096, max_depth: int = 8) -> int:
+    """How many rigid bodies this graph expands to, near enough to budget with.
+
+    A *lower* bound, and known to be one: it counts graph nodes with their
+    ``radial``, mirroring and recursion multipliers, and cannot see that a
+    single surface part becomes several spanwise segments.  Measured against
+    the built phenotype over 207 designs the ratio is 1.00 median, 2.44 at the
+    95th percentile and 11.0 at worst, which is why ``MAX_BODIES`` sits far
+    below the capacity it protects.  Bounded in depth and in total so a cyclic
+    graph terminates.
+    """
+
+    def walk(node: int, mult: int, depth: int, visiting: frozenset) -> int:
+        if depth >= max_depth or mult <= 0:
+            return 0
+        total = 0
+        for e in g.edges:
+            if e.parent != node or e.child in visiting:
+                continue
+            copies = max(int(e.radial), 1) * (2 if e.reflect else 1)
+            m = mult
+            # ``recursion`` follows the same edge again, which builds a serial
+            # chain -- and every link of that chain carries whatever hangs off
+            # the child, so the subtree is counted once per repetition rather
+            # than once for the deepest link.
+            for _ in range(max(int(e.recursion), 1)):
+                m *= copies
+                total += m + walk(e.child, m, depth + 1, visiting | {e.child})
+                if total >= cap:
+                    return cap
+        return total
+
+    return 1 + min(walk(g.root, 1, 0, frozenset({g.root})), cap)
+
+
 def mut_add_part(g: Genome, rng: np.random.Generator) -> bool:
     """Grow a new module and attach it somewhere."""
-    if len(g.parts) >= 8:
+    if len(g.parts) >= MAX_PARTS or estimated_bodies(g) >= MAX_BODIES:
         return False
     kind = str(rng.choice(
         PART_KINDS,
@@ -629,6 +729,153 @@ def mut_add_part(g: Genome, rng: np.random.Generator) -> bool:
             recursion=int(rng.integers(1, 3)),
         )
     )
+    return True
+
+
+def _clone_fields(dst: Genome, src: Genome, part: Part) -> Part:
+    """A copy of ``part`` carrying *its own* shape genes in ``dst``.
+
+    The copy gets fresh CPPN entries rather than the source's indices.  Sharing
+    the index is what would make a duplication into duplication *without*
+    divergence: two parts locked to one shape gene, which no later mutation can
+    separate because there is only one gene to mutate.
+    """
+    p = part.copy()
+    if p.surface_cppn >= 0 and p.surface_cppn < len(src.cppns):
+        dst.cppns.append(src.cppns[p.surface_cppn].copy())
+        p.surface_cppn = len(dst.cppns) - 1
+    elif p.surface_cppn >= 0:
+        p.surface_cppn = -1
+    if p.body_cppn >= 0 and p.body_cppn < len(src.body_cppns):
+        dst.body_cppns.append(src.body_cppns[p.body_cppn].copy())
+        p.body_cppn = len(dst.body_cppns) - 1
+    elif p.body_cppn >= 0:
+        p.body_cppn = -1
+    return p
+
+
+def mut_duplicate_part(g: Genome, rng: np.random.Generator) -> bool:
+    """Copy a module, attach the copy beside the original, and let it diverge.
+
+    Duplication followed by divergence is how a graded series appears -- a wing,
+    then a smaller wing, then a fin -- and it is the one structural move this
+    search did not have.  ``add_part`` draws a part from the prior, so every
+    member of such a series had to be stumbled on independently; ``part_kind``
+    and ``part_dimensions`` can only move a part that already exists.  Here the
+    copy starts functional, at a place on the body where its twin already works,
+    and selection acts on the difference from that point.
+
+    This is the operator the roadmap's Phase 5 names, and it is the reason the
+    part cap had to go with it: at eight parts a duplication is usually refused.
+    """
+    if len(g.parts) >= MAX_PARTS or estimated_bodies(g) >= MAX_BODIES:
+        return False
+    sources = [i for i in range(len(g.parts)) if i != g.root]
+    if not sources:
+        return False
+    src = sources[int(rng.integers(len(sources)))]
+
+    copy = _clone_fields(g, g, g.parts[src])
+    g.parts.append(copy)
+    new = len(g.parts) - 1
+
+    # Attached where its twin is attached, then displaced.  A duplicate that
+    # lands somewhere unrelated is an `add_part` with extra steps; a duplicate
+    # beside its original is a serial or paired element, which is what a limb
+    # series is made of.
+    incoming = [e for e in g.edges if e.child == src]
+    if incoming:
+        e = incoming[int(rng.integers(len(incoming)))].copy()
+        e.child = new
+        e.pos_u = float(np.clip(e.pos_u + rng.normal(0.0, 0.18), 0.0, 1.0))
+        e.azimuth = float(e.azimuth + rng.normal(0.0, 0.5))
+        e.elevation = float(np.clip(e.elevation + rng.normal(0.0, 0.25), -1.4, 1.4))
+        e.scale = float(np.clip(e.scale * float(rng.uniform(0.6, 1.15)), 0.2, 1.4))
+    else:
+        e = Edge(parent=g.root, child=new,
+                 pos_u=float(rng.uniform(0.0, 1.0)),
+                 azimuth=float(rng.uniform(-math.pi, math.pi)),
+                 elevation=float(rng.uniform(-0.8, 0.8)),
+                 scale=float(rng.uniform(0.5, 1.1)))
+    g.edges.append(e)
+
+    # Divergence.  Small on the dimensions, larger on the phase: a duplicated
+    # oscillator beating in unison with its original is a wider paddle, and
+    # beating out of phase is a gait.
+    copy.length = float(np.clip(copy.length * float(rng.uniform(0.7, 1.3)), 0.02, 1.2))
+    copy.span = float(np.clip(copy.span * float(rng.uniform(0.7, 1.3)), 0.02, 1.6))
+    copy.root_chord = float(np.clip(
+        copy.root_chord * float(rng.uniform(0.75, 1.25)), 0.01, 0.6))
+    copy.phase_offset = float((copy.phase_offset
+                               + rng.normal(0.0, 1.2)) % (2.0 * math.pi))
+    if rng.random() < 0.25:
+        copy.kind = str(rng.choice(PART_KINDS))
+        if copy.is_surface and copy.surface_cppn < 0:
+            g.cppns.append(new_surface_cppn(rng))
+            copy.surface_cppn = len(g.cppns) - 1
+    return True
+
+
+def graft_subtree(child: Genome, donor: Genome, rng: np.random.Generator) -> bool:
+    """Move a subtree of ``donor`` onto ``child``.  Graph-level recombination.
+
+    ``crossover`` deliberately took one parent's graph wholesale and imported
+    only the other's global genes and CPPN weights, on the reasoning that graph
+    crossover between arbitrary topologies is mostly destructive.  That is true
+    of *cut-and-splice* crossover, which severs both graphs at a random point
+    and rejoins the halves.  It is not true of subtree grafting, which is what
+    genetic programming uses and what this is: a whole, coherent limb -- with
+    its own shape genes, its own joint, its own phase -- is transplanted onto a
+    site that already carries something, and the receiving graph is otherwise
+    untouched.
+
+    The consequence of not having it: structure was effectively asexual.  Every
+    graph in the archive descended from one seed graph by mutation alone, so two
+    islands that independently discovered a good wing and a good fin could never
+    produce a design with both.  That is the whole argument for having islands.
+
+    Returns False and leaves ``child`` untouched when there is nothing to move.
+    """
+    donors = [i for i in range(len(donor.parts)) if i != donor.root]
+    if not donors or not donor.edges:
+        return False
+    v = donors[int(rng.integers(len(donors)))]
+    incoming = [e for e in donor.edges if e.child == v]
+    if not incoming:
+        return False
+
+    sub = descendants(donor, v)
+    # Bounded: a graft that brings half the donor is the cut-and-splice this is
+    # trying not to be, and the receiving graph has a part budget.
+    room = MAX_PARTS - len(child.parts)
+    if room <= 0:
+        return False
+    sub = sub[:min(len(sub), 4, room)]
+    keep = set(sub)
+
+    remap = {old: len(child.parts) + k for k, old in enumerate(sub)}
+    for old in sub:
+        child.parts.append(_clone_fields(child, donor, donor.parts[old]))
+    for e in donor.edges:
+        if e.parent in keep and e.child in keep and e.child != v:
+            ne = e.copy()
+            ne.parent, ne.child = remap[e.parent], remap[e.child]
+            child.edges.append(ne)
+
+    # The attachment: the donor's own edge parameters, onto a site chosen in the
+    # receiving graph.  Keeping the donor's azimuth and elevation is what makes
+    # this a transplanted limb rather than a part dropped on at random.
+    ne = incoming[int(rng.integers(len(incoming)))].copy()
+    ne.parent = int(rng.integers(len(child.parts) - len(sub)))
+    ne.child = remap[v]
+    child.edges.append(ne)
+    if estimated_bodies(child) > MAX_BODIES * 2:
+        # Too branchy to be worth building; undo rather than hand the pipeline
+        # a design it will refuse.
+        del child.parts[remap[v]:]
+        child.edges = [e for e in child.edges
+                       if e.parent < len(child.parts) and e.child < len(child.parts)]
+        return False
     return True
 
 
@@ -778,6 +1025,7 @@ MUTATION_OPERATORS: dict[str, callable] = {
     "edge_placement": mut_edge_placement,
     "edge_topology": mut_edge_topology,
     "add_part": mut_add_part,
+    "duplicate_part": mut_duplicate_part,
     "remove_part": mut_remove_part,
     "part_kind": mut_part_kind,
     "material": mut_material,
@@ -794,8 +1042,8 @@ MUTATION_OPERATORS: dict[str, callable] = {
 #: these separately: structural moves have much higher variance, so they are
 #: worth more early and less once the archive is dense.
 STRUCTURAL_OPERATORS = {
-    "edge_topology", "add_part", "remove_part", "part_kind", "cppn_structure",
-    "radial_symmetry", "body_field",
+    "edge_topology", "add_part", "duplicate_part", "remove_part", "part_kind",
+    "cppn_structure", "radial_symmetry", "body_field",
 }
 
 
@@ -806,14 +1054,25 @@ def mutate(
     operators: list[str] | None = None,
     n_ops: int = 1,
 ) -> tuple[Genome, list[str]]:
-    """Apply ``n_ops`` named operators.  Returns the child and what was applied."""
+    """Apply the named operators.  Returns the child and what was applied.
+
+    When ``operators`` is given it is a *plan*, applied in order -- the caller
+    (the curator's bandit) has already decided what this child should be
+    subjected to.  The first version resampled that list uniformly with
+    replacement ``n_ops`` times, which quietly threw the plan away.
+    ``n_ops`` now only sizes a draw from the full operator set, which is what
+    callers without a bandit want.
+    """
     child = g.copy()
     child.parent_id = g.genome_id
     child.genome_id = ""
-    names = list(operators or MUTATION_OPERATORS)
+    if operators:
+        plan = list(operators)
+    else:
+        names = list(MUTATION_OPERATORS)
+        plan = [names[int(rng.integers(len(names)))] for _ in range(n_ops)]
     applied: list[str] = []
-    for _ in range(n_ops):
-        name = names[int(rng.integers(len(names)))]
+    for name in plan:
         if MUTATION_OPERATORS[name](child, rng):
             applied.append(name)
     child.lineage = (g.lineage + applied)[-24:]
@@ -823,15 +1082,23 @@ def mutate(
 def crossover(a: Genome, b: Genome, rng: np.random.Generator) -> Genome:
     """Blend two designs.
 
-    Graph crossover between arbitrary topologies is mostly destructive, so this
-    stays conservative: the child takes one parent's graph wholesale and imports
-    the other's global genes and CPPN weights.  That transfers the two things
-    that genuinely are interchangeable between designs -- energy strategy and
-    surface shape -- without scrambling a working kinematic tree.
+    The child takes one parent's graph and imports the other's global genes and
+    CPPN weights -- energy strategy and surface shape, the two things that are
+    genuinely interchangeable between designs -- and half the time it also
+    receives a whole limb from the other parent (``graft_subtree``).
+
+    The graft is the half that was missing.  Without it the child's *structure*
+    came entirely from one parent, so graphs only ever changed by mutation and
+    two islands that independently found a good wing and a good fin could not
+    produce a design carrying both.  The original reasoning -- that graph
+    crossover between arbitrary topologies is mostly destructive -- is about
+    cut-and-splice; grafting a coherent subtree onto an untouched receiving
+    graph is the operation genetic programming actually uses.
     """
     child = a.copy()
     child.parent_id = a.genome_id
     child.genome_id = ""
+    grafted = rng.random() < 0.5 and graft_subtree(child, b, rng)
     if rng.random() < 0.5:
         child.battery_wh = b.battery_wh
         child.battery_chem = b.battery_chem
@@ -844,5 +1111,6 @@ def crossover(a: Genome, b: Genome, rng: np.random.Generator) -> Genome:
     for i in range(min(len(child.cppns), len(b.cppns))):
         if rng.random() < 0.5:
             child.cppns[i] = CPPN.crossover(child.cppns[i], b.cppns[i], rng)
-    child.lineage = (a.lineage + ["crossover"])[-24:]
+    child.lineage = (a.lineage
+                     + ["graft" if grafted else "crossover"])[-24:]
     return child

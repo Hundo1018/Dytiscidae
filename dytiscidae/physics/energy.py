@@ -152,7 +152,30 @@ class PowerBudget:
     avionics_w: float = 6.0
 
     def __post_init__(self) -> None:
+        self._pack()
         self.reset()
+
+    def _pack(self) -> None:
+        """Flatten the actuators' constants into arrays, once.
+
+        ``Actuator.electrical_power`` is written over arrays, but the loop this
+        replaces called it once per actuator with a *scalar*, so every step paid
+        a numpy round trip per actuator per quantity -- of the order of 400 per
+        timestep at batch 16.  Profiled on real evolved bodies that made this
+        model 33-36% of a batched step against 10% for ``mj_step``, which is not
+        where docs/CPU_LEGACY.md said the time was going.
+        """
+        n = len(self.actuators)
+        z = np.zeros(0)
+        self._gear = np.array([a.gear_ratio * a.eta_gear for a in self.actuators]) if n else z
+        self._km = np.array([max(a.km, 1e-9) for a in self.actuators]) if n else z
+        self._k_iron = np.array([a.k_iron for a in self.actuators]) if n else z
+        self._k_visc = np.array([a.k_visc for a in self.actuators]) if n else z
+        self._ratio = np.array([a.gear_ratio for a in self.actuators]) if n else z
+        self._seal = np.array([SHAFT_SEAL_FRICTION if a.sealed else 0.0
+                               for a in self.actuators]) if n else z
+        self._rating = np.array([max(0.35 * a.p_cont, 1e-6)
+                                 for a in self.actuators]) if n else z
 
     def reset(self) -> None:
         self.battery.reset()
@@ -161,7 +184,6 @@ class PowerBudget:
         self.avionics_j = 0.0
         self.t = 0.0
         self.max_overload = 0.0
-        self.samples: list[tuple[float, float]] = []
 
     @property
     def actuator_mass(self) -> float:
@@ -169,19 +191,36 @@ class PowerBudget:
 
     def step(self, torques: np.ndarray, speeds: np.ndarray, dt: float) -> bool:
         """Charge one control step.  Returns False when the pack is flat."""
+        n = min(len(self.actuators), len(torques))
         p = self.avionics_w
-        for i, act in enumerate(self.actuators):
-            if i >= len(torques):
-                break
-            p += float(act.electrical_power(torques[i], speeds[i]))
+        if n:
+            # The same four loss terms as ``Actuator.electrical_power``, and the
+            # same overload ratio, evaluated for every actuator at once.  The
+            # scalar path is still there and the tests pin the two together.
+            raw = np.asarray(torques[:n], float)
+            om = np.asarray(speeds[:n], float)
+            # Seal friction is a load the motor must overcome, so it costs
+            # power -- but ``thermal_overload`` deliberately reads the raw
+            # shaft torque, so the two must not share a tau.  Folding the seal
+            # into both moved the overload by 1.8e-2, which the equivalence
+            # check caught and which would have shifted an exploit threshold.
+            tau = raw + np.sign(om) * self._seal[:n]
+            om_m = np.abs(om) * self._ratio[:n]
+            copper_power = (np.abs(tau) / self._gear[:n] / self._km[:n]) ** 2
+            copper_raw = (np.abs(raw) / self._gear[:n] / self._km[:n]) ** 2
+            p += float(np.sum(np.abs(tau * om) + copper_power
+                              + self._k_iron[:n] * om_m
+                              + self._k_visc[:n] * om_m ** 2))
             self.max_overload = max(
-                self.max_overload, float(act.thermal_overload(torques[i], speeds[i]))
-            )
+                self.max_overload, float(np.max(copper_raw / self._rating[:n])))
         self.avionics_j += self.avionics_w * dt
         self.actuator_j += (p - self.avionics_w) * dt
         self.total_j += p * dt
         self.t += dt
-        self.samples.append((self.t, p))
+        # A per-step (t, power) trace used to accumulate here and nothing ever
+        # read it -- 2,000 tuples per environment per segment, allocated inside
+        # the hottest loop in the project.  ``mean_power`` is the only thing
+        # anyone asks for and it comes from the running totals above.
         return self.battery.draw(p, dt)
 
     @property

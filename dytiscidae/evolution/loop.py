@@ -29,7 +29,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..control.cpg import CPGParams, Policy
+from ..control.cpg import TWIST_DIM, CPGParams, Policy
 from ..core.genome import Genome, crossover, mutate, random_genome
 from ..core.phenotype import build
 from ..core.bodyplans import seed_population
@@ -39,6 +39,7 @@ from ..envs.evaluate import (
     Controller,
     behaviour_descriptor,
     evaluate_tier1,
+    evaluate_tier1_5,
     evaluate_tier2,
     fitness,
     objectives,
@@ -48,7 +49,6 @@ from ..ops.telemetry import Telemetry
 from ..envs.transitions import TransitionSet
 from .archive import Archive
 from .auditor import Auditor
-from .cmaes import CMAES, Emitter
 from .critic import Critic, critic_features
 from .curator import Curator
 from .curriculum import STAGES, Curriculum
@@ -72,16 +72,89 @@ class SearchConfig:
     batch: int = 4  # candidates per generation
     seed: int = 0
 
+    #: Worker processes stepping machines in parallel.  1 is the old
+    #: single-process behaviour and is what every stored run used.
+    #:
+    #: Measured on this machine: 16 workers of 8 machines return 12.7x the
+    #: throughput of one worker of 8, at 26% more wall per worker, because only
+    #: half of a batched step is the GPU and that half is host-side marshalling
+    #: rather than kernel time.  See ``envs/actors.py`` for the table.
+    #:
+    #: Note the interaction with ``batch``: a shard smaller than ``min_shard``
+    #: pays a batch's fixed cost for almost no work, so the pool never makes
+    #: more shards than ``batch // min_shard``.  Using twenty cores means
+    #: raising ``batch``, which is a search-design decision, not a throughput
+    #: one -- so it is left to the caller rather than done here.
+    workers: int = 1
+    min_shard: int = 8
+
     # Fidelity
     segment_seconds: float = 8.0
     identify_axes_every: int = 1  # re-identify a child's axes this often
     tier0_gate: float = -0.85  # reject below this structural margin
     tier2_every: int = 15
+    #: Seconds of the single long leg run on promotion candidates before the
+    #: Tier-2 mission.  Zero disables it.  See ``envs.evaluate.evaluate_tier1_5``
+    #: for why 60 and why only here.
+    tier1_5_seconds: float = 60.0
 
-    # Controller refinement
-    controller_refine_steps: int = 0  # CMA-ES iterations per child (0 = inherit only)
+    # Controller refinement.  Each step is one extra batched Tier-1 for the
+    # whole generation, so a generation costs (1 + steps) evaluations.
+    controller_refine_steps: int = 0  # (1+1)-ES steps per candidate; 0 = inherit only
+    #: Share of the archive's scalar that is the mission itself, as a
+    #: population quantile, rather than the island/curriculum blend.  Measured
+    #: over arch31: at 0.0 (which is what every run before 2026-09-01 was)
+    #: corr(archive fitness, mission_fraction) = 0.159 and the search traded
+    #: 36% of its energy fraction for 32% more competence, because energy is a
+    #: factor of the mission and appeared nowhere in the score.
+    mission_weight: float = 0.30
+    #: Weight on the potential-based shaping term in the PPO reward.  Zero
+    #: reproduces the terminal-only reward every run before 2026-09-01 used.
+    #: Shaping of this form cannot change what is optimal (Ng, Harada & Russell
+    #: 1999); it changes only when credit arrives, which for a scalar delivered
+    #: once every 161 decisions is the whole problem.
+    reward_shaping: float = 0.2
+    #: Bins per learned descriptor axis.  Four axes at 8 bins is 4096 cells per
+    #: island and 24,576 across six -- 2.6x arch31's *entire* evaluation budget
+    #: of 9,620, so 81.9% of surviving cells were never improved on and
+    #: MAP-Elites degenerated into novelty sampling.  An archive has to be
+    #: scaled to the budget that will be spent filling it.
+    descriptor_bins: int = 5
+    controller_refine_sigma: float = 0.1  # perturbation scale on policy weights
+    #: Refinement steps spent on an elite at the moment it is promoted to
+    #: Tier-2.  Refining every candidate every generation costs a full batched
+    #: evaluation per step and was left at zero for that reason; promotion is
+    #: where the search has already decided a design is worth spending on, and
+    #: there are at most three per verification round.  So the cost is bounded
+    #: by promotions rather than by population, which is what makes a nonzero
+    #: default affordable.
+    promotion_refine_steps: int = 6
     policy_hidden: int = 0
-    n_modes: int = 4
+    n_modes: int = 6
+
+    #: A policy shared by every morphology, trained by PPO on the transitions
+    #: the whole generation produces.  It coexists with the per-candidate
+    #: policy rather than replacing it: the shared one supplies competence that
+    #: generalises across bodies, the per-candidate (1+1)-ES adapts to the one
+    #: body it lives on, and the two intents are summed.  Per-candidate PPO is
+    #: not an option -- see learning/ppo.py for the arithmetic.
+    use_shared_policy: bool = False
+    shared_hidden: int = 64
+    shared_lr: float = 1e-3
+    shared_epochs: int = 10
+    shared_minibatch: int = 2048
+    #: Stop an update once it has moved the policy this far.  Without it,
+    #: raising the rate is how a policy gets destroyed.
+    shared_target_kl: float = 0.015
+    #: Entropy bonus.  Zero -- which is what every run so far used -- lets the
+    #: log-std collapse early and the policy stop exploring while the search is
+    #: still handing it new morphologies every generation.
+    shared_ent_coef: float = 0.01
+    #: Anneal the learning rate linearly to zero over the run.  arch33's policy
+    #: hit the KL ceiling on 88% of its updates past generation 450 and its
+    #: parameter trajectory was anti-correlated step to step, which is the
+    #: signature a fixed rate produces on its own.
+    shared_lr_anneal: bool = True
 
     # Seeding
     n_reference_seeds: int = 20
@@ -157,7 +230,6 @@ class SearchState:
     critic: Critic | None = None
     scout: Scout | None = None
     island: str = "generalist"
-    emitters: list[Emitter] = field(default_factory=list)
     started: float = field(default_factory=time.time)
     evaluated: int = 0
     tier0_rejected: int = 0
@@ -167,6 +239,24 @@ class SearchState:
     #: auditor can veto a tightening that turned out to rest on a design it
     #: subsequently invalidated.
     judge_moves: list = field(default_factory=list)
+    #: Worker processes, or None for the single-process path.  Created by
+    #: ``run_search`` and closed when it returns.
+    pool: object = None
+    #: How many generations each island has been the active one.
+    #:
+    #: Every periodic job used to fire on ``gen % N``, and the island rotates
+    #: once per generation, so with six islands any N sharing a factor with six
+    #: could only ever fire on a subset of them: ``tier2_every = 15`` reaches
+    #: islands 0 and 3, ``audit_every = 30`` reaches island 0 alone.  Four
+    #: islands had never had a design verified at full fidelity in any run, and
+    #: every audit in arch30, arch31 and arch33 landed on ``air``.  Counting
+    #: visits per island removes the aliasing without changing the global rate:
+    #: an island fires every ``N`` of its own visits, which is one firing every
+    #: ``N`` generations across the archipelago, exactly as before.
+    island_visits: dict = field(default_factory=dict)
+    #: The policy shared by every morphology, or None when not in use.
+    shared: object = None
+    shared_opt: object = None
 
     @property
     def archive(self) -> Archive:
@@ -211,7 +301,7 @@ def evaluate_candidate(
     """Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``."""
     pheno = build(genome)
     t0 = evaluate_tier0(pheno, spec)
-    if pheno.report.min_margin < cfg.tier0_gate or t0.mission_fraction <= 0.0:
+    if pheno.report.gate_margin < cfg.tier0_gate or t0.mission_fraction <= 0.0:
         return pheno, t0, None
 
     policy = _controller_for(pheno, genome, cfg, inherited_policy)
@@ -219,12 +309,251 @@ def evaluate_candidate(
     result = evaluate_tier1(
         pheno,
         spec=spec,
-        controller=None if identify else ctrl,
+        controller=ctrl,  # see evaluate_candidates: identify is not a policy switch
         segment_seconds=cfg.segment_seconds,
         identify_axes=identify,
         seed=seed,
     )
     return pheno, result, ctrl
+
+
+_WARNED_CPU = False
+
+
+def _warn_cpu_fallback() -> None:
+    """Say once, on stderr, that this run is not using the GPU.
+
+    Printed rather than warnings.warn because a search run's stderr is what
+    gets read afterwards, and the default warning filter shows a given warning
+    once per location and then hides it.
+    """
+    global _WARNED_CPU
+    if _WARNED_CPU:
+        return
+    _WARNED_CPU = True
+    import sys
+
+    from ..envs import batchroll
+    print(
+        "\n*** GPU fluid extension not importable; this run is on the CPU. ***\n"
+        f"    reason: {batchroll.UNAVAILABLE_REASON}\n"
+        "    Build it with `cd mojo && pixi run build`.  Every timing and\n"
+        "    every wall-clock estimate below is the CPU path.\n",
+        file=sys.stderr, flush=True)
+
+
+def evaluate_candidates(
+    genomes,
+    cfg: SearchConfig,
+    *,
+    inherited=None,
+    identify: bool = True,
+    spec: MissionSpec | None = None,
+    seeds=None,
+    shared=None,
+    buffer=None,
+    pool=None,
+):
+    """Tier-0 gate then a shared Tier-1 for the whole group.
+
+    Same contract as ``evaluate_candidate`` but for a list, returning one
+    ``(phenotype, result, controller)`` per input in the same order.  Falls back
+    to the per-candidate path when the GPU extension is not importable, so a
+    CPU-only checkout behaves exactly as it did -- but says so, once, loudly.
+    The fallback used to be silent, and a search launched without the extension
+    on sys.path ran to completion on the CPU looking entirely normal.
+
+    The Tier-0 gate is applied first and independently, as it is per candidate:
+    a genome that fails it never reaches Tier-1 and never joins the batch, which
+    also keeps the batch free of designs that would only waste device memory.
+    """
+    from ..envs import batchroll
+
+    k = len(genomes)
+    inherited = inherited or [None] * k
+    seeds = seeds or [0] * k
+    out = [None] * k
+
+    # Build and gate one at a time.  A genome that will not build is one dead
+    # candidate, not a dead group -- as a list comprehension here would have
+    # made it.  That distinction is invisible in the generation loop, which
+    # catches the exception and credits the whole batch as rejected, but it is
+    # fatal during seeding: one bad random genome would leave every island
+    # empty and the run would proceed against a blank archive.
+    phenos: list = [None] * k
+    passed = []
+    for i, g in enumerate(genomes):
+        try:
+            pheno = build(g)
+            t0 = evaluate_tier0(pheno, spec)
+        except Exception:
+            continue
+        phenos[i] = pheno
+        if pheno.report.gate_margin < cfg.tier0_gate or t0.mission_fraction <= 0.0:
+            out[i] = (pheno, t0, None)
+        else:
+            passed.append(i)
+
+    if not passed:
+        return out
+
+    if not batchroll.AVAILABLE:
+        _warn_cpu_fallback()
+        for i in passed:
+            out[i] = evaluate_candidate(
+                genomes[i], cfg, inherited_policy=inherited[i],
+                identify=identify, spec=spec, seed=seeds[i])
+        return out
+
+    ctrls = []
+    for i in passed:
+        policy = _controller_for(phenos[i], genomes[i], cfg, inherited[i])
+        ctrls.append(Controller(params=None, policy=policy))
+
+    results = _batched(
+        pool, [phenos[i] for i in passed], spec=spec,
+        shared=shared, buffer=buffer, n_modes=cfg.n_modes,
+        # The controller goes in whether or not axes are being identified.
+        # These used to be the same switch -- `None if identify else c` -- and
+        # since identify_axes_every defaults to 1, that made it None always, so
+        # no evaluation in the search ever ran a policy.  Identifying a body's
+        # mobility axes and driving it with a policy are independent; the
+        # batched evaluator has always accepted both in one call.
+        controllers=ctrls,
+        segment_seconds=cfg.segment_seconds, identify_axes=identify,
+        seed=seeds[passed[0]])
+
+    results = _refine_controllers(
+        [phenos[i] for i in passed], ctrls, results, cfg,
+        spec=spec, seed=seeds[passed[0]], shared=shared, pool=pool)
+
+    for slot, i in enumerate(passed):
+        out[i] = (phenos[i], results[slot], ctrls[slot])
+    return out
+
+
+def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
+                        steps: int | None = None, shared=None, pool=None):
+    """Local search on policy weights, every candidate advanced in one batch.
+
+    A (1+1) evolution strategy: perturb, evaluate, keep the perturbation if the
+    mission fraction improved.  It is the cheapest thing that is honestly a
+    search, and more importantly it is the shape the GPU wants -- one perturbed
+    weight vector per candidate means each refinement step is a single batched
+    evaluation, the same call the generation itself uses.  A per-candidate
+    CMA-ES would need one batch per candidate per step and would not fit.
+
+    Refinement never re-identifies axes.  The bases were measured on these exact
+    bodies in the call above and are already on the controllers; identification
+    is per-machine and sequential, so repeating it every step would cost more
+    than the refinement.
+
+    Weights start at zero for a candidate whose shape did not match its parent,
+    and a zero policy commands nothing -- so a refinement step is also the only
+    thing that ever gives such a candidate a non-zero controller.
+    """
+    if steps is None:
+        steps = int(getattr(cfg, "controller_refine_steps", 0))
+    if not ctrls:
+        return results
+
+    # Re-score without the exploration noise before anything is kept.
+    #
+    # ``results`` arrives from the generation's own rollout, which samples the
+    # shared policy because that rollout is also the learning data.  Measured
+    # over five repeats of eight bodies: sampling puts a 33% relative standard
+    # deviation on mission_fraction and 28% on the crossing fraction, and
+    # because MAP-Elites keeps the best score a cell has seen, that variance
+    # becomes a bias -- best-of-five sits 63% above the mean, with no design
+    # merit in the difference.  Scoring at the policy's mean is reproducible to
+    # the last bit (measured sd 0.00000).
+    #
+    # It also makes the (1+1)-ES below a fair comparison: its trials are scored
+    # without noise, so leaving the incoming sampled number as the baseline
+    # would ask every trial to beat whatever the noise happened to add.
+    #
+    # The cost is one batched evaluation per generation, which is why it is
+    # spent only when there is a shared policy to be noisy.
+    if shared is not None:
+        results = batchroll_eval(phenos, ctrls, cfg, spec=spec, seed=seed,
+                                 shared=shared, pool=pool)
+    if steps <= 0:
+        return results
+
+    sigma = float(getattr(cfg, "controller_refine_sigma", 0.1))
+    rng = np.random.default_rng(seed ^ 0x9E3779B9)
+    best = [float(r.mission_fraction) for r in results]
+
+    for _ in range(steps):
+        trials, sizes = [], []
+        for c in ctrls:
+            w = c.policy.weights if c.policy is not None else None
+            if w is None or w.size == 0:
+                trials.append(c)
+                sizes.append(None)
+                continue
+            step = rng.normal(0.0, sigma, size=w.shape)
+            trial = Controller(params=c.params,
+                               policy=_copy_policy(c.policy, w + step),
+                               bases=c.bases)
+            trials.append(trial)
+            sizes.append(step)
+
+        if all(s is None for s in sizes):
+            break
+
+        trial_results = batchroll_eval(
+            phenos, trials, cfg, spec=spec, seed=seed, shared=shared, pool=pool)
+
+        for i, (tr, step) in enumerate(zip(trial_results, sizes)):
+            if step is None or tr is None:
+                continue
+            score = float(tr.mission_fraction)
+            if score > best[i]:
+                best[i] = score
+                ctrls[i].policy = trials[i].policy
+                results[i] = tr
+
+    return results
+
+
+def _copy_policy(policy, weights):
+    """A policy with the same shape and different weights."""
+    twin = Policy(n_obs=policy.n_obs, n_modes=policy.n_modes, hidden=policy.hidden)
+    twin.weights = np.asarray(weights, float)
+    return twin
+
+
+def batchroll_eval(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None):
+    """One batched Tier-1 with given controllers and no axis identification.
+
+    ``shared`` is passed through because the two policies' intents are *summed*
+    at the point of use.  Refining a candidate's weights with the shared policy
+    absent optimises one half of a sum against the other half being zero, and
+    then stores the result to be scored with the other half present.
+
+    ``pool`` spreads the batch over worker processes.  None, or a pool of one,
+    is the single-process call this has always been.
+    """
+    return _batched(
+        pool, phenos, spec=spec, controllers=ctrls,
+        segment_seconds=cfg.segment_seconds, identify_axes=False, seed=seed,
+        shared=shared, n_modes=cfg.n_modes)
+
+
+def _batched(pool, phenos, **kwargs):
+    """``evaluate_tier1_batch``, through the actor pool when there is one.
+
+    One function so that every batched evaluation in the search -- the
+    generation, the noise-free re-score, and each refinement step -- goes
+    through the same door, and adding a second door is not how the two stop
+    agreeing.
+    """
+    from ..envs import batchroll
+
+    if pool is not None:
+        return pool.evaluate_tier1(phenos, **kwargs)
+    return batchroll.evaluate_tier1_batch(phenos, **kwargs)
 
 
 def seed_archive(state: SearchState, spec: MissionSpec) -> None:
@@ -276,8 +605,15 @@ def _meta(pheno, result, ctrl) -> dict:
         "battery_wh": round(pheno.genome.battery_wh, 1),
         "flap_hz": round(pheno.genome.flap_frequency, 2),
         "dof": pheno.n_actuated,
-        "body_plan": (pheno.genome.lineage[0] if pheno.genome.lineage else "?"),
+        # The plan the graph descends from, set once at birth.  This used to
+        # read ``lineage[0]``, which is the oldest surviving *mutation operator*
+        # name in a 24-entry rolling window, so the field mixed plan names with
+        # operator names and could not be used for a diversity claim.
+        "body_plan": (getattr(pheno.genome, "body_plan", "") or "?"),
         "feasible": bool(pheno.report.ok),
+        # Which flight gates this design fails, so the wingless class is
+        # countable in the record rather than inferred from wing_area later.
+        "air_gates": list(getattr(result, "air_gates", []) or []),
         "margin": round(pheno.report.min_margin, 3),
         "worst_check": pheno.report.worst.name if pheno.report.worst else "",
         "mission_fraction": round(result.mission_fraction, 4),
@@ -348,6 +684,15 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     })
 
     cell = state.archive.cell_of(bd)
+    # An unvisited cell starts at the stage its parent had earned, not at zero.
+    # 58.9% of arch31's children landed in an empty cell and every one of them
+    # was asked the easiest question regardless of what its lineage could
+    # already do, which is why 69.1% of all evaluations sat at stage 0 and the
+    # handover ramp never left the floor.  See Curriculum.seed_stage.
+    state.curriculum.seed_stage(
+        cell,
+        state.curriculum.stage_of(parent.cell) if parent is not None else 0,
+    )
     base = island_score(state.island, result, tset)
     sr = state.curriculum.evaluate(cell, result, tset)
     # A cell that has been promoted is asked a harder question, and the answer
@@ -355,8 +700,30 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     # curriculum's projection replaces the island's, because the island's
     # objective is the *final* question and asking it of a design three stages
     # away is the sparse-reward trap this exists to avoid.
-    if sr.stage < 4:
-        base = float(0.5 * base + 0.5 * sr.score)
+    # How much of the blend the island's own objective has earned, rather than a
+    # flat half.  See Curriculum.handover: the islands are an early device and
+    # the search is looking for a triphibian again by the end, so the weight has
+    # to move.  A fixed 0.5 left the air island selecting 96% on a score that
+    # does not read air.
+    state.curriculum.observe_blend(base, sr.score, sr.stage,
+                                   float(result.mission_fraction))
+    # Blend the two halves as population standings, not raw scores.  They are
+    # not on the same scale -- measured over arch30 the island half spans 0.0437
+    # p10-p90 and the curriculum half 0.5092 -- so a convex combination of the
+    # raw values hands the decision to whichever half happens to be larger,
+    # whatever weight is nominally applied.  See Curriculum.standing.
+    isl_q, cur_q = state.curriculum.standing(base, sr.score, sr.stage)
+    mis_q = state.curriculum.mission_standing(result.mission_fraction, sr.stage)
+    w = state.curriculum.handover(sr.stage)
+    # Three quantiles, not two.  The first two answer "how well did this design
+    # answer the question its cell was asked"; the third answers "how much of
+    # the mission did it actually do", and measurement says those are nearly
+    # unrelated -- corr(archive fitness, mission_fraction) = 0.159 over arch31's
+    # 9384 evaluations, with corr against the weakest competence at 0.003 and
+    # against the energy margin at 0.056, both of which are factors of the
+    # mission the score could not see.  See Curriculum.mission_standing.
+    mw = float(np.clip(getattr(state.config, "mission_weight", 0.30), 0.0, 1.0))
+    base = float((1.0 - mw) * (w * isl_q + (1.0 - w) * cur_q) + mw * mis_q)
     cfeat = critic_features(_meta_light(pheno, result), result)
     discount = state.critic.discount(cfeat) if state.critic is not None else 1.0
     fit = float(base * discount)
@@ -397,6 +764,13 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     }
     meta["critic_discount"] = round(discount, 3)
     meta["critic_features"] = [float(x) for x in cfeat]
+    # Every term of the scalar that decided this design's fate, so that a run
+    # can be decomposed afterwards instead of re-derived from the code.
+    meta["score_parts"] = {
+        "island_q": round(isl_q, 4), "curriculum_q": round(cur_q, 4),
+        "mission_q": round(mis_q, 4), "handover": round(w, 4),
+        "mission_weight": round(mw, 4), "blend": round(base, 4),
+    }
 
     # What was knowable about this design at birth, for the scout.  Novelty is
     # computed against the archive *before* the design is filed, otherwise every
@@ -431,7 +805,12 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
         )
 
     state.curator.observe_domains(meta)
-    state.curator.credit(operators, status, fit - previous)
+    # What the operator has to beat: whatever already held the cell *and* the
+    # parent it was applied to.  ``previous`` alone is zero for an unoccupied
+    # cell, which made "landed somewhere empty" indistinguishable from a real
+    # improvement -- see Curator.credit.
+    reference = max(previous, float(parent.fitness) if parent is not None else 0.0)
+    state.curator.credit(operators, status, fit - reference)
     state.curator.note_offspring(parent, status)
     state.telemetry.event(
         {"kind": "evaluate", "gen": state.archive.generation, "status": status,
@@ -468,10 +847,22 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
     rng = np.random.default_rng(cfg.seed)
     telemetry = Telemetry(cfg.run_dir, event_sample=cfg.event_sample)
 
+    # Worker processes, created once and kept: a worker pays for importing
+    # MuJoCo and torch and for allocating its own GPU pipeline, and that is a
+    # per-worker cost rather than a per-generation one.
+    from ..envs.actors import ActorPool
+
+    pool = ActorPool(cfg.workers, min_shard=cfg.min_shard)
+
     archipelago = Archipelago(migrate_every=cfg.migrate_every, n_migrants=cfg.n_migrants)
     curricula: dict = {}
+    # The hand-picked axes are only the bootstrap grid -- the learned ones
+    # replace them at the first refit -- but their resolution has to match the
+    # budget from the first generation, not from the first refit.
+    boot_axes = [(n, lo, hi, min(b, int(cfg.descriptor_bins)))
+                 for (n, lo, hi, b) in BD_AXES]
     for name in cfg.islands:
-        a = Archive(BD_AXES)
+        a = Archive(boot_axes)
         cur = Curator(a, seed=cfg.seed)
         archipelago.register(name, a, cur)
         curricula[name] = Curriculum()
@@ -480,10 +871,6 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         # cell stopped existing.
         cur.curriculum = curricula[name]
 
-    learned = (
-        LearnedDescriptors(n_dims=len(BD_AXES), refit_every=cfg.descriptor_refit_every)
-        if cfg.learned_axes else None
-    )
     state = SearchState(
         telemetry=telemetry, config=cfg, rng=rng,
         archipelago=archipelago, curricula=curricula,
@@ -493,8 +880,33 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         scout=(Scout(horizon=cfg.scout_horizon, reserve=cfg.scout_reserve, seed=cfg.seed)
                if cfg.use_scout else None),
         island=cfg.islands[-1] if cfg.islands else "generalist",
-        descriptors=learned, spec=spec,
+        pool=pool,
+        descriptors=(
+            LearnedDescriptors(n_dims=len(BD_AXES),
+                               refit_every=cfg.descriptor_refit_every)
+            if cfg.learned_axes else None),
+        spec=spec,
     )
+
+    if cfg.use_shared_policy:
+        from ..learning import ppo as _ppo
+        if not _ppo.AVAILABLE:
+            raise RuntimeError(
+                "--shared-policy needs torch, which is not importable "
+                f"({_ppo.UNAVAILABLE_REASON}). Install it with "
+                "`uv pip install --python .venv/bin/python "
+                "--index-url https://download.pytorch.org/whl/cpu torch`. "
+                "Refusing to run silently without the thing that was asked "
+                "for -- see the CPU-fallback note in envs/batchroll.py.")
+        import torch as _torch
+        # TWIST_DIM, not n_modes: the shared policy commands a body twist,
+        # which is the same six axes on every machine, where a mode index is a
+        # private coordinate that means something different on each.
+        state.shared = _ppo.SharedPolicy(
+            TriphibianEnv.OBS_DIM, TWIST_DIM, hidden=cfg.shared_hidden)
+        # eps 1e-5 rather than torch's 1e-8; see ``ppo_update``.
+        state.shared_opt = _torch.optim.Adam(
+            state.shared.parameters(), lr=cfg.shared_lr, eps=1e-5)
 
     for c in archipelago.curators.values():
         c.scout = state.scout
@@ -517,12 +929,30 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
 
     for gen in range(start_gen, cfg.generations):
         state.island = order[gen % len(order)]
+        # This island's own visit number, which is what the periodic jobs below
+        # count.  See ``SearchState.island_visits``.
+        visits = state.island_visits.get(state.island, 0)
+        state.island_visits[state.island] = visits + 1
         archive = state.archive
         curator = state.curator
         for a in archipelago.archives.values():
             a.generation = gen
         regime = curator.update_regime()
 
+        # The generation's candidates are built first and evaluated together, so
+        # their panels share one GPU launch.  Built strictly in the order the
+        # sequential version built them, and placed in that same order, so the
+        # curator sees the same sequence of outcomes.
+        #
+        # `state.evaluated` used to advance between candidates within a
+        # generation, feeding both `genome_id` and the identify cadence.  It
+        # cannot now, so a local counter stands in.  The one visible difference:
+        # a candidate that throws no longer holds the number back for the next
+        # one, so ids within a generation can skip.  That is a naming detail --
+        # ids are for tracing, and the identify cadence is a "% every N" that
+        # does not care where the phase sits.
+        built = []
+        counter = state.evaluated
         for _ in range(cfg.batch):
             # Immigrants and hybrids are evaluated before anything home-grown,
             # because the whole point of moving them is to find out whether they
@@ -548,30 +978,77 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                             operators = operators + ["crossover"]
 
             child.generation = gen
-            child.genome_id = f"{state.island[:2]}{gen}_{state.evaluated}"
-            identify = (state.evaluated % max(cfg.identify_axes_every, 1)) == 0
+            child.genome_id = f"{state.island[:2]}{gen}_{counter}"
+            identify = (counter % max(cfg.identify_axes_every, 1)) == 0
+            counter += 1
+            built.append((child, inherited, identify, operators, parent,
+                          int(rng.integers(1 << 30))))
 
-            try:
-                pheno, result, ctrl = evaluate_candidate(
-                    child, cfg, inherited_policy=inherited, identify=identify,
-                    spec=spec, seed=int(rng.integers(1 << 30))
-                )
-            except Exception as exc:
-                telemetry.event({"kind": "error", "gen": gen, "island": state.island,
-                                 "error": f"{type(exc).__name__}: {exc}"})
+        try:
+            buffer = None
+            if state.shared is not None:
+                from ..learning.ppo import RolloutBuffer
+                buffer = RolloutBuffer(shaping=cfg.reward_shaping)
+            evaluated = evaluate_candidates(
+                [b[0] for b in built], cfg,
+                inherited=[b[1] for b in built],
+                identify=any(b[2] for b in built), spec=spec,
+                seeds=[b[5] for b in built],
+                shared=state.shared, buffer=buffer, pool=state.pool)
+        except Exception as exc:
+            telemetry.event({"kind": "error", "gen": gen, "island": state.island,
+                             "error": f"{type(exc).__name__}: {exc}"})
+            for _c, _i, _id, operators, _p, _s in built:
+                curator.credit(operators, "rejected", 0.0)
+            evaluated = []
+
+        gen_diverged = gen_rollouts = 0
+        for (child, _inh, _idf, operators, parent, _sd), got in zip(built, evaluated):
+            if got is None:
                 curator.credit(operators, "rejected", 0.0)
                 continue
-
+            pheno, result, ctrl = got
             state.evaluated += 1
             curator.evaluations += 1
+            gen_diverged += result.diverged_rollouts
+            gen_rollouts += result.n_rollouts
             _place(state, child, pheno, result, ctrl, parent, operators)
 
+        # --- the shared policy learns from everything the generation saw ----
+        if state.shared is not None and buffer is not None:
+            from ..learning.ppo import ppo_update
+            frac = 1.0
+            if cfg.shared_lr_anneal and cfg.generations > 0:
+                frac = max(1.0 - gen / float(cfg.generations), 0.0)
+            info = ppo_update(state.shared, buffer, lr=cfg.shared_lr,
+                              epochs=cfg.shared_epochs,
+                              minibatch=cfg.shared_minibatch,
+                              target_kl=cfg.shared_target_kl,
+                              ent_coef=cfg.shared_ent_coef,
+                              lr_fraction=frac,
+                              optimiser=state.shared_opt)
+            # The reward the update actually saw, per segment kind, so a later
+            # reading can tell a policy that stopped learning from one that was
+            # never given a gradient.  arch31's ppo line reported neither, and
+            # the fact that 84.1% of the reward's variance was the domain
+            # one-hot had to be recovered from the evaluation events instead.
+            rstats = {}
+            for t in buffer.trajectories:
+                rstats.setdefault(t.tag, []).append(t.terminal_reward)
+            telemetry.event({"kind": "ppo", "gen": gen, "island": state.island,
+                             "reward_by_tag": {
+                                 k: [round(float(np.mean(v)), 4),
+                                     round(float(np.std(v)), 4), len(v)]
+                                 for k, v in sorted(rstats.items())},
+                             "shaping": cfg.reward_shaping,
+                             **{k: v for k, v in info.items()}})
+
         # --- verification, and the critic's only source of truth ------------
-        if gen % max(cfg.tier2_every, 1) == 0 and archive.cells:
+        if visits % max(cfg.tier2_every, 1) == 0 and archive.cells:
             _verify_and_label(state, gen, spec, rng)
 
         # --- the third party ------------------------------------------------
-        if gen % max(cfg.audit_every, 1) == 0 and archive.cells:
+        if visits % max(cfg.audit_every, 1) == 0 and archive.cells:
             invalid = _audit(state, gen, spec, rng)
             if invalid:
                 vetoed = state.auditor.review_tightening(
@@ -606,18 +1083,30 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             telemetry.event({"kind": "critic_fit", "gen": gen, **state.critic.report()})
 
         # --- learned descriptor axes ----------------------------------------
+        #
+        # Read through ``state.descriptors``, never an alias captured before the
+        # loop: ``load_state`` replaces the object on resume, and an alias kept
+        # pointing at the fresh, empty one -- so a resumed run observed into the
+        # restored object and checked the empty one for refits, forever (arch24:
+        # seen 3049 against a last refit at 1204, zero refits after resume).
+        learned = state.descriptors
         if learned is not None and learned.due_for_refit() and learned.fit():
             def _reproject(e, _d=learned):
                 f = e.meta.get("features")
                 return _d.project(np.asarray(f, float)) if f else None
 
             axes = [
-                (f"latent{i}", float(lo), float(hi), 8)
+                (f"latent{i}", float(lo), float(hi), int(cfg.descriptor_bins))
                 for i, (lo, hi) in enumerate(learned.bounds())
             ]
             for name, a in archipelago.archives.items():
                 stats = a.rebin(axes, _reproject)
                 archipelago.curators[name].on_rebin()
+                # The curriculum is keyed by cell too, and nothing was re-keying
+                # it: arch31 finished with 1,040 stage entries against 251 live
+                # cells, 9.6% of them naming a cell that still existed.
+                if name in state.curricula:
+                    stats.update(state.curricula[name].rebuild_from(a))
             telemetry.event({"kind": "descriptor_refit", "gen": gen, **stats,
                              **learned.report()})
 
@@ -632,6 +1121,26 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         report["island"] = state.island
         report["evaluated"] = state.evaluated
         report["tier0_rejected"] = state.tier0_rejected
+        report["diverged_rollouts"] = gen_diverged
+        report["rollouts"] = gen_rollouts
+        # The mission headline.  ``best`` below is whichever island's champion
+        # scored highest, which for ten runs in a row was the water island's
+        # wingless specialist -- an intentionally partial objective presented
+        # as the headline.  What this search is *for* is mission_fraction on
+        # the generalist archive, so that is what gets a column of its own,
+        # with the fitness<->mission correlation beside it: the number that
+        # measured 0.14 on arch30 and prompted the standings blend.
+        g_arch = archipelago.archives.get("generalist")
+        if g_arch is not None and g_arch.cells:
+            pairs = [(e.fitness,
+                      float((e.meta or {}).get("mission_fraction", 0.0)))
+                     for e in g_arch.cells.values()]
+            fits, mfs = zip(*pairs)
+            report["mission_best"] = round(max(mfs), 4)
+            if (len(pairs) >= 16 and float(np.std(fits)) > 1e-9
+                    and float(np.std(mfs)) > 1e-9):
+                report["mission_corr"] = round(
+                    float(np.corrcoef(fits, mfs)[0, 1]), 4)
         report["elapsed"] = round(time.time() - state.started, 1)
         report["curriculum"] = state.curriculum.report()
         report["judge"] = state.judge.report()
@@ -662,6 +1171,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         a.save(Path(cfg.run_dir) / f"archive_{name}.pkl")
         a.export_json(Path(cfg.run_dir) / f"archive_{name}.json")
     save_state(state, cfg.generations - 1)
+    pool.close()
     telemetry.close()
     return state
 
@@ -694,9 +1204,33 @@ def save_state(state: SearchState, gen: int) -> None:
         "curricula": state.curricula,
         "descriptors": state.descriptors,
         "judge_moves": state.judge_moves,
+        "island_visits": dict(state.island_visits),
         "curators": state.archipelago.curators,
         "islands": list(state.archipelago.names),
     }
+    # The shared policy is the most expensive learned thing in the run -- every
+    # generation's transitions went into it -- and it was the one piece of
+    # learned state the checkpoint did not carry, so an interrupted run resumed
+    # with a randomly initialised network and no sign that it had.  Stored as a
+    # state_dict rather than the module: a pickled nn.Module is a hostage to the
+    # torch version that wrote it.
+    if state.shared is not None:
+        payload["shared_state"] = {
+            k: v.detach().cpu().numpy() for k, v in state.shared.state_dict().items()
+        }
+        payload["shared_shape"] = (state.shared.n_obs, state.shared.n_modes)
+        # A dated copy beside the rolling checkpoint.  ``search_state.pkl`` is
+        # overwritten every time, so a finished run says what the policy ended
+        # as and nothing about how it got there -- and the question arch31
+        # could not answer was exactly whether the policy was converging or
+        # random-walking under a gradient that turned every generation (99% of
+        # its updates past generation 400 stopped on the KL bound while nothing
+        # improved).  A few thousand floats per checkpoint makes that
+        # answerable afterwards.
+        snaps = Path(state.config.run_dir) / "policy_snapshots"
+        snaps.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(snaps / f"gen{gen:05d}.npz",
+                            **payload["shared_state"])
     tmp = path.with_suffix(".tmp")
     with open(tmp, "wb") as f:
         pickle.dump(payload, f)
@@ -745,14 +1279,120 @@ def load_state(state: SearchState) -> int:
             # by running the recovery against a live run's directory rather than
             # a two-generation fixture.
             live.generation = restored.generation
+            # The grid itself is learned state.  A descriptor refit moved the
+            # axes and re-filed every elite; restoring the cells onto the
+            # constructor's hand-picked axes silently undoes that, so every
+            # resumed run searched on the grid `learned_axes` was meant to
+            # replace (arch24 at gen 500 still carried the hand-picked axes).
+            live.axes = restored.axes
+            live.names = restored.names
+            live.lo = restored.lo
+            live.hi = restored.hi
+            live.bins = restored.bins
 
     state.evaluated = int(d.get("evaluated", 0))
     state.tier0_rejected = int(d.get("tier0_rejected", 0))
+    # Per-island visit counts.  A checkpoint written before these existed has
+    # none; reconstructing them from the generation number is exact, because
+    # the rotation is deterministic -- island i is active on every generation
+    # with ``gen % n == i``.
+    if d.get("island_visits"):
+        state.island_visits.update(dict(d["island_visits"]))
+    else:
+        names = list(d.get("islands") or state.archipelago.names)
+        n = max(len(names), 1)
+        g = int(d.get("generation", 0))
+        for i, name in enumerate(names):
+            state.island_visits[name] = (g - i + n - 1) // n if g > i else 0
     for attr in ("judge", "auditor", "critic", "scout", "descriptors"):
         if d.get(attr) is not None:
             setattr(state, attr, d[attr])
     if d.get("curricula"):
         state.curricula.update(d["curricula"])
+        # A checkpoint written before the blend became a moving quantity has
+        # Curriculum objects with no handover state at all -- unpickling a
+        # dataclass restores the attributes it was saved with, not the ones the
+        # class has now, so the defaults never run.  Resuming such a run would
+        # die on the first scoring call.  Restoring at zero is also the right
+        # answer rather than merely a safe one: the handover is evidence about
+        # the population, that evidence was never gathered, and it re-earns
+        # itself within a window.
+        for cur in state.curricula.values():
+            if not hasattr(cur, "_handover"):
+                cur._handover = 0.0
+            # The ranking window became per-stage on 2026-09-01.  A checkpoint
+            # from before that holds a flat list of (island, curriculum) pairs,
+            # which the new code would index by stage and die on.  The pairs
+            # are not recoverable into stages -- nothing recorded which stage
+            # each came from -- so they are dropped, and the windows re-earn
+            # themselves within ``window`` evaluations.
+            if not isinstance(getattr(cur, "_recent", None), dict):
+                cur._recent = {}
+            if not hasattr(cur, "window"):
+                cur.window = 256
+            for attr, default in (("min_rank_samples", 12),
+                                  ("handover_floor", 0.25)):
+                if not hasattr(cur, attr):
+                    setattr(cur, attr, default)
+    # The shared policy, if this run has one and the checkpoint carried one of
+    # the same shape.  Without this a resumed --shared-policy run restarts PPO
+    # from a random network while every other learned thing continues, which is
+    # the worst of both: the archive keeps scores earned by a trained policy and
+    # the policy that earned them is gone.
+    if state.shared is not None and d.get("shared_state"):
+        import torch as _torch
+        shape = tuple(d.get("shared_shape") or ())
+        if shape == (state.shared.n_obs, state.shared.n_modes):
+            # ``strict=False``: a checkpoint written before the observation
+            # normalisation existed carries no ``obs_mean``/``obs_var``, and
+            # refusing to load the weights over a missing pair of buffers would
+            # throw away the one thing the checkpoint was written for.  The
+            # buffers then start from their identity values and re-earn
+            # themselves within an update.  Anything actually missing is
+            # reported rather than swallowed.
+            missing, unexpected = state.shared.load_state_dict(
+                {k: _torch.as_tensor(v) for k, v in d["shared_state"].items()},
+                strict=False)
+            if missing or unexpected:
+                state.telemetry.event({"kind": "shared_policy_partial_load",
+                                       "missing": list(missing),
+                                       "unexpected": list(unexpected)})
+        else:
+            print(f"  (checkpointed shared policy is {shape}, this run wants "
+                  f"({state.shared.n_obs}, {state.shared.n_modes}); "
+                  f"starting it from scratch)", flush=True)
+            state.telemetry.event({"kind": "shared_policy_shape_mismatch",
+                                   "stored": list(shape),
+                                   "want": [state.shared.n_obs,
+                                            state.shared.n_modes]})
+
+    # Say so when a resumed archive's controllers cannot be inherited.
+    #
+    # `_controller_for` transfers stored weights only when the shape matches and
+    # silently starts from zeros when it does not, which is right per candidate
+    # -- weights fitted against a different observation mean nothing here.  Held
+    # across a whole archive it is a different event: widening the observation
+    # from 14 channels to 19 makes every policy in every run before it
+    # untransferable, and 240 discarded controllers should not look like a
+    # normal resume.
+    want = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=state.config.n_modes,
+                  hidden=state.config.policy_hidden).n_weights
+    stored, mismatched = 0, 0
+    for a in state.archipelago.archives.values():
+        for e in a.cells.values():
+            w = (e.meta or {}).get("policy")
+            if w:
+                stored += 1
+                mismatched += len(w) != want
+    if mismatched:
+        print(f"  ({mismatched} of {stored} stored controllers do not fit this "
+              f"policy shape ({want} weights) and start from zeros; "
+              f"--promotion-refine-steps re-earns them at verification)",
+              flush=True)
+        state.telemetry.event({"kind": "policy_shape_mismatch",
+                               "stored": stored, "mismatched": mismatched,
+                               "want": want})
+
     state.judge_moves = list(d.get("judge_moves", []))
     for name, cur in (d.get("curators") or {}).items():
         if name in state.archipelago.curators:
@@ -781,19 +1421,32 @@ def seed_archipelago(state: SearchState, spec: MissionSpec) -> None:
     *reward*, not in what they start from, so any divergence between them after
     a few hundred generations is attributable to the objective rather than to
     the draw.
+
+    The seeds go through the batched evaluator, like every other generation.
+    They used to go one at a time through ``evaluate_candidate``, which meant
+    the whole seeding phase ran on the numpy solver with no GPU batching at all:
+    175 s of a run's 228 s pre-loop cost, at 8.75 s per seed against 4.8 s per
+    candidate once batched.  Nothing about seeding needs the singular path --
+    it was simply written before there was a batched one.
     """
     cfg = state.config
     seeds: list[Genome] = list(seed_population(state.rng, cfg.n_reference_seeds))
     seeds += [random_genome(state.rng) for _ in range(cfg.n_random_seeds)]
-
     for i, g in enumerate(seeds):
         g.genome_id = f"seed{i}"
-        try:
-            pheno, result, ctrl = evaluate_candidate(
-                g, cfg, identify=True, spec=spec, seed=int(state.rng.integers(1 << 30))
-            )
-        except Exception:
+
+    seed_seeds = [int(state.rng.integers(1 << 30)) for _ in seeds]
+    try:
+        evaluated = evaluate_candidates(
+            seeds, cfg, identify=True, spec=spec, seeds=seed_seeds,
+            pool=state.pool)
+    except Exception:
+        return
+
+    for g, got in zip(seeds, evaluated):
+        if got is None:
             continue
+        pheno, result, ctrl = got
         state.evaluated += 1
         # One evaluation, filed on every island: the physics is the same, only
         # the scoring differs, so re-simulating per island would buy nothing.
@@ -801,6 +1454,121 @@ def seed_archipelago(state: SearchState, spec: MissionSpec) -> None:
             state.island = name
             state.curator.evaluations += 1
             _place(state, g.copy(), pheno, result, ctrl, parent=None, operators=["seed"])
+
+
+def _with_shared(state: SearchState, ctrl):
+    """A controller whose policy is the sum the batched evaluator would apply.
+
+    Tier-2 runs the single-machine path, which takes one policy, so it saw only
+    the per-candidate half of a control law whose other half was present when
+    the Tier-1 score it is checking was earned.  The critic is trained on the
+    ratio between the two numbers, so the missing half was being charged to the
+    design.
+    """
+    if state.shared is None or ctrl is None:
+        return ctrl
+    from ..envs.evaluate import SharedController, SummedPolicy
+    return SharedController(
+        params=ctrl.params, bases=ctrl.bases,
+        policy=SummedPolicy(own=ctrl.policy, shared=state.shared,
+                            n_modes=state.config.n_modes))
+
+
+def _refined_controller_for(state: SearchState, elite, pheno, spec, rng):
+    """The elite's controller, refined at the moment it is promoted.
+
+    Refining every candidate every generation costs a full batched Tier-1 per
+    step, which is why ``controller_refine_steps`` defaults to zero and why the
+    500-generation runs selected bodies on the strength of a controller nothing
+    had optimised.  Promotion is the affordable place to spend that budget: the
+    search has already decided this design is worth a Tier-2, and there are at
+    most three per verification round, so the cost scales with promotions
+    rather than with population.
+
+    It also puts the refinement where its result is worth most.  A refined
+    controller found here is stored back on the elite, so the archive's record
+    of what a design can do is made with a controller that was actually tuned
+    for it, and every child that inherits from this cell starts from those
+    weights rather than from its parent's untuned ones.
+
+    Returns ``None`` when there is nothing to refine, which makes the caller
+    behave exactly as it did before this existed.
+    """
+    cfg = state.config
+    steps = int(getattr(cfg, "promotion_refine_steps", 0))
+    if steps <= 0:
+        return None
+
+    from ..envs import batchroll
+
+    policy = _controller_for(pheno, elite.genome, cfg, elite.meta.get("policy"))
+    if policy is None or policy.weights.size == 0:
+        return None
+    ctrl = Controller(params=None, policy=policy)
+
+    # The stored elite carries weights but not the basis they were measured
+    # against -- it is a matrix per domain, too large to keep on every cell --
+    # so identification has to run once here before refinement can command
+    # anything.  ``evaluate_tier1_batch`` does both in one call.
+    base = batchroll.evaluate_tier1_batch(
+        [pheno], spec=spec, controllers=[ctrl],
+        segment_seconds=cfg.segment_seconds, identify_axes=True,
+        seed=int(rng.integers(1 << 30)), shared=state.shared,
+        n_modes=cfg.n_modes)
+    ctrl.bases = base[0].mobility
+    if not ctrl.bases:
+        return ctrl
+
+    _refine_controllers([pheno], [ctrl], base, cfg, spec=spec,
+                        seed=int(rng.integers(1 << 30)), steps=steps,
+                        shared=state.shared)
+    return ctrl
+
+
+def _tier1_5(state: SearchState, elite, pheno, ctrl, spec, rng) -> dict:
+    """One 60 s leg on a promotion candidate, and what it retained.
+
+    Placed here rather than in the generation loop because this is the only
+    place the cost is affordable: at most three promotions per verification
+    round, against sixteen candidates per generation.
+
+    Reported, not enforced.  What the retention distribution looks like is an
+    open measurement -- the number this exists to produce -- and gating Tier-2
+    on it before that distribution is known would be choosing a threshold from
+    nothing, which is the habit the rest of this file is written against.  It
+    also happens to be the pair the critic learns from, so a gate would remove
+    the ground truth that would justify the gate.
+
+    Returns telemetry fields, empty when the leg is disabled or fails.
+    """
+    seconds = float(getattr(state.config, "tier1_5_seconds", 0.0))
+    if seconds <= 0.0:
+        return {}
+    competences = {k: float(elite.meta.get(k, 0.0) or 0.0)
+                   for k in ("air", "water", "land")}
+    try:
+        seg = evaluate_tier1_5(
+            pheno, spec=spec, controller=_with_shared(state, ctrl),
+            seconds=seconds, seed=int(rng.integers(1 << 30)),
+            competences=competences)
+    except Exception as exc:
+        return {"tier1_5_error": f"{type(exc).__name__}: {exc}"}
+    dom = seg.domain.value
+    short = competences.get(dom, 0.0)
+    out = {
+        "tier1_5_domain": dom,
+        "tier1_5_seconds": seconds,
+        "tier1_5_competence": round(float(seg.competence), 4),
+        "tier1_5_short": round(short, 4),
+        "tier1_5_retention": (round(float(seg.competence) / short, 3)
+                              if short > 1e-4 else None),
+        "tier1_5_failure": seg.failure,
+    }
+    # Kept on the elite as well, so the archive on disk carries it and the
+    # correlation can be computed from a finished run without replaying the
+    # event log.
+    elite.meta["tier1_5"] = [dom, out["tier1_5_competence"], out["tier1_5_short"]]
+    return out
 
 
 def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
@@ -817,9 +1585,26 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
             continue
         try:
             p2 = build(elite.genome)
-            r2 = evaluate_tier2(p2, spec=spec, seed=int(rng.integers(1 << 30)))
+            ctrl2 = _refined_controller_for(state, elite, p2, spec, rng)
+            long_leg = _tier1_5(state, elite, p2, ctrl2, spec, rng)
+            r2 = evaluate_tier2(p2, spec=spec,
+                                controller=_with_shared(state, ctrl2),
+                                seed=int(rng.integers(1 << 30)))
             f2 = fitness(p2, r2)
             curator.record_promotion(elite, f2)
+            if ctrl2 is not None and ctrl2.policy is not None:
+                # Keep what the refinement found.  Verification is the one
+                # place the search pays for a design twice, and discarding the
+                # better controller it just bought would make the second
+                # payment worthless to everyone except the critic.
+                elite.meta["policy"] = ctrl2.policy.weights.tolist()
+                # And say that these weights were *fitted to this body*, rather
+                # than inherited from a parent.  Most archive entries carry a
+                # policy; only these were optimised.  The distillation study
+                # needs to tell the two apart, and reconstructing it afterwards
+                # meant cross-referencing the promote events against cells.
+                elite.meta["policy_refined"] = int(
+                    getattr(cfg, "promotion_refine_steps", 0))
             cheap = float(elite.meta.get("mission_fraction", 0.0))
             if state.critic is not None and cheap > 1e-4:
                 feats = elite.meta.get("critic_features")
@@ -833,6 +1618,7 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
                                    "tier2_fitness": round(f2, 4),
                                    "tier2_fraction": round(r2.mission_fraction, 4),
                                    "tier1_fraction": round(cheap, 4),
+                                   **long_leg,
                                    "exploit": r2.exploit, "notes": r2.notes[:3]})
             if r2.exploit:
                 curator.quarantine(elite.descriptor, r2.exploit, elite.genome)

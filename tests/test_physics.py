@@ -709,10 +709,34 @@ def test_air_segment_can_be_scored() -> None:
         f"{min(loadings):.0f}..{max(loadings):.0f} N/m^2",
     )
     # A heavier-loaded design must be launched faster: that is what trim means.
-    order = np.argsort(loadings)
-    v = np.array(launches)[order]
-    check("launch speed rises with wing loading", bool(np.all(np.diff(v) >= -1e-9)),
-          " ".join(f"{x:.1f}" for x in v))
+    #
+    # Held *within* an airframe, not across them.  Sorting all the plans by W/S
+    # and requiring the measured launch speeds to rise with it assumes every
+    # design reaches the same lift coefficient, and ``launch_speed`` exists
+    # precisely because they do not -- its docstring is about how effective CL
+    # sits near 0.35 and varies with whatever dihedral and twist the CPPN gave
+    # the surface.  Two plans can therefore share a wing loading and trim tens
+    # of percent apart: gannet at 85.6 N/m^2 launches at 13.3 m/s and bat at
+    # 86.3 launches at 15.8.  That pair was already a near-tie ordered by luck,
+    # and the cross-plan check duly broke on the seventh plan while both of its
+    # own numbers were correct.
+    #
+    # Adding battery changes mass and leaves the wing alone, so within one
+    # airframe CL is fixed and the relation is the clean physical one.
+    for name in ("gannet", "ray", "beetle"):
+        light = BODY_PLANS[name]()
+        heavy = BODY_PLANS[name]()
+        heavy.battery_wh = light.battery_wh * 2.5
+        pl, ph = build(light), build(heavy)
+        el, eh = TriphibianEnv(pl), TriphibianEnv(ph)
+        el.reset(Domain.AIR, randomise=False)
+        eh.reset(Domain.AIR, randomise=False)
+        wl = pl.mass * 9.80665 / max(pl.wing_area, 1e-3)
+        wh = ph.mass * 9.80665 / max(ph.wing_area, 1e-3)
+        check(f"launch speed rises with wing loading ({name})",
+              eh.launch_speed >= el.launch_speed - 1e-9,
+              f"W/S {wl:.0f} -> {wh:.0f} N/m^2 gives "
+              f"{el.launch_speed:.1f} -> {eh.launch_speed:.1f} m/s")
 
 
 def test_truncated_episodes_cannot_score() -> None:
@@ -1561,6 +1585,464 @@ def test_wave_field() -> None:
           f"{np.linalg.norm(shallow):.3f} -> {np.linalg.norm(deep):.4f} m/s")
 
 
+def test_jet_thrust_matches_momentum_flux() -> None:
+    """Pulsed-jet thrust is rho Q^2/A opposite the orifice, in water only.
+
+    The model existed unwired: a medusa passed the has_propulsor gate and then
+    could not produce a newton, so a whole body-plan family was admitted to the
+    search and dynamically unwinnable.  This pins the wiring: magnitude from
+    momentum flux, direction opposite the expelled flow, nothing in air, refill
+    charged at the reduced coefficient.
+    """
+    print("\njet: thrust is momentum flux, water only, refill discounted")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.mjcf import compile_phenotype
+    from dytiscidae.core.phenotype import build, build_jets
+    from dytiscidae.physics.jet import JetSet
+
+    def bell_model(z: float):
+        xml = f"""
+        <mujoco>
+          <option timestep="0.004" gravity="0 0 0" density="0" viscosity="0"/>
+          <worldbody>
+            <body name="bell" pos="0 0 {z}">
+              <joint name="bell_j" type="hinge" axis="0 1 0" range="0 1"
+                     limited="true"/>
+              <geom type="sphere" size="0.06" density="400"/>
+            </body>
+          </worldbody>
+        </mujoco>"""
+        model = mujoco.MjModel.from_xml_string(xml)
+        data = mujoco.MjData(model)
+        return model, data
+
+    medium = MediumField()
+    volume, stroke_frac, orifice = 1e-3, 0.6, 2e-4
+    jets = JetSet(
+        body_id=np.array([1]), joint_id=np.array([0]),
+        axis_local=np.array([[1.0, 0.0, 0.0]]),
+        volume=np.array([volume]), stroke_fraction=np.array([stroke_frac]),
+        orifice_area=np.array([orifice]), joint_range=np.array([[0.0, 1.0]]),
+    )
+
+    # Contracting at omega = 2 rad/s over a 1 rad range sweeps
+    # Q = V * stroke * omega / span = 1.2e-3 m^3/s.
+    model, data = bell_model(-2.0)
+    data.qpos[0], data.qvel[0] = 0.0, 2.0
+    mujoco.mj_forward(model, data)
+    jets.apply(model, data, medium, 0.0, model.opt.timestep)
+    q = volume * stroke_frac * 2.0
+    expected = medium.water.rho * q * q / orifice
+    fx = float(data.xfrc_applied[1, 0])
+    check("thrust magnitude is rho Q^2 / A",
+          np.isclose(-fx, expected, rtol=1e-9),
+          f"{-fx:.3f} N against {expected:.3f} N by hand")
+    check("and it points opposite the expelled flow", fx < 0.0, f"fx={fx:.3f}")
+
+    model, data = bell_model(-2.0)
+    data.qpos[0], data.qvel[0] = 0.0, -2.0
+    mujoco.mj_forward(model, data)
+    jets.apply(model, data, medium, 0.0, model.opt.timestep)
+    fx_refill = float(data.xfrc_applied[1, 0])
+    check("refill is charged at the reduced coefficient, reversed",
+          np.isclose(fx_refill, jets.refill_efficiency * expected, rtol=1e-9),
+          f"{fx_refill:.3f} N against {jets.refill_efficiency * expected:.3f}")
+
+    model, data = bell_model(10.0)
+    data.qpos[0], data.qvel[0] = 0.0, 2.0
+    mujoco.mj_forward(model, data)
+    jets.apply(model, data, medium, 0.0, model.opt.timestep)
+    check("a bell out of the water produces nothing",
+          abs(float(data.xfrc_applied[1, 0])) < 1e-12,
+          f"{float(data.xfrc_applied[1, 0]):.2e} N in air")
+
+    # The wiring end: the medusa plan's own bells must reach the dynamics.
+    p = build(BODY_PLANS["medusa"]())
+    model, _data, _names, _panels = compile_phenotype(p)
+    built = build_jets(p, model)
+    check("the medusa's bells reach the jet model", built.n > 0,
+          f"{built.n} bells")
+    check("and at least one of them is driven by a real joint",
+          bool((built.joint_id >= 0).any()),
+          f"joint ids {built.joint_id.tolist()}")
+
+
+def test_a_failing_sweep_gates_only_the_last_swimmer() -> None:
+    """A wing that cannot sweep in water is fatal only when nothing else swims.
+
+    Tier-0 rejected on ``min_margin`` over every check, and the hydrodynamic
+    sweep check was 40 of arch24's 81 rejects -- nearly every newly grown wing
+    died at the door for a load case the machine could avoid by holding that
+    wing still and swimming on its paddles, which is what a real gannet does.
+    The check stays in the report and in feasibility; it stops gating when
+    other water propulsion remains.
+    """
+    print("\nstructure: a failing sweep gates only the last swimmer")
+    from dytiscidae.core.bodyplans import gannet
+    from dytiscidae.core.genome import WING as PART_WING
+    from dytiscidae.core.phenotype import build
+
+    g = gannet()
+    for part in g.parts:
+        if part.kind == PART_WING:
+            part.span *= 1.6
+    p = build(g)
+    sweeps = [c for c in p.report.checks if c.name == "sweep_load_in_water"]
+    failing = [c for c in sweeps if not c.ok]
+    check("the oversized wing fails its sweep check", len(failing) >= 1,
+          f"{len(failing)} of {len(sweeps)} sweep checks failing")
+    check("while another surface still passes", any(c.ok for c in sweeps))
+    check("the failing sweep no longer gates",
+          all(not c.gating for c in failing))
+    check("so the gate margin recovers while the true margin does not",
+          p.report.gate_margin > 0.0 > p.report.min_margin,
+          f"gate {p.report.gate_margin:+.2f} vs true {p.report.min_margin:+.2f}")
+    check("and feasibility still tells the truth", not p.report.ok)
+
+    # The reference gannet is untouched: everything passes, both margins agree.
+    ref = build(gannet())
+    check("a passing design's two margins agree",
+          abs(ref.report.gate_margin - ref.report.min_margin) < 1e-12,
+          f"{ref.report.gate_margin:+.2f}")
+
+
+def test_the_power_budget_vectorises_without_changing_the_answer() -> None:
+    """The batched budget must equal the per-actuator loop it replaced.
+
+    ``PowerBudget.step`` called ``electrical_power`` and ``thermal_overload``
+    once per actuator with a *scalar*, so every timestep paid a numpy round
+    trip per actuator per quantity.  Profiled on real evolved bodies that was
+    33-36% of a batched step, against 10% for ``mj_step``.
+
+    The trap this pins: ``electrical_power`` adds shaft-seal friction and
+    ``thermal_overload`` deliberately does not, so the two cannot share one
+    torque.  Folding the seal into both moved the overload by 1.8e-2 -- small
+    enough to look like rounding, large enough to shift the exploit threshold
+    at ``max_actuator_overload > 3.0``.
+    """
+    print("\nenergy: the vectorised budget equals the loop it replaced")
+    rng = np.random.default_rng(0)
+    acts = [
+        Actuator(motor_class=str(c), mass=float(m), gear_ratio=float(g),
+                 sealed=bool(s))
+        for c, m, g, s in zip(rng.choice(["bldc", "coreless", "geared"], 13),
+                              rng.uniform(0.04, 0.3, 13),
+                              rng.uniform(1.0, 12.0, 13),
+                              rng.random(13) < 0.4)
+    ]
+
+    def scalar(budget, tq, sp):
+        p, overload = budget.avionics_w, 0.0
+        for i, a in enumerate(budget.actuators):
+            if i >= len(tq):
+                break
+            p += float(a.electrical_power(tq[i], sp[i]))
+            overload = max(overload, float(a.thermal_overload(tq[i], sp[i])))
+        return p, overload
+
+    worst_p = worst_o = 0.0
+    for _ in range(200):
+        tq, sp = rng.normal(0, 3, 13), rng.normal(0, 20, 13)
+        b = PowerBudget(battery=Battery(wh=260), actuators=acts)
+        ref_p, ref_o = scalar(b, tq, sp)
+        b.step(tq, sp, 0.004)
+        worst_p = max(worst_p, abs(b.total_j / 0.004 - ref_p) / max(abs(ref_p), 1e-9))
+        worst_o = max(worst_o, abs(b.max_overload - ref_o) / max(abs(ref_o), 1e-9))
+
+    check("power matches the scalar loop to floating point",
+          worst_p < 1e-12, f"max relative error {worst_p:.2e}")
+    check("and the overload matches exactly, seal friction excluded",
+          worst_o == 0.0, f"max relative error {worst_o:.2e}")
+
+    # Fewer actuators than torques, and none at all, are both real cases.
+    short = PowerBudget(battery=Battery(wh=260), actuators=acts[:3])
+    short.step(rng.normal(0, 3, 13), rng.normal(0, 20, 13), 0.004)
+    check("a short actuator list charges only its own actuators",
+          short.total_j > 0.0)
+    empty = PowerBudget(battery=Battery(wh=260), actuators=[])
+    empty.step(np.zeros(0), np.zeros(0), 0.004)
+    check("a machine with no actuators still pays the hotel load",
+          np.isclose(empty.total_j, empty.avionics_w * 0.004),
+          f"{empty.total_j:.6f} J")
+
+
+def test_training_states_are_a_distribution_not_a_pose() -> None:
+    """Rollouts must not all begin from the same state.
+
+    Every rollout the policy learned from started at one spawn pose per domain
+    with a few centimetres of noise, identity attitude, no velocity, a full
+    battery and a stroke phase of exactly zero -- and the crossings had no noise
+    at all.  Two of the channels added to the observation were therefore
+    constant across the whole training set: a battery that is always full and a
+    stroke that always starts at the same point cannot be learned from.
+    """
+    print("\nsensing: training states are a distribution, not a pose")
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(beetle()))
+    tilt, stroke, battery = [], [], []
+    for k in range(60):
+        env.reset(Domain.WATER)
+        env.scatter(np.random.default_rng(k))
+        o = env.observation(Domain.WATER)
+        tilt.append(math.degrees(math.acos(min(1.0, max(-1.0, -o[8])))))
+        battery.append(o[16])
+        stroke.append(o[17])
+
+    check("attitude is perturbed, but not into a tumble",
+          2.0 < float(np.mean(tilt)) < 20.0 and max(tilt) < 45.0,
+          f"mean {np.mean(tilt):.1f} deg, max {max(tilt):.1f} deg")
+    check("the battery channel actually varies",
+          float(np.std(battery)) > 0.05,
+          f"sd {np.std(battery):.3f}, range "
+          f"{min(battery):.2f}-{max(battery):.2f}")
+    check("and so does the stroke phase",
+          float(np.std(stroke)) > 1e-3, f"sd {np.std(stroke):.4f}")
+
+    # Same generator, same state.  ``randomise=False`` isolates the scatter
+    # from reset's own spawn noise, which draws from the env's generator and
+    # therefore advances between calls -- the first version of this check
+    # conflated the two and failed on the wrong thing.
+    env.reset(Domain.WATER, randomise=False)
+    env.scatter(np.random.default_rng(11))
+    a = env.observation(Domain.WATER).copy()
+    env.reset(Domain.WATER, randomise=False)
+    env.scatter(np.random.default_rng(11))
+    check("the same draw gives the same state",
+          np.allclose(a, env.observation(Domain.WATER)))
+
+
+def test_the_controller_senses_what_the_mission_scores() -> None:
+    """The four senses added for the mission's own quantities behave.
+
+    ``tanh(d/5)`` reads 0.96 at the 10 m target -- the one place the depth
+    channel must discriminate is the one place it saturated, so depth-hold had
+    to be inferred from reward alone.  The error channel is zero exactly at
+    the target.  Battery, contact and stroke phase existed in the simulation
+    and were invisible to the controller.
+    """
+    print("\nsensing: the controller senses what the mission scores")
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(beetle()))
+    env.reset(Domain.WATER)
+    obs = env.observation(Domain.WATER)
+    check("the observation matches its declared width",
+          len(obs) == TriphibianEnv.OBS_DIM,
+          f"{len(obs)} vs OBS_DIM={TriphibianEnv.OBS_DIM}")
+
+    # Teleport the root to the mission's target depth: the error channel must
+    # read zero there, where the absolute channel is already saturated.
+    env.data.qpos[2] = -TriphibianEnv.TARGET_DEPTH
+    mujoco.mj_forward(env.model, env.data)
+    at_target = env.observation(Domain.WATER)
+    check("the depth-error channel is zero at the target",
+          abs(at_target[14]) < 0.05, f"error channel {at_target[14]:+.3f}")
+    check("where the absolute depth channel is nearly blind",
+          at_target[9] > 0.9, f"tanh(d/5) = {at_target[9]:.3f}")
+
+    env.reset(Domain.WATER)
+    before = env.observation(Domain.WATER)[16]
+    env.rollout(0.5, domain=Domain.WATER)
+    after = env.observation(Domain.WATER)[16]
+    check("the battery channel drains as energy is spent", after < before,
+          f"{before:.5f} -> {after:.5f}")
+    check("stroke phase and rate stay in their declared ranges",
+          -1.0 <= after and abs(env.observation(Domain.WATER)[17]) <= 1.0
+          and abs(env.observation(Domain.WATER)[18]) <= 3.0)
+
+
+def test_flap_frequency_is_commandable_in_the_loop() -> None:
+    """The identified basis can move flap frequency, so resonance is reachable.
+
+    ``resonance_seek`` on the skill bench argues that a compliant wing driven at
+    resonance costs a fraction of the power, and that the resonance *moves* when
+    the machine enters water.  The bench's weights cannot transfer to a vehicle
+    -- different observation and action widths over different dynamics -- so the
+    question that matters is whether a mission policy can do the same thing in
+    the loop.  It needs three things, and this pins the one that was never
+    checked: frequency is the last entry of ``CPGParams.flat()``, and the
+    mobility basis spans it.
+    """
+    print("\ncontrol: flap frequency is commandable through the mobility basis")
+    from dytiscidae.control.cpg import CPGParams
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.batchroll import identify_batch
+    from dytiscidae.envs.triphibian import (
+        MORPHOLOGY_DIM, Domain, TriphibianEnv)
+
+    env = TriphibianEnv(build(beetle()))
+    n = env.cpg.n
+    check("the CPG parameter vector carries frequency last",
+          env.cpg.n_params == 3 * n + 1, f"n_params={env.cpg.n_params}, n={n}")
+
+    basis = identify_batch([env], Domain.WATER, seed=1)[0]
+    freq_weight = float(np.max(np.abs(basis.modes[:, -1])))
+    check("the identified water basis spans the frequency dimension",
+          freq_weight > 0.05,
+          f"largest frequency component across modes: {freq_weight:.3f}")
+
+    # And commanding it actually changes the rhythm, rather than the component
+    # being present in the matrix and discarded downstream.
+    base = env.cpg.base
+    mode = int(np.argmax(np.abs(basis.modes[:, -1])))
+    coeffs = np.zeros(basis.modes.shape[0])
+    coeffs[mode] = 1.0
+    moved = basis.command_params(base, coeffs, n)
+    check("commanding that mode moves the flap frequency",
+          abs(moved.frequency - base.frequency) > 1e-6,
+          f"{base.frequency:.4f} -> {moved.frequency:.4f} Hz")
+    check("and the observation carries the stroke phase to time it against",
+          TriphibianEnv.OBS_DIM == 19 + MORPHOLOGY_DIM,
+          f"19 sensed + {MORPHOLOGY_DIM} morphology = {TriphibianEnv.OBS_DIM}")
+    del CPGParams
+
+
+def test_an_auto_reset_rollout_is_not_trusted() -> None:
+    """A segment whose physics blew up must fail, not be scored.
+
+    MuJoCo 3.x auto-resets the state to the initial pose when qacc goes
+    non-finite, so a blowup never trips the position-divergence guard: the
+    machine teleports to spawn mid-rollout and keeps being scored as if the
+    trajectory were real.  arch30's resumed population produced 18 such events
+    in three generations with zero rollouts marked diverged -- an entirely
+    silent score-corruption channel.
+    """
+    print("\nstability: an auto-reset rollout is marked unstable")
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(beetle()))
+    env.reset(Domain.AIR)
+    clean = env.rollout(0.1, domain=Domain.AIR)
+    check("a clean rollout records no bad-qacc events",
+          clean.bad_qacc == 0 and clean.failure != "unstable",
+          f"bad_qacc={clean.bad_qacc}")
+
+    bad_enum = mujoco.mjtWarning.mjWARN_BADQACC
+    original = env.step
+
+    def step_with_warning(angles):
+        env.data.warning[bad_enum].number += 1
+        return original(angles)
+
+    env.reset(Domain.AIR)
+    env.step = step_with_warning
+    res = env.rollout(0.1, domain=Domain.AIR)
+    env.step = original
+    check("a rollout with bad-qacc events is marked unstable",
+          (not res.survived) and res.failure == "unstable",
+          f"survived={res.survived} failure={res.failure!r}")
+    check("and the event count is recorded", res.bad_qacc > 0,
+          f"bad_qacc={res.bad_qacc}")
+
+
+def test_the_air_score_measures_flight() -> None:
+    """Four ways an object that is not flying used to score for flight.
+
+    Measured across arch33: winged designs scored 0.144 in air and wingless
+    0.136, and both fell at about 11 m/s.  The score was not measuring flight,
+    it was measuring having been thrown.
+    """
+    print("\nair score: what a machine did, not what it was given")
+    import numpy as np
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import (
+        MAX_SPIN_RATE, MAX_WING_LOADING, Domain, SegmentResult, TriphibianEnv,
+        _turn_authority, airworthiness,
+    )
+
+    class Body:
+        def __init__(self, area, loading):
+            self.wing_area, self.wing_loading = area, loading
+
+    # 1. The Tier-0 gates.  arch33's mission champion: 12 kg, wing_area 0.0000,
+    #    wing loading 1,178,337 N/m^2.
+    check("a design with no lifting surface is gated",
+          airworthiness(Body(0.0, 1_178_337.0)) == ["no lifting surface"],
+          f"{airworthiness(Body(0.0, 1_178_337.0))}")
+    over = airworthiness(Body(0.05, MAX_WING_LOADING * 2))
+    check("and so is one loaded past any speed that could carry it",
+          len(over) == 1 and "wing loading" in over[0], f"{over}")
+    check("but a real wing is not",
+          airworthiness(Body(0.51, 85.6)) == [],
+          "the gannet, 0.51 m^2 at 86 N/m^2")
+
+    env = TriphibianEnv(build(BODY_PLANS["gannet"]()))
+    dt, dur = env.timestep, 8.0
+    n = int(dur / dt)
+
+    def air(sink, *, spins=None, commands=None, responses=None, gates=()):
+        r = SegmentResult(domain=Domain.AIR, duration=dur)
+        r.mean_speed = 20.0
+        clear = 30.0 - sink * np.arange(n) * dt
+        env.air_gates = list(gates)
+        try:
+            s = env._score_segment(
+                Domain.AIR, r, -clear, clear, np.ones(n), np.zeros(n), clear,
+                spins=spins, commands=commands, responses=responses)
+        finally:
+            env.air_gates = []
+        return s, r.measurements
+
+    # 2. Holding height is not the same as losing it slowly.
+    _s, held = air(0.0)
+    _s, creep = air(0.4)
+    check("holding a height satisfies station keeping",
+          held["station_keeping"] > 0.95, f"{held['station_keeping']:.2f}")
+    check("and a shallow glide does not, though it clears the sink bar",
+          creep["sink_rate"] < 0.5 and creep["station_keeping"] < 0.6,
+          f"sink {creep['sink_rate']:.2f} m/s, station "
+          f"{creep['station_keeping']:.2f}")
+
+    # 3. A tumble is not a commanded turn.
+    rng = np.random.default_rng(0)
+    cmd = [rng.normal(size=3) for _ in range(80)]
+    follows = [np.zeros(3)] + [0.8 * c for c in cmd[:-1]]
+    tumbles = [rng.normal(size=3) * 3.0 for _ in range(80)]
+    a_follow, _ = _turn_authority(cmd, follows)
+    a_tumble, _ = _turn_authority(tumbles, tumbles[::-1])
+    check("a machine that turns when told to has command authority",
+          a_follow > 0.9, f"corr {a_follow:+.2f}")
+    check("and one that spins on its own does not",
+          abs(a_tumble) < 0.3, f"corr {a_tumble:+.2f}")
+    _s, uncommanded = air(0.0, commands=None, responses=None)
+    check("so an uncommanded rotation scores no manoeuvring",
+          uncommanded["turn_rate_held"] == 0.0,
+          "the arch33 champion logged 31.4 rad/s with zero actuated DOF")
+
+    # 4. Spinning faster than a revolution a second is not flight.
+    fast = np.full(n, MAX_SPIN_RATE * 5.0)
+    spun, m_spun = air(0.0, spins=fast)
+    level, _ = air(0.0)
+    check("a machine tumbling at five revolutions a second is not flying",
+          spun < 0.1 * level, f"{spun:.3f} against {level:.3f} level")
+    check("and it cannot climb the ladder on its sink rate either",
+          m_spun["sink_rate"] > 9.0 and m_spun["measured_sink_rate"] == 0.0,
+          f"ladder sees {m_spun['sink_rate']:.1f}, record keeps "
+          f"{m_spun['measured_sink_rate']:.1f}")
+
+    # 5. The launch is no longer inversely earned.
+    lo, hi = __import__("dytiscidae.envs.triphibian", fromlist=["x"]).LAUNCH_SPEED_RANGE
+    speed, _pitch = env._measure_trim_speed(lo, hi)
+    check("a design that can fly is launched inside the band",
+          lo <= speed <= hi, f"gannet launches at {speed:.1f} m/s")
+    # The "no trim speed anywhere in the band" branch, forced by asking for a
+    # band nothing can fly in.  This used to return the *top* of the range, so
+    # the machines that could not fly at all were the ones thrown hardest.
+    none_speed, _ = env._measure_trim_speed(1.0, 2.0)
+    check("and one that cannot fly anywhere in the band is dropped, not thrown",
+          abs(none_speed - 1.0) < 1e-9,
+          f"released at {none_speed:.1f} m/s, the floor, not the 2.0 m/s cap")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -1592,6 +2074,14 @@ def main() -> int:
     test_actuator_never_regenerates()
     test_structure_rejects_impossible_wings()
     test_wave_field()
+    test_jet_thrust_matches_momentum_flux()
+    test_a_failing_sweep_gates_only_the_last_swimmer()
+    test_the_power_budget_vectorises_without_changing_the_answer()
+    test_training_states_are_a_distribution_not_a_pose()
+    test_the_controller_senses_what_the_mission_scores()
+    test_flap_frequency_is_commandable_in_the_loop()
+    test_an_auto_reset_rollout_is_not_trusted()
+    test_the_air_score_measures_flight()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

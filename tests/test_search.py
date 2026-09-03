@@ -189,7 +189,9 @@ def test_curator_regimes_respond_to_the_run() -> None:
 
     r = c.update_regime()
     check("an empty archive bootstraps", r.name == "bootstrapping", r.name)
-    check("bootstrapping runs no emitters", r.emitter_fraction == 0.0)
+    check("bootstrapping widens the net rather than refining",
+          r.feasibility_bias >= 0.7 and r.n_mutations >= 2,
+          f"feasibility_bias={r.feasibility_bias} n_mutations={r.n_mutations}")
 
     rng = np.random.default_rng(0)
     for i in range(40):
@@ -1013,6 +1015,67 @@ def test_transitions_are_graded_not_pass_fail() -> None:
           two <= one, f"{one:.2f} -> {two:.2f} after adding a second crossing")
 
 
+def test_an_attempted_takeoff_outscores_never_leaving_the_ground() -> None:
+    """Getting partway off the ground must be worth more than not trying.
+
+    ``land_to_air`` asks for clearance above half a metre *at the end* of the
+    episode, which is sustained flight rather than a leap, and the gate it
+    feeds is multiplicative.  So while the gate read ``crossed`` directly,
+    every design that failed it scored the same zero: a machine that leapt
+    0.566 m and came down was worth exactly what a machine that never moved
+    was worth, and the search had no gradient to climb toward takeoff.
+
+    The fix must give a gradient without giving away the crossing, so this
+    pins both directions at once.
+    """
+    print("\nenvs: an attempted takeoff beats sitting still")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.transitions import TransitionResult, run_transition
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    scores = {}
+    for name in ("gannet", "teal"):
+        env = TriphibianEnv(build(BODY_PLANS[name]()))
+        ctrl = Controller(params=env.cpg.base)
+        scores[name] = run_transition(env, "land_to_air", ctrl, duration=6.0)
+
+    sit, leap = scores["gannet"], scores["teal"]
+    check("the leaper actually leaves the ground and the other does not",
+          leap.peak_clearance > 5.0 * sit.peak_clearance,
+          f"peak clearance {sit.peak_clearance:.3f} m vs {leap.peak_clearance:.3f} m")
+    check("neither of them completes the crossing",
+          not sit.crossed and not leap.crossed,
+          f"crossed {sit.crossed} / {leap.crossed}")
+    check("yet the leap scores strictly more than sitting still",
+          leap.approach > sit.approach + 0.1,
+          f"approach {sit.approach:.3f} vs {leap.approach:.3f} -- both were 0.000")
+    check("and both stay below what completing the crossing pays",
+          max(sit.approach, leap.approach) <= 0.6 + 1e-9,
+          f"capped at {max(sit.approach, leap.approach):.3f} against 1.0 for a crossing")
+
+    # Height alone must not buy it, and neither must hang time: a single
+    # ballistic hop that lands at once, and a machine that never quite touches
+    # while going nowhere, are both things this should refuse to pay for.
+    hop = TransitionResult(kind="land_to_air")
+    hop.peak_clearance, hop.airborne_fraction = 0.6, 0.02
+    drift = TransitionResult(kind="land_to_air")
+    drift.peak_clearance, drift.airborne_fraction = 0.02, 0.9
+    from dytiscidae.envs.transitions import _score
+
+    for res in (hop, drift):
+        _score(TriphibianEnv(build(BODY_PLANS["gannet"]())), res, -1,
+               np.array([1.0]), np.array([0.0]), Domain.AIR)
+    check("one term alone cannot earn a full approach",
+          max(hop.approach, drift.approach) < 0.35,
+          f"height-only {hop.approach:.3f}, hangtime-only {drift.approach:.3f}, "
+          f"both against {leap.approach:.3f} for a real leap")
+    check("a completed crossing is still worth exactly one",
+          TransitionResult(kind="x", crossed=True, approach=1.0).components["crossed"] == 1.0,
+          "the gate is unchanged where it mattered")
+
+
 def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     """The standard must get harder as the population improves, without making
     the record incomparable.
@@ -1034,12 +1097,18 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     j = Judge(quantile=0.9, update_every=1)
 
     # The ladder must be a progression: more capability, more rungs.
+    # ``holds_station`` sits between holding height and climbing: a machine
+    # gliding down at 0.4 m/s clears ``holds_height`` for a whole segment while
+    # never holding a height, so the two are separate rungs.
     seq = [
         ({"airborne_fraction": 0.05}, 0),
         ({"airborne_fraction": 0.7, "sink_rate": 6.0}, 2),
         ({"airborne_fraction": 0.7, "sink_rate": 2.0}, 3),
         ({"airborne_fraction": 0.9, "sink_rate": 0.2}, 4),
-        ({"airborne_fraction": 0.95, "sink_rate": -1.0, "turn_rate_held": 0.0}, 5),
+        ({"airborne_fraction": 0.9, "sink_rate": 0.2,
+          "station_keeping": 0.8}, 5),
+        ({"airborne_fraction": 0.95, "sink_rate": -1.0,
+          "station_keeping": 0.8, "turn_rate_held": 0.0}, 6),
     ]
     ok = all(rung_reached("air", m) == k for m, k in seq)
     check("the ladder orders capability", ok,
@@ -1050,10 +1119,10 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
 
     # The within-rung bonus must never reach the next rung's score.
     below = j.score("air", {"airborne_fraction": 0.95, "sink_rate": -1.0,
-                            "turn_rate_held": 0.0})
+                            "station_keeping": 0.8, "turn_rate_held": 0.0})
     top = j.score("air", {"airborne_fraction": 0.95, "sink_rate": -1.0,
-                          "turn_rate_held": 0.5})
-    check("clearing four rungs never ties with clearing five",
+                          "station_keeping": 0.8, "turn_rate_held": 0.5})
+    check("clearing six rungs never ties with clearing seven",
           below["total"] < top["total"], f"{below['total']:.3f} < {top['total']:.3f}")
 
     # The bar tightens as the population improves.
@@ -1280,6 +1349,115 @@ def test_critic_learns_the_exploit_signature() -> None:
     check("a critic with no signal has no influence",
           blind.calibration < 0.35 or blind.discount(np.zeros(16)) > 0.9,
           f"calibration {blind.calibration:.2f}, discount x{blind.discount(np.zeros(16)):.3f}")
+
+
+def test_the_island_objective_takes_its_weight_back() -> None:
+    """The blend between curriculum and island objective must not be a constant.
+
+    It was a flat 0.5 below stage 4, and on the 500-generation runs that meant
+    the *air* island was selecting almost entirely on a score that does not read
+    air.  Measured: its champion had air competence 0.107, so the island
+    objective -- competence**1.5 -- could contribute at most 0.035 against a
+    stored fitness of 0.5019.  96% of the pressure came from the island-blind
+    half, and the island filled with wingless water specialists.
+
+    Islands are an early device: grow terrain-adapted genes fast, keep a dark
+    horse alive long enough to show itself.  By the end the target is a
+    triphibian again, so the island's own objective has to come back.
+    """
+    print("\ncurriculum: the island objective takes its weight back")
+    from dytiscidae.evolution.curriculum import N_STAGES, Curriculum
+
+    c = Curriculum()
+    # The ramp now has a floor.  At ``stage/4`` alone the island half carried
+    # *zero* weight for the 69.1% of arch31's evaluations that sat at stage 0,
+    # so on the generalist island -- whose island objective is the mission
+    # itself -- the mission contributed nothing at all to most of the run.  The
+    # weighted-mean weight applied across the whole 600 generations was 0.1027.
+    check("the blend still starts mostly on the curriculum, but not entirely",
+          0.0 < c.handover(0) <= 0.3,
+          f"stage 0 hands over {c.handover(0):.2f} of the weight")
+    check("and the top of the ladder is the island's outright",
+          c.handover(N_STAGES - 1) == 1.0, "stage 4 -> 1.0")
+    check("the stage ramp is monotone",
+          all(c.handover(s) <= c.handover(s + 1) for s in range(N_STAGES - 1)),
+          " ".join(f"{c.handover(s):.2f}" for s in range(N_STAGES)))
+
+    # The spread-based "evidence" term is gone.  It weighted whichever half
+    # discriminated more, which silences a hard objective exactly when it
+    # matters: mission_fraction has a small spread *because* nothing can do the
+    # mission yet.  Over arch30 it averaged 0.197, below the 0.25 stage floor it
+    # was meant to improve on, and selection ended up correlating with mission
+    # capability at r = 0.1413.  So the ramp is now the whole rule.
+    flat = Curriculum()
+    for i in range(64):
+        flat.observe_blend(0.035, 0.2 + 0.8 * (i % 8) / 7.0, 1)
+    check("a flat island objective still gets its stage share, not less",
+          abs(flat.handover(1) - 0.25) < 1e-9,
+          f"stage-1 handover {flat.handover(1):.3f}")
+
+    sharp = Curriculum()
+    for i in range(64):
+        sharp.observe_blend(0.05 + 0.9 * (i % 8) / 7.0, 0.98, 1)
+    check("and a sharp one gets the same share: the ramp ignores spread",
+          abs(sharp.handover(1) - flat.handover(1)) < 1e-9,
+          f"flat {flat.handover(1):.3f} vs sharp {sharp.handover(1):.3f}")
+
+    # The property that actually fixes the bug: the two halves reach the blend
+    # on the same scale.  Raw, the island half spans 0.0437 p10-p90 against the
+    # curriculum's 0.5092 -- an 11.7x mismatch that hands the decision to the
+    # curriculum whatever weight is nominally applied.
+    mixed = Curriculum()
+    for i in range(64):
+        frac = (i % 8) / 7.0
+        mixed.observe_blend(0.02 + 0.04 * frac, 0.2 + 0.9 * frac, 2)
+    lo_i, lo_c = mixed.standing(0.021, 0.21, 2)
+    hi_i, hi_c = mixed.standing(0.059, 1.09, 2)
+    check("a tiny-scale island score still spans the standing range",
+          (hi_i - lo_i) > 0.7,
+          f"island standing {lo_i:.2f} -> {hi_i:.2f} over a raw span of 0.04")
+    check("and the large-scale curriculum score spans no more than it",
+          abs((hi_c - lo_c) - (hi_i - lo_i)) < 0.2,
+          f"curriculum standing {lo_c:.2f} -> {hi_c:.2f} over a raw span of 0.9")
+
+    # Before there is a population to rank against, both halves come back
+    # neutral rather than raw.  Raw would put an unrankable design onto the same
+    # axis as ranked ones at whatever scale it happens to have, which is the
+    # mismatch this whole mechanism exists to remove; 0.5 says "cannot rank
+    # this yet" and lets the other terms decide.
+    young = Curriculum()
+    young.observe_blend(0.03, 0.9, 0)
+    check("with too little history neither half claims to rank",
+          young.standing(0.5, 0.7, 0) == (0.5, 0.5),
+          f"fewer than {young.min_rank_samples} observations -> neutral")
+
+    # The windows are per stage.  Pooling them meant a stage-2 design, whose
+    # score is a smaller quantity by construction, landed in the bottom
+    # quantile for having been promoted: corr(fitness, stage) = -0.35.
+    split = Curriculum()
+    for i in range(64):
+        split.observe_blend(0.9, 0.9, 0)          # an easy stage scores high
+        split.observe_blend(0.05, 0.05, 2)        # a hard one scores low
+    top_of_hard = split.standing(0.06, 0.06, 2)[1]
+    same_in_easy = split.standing(0.06, 0.06, 0)[1]
+    check("a design is ranked against its own stage, not against an easier one",
+          top_of_hard > 0.9 and same_in_easy < 0.1,
+          f"0.06 ranks {top_of_hard:.2f} at stage 2 and {same_in_easy:.2f} at stage 0")
+
+    # And the mission arrives on the same scale as the other two, because a
+    # blend of raw magnitudes hands the decision to whichever is largest.
+    for i in range(64):
+        split.observe_blend(0.5, 0.5, 1, mission=0.001 * i)
+    check("the mission enters the blend as a standing too",
+          split.mission_standing(0.062, 1) > 0.9
+          and split.mission_standing(0.001, 1) < 0.2,
+          f"mission 0.062 -> {split.mission_standing(0.062, 1):.2f}, "
+          f"0.001 -> {split.mission_standing(0.001, 1):.2f}")
+
+    check("the blend is in the record, since it moves",
+          {"handover_floor", "handover_typical", "handover_mean", "rank_windows"}
+          <= set(Curriculum(stages={(0, 0, 0, 0): 1}).report()),
+          "report() carries the weight actually applied, not a field nothing writes")
 
 
 def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> None:
@@ -1512,6 +1690,479 @@ def test_a_run_can_be_picked_up_where_it_stopped() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_promotion_needs_a_nonzero_answer_to_the_next_question() -> None:
+    """A cell climbs the ladder only once it has touched the next rung.
+
+    Stage bars alone let a swimmer pass "directed" on depth-hold and be
+    promoted into "crossing" without ever having crossed anything: arch30
+    logged 764 promotions against 17 demotions while the typical cell sat at
+    stage 1 and five cells ever reached "chain".  Zero on the next stage's
+    question is not a bar to tune -- it is the difference between "has
+    something to climb" and "was pushed off a cliff".
+    """
+    print("\ncurriculum: promotion needs a nonzero answer to the next question")
+    from types import SimpleNamespace
+
+    from dytiscidae.evolution.curriculum import Curriculum
+
+    def result_water_specialist():
+        seg = SimpleNamespace(
+            competence=0.9,
+            measurements={"depth_error": 0.5, "max_depth": 9.0,
+                          "water_speed": 0.5},
+        )
+        return SimpleNamespace(segments={"water": seg}, mission_fraction=0.0)
+
+    def transitions(crossed: float):
+        comps = {k: (0.5 if crossed > 0 else 0.0)
+                 for k in ("shock", "control", "settle", "economy",
+                           "exit_state")}
+        comps["crossed"] = crossed
+        return SimpleNamespace(component_means=lambda: comps)
+
+    cur = Curriculum()
+    cell = (1, 2, 3, 4)
+    cur.stages[cell] = 1
+
+    sr = cur.evaluate(cell, result_water_specialist(), transitions(0.0))
+    check("the stage bar itself is passed", sr.passed,
+          f"here={sr.detail['here']} bar={sr.detail['bar']}")
+    check("but a cell that never crossed is held, not promoted",
+          cur.update(cell, sr) == "held" and cur.stage_of(cell) == 1)
+
+    sr = cur.evaluate(cell, result_water_specialist(), transitions(0.5))
+    check("one real crossing, however rough, earns the promotion",
+          cur.update(cell, sr) == "promoted" and cur.stage_of(cell) == 2,
+          f"next={sr.detail['next']}")
+
+
+def test_the_headline_is_the_mission() -> None:
+    """The generation report carries the generalist's mission_fraction.
+
+    ``best_fitness`` is whichever island's champion scored highest -- for ten
+    runs in a row that was the water island's wingless specialist, and reading
+    it as the run's headline hid that mission_fraction never moved.
+    """
+    print("\nloop: the headline is the mission")
+    import json
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    tmp = tempfile.mkdtemp(prefix="dyt-headline-")
+    try:
+        run_search(SearchConfig(
+            generations=1, batch=1, seed=11, segment_seconds=1.0,
+            n_reference_seeds=1, n_random_seeds=0, islands=("generalist",),
+            tier2_every=999, audit_every=999, migrate_every=999,
+            checkpoint_every=999, run_dir=tmp, identify_axes_every=999,
+        ), MissionSpec())
+        rows = [json.loads(l) for l in open(Path(tmp) / "generations.jsonl")]
+        gen_rows = [r for r in rows if "mission_best" in r]
+        check("the report carries mission_best", len(gen_rows) >= 1,
+              f"{len(gen_rows)} rows carry it")
+        check("and it is a fraction, not a fitness",
+              all(0.0 <= r["mission_best"] <= 1.0 for r in gen_rows))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
+    """Verification refines the elite's controller, and stores the result.
+
+    ``controller_refine_steps`` defaults to zero because refining every
+    candidate costs a full batched Tier-1 per step -- so the 500-generation
+    runs verified designs against a controller nothing had ever optimised.
+    Promotion is the affordable place: at most three per verification round,
+    and the search has already decided the design is worth a Tier-2.  Keeping
+    the refined weights on the elite is what makes the second payment worth
+    anything to the archive rather than only to the critic.
+    """
+    print("\nloop: promotion spends refinement and keeps what it buys")
+    import json
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    tmp = tempfile.mkdtemp(prefix="dyt-promote-")
+    try:
+        state = run_search(SearchConfig(
+            generations=2, batch=2, seed=3, segment_seconds=0.5,
+            n_reference_seeds=2, n_random_seeds=0, islands=("generalist",),
+            tier2_every=1, audit_every=999, migrate_every=999,
+            checkpoint_every=999, run_dir=tmp, identify_axes_every=999,
+            promotion_refine_steps=2), MissionSpec())
+        events = [json.loads(l) for l in open(Path(tmp) / "events.jsonl")]
+        promotions = [e for e in events if e.get("kind") == "promote"]
+        errors = [e for e in events if e.get("kind") == "error"]
+        check("verification still promotes", len(promotions) >= 1,
+              f"{len(promotions)} promotions")
+        check("and refinement at promotion raises no errors", not errors,
+              f"{[e.get('error') for e in errors[:2]]}")
+        stored = [e for e in state.archive.cells.values()
+                  if e.meta.get("policy")]
+        check("elites carry policy weights forward",
+              len(stored) == len(state.archive.cells) and stored,
+              f"{len(stored)} of {len(state.archive.cells)}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_a_shared_command_means_the_same_thing_on_every_body() -> None:
+    """A mode index is a private coordinate; a body twist is not.
+
+    Modes come out of an SVD, so their order is by authority and their sign is
+    arbitrary, and what mode 0 physically *is* depends on the body.  Measured
+    across twelve elites from arch31, the mean pairwise cosine between their
+    water mode-0 directions was +0.094 -- mode 0 was yaw on four of them, heave
+    on three, roll on two.  A policy shared across bodies and indexed by mode
+    therefore commands unrelated things on different machines, and its gradients
+    average toward nothing.  Commanding a twist and letting each body's basis
+    invert for the coefficients puts every machine back in the same units.
+
+    Two bases here describe the *same* physical machine with the modes permuted
+    and sign-flipped, which is exactly what an SVD is free to do.
+    """
+    print("\ncpg: a shared command means the same thing on every body")
+    from dytiscidae.control.cpg import MobilityBasis
+
+    # Three clean axes: surge, heave, yaw.
+    eff = np.zeros((3, 6))
+    eff[0, 0] = 1.0     # surge
+    eff[1, 2] = 1.0     # heave
+    eff[2, 5] = 1.0     # yaw
+    modes = np.eye(3, 7)
+    a = MobilityBasis(modes=modes, effects=eff.copy(),
+                      authority=np.array([3.0, 2.0, 1.0]), medium="water")
+    # Same machine, different SVD: modes reordered and two signs flipped.
+    perm = [2, 0, 1]
+    b = MobilityBasis(modes=modes[perm], effects=-eff[perm],
+                      authority=np.array([1.0, 3.0, 2.0])[perm], medium="water")
+
+    heave = np.zeros(6)
+    heave[2] = 1.0
+    ta = a.twist_of(a.coeffs_for_twist(heave))
+    tb = b.twist_of(b.coeffs_for_twist(heave))
+    cos = float(np.dot(ta, tb) / max(np.linalg.norm(ta) * np.linalg.norm(tb), 1e-12))
+    check("commanding heave gives the same motion through both bases",
+          cos > 0.99, f"cosine {cos:+.4f}")
+    check("and it really is heave", abs(ta[2]) > 10 * abs(ta[0]) + 1e-9,
+          f"twist {np.round(ta, 3).tolist()}")
+
+    # The same request indexed by mode does not survive the relabelling.
+    ca = np.zeros(3); ca[1] = 1.0
+    ma, mb = a.twist_of(ca), b.twist_of(ca)
+    mode_cos = float(np.dot(ma, mb)
+                     / max(np.linalg.norm(ma) * np.linalg.norm(mb), 1e-12))
+    check("where commanding mode 1 does not",
+          mode_cos < 0.5, f"cosine {mode_cos:+.4f}")
+
+    # An axis the body does not have must come back small, not enormous.
+    roll = np.zeros(6); roll[3] = 1.0
+    c_roll = a.coeffs_for_twist(roll)
+    c_heave = a.coeffs_for_twist(heave)
+    # Saturation must not spend everything the body has.
+    from dytiscidae.control.cpg import INTENT_AUTHORITY
+    full = a.twist_of(a.coeffs_for_twist(heave))[2]
+    _inv, reach = a._inverse
+    check("a saturated intent asks for a fraction of the body's reach, not all",
+          abs(full - INTENT_AUTHORITY * reach[2]) < 0.05 * reach[2],
+          f"delivered {full:.4f} of reach {reach[2]:.4f} "
+          f"(authority {INTENT_AUTHORITY})")
+
+    check("asking for an axis this body lacks returns almost nothing",
+          np.linalg.norm(c_roll) < 0.05 * np.linalg.norm(c_heave),
+          f"||c_roll|| {np.linalg.norm(c_roll):.2e} vs "
+          f"||c_heave|| {np.linalg.norm(c_heave):.3f}")
+
+    empty = MobilityBasis(modes=np.zeros((0, 7)), effects=np.zeros((0, 6)),
+                          authority=np.zeros(0))
+    check("a body with no identified axes commands nothing, and does not raise",
+          empty.coeffs_for_twist(heave).shape == (0,))
+
+    # A machine that cannot move has modes but no authority, so a ridge
+    # proportional to the problem is zero and the solve is singular.  Such a
+    # body is rare among the best elites and common in a random draw, which is
+    # how this got through the first time.
+    inert = MobilityBasis(modes=np.eye(3, 7), effects=eff.copy(),
+                          authority=np.zeros(3), medium="water")
+    got = inert.coeffs_for_twist(heave)
+    check("a body with no authority commands nothing, and does not raise",
+          got.shape == (3,) and np.allclose(got, 0.0), f"{got}")
+    faint = MobilityBasis(modes=np.eye(3, 7), effects=eff.copy(),
+                          authority=np.array([1e-9, 1e-10, 0.0]), medium="water")
+    out = faint.coeffs_for_twist(heave)
+    check("and a barely-mobile one does not answer with enormous coefficients",
+          np.all(np.isfinite(out)) and np.linalg.norm(out) < 10.0,
+          f"||c|| {np.linalg.norm(out):.3e}")
+
+
+def test_the_identification_width_reaches_the_policy() -> None:
+    """``n_modes`` must drive the identification, not merely the policy.
+
+    They were two independent defaults that had to agree and nothing connected
+    them: `identify_batch` took `max_modes=4` and never saw the config, so
+    `--n-modes 6` raised `operands could not be broadcast together with shapes
+    (4,) (6,)` in the middle of a rollout.  A config field that can only hold
+    one value is worse than no field.
+    """
+    print("\nloop: the identification width follows the configured one")
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.loop import SearchConfig, evaluate_candidates
+
+    for width in (4, 6):
+        cfg = SearchConfig(segment_seconds=0.3, controller_refine_steps=0,
+                           n_modes=width)
+        out = evaluate_candidates([beetle()], cfg, identify=True,
+                                  spec=MissionSpec(), seeds=[1])
+        _p, result, _c = out[0]
+        widths = {k: v.modes.shape[0] for k, v in result.mobility.items()}
+        check(f"n_modes={width} identifies {width} modes",
+              widths and all(w == width for w in widths.values()),
+              f"{widths}")
+
+
+def test_every_path_agrees_on_the_control_law() -> None:
+    """Refinement and verification must see the policy they will be scored with.
+
+    The two policies' intents are *summed* at the point of use, and only the
+    batched evaluator knew that.  Refinement optimised the per-candidate half
+    with the shared half absent and then stored the result to be scored with it
+    present; Tier-2 ran the single-machine path, which takes one policy, so it
+    verified a design under a control law that was not the one its Tier-1 score
+    was earned with -- and the critic is trained on exactly that ratio, so the
+    missing half was charged to the design.
+    """
+    print("\nloop: refinement and verification see the real control law")
+    import inspect
+
+    from dytiscidae.control.cpg import MobilityBasis
+    from dytiscidae.envs.evaluate import SummedPolicy
+    from dytiscidae.evolution import loop as loop_mod
+
+    class Fixed:
+        """Stands in for the shared policy: a twist, mean and sampled apart."""
+        def __init__(self, mean, sampled):
+            self.mean, self.sampled = mean, sampled
+
+        def act(self, obs, deterministic=False):
+            v = self.mean if deterministic else self.sampled
+            return np.full(6, v), 0.0, 0.0
+
+    class Own:
+        def act(self, obs):
+            return np.full(3, 0.25)
+
+    # A basis with three clean, equally strong axes, so a commanded twist maps
+    # back to coefficients that are easy to read.
+    eff = np.zeros((3, 6))
+    eff[0, 0] = eff[1, 1] = eff[2, 2] = 1.0
+    basis = MobilityBasis(modes=np.eye(3, 7), effects=eff,
+                          authority=np.ones(3), medium="air")
+
+    summed = SummedPolicy(own=Own(), shared=Fixed(0.5, 99.0), n_modes=3,
+                          basis=basis)
+    got = summed.act(np.zeros(19))
+    check("the summed policy adds both halves",
+          float(np.min(got)) > 0.25 + 1e-9, f"{np.round(got, 4).tolist()}")
+    check("and takes the shared half at its mean, never a sample",
+          float(np.max(got)) < 1.0, f"max {float(np.max(got)):.3f}")
+
+    only_own = SummedPolicy(own=Own(), shared=None, n_modes=3, basis=basis)
+    check("with no shared policy it is just the candidate's own",
+          np.allclose(only_own.act(np.zeros(19)), 0.25))
+
+    # Without a basis the shared half cannot be honoured -- it commands a twist
+    # and nothing can turn that into coefficients -- so it is dropped rather
+    # than added raw, which would mean something different on every body.
+    no_basis = SummedPolicy(own=Own(), shared=Fixed(0.5, 99.0), n_modes=3)
+    check("and with no basis the shared half is dropped, not misread",
+          np.allclose(no_basis.act(np.zeros(19)), 0.25),
+          f"{np.round(no_basis.act(np.zeros(19)), 4).tolist()}")
+
+    # The refinement path must thread the shared policy through, or it
+    # optimises one half of a sum against the other half being zero.
+    for fn in (loop_mod._refine_controllers, loop_mod.batchroll_eval):
+        check(f"{fn.__name__} accepts the shared policy",
+              "shared" in inspect.signature(fn).parameters,
+              f"parameters: {list(inspect.signature(fn).parameters)}")
+    src = inspect.getsource(loop_mod._refined_controller_for)
+    check("promotion-time refinement passes it on",
+          "shared=state.shared" in src)
+    check("and Tier-2 verification is given the summed law",
+          "_with_shared(state, ctrl2)"
+          in inspect.getsource(loop_mod._verify_and_label))
+
+
+def test_the_shared_policy_survives_a_resume() -> None:
+    """The most expensive learned thing in the run must outlive an interruption.
+
+    Every generation's transitions go into the shared policy, and it was the one
+    piece of learned state ``save_state`` did not carry -- so an interrupted
+    ``--shared-policy`` run resumed with a randomly initialised network while the
+    archive kept the scores the trained one had earned, and nothing said so.
+    """
+    print("\nloop: the shared policy survives a resume")
+    import shutil
+    import tempfile
+
+    from dytiscidae.learning.ppo import AVAILABLE, SharedPolicy
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    if not AVAILABLE:
+        check("torch is available to test the shared policy", True,
+              "skipped: torch not importable")
+        return
+
+    tmp = tempfile.mkdtemp(prefix="dyt-shared-resume-")
+    try:
+        base = dict(batch=1, seed=6, segment_seconds=0.4, n_reference_seeds=1,
+                    n_random_seeds=0, islands=("generalist",), tier2_every=999,
+                    audit_every=999, migrate_every=999, checkpoint_every=1,
+                    run_dir=tmp, identify_axes_every=999,
+                    use_shared_policy=True, promotion_refine_steps=0)
+        first = run_search(SearchConfig(generations=1, **base), MissionSpec())
+        w1 = first.shared.state_dict()["actor.0.weight"].detach().numpy().copy()
+
+        again = run_search(SearchConfig(generations=2, resume=True, **base),
+                           MissionSpec())
+        w2 = again.shared.state_dict()["actor.0.weight"].detach().numpy()
+
+        fresh = SharedPolicy(first.shared.n_obs, first.shared.n_modes,
+                             hidden=64)
+        wf = fresh.state_dict()["actor.0.weight"].detach().numpy()
+        d_resumed = float(np.linalg.norm(w2 - w1))
+        d_fresh = float(np.linalg.norm(wf - w1))
+        check("the resumed policy starts from the checkpointed weights",
+              d_resumed < 1e-6,
+              f"distance to checkpoint {d_resumed:.6f}")
+        check("which a fresh network would not",
+              d_fresh > 1.0, f"a fresh network sits {d_fresh:.3f} away")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_a_resume_says_when_controllers_cannot_be_inherited() -> None:
+    """Widening the observation orphans every stored controller; say so.
+
+    ``_controller_for`` starts from zeros when a stored weight vector does not
+    fit, which is right per candidate -- weights fitted against a different
+    observation space mean nothing.  Across a whole archive it is a different
+    event: the 14-to-19 channel widening made every policy in every earlier run
+    untransferable, and 240 discarded controllers must not look like a normal
+    resume.
+    """
+    print("\nloop: a resume says when controllers cannot be inherited")
+    import json
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    tmp = tempfile.mkdtemp(prefix="dyt-orphan-")
+    try:
+        base = dict(batch=1, seed=4, segment_seconds=0.5, n_reference_seeds=1,
+                    n_random_seeds=0, islands=("generalist",), tier2_every=999,
+                    audit_every=999, migrate_every=999, checkpoint_every=1,
+                    run_dir=tmp, identify_axes_every=999,
+                    promotion_refine_steps=0)
+        first = run_search(SearchConfig(generations=1, **base), MissionSpec())
+        arch = first.archipelago.archives["generalist"]
+        check("the run stored controllers to orphan",
+              any(e.meta.get("policy") for e in arch.cells.values()))
+
+        # Corrupt the stored width the way a change of observation space does.
+        for e in arch.cells.values():
+            if e.meta.get("policy"):
+                e.meta["policy"] = list(e.meta["policy"]) + [0.0]
+        arch.save(Path(tmp) / "archive_generalist.pkl")
+
+        run_search(SearchConfig(generations=2, resume=True, **base),
+                   MissionSpec())
+        events = [json.loads(l) for l in open(Path(tmp) / "events.jsonl")]
+        warned = [e for e in events
+                  if e.get("kind") == "policy_shape_mismatch"]
+        check("the resume reports the orphaned controllers", warned,
+              f"{warned[-1] if warned else 'no event'}")
+        check("and counts them rather than merely flagging",
+              warned and warned[-1]["mismatched"] >= 1,
+              f"{warned[-1]['mismatched']} of {warned[-1]['stored']}"
+              if warned else "")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_learned_axes_survive_resume() -> None:
+    """A refit that moved the archive onto latent axes must survive ``--resume``.
+
+    Two silent failures, found by forensics on arch24's checkpoint rather than
+    by any test: the restored archive kept its cells but woke up on the
+    constructor's hand-picked axes, and the refit trigger read an alias of the
+    descriptors captured before ``load_state`` replaced them -- so the restored
+    object accumulated samples (seen 3049) while the alias it checked stayed
+    empty, and a 500-generation run refit zero times after its first resume.
+    """
+    print("\nloop: learned axes survive a resume")
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution.loop import SearchConfig, run_search, save_state
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    tmp = tempfile.mkdtemp(prefix="dyt-axes-resume-")
+    try:
+        base = dict(batch=1, seed=7, segment_seconds=1.0, n_reference_seeds=1,
+                    n_random_seeds=0, islands=("generalist",),
+                    tier2_every=999, audit_every=999, migrate_every=999,
+                    checkpoint_every=1, run_dir=tmp, identify_axes_every=999)
+        first = run_search(SearchConfig(generations=2, **base), MissionSpec())
+
+        # Stand in for the long run this fixture cannot afford: enough observed
+        # behaviour to fit, one refit, and the rebin the loop performs after one.
+        rng = np.random.default_rng(0)
+        d = first.descriptors
+        for _ in range(d.min_samples):
+            d.observe(rng.normal(size=16))
+        check("the projection fits once fed", d.fit())
+        d.refit_every = 1  # the next refit falls due inside the resumed run
+        refits_before = d.refits
+        latent = [(f"latent{i}", float(lo), float(hi), 8)
+                  for i, (lo, hi) in enumerate(d.bounds())]
+        n_latent = len(latent)
+        fronts_saved = 0
+        for name, a in first.archipelago.archives.items():
+            a.rebin(latent, lambda e: np.asarray(e.descriptor, float)[:n_latent])
+            fronts_saved += sum(len(f) for f in a.fronts.values())
+            a.save(Path(tmp) / f"archive_{name}.pkl")
+        save_state(first, first.archipelago.archives["generalist"].generation)
+
+        again = run_search(SearchConfig(generations=5, resume=True, **base),
+                           MissionSpec())
+        a2 = again.archipelago.archives["generalist"]
+        check("the archive wakes up on the axes it was saved with",
+              [n for n, *_ in a2.axes][:n_latent]
+              == [f"latent{i}" for i in range(n_latent)],
+              f"axes after resume: {[n for n, *_ in a2.axes]}")
+        check("the fronts come back with it",
+              sum(len(f) for f in a2.fronts.values()) >= min(fronts_saved, 1),
+              f"{fronts_saved} front members saved")
+        check("the restored descriptors keep their memory",
+              again.descriptors.seen >= d.min_samples,
+              f"seen={again.descriptors.seen}")
+        check("and the refit trigger reads the restored object, not a stale alias",
+              again.descriptors.refits > refits_before,
+              f"refits {refits_before} -> {again.descriptors.refits}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_the_loop_wires_every_layer_together() -> None:
     """The judge, the auditor, the critic, the curriculum and the islands must
     all be connected to the search, not merely present in the tree.
@@ -1719,6 +2370,433 @@ def test_scout_finds_dark_horses_and_may_only_protect() -> None:
           f"far {far:.3f} against near {near:.3f}")
 
 
+def test_the_search_is_pointed_at_the_mission_and_compounds() -> None:
+    """The five defects the arch31 forensics found, each pinned by a check.
+
+    Every number quoted here was measured over that run's 9,384 evaluations and
+    1,451 surviving elites, and every one of them is a property of the machinery
+    rather than of the physics, so it belongs in a test rather than in a
+    postmortem.
+    """
+    print("\nsearch: pointed at the mission, and compounding")
+    from dytiscidae.core.genome import MUTATION_OPERATORS, mutate, random_genome
+    from dytiscidae.evolution.archive import Archive
+    from dytiscidae.evolution.curator import Curator, OperatorBandit
+    from dytiscidae.evolution.curriculum import Curriculum
+
+    # 1. A new cell starts where its parent got to.  58.9% of arch31's children
+    #    landed in an unoccupied cell and every one of them restarted at stage
+    #    0, which is why 69.1% of all evaluations were asked the easiest
+    #    question no matter what the lineage could already do.
+    c = Curriculum()
+    c.stages[(1, 1, 1, 1)] = 3
+    check("an unvisited cell inherits its parent's stage",
+          c.seed_stage((2, 2, 2, 2), c.stage_of((1, 1, 1, 1))) == 3,
+          "parent at 'chain' -> child's cell starts at 'chain'")
+    check("and a cell that already has a stage keeps it",
+          c.seed_stage((1, 1, 1, 1), 0) == 3, "seeding never demotes")
+
+    # 2. A multi-mutation child gets different operators.  6,198 of arch31's
+    #    6,284 multi-mutation children were one operator applied two or three
+    #    times, because the bandit's argmax was called n times with no state
+    #    change in between.
+    b = OperatorBandit()
+    rng = np.random.default_rng(7)
+    picked = []
+    for _ in range(3):
+        picked.append(b.select(rng, structural_bias=2.2, exclude=tuple(picked)))
+    check("three mutations means three different operators",
+          len(set(picked)) == 3, ", ".join(picked))
+
+    # 3. And the plan the bandit made is the plan that gets applied, rather than
+    #    a fresh uniform draw from it.
+    g = random_genome(np.random.default_rng(3))
+    plan = ["global_energy", "global_energy", "global_energy"]
+    _, applied = mutate(g, np.random.default_rng(4), operators=plan, n_ops=3)
+    check("mutate applies the plan it was handed",
+          applied == plan, f"{applied}")
+
+    # 4. Credit is improvement, not arrival.  Paying a flat 1.0 for landing in
+    #    an empty cell left all twenty-four operators scoring 0.60-0.73 -- a
+    #    bandit choosing between arms it cannot tell apart, which drifted into
+    #    growth until 31.4% of the population sat on the eight-part cap.
+    a = Archive([("x", 0.0, 1.0, 5), ("y", 0.0, 1.0, 5)])
+    cur = Curator(a, seed=0)
+    for i in range(40):
+        cur.credit(["cppn_weights"], "improved", 0.002)
+    for i in range(40):
+        cur.credit(["add_part"], "new", 0.30)
+    weak = cur.bandit.stats["cppn_weights"].mean_reward
+    strong = cur.bandit.stats["add_part"].mean_reward
+    check("an operator that improves outscores one that merely arrives",
+          strong > weak + 0.2, f"add_part {strong:.3f} against cppn_weights {weak:.3f}")
+    cur2 = Curator(a, seed=0)
+    for i in range(40):
+        cur2.credit(["scale"], "new", 0.0)
+    check("and arriving with no improvement is worth only the novelty share",
+          abs(cur2.bandit.stats["scale"].mean_reward - cur2.novelty_credit) < 1e-9,
+          f"{cur2.bandit.stats['scale'].mean_reward:.3f} == novelty_credit")
+
+    # 5. Pruning compares designs asked the same question.  Ranking a promoted
+    #    design against its unpromoted neighbours culled the ones that had
+    #    advanced: crossing-stage designs were 8.5% of arch31's evaluations and
+    #    3.4% of its surviving elites.
+    a2 = Archive([("x", 0.0, 1.0, 8), ("y", 0.0, 1.0, 8)])
+    cur3 = Curator(a2, seed=0, crowding_limit=0)
+    obj = np.array([0.5, 1.0, 1.0])
+    for i in range(6):
+        a2.add(f"easy{i}", 0.90, [0.50 + 0.02 * i, 0.50], {"stage": 0}, objectives=obj)
+    # one advanced design, weak *only* by the standard of the easy question
+    a2.add("hard", 0.30, [0.52, 0.52], {"stage": 2}, objectives=obj)
+    hard_cell = a2.cell_of(np.array([0.52, 0.52]))
+    cur3.prune(max_prunes=3)
+    check("a promoted design is not culled for being ranked against easier ones",
+          hard_cell in a2.cells,
+          "the only stage-2 occupant has no same-stage neighbourhood to lose to")
+
+
+def test_the_body_plan_outlives_the_lineage_window() -> None:
+    """``meta["body_plan"]`` has to say which archetype a design descends from.
+
+    It used to read ``genome.lineage[0]``, and ``lineage`` is a rolling window of
+    the last 24 *mutation operator* names.  So the field reported a plan for a
+    design's first 24 mutations and an operator name for the rest of its life,
+    and every diversity claim made from it in arch30, arch31 and arch33 was
+    reading a mixture of the two.
+    """
+    print("\ntelemetry: the body plan is not the first mutation operator")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.genome import crossover, mutate, random_genome
+    from dytiscidae.core.reference import reference_genome
+
+    rng = np.random.default_rng(0)
+    g = BODY_PLANS["bat"]()
+    check("an archetype knows what it is", g.body_plan == "bat", g.body_plan)
+    for _ in range(30):
+        g, _ = mutate(g, rng, n_ops=2)
+    check("and still does after thirty mutations", g.body_plan == "bat",
+          f"body_plan={g.body_plan!r} while lineage[0]={g.lineage[0]!r}")
+    check("which is exactly when the old field stopped saying so",
+          g.lineage[0] != "bat",
+          f"lineage has rolled to {g.lineage[0]!r}")
+    other = random_genome(rng)
+    check("a random graph is not an archetype", other.body_plan == "random",
+          other.body_plan)
+    check("the reference is its own plan",
+          reference_genome().body_plan == "reference")
+    # Crossover takes one parent's graph wholesale, so the plan is that
+    # parent's and not a blend of two.
+    check("crossover keeps the graph donor's plan",
+          crossover(g, other, rng).body_plan == "bat")
+
+
+def test_every_island_is_reached_by_verification_and_audit() -> None:
+    """The island rotates once per generation, so ``gen % N`` aliases.
+
+    With six islands, ``tier2_every = 15`` fires only on islands 0 and 3 and
+    ``audit_every = 30`` only on island 0.  Four islands had never had a design
+    verified at full fidelity in any run, and every audit in arch30, arch31 and
+    arch33 landed on ``air`` -- which is visible in arch33's archives, where the
+    only cells carrying a refined controller belong to two islands.
+    """
+    print("\nschedule: every island is verified and audited")
+    import inspect
+
+    from dytiscidae.evolution import loop as loop_mod
+
+    src = inspect.getsource(loop_mod.run_search)
+    check("verification counts island visits, not generations",
+          "if visits % max(cfg.tier2_every, 1) == 0" in src)
+    check("and so does the audit",
+          "if visits % max(cfg.audit_every, 1) == 0" in src)
+
+    islands, gens = 6, 900
+    for every in (15, 30):
+        old, new = set(), set()
+        visits = {}
+        fires_old = fires_new = 0
+        for gen in range(gens):
+            isl = gen % islands
+            v = visits.get(isl, 0)
+            visits[isl] = v + 1
+            if gen % every == 0:
+                old.add(isl)
+                fires_old += 1
+            if v % every == 0:
+                new.add(isl)
+                fires_new += 1
+        check(f"every {every} generations: the old rule reached "
+              f"{len(old)}/{islands} islands",
+              len(old) < islands, f"islands {sorted(old)}")
+        check(f"the new rule reaches all {islands}", len(new) == islands,
+              f"islands {sorted(new)}")
+        check("at the same total cost", abs(fires_new - fires_old) <= 1,
+              f"{fires_old} firings before, {fires_new} after")
+
+    # And the counters survive an interruption, or a resumed run re-fires
+    # everything at once.
+    check("the visit counts are checkpointed",
+          '"island_visits": dict(state.island_visits)'
+          in inspect.getsource(loop_mod.save_state))
+    check("and reconstructed for a checkpoint written before they existed",
+          "island_visits" in inspect.getsource(loop_mod.load_state))
+
+
+def test_a_long_leg_runs_on_promotion_candidates_only() -> None:
+    """Eight seconds against a 300 s mission leg is 2.7% of it.
+
+    Nothing that accumulates -- a draining battery, a drifting controller, an
+    attitude diverging slowly -- is visible in that window, and over 180
+    promotions in arch33 corr(tier1_fraction, tier2_fraction) was +0.077.
+    """
+    print("\nfidelity: a sixty-second leg where it is affordable")
+    import inspect
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import evaluate_tier1_5, weakest_domain
+    from dytiscidae.envs.triphibian import Domain
+    from dytiscidae.evolution import loop as loop_mod
+
+    check("the weak leg is the one the mission turns on",
+          weakest_domain({"air": 0.5, "water": 0.1, "land": 0.4}) is Domain.WATER,
+          "mission_fraction is gated on the minimum competence")
+    check("and a missing competence counts as zero, not as absent",
+          weakest_domain({"air": 0.5}) in (Domain.WATER, Domain.LAND))
+
+    seg = evaluate_tier1_5(build(BODY_PLANS["beetle"]()), seconds=2.0,
+                           competences={"air": 0.9, "water": 0.9, "land": 0.0})
+    check("it runs the weakest leg and scores it",
+          seg.domain is Domain.LAND and seg.duration == 2.0,
+          f"{seg.domain.value} for {seg.duration:.0f} s, "
+          f"competence {seg.competence:.3f}")
+
+    src = inspect.getsource(loop_mod._verify_and_label)
+    check("and it runs at promotion, where the cost is per promotion",
+          "_tier1_5(state, elite, p2, ctrl2, spec, rng)" in src)
+    check("before the Tier-2 mission, not instead of it",
+          src.index("_tier1_5(") < src.index("evaluate_tier2("))
+    check("the retention is recorded so the correlation is measurable",
+          '"tier1_5_retention"' in inspect.getsource(loop_mod._tier1_5))
+
+
+def test_the_shared_controller_question_is_answered_with_a_number() -> None:
+    """Before a fifth shared policy, ask whether one is representable at all.
+
+    The instrument has to be able to find a shared controller when one exists,
+    or a null result from it means nothing.  So it is run twice on synthetic
+    teachers: once where every body's optimum genuinely is a smooth function of
+    its morphology, and once where the same teachers are paired to the wrong
+    bodies.
+    """
+    print("\ndistillation: the instrument, checked against a known answer")
+    from dytiscidae.envs.triphibian import MORPHOLOGY_DIM, TriphibianEnv
+    from dytiscidae.learning import distill as D
+
+    rng = np.random.default_rng(0)
+    n_modes = 3
+    n_obs = TriphibianEnv.OBS_DIM
+
+    # Teachers whose weights are an affine function of the morphology: a
+    # conditioned network can represent this family exactly.
+    basis = rng.normal(0, 0.25, (MORPHOLOGY_DIM, n_obs * n_modes + n_modes))
+    off = rng.normal(0, 0.05, n_obs * n_modes + n_modes)
+    teachers = []
+    for i in range(40):
+        m = rng.uniform(-1, 1, MORPHOLOGY_DIM)
+        teachers.append(D.Teacher(name=f"b{i}", island="synthetic",
+                                  weights=m @ basis + off, morph=m))
+
+    states = D.sample_states(96, rng)
+    check("sampled states have the environment's own width",
+          states.shape[1] == n_obs - MORPHOLOGY_DIM,
+          f"{states.shape[1]} state channels + {MORPHOLOGY_DIM} morphology")
+    targets = D.teacher_targets(teachers, states, n_modes)
+    check("and every teacher's output is a bounded intent",
+          bool(np.all(np.abs(targets) <= 1.0)),
+          f"max |a| = {np.abs(targets).max():.4f}")
+
+    order = rng.permutation(len(teachers))
+    test_i, train_i = order[:12], order[12:]
+
+    def fit(perm_targets):
+        import torch
+        import torch.nn as nn
+        torch.manual_seed(0)
+        net = nn.Sequential(nn.Linear(n_obs, 128), nn.Tanh(),
+                            nn.Linear(128, 128), nn.Tanh(),
+                            nn.Linear(128, n_modes), nn.Tanh())
+        opt = torch.optim.Adam(net.parameters(), lr=3e-3)
+        morph = np.stack([t.morph for t in teachers])
+
+        def block(idx):
+            s = np.repeat(states[None], len(idx), 0)
+            m = np.repeat(morph[idx][:, None, :], len(states), 1)
+            x = np.concatenate([s, m], 2).reshape(-1, n_obs)
+            return (torch.as_tensor(x, dtype=torch.float32),
+                    torch.as_tensor(perm_targets[idx].reshape(-1, n_modes),
+                                    dtype=torch.float32))
+
+        xa, ya = block(train_i)
+        xb, yb = block(test_i)
+        for _ in range(5000):
+            i = torch.randperm(xa.shape[0])[:2048]
+            loss = ((net(xa[i]) - ya[i]) ** 2).mean()
+            opt.zero_grad(); loss.backward(); opt.step()
+        with torch.no_grad():
+            return D._r2(net(xb).numpy(), yb.numpy())
+
+    honest = fit(targets)
+    shuffled = fit(targets[rng.permutation(len(teachers))])
+    check("when a shared controller exists the study finds it",
+          honest > 0.6, f"held-out R2 {honest:+.3f} on 12 unseen bodies")
+    check("and when the morphology means nothing it does not",
+          shuffled < 0.2 and honest - shuffled > 0.4,
+          f"shuffled floor {shuffled:+.3f} against {honest:+.3f}")
+    check("R2 is measured against the constant baseline, so 0.0 is 'no better "
+          "than commanding the population mean'",
+          abs(D._r2(np.full((64, 2), 0.5), np.full((64, 2), 0.5))) < 1e-6
+          or D._r2(np.zeros((64, 2)), rng.normal(size=(64, 2))) < 0.2)
+
+
+def test_sharding_a_generation_does_not_change_a_score() -> None:
+    """Worker processes may only make the search faster, never different.
+
+    Nothing per machine depends on which other machines share its batch: the
+    scatter draw and the identification deltas are each ``default_rng`` built
+    fresh per machine, the force limiter is per machine, and the fluid kernel
+    has no cross-machine reduction.  That is what makes an actor pool safe, and
+    it is worth asserting rather than assuming -- a shared generator anywhere in
+    that chain would make a design's score depend on its position in the batch.
+    """
+    print("\nactors: a shard boundary is not visible in a score")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.actors import ActorPool, split
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    # The shard arithmetic first, which needs no simulation.
+    check("shards cover the batch exactly and in order",
+          split(16, 4, 4) == [(0, 4), (4, 8), (8, 12), (12, 16)],
+          f"{split(16, 4, 4)}")
+    check("a shard is never smaller than min_shard",
+          split(16, 16, 4) == split(16, 4, 4),
+          "sixteen workers on sixteen machines still make four shards of four")
+    check("and a batch smaller than one shard is not split at all",
+          split(3, 8, 4) == [(0, 3)], f"{split(3, 8, 4)}")
+    check("a pool of one runs in this process",
+          ActorPool(1)._pool is None)
+
+    plans = list(BODY_PLANS.values())
+    phenos = [build(plans[i % len(plans)]()) for i in range(6)]
+    kw = dict(spec=MissionSpec(), segment_seconds=1.0, identify_axes=True,
+              seed=11, n_modes=6)
+
+    def run(workers):
+        pool = ActorPool(workers, min_shard=2)
+        ctrls = [Controller(params=None, policy=None) for _ in phenos]
+        try:
+            res = pool.evaluate_tier1(phenos, controllers=ctrls, **kw)
+        finally:
+            pool.close()
+        return ([r.mission_fraction for r in res],
+                [sorted(c.bases or {}) for c in ctrls],
+                [r.mobility["air"].rank for r in res])
+
+    one = run(1)
+    many = run(3)
+    check("the same six machines score the same in one shard or three",
+          one[0] == many[0],
+          f"max difference {max(abs(a - b) for a, b in zip(one[0], many[0])):.3g}")
+    check("and their measured mobility comes back with them",
+          one[1] == many[1] and one[2] == many[2],
+          f"air ranks {one[2]}")
+
+
+def test_structure_can_be_recombined_and_duplicated() -> None:
+    """Structure was asexual: every graph descended from one seed by mutation.
+
+    ``crossover`` took one parent's graph wholesale, so two islands that
+    independently found a good wing and a good fin could not produce a design
+    carrying both -- which is most of the argument for having islands.  And
+    there was no way to build a graded limb series except by stumbling on each
+    member from the prior, because the only additive operator draws a part from
+    that prior.
+    """
+    print("\nstructure: grafting and duplication")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.genome import (MAX_BODIES, MAX_PARTS,
+                                        MUTATION_OPERATORS, STRUCTURAL_OPERATORS,
+                                        crossover, descendants, estimated_bodies,
+                                        graft_subtree)
+    from dytiscidae.core.phenotype import build
+
+    rng = np.random.default_rng(3)
+    check("the part cap is no longer the compute-era eight", MAX_PARTS > 8,
+          f"MAX_PARTS = {MAX_PARTS}, with a body budget of {MAX_BODIES}")
+    check("duplication is registered, and as a structural move",
+          "duplicate_part" in MUTATION_OPERATORS
+          and "duplicate_part" in STRUCTURAL_OPERATORS)
+
+    # Duplication has to *diverge*, which means its own shape gene.
+    g = BODY_PLANS["gannet"]()
+    surfaces = [p for p in g.parts if p.is_surface and p.surface_cppn >= 0]
+    before_parts, before_cppns = len(g.parts), len(g.cppns)
+    fired = MUTATION_OPERATORS["duplicate_part"](g, rng)
+    check("a duplication adds a part", fired and len(g.parts) == before_parts + 1,
+          f"{before_parts} -> {len(g.parts)}")
+    grew = len(g.cppns) > before_cppns
+    check("and the copy gets its own shape gene rather than sharing one",
+          grew or not surfaces,
+          f"cppns {before_cppns} -> {len(g.cppns)}; sharing would lock the two "
+          "parts to one gene that no mutation can separate")
+    idx = [i for i, p in enumerate(g.parts)]
+    check("the duplicate is still buildable", len(build(g).segments) > 0,
+          f"{len(build(g).segments)} segments from {len(idx)} parts")
+
+    # Grafting has to move a coherent subtree and leave the receiver buildable.
+    names = list(BODY_PLANS)
+    fired = built = added = 0
+    for i in range(60):
+        a = BODY_PLANS[names[i % len(names)]]()
+        b = BODY_PLANS[names[(i // len(names) + 1) % len(names)]]()
+        kid = a.copy()
+        n0 = len(kid.parts)
+        if not graft_subtree(kid, b, rng):
+            continue
+        fired += 1
+        added += len(kid.parts) - n0
+        try:
+            build(kid)
+            built += 1
+        except Exception:
+            pass
+    check("a graft moves a limb between two graphs", fired > 40,
+          f"fired {fired}/60, adding {added / max(fired, 1):.2f} parts on average")
+    check("and everything it produces still builds", built == fired,
+          f"{built}/{fired}")
+
+    check("the subtree walk terminates on a cyclic graph",
+          len(descendants(g, g.root)) <= len(g.parts),
+          f"{len(descendants(g, g.root))} of {len(g.parts)} parts reachable")
+
+    # And crossover reaches it, with the lineage saying which happened.
+    seen = set()
+    for _ in range(40):
+        kid = crossover(BODY_PLANS["eel"](), BODY_PLANS["bat"](), rng)
+        seen.add(kid.lineage[-1])
+    check("crossover records whether structure moved or only genes did",
+          seen == {"graft", "crossover"}, f"{sorted(seen)}")
+
+    # The budget is on bodies, because a part is not a body.
+    branchy = BODY_PLANS["medusa"]()
+    check("the body estimate sees what a part count cannot",
+          estimated_bodies(branchy) > len(branchy.parts),
+          f"{len(branchy.parts)} parts expand to about "
+          f"{estimated_bodies(branchy)} bodies")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -1740,13 +2818,31 @@ def main() -> int:
     test_no_dataclass_can_raise_on_equality()
     test_arriving_somewhere_is_not_one_lucky_timestep()
     test_transitions_are_graded_not_pass_fail()
+    test_an_attempted_takeoff_outscores_never_leaving_the_ground()
     test_judge_ladder_is_fixed_and_bar_only_tightens()
     test_auditor_can_invalidate_and_veto()
     test_critic_learns_the_exploit_signature()
+    test_the_island_objective_takes_its_weight_back()
     test_curriculum_and_islands_give_gradient_where_the_mission_gives_none()
     test_scout_finds_dark_horses_and_may_only_protect()
     test_a_run_can_be_picked_up_where_it_stopped()
+    test_promotion_needs_a_nonzero_answer_to_the_next_question()
+    test_the_headline_is_the_mission()
+    test_promotion_spends_refinement_and_keeps_what_it_buys()
+    test_a_shared_command_means_the_same_thing_on_every_body()
+    test_the_identification_width_reaches_the_policy()
+    test_the_search_is_pointed_at_the_mission_and_compounds()
+    test_every_path_agrees_on_the_control_law()
+    test_the_shared_policy_survives_a_resume()
+    test_a_resume_says_when_controllers_cannot_be_inherited()
+    test_learned_axes_survive_resume()
     test_the_loop_wires_every_layer_together()
+    test_the_body_plan_outlives_the_lineage_window()
+    test_every_island_is_reached_by_verification_and_audit()
+    test_a_long_leg_runs_on_promotion_candidates_only()
+    test_the_shared_controller_question_is_answered_with_a_number()
+    test_sharding_a_generation_does_not_change_a_score()
+    test_structure_can_be_recombined_and_duplicated()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

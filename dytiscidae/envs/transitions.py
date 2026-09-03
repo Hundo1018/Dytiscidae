@@ -125,6 +125,9 @@ class TransitionResult:
     kind: str
     crossed: bool = False
     failure: str = ""
+    #: MuJoCo bad-qacc events during the crossing; same auto-reset channel the
+    #: segment rollouts guard against (see SegmentResult.bad_qacc).
+    bad_qacc: int = 0
 
     # Raw measurements, kept so the record survives any change to the scoring.
     peak_entry_speed: float = 0.0
@@ -140,6 +143,31 @@ class TransitionResult:
     #: Peak slamming pressure and the hull's capacity for it, Pa.
     slam_pressure: float = 0.0
     slam_capacity: float = 0.0
+    #: Highest the machine's lowest geometry ever got, and the share of the
+    #: episode it spent with no ground contact at all.  Raw, always recorded.
+    peak_clearance: float = 0.0
+    airborne_fraction: float = 0.0
+
+    #: How much of the crossing happened, in [0, 1], and 1.0 exactly when
+    #: ``crossed`` is true.  This is what the fitness gate reads.
+    #:
+    #: It used to read ``crossed`` itself, and that was a cliff: the gate is
+    #: multiplicative -- ``transition_fraction = crossed * (0.40 + 0.60 *
+    #: quality)`` -- so every design that did not complete the crossing scored
+    #: exactly zero for it, and they all scored the same zero.  A machine that
+    #: leapt 0.566 m and came down was worth precisely as much as one that
+    #: never moved, which is the same defect the buoyancy checks had before
+    #: they were given graded margins, and it is fatal in the same way: the
+    #: search cannot climb a quantity that does not vary.
+    #:
+    #: Takeoff is where it bites hardest, because ``land_to_air`` asks for
+    #: clearance above half a metre *at the end of the episode* -- sustained
+    #: flight, not a leap -- and a machine cannot get there in one mutation
+    #: from a machine that is sitting on the ground.  Grading the approach is
+    #: what makes the intermediate rungs -- leaves the ground at all, stays off
+    #: it longer, comes down slower -- visible to selection, so the capability
+    #: can be evolved toward instead of having to arrive complete.
+    approach: float = 0.0
 
     # Normalised components, all higher-is-better.
     shock: float = 0.0
@@ -152,7 +180,9 @@ class TransitionResult:
     def components(self) -> dict[str, float]:
         """The scored parts, for the judge to weight."""
         return {
-            "crossed": 1.0 if self.crossed else 0.0,
+            # Graded: 1.0 iff the crossing actually completed, and a fraction
+            # of it for an attempt that got part of the way.  See ``approach``.
+            "crossed": float(self.approach),
             "shock": self.shock,
             "control": self.control,
             "settle": self.settle,
@@ -220,6 +250,8 @@ def run_transition(
     speeds: list[float] = []
     slam_window: list[float] = []
     slam_n = max(int(0.010 / env.timestep), 1)
+    airborne_steps = 0
+    r.peak_clearance = float(env.clearance())
 
     for i in range(n):
         if controller.policy is not None and basis is not None and i % control_every == 0:
@@ -240,6 +272,13 @@ def run_transition(
         uprights.append(up)
         speeds.append(float(np.linalg.norm(env.body_twist()[:3])))
         r.min_upright = min(r.min_upright, up)
+        # How far off the ground it ever got, and how long it stayed off it.
+        # Recorded for every crossing, scored only where it means something.
+        clear_now = float(env.clearance())
+        if clear_now > r.peak_clearance:
+            r.peak_clearance = clear_now
+        if int(env.data.ncon) == 0:
+            airborne_steps += 1
         # Slam over a short window, not a single step.
         #
         # ``diag.slam`` is a one-step finite difference of the entrained mass,
@@ -273,6 +312,7 @@ def run_transition(
         cross_step = max(len(uprights) - 1, 0)
 
     r.crossed = cross_step >= 0 and not r.failure
+    r.airborne_fraction = airborne_steps / max(len(uprights), 1)
     r.energy_j = float(env.budget.total_j - energy0)
     r.exit_depth = float(env.depth())
     r.exit_upright = float(uprights[-1]) if uprights else 0.0
@@ -294,7 +334,28 @@ def _score(
 ) -> None:
     """Turn the raw measurements into the six normalised components."""
     if not r.crossed:
+        # A failed crossing is not automatically worth nothing.  For an air
+        # target the bar is terminal clearance above 0.5 m, and the distance
+        # from "sitting on the ground" to that is far more than one mutation --
+        # so the approach is graded, and the intermediate rungs become
+        # something selection can see and climb.
+        #
+        # Two measurements, because either one alone is gameable.  Peak
+        # clearance alone rewards a single ballistic hop that lands
+        # immediately; airborne fraction alone rewards a machine that is
+        # never quite touching the ground while going nowhere.  Together they
+        # ask for height *and* time, which is what a takeoff is.
+        #
+        # Capped at 0.6 so that completing the crossing is always strictly
+        # better than any approach to it.  The gate is multiplicative, so this
+        # scales the whole transition score rather than adding to it: a leap
+        # cannot out-earn a flight, it can only stop being worth zero.
+        if target is Domain.AIR:
+            height = float(np.clip(r.peak_clearance / 0.5, 0.0, 1.0))
+            aloft = float(np.clip(r.airborne_fraction, 0.0, 1.0))
+            r.approach = float(0.6 * np.clip(0.5 * height + 0.5 * aloft, 0.0, 1.0))
         return
+    r.approach = 1.0
 
     # --- shock ------------------------------------------------------------
     # The *hydrodynamic* slam load, not the speed of the machine's centre.
