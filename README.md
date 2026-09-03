@@ -52,12 +52,16 @@ runs so far selected bodies on the strength of an untrained controller.
 ```bash
 pip install -r requirements.txt
 
-python -m dytiscidae.ops.run verify              # 30 physics checks
+python -m dytiscidae.ops.run verify              # 162 physics checks
 python -m dytiscidae.ops.run reference           # inspect the hand design
 python -m dytiscidae.ops.run search --generations 200 --run runs/first
 python -m dytiscidae.ops.run dashboard --run runs/first
 python -m dytiscidae.ops.run skills              # train the actuator skills
+python -m dytiscidae.ops.run distill --run runs/first   # is a shared controller reachable?
 ```
+
+[docs/ROADMAP.md](docs/ROADMAP.md) is the current work list, with the
+measurement behind each item and the number each finished one produced.
 
 `search` prints one line per generation and refreshes
 `runs/first/dashboard.html` every five generations, so you can watch it live by
@@ -233,7 +237,7 @@ being wrong, which is the failure mode that matters in a generative pipeline.
 | A rock scored 0.57 for land competence | All six plans between 0.541 and 0.596 while nothing walked | Six tenths of a locomotion score was awarded for lying still the right way up, and the climb term was computed, documented as "the capability", and left out of the return. |
 | The auditor's veto had no link to the bar it undid | — (would have silently frozen the judge) | It took a *count* of failed audits and rolled back every domain's most recent tightening. Audits find something most rounds; a ratchet reset most rounds never rises. |
 
-Verify with `python -m dytiscidae.ops.run verify` (115 checks); the search machinery has its own 194 in `tests/test_search.py`.
+Verify with `python -m dytiscidae.ops.run verify` (162 checks); the search machinery has its own 289 in `tests/test_search.py`, and the shared learner 8 in `tests/test_ppo.py`.
 
 ---
 
@@ -250,11 +254,13 @@ dytiscidae/
   evolution/   archive (MOME), cmaes, curator, loop, judge (ratchets the bar),
                auditor (the third party), critic, curriculum, islands, scout
                (predicts potential), descriptors (learned archive axes)
+  learning/    ppo (the shared policy), distill (is a shared policy reachable?)
   viz/         dashboard (self-contained HTML), render (offscreen video),
                showcase (one mission, wake and stress overlaid)
   ops/         telemetry (JSONL), run (CLI)
-tests/         test_physics.py  — 115 checks pinning conventions and magnitudes
-               test_search.py   — 194 checks on the search machinery
+tests/         test_physics.py  — 162 checks pinning conventions and magnitudes
+               test_search.py   — 289 checks on the search machinery
+               test_ppo.py      — 8 checks on the shared PPO learner
 ```
 
 ---
@@ -267,7 +273,24 @@ Worth knowing before trusting a result:
   wing–wing interaction. Good to maybe ±30% for a flapping wing, which is fine
   for ranking designs and not fine for predicting absolute performance.
 - **Tier-1 extrapolation.** The 45-minute budget comes from a short window. Tier-2
-  checks it, but only for promoted elites.
+  checks it, but only for promoted elites, and over arch33's 180 promotions
+  corr(tier1_fraction, tier2_fraction) was +0.077 — the cheap score carried
+  almost no information about the verified one. A 60 s single leg now runs at
+  each promotion (`evaluate_tier1_5`) and reports its retention, which is the
+  measurement that will say whether that has changed.
+- **Air scores before and after 2026-09-03 are different quantities.** The air
+  score used to pay 0.25 for being off the ground and 0.2 for the launch
+  velocity the environment supplied, and released a design with no trim speed at
+  the 30 m/s cap — so wingless machines scored 0.136 against winged 0.144. Every
+  term now describes the trajectory the machine flew. Raw measurements travel
+  with each design, so older runs stay analysable; their air *scores* do not
+  compare to arch34's. See ROADMAP Phase 1.1.
+- **No shared controller is reachable on the present conditioning.** A
+  morphology-conditioned student trained on 550 stored per-body controllers
+  fits the bodies it saw (train R² 0.66, 0.99 on the refined subset) and does
+  not beat commanding the population mean on bodies it did not (held-out R²
+  −0.05). `ops.run distill` reproduces it. Capacity is not the constraint;
+  generalisation across morphologies is.
 - **Added mass is directional but not a full tensor.** Each element gets a
   per-axis coefficient from its own extents, `Ca_i = 0.5(e_j+e_k)/(2 e_i)`,
   projected onto its instantaneous direction of motion. Exact for a sphere,
