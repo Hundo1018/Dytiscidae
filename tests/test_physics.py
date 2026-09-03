@@ -1943,6 +1943,106 @@ def test_an_auto_reset_rollout_is_not_trusted() -> None:
           f"bad_qacc={res.bad_qacc}")
 
 
+def test_the_air_score_measures_flight() -> None:
+    """Four ways an object that is not flying used to score for flight.
+
+    Measured across arch33: winged designs scored 0.144 in air and wingless
+    0.136, and both fell at about 11 m/s.  The score was not measuring flight,
+    it was measuring having been thrown.
+    """
+    print("\nair score: what a machine did, not what it was given")
+    import numpy as np
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import (
+        MAX_SPIN_RATE, MAX_WING_LOADING, Domain, SegmentResult, TriphibianEnv,
+        _turn_authority, airworthiness,
+    )
+
+    class Body:
+        def __init__(self, area, loading):
+            self.wing_area, self.wing_loading = area, loading
+
+    # 1. The Tier-0 gates.  arch33's mission champion: 12 kg, wing_area 0.0000,
+    #    wing loading 1,178,337 N/m^2.
+    check("a design with no lifting surface is gated",
+          airworthiness(Body(0.0, 1_178_337.0)) == ["no lifting surface"],
+          f"{airworthiness(Body(0.0, 1_178_337.0))}")
+    over = airworthiness(Body(0.05, MAX_WING_LOADING * 2))
+    check("and so is one loaded past any speed that could carry it",
+          len(over) == 1 and "wing loading" in over[0], f"{over}")
+    check("but a real wing is not",
+          airworthiness(Body(0.51, 85.6)) == [],
+          "the gannet, 0.51 m^2 at 86 N/m^2")
+
+    env = TriphibianEnv(build(BODY_PLANS["gannet"]()))
+    dt, dur = env.timestep, 8.0
+    n = int(dur / dt)
+
+    def air(sink, *, spins=None, commands=None, responses=None, gates=()):
+        r = SegmentResult(domain=Domain.AIR, duration=dur)
+        r.mean_speed = 20.0
+        clear = 30.0 - sink * np.arange(n) * dt
+        env.air_gates = list(gates)
+        try:
+            s = env._score_segment(
+                Domain.AIR, r, -clear, clear, np.ones(n), np.zeros(n), clear,
+                spins=spins, commands=commands, responses=responses)
+        finally:
+            env.air_gates = []
+        return s, r.measurements
+
+    # 2. Holding height is not the same as losing it slowly.
+    _s, held = air(0.0)
+    _s, creep = air(0.4)
+    check("holding a height satisfies station keeping",
+          held["station_keeping"] > 0.95, f"{held['station_keeping']:.2f}")
+    check("and a shallow glide does not, though it clears the sink bar",
+          creep["sink_rate"] < 0.5 and creep["station_keeping"] < 0.6,
+          f"sink {creep['sink_rate']:.2f} m/s, station "
+          f"{creep['station_keeping']:.2f}")
+
+    # 3. A tumble is not a commanded turn.
+    rng = np.random.default_rng(0)
+    cmd = [rng.normal(size=3) for _ in range(80)]
+    follows = [np.zeros(3)] + [0.8 * c for c in cmd[:-1]]
+    tumbles = [rng.normal(size=3) * 3.0 for _ in range(80)]
+    a_follow, _ = _turn_authority(cmd, follows)
+    a_tumble, _ = _turn_authority(tumbles, tumbles[::-1])
+    check("a machine that turns when told to has command authority",
+          a_follow > 0.9, f"corr {a_follow:+.2f}")
+    check("and one that spins on its own does not",
+          abs(a_tumble) < 0.3, f"corr {a_tumble:+.2f}")
+    _s, uncommanded = air(0.0, commands=None, responses=None)
+    check("so an uncommanded rotation scores no manoeuvring",
+          uncommanded["turn_rate_held"] == 0.0,
+          "the arch33 champion logged 31.4 rad/s with zero actuated DOF")
+
+    # 4. Spinning faster than a revolution a second is not flight.
+    fast = np.full(n, MAX_SPIN_RATE * 5.0)
+    spun, m_spun = air(0.0, spins=fast)
+    level, _ = air(0.0)
+    check("a machine tumbling at five revolutions a second is not flying",
+          spun < 0.1 * level, f"{spun:.3f} against {level:.3f} level")
+    check("and it cannot climb the ladder on its sink rate either",
+          m_spun["sink_rate"] > 9.0 and m_spun["measured_sink_rate"] == 0.0,
+          f"ladder sees {m_spun['sink_rate']:.1f}, record keeps "
+          f"{m_spun['measured_sink_rate']:.1f}")
+
+    # 5. The launch is no longer inversely earned.
+    lo, hi = __import__("dytiscidae.envs.triphibian", fromlist=["x"]).LAUNCH_SPEED_RANGE
+    speed, _pitch = env._measure_trim_speed(lo, hi)
+    check("a design that can fly is launched inside the band",
+          lo <= speed <= hi, f"gannet launches at {speed:.1f} m/s")
+    # The "no trim speed anywhere in the band" branch, forced by asking for a
+    # band nothing can fly in.  This used to return the *top* of the range, so
+    # the machines that could not fly at all were the ones thrown hardest.
+    none_speed, _ = env._measure_trim_speed(1.0, 2.0)
+    check("and one that cannot fly anywhere in the band is dropped, not thrown",
+          abs(none_speed - 1.0) < 1e-9,
+          f"released at {none_speed:.1f} m/s, the floor, not the 2.0 m/s cap")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -1981,6 +2081,7 @@ def main() -> int:
     test_the_controller_senses_what_the_mission_scores()
     test_flap_frequency_is_commandable_in_the_loop()
     test_an_auto_reset_rollout_is_not_trusted()
+    test_the_air_score_measures_flight()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

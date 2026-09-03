@@ -433,7 +433,11 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
     starts = [e.root_pos().copy() for e in envs]
     bad0 = [int(e.data.warning[e._mj.mjtWarning.mjWARN_BADQACC].number)
             for e in envs]
-    rec = [dict(depths=[], alts=[], ups=[], contacts=[], clears=[], slam=0.0)
+    # ``spins`` is per recorded step and must stay the same length as
+    # ``clears``; ``cmds``/``resp`` are per control decision.  All three feed
+    # the air branch's tumble-versus-commanded-turn test.
+    rec = [dict(depths=[], alts=[], ups=[], contacts=[], clears=[], slam=0.0,
+                spins=[], cmds=[], resp=[])
            for _ in envs]
     cur = list(params_list)
     active = np.ones(k, dtype=bool)
@@ -471,6 +475,9 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                                 potential_of(obs, getattr(domain, "value", str(domain))))
                     cur[m] = bases[m].command_params(
                         params_list[m], coeffs, e.cpg.n)
+                    rec[m]["cmds"].append(
+                        np.asarray(bases[m].twist_of(coeffs), float)[3:])
+                    rec[m]["resp"].append(e.body_twist()[3:])
                 angles.append(e.cpg.command(cur[m], e.data.time))
             else:
                 angles.append(None)
@@ -497,6 +504,7 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
             R = e.data.xmat[e.root_body].reshape(3, 3)
             r["ups"].append(float(R[2, 2]))
             r["contacts"].append(1.0 if e._touching_ground() else 0.0)
+            r["spins"].append(float(np.linalg.norm(e.body_twist()[3:])))
             r["slam"] = max(r["slam"], e.solver.diag.slam)
 
         if not active.any():
@@ -521,7 +529,9 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
         res[m].max_depth = float(max(r["depths"])) if r["depths"] else 0.0
         res[m].competence = e._score_segment(
             domain, res[m], np.array(r["depths"]), np.array(r["alts"]),
-            np.array(r["ups"]), np.array(r["contacts"]), np.array(r["clears"]))
+            np.array(r["ups"]), np.array(r["contacts"]), np.array(r["clears"]),
+            spins=np.array(r["spins"]), commands=r["cmds"],
+            responses=r["resp"])
     return res
 
 
@@ -558,6 +568,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         t0_r = evaluate_tier0(p, spec)
         r.structural_margin = t0_r.structural_margin
         r.feasible = t0_r.feasible
+        r.air_gates = list(t0_r.air_gates)
         if not p.segments:
             r.notes.append("empty phenotype")
             continue

@@ -236,6 +236,19 @@ class Genome:
 
     # --- bookkeeping --------------------------------------------------------
     lineage: list[str] = field(default_factory=list)
+    #: Which archetype this design's graph descends from.
+    #:
+    #: Separate from ``lineage`` because they answer different questions and
+    #: sharing one field made the answer to both wrong.  ``lineage`` is a
+    #: rolling window of the last 24 *mutation operator* names, kept for the
+    #: curator's bandit; the body plan is set once at birth and never changes,
+    #: because a mutation cannot turn a bat into an eel.  Reading the plan off
+    #: ``lineage[0]`` -- which is what ``meta["body_plan"]`` used to do --
+    #: returns the plan only for the first 24 mutations of a design's history
+    #: and an operator name (``jitter_cppn``, ``add_part``) for every design
+    #: after that.  Every diversity claim made from that field in arch30,
+    #: arch31 and arch33 was reading a mixture of the two.
+    body_plan: str = ""
     generation: int = 0
     parent_id: str | None = None
     genome_id: str = ""
@@ -257,6 +270,7 @@ class Genome:
             ballast_fraction=self.ballast_fraction,
             deadrise_deg=self.deadrise_deg,
             lineage=list(self.lineage),
+            body_plan=getattr(self, "body_plan", ""),
             generation=self.generation,
             parent_id=self.parent_id,
             genome_id=self.genome_id,
@@ -355,6 +369,7 @@ def random_genome(rng: np.random.Generator, *, target_scale: float = 1.0) -> Gen
     g.ballast_fraction = float(rng.uniform(0.1, 0.9))
     g.deadrise_deg = float(rng.uniform(5.0, 50.0))
     g.lineage = ["seed"]
+    g.body_plan = "random"
     return g
 
 

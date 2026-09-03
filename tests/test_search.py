@@ -1097,12 +1097,18 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     j = Judge(quantile=0.9, update_every=1)
 
     # The ladder must be a progression: more capability, more rungs.
+    # ``holds_station`` sits between holding height and climbing: a machine
+    # gliding down at 0.4 m/s clears ``holds_height`` for a whole segment while
+    # never holding a height, so the two are separate rungs.
     seq = [
         ({"airborne_fraction": 0.05}, 0),
         ({"airborne_fraction": 0.7, "sink_rate": 6.0}, 2),
         ({"airborne_fraction": 0.7, "sink_rate": 2.0}, 3),
         ({"airborne_fraction": 0.9, "sink_rate": 0.2}, 4),
-        ({"airborne_fraction": 0.95, "sink_rate": -1.0, "turn_rate_held": 0.0}, 5),
+        ({"airborne_fraction": 0.9, "sink_rate": 0.2,
+          "station_keeping": 0.8}, 5),
+        ({"airborne_fraction": 0.95, "sink_rate": -1.0,
+          "station_keeping": 0.8, "turn_rate_held": 0.0}, 6),
     ]
     ok = all(rung_reached("air", m) == k for m, k in seq)
     check("the ladder orders capability", ok,
@@ -1113,10 +1119,10 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
 
     # The within-rung bonus must never reach the next rung's score.
     below = j.score("air", {"airborne_fraction": 0.95, "sink_rate": -1.0,
-                            "turn_rate_held": 0.0})
+                            "station_keeping": 0.8, "turn_rate_held": 0.0})
     top = j.score("air", {"airborne_fraction": 0.95, "sink_rate": -1.0,
-                          "turn_rate_held": 0.5})
-    check("clearing four rungs never ties with clearing five",
+                          "station_keeping": 0.8, "turn_rate_held": 0.5})
+    check("clearing six rungs never ties with clearing seven",
           below["total"] < top["total"], f"{below['total']:.3f} < {top['total']:.3f}")
 
     # The bar tightens as the population improves.
@@ -2449,6 +2455,210 @@ def test_the_search_is_pointed_at_the_mission_and_compounds() -> None:
           "the only stage-2 occupant has no same-stage neighbourhood to lose to")
 
 
+def test_the_body_plan_outlives_the_lineage_window() -> None:
+    """``meta["body_plan"]`` has to say which archetype a design descends from.
+
+    It used to read ``genome.lineage[0]``, and ``lineage`` is a rolling window of
+    the last 24 *mutation operator* names.  So the field reported a plan for a
+    design's first 24 mutations and an operator name for the rest of its life,
+    and every diversity claim made from it in arch30, arch31 and arch33 was
+    reading a mixture of the two.
+    """
+    print("\ntelemetry: the body plan is not the first mutation operator")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.genome import crossover, mutate, random_genome
+    from dytiscidae.core.reference import reference_genome
+
+    rng = np.random.default_rng(0)
+    g = BODY_PLANS["bat"]()
+    check("an archetype knows what it is", g.body_plan == "bat", g.body_plan)
+    for _ in range(30):
+        g, _ = mutate(g, rng, n_ops=2)
+    check("and still does after thirty mutations", g.body_plan == "bat",
+          f"body_plan={g.body_plan!r} while lineage[0]={g.lineage[0]!r}")
+    check("which is exactly when the old field stopped saying so",
+          g.lineage[0] != "bat",
+          f"lineage has rolled to {g.lineage[0]!r}")
+    other = random_genome(rng)
+    check("a random graph is not an archetype", other.body_plan == "random",
+          other.body_plan)
+    check("the reference is its own plan",
+          reference_genome().body_plan == "reference")
+    # Crossover takes one parent's graph wholesale, so the plan is that
+    # parent's and not a blend of two.
+    check("crossover keeps the graph donor's plan",
+          crossover(g, other, rng).body_plan == "bat")
+
+
+def test_every_island_is_reached_by_verification_and_audit() -> None:
+    """The island rotates once per generation, so ``gen % N`` aliases.
+
+    With six islands, ``tier2_every = 15`` fires only on islands 0 and 3 and
+    ``audit_every = 30`` only on island 0.  Four islands had never had a design
+    verified at full fidelity in any run, and every audit in arch30, arch31 and
+    arch33 landed on ``air`` -- which is visible in arch33's archives, where the
+    only cells carrying a refined controller belong to two islands.
+    """
+    print("\nschedule: every island is verified and audited")
+    import inspect
+
+    from dytiscidae.evolution import loop as loop_mod
+
+    src = inspect.getsource(loop_mod.run_search)
+    check("verification counts island visits, not generations",
+          "if visits % max(cfg.tier2_every, 1) == 0" in src)
+    check("and so does the audit",
+          "if visits % max(cfg.audit_every, 1) == 0" in src)
+
+    islands, gens = 6, 900
+    for every in (15, 30):
+        old, new = set(), set()
+        visits = {}
+        fires_old = fires_new = 0
+        for gen in range(gens):
+            isl = gen % islands
+            v = visits.get(isl, 0)
+            visits[isl] = v + 1
+            if gen % every == 0:
+                old.add(isl)
+                fires_old += 1
+            if v % every == 0:
+                new.add(isl)
+                fires_new += 1
+        check(f"every {every} generations: the old rule reached "
+              f"{len(old)}/{islands} islands",
+              len(old) < islands, f"islands {sorted(old)}")
+        check(f"the new rule reaches all {islands}", len(new) == islands,
+              f"islands {sorted(new)}")
+        check("at the same total cost", abs(fires_new - fires_old) <= 1,
+              f"{fires_old} firings before, {fires_new} after")
+
+    # And the counters survive an interruption, or a resumed run re-fires
+    # everything at once.
+    check("the visit counts are checkpointed",
+          '"island_visits": dict(state.island_visits)'
+          in inspect.getsource(loop_mod.save_state))
+    check("and reconstructed for a checkpoint written before they existed",
+          "island_visits" in inspect.getsource(loop_mod.load_state))
+
+
+def test_a_long_leg_runs_on_promotion_candidates_only() -> None:
+    """Eight seconds against a 300 s mission leg is 2.7% of it.
+
+    Nothing that accumulates -- a draining battery, a drifting controller, an
+    attitude diverging slowly -- is visible in that window, and over 180
+    promotions in arch33 corr(tier1_fraction, tier2_fraction) was +0.077.
+    """
+    print("\nfidelity: a sixty-second leg where it is affordable")
+    import inspect
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import evaluate_tier1_5, weakest_domain
+    from dytiscidae.envs.triphibian import Domain
+    from dytiscidae.evolution import loop as loop_mod
+
+    check("the weak leg is the one the mission turns on",
+          weakest_domain({"air": 0.5, "water": 0.1, "land": 0.4}) is Domain.WATER,
+          "mission_fraction is gated on the minimum competence")
+    check("and a missing competence counts as zero, not as absent",
+          weakest_domain({"air": 0.5}) in (Domain.WATER, Domain.LAND))
+
+    seg = evaluate_tier1_5(build(BODY_PLANS["beetle"]()), seconds=2.0,
+                           competences={"air": 0.9, "water": 0.9, "land": 0.0})
+    check("it runs the weakest leg and scores it",
+          seg.domain is Domain.LAND and seg.duration == 2.0,
+          f"{seg.domain.value} for {seg.duration:.0f} s, "
+          f"competence {seg.competence:.3f}")
+
+    src = inspect.getsource(loop_mod._verify_and_label)
+    check("and it runs at promotion, where the cost is per promotion",
+          "_tier1_5(state, elite, p2, ctrl2, spec, rng)" in src)
+    check("before the Tier-2 mission, not instead of it",
+          src.index("_tier1_5(") < src.index("evaluate_tier2("))
+    check("the retention is recorded so the correlation is measurable",
+          '"tier1_5_retention"' in inspect.getsource(loop_mod._tier1_5))
+
+
+def test_the_shared_controller_question_is_answered_with_a_number() -> None:
+    """Before a fifth shared policy, ask whether one is representable at all.
+
+    The instrument has to be able to find a shared controller when one exists,
+    or a null result from it means nothing.  So it is run twice on synthetic
+    teachers: once where every body's optimum genuinely is a smooth function of
+    its morphology, and once where the same teachers are paired to the wrong
+    bodies.
+    """
+    print("\ndistillation: the instrument, checked against a known answer")
+    from dytiscidae.envs.triphibian import MORPHOLOGY_DIM, TriphibianEnv
+    from dytiscidae.learning import distill as D
+
+    rng = np.random.default_rng(0)
+    n_modes = 3
+    n_obs = TriphibianEnv.OBS_DIM
+
+    # Teachers whose weights are an affine function of the morphology: a
+    # conditioned network can represent this family exactly.
+    basis = rng.normal(0, 0.25, (MORPHOLOGY_DIM, n_obs * n_modes + n_modes))
+    off = rng.normal(0, 0.05, n_obs * n_modes + n_modes)
+    teachers = []
+    for i in range(40):
+        m = rng.uniform(-1, 1, MORPHOLOGY_DIM)
+        teachers.append(D.Teacher(name=f"b{i}", island="synthetic",
+                                  weights=m @ basis + off, morph=m))
+
+    states = D.sample_states(96, rng)
+    check("sampled states have the environment's own width",
+          states.shape[1] == n_obs - MORPHOLOGY_DIM,
+          f"{states.shape[1]} state channels + {MORPHOLOGY_DIM} morphology")
+    targets = D.teacher_targets(teachers, states, n_modes)
+    check("and every teacher's output is a bounded intent",
+          bool(np.all(np.abs(targets) <= 1.0)),
+          f"max |a| = {np.abs(targets).max():.4f}")
+
+    order = rng.permutation(len(teachers))
+    test_i, train_i = order[:12], order[12:]
+
+    def fit(perm_targets):
+        import torch
+        import torch.nn as nn
+        torch.manual_seed(0)
+        net = nn.Sequential(nn.Linear(n_obs, 128), nn.Tanh(),
+                            nn.Linear(128, 128), nn.Tanh(),
+                            nn.Linear(128, n_modes), nn.Tanh())
+        opt = torch.optim.Adam(net.parameters(), lr=3e-3)
+        morph = np.stack([t.morph for t in teachers])
+
+        def block(idx):
+            s = np.repeat(states[None], len(idx), 0)
+            m = np.repeat(morph[idx][:, None, :], len(states), 1)
+            x = np.concatenate([s, m], 2).reshape(-1, n_obs)
+            return (torch.as_tensor(x, dtype=torch.float32),
+                    torch.as_tensor(perm_targets[idx].reshape(-1, n_modes),
+                                    dtype=torch.float32))
+
+        xa, ya = block(train_i)
+        xb, yb = block(test_i)
+        for _ in range(5000):
+            i = torch.randperm(xa.shape[0])[:2048]
+            loss = ((net(xa[i]) - ya[i]) ** 2).mean()
+            opt.zero_grad(); loss.backward(); opt.step()
+        with torch.no_grad():
+            return D._r2(net(xb).numpy(), yb.numpy())
+
+    honest = fit(targets)
+    shuffled = fit(targets[rng.permutation(len(teachers))])
+    check("when a shared controller exists the study finds it",
+          honest > 0.6, f"held-out R2 {honest:+.3f} on 12 unseen bodies")
+    check("and when the morphology means nothing it does not",
+          shuffled < 0.2 and honest - shuffled > 0.4,
+          f"shuffled floor {shuffled:+.3f} against {honest:+.3f}")
+    check("R2 is measured against the constant baseline, so 0.0 is 'no better "
+          "than commanding the population mean'",
+          abs(D._r2(np.full((64, 2), 0.5), np.full((64, 2), 0.5))) < 1e-6
+          or D._r2(np.zeros((64, 2)), rng.normal(size=(64, 2))) < 0.2)
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -2489,6 +2699,10 @@ def main() -> int:
     test_a_resume_says_when_controllers_cannot_be_inherited()
     test_learned_axes_survive_resume()
     test_the_loop_wires_every_layer_together()
+    test_the_body_plan_outlives_the_lineage_window()
+    test_every_island_is_reached_by_verification_and_audit()
+    test_a_long_leg_runs_on_promotion_candidates_only()
+    test_the_shared_controller_question_is_answered_with_a_number()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

@@ -168,6 +168,11 @@ class MissionResult:
     #: visible per generation to be managed at all.
     diverged_rollouts: int = 0
     n_rollouts: int = 0
+    #: Flight gates this design fails, as reasons.  Computed closed-form at
+    #: Tier 0 and carried forward, because Tier 1 used to simulate an air
+    #: segment for a machine Tier 0 had already established has no wing, and
+    #: score it.  See ``airworthiness``.
+    air_gates: list[str] = field(default_factory=list)
 
     @property
     def energy_margin(self) -> float:
@@ -179,6 +184,128 @@ class MissionResult:
 # --------------------------------------------------------------------------
 # Tier 0: analytic
 # --------------------------------------------------------------------------
+
+#: Bounds on the launch airspeed, m/s.  Outside this band the quasi-steady
+#: coefficients are extrapolating and the design is not one this mission is
+#: about anyway.
+LAUNCH_SPEED_RANGE = (6.0, 30.0)
+
+#: The largest lift coefficient the strip model will produce (``lift_coefficient``
+#: caps at ``1.2 * cl_max`` with ``cl_max`` reaching 1.9 under a strong leading-
+#: edge vortex).  1.8 is the figure Tier 0's stall-speed estimate already used;
+#: naming it here keeps the gate below and that estimate from drifting apart.
+CL_MAX = 1.8
+
+#: A lifting surface smaller than this is not a lifting surface.  The same
+#: figure ``Phenotype.is_plausible_flyer`` uses to decide whether flight load
+#: cases apply at all.
+WING_AREA_FLOOR = 1e-3  # m^2
+
+#: Wing loading at which the stall speed is exactly the top of the launch band:
+#: ``0.5 rho V^2 CL_max`` = 992 N/m^2 at 30 m/s.  Above it there is no speed
+#: this mission will fly a machine at, and no attitude at that speed, which
+#: produces the machine's own weight in lift.  Derived rather than chosen.
+MAX_WING_LOADING = 0.5 * 1.225 * LAUNCH_SPEED_RANGE[1] ** 2 * CL_MAX
+
+#: Body angular rate above which nothing measured over an air segment is an
+#: attitude that was *held*.  One revolution per second turns the machine
+#: through 160 degrees within a single stroke at the reference design's 2.2 Hz,
+#: so its angle of attack sweeps the whole circle several times inside the
+#: window the sink rate is averaged over.
+MAX_SPIN_RATE = 2.0 * math.pi  # rad/s
+
+#: Correlation between commanded and achieved angular rate below which an
+#: attitude change was not asked for.  Zero is "the machine's rotation is
+#: unrelated to its commands"; this is deliberately close to zero, because the
+#: claim being defended against is a design with *no* control authority at all.
+MIN_TURN_AUTHORITY = 0.3
+
+#: Sink rate at which a descent stops being a glide and becomes a fall.
+#:
+#: At the bottom of the launch band the flight path is then steeper than 45
+#: degrees, so nothing about the trajectory is being produced by lift.  This is
+#: what replaced the flat ``+ 0.25`` the air score used to add for being off the
+#: ground at all: gliding is a real capability and has to keep scoring
+#: something, but it has to be *earned* by the descent rate rather than paid to
+#: anything that has left the surface.  Measured over the seven seed plans, the
+#: flappers sink at 10-14 m/s and the gannet at 1.7.
+SINK_BALLISTIC = LAUNCH_SPEED_RANGE[0]  # m/s
+
+#: What a gated design's air segment is worth.  Not zero.
+#:
+#: A hard zero would make ``mission_fraction`` -- which is gated on the *minimum*
+#: competence -- exactly zero for every wingless machine at once, and with it
+#: every gradient back toward growing a wing.  ``fitness`` declines to zero
+#: infeasible designs for the same reason.  A twentieth separates the two
+#: classes decisively without flattening one of them: measured on arch33,
+#: winged designs scored 0.144 in air and wingless 0.136, and at this credit
+#: the wingless class scores 0.007 against the same 0.144.
+GATED_AIR_CREDIT = 0.05
+
+
+def airworthiness(p: Phenotype) -> list[str]:
+    """Which flight gates a design fails, as reasons.  Empty means none.
+
+    These are Tier-0 facts -- geometry and mass, no simulation -- about a
+    family of designs the search kept finding and the scoring kept paying.
+    arch33's mission champion was 12 kg with ``wing_area`` 0.0000 m^2, a wing
+    loading of 1,178,337 N/m^2 and zero actuated degrees of freedom, and it was
+    recorded *climbing* at 2.08 m/s while spinning at 31.4 rad/s.  It scored
+    0.18, and the existing exploit flag needs 0.35 to disqualify, so nothing in
+    the run objected.
+
+    Tier 0 already knew: ``p_air`` is infinite for such a machine and the note
+    reads "no lifting surface".  Tier 1 then simulated an air segment for it
+    anyway and scored the result, so the closed-form finding was overwritten by
+    a number produced by throwing the object.  These gates carry the Tier-0
+    finding into the air score.
+
+    What a gate does *not* do is reject the design.  A wingless submarine is a
+    legitimate water specialist and the islands exist so it can be one; it
+    simply cannot be credited with flight.
+    """
+    out: list[str] = []
+    if p.wing_area < WING_AREA_FLOOR:
+        out.append("no lifting surface")
+    elif p.wing_loading > MAX_WING_LOADING:
+        out.append(
+            f"wing loading {p.wing_loading:.0f} N/m^2 exceeds "
+            f"{MAX_WING_LOADING:.0f}: no launch speed carries the weight"
+        )
+    return out
+
+
+def _turn_authority(commands, responses) -> tuple:
+    """How much of a machine's rotation it actually asked for.
+
+    Returns ``(correlation, mean_rate)``.  ``commands`` are the angular halves
+    of the body twists the controller commanded, one per control decision, and
+    ``responses`` are the angular body rates measured at those same decisions.
+    The command at step *k* is paired with the response at *k+1*, so the machine
+    is given one control interval to answer.
+
+    Both are in the body frame and in rad/s -- ``MobilityBasis.twist_of`` is the
+    forward model of the same identification the commands are expressed in -- so
+    the correlation is between a request and its outcome on the same axes.
+
+    A design with no controller, no mobility basis or no actuated degrees of
+    freedom produces no commands, and the answer is zero: whatever it is doing
+    with its attitude, it did not ask for it.
+    """
+    if commands is None or responses is None:
+        return 0.0, 0.0
+    c = np.asarray(commands, float)
+    a = np.asarray(responses, float)
+    n = min(len(c), len(a)) - 1
+    if n < 2 or c.ndim != 2 or a.ndim != 2:
+        return 0.0, 0.0
+    x = c[:n].ravel()
+    y = a[1:n + 1].ravel()
+    rate = float(np.mean(np.linalg.norm(a[1:n + 1], axis=1)))
+    if float(np.std(x)) < 1e-9 or float(np.std(y)) < 1e-9:
+        return 0.0, rate
+    corr = float(np.corrcoef(x, y)[0, 1])
+    return (corr if np.isfinite(corr) else 0.0), rate
 
 
 def evaluate_tier0(p: Phenotype, spec: MissionSpec | None = None) -> MissionResult:
@@ -243,6 +370,8 @@ def evaluate_tier0(p: Phenotype, spec: MissionSpec | None = None) -> MissionResu
     if not r.feasible:
         w = p.report.worst
         r.notes.append(f"structural: {w.name} margin {w.margin:+.2f}" if w else "structural")
+    r.air_gates = airworthiness(p)
+    r.notes.extend(f"air gate: {g}" for g in r.air_gates)
     r.notes.append(f"v_cruise={v_cruise:.1f}m/s P_air={p_air:.0f}W P_water={p_water:.0f}W")
     return r
 
@@ -255,6 +384,36 @@ def evaluate_tier0(p: Phenotype, spec: MissionSpec | None = None) -> MissionResu
 #: Channels of body identity appended to every observation.  See
 #: ``TriphibianEnv.morphology_context``.
 MORPHOLOGY_DIM = 8
+
+
+def morphology_channels(*, mass: float, density_ratio: float, wing_area: float,
+                        span: float, aspect_ratio: float, wing_loading: float,
+                        n_actuated: int, battery_wh: float) -> np.ndarray:
+    """The eight body-identity channels, from scalars rather than a phenotype.
+
+    Split out so that anything reading a stored design's morphology -- the
+    distillation study reads it out of archive JSON, where every one of these
+    is already recorded -- computes exactly the transform the policy was trained
+    under.  A second copy of this arithmetic is how a stored policy comes to
+    mean something different from what it meant when it was fitted.
+
+    Every channel is scaled to roughly [-1, 1] by a *fixed* transform rather
+    than by population statistics, because a normalisation that moves would make
+    a stored policy mean something different in a later generation.
+    """
+    mass = float(max(mass, 1e-3))
+    wing = float(max(wing_area, 0.0))
+    return np.array([
+        np.clip((np.log10(mass) - np.log10(0.4))
+                / (np.log10(40.0) - np.log10(0.4)) * 2.0 - 1.0, -1.5, 1.5),
+        np.clip(np.tanh(float(density_ratio) - 1.0), -1.0, 1.0),
+        np.clip(np.tanh(wing / 0.5), 0.0, 1.0),
+        np.clip(float(max(span, 0.0)) / 3.0, 0.0, 1.5),
+        np.clip(float(aspect_ratio) / 20.0, 0.0, 1.5),
+        np.clip(np.log10(max(float(wing_loading), 1.0)) / 3.0 - 1.0, -1.5, 1.5),
+        np.clip(int(n_actuated) / 16.0, 0.0, 1.5),
+        np.clip(float(battery_wh) / (100.0 * mass), 0.0, 1.5),
+    ], float)
 
 
 class TriphibianEnv:
@@ -273,20 +432,18 @@ class TriphibianEnv:
     #: set by the height of the drop, not by aerodynamics, so the search was
     #: being asked to optimise a number it could barely move.
     #:
-    #: A flight test does not start with the aircraft at rest in mid-air.  The
-    #: launch is deliberately identical for every design -- a per-design trim
-    #: speed would hand a tiny-winged machine a large free velocity and the
-    #: speed term would pay it for that.
+    #: A flight test does not start with the aircraft at rest in mid-air, so
+    #: the air segment is a launch.  The speed is each design's own measured
+    #: trim speed (see ``launch_speed``), which is only defensible now that the
+    #: two things that made it a *gift* are gone: a design with no trim speed
+    #: anywhere is released at the bottom of the band rather than the top, and
+    #: the air score no longer pays for the velocity it was handed.
     SPAWN = {
         Domain.AIR: (-40.0, 0.0, 30.0),
         Domain.WATER: (-8.0, 0.0, -4.0),
         Domain.LAND: (15.0, 0.0, 0.9),
     }
 
-    #: Bounds on the launch airspeed, m/s.  Outside this band the quasi-steady
-    #: coefficients are extrapolating and the design is not one this mission is
-    #: about anyway.
-    LAUNCH_SPEED_RANGE = (6.0, 30.0)
 
     def __init__(
         self,
@@ -304,6 +461,8 @@ class TriphibianEnv:
         rather than as the flat box that collides for them.  Rendering wants it;
         search does not, and pays about a quarter of its step budget for it."""
         self.p = phenotype
+        #: Flight gates from geometry and mass alone; see ``airworthiness``.
+        self.air_gates = airworthiness(phenotype)
         self._morph_ctx = None
         self.rng = np.random.default_rng(seed)
         self.medium = MediumField(sea_state=sea_state, current=current, wind=wind)
@@ -524,7 +683,7 @@ class TriphibianEnv:
         cached = getattr(self.p, "_measured_trim", None)
         if cached is not None:
             return cached
-        lo, hi = self.LAUNCH_SPEED_RANGE
+        lo, hi = LAUNCH_SPEED_RANGE
         out = self._measure_trim_speed(lo, hi)
         try:
             self.p._measured_trim = out
@@ -605,10 +764,18 @@ class TriphibianEnv:
 
         top, top_a = best_lift(hi)
         if top < weight:
-            # Cannot fly at any speed we are willing to model.  Launched at the
-            # cap, at the attitude that does least badly, and it will fall --
-            # which is the correct answer for a design that cannot fly.
-            return float(hi), float(top_a)
+            # Cannot fly at any speed we are willing to model.  Released at the
+            # *bottom* of the band, at the attitude that does least badly.
+            #
+            # This used to be the top of the band, and that made the launch
+            # inversely earned: the machines that could not fly at all were the
+            # ones thrown hardest, at 30 m/s, and the air score then paid them
+            # 0.2 for the speed they had been given and let them read as
+            # climbing when the beach rose to meet them 75 m downrange.  The
+            # comment that used to be here said this was "the correct answer for
+            # a design that cannot fly"; the correct answer for a design that
+            # cannot fly is to drop it, not to throw it.
+            return float(lo), float(top_a)
         base, base_a = best_lift(lo)
         if base >= weight:
             v_stall = lo
@@ -801,21 +968,16 @@ class TriphibianEnv:
         """
         if self._morph_ctx is None:
             p = self.p
-            mass = float(max(p.mass, 1e-3))
-            wing = float(max(p.wing_area, 0.0))
-            span = float(max(p.max_span, 0.0))
-            cap = float(getattr(p.genome, "battery_wh", 0.0))
-            self._morph_ctx = np.array([
-                np.clip((np.log10(mass) - np.log10(0.4))
-                        / (np.log10(40.0) - np.log10(0.4)) * 2.0 - 1.0, -1.5, 1.5),
-                np.clip(np.tanh(float(p.density_ratio) - 1.0), -1.0, 1.0),
-                np.clip(np.tanh(wing / 0.5), 0.0, 1.0),
-                np.clip(span / 3.0, 0.0, 1.5),
-                np.clip(float(p.aspect_ratio) / 20.0, 0.0, 1.5),
-                np.clip(np.log10(max(float(p.wing_loading), 1.0)) / 3.0 - 1.0, -1.5, 1.5),
-                np.clip(len(self.act_names) / 16.0, 0.0, 1.5),
-                np.clip(cap / (100.0 * mass), 0.0, 1.5),
-            ], float)
+            self._morph_ctx = morphology_channels(
+                mass=p.mass,
+                density_ratio=p.density_ratio,
+                wing_area=p.wing_area,
+                span=p.max_span,
+                aspect_ratio=p.aspect_ratio,
+                wing_loading=p.wing_loading,
+                n_actuated=len(self.act_names),
+                battery_wh=float(getattr(p.genome, "battery_wh", 0.0)),
+            )
         return self._morph_ctx
 
     def observation(self, target: "Domain | None" = None) -> np.ndarray:
@@ -931,6 +1093,10 @@ class TriphibianEnv:
         bad0 = int(self.data.warning[
             self._mj.mjtWarning.mjWARN_BADQACC].number)
         depths, alts, ups, contacts, clearances = [], [], [], [], []
+        # The attitude record.  ``spins`` is per step; ``commands`` and
+        # ``responses`` are per control decision, and exist so the air score can
+        # tell a commanded turn from a tumble -- see ``_turn_authority``.
+        spins, commands, responses = [], [], []
         peak_slam = 0.0
         cur = p
 
@@ -938,6 +1104,8 @@ class TriphibianEnv:
             if policy is not None and basis is not None and i % control_every == 0:
                 coeffs = policy.act(self.observation(domain))
                 cur = basis.command_params(p, coeffs, self.cpg.n)
+                commands.append(np.asarray(basis.twist_of(coeffs), float)[3:])
+                responses.append(self.body_twist()[3:])
             angles = self.cpg.command(cur, self.data.time)
             if not self.step(angles):
                 res.failure = "battery exhausted"
@@ -954,6 +1122,7 @@ class TriphibianEnv:
             R = self.data.xmat[self.root_body].reshape(3, 3)
             ups.append(float(R[2, 2]))
             contacts.append(1.0 if self._touching_ground() else 0.0)
+            spins.append(float(np.linalg.norm(self.body_twist()[3:])))
             peak_slam = max(peak_slam, self.solver.diag.slam)
 
         end = self.root_pos().copy()
@@ -974,12 +1143,22 @@ class TriphibianEnv:
         res.competence = self._score_segment(
             domain, res, np.array(depths), np.array(alts),
             np.array(ups), np.array(contacts), np.array(clearances),
+            spins=np.array(spins), commands=commands, responses=responses,
         )
         return res
 
     def _score_segment(self, domain, res, depths, alts, ups, contacts,
-                       clearances=None) -> float:
+                       clearances=None, *, spins=None, commands=None,
+                       responses=None) -> float:
         """Domain competence in [0, 1].
+
+        ``spins`` is the body angular rate magnitude at each recorded step, and
+        ``commands``/``responses`` are the commanded and achieved angular rates
+        at each control decision.  All three are optional and all three are only
+        read by the air branch, where the difference between a tumble and a
+        commanded turn is the difference between a score and an exploit.  A
+        caller that does not supply them gets an air score with no manoeuvring
+        credit, which is the right answer for a rollout that had no controller.
 
         Each domain is scored on what actually matters there, not on a generic
         "went far" reward -- flying is about not falling, diving is about
@@ -1040,11 +1219,42 @@ class TriphibianEnv:
             frac = float(np.sum(airborne) / n_want)
             if frac < 0.05:
                 return 0.0  # never left the surface: no flight to score
+            idx = np.flatnonzero(airborne)
+
+            # --- the gates ---------------------------------------------
+            #
+            # Two of them are Tier-0 facts about the machine (``airworthiness``)
+            # and the third is measured here: a body turning faster than a
+            # revolution a second has no attitude that persists long enough for
+            # anything below to be a measurement of flight.
+            spin = 0.0
+            if spins is not None and len(spins) == len(clearances) and len(idx):
+                spin = float(np.mean(np.asarray(spins, float)[idx]))
+            gates = list(self.air_gates)
+            if spin > MAX_SPIN_RATE:
+                gates.append(f"spinning at {spin:.1f} rad/s")
+            credit = GATED_AIR_CREDIT if gates else 1.0
+
             # Sink is a rate, and a rate needs a baseline long enough to be one.
             # Over a tenth of a second every launched object has a sink rate of
             # nearly zero, including a brick.
+            #
+            # The partial credit for a brief hop was 0.25, which is what a
+            # genuine glide at 1.0 m/s sink now scores.  A hop and a glide are
+            # not the same achievement, so it is 0.10.
             if np.sum(airborne) * self.timestep < 0.35 * res.duration:
-                return float(frac * 0.25)
+                # The diagnostics, but deliberately not the ladder metrics: a
+                # hop that was too short to measure a sink rate over should not
+                # be able to climb a rung on the strength of having happened.
+                # This is the path arch33's wingless "climbers" now take, and
+                # what they left behind was a blank record.
+                res.measurements.update({
+                    "spin_rate": spin,
+                    "measured_sink_rate": 9.9,
+                    "air_gates": float(len(gates)),
+                    "airborne_seconds": float(np.sum(airborne) * self.timestep),
+                })
+                return float(credit * frac * 0.10)
 
             # Sink rate measured only over the airborne stretch, and only its
             # later half, by which time a real flyer has settled.  Zero sink is
@@ -1057,8 +1267,8 @@ class TriphibianEnv:
             # speed cap because its wing area rounded to zero, lobbed seventy
             # five metres downrange, and read as *climbing* over the second half
             # of its arc because the hill came up to meet it.  Scored 0.75 for
-            # flight.
-            idx = np.flatnonzero(airborne)
+            # flight.  It is now released at the bottom of the launch band, and
+            # gated above in any case.
             late = idx[len(idx) // 2:]
             if len(late) > 1:
                 span_s = (late[-1] - late[0]) * self.timestep
@@ -1068,26 +1278,74 @@ class TriphibianEnv:
             else:
                 sink = 9.9
             flight = float(np.clip(1.0 - sink / 1.5, 0.0, 1.0))
-            # Speed is scored against this design's own launch, not against a
-            # fixed 8 m/s.  With the launch set to each machine's trim speed, an
-            # absolute threshold would hand full marks to every design that
-            # simply had a small wing, since a small wing means a fast launch.
-            # Measured this way the term asks whether the machine *kept* the
-            # speed it was given, which is what sustaining flight means.
-            speed = float(np.clip(res.mean_speed / max(self.launch_speed, 1e-6), 0.0, 1.0))
+            # Gliding, graded over the whole range between flight and falling.
+            # The 0.55/1.5 term above is zero for everything that is not very
+            # nearly holding height -- no seed plan reaches it -- so without a
+            # graded companion the air score is a step function nothing in the
+            # population can climb, which is the failure the flat 0.25 was
+            # papering over.  This one has to be earned.
+            glide = float(np.clip(1.0 - sink / SINK_BALLISTIC, 0.0, 1.0))
+
+            # Station keeping: holding *a* height, not merely losing height
+            # slowly.  Nothing used to measure this, so the ``holds_height``
+            # rung was satisfied by a fast shallow glide -- a machine trading
+            # altitude for ground speed at 0.4 m/s clears a 0.5 m/s bar for the
+            # whole segment while never holding anything.
+            #
+            # The band is a quarter of the machine's own span, floored at half
+            # a metre: staying that close to the height it settled at is a
+            # station-keeping tolerance, and expressing it in the machine's own
+            # geometry makes it the same test for a 0.4 m machine and a 3 m one.
+            #
+            # Over an 8 s segment this separates a 0.4 m/s creep from level
+            # flight and not much finer than that -- 0.4 m/s is 1.6 m of drift
+            # over the window, which is the scale of the machine.  The
+            # measurement earns its keep on the 60 s leg (``evaluate_tier1_5``),
+            # where the same creep is 24 m.
+            band = max(0.25 * float(getattr(self.p, "max_span", 2.0)), 0.5)
+            if len(late) > 1:
+                ref = float(clearances[late[0]])
+                station = float(np.mean(np.abs(clearances[late] - ref) < band))
+            else:
+                station = 0.0
+
+            # Manoeuvring means the attitude change was *asked for*.
+            authority, turn = _turn_authority(commands, responses)
+
             res.altitude_held = flight
-            # Turn rate sustained *while* not losing height: manoeuvring and
-            # falling out of a turn are different things.
-            turn = float(np.mean(np.abs(np.diff(np.asarray(ups)[idx])))) / max(
-                self.timestep, 1e-6
-            ) if len(idx) > 2 else 0.0
             res.measurements.update({
                 "airborne_fraction": frac,
-                "sink_rate": sink,
-                "turn_rate_held": turn if sink < 0.5 else 0.0,
+                # The ladder reads these, so a gated design must not be able to
+                # climb it on numbers that do not mean what they say.  The
+                # measurements themselves are kept under their own names so the
+                # record stays honest and the gate stays re-derivable.
+                "sink_rate": 9.9 if gates else sink,
+                "glide": 0.0 if gates else glide,
+                "station_keeping": 0.0 if gates else station,
+                "measured_sink_rate": sink,
+                "measured_station_keeping": station,
+                "spin_rate": spin,
+                "turn_authority": authority,
+                # This used to be the mean rate of change of the up-vector over
+                # the airborne stretch, gated only on not sinking, and the
+                # arch33 exploit champion logged 31.4 rad/s of it while having
+                # zero actuated degrees of freedom -- there was nothing aboard
+                # that could have commanded a turn.
+                "turn_rate_held": turn if (
+                    sink < 0.5 and authority > MIN_TURN_AUTHORITY and not gates
+                ) else 0.0,
+                "air_gates": float(len(gates)),
             })
-            # Every term is gated on actually being up there.
-            return float(frac * (0.55 * flight + 0.25 + 0.2 * speed))
+            # Both of the terms that paid for something other than flying are
+            # gone.  The flat 0.25 for being off the ground at all is now the
+            # graded glide term, and the 0.2 for the launch velocity the
+            # environment handed the machine is simply removed -- scoring a
+            # machine on speed it did not produce is what made the launch a
+            # gift worth having.  Every term that remains is a property of the
+            # trajectory the machine flew.
+            return float(
+                credit * frac * (0.55 * flight + 0.25 * glide + 0.20 * station)
+            )
 
         if domain is Domain.WATER:
             target = self.TARGET_DEPTH

@@ -56,7 +56,7 @@ def main() -> int:
     # earlier steps, or a sparse-terminal task cannot be learned at all.
     buf = RolloutBuffer()
     buf.add(_rollout(p, rng, 32, lambda acts: 1.0))
-    _o, _a, _l, adv, ret = buf.build()
+    _o, _a, _l, adv, ret, _v = buf.build()
     credited = bool(np.count_nonzero(adv) == len(adv))
     print(f"  [{'ok  ' if credited else 'FAIL'}] sparse terminal reward reaches "
           f"every step  -- {np.count_nonzero(adv)}/{len(adv)} nonzero advantages")

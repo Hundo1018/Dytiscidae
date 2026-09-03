@@ -215,6 +215,7 @@ def evaluate_tier1(
     r = MissionResult(tier=1)
     r.structural_margin = tier0.structural_margin
     r.feasible = tier0.feasible
+    r.air_gates = list(tier0.air_gates)
     if not p.segments:
         r.notes.append("empty phenotype")
         r.wall_time = time.time() - t0
@@ -275,6 +276,81 @@ def evaluate_tier1(
     finalise_tier1(r, clamped_any)
     r.wall_time = time.time() - t0
     return r
+
+
+# --------------------------------------------------------------------------
+# Tier 1.5
+# --------------------------------------------------------------------------
+
+
+def weakest_domain(competences: dict) -> Domain:
+    """The domain a design is worst at, which is the one the mission turns on.
+
+    ``mission_fraction`` is ``min(competence)**0.5 * mean(competence) * ...``,
+    so the minimum is the binding term twice over.  If a cheap score is going to
+    fail to survive a long leg anywhere, this is where.
+    """
+    best = None
+    for dom in DOMAIN_CYCLE:
+        v = float(competences.get(dom.value, 0.0) or 0.0)
+        if best is None or v < best[1]:
+            best = (dom, v)
+    return best[0] if best else Domain.AIR
+
+
+def evaluate_tier1_5(
+    p: Phenotype,
+    *,
+    spec: MissionSpec | None = None,
+    controller: Controller | None = None,
+    seconds: float = 60.0,
+    seed: int = 0,
+    domain: Domain | None = None,
+    competences: dict | None = None,
+    sea_state=None,
+) -> SegmentResult:
+    """One long leg, run only on designs the search has decided to promote.
+
+    A Tier-1 segment is 8 s against a 300 s mission leg -- 2.7% of it -- so
+    nothing that *accumulates* is visible to selection at all: a battery that
+    drains, a controller that drifts, an attitude that diverges slowly, silt on
+    a hull.  Measured over 180 promotions in arch33, the correlation between the
+    cheap mission fraction and the verified one was +0.077, which is to say the
+    search's own score carries almost no information about the thing it is
+    selecting for.
+
+    Sixty seconds is 7.5 Tier-1 segments and a fifth of a mission leg, long
+    enough for a drift to show and short enough that the cost scales with
+    promotions rather than with population: at most three promotions per
+    verification round against a batch of sixteen candidates per generation.
+
+    One leg, not three, and it is the weakest one -- see ``weakest_domain``.
+
+    Returns the scored segment.  Comparing its competence against the Tier-1
+    competence for the same domain is the retention number this exists to make
+    measurable.
+    """
+    spec = spec or MissionSpec()
+    if not p.segments:
+        return SegmentResult(domain=Domain.AIR, duration=seconds,
+                             survived=False, failure="empty phenotype")
+    dom = domain or weakest_domain(competences or {})
+    try:
+        env = TriphibianEnv(p, seed=seed, sea_state=sea_state)
+    except Exception as exc:
+        return SegmentResult(domain=dom, duration=seconds, survived=False,
+                             failure=f"compile failed: {type(exc).__name__}: {exc}")
+    ctrl = controller or Controller(params=env.cpg.base)
+    if ctrl.params is None:  # the rhythm belongs to the body
+        ctrl.params = env.cpg.base
+    env.reset(dom)
+    return env.rollout(
+        seconds,
+        params=ctrl.params,
+        policy=ctrl.policy,
+        basis=ctrl.basis_for(dom),
+        domain=dom,
+    )
 
 
 # --------------------------------------------------------------------------

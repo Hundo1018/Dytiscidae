@@ -622,14 +622,38 @@ def teal() -> Genome:
     return g
 
 
+def _stamped(name: str, make):
+    """A plan constructor that records which plan it built.
+
+    The stamp is applied here rather than inside each constructor so that no
+    caller can obtain an unstamped archetype -- ``meta["body_plan"]`` used to be
+    recovered from ``genome.lineage[0]``, which is a rolling window of mutation
+    operator names, so it reported the plan only until a design had accumulated
+    24 mutations and reported an operator name afterwards.
+    """
+
+    def build() -> Genome:
+        g = make()
+        g.body_plan = name
+        return g
+
+    build.__name__ = make.__name__
+    build.__qualname__ = make.__qualname__
+    build.__doc__ = make.__doc__
+    return build
+
+
 BODY_PLANS = {
-    "beetle": beetle,
-    "medusa": medusa,
-    "bat": bat,
-    "eel": eel,
-    "ray": ray,
-    "gannet": gannet,
-    "teal": teal,
+    name: _stamped(name, make)
+    for name, make in {
+        "beetle": beetle,
+        "medusa": medusa,
+        "bat": bat,
+        "eel": eel,
+        "ray": ray,
+        "gannet": gannet,
+        "teal": teal,
+    }.items()
 }
 
 

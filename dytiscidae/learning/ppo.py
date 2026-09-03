@@ -65,6 +65,7 @@ batched onto the GPU; this is not the part that wants an accelerator.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -81,11 +82,31 @@ except Exception as exc:  # pragma: no cover
     UNAVAILABLE_REASON = f"{type(exc).__name__}: {exc}"
 
 
-def _mlp(n_in: int, n_hidden: int, n_out: int):
+def _layer(n_in: int, n_out: int, gain: float):
+    """A linear layer with orthogonal weights and zero bias.
+
+    Orthogonal initialisation keeps the singular values of every layer at
+    ``gain``, so activations neither vanish nor saturate as they pass through
+    the stack.  With ``tanh`` units the difference is not cosmetic: the default
+    Kaiming-uniform initialisation puts a two-layer tanh trunk close to its
+    saturated region at the start of training, where the derivative is nearly
+    zero, and the policy spends its first updates escaping its own
+    initialisation rather than learning.
+    """
+    lin = nn.Linear(n_in, n_out)
+    nn.init.orthogonal_(lin.weight, gain)
+    nn.init.constant_(lin.bias, 0.0)
+    return lin
+
+
+def _mlp(n_in: int, n_hidden: int, n_out: int, out_gain: float = 1.0):
+    # sqrt(2) is the tanh/ReLU gain; the small output gain starts the policy
+    # near zero intent ("command nothing"), which is the same starting point a
+    # per-candidate ``Policy`` gets from its zeroed weights.
     return nn.Sequential(
-        nn.Linear(n_in, n_hidden), nn.Tanh(),
-        nn.Linear(n_hidden, n_hidden), nn.Tanh(),
-        nn.Linear(n_hidden, n_out),
+        _layer(n_in, n_hidden, math.sqrt(2.0)), nn.Tanh(),
+        _layer(n_hidden, n_hidden, math.sqrt(2.0)), nn.Tanh(),
+        _layer(n_hidden, n_out, out_gain),
     )
 
 
@@ -102,25 +123,89 @@ class SharedPolicy(nn.Module if AVAILABLE else object):
             raise RuntimeError(f"torch unavailable: {UNAVAILABLE_REASON}")
         super().__init__()
         self.n_obs, self.n_modes = int(n_obs), int(n_modes)
-        self.actor = _mlp(self.n_obs, hidden, self.n_modes)
-        self.critic = _mlp(self.n_obs, hidden, 1)
+        self.actor = _mlp(self.n_obs, hidden, self.n_modes, out_gain=0.01)
+        self.critic = _mlp(self.n_obs, hidden, 1, out_gain=1.0)
         # State-independent log-std, the usual choice for continuous control:
         # the policy learns how much to explore without having to predict it
         # from an observation that may not contain the answer.
         self.log_std = nn.Parameter(torch.full((self.n_modes,), -0.5))
+        # Running observation statistics.  Registered as buffers so they travel
+        # in ``state_dict`` -- a normalisation that is not checkpointed makes
+        # every stored weight mean something different after a resume.
+        #
+        # The observation is 27 channels on wildly different scales: body rates
+        # divided by 5, a domain one-hot, a battery fraction, and eight
+        # morphology channels.  An unnormalised first layer sees the largest of
+        # them and is nearly blind to the rest.
+        self.register_buffer("obs_mean", torch.zeros(self.n_obs))
+        self.register_buffer("obs_var", torch.ones(self.n_obs))
+        self.register_buffer("obs_count", torch.tensor(1e-4))
 
-    def distribution(self, obs):
-        mean = torch.tanh(self.actor(obs))  # intent is bounded, like Policy.act
-        return torch.distributions.Normal(mean, self.log_std.exp())
+    # ---------------------------------------------------------- normalisation
+
+    def normalise(self, obs):
+        return torch.clamp(
+            (obs - self.obs_mean) / torch.sqrt(self.obs_var + 1e-8), -10.0, 10.0)
+
+    def observe(self, obs_np) -> None:
+        """Fold a batch of observations into the running statistics.
+
+        Called once per update, *after* the epochs, so that within one update
+        every log-probability is computed under the same normalisation the
+        rollout used.  Updating mid-update would make the importance ratio a
+        comparison between two different functions.
+        """
+        x = torch.as_tensor(np.asarray(obs_np, np.float32))
+        if x.ndim != 2 or x.shape[0] < 2:
+            return
+        b_mean, b_var, b_n = x.mean(0), x.var(0, unbiased=False), float(x.shape[0])
+        delta = b_mean - self.obs_mean
+        total = self.obs_count + b_n
+        m2 = (self.obs_var * self.obs_count + b_var * b_n
+              + delta.pow(2) * self.obs_count * b_n / total)
+        self.obs_mean.copy_(self.obs_mean + delta * b_n / total)
+        self.obs_var.copy_(m2 / total)
+        self.obs_count.copy_(total)
+
+    # ------------------------------------------------------------- the policy
+
+    def latent(self, obs):
+        """The pre-squash Gaussian over intent.
+
+        The action is ``tanh`` of a sample from this, not a sample from a
+        Gaussian whose *mean* has been squashed.  That was the previous shape
+        and it was wrong in a way that mattered: with ``log_std = -0.5`` the
+        standard deviation is 0.607, so a large fraction of every sample fell
+        outside [-1, 1] -- and ``MobilityBasis.coeffs_for_twist`` clips its
+        input to that interval before using it.  The policy was therefore
+        scored on actions it had not taken, and the gradient it computed was the
+        gradient of a distribution over a region the environment could not
+        reach.
+        """
+        return torch.distributions.Normal(
+            self.actor(self.normalise(obs)), self.log_std.exp())
+
+    def value(self, obs):
+        return self.critic(self.normalise(obs)).squeeze(-1)
+
+    def log_prob(self, obs, act):
+        """Log-density of an already-squashed action, with the tanh Jacobian."""
+        base = self.latent(obs)
+        a = act.clamp(-1.0 + 1e-6, 1.0 - 1e-6)
+        u = torch.atanh(a)
+        return (base.log_prob(u).sum(-1)
+                - torch.log1p(-a.pow(2) + 1e-6).sum(-1))
 
     def act(self, obs_np, *, deterministic: bool = False):
         """One decision, numpy in and numpy out, for use inside a rollout."""
         with torch.no_grad():
             obs = torch.as_tensor(np.asarray(obs_np, np.float32)).unsqueeze(0)
-            dist = self.distribution(obs)
-            a = dist.mean if deterministic else dist.sample()
-            logp = dist.log_prob(a).sum(-1)
-            v = self.critic(obs).squeeze(-1)
+            base = self.latent(obs)
+            u = base.mean if deterministic else base.sample()
+            a = torch.tanh(u)
+            logp = (base.log_prob(u).sum(-1)
+                    - torch.log1p(-a.pow(2) + 1e-6).sum(-1))
+            v = self.value(obs)
         return (a.squeeze(0).numpy().astype(float),
                 float(logp.item()), float(v.item()))
 
@@ -226,8 +311,12 @@ class RolloutBuffer:
         return {k: max(float(np.std(v)), 0.05) for k, v in by.items()}
 
     def build(self):
-        """Flatten to (obs, act, logp, advantage, return) arrays."""
-        O, A, L, ADV, RET = [], [], [], [], []
+        """Flatten to (obs, act, logp, advantage, return, value) arrays.
+
+        The old value estimates come out too, because the value loss is clipped
+        against them -- see ``ppo_update``.
+        """
+        O, A, L, ADV, RET, VAL = [], [], [], [], [], []
         scale = self._terminal_scale()
         for t in self.trajectories:
             n = len(t)
@@ -254,8 +343,9 @@ class RolloutBuffer:
             L.append(np.asarray(t.logp, np.float32))
             ADV.append(adv)
             RET.append(adv + val)
+            VAL.append(val)
         return (np.concatenate(O), np.concatenate(A), np.concatenate(L),
-                np.concatenate(ADV), np.concatenate(RET))
+                np.concatenate(ADV), np.concatenate(RET), np.concatenate(VAL))
 
 
 class SegmentCollector:
@@ -291,9 +381,9 @@ class SegmentCollector:
 
 def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
                minibatch: int = 2048, clip: float = 0.2,
-               vf_coef: float = 0.5, ent_coef: float = 0.0,
+               vf_coef: float = 0.5, ent_coef: float = 0.01,
                max_grad_norm: float = 0.5, target_kl: float = 0.015,
-               optimiser=None) -> dict:
+               lr_fraction: float = 1.0, optimiser=None) -> dict:
     """One PPO update over everything the generation collected.
 
     The defaults were raised after the first full run that used this.  At
@@ -315,6 +405,29 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
     clipped-surrogate and value losses, and the approximate KL.  A run that
     reports a rising KL with a flat loss is a run whose learning rate is wrong,
     and that is not visible from the search's own fitness numbers.
+
+    Implementation hygiene, added as one arm rather than one at a time
+    -----------------------------------------------------------------
+
+    ``lr_fraction`` linearly anneals the rate over the run; ``ent_coef`` is no
+    longer zero; the value loss is clipped against the old estimate; the
+    optimiser's epsilon is 1e-5 rather than torch's 1e-8; the trunk is
+    orthogonally initialised and the policy is a genuinely squashed Gaussian
+    (see ``SharedPolicy.latent``); and the observation is normalised by running
+    statistics the policy carries.
+
+    These are coupled -- annealing changes the KL curve, orthogonal
+    initialisation changes where the tanh units start, an entropy bonus changes
+    exploration -- so measuring them one per run would cost five runs to learn
+    less than one arm against arch33 does.
+
+    The diagnostic this resolves: arch33's policy hit the KL ceiling on 88% of
+    updates by generation 450, and its trajectory over 46 snapshots was
+    significantly anti-correlated step to step (cosine -0.061 +/- 0.019, and
+    -0.128 +/- 0.016 over the last third, with displacement growing as
+    n^0.388).  A *fixed* learning rate alone produces that signature, so it was
+    never evidence that the gradient direction rotates -- which is why the
+    anneal is in this arm and no conclusion was drawn from the old runs.
     """
     if not AVAILABLE:
         raise RuntimeError(f"torch unavailable: {UNAVAILABLE_REASON}")
@@ -322,19 +435,30 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
     if n < 2:
         return {"transitions": n, "skipped": True}
 
-    obs, act, logp_old, adv, ret = buffer.build()
-    obs = torch.as_tensor(obs)
+    obs_np, act, logp_old, adv, ret, val_old = buffer.build()
+    obs = torch.as_tensor(obs_np)
     act = torch.as_tensor(act)
     logp_old = torch.as_tensor(logp_old)
     adv = torch.as_tensor(adv.astype(np.float32))
     ret = torch.as_tensor(ret.astype(np.float32))
+    val_old = torch.as_tensor(val_old.astype(np.float32))
     # Normalising advantages across the batch is what lets one policy learn from
     # morphologies whose competences live on different scales.
     adv = (adv - adv.mean()) / (adv.std() + 1e-8)
 
-    opt = optimiser or torch.optim.Adam(policy.parameters(), lr=lr)
+    # Adam's default epsilon is 1e-8, which is small enough relative to these
+    # gradients that the effective step size varies by orders of magnitude
+    # between parameters; 1e-5 is the value the PPO implementations that
+    # reproduce published results use.
+    opt = optimiser or torch.optim.Adam(policy.parameters(), lr=lr, eps=1e-5)
+    # Linear anneal.  A fixed rate is what produces a policy that keeps moving
+    # as far as the KL bound allows and arrives nowhere.
+    lr_now = float(lr) * float(np.clip(lr_fraction, 0.0, 1.0))
+    for group in opt.param_groups:
+        group["lr"] = lr_now
     idx = np.arange(n)
-    stats = {"pi_loss": 0.0, "v_loss": 0.0, "kl": 0.0, "n_batches": 0}
+    stats = {"pi_loss": 0.0, "v_loss": 0.0, "kl": 0.0, "entropy": 0.0,
+             "clipfrac": 0.0, "n_batches": 0}
 
     stopped_early = False
     for _ in range(epochs):
@@ -344,14 +468,23 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
         epoch_kl, epoch_batches = 0.0, 0
         for s in range(0, n, minibatch):
             b = torch.as_tensor(idx[s:s + minibatch].copy())
-            dist = policy.distribution(obs[b])
-            logp = dist.log_prob(act[b]).sum(-1)
+            logp = policy.log_prob(obs[b], act[b])
             ratio = (logp - logp_old[b]).exp()
             a = adv[b]
             pi_loss = -torch.min(
                 ratio * a, ratio.clamp(1 - clip, 1 + clip) * a).mean()
-            v_loss = ((policy.critic(obs[b]).squeeze(-1) - ret[b]) ** 2).mean()
-            ent = dist.entropy().sum(-1).mean()
+            # Clipped value loss: the critic may not move further from its own
+            # previous estimate than the policy is allowed to, which stops one
+            # unusually large return from dragging the baseline the advantages
+            # of every other morphology are measured against.
+            v = policy.value(obs[b])
+            v_clipped = val_old[b] + (v - val_old[b]).clamp(-clip, clip)
+            v_loss = 0.5 * torch.max((v - ret[b]) ** 2,
+                                     (v_clipped - ret[b]) ** 2).mean()
+            # A squashed Gaussian has no closed-form entropy, so this is the
+            # one-sample estimator -- unbiased, and the only term the bonus
+            # needs a gradient through.
+            ent = -logp.mean()
             loss = pi_loss + vf_coef * v_loss - ent_coef * ent
 
             opt.zero_grad()
@@ -363,6 +496,9 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
             stats["pi_loss"] += float(pi_loss.item())
             stats["v_loss"] += float(v_loss.item())
             stats["kl"] += kl
+            stats["entropy"] += float(ent.item())
+            stats["clipfrac"] += float(
+                ((ratio - 1.0).abs() > clip).float().mean().item())
             stats["n_batches"] += 1
             epoch_kl += kl
             epoch_batches += 1
@@ -374,6 +510,10 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
         if target_kl and epoch_batches and epoch_kl / epoch_batches > target_kl:
             stopped_early = True
 
+    # The normalisation moves only now, so that every ratio above was computed
+    # under the statistics the rollout itself used.
+    policy.observe(obs_np)
+
     k = max(stats["n_batches"], 1)
     return {
         "transitions": n,
@@ -381,6 +521,9 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
         "pi_loss": stats["pi_loss"] / k,
         "v_loss": stats["v_loss"] / k,
         "kl": stats["kl"] / k,
+        "entropy": stats["entropy"] / k,
+        "clipfrac": stats["clipfrac"] / k,
+        "lr": lr_now,
         "grad_steps": stats["n_batches"],
         "stopped_early": stopped_early,
         "skipped": False,

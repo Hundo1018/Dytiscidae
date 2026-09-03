@@ -39,6 +39,7 @@ from ..envs.evaluate import (
     Controller,
     behaviour_descriptor,
     evaluate_tier1,
+    evaluate_tier1_5,
     evaluate_tier2,
     fitness,
     objectives,
@@ -76,6 +77,10 @@ class SearchConfig:
     identify_axes_every: int = 1  # re-identify a child's axes this often
     tier0_gate: float = -0.85  # reject below this structural margin
     tier2_every: int = 15
+    #: Seconds of the single long leg run on promotion candidates before the
+    #: Tier-2 mission.  Zero disables it.  See ``envs.evaluate.evaluate_tier1_5``
+    #: for why 60 and why only here.
+    tier1_5_seconds: float = 60.0
 
     # Controller refinement.  Each step is one extra batched Tier-1 for the
     # whole generation, so a generation costs (1 + steps) evaluations.
@@ -125,6 +130,15 @@ class SearchConfig:
     #: Stop an update once it has moved the policy this far.  Without it,
     #: raising the rate is how a policy gets destroyed.
     shared_target_kl: float = 0.015
+    #: Entropy bonus.  Zero -- which is what every run so far used -- lets the
+    #: log-std collapse early and the policy stop exploring while the search is
+    #: still handing it new morphologies every generation.
+    shared_ent_coef: float = 0.01
+    #: Anneal the learning rate linearly to zero over the run.  arch33's policy
+    #: hit the KL ceiling on 88% of its updates past generation 450 and its
+    #: parameter trajectory was anti-correlated step to step, which is the
+    #: signature a fixed rate produces on its own.
+    shared_lr_anneal: bool = True
 
     # Seeding
     n_reference_seeds: int = 20
@@ -209,6 +223,18 @@ class SearchState:
     #: auditor can veto a tightening that turned out to rest on a design it
     #: subsequently invalidated.
     judge_moves: list = field(default_factory=list)
+    #: How many generations each island has been the active one.
+    #:
+    #: Every periodic job used to fire on ``gen % N``, and the island rotates
+    #: once per generation, so with six islands any N sharing a factor with six
+    #: could only ever fire on a subset of them: ``tier2_every = 15`` reaches
+    #: islands 0 and 3, ``audit_every = 30`` reaches island 0 alone.  Four
+    #: islands had never had a design verified at full fidelity in any run, and
+    #: every audit in arch30, arch31 and arch33 landed on ``air``.  Counting
+    #: visits per island removes the aliasing without changing the global rate:
+    #: an island fires every ``N`` of its own visits, which is one firing every
+    #: ``N`` generations across the archipelago, exactly as before.
+    island_visits: dict = field(default_factory=dict)
     #: The policy shared by every morphology, or None when not in use.
     shared: object = None
     shared_opt: object = None
@@ -542,8 +568,15 @@ def _meta(pheno, result, ctrl) -> dict:
         "battery_wh": round(pheno.genome.battery_wh, 1),
         "flap_hz": round(pheno.genome.flap_frequency, 2),
         "dof": pheno.n_actuated,
-        "body_plan": (pheno.genome.lineage[0] if pheno.genome.lineage else "?"),
+        # The plan the graph descends from, set once at birth.  This used to
+        # read ``lineage[0]``, which is the oldest surviving *mutation operator*
+        # name in a 24-entry rolling window, so the field mixed plan names with
+        # operator names and could not be used for a diversity claim.
+        "body_plan": (getattr(pheno.genome, "body_plan", "") or "?"),
         "feasible": bool(pheno.report.ok),
+        # Which flight gates this design fails, so the wingless class is
+        # countable in the record rather than inferred from wing_area later.
+        "air_gates": list(getattr(result, "air_gates", []) or []),
         "margin": round(pheno.report.min_margin, 3),
         "worst_check": pheno.report.worst.name if pheno.report.worst else "",
         "mission_fraction": round(result.mission_fraction, 4),
@@ -826,8 +859,9 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         # private coordinate that means something different on each.
         state.shared = _ppo.SharedPolicy(
             TriphibianEnv.OBS_DIM, TWIST_DIM, hidden=cfg.shared_hidden)
+        # eps 1e-5 rather than torch's 1e-8; see ``ppo_update``.
         state.shared_opt = _torch.optim.Adam(
-            state.shared.parameters(), lr=cfg.shared_lr)
+            state.shared.parameters(), lr=cfg.shared_lr, eps=1e-5)
 
     for c in archipelago.curators.values():
         c.scout = state.scout
@@ -850,6 +884,10 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
 
     for gen in range(start_gen, cfg.generations):
         state.island = order[gen % len(order)]
+        # This island's own visit number, which is what the periodic jobs below
+        # count.  See ``SearchState.island_visits``.
+        visits = state.island_visits.get(state.island, 0)
+        state.island_visits[state.island] = visits + 1
         archive = state.archive
         curator = state.curator
         for a in archipelago.archives.values():
@@ -934,10 +972,15 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         # --- the shared policy learns from everything the generation saw ----
         if state.shared is not None and buffer is not None:
             from ..learning.ppo import ppo_update
+            frac = 1.0
+            if cfg.shared_lr_anneal and cfg.generations > 0:
+                frac = max(1.0 - gen / float(cfg.generations), 0.0)
             info = ppo_update(state.shared, buffer, lr=cfg.shared_lr,
                               epochs=cfg.shared_epochs,
                               minibatch=cfg.shared_minibatch,
                               target_kl=cfg.shared_target_kl,
+                              ent_coef=cfg.shared_ent_coef,
+                              lr_fraction=frac,
                               optimiser=state.shared_opt)
             # The reward the update actually saw, per segment kind, so a later
             # reading can tell a policy that stopped learning from one that was
@@ -956,11 +999,11 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                              **{k: v for k, v in info.items()}})
 
         # --- verification, and the critic's only source of truth ------------
-        if gen % max(cfg.tier2_every, 1) == 0 and archive.cells:
+        if visits % max(cfg.tier2_every, 1) == 0 and archive.cells:
             _verify_and_label(state, gen, spec, rng)
 
         # --- the third party ------------------------------------------------
-        if gen % max(cfg.audit_every, 1) == 0 and archive.cells:
+        if visits % max(cfg.audit_every, 1) == 0 and archive.cells:
             invalid = _audit(state, gen, spec, rng)
             if invalid:
                 vetoed = state.auditor.review_tightening(
@@ -1115,6 +1158,7 @@ def save_state(state: SearchState, gen: int) -> None:
         "curricula": state.curricula,
         "descriptors": state.descriptors,
         "judge_moves": state.judge_moves,
+        "island_visits": dict(state.island_visits),
         "curators": state.archipelago.curators,
         "islands": list(state.archipelago.names),
     }
@@ -1202,6 +1246,18 @@ def load_state(state: SearchState) -> int:
 
     state.evaluated = int(d.get("evaluated", 0))
     state.tier0_rejected = int(d.get("tier0_rejected", 0))
+    # Per-island visit counts.  A checkpoint written before these existed has
+    # none; reconstructing them from the generation number is exact, because
+    # the rotation is deterministic -- island i is active on every generation
+    # with ``gen % n == i``.
+    if d.get("island_visits"):
+        state.island_visits.update(dict(d["island_visits"]))
+    else:
+        names = list(d.get("islands") or state.archipelago.names)
+        n = max(len(names), 1)
+        g = int(d.get("generation", 0))
+        for i, name in enumerate(names):
+            state.island_visits[name] = (g - i + n - 1) // n if g > i else 0
     for attr in ("judge", "auditor", "critic", "scout", "descriptors"):
         if d.get(attr) is not None:
             setattr(state, attr, d[attr])
@@ -1241,8 +1297,20 @@ def load_state(state: SearchState) -> int:
         import torch as _torch
         shape = tuple(d.get("shared_shape") or ())
         if shape == (state.shared.n_obs, state.shared.n_modes):
-            state.shared.load_state_dict(
-                {k: _torch.as_tensor(v) for k, v in d["shared_state"].items()})
+            # ``strict=False``: a checkpoint written before the observation
+            # normalisation existed carries no ``obs_mean``/``obs_var``, and
+            # refusing to load the weights over a missing pair of buffers would
+            # throw away the one thing the checkpoint was written for.  The
+            # buffers then start from their identity values and re-earn
+            # themselves within an update.  Anything actually missing is
+            # reported rather than swallowed.
+            missing, unexpected = state.shared.load_state_dict(
+                {k: _torch.as_tensor(v) for k, v in d["shared_state"].items()},
+                strict=False)
+            if missing or unexpected:
+                state.telemetry.event({"kind": "shared_policy_partial_load",
+                                       "missing": list(missing),
+                                       "unexpected": list(unexpected)})
         else:
             print(f"  (checkpointed shared policy is {shape}, this run wants "
                   f"({state.shared.n_obs}, {state.shared.n_modes}); "
@@ -1410,6 +1478,52 @@ def _refined_controller_for(state: SearchState, elite, pheno, spec, rng):
     return ctrl
 
 
+def _tier1_5(state: SearchState, elite, pheno, ctrl, spec, rng) -> dict:
+    """One 60 s leg on a promotion candidate, and what it retained.
+
+    Placed here rather than in the generation loop because this is the only
+    place the cost is affordable: at most three promotions per verification
+    round, against sixteen candidates per generation.
+
+    Reported, not enforced.  What the retention distribution looks like is an
+    open measurement -- the number this exists to produce -- and gating Tier-2
+    on it before that distribution is known would be choosing a threshold from
+    nothing, which is the habit the rest of this file is written against.  It
+    also happens to be the pair the critic learns from, so a gate would remove
+    the ground truth that would justify the gate.
+
+    Returns telemetry fields, empty when the leg is disabled or fails.
+    """
+    seconds = float(getattr(state.config, "tier1_5_seconds", 0.0))
+    if seconds <= 0.0:
+        return {}
+    competences = {k: float(elite.meta.get(k, 0.0) or 0.0)
+                   for k in ("air", "water", "land")}
+    try:
+        seg = evaluate_tier1_5(
+            pheno, spec=spec, controller=_with_shared(state, ctrl),
+            seconds=seconds, seed=int(rng.integers(1 << 30)),
+            competences=competences)
+    except Exception as exc:
+        return {"tier1_5_error": f"{type(exc).__name__}: {exc}"}
+    dom = seg.domain.value
+    short = competences.get(dom, 0.0)
+    out = {
+        "tier1_5_domain": dom,
+        "tier1_5_seconds": seconds,
+        "tier1_5_competence": round(float(seg.competence), 4),
+        "tier1_5_short": round(short, 4),
+        "tier1_5_retention": (round(float(seg.competence) / short, 3)
+                              if short > 1e-4 else None),
+        "tier1_5_failure": seg.failure,
+    }
+    # Kept on the elite as well, so the archive on disk carries it and the
+    # correlation can be computed from a finished run without replaying the
+    # event log.
+    elite.meta["tier1_5"] = [dom, out["tier1_5_competence"], out["tier1_5_short"]]
+    return out
+
+
 def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
     """Tier-2 the best of this island, and teach the critic what it found.
 
@@ -1425,6 +1539,7 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
         try:
             p2 = build(elite.genome)
             ctrl2 = _refined_controller_for(state, elite, p2, spec, rng)
+            long_leg = _tier1_5(state, elite, p2, ctrl2, spec, rng)
             r2 = evaluate_tier2(p2, spec=spec,
                                 controller=_with_shared(state, ctrl2),
                                 seed=int(rng.integers(1 << 30)))
@@ -1436,6 +1551,13 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
                 # better controller it just bought would make the second
                 # payment worthless to everyone except the critic.
                 elite.meta["policy"] = ctrl2.policy.weights.tolist()
+                # And say that these weights were *fitted to this body*, rather
+                # than inherited from a parent.  Most archive entries carry a
+                # policy; only these were optimised.  The distillation study
+                # needs to tell the two apart, and reconstructing it afterwards
+                # meant cross-referencing the promote events against cells.
+                elite.meta["policy_refined"] = int(
+                    getattr(cfg, "promotion_refine_steps", 0))
             cheap = float(elite.meta.get("mission_fraction", 0.0))
             if state.critic is not None and cheap > 1e-4:
                 feats = elite.meta.get("critic_features")
@@ -1449,6 +1571,7 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
                                    "tier2_fitness": round(f2, 4),
                                    "tier2_fraction": round(r2.mission_fraction, 4),
                                    "tier1_fraction": round(cheap, 4),
+                                   **long_leg,
                                    "exploit": r2.exploit, "notes": r2.notes[:3]})
             if r2.exploit:
                 curator.quarantine(elite.descriptor, r2.exploit, elite.genome)

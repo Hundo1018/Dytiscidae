@@ -501,6 +501,23 @@ def cmd_render(args) -> int:
     return 0
 
 
+def cmd_distill(args) -> int:
+    """Is a shared controller reachable at all?  Answered from stored policies."""
+    from ..learning.distill import distil
+
+    res = distil(args.run, n_states=args.states, hidden=args.hidden,
+                 epochs=args.epochs, held_out=args.held_out, seed=args.seed,
+                 refined_only=args.refined_only)
+    print(f"distillation study of {args.run}")
+    print("-" * 60)
+    print("\n".join(res.lines()))
+    if res.per_body:
+        print("\nworst held-out bodies (name, R2, tier-1 mission fraction):")
+        for row in res.per_body[:5]:
+            print(f"  {row[0]:<28} {row[1]:+.3f}  {row[2]:.4f}")
+    return 0 if res.scores else 1
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="dytiscidae", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -667,6 +684,21 @@ def main(argv=None) -> int:
     p.add_argument("--top", type=int, default=3)
     p.add_argument("--duration", type=float, default=8.0)
     p.set_defaults(fn=cmd_render)
+
+    p = sub.add_parser(
+        "distill",
+        help="can one conditioned network match the per-body controllers?")
+    p.add_argument("--run", default="runs/latest")
+    p.add_argument("--states", type=int, default=256,
+                   help="observations sampled per teacher")
+    p.add_argument("--hidden", type=int, default=128)
+    p.add_argument("--epochs", type=int, default=4000)
+    p.add_argument("--held-out", type=float, default=0.3, dest="held_out",
+                   help="fraction of *bodies* the student never sees")
+    p.add_argument("--refined-only", action="store_true", dest="refined_only",
+                   help="only policies a promotion actually fitted to their body")
+    p.add_argument("--seed", type=int, default=0)
+    p.set_defaults(fn=cmd_distill)
 
     args = ap.parse_args(argv)
     return args.fn(args)
