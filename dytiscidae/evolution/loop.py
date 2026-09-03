@@ -72,6 +72,22 @@ class SearchConfig:
     batch: int = 4  # candidates per generation
     seed: int = 0
 
+    #: Worker processes stepping machines in parallel.  1 is the old
+    #: single-process behaviour and is what every stored run used.
+    #:
+    #: Measured on this machine: 16 workers of 8 machines return 12.7x the
+    #: throughput of one worker of 8, at 26% more wall per worker, because only
+    #: half of a batched step is the GPU and that half is host-side marshalling
+    #: rather than kernel time.  See ``envs/actors.py`` for the table.
+    #:
+    #: Note the interaction with ``batch``: a shard smaller than ``min_shard``
+    #: pays a batch's fixed cost for almost no work, so the pool never makes
+    #: more shards than ``batch // min_shard``.  Using twenty cores means
+    #: raising ``batch``, which is a search-design decision, not a throughput
+    #: one -- so it is left to the caller rather than done here.
+    workers: int = 1
+    min_shard: int = 8
+
     # Fidelity
     segment_seconds: float = 8.0
     identify_axes_every: int = 1  # re-identify a child's axes this often
@@ -223,6 +239,9 @@ class SearchState:
     #: auditor can veto a tightening that turned out to rest on a design it
     #: subsequently invalidated.
     judge_moves: list = field(default_factory=list)
+    #: Worker processes, or None for the single-process path.  Created by
+    #: ``run_search`` and closed when it returns.
+    pool: object = None
     #: How many generations each island has been the active one.
     #:
     #: Every periodic job used to fire on ``gen % N``, and the island rotates
@@ -333,6 +352,7 @@ def evaluate_candidates(
     seeds=None,
     shared=None,
     buffer=None,
+    pool=None,
 ):
     """Tier-0 gate then a shared Tier-1 for the whole group.
 
@@ -390,8 +410,8 @@ def evaluate_candidates(
         policy = _controller_for(phenos[i], genomes[i], cfg, inherited[i])
         ctrls.append(Controller(params=None, policy=policy))
 
-    results = batchroll.evaluate_tier1_batch(
-        [phenos[i] for i in passed], spec=spec,
+    results = _batched(
+        pool, [phenos[i] for i in passed], spec=spec,
         shared=shared, buffer=buffer, n_modes=cfg.n_modes,
         # The controller goes in whether or not axes are being identified.
         # These used to be the same switch -- `None if identify else c` -- and
@@ -405,7 +425,7 @@ def evaluate_candidates(
 
     results = _refine_controllers(
         [phenos[i] for i in passed], ctrls, results, cfg,
-        spec=spec, seed=seeds[passed[0]], shared=shared)
+        spec=spec, seed=seeds[passed[0]], shared=shared, pool=pool)
 
     for slot, i in enumerate(passed):
         out[i] = (phenos[i], results[slot], ctrls[slot])
@@ -413,7 +433,7 @@ def evaluate_candidates(
 
 
 def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
-                        steps: int | None = None, shared=None):
+                        steps: int | None = None, shared=None, pool=None):
     """Local search on policy weights, every candidate advanced in one batch.
 
     A (1+1) evolution strategy: perturb, evaluate, keep the perturbation if the
@@ -456,7 +476,7 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
     # spent only when there is a shared policy to be noisy.
     if shared is not None:
         results = batchroll_eval(phenos, ctrls, cfg, spec=spec, seed=seed,
-                                 shared=shared)
+                                 shared=shared, pool=pool)
     if steps <= 0:
         return results
 
@@ -483,7 +503,7 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
             break
 
         trial_results = batchroll_eval(
-            phenos, trials, cfg, spec=spec, seed=seed, shared=shared)
+            phenos, trials, cfg, spec=spec, seed=seed, shared=shared, pool=pool)
 
         for i, (tr, step) in enumerate(zip(trial_results, sizes)):
             if step is None or tr is None:
@@ -504,19 +524,36 @@ def _copy_policy(policy, weights):
     return twin
 
 
-def batchroll_eval(phenos, ctrls, cfg, *, spec, seed, shared=None):
+def batchroll_eval(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None):
     """One batched Tier-1 with given controllers and no axis identification.
 
     ``shared`` is passed through because the two policies' intents are *summed*
     at the point of use.  Refining a candidate's weights with the shared policy
     absent optimises one half of a sum against the other half being zero, and
     then stores the result to be scored with the other half present.
+
+    ``pool`` spreads the batch over worker processes.  None, or a pool of one,
+    is the single-process call this has always been.
     """
-    from ..envs import batchroll
-    return batchroll.evaluate_tier1_batch(
-        phenos, spec=spec, controllers=ctrls,
+    return _batched(
+        pool, phenos, spec=spec, controllers=ctrls,
         segment_seconds=cfg.segment_seconds, identify_axes=False, seed=seed,
         shared=shared, n_modes=cfg.n_modes)
+
+
+def _batched(pool, phenos, **kwargs):
+    """``evaluate_tier1_batch``, through the actor pool when there is one.
+
+    One function so that every batched evaluation in the search -- the
+    generation, the noise-free re-score, and each refinement step -- goes
+    through the same door, and adding a second door is not how the two stop
+    agreeing.
+    """
+    from ..envs import batchroll
+
+    if pool is not None:
+        return pool.evaluate_tier1(phenos, **kwargs)
+    return batchroll.evaluate_tier1_batch(phenos, **kwargs)
 
 
 def seed_archive(state: SearchState, spec: MissionSpec) -> None:
@@ -810,6 +847,13 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
     rng = np.random.default_rng(cfg.seed)
     telemetry = Telemetry(cfg.run_dir, event_sample=cfg.event_sample)
 
+    # Worker processes, created once and kept: a worker pays for importing
+    # MuJoCo and torch and for allocating its own GPU pipeline, and that is a
+    # per-worker cost rather than a per-generation one.
+    from ..envs.actors import ActorPool
+
+    pool = ActorPool(cfg.workers, min_shard=cfg.min_shard)
+
     archipelago = Archipelago(migrate_every=cfg.migrate_every, n_migrants=cfg.n_migrants)
     curricula: dict = {}
     # The hand-picked axes are only the bootstrap grid -- the learned ones
@@ -836,6 +880,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         scout=(Scout(horizon=cfg.scout_horizon, reserve=cfg.scout_reserve, seed=cfg.seed)
                if cfg.use_scout else None),
         island=cfg.islands[-1] if cfg.islands else "generalist",
+        pool=pool,
         descriptors=(
             LearnedDescriptors(n_dims=len(BD_AXES),
                                refit_every=cfg.descriptor_refit_every)
@@ -949,7 +994,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 inherited=[b[1] for b in built],
                 identify=any(b[2] for b in built), spec=spec,
                 seeds=[b[5] for b in built],
-                shared=state.shared, buffer=buffer)
+                shared=state.shared, buffer=buffer, pool=state.pool)
         except Exception as exc:
             telemetry.event({"kind": "error", "gen": gen, "island": state.island,
                              "error": f"{type(exc).__name__}: {exc}"})
@@ -1126,6 +1171,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         a.save(Path(cfg.run_dir) / f"archive_{name}.pkl")
         a.export_json(Path(cfg.run_dir) / f"archive_{name}.json")
     save_state(state, cfg.generations - 1)
+    pool.close()
     telemetry.close()
     return state
 
@@ -1392,7 +1438,8 @@ def seed_archipelago(state: SearchState, spec: MissionSpec) -> None:
     seed_seeds = [int(state.rng.integers(1 << 30)) for _ in seeds]
     try:
         evaluated = evaluate_candidates(
-            seeds, cfg, identify=True, spec=spec, seeds=seed_seeds)
+            seeds, cfg, identify=True, spec=spec, seeds=seed_seeds,
+            pool=state.pool)
     except Exception:
         return
 

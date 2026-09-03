@@ -54,7 +54,8 @@ pip install -r requirements.txt
 
 python -m dytiscidae.ops.run verify              # 162 physics checks
 python -m dytiscidae.ops.run reference           # inspect the hand design
-python -m dytiscidae.ops.run search --generations 200 --run runs/first
+python -m dytiscidae.ops.run search --generations 200 --run runs/first \
+       --batch 32 --workers 4          # 2.2x on this machine; see below
 python -m dytiscidae.ops.run dashboard --run runs/first
 python -m dytiscidae.ops.run skills              # train the actuator skills
 python -m dytiscidae.ops.run distill --run runs/first   # is a shared controller reachable?
@@ -70,6 +71,15 @@ generation.
 
 The main cost dial is `--segment-seconds` (default 8). Halving it roughly halves
 the run time and roughly doubles the variance of every Tier-1 score.
+
+`--workers` steps machines in several processes, each with its own GPU pipeline.
+It trades against `--batch`: the pool never makes a shard smaller than
+`--min-shard` (8), because a shard of four costs 149 µs per machine-step against
+89 in a shard of sixteen. On a generation of 32, four workers is 2.18x and eight
+is 2.20x — to use more cores, raise `--batch`. Raw stepping throughput scales
+further than that (12.7x at sixteen workers of eight machines); the difference is
+shard size, not contention. Sharding cannot change a score: the same designs
+score bit-identically at 1, 2, 4 and 8 workers, and a test pins it.
 
 ---
 
@@ -237,7 +247,7 @@ being wrong, which is the failure mode that matters in a generative pipeline.
 | A rock scored 0.57 for land competence | All six plans between 0.541 and 0.596 while nothing walked | Six tenths of a locomotion score was awarded for lying still the right way up, and the climb term was computed, documented as "the capability", and left out of the return. |
 | The auditor's veto had no link to the bar it undid | — (would have silently frozen the judge) | It took a *count* of failed audits and rolled back every domain's most recent tightening. Audits find something most rounds; a ratchet reset most rounds never rises. |
 
-Verify with `python -m dytiscidae.ops.run verify` (162 checks); the search machinery has its own 289 in `tests/test_search.py`, and the shared learner 8 in `tests/test_ppo.py`.
+Verify with `python -m dytiscidae.ops.run verify` (162 checks); the search machinery has its own 305 in `tests/test_search.py`, and the shared learner 8 in `tests/test_ppo.py`.
 
 ---
 
@@ -250,7 +260,8 @@ dytiscidae/
   core/        cppn, genome, phenotype, mjcf, reference
   control/     cpg (pattern generator + mobility basis identification)
   envs/        triphibian (mission, 3 tiers), skills (actuator bench), evaluate,
-               transitions (graded crossings), mission (one unbroken run)
+               transitions (graded crossings), mission (one unbroken run),
+               batchroll (one GPU call per timestep), actors (worker processes)
   evolution/   archive (MOME), cmaes, curator, loop, judge (ratchets the bar),
                auditor (the third party), critic, curriculum, islands, scout
                (predicts potential), descriptors (learned archive axes)
@@ -259,7 +270,7 @@ dytiscidae/
                showcase (one mission, wake and stress overlaid)
   ops/         telemetry (JSONL), run (CLI)
 tests/         test_physics.py  — 162 checks pinning conventions and magnitudes
-               test_search.py   — 289 checks on the search machinery
+               test_search.py   — 305 checks on the search machinery
                test_ppo.py      — 8 checks on the shared PPO learner
 ```
 

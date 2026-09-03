@@ -1,9 +1,16 @@
 # Roadmap
 
-Written 2026-09-03 after arch33, and revised the same day once Phases 0, 1, 3
-and 4 were built. Every item names the measurement that motivates it; nothing
-here is on the list because it seemed like a good idea, and nothing is marked
-done without the number it produced.
+Written 2026-09-03 after arch33, and revised the same day once every phase was
+built. Every item names the measurement that motivates it; nothing here is on
+the list because it seemed like a good idea, and nothing is marked done without
+the number it produced.
+
+All six phases are implemented. **None of it has been through a training run** —
+every number below is from offline measurement: the seed plans, the stored
+arch33 archives, re-runs of arch33 elites, and timing probes. The next run is
+the test, and it is one arm rather than six, which is a deliberate choice and
+not an oversight: Phase 4's items are mutually coupled, Phase 1 changes what the
+score means, and arch33 already spent a run per item to learn less.
 
 Read [CPU_LEGACY.md](CPU_LEGACY.md) for the older backlog. This file supersedes
 it wherever the two disagree.
@@ -226,22 +233,68 @@ a plan for a design's first 24 mutations and an operator name (`jitter_cppn`,
 arch30, arch31 and arch33 was reading a mixture of the two, and none of them can
 be repaired from the stored runs.
 
-## Phase 2 — throughput — **not done**
+## Phase 2 — throughput — **done**
 
-- **Multiprocess actors.** 16 machines are stepped in lockstep inside one
-  process; 20 cores are idle. Near-linear, certain, and it makes every later
-  experiment cheaper. Measured: 190.5 µs of wall per machine-step, i.e. 1.31x
-  real time per machine and 21x only because 16 run at once.
-- Then re-cost longer segments. At present 8 s → 24 s would take a generation
-  from 160 s to 481 s (120 h for 900 generations).
+**Multiprocess actors.** `envs/actors.py`, `--workers N`. A persistent pool of
+worker processes, each holding its own batched evaluator and its own GPU
+pipeline. Also where PPO's data collection becomes parallel: each worker fills
+its own `RolloutBuffer` and the parent concatenates the trajectories, so the
+batch the optimiser sees — including `_terminal_scale`, which is computed over
+the merged set — is exactly the batch it saw before.
 
-This is the largest remaining item and it was deliberately left alone: it moves
-the boundary between `BatchedFluid` (which exists to put a whole generation's
-panels into one launch) and the stepping loop, and doing that at the same time
-as changing what the scores mean would make the next run's result unattributable
-to either. Phase 0's finding sharpens the design: since ~70% of a fluid call is
-fixed per-call cost, an actor pool must keep the panel batching *inside* each
-process rather than reverting to one solver call per machine.
+**What a batched step is made of**, measured at batch 16, best of five over 200
+steps:
+
+    step 1179 us = fluid 580 (49%) + mj_step 199 (17%)
+                   + power budget 207 (18%) + Python 194 (16%)
+
+Barely half of it is the part that already runs on the GPU — and that half is
+host-side marshalling rather than kernel time, which is why it parallelises too.
+
+**Raw stepping throughput**, W processes of 8 machines each:
+
+| W | per-process step | machine-steps/s | vs W=1 |
+|---|---|---|---|
+| 1 | 853 µs | 9.4k | 1.00x |
+| 2 | 914 µs | 17.5k | 1.86x |
+| 4 | 910 µs | 35.2k | 3.72x |
+| 8 | 1005 µs | 63.7k | 6.7x |
+| 16 | 1074 µs | 119.1k | **12.7x** |
+
+Sixteen processes cost 26% more per process and return 12.7 times the
+throughput. Growing the batch inside one process instead saturates: k=32 gives
+78 µs/machine against k=16's 89, and 12.8k machine-steps/s against 119k.
+
+**End to end**, a full evaluation (identification, three 8 s segments, three
+transitions) of 32 designs on a warm pool:
+
+| workers | wall | speedup |
+|---|---|---|
+| 1 | 141.8 s | 1.00x |
+| 2 | 87.2 s | 1.63x |
+| 4 | 65.1 s | **2.18x** |
+| 8 | 64.4 s | 2.20x |
+
+The gap between 12.7x and 2.2x is the reason `min_shard` exists and is the
+useful finding here. At 32 designs, eight workers means shards of four, and a
+shard of four costs 149 µs per machine-step against 105 in eight and 89 in
+sixteen — so the extra parallelism is spent entirely on smaller batches. Shard
+size and worker count trade against each other; the floor is 8, which is where
+that curve flattens, and **using more cores means raising `--batch`**, which is
+a search-design decision and is therefore left to the caller rather than done
+automatically.
+
+**Sharding cannot change a score, and that is asserted rather than assumed.**
+Nothing per machine depends on which other machines share its batch: the scatter
+draw and the identification deltas are each a `default_rng` built fresh per
+machine, the force limiter is per machine, and the fluid kernel has no
+cross-machine reduction. Measured, the same designs score bit-identically at 1,
+2, 4 and 8 workers, and `tests/test_search.py` pins it. The one deliberate
+exception is a *learning* shared policy, which samples its actions: a run with
+one is reproducible per worker count rather than across worker counts.
+
+Longer segments can now be re-costed against this rather than against the
+single-process figure.
 
 ## Phase 3 — the learner
 
@@ -335,12 +388,51 @@ Given Phase 3, this arm is worth running as *hygiene on the learner the project
 keeps for the PGA variation operator*, not as a fifth attempt at a shared
 controller.
 
-## Phase 5 — structural evolution
+## Phase 5 — structural evolution — **done, and it was gated on Phase 1.2**
 
-Graph-level recombination (`crossover` deliberately takes one parent's graph
-wholesale, so structure is effectively asexual), a gene duplication-and-
-divergence operator, and removing the 8-part cap.
+Three changes, all in `core/genome.py`.
 
-Deliberately last: while corr(tier1, tier2) ≈ 0, stronger variation only climbs
-the wrong hill faster. Phase 1.2 is what will say whether that is still true —
-`tier1_5_retention` is the number to look at after the next run.
+**Graph-level recombination.** `crossover` took one parent's graph wholesale and
+imported only the other's global genes and CPPN weights, so structure was
+effectively asexual: every graph in an archive descended from one seed graph by
+mutation alone, and two islands that independently found a good wing and a good
+fin could never produce a design carrying both — which is most of the argument
+for having islands at all. `graft_subtree` transplants a whole coherent limb,
+with its own shape genes, joint and phase, onto a site in the receiving graph,
+which is otherwise untouched. The original reasoning against graph crossover is
+sound and is about *cut-and-splice*, which severs both graphs and rejoins the
+halves; subtree grafting is what genetic programming actually uses. Measured
+over 60 archetype pairs it fires every time, adds 1.33 parts on average, and
+everything it produces builds. The lineage records `graft` rather than
+`crossover` when structure moved, so the two are separable in the record.
+
+**Duplication and divergence.** `mut_duplicate_part` copies a module, attaches
+the copy where its twin is attached and then displaces it, and diverges the
+copy's dimensions and phase. The copy gets *its own* CPPN entry rather than the
+original's index — sharing the index would be duplication without divergence,
+two parts locked to one shape gene that no later mutation can separate. This is
+the move that builds a graded series (a wing, a smaller wing, a fin); before it,
+the only additive operator drew a part from the prior, so every member of such a
+series had to be stumbled on independently.
+
+**The 8-part cap is gone.** It was a compute-era number and it was never binding
+on quality — arch33's population mean sat at 3.95 parts from the first
+generation to the last — but at eight parts a duplication is usually refused,
+so it had to go with the operator. `MAX_PARTS` is 24 and the guard that actually
+binds is on *bodies*: one part with `radial=6` and `reflect` becomes twelve
+rigid bodies per level of recursion. `estimated_bodies` walks the graph for
+that, and it is a lower bound and known to be one — measured against the built
+phenotype over 207 designs the real-to-estimated ratio is 1.00 median, 2.44 at
+the 95th percentile and 11.0 at worst, because a surface part expands into
+spanwise segments the graph cannot see. So the ceiling sits an order of
+magnitude below the resource it protects, and `MIN_CAP_BODIES` was raised from
+2,048 to 8,192 so the backstop is far away.
+
+**Why this was last, and what unlocks it.** The stated condition was that while
+corr(tier1, tier2) ≈ 0, stronger variation only climbs the wrong hill faster.
+That condition has not been *measured* away — it needs a run — but the two
+things it depends on were both fixed first: the air score now measures flight
+(Phase 1.1) and `tier1_5_retention` (Phase 1.2) is the number that will say
+whether an 8 s score survives a 60 s leg. If it does not, these operators should
+be turned down, not tuned: `STRUCTURAL_OPERATORS` is what the curator throttles
+and `duplicate_part` is registered there with the rest.

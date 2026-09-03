@@ -2659,6 +2659,144 @@ def test_the_shared_controller_question_is_answered_with_a_number() -> None:
           or D._r2(np.zeros((64, 2)), rng.normal(size=(64, 2))) < 0.2)
 
 
+def test_sharding_a_generation_does_not_change_a_score() -> None:
+    """Worker processes may only make the search faster, never different.
+
+    Nothing per machine depends on which other machines share its batch: the
+    scatter draw and the identification deltas are each ``default_rng`` built
+    fresh per machine, the force limiter is per machine, and the fluid kernel
+    has no cross-machine reduction.  That is what makes an actor pool safe, and
+    it is worth asserting rather than assuming -- a shared generator anywhere in
+    that chain would make a design's score depend on its position in the batch.
+    """
+    print("\nactors: a shard boundary is not visible in a score")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.actors import ActorPool, split
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    # The shard arithmetic first, which needs no simulation.
+    check("shards cover the batch exactly and in order",
+          split(16, 4, 4) == [(0, 4), (4, 8), (8, 12), (12, 16)],
+          f"{split(16, 4, 4)}")
+    check("a shard is never smaller than min_shard",
+          split(16, 16, 4) == split(16, 4, 4),
+          "sixteen workers on sixteen machines still make four shards of four")
+    check("and a batch smaller than one shard is not split at all",
+          split(3, 8, 4) == [(0, 3)], f"{split(3, 8, 4)}")
+    check("a pool of one runs in this process",
+          ActorPool(1)._pool is None)
+
+    plans = list(BODY_PLANS.values())
+    phenos = [build(plans[i % len(plans)]()) for i in range(6)]
+    kw = dict(spec=MissionSpec(), segment_seconds=1.0, identify_axes=True,
+              seed=11, n_modes=6)
+
+    def run(workers):
+        pool = ActorPool(workers, min_shard=2)
+        ctrls = [Controller(params=None, policy=None) for _ in phenos]
+        try:
+            res = pool.evaluate_tier1(phenos, controllers=ctrls, **kw)
+        finally:
+            pool.close()
+        return ([r.mission_fraction for r in res],
+                [sorted(c.bases or {}) for c in ctrls],
+                [r.mobility["air"].rank for r in res])
+
+    one = run(1)
+    many = run(3)
+    check("the same six machines score the same in one shard or three",
+          one[0] == many[0],
+          f"max difference {max(abs(a - b) for a, b in zip(one[0], many[0])):.3g}")
+    check("and their measured mobility comes back with them",
+          one[1] == many[1] and one[2] == many[2],
+          f"air ranks {one[2]}")
+
+
+def test_structure_can_be_recombined_and_duplicated() -> None:
+    """Structure was asexual: every graph descended from one seed by mutation.
+
+    ``crossover`` took one parent's graph wholesale, so two islands that
+    independently found a good wing and a good fin could not produce a design
+    carrying both -- which is most of the argument for having islands.  And
+    there was no way to build a graded limb series except by stumbling on each
+    member from the prior, because the only additive operator draws a part from
+    that prior.
+    """
+    print("\nstructure: grafting and duplication")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.genome import (MAX_BODIES, MAX_PARTS,
+                                        MUTATION_OPERATORS, STRUCTURAL_OPERATORS,
+                                        crossover, descendants, estimated_bodies,
+                                        graft_subtree)
+    from dytiscidae.core.phenotype import build
+
+    rng = np.random.default_rng(3)
+    check("the part cap is no longer the compute-era eight", MAX_PARTS > 8,
+          f"MAX_PARTS = {MAX_PARTS}, with a body budget of {MAX_BODIES}")
+    check("duplication is registered, and as a structural move",
+          "duplicate_part" in MUTATION_OPERATORS
+          and "duplicate_part" in STRUCTURAL_OPERATORS)
+
+    # Duplication has to *diverge*, which means its own shape gene.
+    g = BODY_PLANS["gannet"]()
+    surfaces = [p for p in g.parts if p.is_surface and p.surface_cppn >= 0]
+    before_parts, before_cppns = len(g.parts), len(g.cppns)
+    fired = MUTATION_OPERATORS["duplicate_part"](g, rng)
+    check("a duplication adds a part", fired and len(g.parts) == before_parts + 1,
+          f"{before_parts} -> {len(g.parts)}")
+    grew = len(g.cppns) > before_cppns
+    check("and the copy gets its own shape gene rather than sharing one",
+          grew or not surfaces,
+          f"cppns {before_cppns} -> {len(g.cppns)}; sharing would lock the two "
+          "parts to one gene that no mutation can separate")
+    idx = [i for i, p in enumerate(g.parts)]
+    check("the duplicate is still buildable", len(build(g).segments) > 0,
+          f"{len(build(g).segments)} segments from {len(idx)} parts")
+
+    # Grafting has to move a coherent subtree and leave the receiver buildable.
+    names = list(BODY_PLANS)
+    fired = built = added = 0
+    for i in range(60):
+        a = BODY_PLANS[names[i % len(names)]]()
+        b = BODY_PLANS[names[(i // len(names) + 1) % len(names)]]()
+        kid = a.copy()
+        n0 = len(kid.parts)
+        if not graft_subtree(kid, b, rng):
+            continue
+        fired += 1
+        added += len(kid.parts) - n0
+        try:
+            build(kid)
+            built += 1
+        except Exception:
+            pass
+    check("a graft moves a limb between two graphs", fired > 40,
+          f"fired {fired}/60, adding {added / max(fired, 1):.2f} parts on average")
+    check("and everything it produces still builds", built == fired,
+          f"{built}/{fired}")
+
+    check("the subtree walk terminates on a cyclic graph",
+          len(descendants(g, g.root)) <= len(g.parts),
+          f"{len(descendants(g, g.root))} of {len(g.parts)} parts reachable")
+
+    # And crossover reaches it, with the lineage saying which happened.
+    seen = set()
+    for _ in range(40):
+        kid = crossover(BODY_PLANS["eel"](), BODY_PLANS["bat"](), rng)
+        seen.add(kid.lineage[-1])
+    check("crossover records whether structure moved or only genes did",
+          seen == {"graft", "crossover"}, f"{sorted(seen)}")
+
+    # The budget is on bodies, because a part is not a body.
+    branchy = BODY_PLANS["medusa"]()
+    check("the body estimate sees what a part count cannot",
+          estimated_bodies(branchy) > len(branchy.parts),
+          f"{len(branchy.parts)} parts expand to about "
+          f"{estimated_bodies(branchy)} bodies")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -2703,6 +2841,8 @@ def main() -> int:
     test_every_island_is_reached_by_verification_and_audit()
     test_a_long_leg_runs_on_promotion_candidates_only()
     test_the_shared_controller_question_is_answered_with_a_number()
+    test_sharding_a_generation_does_not_change_a_score()
+    test_structure_can_be_recombined_and_duplicated()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

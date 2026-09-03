@@ -93,8 +93,15 @@ except Exception as exc:  # pragma: no cover
 #: constructing a second one and hanging.
 _POOL = {"pipe": None, "cap": (0, 0, 0)}
 
+#: Headroom, because the capacity cannot grow after the first allocation and
+#: exceeding it stops the run.  Measured on a batch of 16 archetypes: 1,290
+#: panels and about 350 bodies, so these are an order of magnitude above what a
+#: generation of the current size uses.  Bodies was 2,048 and was raised when
+#: the 8-part cap went (see ``core.genome.MAX_PARTS``): a branchy design can
+#: expand to far more bodies than its part count suggests, and the cost of the
+#: headroom is one allocation of a few arrays.
 MIN_CAP_PANELS = 16384
-MIN_CAP_BODIES = 2048
+MIN_CAP_BODIES = 8192
 MIN_CAP_MACHINES = 256
 
 
