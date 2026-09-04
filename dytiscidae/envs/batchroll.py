@@ -450,6 +450,23 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
     active = np.ones(k, dtype=bool)
 
     for i in range(n_steps):
+        # Every machine that decides on this step decides in one forward pass.
+        # At batch 1 the shared policy is dispatch-bound -- 137 us for twelve
+        # thousand parameters on this machine against 68 us for sixteen rows
+        # together -- so one call per machine per control interval costs
+        # 219 us of every batched physics step, a sixth of it.  Batching them
+        # changes the order the samples are drawn in and nothing else.
+        shared_out = {}
+        if shared is not None and bases is not None and i % control_every == 0:
+            rows = [m for m in range(k) if active[m] and bases[m] is not None]
+            if rows:
+                obs_rows = [envs[m].observation(domain) for m in rows]
+                acts, logps, vals = shared.act_many(
+                    np.asarray(obs_rows, np.float32),
+                    deterministic=collector is None)
+                shared_out = {
+                    m: (obs_rows[j], acts[j], float(logps[j]), float(vals[j]))
+                    for j, m in enumerate(rows)}
         angles = []
         for m, e in enumerate(envs):
             if active[m]:
@@ -457,7 +474,8 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                         and i % control_every == 0
                         and ((policies is not None and policies[m] is not None)
                              or shared is not None)):
-                    obs = e.observation(domain)
+                    obs = (shared_out[m][0] if m in shared_out
+                           else e.observation(domain))
                     coeffs = np.zeros(bases[m].modes.shape[0])
                     if policies is not None and policies[m] is not None:
                         own = np.asarray(policies[m].act(obs), float)
@@ -468,8 +486,9 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                         # The exploration noise exists to generate on-policy
                         # data; a rollout that banks no trajectory has nothing
                         # to explore for, and its score goes into the archive.
-                        a, logp, val = shared.act(
-                            obs, deterministic=collector is None)
+                        # Drawn in the batched pass at the top of the step;
+                        # a missing key is a bug, not a case to paper over.
+                        _obs, a, logp, val = shared_out[m]
                         # The shared policy commands a body *twist*, not a mode
                         # index: mode k means something different on every body
                         # (see MobilityBasis), so a shared action indexed by
