@@ -444,7 +444,7 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
     # ``clears``; ``cmds``/``resp`` are per control decision.  All three feed
     # the air branch's tumble-versus-commanded-turn test.
     rec = [dict(depths=[], alts=[], ups=[], contacts=[], clears=[], slam=0.0,
-                spins=[], cmds=[], resp=[])
+                spins=[], cmds=[], resp=[], vzs=[])
            for _ in envs]
     cur = list(params_list)
     active = np.ones(k, dtype=bool)
@@ -531,6 +531,7 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
             r["ups"].append(float(R[2, 2]))
             r["contacts"].append(1.0 if e._touching_ground() else 0.0)
             r["spins"].append(float(np.linalg.norm(e.body_twist()[3:])))
+            r["vzs"].append(float(e.body_twist()[2]))
             r["slam"] = max(r["slam"], e.solver.diag.slam)
 
         if not active.any():
@@ -557,7 +558,7 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
             domain, res[m], np.array(r["depths"]), np.array(r["alts"]),
             np.array(r["ups"]), np.array(r["contacts"]), np.array(r["clears"]),
             spins=np.array(r["spins"]), commands=r["cmds"],
-            responses=r["resp"])
+            responses=r["resp"], vzs=np.array(r["vzs"]))
     return res
 
 

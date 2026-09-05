@@ -1096,7 +1096,7 @@ class TriphibianEnv:
         # The attitude record.  ``spins`` is per step; ``commands`` and
         # ``responses`` are per control decision, and exist so the air score can
         # tell a commanded turn from a tumble -- see ``_turn_authority``.
-        spins, commands, responses = [], [], []
+        spins, commands, responses, vzs = [], [], [], []
         peak_slam = 0.0
         cur = p
 
@@ -1123,6 +1123,7 @@ class TriphibianEnv:
             ups.append(float(R[2, 2]))
             contacts.append(1.0 if self._touching_ground() else 0.0)
             spins.append(float(np.linalg.norm(self.body_twist()[3:])))
+            vzs.append(float(self.body_twist()[2]))
             peak_slam = max(peak_slam, self.solver.diag.slam)
 
         end = self.root_pos().copy()
@@ -1144,12 +1145,13 @@ class TriphibianEnv:
             domain, res, np.array(depths), np.array(alts),
             np.array(ups), np.array(contacts), np.array(clearances),
             spins=np.array(spins), commands=commands, responses=responses,
+            vzs=np.array(vzs),
         )
         return res
 
     def _score_segment(self, domain, res, depths, alts, ups, contacts,
                        clearances=None, *, spins=None, commands=None,
-                       responses=None) -> float:
+                       responses=None, vzs=None) -> float:
         """Domain competence in [0, 1].
 
         ``spins`` is the body angular rate magnitude at each recorded step, and
@@ -1381,11 +1383,37 @@ class TriphibianEnv:
         if len(alts) > 2:
             climbed = float(beach_surface_z(float(self.root_pos()[0])) - beach_surface_z(
                 float(self.root_pos()[0]) - res.distance))
+        # Take-off, measured where the machine actually starts on the ground.
+        #
+        # The air segment is a *launch* -- 30 m up at trim speed -- so nothing
+        # in this project had ever measured whether a design can leave the
+        # ground under its own power, and ``transitions.py`` records that none
+        # of the seed plans can.  A probe over arch34's final archive put 96
+        # elites on the beach for 30 s: the median never exceeded its 0.05 m
+        # spawn clearance, and the best reached 0.133 m against a 0.50 m bar.
+        #
+        # A threshold on peak clearance is therefore the wrong instrument -- it
+        # reads zero across a population whose entire signal lives below it.
+        # This is the projectile estimate instead: the height the machine's
+        # present upward velocity would carry it to, which is dense from the
+        # first gram of unweighting and does not require leaving the ground at
+        # all.  Same densification, and the same equations, as Wang et al.,
+        # "Towards Quadrupedal Jumping and Walking for Dynamic Locomotion using
+        # Reinforcement Learning" (arXiv 2510.24584).
+        takeoff = 0.0
+        if clearances is not None and len(np.asarray(clearances)):
+            c = np.asarray(clearances, float)
+            v = np.asarray(vzs, float) if vzs is not None else np.zeros_like(c)
+            v = v[:len(c)] if len(v) >= len(c) else np.pad(v, (0, len(c) - len(v)))
+            apex = c + np.maximum(v, 0.0) ** 2 / (2.0 * 9.81)
+            apex = apex[np.isfinite(apex)]
+            takeoff = float(np.max(apex)) if apex.size else 0.0
         res.measurements.update({
             "upright": upright,
             "contact_fraction": contact,
             "land_speed": float(res.mean_speed),
             "slope_climbed": max(climbed, 0.0),
+            "takeoff_height": takeoff,
         })
         # Posture *gates* locomotion rather than substituting for it.
         #

@@ -2043,6 +2043,75 @@ def test_the_air_score_measures_flight() -> None:
           f"released at {none_speed:.1f} m/s, the floor, not the 2.0 m/s cap")
 
 
+def test_takeoff_is_measured_where_the_machine_starts_on_the_ground() -> None:
+    """The air segment is a launch, so nothing measured leaving the ground.
+
+    arch34 ran 14,006 evaluations and its telemetry could not answer whether any
+    design can take off, because every air score was earned from a 30 m spawn at
+    trim speed.  A probe over its final archive put 96 elites on the beach for
+    30 s: median peak clearance 0.050 m -- exactly the spawn value, so most
+    never moved upward at all -- and best 0.133 m against a 0.50 m bar.
+
+    So the measurement is the projectile estimate, not peak clearance: a
+    threshold above 0.133 m reads zero for the whole population and carries no
+    gradient, while ``clearance + max(0, vz)^2 / 2g`` is dense from the first
+    upward velocity and does not require leaving the ground.
+    """
+    import numpy as np
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, SegmentResult, TriphibianEnv
+    from dytiscidae.evolution.judge import LADDER, rung_reached
+
+    env = TriphibianEnv(build(BODY_PLANS["beetle"]()))
+    res = SegmentResult(domain=Domain.LAND, duration=1.0)
+    res.mean_speed = 0.0
+    n = 40
+    ones = np.ones(n)
+
+    # A machine pinned to the ground, never moving upward.
+    env._score_segment(Domain.LAND, res, np.zeros(n), ones * 0.9, ones,
+                       ones, clearances=ones * 0.05, vzs=np.zeros(n))
+    flat = res.measurements["takeoff_height"]
+    check("a machine that never rises measures its own spawn clearance",
+          abs(flat - 0.05) < 1e-9, f"{flat:.4f} m")
+
+    # The same machine with one upward impulse it never converts to height:
+    # 2 m/s straight up is an apex 0.204 m above where it started.
+    vz = np.zeros(n)
+    vz[10] = 2.0
+    res2 = SegmentResult(domain=Domain.LAND, duration=1.0)
+    res2.mean_speed = 0.0
+    env._score_segment(Domain.LAND, res2, np.zeros(n), ones * 0.9, ones,
+                       ones, clearances=ones * 0.05, vzs=vz)
+    impulse = res2.measurements["takeoff_height"]
+    check("an upward impulse scores before any height is gained",
+          impulse > flat, f"{flat:.4f} -> {impulse:.4f} m with 2 m/s of vz")
+    check("and it scores the apex that impulse implies",
+          abs(impulse - (0.05 + 4.0 / (2 * 9.81))) < 1e-6,
+          f"{impulse:.4f} m against 0.05 + v^2/2g = {0.05 + 4.0 / 19.62:.4f}")
+
+    # The ladder has to put arch34's best inside it rather than at zero.
+    check("arch34's best elite lands on a rung, not on the floor",
+          rung_reached("takeoff", {"takeoff_height": 0.133}) >= 1,
+          f"0.133 m -> rung {rung_reached('takeoff', {'takeoff_height': 0.133})}")
+    check("and the spawn clearance alone does not",
+          rung_reached("takeoff", {"takeoff_height": 0.05}) == 0)
+    check("there is a slope above it rather than one bar",
+          len(LADDER["takeoff"]) >= 3
+          and rung_reached("takeoff", {"takeoff_height": 2.0}) > rung_reached(
+              "takeoff", {"takeoff_height": 0.3}),
+          f"{len(LADDER['takeoff'])} rungs")
+
+    # The land ladder must be untouched: rung_reached stops at the first unmet
+    # rung, so anything inserted there would gate the 61.6% of arch34 that sits
+    # at land rung 2.
+    check("the land ladder is not disturbed",
+          [r[0] for r in LADDER["land"]] == ["stays_upright", "supports_itself",
+                                             "moves", "walks", "climbs_slope"])
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -2082,6 +2151,7 @@ def main() -> int:
     test_flap_frequency_is_commandable_in_the_loop()
     test_an_auto_reset_rollout_is_not_trusted()
     test_the_air_score_measures_flight()
+    test_takeoff_is_measured_where_the_machine_starts_on_the_ground()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

@@ -94,6 +94,25 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         ("walks", "land_speed", 0.4),
         ("climbs_slope", "slope_climbed", 0.5),
     ],
+    # Take-off, and it is deliberately a ladder of its own rather than rungs
+    # appended to ``land``.  ``rung_reached`` stops at the first unmet rung, and
+    # arch34's land distribution is 28.7% at rung 0, 61.6% stuck at rung 2 --
+    # upright and self-supporting but under 0.1 m/s -- with 0.5% at the top.
+    # Rungs added above ``climbs_slope`` would be visible to one design in two
+    # hundred, which is a ladder nobody is standing on.
+    #
+    # The thresholds are set from the measured population, not from what a
+    # take-off ought to look like: 0.05 m is the spawn clearance, arch34's best
+    # elite reached 0.133 m, and 0.50 m is the bar ``transitions.py`` uses for
+    # a crossing.  So the first rung is inside reach of what already exists and
+    # the last is a real climb-out, which is what makes this a slope rather
+    # than a wall.
+    "takeoff": [
+        ("unweights", "takeoff_height", 0.08),   # any upward impulse at all
+        ("hops", "takeoff_height", 0.25),        # clearly leaves the ground
+        ("clears", "takeoff_height", 0.50),      # the crossing bar
+        ("climbs_out", "takeoff_height", 1.50),  # a departure, not a hop
+    ],
     "transition": [
         ("crosses", "crossed_fraction", 0.34),
         ("crosses_all", "crossed_fraction", 0.99),
