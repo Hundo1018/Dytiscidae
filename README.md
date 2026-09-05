@@ -63,6 +63,9 @@ python -m dytiscidae.ops.run distill --run runs/first   # is a shared controller
 
 [docs/ROADMAP.md](docs/ROADMAP.md) is the current work list, with the
 measurement behind each item and the number each finished one produced.
+[CLAUDE.md](CLAUDE.md) carries the operating notes: the measured pool-shape
+optimum, how to read the telemetry without being fooled by it, and the traps
+that have cost time before.
 
 `search` prints one line per generation and refreshes
 `runs/first/dashboard.html` every five generations, so you can watch it live by

@@ -5,19 +5,195 @@ built. Every item names the measurement that motivates it; nothing here is on
 the list because it seemed like a good idea, and nothing is marked done without
 the number it produced.
 
-All six phases are implemented. **None of it has been through a training run** —
-every number below is from offline measurement: the seed plans, the stored
-arch33 archives, re-runs of arch33 elites, and timing probes. The next run is
-the test, and it is one arm rather than six, which is a deliberate choice and
-not an oversight: Phase 4's items are mutually coupled, Phase 1 changes what the
-score means, and arch33 already spent a run per item to learn less.
+Revised 2026-09-05, after arch34 ran. The six phases below are history now and
+keep the measurements that motivated them; **the current work list is
+[arch35](#arch35--the-work-list)**, immediately after the results.
 
 Read [CPU_LEGACY.md](CPU_LEGACY.md) for the older backlog. This file supersedes
 it wherever the two disagree.
 
 ---
 
-## Where arch33 left things
+## What arch34 measured
+
+900 generations, 21.7 h, 14,006 evaluations, seed 20260901, batch 16,
+`--workers 4 --min-shard 4`. Run directory `runs/arch34`, report at
+`runs/arch34/report.html`.
+
+| | arch33 | arch34 |
+|---|---|---|
+| wall for 900 generations | 40.4 h | **21.7 h** |
+| evaluations | 13,353 | 14,006 |
+| islands receiving promotions | **2** | **6** (of 180) |
+| lineage depth, last 20 gens / max | 10.15 / 25 | 9.54 / **26** |
+| curriculum typical / reached | 2 / 4 | 2 / 4 |
+| n_parts, first 100 → last 100 | 3.96 → 3.95 | 4.59 → **6.98** |
+| energy-infeasible, first → last | 39.7% → **31.8%** | 41.4% → **56.3%** |
+| corr(fitness, mission), final gen | +0.784 | +0.697 |
+
+**`mission_fraction` levels do not compare across the arch33/arch34 boundary and
+were not compared.** Phase 1.1 redefined the air term and 1.4 gates it, and
+`mission_fraction` is built from air. Both within-run changes are positive and
+significant (arch33 t=+11.3, arch34 t=+5.1); neither magnitude may be read
+against the other.
+
+**What worked.** Phase 1.3 exactly: promotions 6/6/6/6/6/6 by island against
+arch33's two. Phase 2: the same generation count in 54% of the wall time.
+Phase 1.4: airworthiness gates fired on 19.2% of evaluations, 1,311 of them for
+"no lifting surface", and **zero exploit events were raised in the whole run**
+against arch33's wingless-thrown-glider family. Best design of the run:
+`mission_fraction` 0.3474 at gen 447, amphibian island, gannet plan, 8 parts,
+6 DOF, 7.26 kg, 2.60 m span, wing loading 137 N/m², energy margin +0.581, no
+gates — a real flyer.
+
+**What Phase 5 cost.** Four measured consequences of the structural operators,
+all tracking `n_parts` 3.95 → 6.98: per-generation time +7%, rollout divergence
+0.25% → ~2% (eightfold), archive pressure, and the largest — **energy
+infeasibility 41% → 56%**, reversing arch33's 40% → 32% gain. Within arch34 the
+link is direct: infeasible share runs 20.6% at 2 parts, 52.8% at 4, 57.9% at
+5–6. **arch33's 8-part cap was doing energy work nobody had credited it with.**
+
+**Phase 4 (PPO hygiene) remains unattributable**, as designed — it was one arm
+with Phase 1.
+
+### The three findings that set arch35's list
+
+**1. Tier-1 does not predict Tier-2, and never did.**
+`corr(tier1_fraction, tier2_fraction)` = **+0.105** over 180 promotions
+(arch33: **+0.077** over its own 180 — the disconnect is not new, arch33 simply
+had no instrument for it). Split by era it wanders between −0.01 and +0.28 with
+n≈36 per band: no trend, just noise around zero.
+
+Tier-1.5 says why. Over 179 promotions the 60 s retention is **bimodal**: 66.5%
+in [0, 0.25), 24.0% at or above 1.0, only 9.5% in the whole middle. Median
+0.124. And the 8 s score predicts which mode a design lands in — *inversely*:
+
+| 8 s Tier-1 score | n | median retention over 60 s |
+|---|---|---|
+| above the median | 101 | **0.037** |
+| below the median | 78 | **0.390** |
+
+`air` was the binding domain at 60 s in 53 of the first 61 cases.
+
+**2. Every air score this project has produced was earned by a machine that was
+thrown.** `TriphibianEnv.SPAWN[Domain.AIR]` is 30 m altitude and `reset` sets
+`qvel[0] = launch_speed`. `envs/mission.run_continuous` has *one* placement —
+its docstring: "Start in the first commanded domain, the only placement in the
+run" — so in a continuous mission the air and water legs begin with the machine
+wherever the land leg left it. `DOMAIN_CYCLE` is [AIR, WATER, LAND] and the
+three scored transitions are `air_to_water`, `water_to_air`, `water_to_land`:
+**`land_to_air` is not among them.**
+
+Filmed, every elite gives the same result — the fitness-best, the mission-best,
+at 8 s legs and at 60 s legs: land 98–100% on-task, **air 0%, water 0%,
+transitions 0/2, max depth 0.0 m**. The beach needs 11.4 m of travel to reach
+water deep enough to submerge; the best elite covers 3.18 m in 30 s.
+
+**3. The population is not uniformly incapable of leaving the ground — a probe
+said so and the probe was wrong.** Driving elites from `cpg.base` rather than
+through the evaluation path reported that none rise. Measured properly over 64
+elites: 18.8% gain height, 12.5% more than 0.20 m, 7.8% more than 0.45 m, best
+1.04 m. Hopping and sustaining flight are different capabilities and only the
+first exists.
+
+---
+
+## arch35 — the work list
+
+Two items are already implemented and unrun; the rest are ordered by evidence.
+
+### Done and unrun — the next run tests these
+
+**A. Take-off is measured, gated, laddered, and enters the mission score.**
+`takeoff_height` is the projectile estimate `clearance + max(0, vz)²/2g` as a
+gain over resting clearance, gated on airborne-and-upright, with
+`measured_takeoff_height` beside it. A `takeoff` ladder runs 0.02 / 0.10 / 0.30
+/ 0.80 m. `mission_fraction` multiplies by `max(takeoff_fraction, 0.05)` with
+full credit at 0.30 m — the transition term's shape, deliberately **not** a
+fourth competence, where `min(competences)` would multiply the population by its
+own zero.
+
+Thresholds come from the measured distribution. A threshold anywhere above the
+population reads zero and carries no gradient, which is the failure Wang et al.
+name in *Towards Quadrupedal Jumping and Walking for Dynamic Locomotion using
+Reinforcement Learning* (arXiv 2510.24584) and fix by densifying with the
+projectile equations.
+
+**`mission_fraction` is not comparable across this boundary either.** The trade
+is deliberate: what is given up is comparison with a score at which arch34 ran
+0/2 transitions and 0% on-task in air and water.
+
+**B. `land` gains `stirs` before `moves`.** On `land_peak_speed` — the best
+one-second displacement rate over windows held upright throughout — at 0.08 m/s.
+61.6% of arch34 sat at the rung below `moves`, upright and self-supporting and
+under its 0.1 m/s *mean*; measured peak is 0.086 m/s median against a 0.026 m/s
+mean. A machine that covers half a metre in one second and falls averages an
+eighth of what it produced.
+
+Both A and B were caught scoring falls before they were gated — ungated, the
+apex estimate read p90 0.378 m and peak speed 3.23 m/s, a body rebounding off
+the beach and a body sliding down it on its side. That is the **third** time
+this project has found a score paying for uncontrolled motion, after the thrown
+glider and the tumble-as-turn, and the third time the fix was a gate rather than
+a coefficient.
+
+### Not done, in order
+
+**C. Score `land_to_air`, once the take-off ladder has produced a distribution.**
+It is already in `TRANSITION_ENDPOINTS`; only the scoring loops in
+`batchroll.py:689` and `evaluate.py:260` exclude it. It was excluded because
+nothing could do it — `transitions.py` records "none: nothing gets off the
+ground" for all six seed plans — and that reason is now partly obsolete. Wait
+for one run with A in place: if the take-off rungs stay empty, adding the
+transition adds a constant zero.
+
+**D. `--segment-seconds 24`.** Cost measured, and it is not what the README
+said: 8 s costs 57.2 s per 8 designs, 16 s costs 65.1 s (1.14x), 24 s costs
+77.0 s (1.35x), because identification is 67% of an evaluation and does not
+scale with the window. **Tripling the window costs a third more, not three
+times more.** Demoted below A–C: a longer window on a thrown machine measures a
+longer throw, so take-off has to be scored first for window length to mean
+anything.
+
+**E. Charge for parts, or restore a cap.** Energy infeasibility went 41% → 56%
+as `n_parts` went 3.95 → 6.98, and within arch34 the link is monotone in part
+count. The search is buying structural complexity with energy feasibility and
+is not being charged for it. Not a return to 8 parts — the cap was a compute-era
+number — but the energy cost of parts has to reach the selection pressure.
+
+**F. `descriptor_refit_every`.** The archive is losing ground to its own
+refits: the archive size *at* each refit fell 105 → 116 → 105 → 108 → 107 → 95
+→ 88 → 77 over the run, and the four learned axes do not converge — lead-term
+agreement between successive refits ran 4/4, 1/4, 2/4, 4/4, 2/4. Every refit
+merges 16–31 cells (331 total, worst 107 → 76) and the search stops refilling
+to its previous peak. `qd_score` fell ~60 → 36 and coverage ~16% → 10% over the
+same stretch. Candidate fixes: refit less often, freeze the axes once they
+settle, or require a refit to improve a criterion before it is accepted.
+
+**G. Identification is 67% of an evaluation.** `identify_axes_every` is 1, so
+every candidate is re-identified every generation, and `batchroll.py` states it
+cannot be batched — each machine runs a different perturbation experiment.
+`Genome.body_plan` is now its own field, so whether structure changed is known:
+an unchanged morphology could reuse its axes. This is the largest single
+throughput lever left and it is worth more than any further pool-shape work.
+
+**H. `np.cross` is 16% of an evaluation** — 308k calls of a three-element cross
+product plus numpy's dispatch overhead, inside `FluidSolver.apply`. Explicit
+component arithmetic is the standard 5–10x. Mechanical, low risk.
+
+**I. Nothing rewards going *toward* the water.** `SegmentResult.distance` is
+`norm(end - start)`, direction-free. A design that walks well has no gradient
+pulling it down the beach, and the mission's water leg is 11.4 m away.
+
+---
+
+## arch34's phases, kept for the measurements behind them
+
+Everything below is history as of 2026-09-05. It is kept because each
+item carries the number that motivated it, and those numbers are still
+the reason the code looks the way it does.
+
+### Where arch33 left things
 
 arch33 (900 generations, 40.4 h, 13,353 evaluations) changed nine things and
 eight of them worked.
@@ -53,7 +229,7 @@ Do not build a fifth. Phase 3 below now says *why* with a number.
 
 ---
 
-## Phase 0 — measure, no code — **done**
+### Phase 0 — measure, no code — **done**
 
 **The fluid solver's cost split is not what the standing figure says.** Measured
 on this machine over 25 designs (7 archetypes and 18 perturbations), panels
@@ -110,9 +286,9 @@ for the airborne fraction to carry the flat 0.25, and the rising beach supplied
 the rest. That is also the strongest single argument for Phase 1.1: the term
 that had to go was not the one anybody would have picked.
 
-## Phase 1 — fidelity. This was the binding constraint — **done**
+### Phase 1 — fidelity. This was the binding constraint — **done**
 
-### 1.1 The air score now measures flight
+#### 1.1 The air score now measures flight
 
 All four causes fixed together, because each one alone leaves the others paying.
 
@@ -161,7 +337,7 @@ because it was launched at 28.4 m/s and kept the speed it was given.
 deliberate — the whole finding was that the old number did not measure flight —
 and the raw measurements travel with every design, so old runs stay analysable.
 
-### 1.2 Tier-1.5: a 60 s single leg on promotion candidates
+#### 1.2 Tier-1.5: a 60 s single leg on promotion candidates
 
 `envs.evaluate.evaluate_tier1_5`, called from `_verify_and_label` before the
 Tier-2 mission. One leg, not three, and it is the **weakest** one — the mission
@@ -176,7 +352,7 @@ distribution is known would be choosing a threshold from nothing — and would
 also remove the ground-truth pair the critic learns from. `tier1_5_retention`
 now appears on every promote event and on the elite in the archive.
 
-### 1.3 Schedule aliasing
+#### 1.3 Schedule aliasing
 
 Every periodic job fired on `gen % N` while the island rotates once per
 generation, so with six islands any `N` sharing a factor with six could only
@@ -192,7 +368,7 @@ The defect is visible in arch33's own archives: of 550 stored controllers, the
 controller is only refined at a promotion and a promotion only happens at a
 verification.
 
-### 1.4 Tier-0 gates for the exploit family
+#### 1.4 Tier-0 gates for the exploit family
 
 `envs.triphibian.airworthiness` returns the flight gates a design fails, from
 geometry and mass alone:
@@ -222,7 +398,7 @@ back toward growing a wing. Its ladder-visible `sink_rate`, `station_keeping`
 and `turn_rate_held` are neutralised so it cannot climb the ladder either, while
 `measured_sink_rate` keeps the honest number.
 
-### 1.5 Telemetry defect
+#### 1.5 Telemetry defect
 
 `Genome.body_plan` is now its own field, set once at birth by the constructor
 that builds the archetype and preserved through `copy`, `mutate` and
@@ -233,7 +409,7 @@ a plan for a design's first 24 mutations and an operator name (`jitter_cppn`,
 arch30, arch31 and arch33 was reading a mixture of the two, and none of them can
 be repaired from the stored runs.
 
-## Phase 2 — throughput — **done**
+### Phase 2 — throughput — **done**
 
 **Multiprocess actors.** `envs/actors.py`, `--workers N`. A persistent pool of
 worker processes, each holding its own batched evaluator and its own GPU
@@ -296,7 +472,7 @@ one is reproducible per worker count rather than across worker counts.
 Longer segments can now be re-costed against this rather than against the
 single-process figure.
 
-## Phase 3 — the learner
+### Phase 3 — the learner
 
 - **No fifth shared-policy variant.**
 - **The distillation test is done, and it answers the capacity question.**
@@ -353,7 +529,7 @@ single-process figure.
   a near-episodic reward produces. RUDDER (arXiv 1806.07857) would replace the
   hand-written potential with a learned return decomposition.
 
-## Phase 4 — PPO implementation hygiene, as one arm — **built, unmeasured**
+### Phase 4 — PPO implementation hygiene, as one arm — **ran, unattributable**
 
 All seven changed together, in `learning/ppo.py`:
 
@@ -388,7 +564,7 @@ Given Phase 3, this arm is worth running as *hygiene on the learner the project
 keeps for the PGA variation operator*, not as a fifth attempt at a shared
 controller.
 
-## Phase 5 — structural evolution — **done, and it was gated on Phase 1.2**
+### Phase 5 — structural evolution — **ran; see "What Phase 5 cost" above**
 
 Three changes, all in `core/genome.py`.
 
