@@ -418,11 +418,23 @@ def cmd_showcase(args) -> int:
                   + (f" from island {args.island!r} (have: {', '.join(islands)})"
                      if args.island else ""))
             return 1
-        elite = max(pool, key=lambda e: e.fitness)
+        # "Best" is ambiguous and the two answers disagree.  Fitness is what the
+        # curator ranks by; `mission_fraction` is what the machine achieves on
+        # the mission, and arch34 ended with corr(fitness, mission) = +0.70 --
+        # close, and not close enough.  Filming the fitness-best elite showed a
+        # machine that walked and never left the ground while the run's actual
+        # best flew at a 95% airborne fraction, which is how this option came
+        # to exist.
+        if args.by == "mission":
+            key = lambda e: (e.meta or {}).get("mission_fraction") or 0.0
+        else:
+            key = lambda e: e.fitness
+        elite = max(pool, key=key)
         p = build(elite.genome)
         print(f"filming the best of {len(pool)} elites from {args.design}"
-              f"{f' (island {args.island})' if args.island else ''}: "
-              f"fitness {elite.fitness:.4f}, island "
+              f"{f' (island {args.island})' if args.island else ''} by {args.by}: "
+              f"fitness {elite.fitness:.4f}, mission_fraction "
+              f"{(elite.meta or {}).get('mission_fraction') or 0:.4f}, island "
               f"{(elite.meta or {}).get('island', '-')}, tier {elite.tier}")
     elif args.plan:
         from ..core.bodyplans import BODY_PLANS
@@ -678,6 +690,9 @@ def main(argv=None) -> int:
                    help="restrict --design to one island's archive")
     p.add_argument("--plan", default=None,
                    help="film a named body plan instead (beetle, gannet, ...)")
+    p.add_argument("--by", choices=("fitness", "mission"), default="fitness",
+                   help="which elite counts as best: the curator's fitness "
+                        "ranking, or the mission fraction the machine achieved")
     p.add_argument("--controller", default=None, help="load a trained controller pickle")
     p.add_argument("--train", action="store_true", help="train one first")
     p.add_argument("--iterations", type=int, default=22)
