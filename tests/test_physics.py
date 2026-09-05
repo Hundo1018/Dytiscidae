@@ -2043,6 +2043,133 @@ def test_the_air_score_measures_flight() -> None:
           f"released at {none_speed:.1f} m/s, the floor, not the 2.0 m/s cap")
 
 
+def test_takeoff_is_measured_where_the_machine_starts_on_the_ground() -> None:
+    """The air segment is a launch, so nothing measured leaving the ground.
+
+    arch34 ran 14,006 evaluations and its telemetry could not answer whether any
+    design can take off, because every air score was earned from a 30 m spawn at
+    trim speed.  A probe over its final archive put 96 elites on the beach for
+    30 s: median peak clearance 0.050 m -- exactly the spawn value, so most
+    never moved upward at all -- and best 0.133 m against a 0.50 m bar.
+
+    So the measurement is the projectile estimate, not peak clearance: a
+    threshold above 0.133 m reads zero for the whole population and carries no
+    gradient, while ``clearance + max(0, vz)^2 / 2g`` is dense from the first
+    upward velocity and does not require leaving the ground.
+    """
+    import numpy as np
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, SegmentResult, TriphibianEnv
+    from dytiscidae.evolution.judge import LADDER, rung_reached
+
+    env = TriphibianEnv(build(BODY_PLANS["beetle"]()))
+    n = 120
+    ones, zeros = np.ones(n), np.zeros(n)
+
+    # Airborne and upright at a constant height: it left the ground but gained
+    # nothing, so the measure is a gain and reads zero.
+    res = SegmentResult(domain=Domain.LAND, duration=1.0)
+    res.mean_speed = 0.0
+    env._score_segment(Domain.LAND, res, zeros, ones * 0.9, ones,
+                       zeros, clearances=ones * 0.05, vzs=zeros)
+    flat = res.measurements["takeoff_height"]
+    check("height is measured as a gain, so holding one reads zero",
+          abs(flat) < 1e-9, f"{flat:.4f} m")
+
+    # The same machine with one upward impulse it never converts to height:
+    # 2 m/s straight up is an apex 0.204 m above where it started.
+    vz = zeros.copy()
+    vz[10] = 2.0
+    res2 = SegmentResult(domain=Domain.LAND, duration=1.0)
+    res2.mean_speed = 0.0
+    env._score_segment(Domain.LAND, res2, zeros, ones * 0.9, ones,
+                       zeros, clearances=ones * 0.05, vzs=vz)
+    impulse = res2.measurements["takeoff_height"]
+    check("an upward impulse scores before any height is gained",
+          impulse > flat, f"{flat:.4f} -> {impulse:.4f} m with 2 m/s of vz")
+    check("and it scores exactly the apex that impulse implies",
+          abs(impulse - 4.0 / (2 * 9.81)) < 1e-6,
+          f"{impulse:.4f} m against v^2/2g = {4.0 / 19.62:.4f}")
+
+    # The ladder has to put arch34's best inside it rather than at zero.
+    check("arch34's best elite lands on a rung, not on the floor",
+          rung_reached("takeoff", {"takeoff_height": 0.133}) >= 1,
+          f"0.133 m -> rung {rung_reached('takeoff', {'takeoff_height': 0.133})}")
+    check("and a machine that never rose does not",
+          rung_reached("takeoff", {"takeoff_height": 0.0}) == 0)
+    check("there is a slope above it rather than one bar",
+          len(LADDER["takeoff"]) >= 3
+          and rung_reached("takeoff", {"takeoff_height": 2.0}) > rung_reached(
+              "takeoff", {"takeoff_height": 0.3}),
+          f"{len(LADDER['takeoff'])} rungs")
+
+    # Both gates, and both were put there by measurement rather than taste.
+    # Ungated over 64 arch34 elites the estimate read p90 0.378 m from a
+    # population whose best controlled hop is a tenth of that: it was scoring
+    # the rebound of a machine falling over.
+    fallen = SegmentResult(domain=Domain.LAND, duration=1.0)
+    fallen.mean_speed = 0.0
+    rising = zeros.copy()
+    rising[10] = 3.0
+    env._score_segment(Domain.LAND, fallen, zeros, ones * 0.9,
+                       ones * 0.1,                      # on its side
+                       zeros, clearances=ones * 0.05, vzs=rising)
+    check("a machine on its side scores no take-off however fast it is rising",
+          fallen.measurements["takeoff_height"] == 0.0)
+    grounded = SegmentResult(domain=Domain.LAND, duration=1.0)
+    grounded.mean_speed = 0.0
+    env._score_segment(Domain.LAND, grounded, zeros, ones * 0.9, ones,
+                       ones,                             # never off the ground
+                       clearances=ones * 0.05, vzs=rising)
+    check("and neither does one that never leaves the ground",
+          grounded.measurements["takeoff_height"] == 0.0)
+
+    # The estimate is dense and the achievement is not, so both are recorded.
+    check("the height actually reached is kept beside the estimate",
+          "measured_takeoff_height" in res2.measurements
+          and res2.measurements["measured_takeoff_height"] <= res2.measurements[
+              "takeoff_height"] + 1e-9)
+
+    # Locomotion: a lurch of half a metre inside one second, then nothing.
+    lurch = SegmentResult(domain=Domain.LAND, duration=8.0)
+    lurch.mean_speed = 0.05
+    xy = np.zeros((n, 2))
+    hop = n // 8
+    xy[hop:2 * hop, 0] = np.linspace(0.0, 0.5, hop)
+    xy[2 * hop:, 0] = 0.5
+    env._score_segment(Domain.LAND, lurch, zeros, ones * 0.9, ones, ones,
+                       clearances=ones * 0.05, vzs=zeros, xys=xy)
+    check("peak speed sees motion the segment mean averages away",
+          lurch.measurements["land_peak_speed"] > 8 * lurch.measurements["land_speed"],
+          f"mean {lurch.measurements['land_speed']:.3f} m/s vs peak "
+          f"{lurch.measurements['land_peak_speed']:.3f} m/s")
+    sliding = SegmentResult(domain=Domain.LAND, duration=8.0)
+    sliding.mean_speed = 0.05
+    env._score_segment(Domain.LAND, sliding, zeros, ones * 0.9,
+                       ones * 0.1, ones,                # sliding on its side
+                       clearances=ones * 0.05, vzs=zeros, xys=xy)
+    check("but not a body sliding down the beach on its side",
+          sliding.measurements["land_peak_speed"] == 0.0)
+
+    # The new land rung goes in front of `moves`, where the population is.
+    names = [r[0] for r in LADDER["land"]]
+    check("the land ladder gains a rung below the one 61.6% were stuck at",
+          names.index("stirs") < names.index("moves"), " -> ".join(names))
+
+    # Take-off multiplies the mission rather than joining min(competences),
+    # which would multiply the whole population by its own zero.
+    from dytiscidae.envs.evaluate import TAKEOFF_FLOOR, TAKEOFF_FULL
+
+    check("a design that never rises keeps the floor, not zero",
+          TAKEOFF_FLOOR > 0.0, f"floor {TAKEOFF_FLOOR}")
+    check("and one that clears the bar is worth the full factor",
+          float(np.clip(TAKEOFF_FULL / TAKEOFF_FULL, 0, 1)) == 1.0
+          and TAKEOFF_FULL / TAKEOFF_FLOOR >= 4.0,
+          f"{TAKEOFF_FULL} m full, {1 / TAKEOFF_FLOOR:.0f}x the floor")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -2082,6 +2209,7 @@ def main() -> int:
     test_flap_frequency_is_commandable_in_the_loop()
     test_an_auto_reset_rollout_is_not_trusted()
     test_the_air_score_measures_flight()
+    test_takeoff_is_measured_where_the_machine_starts_on_the_ground()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

@@ -196,6 +196,35 @@ class SharedPolicy(nn.Module if AVAILABLE else object):
         return (base.log_prob(u).sum(-1)
                 - torch.log1p(-a.pow(2) + 1e-6).sum(-1))
 
+    def act_many(self, obs_np, *, deterministic: bool = False):
+        """One decision per row, in a single forward pass.
+
+        Identical in distribution to calling :meth:`act` once per row -- the
+        same network, the same squash, the same Jacobian -- and it exists
+        because at batch 1 this network is dispatch-bound rather than
+        arithmetic-bound.  Measured on this machine: 137 us for one row of
+        eleven thousand parameters against 68 us for sixteen rows together,
+        of which 24 us is the MLP itself.  Sixteen machines deciding at 25 Hz
+        on a 4 ms timestep is 219 us per batched physics step one row at a
+        time, which is a sixth of the step.
+
+        What it does change is the order the samples are drawn in, so a run
+        using this is reproducible against itself and not against a run that
+        called :meth:`act` per machine.
+        """
+        with torch.no_grad():
+            obs = torch.as_tensor(np.asarray(obs_np, np.float32))
+            if obs.ndim == 1:
+                obs = obs.unsqueeze(0)
+            base = self.latent(obs)
+            u = base.mean if deterministic else base.sample()
+            a = torch.tanh(u)
+            logp = (base.log_prob(u).sum(-1)
+                    - torch.log1p(-a.pow(2) + 1e-6).sum(-1))
+            v = self.value(obs)
+        return (a.numpy().astype(float), logp.numpy().astype(float),
+                v.numpy().astype(float))
+
     def act(self, obs_np, *, deterministic: bool = False):
         """One decision, numpy in and numpy out, for use inside a rollout."""
         with torch.no_grad():

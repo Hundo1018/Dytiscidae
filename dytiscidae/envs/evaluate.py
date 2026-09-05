@@ -126,6 +126,17 @@ class SharedController(Controller):
 # --------------------------------------------------------------------------
 
 
+#: Apex gain, in metres, at which take-off contributes in full.  Set from the
+#: measured population rather than from what a take-off ought to look like: over
+#: 64 arch34 elites, 7.8% exceed this and the best reaches 1.04 m.
+TAKEOFF_FULL = 0.30
+
+#: What a design that never leaves the ground keeps.  Not zero: 78% of arch34's
+#: elites are there, and zeroing them would erase the ordering the other terms
+#: still carry within that group.
+TAKEOFF_FLOOR = 0.05
+
+
 def finalise_tier1(r: MissionResult, clamped_any: bool) -> None:
     """Turn measured segments and transitions into mission_fraction, and flag
     exploits.
@@ -156,11 +167,31 @@ def finalise_tier1(r: MissionResult, clamped_any: bool) -> None:
     # The mission is only as good as its weakest domain: a machine that flies
     # beautifully and cannot dive has completed none of the cycles, so this is a
     # geometric-style aggregate rather than a mean.
+    # Take-off enters as a factor with a floor, the same shape the transition
+    # term uses, and deliberately not as a fourth competence: `min(competences)`
+    # would multiply the whole population by its own zero and delete every
+    # gradient the other three domains carry.
+    #
+    # The floor keeps today's ordering intact -- 78% of arch34's elites gain no
+    # height at all and land on it together -- while making the capability the
+    # mission is actually blocked on worth twenty times its absence.  Nothing
+    # completes a cycle without leaving the ground, so a mission fraction that
+    # ignored take-off was scoring a mission nobody could fly.
+    #
+    # `mission_fraction` is therefore not comparable across this boundary. That
+    # is a deliberate trade: arch34's continuous missions ran 0/2 transitions
+    # and 0% on-task in air and water, so what is being given up is comparison
+    # with a number no design was succeeding at.
+    seg_land = r.segments.get(Domain.LAND)
+    takeoff_height = float((seg_land.measurements.get("takeoff_height", 0.0)
+                            if seg_land is not None else 0.0) or 0.0)
+    takeoff_fraction = float(np.clip(takeoff_height / TAKEOFF_FULL, 0.0, 1.0))
     r.mission_fraction = float(
         min(competences) ** 0.5
         * float(np.mean(competences))
         * energy_fraction
         * max(transition_fraction, 0.05)
+        * max(takeoff_fraction, TAKEOFF_FLOOR)
     )
 
     # Exploit detection.

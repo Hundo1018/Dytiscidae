@@ -90,9 +90,38 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
     "land": [
         ("stays_upright", "upright", 0.7),
         ("supports_itself", "contact_fraction", 0.5),
+        # Producing motion and sustaining it are different capabilities, and
+        # arch34 had no rung between them: 61.6% of the population sat here,
+        # upright and self-supporting and under the 0.1 m/s mean that `moves`
+        # asks for.  A machine that covers half a metre in one second and then
+        # falls averages an eighth of the speed it produced.  `land_peak_speed`
+        # is the best one-second displacement rate over windows the machine
+        # stayed upright throughout -- measured over 64 arch34 elites its
+        # median is 0.086 m/s against a 0.026 m/s mean, so this rung sits
+        # inside the population rather than above it.
+        ("stirs", "land_peak_speed", 0.08),
         ("moves", "land_speed", 0.1),
         ("walks", "land_speed", 0.4),
         ("climbs_slope", "slope_climbed", 0.5),
+    ],
+    # Take-off, and it is deliberately a ladder of its own rather than rungs
+    # appended to ``land``.  ``rung_reached`` stops at the first unmet rung, and
+    # arch34's land distribution is 28.7% at rung 0, 61.6% stuck at rung 2 --
+    # upright and self-supporting but under 0.1 m/s -- with 0.5% at the top.
+    # Rungs added above ``climbs_slope`` would be visible to one design in two
+    # hundred, which is a ladder nobody is standing on.
+    #
+    # The thresholds are set from the measured population, not from what a
+    # take-off ought to look like: 0.05 m is the spawn clearance, arch34's best
+    # elite reached 0.133 m, and 0.50 m is the bar ``transitions.py`` uses for
+    # a crossing.  So the first rung is inside reach of what already exists and
+    # the last is a real climb-out, which is what makes this a slope rather
+    # than a wall.
+    "takeoff": [
+        ("unweights", "takeoff_height", 0.02),   # rises at all, gated on control
+        ("hops", "takeoff_height", 0.10),        # clearly leaves the ground
+        ("clears", "takeoff_height", 0.30),      # a crossing's worth of height
+        ("climbs_out", "takeoff_height", 0.80),  # a departure, not a hop
     ],
     "transition": [
         ("crosses", "crossed_fraction", 0.34),

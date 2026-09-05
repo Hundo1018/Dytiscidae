@@ -63,14 +63,22 @@ python -m dytiscidae.ops.run distill --run runs/first   # is a shared controller
 
 [docs/ROADMAP.md](docs/ROADMAP.md) is the current work list, with the
 measurement behind each item and the number each finished one produced.
+[CLAUDE.md](CLAUDE.md) carries the operating notes: the measured pool-shape
+optimum, how to read the telemetry without being fooled by it, and the traps
+that have cost time before.
 
 `search` prints one line per generation and refreshes
 `runs/first/dashboard.html` every five generations, so you can watch it live by
 reloading that file. It checkpoints continuously; killing it loses at most one
 generation.
 
-The main cost dial is `--segment-seconds` (default 8). Halving it roughly halves
-the run time and roughly doubles the variance of every Tier-1 score.
+`--segment-seconds` (default 8) is a much weaker cost dial than it looks.
+Measured on 8 designs with identification on: 8 s costs 57.2 s, 16 s costs
+65.1 s (1.14x) and 24 s costs 77.0 s (1.35x). Identification does not scale
+with the window and is 67% of an evaluation (19.1 s with `identify_axes=False`
+against 57.2 s with it), so **tripling the window costs about a third more, not
+three times more**. Lengthening it is therefore cheap, and arch34's Tier-1.5
+measurements say an 8 s score does not predict a 60 s one.
 
 `--workers` steps machines in several processes, each with its own GPU pipeline.
 It trades against `--batch`: the pool never makes a shard smaller than
