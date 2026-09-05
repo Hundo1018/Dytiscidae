@@ -1096,7 +1096,7 @@ class TriphibianEnv:
         # The attitude record.  ``spins`` is per step; ``commands`` and
         # ``responses`` are per control decision, and exist so the air score can
         # tell a commanded turn from a tumble -- see ``_turn_authority``.
-        spins, commands, responses, vzs = [], [], [], []
+        spins, commands, responses, vzs, xys = [], [], [], [], []
         peak_slam = 0.0
         cur = p
 
@@ -1124,6 +1124,7 @@ class TriphibianEnv:
             contacts.append(1.0 if self._touching_ground() else 0.0)
             spins.append(float(np.linalg.norm(self.body_twist()[3:])))
             vzs.append(float(self.body_twist()[2]))
+            xys.append(pos[:2].copy())
             peak_slam = max(peak_slam, self.solver.diag.slam)
 
         end = self.root_pos().copy()
@@ -1145,13 +1146,13 @@ class TriphibianEnv:
             domain, res, np.array(depths), np.array(alts),
             np.array(ups), np.array(contacts), np.array(clearances),
             spins=np.array(spins), commands=commands, responses=responses,
-            vzs=np.array(vzs),
+            vzs=np.array(vzs), xys=np.array(xys),
         )
         return res
 
     def _score_segment(self, domain, res, depths, alts, ups, contacts,
                        clearances=None, *, spins=None, commands=None,
-                       responses=None, vzs=None) -> float:
+                       responses=None, vzs=None, xys=None) -> float:
         """Domain competence in [0, 1].
 
         ``spins`` is the body angular rate magnitude at each recorded step, and
@@ -1400,20 +1401,77 @@ class TriphibianEnv:
         # all.  Same densification, and the same equations, as Wang et al.,
         # "Towards Quadrupedal Jumping and Walking for Dynamic Locomotion using
         # Reinforcement Learning" (arXiv 2510.24584).
+        # Measured as a *gain* over where the machine rests, not as an absolute
+        # clearance: a tall design sitting still would otherwise out-score a
+        # short one that hopped, and the resting height is geometry rather than
+        # an achievement.  Zero therefore means "never rose", for every body.
+        # Gated on being off the ground and the right way up, and both gates
+        # were put there by measurement.  Ungated over 64 arch34 elites this
+        # read a 90th percentile of 0.378 m and a maximum of 1.035 m from a
+        # population whose best controlled hop is 0.13 m: it was scoring the
+        # bounce of a machine falling over.  That is the same defect as the old
+        # air score paying for having been thrown and the old turn rate paying
+        # for a tumble, arriving a third time by a different route.
         takeoff = 0.0
         if clearances is not None and len(np.asarray(clearances)):
             c = np.asarray(clearances, float)
-            v = np.asarray(vzs, float) if vzs is not None else np.zeros_like(c)
-            v = v[:len(c)] if len(v) >= len(c) else np.pad(v, (0, len(c) - len(v)))
+
+            def _align(x, fill=0.0):
+                a = np.asarray(x, float) if x is not None else np.full_like(c, fill)
+                return (a[:len(c)] if len(a) >= len(c)
+                        else np.pad(a, (0, len(c) - len(a)), constant_values=fill))
+
+            v = _align(vzs)
+            free = _align(contacts, 1.0) < 0.5      # not touching the ground
+            level = _align(ups, 0.0) > 0.5          # not on its back or side
             apex = c + np.maximum(v, 0.0) ** 2 / (2.0 * 9.81)
-            apex = apex[np.isfinite(apex)]
-            takeoff = float(np.max(apex)) if apex.size else 0.0
+            ok = np.isfinite(apex) & free & level
+            rest = float(c[0]) if np.isfinite(c[0]) else 0.0
+            takeoff = max(float(np.max(apex[ok])) - rest, 0.0) if ok.any() else 0.0
+            # The estimate is dense and the achievement is not, so both are
+            # kept -- the same split as `sink_rate` against
+            # `measured_sink_rate`.  A machine rebounding off the beach is
+            # airborne, upright and rising, so the gates above cannot tell a
+            # push-off from a bounce; the height it *actually* reached can.
+            got = np.isfinite(c) & free & level
+            measured = max(float(np.max(c[got])) - rest, 0.0) if got.any() else 0.0
+        # `land_speed` is net displacement over the *whole* segment, so a
+        # machine that lurches half a metre in one second and then falls over
+        # averages an eighth of the speed it actually produced.  61.6% of arch34
+        # sat at the land rung below `moves` (0.1 m/s) for exactly this kind of
+        # reason, with a population median of 0.041 m/s.
+        #
+        # `land_peak_speed` is the best displacement rate over any one-second
+        # window: the same densification as `takeoff_height`, applied to the
+        # other place where a threshold sits above the whole distribution.  It
+        # is reported alongside the mean rather than replacing it -- sustaining
+        # motion is a different capability from producing it, and the ladder
+        # should be able to tell them apart.
+        peak = 0.0
+        if len(alts) > 2 and res.duration > 0:
+            step = res.duration / max(len(alts) - 1, 1)
+            w = max(int(round(1.0 / step)), 1)
+            if xys is not None and len(xys) > w:
+                t = np.asarray(xys, float)
+                d = np.linalg.norm(t[w:] - t[:-w], axis=1)
+                # Only windows the machine spent upright throughout.  Ungated
+                # this peaked at 3.23 m/s across arch34's elites, which is a
+                # body sliding down the beach on its side, not locomotion.
+                u = np.asarray(ups, float)
+                u = (u[:len(t)] if len(u) >= len(t)
+                     else np.pad(u, (0, len(t) - len(u))))
+                held = np.minimum.accumulate(u[::-1])[::-1]
+                held = np.array([u[i:i + w + 1].min() for i in range(len(t) - w)])
+                d = np.where(np.isfinite(d) & (held > 0.5), d, 0.0)
+                peak = float(np.max(d) / (w * step)) if d.size else 0.0
         res.measurements.update({
             "upright": upright,
             "contact_fraction": contact,
             "land_speed": float(res.mean_speed),
+            "land_peak_speed": peak,
             "slope_climbed": max(climbed, 0.0),
             "takeoff_height": takeoff,
+            "measured_takeoff_height": measured,
         })
         # Posture *gates* locomotion rather than substituting for it.
         #
