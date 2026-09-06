@@ -2127,10 +2127,66 @@ def test_takeoff_is_measured_where_the_machine_starts_on_the_ground() -> None:
           grounded.measurements["takeoff_height"] == 0.0)
 
     # The estimate is dense and the achievement is not, so both are recorded.
+    # The estimate is an apex and the measurement is a height actually held, so
+    # ungated the first is the larger of the two.
     check("the height actually reached is kept beside the estimate",
           "measured_takeoff_height" in res2.measurements
           and res2.measurements["measured_takeoff_height"] <= res2.measurements[
               "takeoff_height"] + 1e-9)
+
+    # --- arch36's two gates ------------------------------------------------
+    #
+    # Posture across the whole segment, not only at the apex.  A body flung by
+    # a contact impulse is upright on its way through, so the per-sample gate
+    # above passes it; over arch35 the designs below this bar scored 0.79-0.95x
+    # the mission of those above it once the take-off multiplier was divided
+    # out, while being paid for take-off.
+    flung = SegmentResult(domain=Domain.LAND, duration=1.0)
+    flung.mean_speed = 0.0
+    tumbling = ones * 0.2          # on its side for almost the whole segment
+    tumbling[9:12] = 1.0           # upright for the three samples around apex
+    lofted = ones * 0.05           # and it really does get high, briefly
+    lofted[9:12] = 0.9
+    env._score_segment(Domain.LAND, flung, zeros, ones * 0.9, tumbling,
+                       zeros, clearances=lofted, vzs=rising)
+    check("a body upright only at its apex scores no take-off",
+          flung.measurements["takeoff_height"] == 0.0,
+          f"segment-mean posture {float(np.mean(tumbling)):.2f} "
+          f"against the 0.7 bar `stays_upright` already uses")
+    check("but the height it reached is still recorded, so the next instance "
+          "of this is still findable",
+          flung.measurements["measured_takeoff_height"] > 0.5,
+          f"{flung.measurements['measured_takeoff_height']:.4f} m measured "
+          f"against {flung.measurements['takeoff_height']:.4f} m scored")
+
+    # A departure is a flight claim, and `airworthiness` already says which
+    # designs may not make one.  arch35 had 31 wingless segments at `clears`
+    # and 13 at `climbs_out`, one reaching 4.15 m measured.
+    wingless = TriphibianEnv(build(BODY_PLANS["beetle"]()))
+    wingless.p.wing_area = 0.0
+    big = zeros.copy()
+    big[10] = 6.0                                   # apex ~1.8 m, well past 0.80
+    soar = SegmentResult(domain=Domain.LAND, duration=1.0)
+    soar.mean_speed = 0.0
+    wingless._score_segment(Domain.LAND, soar, zeros, ones * 0.9, ones,
+                            zeros, clearances=ones * 0.05, vzs=big)
+    winged = SegmentResult(domain=Domain.LAND, duration=1.0)
+    winged.mean_speed = 0.0
+    env._score_segment(Domain.LAND, winged, zeros, ones * 0.9, ones,
+                       zeros, clearances=ones * 0.05, vzs=big)
+    # Rungs are counted, so `clears` is rung 3 of unweights/hops/clears/
+    # climbs_out and "cannot reach clears" is `< 3`, not `< 2`.
+    check("a design with no lifting surface cannot reach `clears`",
+          rung_reached("takeoff", soar.measurements) < 3,
+          f"{soar.measurements['takeoff_height']:.3f} m scored from an apex of "
+          f"{winged.measurements['takeoff_height']:.3f} m, rung "
+          f"{rung_reached('takeoff', soar.measurements)}")
+    check("and the same rollout with a wing does",
+          rung_reached("takeoff", winged.measurements) >= 3,
+          f"rung {rung_reached('takeoff', winged.measurements)}")
+    check("but it keeps `hops`, because being thrown does leave the ground",
+          rung_reached("takeoff", soar.measurements) >= 2,
+          f"rung {rung_reached('takeoff', soar.measurements)}")
 
     # Locomotion: a lurch of half a metre inside one second, then nothing.
     lurch = SegmentResult(domain=Domain.LAND, duration=8.0)

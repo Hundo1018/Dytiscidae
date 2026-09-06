@@ -201,6 +201,20 @@ CL_MAX = 1.8
 #: cases apply at all.
 WING_AREA_FLOOR = 1e-3  # m^2
 
+#: The highest scored take-off available to a design with no lifting surface.
+#: Just under the `clears` rung at 0.30 m, so a wingless body keeps `unweights`
+#: and `hops` -- it can be thrown, and leaving the ground is all those two rungs
+#: ask -- and cannot reach `clears` ("a crossing's worth of height") or
+#: `climbs_out` ("a departure, not a hop"), both of which are flight claims that
+#: `airworthiness` already refuses such a design.
+TAKEOFF_WINGLESS_CAP = 0.29  # m
+
+#: Segment-mean posture a design must hold for its take-off to be scored at all.
+#: The same 0.7 the `stays_upright` land rung uses, deliberately: a second bar
+#: for the same property would be a second standard with no measurement behind
+#: it.  Set from arch35's distribution -- see the block in `_score_segment`.
+TAKEOFF_POSTURE_BAR = 0.7
+
 #: Wing loading at which the stall speed is exactly the top of the launch band:
 #: ``0.5 rho V^2 CL_max`` = 992 N/m^2 at 30 m/s.  Above it there is no speed
 #: this mission will fly a machine at, and no attitude at that speed, which
@@ -1435,6 +1449,41 @@ class TriphibianEnv:
             # push-off from a bounce; the height it *actually* reached can.
             got = np.isfinite(c) & free & level
             measured = max(float(np.max(c[got])) - rest, 0.0) if got.any() else 0.0
+
+            # Two more gates on the *scored* height, both put here by arch35.
+            #
+            # First: a departure is a flight claim, and `airworthiness` already
+            # says which designs may not make one.  A wingless body can still be
+            # thrown, so it keeps `unweights` and `hops` -- leaving the ground is
+            # what those rungs ask -- but `clears` is "a crossing's worth of
+            # height" and `climbs_out` is "a departure, not a hop", and neither
+            # is available without a lifting surface.  arch35 had 31 wingless
+            # segments at `clears` and 13 at `climbs_out`, one of them reaching
+            # 4.15 m *measured*: the fourth time a score has paid for
+            # uncontrolled motion, and the fourth time the fix is a gate.
+            #
+            # Second: posture over the whole segment, not just at the apex.  The
+            # per-sample `free & level` above catches "upright at the moment it
+            # left", which a body flung by a contact impulse passes on its way
+            # through.  Over arch35, splitting on this same 0.7 bar -- the one
+            # `stays_upright` already uses, so this is not a second standard --
+            # the designs *below* it scored 0.79-0.95x the mission of those
+            # above once A's own multiplier was divided out.  They were being
+            # paid for take-off and were worse at the mission.
+            #
+            # Thresholds set from the measured distribution, per the rule this
+            # project keeps relearning: over arch35's 7806 land segments these
+            # two together leave unweights 24.9%, hops 9.3%, clears 2.4% and
+            # climbs_out 0.7% standing.  Thinner, and not empty -- a rung
+            # nobody stands on carries no gradient.
+            if float(getattr(self.p, "wing_area", 0.0)) < WING_AREA_FLOOR:
+                takeoff = min(takeoff, TAKEOFF_WINGLESS_CAP)
+            if float(upright) < TAKEOFF_POSTURE_BAR:
+                takeoff = 0.0
+            # `measured_takeoff_height` is deliberately left ungated by both.
+            # It is the diagnostic that exists to catch the next instance of
+            # this, and gating it would hide exactly the evidence that found
+            # this one.
         # `land_speed` is net displacement over the *whole* segment, so a
         # machine that lurches half a metre in one second and then falls over
         # averages an eighth of the speed it actually produced.  61.6% of arch34

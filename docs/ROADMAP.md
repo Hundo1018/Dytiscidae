@@ -314,12 +314,35 @@ inside the spread.
 
 Ordered by what arch35 measured, cheapest decisive thing first.
 
-**A. A lifting surface is a precondition for `climbs_out`.** A design with
-`wing_area == 0` cannot depart, and six of them scored the top take-off rung.
-Gate the upper two rungs (`clears`, `climbs_out`) on having a lifting surface
-and on the machine still being airborne at the end of the window rather than at
-its apex. Mechanical, and it is the fourth time the fix for a score paying for
-uncontrolled motion has been a gate rather than a coefficient.
+**A. A lifting surface, and posture, are preconditions for a scored take-off
+— done, unrun.** Two gates on the *scored* `takeoff_height`:
+
+- A design under `WING_AREA_FLOOR` is capped at `TAKEOFF_WINGLESS_CAP` = 0.29 m,
+  just below `clears`. It keeps `unweights` and `hops` — being thrown does leave
+  the ground, which is all those two rungs ask — and cannot claim `clears` ("a
+  crossing's worth of height") or `climbs_out` ("a departure, not a hop"), both
+  of which are flight claims `airworthiness` already refuses it.
+- Segment-mean posture must reach `TAKEOFF_POSTURE_BAR` = 0.7, the bar
+  `stays_upright` already uses, or the take-off scores zero. The existing
+  per-sample `free & level` catches only "upright at the instant it left", which
+  a body flung by a contact impulse passes on its way through.
+
+`measured_takeoff_height` is deliberately left ungated by both: it is the
+diagnostic that found this, and gating it would hide the next one. A test now
+asserts that a body upright only at its apex scores 0.0 while its measured
+height still reads 0.85 m.
+
+Thresholds set from arch35's 7806 land segments rather than from what a take-off
+ought to look like. What the two gates together leave standing:
+
+| | as scored in arch35 | with both gates |
+|---|---|---|
+| unweights | 41.6% | 24.9% |
+| hops | 20.5% | 9.3% |
+| clears | 8.1% | 2.4% |
+| climbs_out | 3.1% | 0.7% |
+
+Thinner and not empty — a rung nobody stands on carries no gradient.
 
 **B. Fix F, as its own arm.** The mechanism is measured, so the candidates are
 now testable rather than speculative: (i) raise `descriptor_refit_every` until
@@ -330,11 +353,30 @@ the axes once lead-term agreement holds across two consecutive refits. **This
 must not ride along with anything else** — arch34's Phase 4 came back "ran,
 unattributable" for exactly that reason.
 
-**C. Resolve the posture trade before adding more take-off pressure.** Split the
-population by whether it holds `stays_upright` and read `mission_fraction` for
-each half. If the `below` group's mission is not worse, A is producing
-specialisation and should be left alone; if it is, take-off credit has to be
-conditioned on retaining posture. This decides whether item E is safe.
+**C. The posture trade — answered, and it drove A above.** Splitting arch35's
+7806 evaluations on the same 0.7 bar:
+
+|  | holds `stays_upright` | below it |
+|---|---|---|
+| share | 71.5% | 28.5% |
+| mission **as scored** | mean 0.00127 | mean **0.00250** |
+| mission, take-off multiplier divided out | mean **0.00720** | mean 0.00625 |
+| take-off median | 0.0079 m | 0.0426 m |
+
+As scored, the designs that cannot stand up look *twice as good*. That is
+entirely A's own multiplier: `mission_fraction` is multiplied by
+`max(takeoff_fraction, 0.05)` and the `below` group's take-off is five times the
+other's, so the comparison was circular. Dividing the multiplier back out —
+`base = mission_fraction / max(takeoff_fraction, 0.05)` — reverses it, in every
+band: ratios 0.81, 0.93, 0.91, 0.95, 0.79.
+
+**A was paying designs that cannot stand up, and they are worse at the mission
+once you stop paying them for it.** Hence the posture gate in A.
+
+One thing this turned up and did not chase: `land` competence is *higher* for
+the below-bar group (median 0.072 against 0.049), which is the wrong direction
+for a score that is supposed to reward locomotion on land. Worth a look before
+anything else is built on the land score.
 
 **D. Score `land_to_air`.** Its precondition — "wait for one run with A in
 place; if the take-off rungs stay empty, adding the transition adds a constant
