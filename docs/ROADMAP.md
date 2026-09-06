@@ -100,7 +100,9 @@ first exists.
 
 ## arch35 — the work list
 
-Two items are already implemented and unrun; the rest are ordered by evidence.
+**Status: A and B ran. See "What arch35 measured" below for what they did.**
+Items C–I below were not attempted in arch35 and carry forward; C's precondition
+is now satisfied and D–I are re-ordered in the arch36 list.
 
 ### Done and unrun — the next run tests these
 
@@ -184,6 +186,179 @@ component arithmetic is the standard 5–10x. Mechanical, low risk.
 **I. Nothing rewards going *toward* the water.** `SegmentResult.distance` is
 `norm(end - start)`, direction-free. A design that walks well has no gradient
 pulling it down the beach, and the mission's water leg is 11.4 m away.
+
+---
+
+## What arch35 measured
+
+496 generations of a planned 900, 7806 evaluations, 12.1 h, 74 s/gen, seed
+20260901. **The run did not finish**: the machine ran out of memory at 11:04 on
+2026-09-06 and the kernel OOM killer fired at 11:05:17. Not a search failure and
+not a crash — uptime was unbroken. Archives and `search_state.pkl` are intact.
+Working notes: `runs/arch35_notes.md`.
+
+### 1. B worked exactly as designed, and is finished
+
+Land ladder by rung name, whole run against arch34:
+
+| rung | arch34 | arch35 |
+|---|---|---|
+| (below) | 28.7% | 26.7% |
+| stays_upright | 1.6% | 1.8% |
+| supports_itself | **61.6%** | **16.2%** |
+| stirs | — | **46.4%** |
+| moves | 7.3% | 8.5% |
+| walks | 0.4% | 0.2% |
+| climbs_slope | 0.5% | 0.2% |
+
+The 61.6% that arch34 stranded moved onto the new rung, and `moves` did not move
+(7.3 → 8.5%) — so `stirs` inserted *below* `moves` rather than cannibalising it.
+That is the whole of what B was for. Nothing further is owed here.
+
+### 2. A moved the distribution and did not move the mission
+
+Take-off occupancy climbed band over band, n≈1550 per band:
+
+| gens | unweights | hops | clears | climbs_out |
+|---|---|---|---|---|
+| 0–99 | 37.9% | 15.9% | 4.2% | 1.2% |
+| 100–199 | 38.2% | 20.2% | 7.9% | 2.8% |
+| 200–299 | 39.3% | 17.4% | 6.8% | 2.6% |
+| 300–399 | 45.2% | 24.1% | 10.9% | 4.5% |
+| 400–449 | **50.2%** | **26.7%** | **11.8%** | **5.3%** |
+
+This is the first time anything in this project has pushed designs off the
+ground. **And the filmed mission is arch34's result unchanged**: the
+mission-best elite of 174 runs `on-task 33%, transitions 0/2, max depth 0.0 m`,
+with the air and water legs at 0%.
+
+Both facts are true at once and the second is the one that matters. A is a
+working gradient on an 8 s land segment; it has not yet produced a machine that
+leaves the ground in a 900 s continuous mission. `mission_fraction` is not
+comparable across the arch34→arch35 boundary, but `transitions 0/2` is, and it
+did not move.
+
+### 3. A is being bought with land posture
+
+Monotone over five bands:
+
+| gens | below `stays_upright` | stirs | hops |
+|---|---|---|---|
+| 0–99 | 21.4% | 48.5% | 15.9% |
+| 100–199 | 27.4% | 47.2% | 20.2% |
+| 200–299 | 28.1% | 46.4% | 17.4% |
+| 300–399 | 30.2% | 43.1% | 24.1% |
+| 400–499 | **37.7%** | **37.0%** | **27.0%** |
+
+`below` gained 16 points while `hops` gained 11 and `stirs` lost 11.5. `moves`
+never moved. The two groups are disjoint — the take-off gate is per-sample
+`free & level`, so nothing in the `below` group can be feeding the take-off
+numbers — so this may be the population splitting rather than a trade. It is
+unresolved, and it is the most important open question A leaves behind: a third
+of the population can no longer stand up, and the mission's land leg needs that.
+Same shape as arch31's "competence +32% bought with energy −36%".
+
+### 4. The take-off tail is the fourth instance of the recurring lesson
+
+~0.2% of evaluations read 4–10 m of take-off height. Of the 55 at or above
+`climbs_out` by gen400, **six have `wing_area == 0.0` and an explicit
+`no lifting surface` air gate**, one of them reaching 4.15 m *measured*. The
+contamination is episodic (all of it in the 50–99 and 150–199 bands; none in
+200–249) and it does **not** grow with the distribution, so it is not being
+amplified by the reward.
+
+The gate is not broken. `free & level` is applied per sample
+(`triphibian.py:1424`), and the segment-mean `upright` in the measurements is an
+aggregate, so a low mean is consistent with "upright at departure, tumbling
+after". The hole is the one the code's own comment names — the gates cannot
+separate a push-off from a bounce — and `measured_takeoff_height` was the
+fallback meant to catch it. **It reads 6.82 m on the worst case, so it does
+not.**
+
+### 5. F reproduced, harder and earlier than arch34
+
+Archive size *at* each refit: 21, 53, 72, 85, 95, 107, 118, 128, 138, 151, 133,
+119, 116, 115, 107. It refilled past its previous peak for nine refits and then
+stopped. Merges grew with it: 2, 6, 14, 14, 9, 23, 11, 27, 13, **37, 38**, 22,
+29, 21, 26.
+
+Mechanism, measured: between refit 12 (after=97) and refit 13 (before=116) the
+search refilled **+19 cells in 27 generations**, and the refits themselves
+removed 21–38. **The merge outruns the refill by 10–20 cells per cycle.**
+`descriptor_refit_every` is 400 evaluations ≈ 26 generations, so the archive
+gets 26 generations to recover from a cut it cannot cover.
+
+Every island peaked between gen196 and gen252 and fell 28–38% (aerial_diver 154
+→ 95, air 149 → 98, generalist 151 → 107, land 128 → 82, amphibian 135 → 94,
+water 135 → 97). 66 of the last 100 generations reported `stagnant`. `best` kept
+climbing throughout — the search was still finding good designs and losing the
+shelf it stores them on.
+
+The axes still do not settle: lead-term agreement between successive refits ran
+4/4, 0/4, 3/4.
+
+### 6. The pool-shape paragraph in CLAUDE.md overstates its case
+
+arch35 ran the documented optimum `--workers 4 --min-shard 4` and reached a
+steady **72–74 s/gen** (n=172, p10 65, p90 86). arch34 ran `--workers 2` with the
+default `--min-shard 8` and its median was **74 s** (n=890, p10 67, p90 85). The
+sweep's 2.3× (4×4 = 31.7 s against 1×16 = 72.2 s) is real on the evaluation path
+and **does not appear at generation level against arch34's actual shape**. Keep
+the flags — they are not worse — but the paragraph should say what it buys
+against the configuration that was actually used before, which is ~2 s/gen,
+inside the spread.
+
+---
+
+## arch36 — the work list
+
+Ordered by what arch35 measured, cheapest decisive thing first.
+
+**A. A lifting surface is a precondition for `climbs_out`.** A design with
+`wing_area == 0` cannot depart, and six of them scored the top take-off rung.
+Gate the upper two rungs (`clears`, `climbs_out`) on having a lifting surface
+and on the machine still being airborne at the end of the window rather than at
+its apex. Mechanical, and it is the fourth time the fix for a score paying for
+uncontrolled motion has been a gate rather than a coefficient.
+
+**B. Fix F, as its own arm.** The mechanism is measured, so the candidates are
+now testable rather than speculative: (i) raise `descriptor_refit_every` until
+the refill covers the merge — the refill rate is ~0.7 cells/generation and
+merges cost 21–38, so the cadence has to be ≥ ~45 generations to break even;
+(ii) require a refit to improve a criterion before it is accepted; (iii) freeze
+the axes once lead-term agreement holds across two consecutive refits. **This
+must not ride along with anything else** — arch34's Phase 4 came back "ran,
+unattributable" for exactly that reason.
+
+**C. Resolve the posture trade before adding more take-off pressure.** Split the
+population by whether it holds `stays_upright` and read `mission_fraction` for
+each half. If the `below` group's mission is not worse, A is producing
+specialisation and should be left alone; if it is, take-off credit has to be
+conditioned on retaining posture. This decides whether item E is safe.
+
+**D. Score `land_to_air`.** Its precondition — "wait for one run with A in
+place; if the take-off rungs stay empty, adding the transition adds a constant
+zero" — is now satisfied: 11.8% clear 0.30 m. Do it **after** A, or it scores
+the same falls A is there to exclude. `batchroll.py:689` and `evaluate.py:260`.
+
+**E. Make a 900-generation run survive the machine.** arch35 died at 55% because
+the desktop and the search together exhausted 15 GB. `--resume` exists and was
+never exercised after an unplanned stop; a run that costs 19 h needs a tested
+resume path and a memory ceiling, not the hope that nothing else runs.
+
+**F. Identification is 67% of an evaluation.** Unchanged from arch35's list and
+still the largest throughput lever. `Genome.body_plan` is its own field, so an
+unchanged morphology could reuse its axes.
+
+**G. `np.cross` is 16% of an evaluation.** Unchanged. Mechanical, low risk.
+
+**H. Charge for parts, or restore a cap.** Unchanged. arch35's mean parts was
+5.41 against arch34's 6.01, so the pressure moved slightly on its own; the link
+between part count and energy infeasibility was not re-measured.
+
+**I. Nothing rewards going *toward* the water.** Unchanged, and now more
+pointed: the filmed machine spent 99% of its land leg in the land medium and
+covered no ground, and the water leg is 11.4 m away.
 
 ---
 
