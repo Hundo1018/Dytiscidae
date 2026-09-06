@@ -227,16 +227,31 @@ Take-off occupancy climbed band over band, n≈1550 per band:
 | 300–399 | 45.2% | 24.1% | 10.9% | 4.5% |
 | 400–449 | **50.2%** | **26.7%** | **11.8%** | **5.3%** |
 
-This is the first time anything in this project has pushed designs off the
-ground. **And the filmed mission is arch34's result unchanged**: the
-mission-best elite of 174 runs `on-task 33%, transitions 0/2, max depth 0.0 m`,
-with the air and water legs at 0%.
+**Corrected at arch36 gen300: about two thirds of that climb was the ungated
+tail.** Applying arch36's two gates to arch35's own record retroactively — same
+data, same bands — the genuine capability grew far less:
 
-Both facts are true at once and the second is the one that matters. A is a
-working gradient on an 8 s land segment; it has not yet produced a machine that
-leaves the ground in a 900 s continuous mission. `mission_fraction` is not
-comparable across the arch34→arch35 boundary, but `transitions 0/2` is, and it
-did not move.
+| gens | unweights | hops | clears | climbs_out |
+|---|---|---|---|---|
+| 0–99 | 26.4% | 8.2% | 0.9% | 0.2% |
+| 100–199 | 22.0% | 9.5% | 3.1% | 1.0% |
+| 200–299 | 23.8% | 7.6% | 2.1% | 0.5% |
+| 300–399 | 26.5% | 10.6% | 2.9% | 1.1% |
+| 400–499 | 25.5% | 10.7% | 3.3% | 0.7% |
+
+`unweights` is flat across the whole run and `climbs_out` is noise. The real
+growth is `clears` 0.9% → 3.3% and `hops` 8.2% → 10.7%. **A did move genuine
+take-off capability, by roughly a third of what the ungated series showed** —
+the rest was wingless designs and bodies that were not holding posture.
+
+**And the filmed mission is arch34's result unchanged**: the mission-best elite
+of 174 runs `on-task 33%, transitions 0/2, max depth 0.0 m`, with the air and
+water legs at 0%.
+
+A is a working gradient on an 8 s land segment; it has not yet produced a
+machine that leaves the ground in a 900 s continuous mission.
+`mission_fraction` is not comparable across the arch34→arch35 boundary, but
+`transitions 0/2` is, and it did not move.
 
 ### 3. A is being bought with land posture
 
