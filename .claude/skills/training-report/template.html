@@ -65,15 +65,35 @@ td.num,th.num{text-align:right}
 figcaption{font-size:12.5px;color:var(--text-secondary);margin-top:6px}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
   background:var(--surface-0);padding:1px 5px;border-radius:4px}
+.evbar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin:14px 0 0;
+  padding:9px 12px;background:var(--surface-1);border:1px solid var(--line);border-radius:10px}
+.evkey{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary)}
+.evkey i{width:11px;height:3px;border-radius:2px;display:inline-block}
+.evnote{font-size:12.5px;color:var(--text-muted);flex-basis:100%}
+.bodies{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px}
+.body figure{margin:0;background:var(--surface-0);border:1px solid var(--line);
+  border-radius:9px;overflow:hidden}
+.body img{display:block;width:100%;height:auto;background:var(--surface-1)}
+.body .cap{padding:8px 10px 10px;font-size:12px;color:var(--text-secondary)}
+.body .cap b{display:block;font-size:13px;color:var(--text-primary);margin-bottom:2px}
+.body .cap .gate{color:var(--bad)}
+.cmp{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.cmp th,.cmp td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line)}
+.cmp th{color:var(--text-secondary);font-weight:600;font-size:12px}
+.cmp td.n{text-align:right;font-variant-numeric:tabular-nums}
+.nocmp{margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--text-secondary)}
+.nocmp li{margin:3px 0}
+.nocmp b{color:var(--text-primary)}
 </style>
 
 <div class="viz-root"><div class="wrap">
 
 <h1>__TITLE__</h1>
-<p class="sub">MAP-Elites over six islands with a shared PPO policy · 900 generations ·
-__SUBTITLE__</p>
+<p class="sub" id="subtitle" data-sub="__SUBTITLE__">MAP-Elites over six islands with a
+shared PPO policy · __SUBTITLE__</p>
 
 <div class="tiles" id="tiles"></div>
+<div class="evbar" id="evbar"></div>
 
 <h2>1 · Search return</h2>
 <p class="sub">Population mean per generation. Both series are Tier-1 estimates over
@@ -164,6 +184,52 @@ analogue is Tier-1.5: what fraction of an 8 s competence survives a 60 s leg.</p
   </div>
 </div>
 
+<section id="sec_bodies" hidden>
+<h2>7b · What a score looks like</h2>
+<p class="sub">The same distribution with the machines in it. Every wrong call this
+project has made about a score has been a call about what the body was physically
+doing — a wingless design scoring 0.853 for flight, a tumble scoring as a commanded
+turn, a bounce off the beach scoring as a take-off. Each was visible on sight.</p>
+<div class="bodies" id="c_bodies"></div>
+<p class="note" id="bodies_note"></p>
+</section>
+
+<section id="sec_cmp" hidden>
+<h2>7c · Against a baseline</h2>
+<p class="sub" id="cmp_sub"></p>
+<div class="grid" id="c_cmp"></div>
+<div class="card wide" style="margin-top:14px">
+  <h3>Held against the baseline</h3>
+  <table class="cmp" id="cmp_table"></table>
+  <h3 style="margin-top:14px">Not compared, and why</h3>
+  <ul class="nocmp" id="cmp_no"></ul>
+</div>
+</section>
+
+<section id="sec_tree" hidden>
+<h2>7d · Lineage — who descended from whom</h2>
+<p class="sub" id="tree_sub"></p>
+<div class="grid">
+  <div class="card wide">
+    <h3>The family the best design came from</h3>
+    <p class="note">One root and its whole descent, best-first. The highlighted path
+      ends at the run's best design; every other branch is a line that was tried and
+      did not beat it. Node height is fitness.</p>
+    <div id="c_tree"></div>
+  </div>
+  <div class="card">
+    <h3>Designs by lineage depth</h3>
+    <div id="c_depth"></div>
+  </div>
+  <div class="card">
+    <h3>Did going deeper pay?</h3>
+    <p class="note">Percentage of designs at each depth with a descendant that beat
+      them. A line falling with depth is a search whose lineages are subcritical.</p>
+    <div id="c_paid"></div>
+  </div>
+</div>
+</section>
+
 <h2>8 · State visitation — the archive</h2>
 <p class="sub">In MAP-Elites the archive <em>is</em> the visited state space. Coverage
 sawtooths because the learned descriptor axes are refitted every 400 evaluations and
@@ -230,7 +296,14 @@ merge cells.</p>
 <script>
 const D = JSON.parse(document.getElementById('payload').textContent);
 const W = 640, H = 200, M = {t:14,r:16,b:26,l:44};
-const fmt = (v,d=2) => Number(v).toFixed(d).replace(/\.?0+$/,'') || '0';
+/* Trailing zeros are stripped only *after* a decimal point.  The old form was
+   `.replace(/\.?0+$/,'')`, which also ate the zeros of an integer: an axis tick
+   at 20% drew as "2%", 900 generations drew as "9", and every chart with a
+   round tick had been silently misreading by a factor of ten. */
+const fmt = (v,d=2) => {
+  const s = Number(v).toFixed(d);
+  return (s.includes('.') ? s.replace(/(\.\d*?)0+$/,'$1').replace(/\.$/,'') : s) || '0';
+};
 
 function frame(w,h,xs,ys,xlab,ylab){
   const iw=w-M.l-M.r, ih=h-M.t-M.b;
@@ -251,6 +324,42 @@ function frame(w,h,xs,ys,xlab,ylab){
 }
 function path(pts,x,y){return pts.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(1)+' '+y(p[1]).toFixed(1)).join(' ');}
 
+/* Event overlay ---------------------------------------------------------
+   `refit` is periodic and moves every archive series by itself, so it gets
+   faint full-height lines.  The rest are one-off and get a tick on the top
+   edge, coloured per kind, each carrying its own tooltip. */
+const EV_COLOUR={invalidated:'var(--s3)',bars:'var(--s4)',
+                 migration:'var(--s2)',exploit:'var(--bad,#c1121f)'};
+function eventOverlay(f,h,xs){
+  const E=(typeof D!=='undefined' && D.events)||{}; let s='';
+  const inX=g=>g>=xs[0]&&g<=xs[1];
+  (E.refit?.gens||[]).filter(inX).forEach(g=>{
+    s+=`<line x1="${f.x(g)}" x2="${f.x(g)}" y1="${M.t}" y2="${h-M.b}" stroke="var(--text-muted)"
+        stroke-width="1" stroke-dasharray="2 4" opacity=".28"><title>descriptor refit at generation ${g}
+${E.refit.why}</title></line>`;
+  });
+  Object.entries(E).forEach(([k,v])=>{
+    if(k==='refit') return;
+    (v.gens||[]).filter(inX).forEach(g=>{
+      s+=`<line x1="${f.x(g)}" x2="${f.x(g)}" y1="${M.t-6}" y2="${M.t+1}"
+          stroke="${EV_COLOUR[k]||'var(--s1)'}" stroke-width="2" opacity=".85"
+          ><title>${k} at generation ${g}
+${v.why||''}</title></line>`;
+    });
+  });
+  return s;
+}
+function eventLegend(){
+  const E=(typeof D!=='undefined' && D.events)||{};
+  const bits=Object.entries(E).map(([k,v])=>{
+    const c=k==='refit'?'var(--text-muted)':(EV_COLOUR[k]||'var(--s1)');
+    return `<span class="evkey"><i style="background:${c}"></i>${k} (${v.n})</span>`;
+  });
+  return bits.length
+    ? bits.join('')+(E.refit?.cadence?`<span class="evnote">${E.refit.cadence}</span>`:'')
+    : '';
+}
+
 function lineChart(el, series, opt={}){
   const all=series.flatMap(s=>s.pts);
   const xs=opt.xs||[Math.min(...all.map(p=>p[0])),Math.max(...all.map(p=>p[0]))];
@@ -263,8 +372,15 @@ function lineChart(el, series, opt={}){
   let s=f.g;
   (opt.marks||[]).forEach(m=>{ s+=`<line x1="${f.x(m)}" x2="${f.x(m)}" y1="${M.t}" y2="${h-M.b}"
       stroke="var(--s2)" stroke-width="1" stroke-dasharray="2 3" opacity=".55"/>`; });
+  /* Three machines move these lines without the search doing anything, so
+     every one of them is drawn: the refit (periodic, faint full-height lines)
+     and the one-off events (ticks along the top edge).  Reading a refit's
+     sawtooth as archive growth, or an auditor deletion as a search trend, is
+     the specific mistake this overlay exists to prevent. */
+  if(opt.events!==false) s+=eventOverlay(f,h,xs);
   series.forEach(sr=>{
     s+=`<path d="${path(sr.pts,f.x,f.y)}" fill="none" stroke="${sr.c}" stroke-width="2"
+        ${sr.dash?'stroke-dasharray="5 4"':''}
         stroke-linejoin="round" stroke-linecap="round"/>`;
     const last=sr.pts[sr.pts.length-1];
     if(sr.label!==false) s+=`<text class="dlabel" fill="${sr.c}" x="${f.x(last[0])+5}"
@@ -310,6 +426,15 @@ if(drop.length){
 
 /* tiles */
 const m=D.meta, b=D.best, R=D.retention;
+/* The axis runs to the generations this run actually reached.  It used to be
+   hard-coded to 900, so a run that stopped early drew a line ending in a third
+   of empty chart and read as a collapse rather than as a shorter run. */
+const XS=[0,m.generations];
+document.getElementById('subtitle').textContent =
+  `MAP-Elites over six islands with a shared PPO policy · ${m.generations} generations`
+  + ` · ${document.getElementById('subtitle').dataset.sub||''}`;
+document.getElementById('evbar').innerHTML=eventLegend()
+  || '<span class="evkey">no refits, audits or bar changes were logged for this run</span>';
 document.getElementById('tiles').innerHTML=[
   [m.hours+' h', m.generations+' generations', m.sec_per_gen+' s per generation'],
   [m.evaluations.toLocaleString(), 'evaluations',
@@ -329,7 +454,7 @@ document.getElementById('tiles').innerHTML=[
 lineChart(document.getElementById('c_return'),[
   {pts:D.train_return.mission.map(p=>[p.g,p.v*100]),c:'var(--s1)',tag:'mission ×100'},
   {pts:D.train_return.fitness.map(p=>[p.g,p.v]),c:'var(--s2)',tag:'fitness'},
-],{xs:[0,900],h:220,ylab:v=>fmt(v,2)});
+],{xs:XS,h:220,ylab:v=>fmt(v,2)});
 
 /* 2 scatter */
 (function(){
@@ -352,14 +477,14 @@ lineChart(document.getElementById('c_return'),[
 lineChart(document.getElementById('c_eval'),[
   {pts:D.eval_return.tier1.map(p=>[p.g,p.v]),c:'var(--s1)',tag:'Tier-1'},
   {pts:D.eval_return.tier2.map(p=>[p.g,p.v]),c:'var(--s2)',tag:'Tier-2'},
-],{xs:[0,900],ylab:v=>fmt(v,3)});
+],{xs:XS,ylab:v=>fmt(v,3)});
 
 /* 3 success */
 lineChart(document.getElementById('c_success'),[
   {pts:D.success.energy.map(p=>[p.g,p.v]),c:'var(--s1)',tag:'energy'},
   {pts:D.success.gated.map(p=>[p.g,p.v]),c:'var(--s2)',tag:'gated'},
   {pts:D.success.diverged.filter((_,i)=>i%6===0).map(p=>[p.g,p.v]),c:'var(--s3)',tag:'diverged'},
-],{xs:[0,900],ys:[0,72],h:220,ylab:v=>fmt(v,0)+'%'});
+],{xs:XS,ys:[0,72],h:220,ylab:v=>fmt(v,0)+'%'});
 
 /* 4 retention */
 if(R){
@@ -381,7 +506,7 @@ barChart(document.getElementById('c_retsplit'),[
 if(D.ppo){
 const ppo=(id,key,c,lab)=>lineChart(document.getElementById(id),
   [{pts:D.ppo[key].map(p=>[p.g,p.v]),c,label:false}],
-  {xs:[0,900],h:180,ylab:lab||(v=>fmt(v,3))});
+  {xs:XS,h:180,ylab:lab||(v=>fmt(v,3))});
 ppo('c_pi','pi_loss','var(--s1)');
 ppo('c_v','v_loss','var(--s2)');
 ppo('c_ent','entropy','var(--s3)',v=>fmt(v,2));
@@ -404,10 +529,103 @@ barChart(document.getElementById('c_fail'),[
   {k:'evaluated',v:D.failures.evaluations,c:'var(--s3)'},
 ],{h:200});
 
+/* 7b bodies — the distribution with the machines in it */
+if(D.bodies && D.bodies.rows && D.bodies.rows.length){
+  document.getElementById('sec_bodies').hidden=false;
+  document.getElementById('c_bodies').innerHTML=D.bodies.rows.map(r=>{
+    const gates=(r.air_gates||[]).length
+      ? `<span class="gate">${r.air_gates.join(', ')}</span>` : 'no gate';
+    return `<div class="body"><figure>
+      <img src="${r.img}" alt="design at the ${r.label} of the score distribution"/>
+      <figcaption class="cap"><b>${r.label} — mission ${fmt(r.mission_fraction,4)}</b>
+        fitness ${fmt(r.fitness,3)} · ${r.body_plan||'?'} · ${r.n_parts||'?'} parts ·
+        ${r.dof||'?'} dof<br/>${fmt(r.mass,2)} kg · span ${fmt(r.span,2)} m ·
+        wing ${fmt(r.wing_area,3)} m²<br/>${gates}
+      </figcaption></figure></div>`;
+  }).join('');
+  const w=D.bodies.rows.filter(r=>!r.wing_area);
+  document.getElementById('bodies_note').textContent =
+    `Sampled at percentiles of the ${D.bodies.rows[0].by} distribution over the archive. `+
+    (w.length ? `${w.length} of these ${D.bodies.rows.length} have no lifting surface at all — `+
+                `read their air numbers against that.`
+              : `Every sampled design carries a lifting surface.`);
+}
+
+/* 7c baseline */
+if(D.baseline){
+  const B=D.baseline, C=D.comparable;
+  document.getElementById('sec_cmp').hidden=false;
+  document.getElementById('cmp_sub').textContent =
+    `Solid is this run, dashed is ${B._name}. Only quantities that mean the same `+
+    `thing in both runs are drawn; the rest are listed underneath with the reason.`;
+  const keys=Object.keys(C).filter(k=>!k.startsWith('_') && B[k]);
+  document.getElementById('c_cmp').innerHTML=
+    keys.map(k=>`<div class="card"><h3>${C[k].label}</h3><div id="cmp_${k}"></div></div>`).join('');
+  keys.forEach(k=>{
+    lineChart(document.getElementById('cmp_'+k),[
+      {pts:C[k].pts.map(p=>[p.g,p.v]),c:'var(--s1)',tag:'this run'},
+      {pts:B[k].pts.map(p=>[p.g,p.v]),c:'var(--text-muted)',tag:B._name,dash:true},
+    ],{h:190,ylab:v=>fmt(v,0)+'%'});
+  });
+  const S=C._scalars, T=B._scalars;
+  const rows=[['generations',S.generations,T.generations,0],
+              ['evaluations',S.evaluations,T.evaluations,0],
+              ['seconds per generation',S.sec_per_gen,T.sec_per_gen,0],
+              ['Tier-0 reject rate (%)',S.tier0_reject_rate,T.tier0_reject_rate,1],
+              ['mean parts per design',S.n_parts,T.n_parts,2]];
+  document.getElementById('cmp_table').innerHTML=
+    `<tr><th>quantity</th><th class="n">this run</th><th class="n">${B._name}</th></tr>`+
+    rows.map(([k,a,c,d])=>`<tr><td>${k}</td><td class="n">${fmt(a,d)}</td>
+      <td class="n">${fmt(c,d)}</td></tr>`).join('');
+  document.getElementById('cmp_no').innerHTML=
+    (C._not_comparable||[]).map(([k,why])=>`<li><b>${k}</b> — ${why}</li>`).join('');
+}
+
+/* 7d lineage */
+if(D.tree){
+  const T=D.tree;
+  document.getElementById('sec_tree').hidden=false;
+  document.getElementById('tree_sub').textContent =
+    `${T.n_nodes.toLocaleString()} designs from ${T.n_roots} roots, `+
+    `deepest line ${T.max_depth}, ${T.branching} children per parent that had any, `+
+    `${T.dead_ends.toLocaleString()} (${Math.round(100*T.dead_ends/T.n_nodes)}%) left no offspring.`;
+  (function(){
+    const N=T.subtree, h=300, byId={};
+    N.forEach(n=>byId[n.id]=n);
+    const maxD=Math.max(...N.map(n=>n.d)), fits=N.map(n=>n.fit);
+    const lo=Math.min(...fits), hi=Math.max(...fits);
+    const iw=W-M.l-M.r, ih=h-M.t-M.b;
+    // Depth on x, fitness on y: a branch that climbs is a line that improved.
+    const x=d=>M.l+(maxD?d/maxD:0)*iw;
+    const y=f=>M.t+ih-((f-lo)/((hi-lo)||1))*ih;
+    const fr=frame(W,h,[0,maxD],[lo,hi],v=>Math.round(v),v=>fmt(v,2));
+    let s=fr.g;
+    N.forEach(n=>{ const p=n.p&&byId[n.p]; if(!p) return;
+      s+=`<line x1="${x(p.d)}" y1="${y(p.fit)}" x2="${x(n.d)}" y2="${y(n.fit)}"
+          stroke="${n.spine?'var(--s1)':'var(--text-muted)'}"
+          stroke-width="${n.spine?2:1}" opacity="${n.spine?.95:.35}"/>`; });
+    N.forEach(n=>{
+      s+=`<circle cx="${x(n.d)}" cy="${y(n.fit)}" r="${n.spine?4.5:(n.kids?3:2.2)}"
+          fill="${n.spine?'var(--s1)':(n.kids?'var(--s3)':'var(--text-muted)')}"
+          fill-opacity="${n.spine?1:(n.kids?.75:.45)}"
+          ><title>${n.id}
+generation ${n.g} · depth ${n.d} · fitness ${fmt(n.fit,4)}
+best anywhere below it ${fmt(n.best,4)} · ${n.kids} children${n.spine?' · on the winning line':''}</title></circle>`;
+    });
+    s+=`<text class="tick" x="${M.l}" y="${h-4}" fill="var(--text-muted)">lineage depth →</text>`;
+    document.getElementById('c_tree').innerHTML=`<svg viewBox="0 0 ${W} ${h}" role="img">${s}</svg>`;
+  })();
+  barChart(document.getElementById('c_depth'),
+    T.depth_hist.map(d=>({k:d.k,v:d.v})),{h:200,c:'var(--s3)',labelBars:false});
+  lineChart(document.getElementById('c_paid'),
+    [{pts:T.paid_by_depth.map(d=>[+d.k,d.v]),c:'var(--s2)',label:false}],
+    {h:200,ylab:v=>fmt(v,0)+'%',events:false});
+}
+
 /* 8 archive */
 lineChart(document.getElementById('c_cov'),
   [{pts:D.archive.coverage.filter((_,i)=>i%3===0).map(p=>[p.g,p.v]),c:'var(--s1)',tag:'coverage'}],
-  {xs:[0,900],h:220,ylab:v=>fmt(v,0)+'%',marks:D.archive.refits});
+  {xs:XS,h:220,ylab:v=>fmt(v,0)+'%',marks:D.archive.refits});
 document.getElementById('cov_note').textContent =
   `${D.archive.refits.length} descriptor refits (dashed). Archive size at each refit fell `+
   `${D.archive.refit_before[0]} → ${D.archive.refit_before[D.archive.refit_before.length-1]}: `+
@@ -417,12 +635,12 @@ barChart(document.getElementById('c_isl'),
   {h:200,c:'var(--s3)'});
 lineChart(document.getElementById('c_lin'),
   [{pts:D.lineage.filter((_,i)=>i%4===0).map(p=>[p.g,p.v]),c:'var(--s1)',label:false}],
-  {xs:[0,900],h:200,ylab:v=>fmt(v,1)});
+  {xs:XS,h:200,ylab:v=>fmt(v,1)});
 
 /* 9 parts */
 lineChart(document.getElementById('c_parts'),
   [{pts:D.parts.trend.map(p=>[p.g,p.v]),c:'var(--s1)',label:false}],
-  {xs:[0,900],h:200,ylab:v=>fmt(v,1)});
+  {xs:XS,h:200,ylab:v=>fmt(v,1)});
 barChart(document.getElementById('c_pe'),
   D.parts.infeasible.map(d=>({k:d.p+(d.p===10?'+':''),v:d.v})),
   {h:200,c:'var(--s2)',vfmt:v=>fmt(v,0)+'%',ylab:v=>fmt(v,0)+'%'});

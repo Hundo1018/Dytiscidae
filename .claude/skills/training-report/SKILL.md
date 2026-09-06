@@ -12,12 +12,37 @@ which design is worth filming and whether the run is worth reporting at all.
 ## 1 · The page
 
 ```bash
-.venv/bin/python .claude/skills/training-report/report.py runs/<run>
+# optional, minutes of compute and a GL context: renders the machines that sit
+# at each percentile of the score distribution, for section 7b
+.venv/bin/python .claude/skills/training-report/bodies.py runs/<run>
+
+.venv/bin/python .claude/skills/training-report/report.py runs/<run> \
+    --baseline runs/<earlier-run>
 ```
 
 Writes `runs/<run>/report.html`. `report.py` aggregates
-`generations.jsonl` and `events.jsonl`; `template.html` is the page, and the
-data is injected at `__PAYLOAD__`. Neither file needs editing for a normal run.
+`generations.jsonl`, `events.jsonl` and the scout's lineage graph out of
+`search_state.pkl`; `template.html` is the page, and the data is injected at
+`__PAYLOAD__`. Neither file needs editing for a normal run.
+
+`--baseline` draws an earlier run as a dashed line on every quantity that means
+the same thing in both, and lists the ones that do not with the reason. With no
+flag it picks the newest sibling run; `--no-baseline` draws none. The comparison
+is computed from raw measurements against fixed thresholds rather than from
+ladder rung indices, because arch35 inserted `stirs` into the land ladder and
+rung 3 is a different rung in the two runs.
+
+Every line chart carries the events that move it without the search doing
+anything: the descriptor refit (faint full-height lines, fired every 400
+*evaluations* — about 26 generations, not every 400 generations), and auditor
+invalidations, judge bar changes, migrations and exploits as coloured ticks on
+the top edge. The legend under the tiles names them with counts. This exists
+because arch35's `mission_corr` dip was read as a search trend when it was five
+auditor deletions.
+
+Section 7d draws the lineage: one root's whole descent with the winning line
+highlighted, designs by depth, and whether going deeper paid. It needs no extra
+telemetry — the scout's parent→child graph is pickled with the search state.
 
 The page has ten sections: search return, evaluation return (the Tier-1 against
 Tier-2 scatter), feasibility rates, score retention, policy and value loss,

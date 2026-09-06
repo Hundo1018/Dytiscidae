@@ -59,11 +59,19 @@ def binned(items, key, n_gens, n=BINS, gk="gen"):
 
 
 def build(run: Path) -> dict:
-    G = [r for r in read(run / "generations.jsonl") if "generation" in r]
+    GEN = read(run / "generations.jsonl")
+    G = [r for r in GEN if "generation" in r]
     EV = read(run / "events.jsonl")
     if not G:
         raise SystemExit(f"no generations in {run}")
-    start = next((e for e in EV if e.get("kind") == "run_start"), {})
+    # The run's configuration is written to `generations.jsonl`, not to
+    # `events.jsonl`.  Looking only in the latter found nothing and the header
+    # rendered "batch null · null s segments" for every run ever reported.
+    # The run's configuration is the header record of `generations.jsonl`, and
+    # it carries no "generation" key, so it is not in `G`.  Looking for it only
+    # in `events.jsonl` found nothing and every report ever produced rendered
+    # "batch null · null s segments".
+    start = next((e for e in GEN + EV if e.get("config")), {})
     cfg = start.get("config", {})
     E = [e for e in EV if e.get("kind") == "evaluate"]
     P = [e for e in EV if e.get("kind") == "promote"]
@@ -181,7 +189,282 @@ def build(run: Path) -> dict:
                    ("gen", "island", "body_plan", "n_parts", "dof", "mass", "span",
                     "wing_area", "wing_loading", "air", "water", "land",
                     "mission_fraction", "energy_margin")}
+
+    out["events"] = event_marks(run, EV)
+    out["comparable"] = comparable_series(E, G, REJ, n_gens)
+    out["tree"] = lineage_tree(run)
+    out["bodies"] = body_panel(run, E)
     return out
+
+
+# --------------------------------------------------------------------------
+# Events.  Every line chart in this report is drawn against generation, and
+# three machines move those lines without the search doing anything: the
+# descriptor refit merges cells every 400 *evaluations*, the auditor deletes
+# designs, and the judge raises its bars.  A reader who does not know where
+# those fired will read their effects as search behaviour -- which is exactly
+# how arch35's `mission_corr` dip was first misread.  So they are marked.
+
+MARK_KINDS = {
+    "descriptor_refit": ("refit", "descriptor refit — cells merged, "
+                                  "coverage and archive size step down"),
+    "audit": ("invalidated", "auditor removed a design as model-dependent"),
+    "judge_tighten": ("bars", "judge raised a competence bar"),
+    "migrate": ("migration", "designs moved between islands"),
+}
+
+
+def event_marks(run: Path, EV: list) -> dict:
+    """Generation numbers for each kind of thing that moves a line by itself."""
+    out = {}
+    for kind, (short, why) in MARK_KINDS.items():
+        gens = sorted({e["gen"] for e in EV
+                       if e.get("kind") == kind and e.get("gen") is not None
+                       and (kind != "audit" or e.get("invalid"))})
+        if gens:
+            out[short] = {"gens": gens, "why": why, "n": len(gens)}
+    ex = sorted({e["gen"] for e in read(run / "exploits.jsonl")
+                 if e.get("gen") is not None})
+    if ex:
+        out["exploit"] = {"gens": ex, "n": len(ex),
+                          "why": "a design was caught scoring for something "
+                                 "the mission did not ask for"}
+    # The refit cadence, stated in the units it actually uses.
+    refits = out.get("refit", {}).get("gens") or []
+    if len(refits) > 1:
+        step = st.fmean([b - a for a, b in zip(refits, refits[1:])])
+        out["refit"]["cadence"] = (
+            f"every 400 evaluations — about {step:.0f} generations here, "
+            f"not every 400 generations")
+    return out
+
+
+# --------------------------------------------------------------------------
+# Baselines.  A number with nothing beside it cannot be read, so every series
+# that *can* carry an earlier run's line gets one.  The ones that cannot are
+# named, with the reason, rather than quietly omitted.
+#
+# Comparisons are computed from raw measurements against fixed thresholds, not
+# from ladder rung indices: arch35 inserted `stirs` into the land ladder, so
+# rung 3 means different things in the two runs and comparing the indices is a
+# category error.  `land_speed >= 0.1` is the same question in both.
+
+COMPARABLE = [
+    ("moves", "fraction of evaluations reaching land_speed >= 0.1 m/s",
+     lambda e: _lm(e, "land", "land_speed") is not None,
+     lambda e: (_lm(e, "land", "land_speed") or 0) >= 0.1),
+    ("upright", "fraction holding upright >= 0.7",
+     lambda e: _lm(e, "land", "upright") is not None,
+     lambda e: (_lm(e, "land", "upright") or 0) >= 0.7),
+    ("submerges", "fraction reaching max_depth >= 0.5 m",
+     lambda e: e.get("max_depth") is not None,
+     lambda e: (e.get("max_depth") or 0) >= 0.5),
+    ("energy_feasible", "fraction with energy_margin >= 0",
+     lambda e: e.get("energy_margin") is not None,
+     lambda e: (e.get("energy_margin") or -1) >= 0),
+]
+
+#: Named, with the reason, instead of being drawn against a baseline that would
+#: make the comparison look meaningful.  CLAUDE.md: say "not comparable" rather
+#: than shrinking the difference.
+NOT_COMPARABLE = [
+    ("mission_fraction", "arch35 multiplies it by max(takeoff_fraction, 0.05); "
+                         "the term was redefined at this boundary"),
+    ("fitness", "carries the mission term, so it moved with mission_fraction"),
+    ("air scores", "redefined at arch33→arch34 and again at arch34→arch35"),
+    ("takeoff_height", "did not exist before arch35 — a baseline would be a "
+                       "line at zero, which reads as a measured zero"),
+    ("land_peak_speed", "did not exist before arch35, same reason"),
+    ("land ladder rungs", "arch35 inserted `stirs`, so rung N is a different "
+                          "rung in the two runs; the metrics above are the "
+                          "comparable form of the same question"),
+]
+
+
+def _lm(e, domain, key):
+    v = ((e.get("ladder_measurements") or {}).get(domain) or {}).get(key)
+    return v if isinstance(v, (int, float)) else None
+
+
+def comparable_series(E, G, REJ, n_gens, bins=18):
+    """Per-band rates that mean the same thing across runs."""
+    span = max(n_gens, 1) / bins
+    out = {}
+    for name, label, has, hit in COMPARABLE:
+        tot, got = collections.Counter(), collections.Counter()
+        for e in E:
+            g = e.get("gen")
+            if g is None or not has(e):
+                continue
+            i = min(int(g // span), bins - 1)
+            tot[i] += 1
+            got[i] += 1 if hit(e) else 0
+        if sum(tot.values()) > 50:
+            out[name] = {"label": label,
+                         "pts": [{"g": round((i + .5) * span),
+                                  "v": 100 * got[i] / tot[i]}
+                                 for i in sorted(tot) if tot[i] >= 20]}
+    d = [b["elapsed"] - a["elapsed"] for a, b in zip(G, G[1:])]
+    d = [x for x in d if 0 < x < 600]
+    out["_scalars"] = {
+        "sec_per_gen": round(st.median(d)) if d else 0,
+        "tier0_reject_rate": round(100 * len(REJ) / max(len(E) + len(REJ), 1), 1),
+        "n_parts": round(st.fmean([e["n_parts"] for e in E
+                                   if e.get("n_parts")]), 2) if E else 0,
+        "evaluations": len(E),
+        "generations": n_gens,
+    }
+    out["_not_comparable"] = NOT_COMPARABLE
+    return out
+
+
+def load_comparable(run: Path):
+    """The same rates for a baseline run, or None if it is not there."""
+    try:
+        G = [r for r in read(run / "generations.jsonl") if "generation" in r]
+        EV = read(run / "events.jsonl")
+        if not G:
+            return None
+        E = [e for e in EV if e.get("kind") == "evaluate"]
+        REJ = [e for e in EV if e.get("kind") == "tier0_reject"]
+        n = max(r["generation"] for r in G) + 1
+        out = comparable_series(E, G, REJ, n)
+        out["_name"] = run.name
+        return out
+    except Exception:
+        return None
+
+
+# --------------------------------------------------------------------------
+# Lineage.  The scout keeps the whole parent->child graph and it is pickled
+# with the search state, so the family tree does not need new telemetry.
+
+def lineage_tree(run: Path, keep: int = 160) -> dict | None:
+    """Who descended from whom, and whether the line paid off."""
+    # Unpickling the scout needs the `dytiscidae` package on the path, and when
+    # this file is run as a script `sys.path[0]` is the skill directory, not the
+    # repo -- so the import fails, the except swallows it, and the section
+    # silently disappears.  Put the repo root on the path first.
+    try:
+        import pickle
+        import sys
+        root = str(Path(__file__).resolve().parents[3])
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        with open(run / "search_state.pkl", "rb") as fh:
+            state = pickle.load(fh)
+        nodes = getattr(state.get("scout"), "nodes", None)
+        if not nodes:
+            return None
+    except Exception as exc:                                   # noqa: BLE001
+        print(f"  no lineage section: {type(exc).__name__}: {exc}")
+        return None
+
+    def f(n, k, default=None):
+        return getattr(n, k, default)
+
+    kids = collections.defaultdict(list)
+    for nid, n in nodes.items():
+        if f(n, "parent_id"):
+            kids[f(n, "parent_id")].append(nid)
+
+    depths = collections.Counter(f(n, "depth", 0) for n in nodes.values())
+    # Did a line improve on the design it started from?  `best_descendant` is
+    # the best fitness anywhere below a node; comparing it to the node's own
+    # fitness is the honest form of "did continuing here pay".
+    paid, tried = collections.Counter(), collections.Counter()
+    for n in nodes.values():
+        d = f(n, "depth", 0)
+        tried[d] += 1
+        if (f(n, "best_descendant") or 0) > (f(n, "fitness") or 0) + 1e-9:
+            paid[d] += 1
+
+    # The whole family the winner came from -- not just its ancestors.  A spine
+    # plus siblings shows the path and hides the competition; what the structure
+    # is actually made of is one root's entire descent, most of which died.  So:
+    # walk down from the winner's root, best-first, until `keep` nodes.
+    best_id = max(nodes, key=lambda k: f(nodes[k], "fitness") or 0)
+    spine, cur = [], best_id
+    while cur:
+        spine.append(cur)
+        cur = f(nodes[cur], "parent_id")
+    spine = list(reversed(spine))
+    spine_set = set(spine)
+
+    root = spine[0]
+    picked, queue = [], [root]
+    while queue and len(picked) < keep:
+        nid = queue.pop(0)
+        picked.append(nid)
+        # Best-first, but the winner's line is never dropped for want of room.
+        queue.extend(sorted(kids.get(nid, []),
+                            key=lambda k: (k not in spine_set,
+                                           -(f(nodes[k], "best_descendant") or 0))))
+
+    def row(nid):
+        n = nodes[nid]
+        return {"id": nid, "p": f(n, "parent_id"),
+                "g": f(n, "generation", 0), "d": f(n, "depth", 0),
+                "fit": round(f(n, "fitness") or 0, 4),
+                "best": round(f(n, "best_descendant") or 0, 4),
+                "isl": f(n, "island", ""),
+                "kids": len(kids.get(nid, [])),
+                "spine": nid in spine_set}
+
+    roots = [nid for nid, n in nodes.items() if not f(n, "parent_id")]
+    top = sorted(roots, key=lambda k: -(f(nodes[k], "best_descendant") or 0))[:10]
+    return {
+        "n_nodes": len(nodes), "n_roots": len(roots),
+        "max_depth": max(depths) if depths else 0,
+        "depth_hist": [{"k": str(d), "v": depths[d]} for d in sorted(depths)],
+        "paid_by_depth": [{"k": str(d), "v": round(100 * paid[d] / tried[d], 1)}
+                          for d in sorted(tried) if tried[d] >= 20],
+        "branching": round(st.fmean([len(v) for v in kids.values()]), 2) if kids else 0,
+        "dead_ends": sum(1 for nid in nodes if not kids.get(nid)),
+        "subtree": [row(nid) for nid in picked],
+        "best_id": best_id,
+        "top_roots": [{"id": r, "isl": f(nodes[r], "island", ""),
+                       "best": round(f(nodes[r], "best_descendant") or 0, 4)}
+                      for r in top],
+    }
+
+
+# --------------------------------------------------------------------------
+# Bodies.  A distribution of scores with no machines beside it says nothing
+# about what a score buys.  `bodies.py` renders a still for each percentile
+# and drops it in <run>/media/thumbs; this embeds whatever is there.
+
+def body_panel(run: Path, E: list) -> dict | None:
+    import base64
+    manifest = run / "media" / "thumbs" / "manifest.json"
+    if not manifest.exists():
+        return None
+    try:
+        rows = json.loads(manifest.read_text())
+    except Exception:
+        return None
+    for r in rows:
+        p = run / "media" / "thumbs" / r.get("file", "")
+        if p.exists() and p.stat().st_size < 900_000:
+            r["img"] = ("data:image/png;base64,"
+                        + base64.b64encode(p.read_bytes()).decode())
+    return {"rows": [r for r in rows if r.get("img")]}
+
+
+def _previous_run(run: Path):
+    """The newest sibling run that has telemetry, for use as a default baseline.
+
+    Picked by mtime rather than by name: run names are not ordered (arch34_4w,
+    arch34_aborted, gputest2), and the newest finished run is nearly always the
+    one a reader wants the new numbers held against.
+    """
+    parent = run.resolve().parent
+    cands = [p for p in parent.glob("*/generations.jsonl")
+             if p.parent.resolve() != run.resolve()]
+    cands = [p for p in cands if p.stat().st_size > 20_000]
+    if not cands:
+        return None
+    return max(cands, key=lambda p: p.stat().st_mtime).parent
 
 
 def main() -> int:
@@ -189,9 +472,23 @@ def main() -> int:
     ap.add_argument("run")
     ap.add_argument("--title", default=None)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--baseline", default=None,
+                    help="an earlier run to draw as a baseline on every series "
+                         "that means the same thing in both (default: the most "
+                         "recent other run with telemetry, if there is one)")
+    ap.add_argument("--no-baseline", action="store_true")
     a = ap.parse_args()
     run = Path(a.run)
     data = build(run)
+
+    base = None
+    if not a.no_baseline:
+        cand = Path(a.baseline) if a.baseline else _previous_run(run)
+        if cand is not None and cand.resolve() != run.resolve():
+            base = load_comparable(cand)
+            if base is None and a.baseline:
+                print(f"  baseline {cand} has no usable telemetry — drawing none")
+    data["baseline"] = base
     title = a.title or f"{run.name} — training report"
     m = data["meta"]
     sub = (f"seed {m['seed']} · batch {m['batch']} · {m['segment_seconds']} s segments"
