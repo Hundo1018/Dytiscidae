@@ -693,6 +693,21 @@ class TriphibianEnv:
         """
         return float(self._trim()[1])
 
+    @property
+    def lift_margin(self) -> float:
+        """Best lift this body makes at the top of the speed band, over its weight.
+
+        1.0 is "there is some speed at which this can hold itself up"; below it
+        the machine is falling however it is released, and the number says how
+        far short.  Over arch36's 179 elites it ran from -1.105 -- pushing
+        *down* at 30 m/s -- through a median of 0.333 to 7.367, and the set with
+        ``lift_margin >= 1.0`` is exactly the set with a real trim speed, both
+        27.4%.
+
+        Free: the trim sweep computes it and caches it per phenotype.
+        """
+        return float(self._trim()[2])
+
     def _trim(self) -> tuple:
         cached = getattr(self.p, "_measured_trim", None)
         if cached is not None:
@@ -777,6 +792,14 @@ class TriphibianEnv:
             return float(fallback)
 
         top, top_a = best_lift(hi)
+        # How much of its own weight this body can lift at the top of the
+        # band, at the best attitude.  Already computed here and thrown
+        # away until arch37; it is the only continuous answer this project
+        # has to "how close is this design to flying", and 72.6% of
+        # arch36's archive needed one -- they could not fly at any speed,
+        # scored the two `airborne_fraction` rungs for falling, and had no
+        # gradient between "generates no lift" and "flies".
+        margin = float(top / weight) if weight > 0 else 0.0
         if top < weight:
             # Cannot fly at any speed we are willing to model.  Released at the
             # *bottom* of the band, at the attitude that does least badly.
@@ -789,7 +812,7 @@ class TriphibianEnv:
             # comment that used to be here said this was "the correct answer for
             # a design that cannot fly"; the correct answer for a design that
             # cannot fly is to drop it, not to throw it.
-            return float(lo), float(top_a)
+            return float(lo), float(top_a), margin
         base, base_a = best_lift(lo)
         if base >= weight:
             v_stall = lo
@@ -804,7 +827,7 @@ class TriphibianEnv:
                     a = mid
             v_stall = b
         v = float(np.clip(v_stall * self.LAUNCH_MARGIN, lo, hi))
-        return v, lowest_pitch(v, top_a)
+        return v, lowest_pitch(v, top_a), margin
 
     def _clear_of_terrain(self, x: float, y: float, z: float, gap: float = 0.05) -> float:
         """Height at which the machine's lowest geometry sits ``gap`` above ground.
@@ -1332,6 +1355,15 @@ class TriphibianEnv:
             res.altitude_held = flight
             res.measurements.update({
                 "airborne_fraction": frac,
+                # Whether this body can hold itself up at all, and by how
+                # much it misses when it cannot.  A property of the
+                # airframe rather than of the episode, which is the point:
+                # the four rungs it carries sit *below* the
+                # `airborne_fraction` ones, so a machine that makes no
+                # lift cannot reach them by being dropped from 30 m.  That
+                # is how 53% of arch36 was paid, and `rung_reached` stops
+                # at the first unmet rung, so the ordering is the gate.
+                "lift_margin": float(self.lift_margin),
                 # The ladder reads these, so a gated design must not be able to
                 # climb it on numbers that do not mean what they say.  The
                 # measurements themselves are kept under their own names so the

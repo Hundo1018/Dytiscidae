@@ -68,6 +68,29 @@ import numpy as np
 #: rung, which is where taste would otherwise creep in.
 LADDER: dict[str, list[tuple[str, str, float]]] = {
     "air": [
+        # Four rungs on whether the airframe can fly at all, *below* the ones
+        # that read where it happened to be.  `airborne_fraction` is satisfied
+        # by falling -- the air segment releases the machine at 30 m and a body
+        # dropped there is airborne for the 2.5 s it takes to arrive -- so
+        # `leaves_surface` and `stays_up` were paying 53% of arch36 for free
+        # fall, with a population median sink rate of 9.9 m/s.
+        #
+        # 130 of arch36's 179 elites (72.6%) could not produce their own weight
+        # in lift at any speed between 6 and 30 m/s, so `_measure_trim_speed`
+        # dropped them rather than launching them; and between "generates no
+        # lift" and "flies" there was no gradient at all, for three quarters of
+        # the population.  `lift_margin` is that gradient and it costs nothing:
+        # the trim sweep already computed it and threw it away.
+        #
+        # Thresholds from the measured distribution over those 179 elites --
+        # min -1.105 (pushing *down* at 30 m/s), median 0.333, p90 5.591 --
+        # leaving 72.1% / 51.4% / ~36% / 27.4% standing.  The last is the same
+        # set as "has a real trim speed", by both measurements, which is the
+        # check that this is the right quantity.
+        ("makes_lift", "lift_margin", 0.10),
+        ("carries_a_third", "lift_margin", 0.30),
+        ("nearly_flies", "lift_margin", 0.60),
+        ("carries_itself", "lift_margin", 1.00),   # can hold itself up somewhere
         ("leaves_surface", "airborne_fraction", 0.10),
         ("stays_up", "airborne_fraction", 0.60),
         ("glides", "sink_rate", 3.0),          # sink below 3 m/s

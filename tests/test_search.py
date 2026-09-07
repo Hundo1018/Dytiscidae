@@ -1100,27 +1100,47 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # ``holds_station`` sits between holding height and climbing: a machine
     # gliding down at 0.4 m/s clears ``holds_height`` for a whole segment while
     # never holding a height, so the two are separate rungs.
+    # The `lift_margin` rungs sit below these and every fixture has to carry one,
+    # because a body that cannot lift its own weight is not flying whatever the
+    # episode looked like -- that is the whole point of them.  The offset is
+    # derived rather than written out, so inserting another rung moves the
+    # expectations instead of breaking them.
+    LIFT = sum(1 for _n, m, _t in LADDER["air"] if m == "lift_margin")
+    flies = {"lift_margin": 1.5}
     seq = [
-        ({"airborne_fraction": 0.05}, 0),
-        ({"airborne_fraction": 0.7, "sink_rate": 6.0}, 2),
-        ({"airborne_fraction": 0.7, "sink_rate": 2.0}, 3),
-        ({"airborne_fraction": 0.9, "sink_rate": 0.2}, 4),
-        ({"airborne_fraction": 0.9, "sink_rate": 0.2,
-          "station_keeping": 0.8}, 5),
-        ({"airborne_fraction": 0.95, "sink_rate": -1.0,
-          "station_keeping": 0.8, "turn_rate_held": 0.0}, 6),
+        ({**flies, "airborne_fraction": 0.05}, LIFT + 0),
+        ({**flies, "airborne_fraction": 0.7, "sink_rate": 6.0}, LIFT + 2),
+        ({**flies, "airborne_fraction": 0.7, "sink_rate": 2.0}, LIFT + 3),
+        ({**flies, "airborne_fraction": 0.9, "sink_rate": 0.2}, LIFT + 4),
+        ({**flies, "airborne_fraction": 0.9, "sink_rate": 0.2,
+          "station_keeping": 0.8}, LIFT + 5),
+        ({**flies, "airborne_fraction": 0.95, "sink_rate": -1.0,
+          "station_keeping": 0.8, "turn_rate_held": 0.0}, LIFT + 6),
     ]
     ok = all(rung_reached("air", m) == k for m, k in seq)
     check("the ladder orders capability", ok,
           " ".join(str(rung_reached("air", m)) for m, _ in seq))
     check("a design cannot skip a rung it failed",
-          rung_reached("air", {"airborne_fraction": 0.05, "sink_rate": -9.0}) == 0,
-          "plummeting-but-never-airborne stays at rung 0")
+          rung_reached("air", {**flies, "airborne_fraction": 0.05,
+                               "sink_rate": -9.0}) == LIFT,
+          "plummeting-but-never-airborne stops where it stopped being airborne")
+    # And the lift rungs order the same way: 72.6% of arch36 could not lift its
+    # own weight at any speed, scored the two `airborne_fraction` rungs for
+    # being dropped from 30 m, and had no gradient between "makes no lift" and
+    # "flies".
+    perfect = {"airborne_fraction": 1.0, "sink_rate": -2.0,
+               "station_keeping": 0.9, "turn_rate_held": 0.5}
+    check("a body that makes no lift scores nothing in air",
+          rung_reached("air", {**perfect, "lift_margin": 0.0}) == 0,
+          "a whole segment airborne, climbing, and it still cannot fly")
+    check("and one halfway there sits between that and flying",
+          0 < rung_reached("air", {**perfect, "lift_margin": 0.35}) < LIFT,
+          f"margin 0.35 -> rung {rung_reached('air', {**perfect, 'lift_margin': 0.35})}")
 
     # The within-rung bonus must never reach the next rung's score.
-    below = j.score("air", {"airborne_fraction": 0.95, "sink_rate": -1.0,
+    below = j.score("air", {**flies, "airborne_fraction": 0.95, "sink_rate": -1.0,
                             "station_keeping": 0.8, "turn_rate_held": 0.0})
-    top = j.score("air", {"airborne_fraction": 0.95, "sink_rate": -1.0,
+    top = j.score("air", {**flies, "airborne_fraction": 0.95, "sink_rate": -1.0,
                           "station_keeping": 0.8, "turn_rate_held": 0.5})
     check("clearing six rungs never ties with clearing seven",
           below["total"] < top["total"], f"{below['total']:.3f} < {top['total']:.3f}")
@@ -1147,7 +1167,10 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # The same achievement scores lower once the bar has moved: that is the
     # point, and the rung is what stays comparable.
     fresh = Judge(quantile=0.9, update_every=1)
-    m = {"airborne_fraction": 0.9, "sink_rate": 1.0}
+    # Carries a lift margin like the fixtures above: without one this lands on
+    # rung 0 and the "rung is unchanged" check below compares two zeros, which
+    # passes while testing nothing.
+    m = {**flies, "airborne_fraction": 0.9, "sink_rate": 1.0}
     early = fresh.score("air", m)
     for _ in range(200):
         fresh.observe({"air": {"sink_rate": float(rng.normal(0.2, 0.3))}})
@@ -2797,6 +2820,95 @@ def test_structure_can_be_recombined_and_duplicated() -> None:
           f"{estimated_bodies(branchy)} bodies")
 
 
+def test_something_asks_a_machine_to_leave_the_ground() -> None:
+    """`land_to_air` was in no island's objective, and no hybrid ever left home.
+
+    Three runs -- arch34, arch35, arch36 -- filmed the same continuous mission
+    result: 0/2 transitions and 0.0 m of depth, while arch35 and arch36 spent
+    two runs building a take-off ladder, gating it, and multiplying it into
+    `mission_fraction`.  The reason was not in the scoring.  Six islands covered
+    three singles, water+land and air+water; **land+air was missing**, and
+    `land_to_air` appeared in no island's transition tuple at all -- the land
+    island's only crossing was `water_to_land`, arriving and never leaving.
+
+    And hybridisation could not fill the gap, because the destination loop broke
+    on its first existing name and `generalist` always exists: 39 of arch36's 39
+    hybrids and 24 of arch35's 24 went there, and `amphibian` and `aerial_diver`
+    received none.  The air x land cross -- a walking flyer -- was built every
+    migration and only ever scored where water was also demanded.
+    """
+    print("\nislands: something has to ask a machine to leave the ground")
+    import numpy as np
+
+    from dytiscidae.evolution.archive import Archive
+    from dytiscidae.evolution.curator import Curator
+    from dytiscidae.evolution.islands import (
+        HYBRID_HOME,
+        ISLANDS,
+        Archipelago,
+        island_score,
+    )
+
+    asks = [k for k, v in ISLANDS.items() if "land_to_air" in v["transitions"]]
+    check("at least one island's objective contains land_to_air",
+          bool(asks), ", ".join(asks) or "none -- nothing asks")
+    check("and one island's domains are exactly land and air",
+          any(set(v["domains"]) == {"land", "air"} for v in ISLANDS.values()),
+          ", ".join("+".join(v["domains"]) for v in ISLANDS.values()))
+
+    # The pair island must read its own two domains and nothing else, or it is
+    # just another generalist and the specialisation argument does not apply.
+    class Seg:
+        def __init__(self, c):
+            self.competence = c
+
+    class Res:
+        def __init__(self, **kw):
+            self.segments = {d: Seg(c) for d, c in kw.items()}
+            self.mission_fraction = 0.0
+
+    strong = island_score("land_air", Res(land=0.8, air=0.7, water=0.0))
+    weak = island_score("land_air", Res(land=0.8, air=0.1, water=0.9))
+    check("land_air scores land and air, and drowning in water does not help",
+          strong > weak, f"{strong:.4f} with air 0.7 against {weak:.4f} with air 0.1")
+
+    # Every specialist pair goes to the island whose objective is that pair.
+    homes = {frozenset(k): v[0] for k, v in HYBRID_HOME.items()}
+    check("each specialist cross has its own destination island",
+          len(set(homes.values())) == 3,
+          ", ".join(f"{'x'.join(sorted(k))}->{v}" for k, v in homes.items()))
+
+    axes = [("m", 0.0, 1.0, 4), ("d", 0.0, 1.0, 4)]
+    arch = Archipelago(migrate_every=1, n_migrants=1)
+    for name in ISLANDS:
+        a = Archive(list(axes))
+        arch.register(name, a, Curator(a, seed=0))
+    rng = np.random.default_rng(0)
+    for i, name in enumerate(("air", "water", "land")):
+        arch.archives[name].add(f"g{i}", 0.9, np.array([0.5, 0.5]), {}, tier=1)
+    moved = arch.migrate(1, rng, crossover=lambda a, b, r: f"{a}+{b}")
+    hyb = [m for m in moved if m["kind"] == "hybrid"]
+    dests = sorted(m["island"] for m in hyb)
+    check("all three crosses are made", len(hyb) == 3, f"{len(hyb)} hybrids")
+    check("and they land on three different islands, not all on generalist",
+          len(set(dests)) == 3, ", ".join(dests))
+    check("the air x land cross goes to the land+air island",
+          any(m["origin"] in ("airxland", "landxair") and m["island"] == "land_air"
+              for m in hyb),
+          ", ".join(f"{m['origin']}->{m['island']}" for m in hyb))
+
+    # And the transition has to be scored, or the objective asks for something
+    # the evaluator never computes.
+    import inspect
+
+    from dytiscidae.envs import batchroll, evaluate as _ev
+    for mod in (batchroll, _ev):
+        src = inspect.getsource(mod)
+        check(f"{mod.__name__.split('.')[-1]} scores land_to_air",
+              'for kind in ("air_to_water", "water_to_air", "water_to_land",\n'
+              '                 "land_to_air"):' in src)
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -2838,6 +2950,7 @@ def main() -> int:
     test_learned_axes_survive_resume()
     test_the_loop_wires_every_layer_together()
     test_the_body_plan_outlives_the_lineage_window()
+    test_something_asks_a_machine_to_leave_the_ground()
     test_every_island_is_reached_by_verification_and_audit()
     test_a_long_leg_runs_on_promotion_candidates_only()
     test_the_shared_controller_question_is_answered_with_a_number()

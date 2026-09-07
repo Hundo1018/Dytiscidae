@@ -2031,16 +2031,49 @@ def test_the_air_score_measures_flight() -> None:
 
     # 5. The launch is no longer inversely earned.
     lo, hi = __import__("dytiscidae.envs.triphibian", fromlist=["x"]).LAUNCH_SPEED_RANGE
-    speed, _pitch = env._measure_trim_speed(lo, hi)
+    speed, _pitch, _margin = env._measure_trim_speed(lo, hi)
     check("a design that can fly is launched inside the band",
           lo <= speed <= hi, f"gannet launches at {speed:.1f} m/s")
     # The "no trim speed anywhere in the band" branch, forced by asking for a
     # band nothing can fly in.  This used to return the *top* of the range, so
     # the machines that could not fly at all were the ones thrown hardest.
-    none_speed, _ = env._measure_trim_speed(1.0, 2.0)
+    none_speed, _, _ = env._measure_trim_speed(1.0, 2.0)
     check("and one that cannot fly anywhere in the band is dropped, not thrown",
           abs(none_speed - 1.0) < 1e-9,
           f"released at {none_speed:.1f} m/s, the floor, not the 2.0 m/s cap")
+
+    # 6. Being dropped no longer buys rungs.
+    #
+    # `airborne_fraction` is satisfied by falling: the segment releases the
+    # machine at 30 m and a body dropped there is airborne for the 2.5 s it
+    # takes to arrive, which is why 53% of arch36 scored `leaves_surface` and
+    # `stays_up` with a population median sink rate of 9.9 m/s.  130 of its 179
+    # elites (72.6%) could not lift their own weight at any speed in the band.
+    #
+    # `lift_margin` is a property of the airframe, its four rungs sit below the
+    # ones that read where the machine happened to be, and `rung_reached` stops
+    # at the first unmet rung -- so the ordering is the gate and no separate
+    # condition is needed.
+    from dytiscidae.evolution.judge import LADDER, rung_reached
+
+    perfect_episode = {"airborne_fraction": 1.0, "sink_rate": 0.0,
+                       "station_keeping": 1.0, "turn_rate_held": 1.0}
+    grounded = rung_reached("air", {**perfect_episode, "lift_margin": 0.0})
+    flying = rung_reached("air", {**perfect_episode, "lift_margin": 1.5})
+    check("a body that makes no lift scores nothing in air, however long it "
+          "stays up", grounded == 0,
+          f"rung {grounded} on a whole segment airborne at zero sink")
+    check("and the same episode from a body that can carry itself does score",
+          flying > grounded, f"rung {flying} against rung {grounded}")
+    check("the lift rungs sit below the ones that read the episode",
+          [n for n, _, _ in LADDER["air"]][:4]
+          == ["makes_lift", "carries_a_third", "nearly_flies", "carries_itself"],
+          " -> ".join(n for n, _, _ in LADDER["air"][:5]))
+    # Set from arch36's measured distribution: min -1.105, median 0.333,
+    # p90 5.591.  A bar above the population reads zero and carries no gradient.
+    partial = rung_reached("air", {**perfect_episode, "lift_margin": 0.35})
+    check("and a body halfway there outscores one that makes none",
+          0 < partial < flying, f"margin 0.35 -> rung {partial}")
 
 
 def test_takeoff_is_measured_where_the_machine_starts_on_the_ground() -> None:
