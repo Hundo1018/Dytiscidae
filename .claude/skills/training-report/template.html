@@ -84,6 +84,14 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
 .nocmp{margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--text-secondary)}
 .nocmp li{margin:3px 0}
 .nocmp b{color:var(--text-primary)}
+.explain{margin:10px 0 2px;padding:9px 11px;border-left:2px solid var(--line);
+  background:var(--surface-0);border-radius:0 7px 7px 0}
+.explain .ax{display:flex;flex-wrap:wrap;gap:4px 18px;margin-bottom:5px}
+.explain .ax span{font-size:12px;color:var(--text-secondary)}
+.explain .ax b{color:var(--text-primary);font-weight:650;margin-right:4px}
+.explain p{margin:4px 0 0;font-size:12.5px;color:var(--text-secondary);line-height:1.5}
+.explain p.how{color:var(--text-muted)}
+.explain code{font-size:11.5px;background:var(--surface-1)}
 </style>
 
 <div class="viz-root"><div class="wrap">
@@ -349,6 +357,100 @@ ${v.why||''}</title></line>`;
   });
   return s;
 }
+/* What every chart is actually showing ----------------------------------
+   Written out because the axis labels are project shorthand: `fitness` is not
+   a score out of one, `mission fraction` is a product of five factors, and
+   `evaluated` is a running total.  Each entry gives the axes, the derivation,
+   and what a movement in the line means.  Definitions are taken from the code
+   that produces the numbers, not from the names. */
+const DEFS = {
+ c_return: {
+  x:'generation of the search (0 to the last generation run)',
+  y:'population mean over every design evaluated in that band — mission fraction is multiplied by 100 to share the axis with fitness',
+  what:'<b>fitness</b> is not a score out of one. It is a blend of three <i>population standings</i> — where a design ranks among its peers, each in [0,1] — discounted by the critic: <code>[(1−mw)·(w·island_q + (1−w)·curriculum_q) + mw·mission_q] × critic_discount</code>, with <code>mw</code> = mission weight, 0.30 by default. A fitness of 0.5 means "median of the population on that blend", not "half marks".<br/><b>mission fraction</b> is what the machine actually did on the mission: <code>min(competences)<sup>0.5</sup> × mean(competences) × energy_fraction × max(transition_fraction, 0.05) × max(takeoff_fraction, 0.05)</code>. The competences are the per-domain scores (air, water, land) in [0,1]; because the weakest one enters twice, a machine that flies well and cannot dive scores near zero.',
+  read:'The two lines answer different questions and are known to disagree — the scatter in section 2 is the measurement of how much.'},
+ c_scatter: {
+  x:'Tier-1 mission fraction — the cheap 8-second estimate, one point per promotion',
+  y:'Tier-2 mission fraction — the same design run over the full mission',
+  what:'Both axes are the same quantity computed from two different rollouts of the same design. Tier-1 is what the search selects on because it is affordable; Tier-2 is what the design is worth.',
+  read:'If the cheap estimate predicted the real one the cloud would lie along the dashed y = x. It does not, and r is printed under the chart.'},
+ c_eval: {
+  x:'generation', y:'mission fraction, averaged over the promotions in each band',
+  what:'The same two quantities as the scatter, plotted against time instead of against each other.',
+  read:'Tier-2 sitting below Tier-1 throughout means the estimate is optimistic, not that the search is failing.'},
+ c_success: {
+  x:'generation', y:'percentage of that band\'s evaluations',
+  what:'There is no binary "success" here, so these are the three gates a design can fail. <b>energy</b>: share with <code>energy_margin ≥ 0</code>, meaning the battery covers what the mission needs. <b>gated</b>: share that failed at least one airworthiness gate (no lifting surface, wing loading beyond the stall band). <b>diverged</b>: share of rollouts the physics could not integrate.',
+  read:'Energy feasibility falling while part count rises is the trade item E on the roadmap is about.'},
+ c_rethist: {
+  x:'retention band', y:'number of promotions in that band',
+  what:'<b>Retention</b> = the competence a design scores over a 60-second leg divided by its 8-second score in the same domain. 1.0 means the capability held; 0.2 means four fifths of it was an artefact of the short window.',
+  read:'Segments are a fixed 8 s, so episode length carries no signal in this project. This is the honest analogue.'},
+ c_retsplit: {
+  x:'half of the population, split at the median 8-second score', y:'median 60-second retention of that half',
+  what:'The same retention, split by how well the design scored on the short window.',
+  read:'If the short score predicted durability the left bar would be the taller one.'},
+ c_dist: {
+  x:'mission fraction band', y:'number of evaluations landing in it',
+  what:'Every evaluation of the run, bucketed by the mission fraction defined above.',
+  read:'The distribution is heavily massed at the bottom in every run so far; the interesting question is what the top tail is physically doing, which is section 7b.'},
+ c_fail: {
+  x:'category', y:'count of evaluations over the whole run',
+  what:'<b>evaluated</b> is the running total of designs that were simulated and scored. <b>Tier-0 rejected</b> never reached simulation — they failed a closed-form structural or energy check first, which costs nothing. The other two are the gates from section 3.',
+  read:'These overlap: one design can be both energy-infeasible and air-gated.'},
+ c_cov: {
+  x:'generation', y:'coverage, percent',
+  what:'<b>coverage</b> = <code>occupied cells / grid capacity</code> for the island that generation visited. The grid is the behaviour space, so this is the fraction of distinct kinds of machine the search is holding.',
+  read:'Consecutive points are different islands and the dashed lines are descriptor refits, which merge cells. Judge growth per island and between refits, never point to point.'},
+ c_isl: {
+  x:'island', y:'promotions from that island over the run',
+  what:'A promotion is an elite that survived a full Tier-2 verification and was written back to the archive.',
+  read:'Six islands receiving promotions means the archipelago is doing its job; two means it is not.'},
+ c_lin: {
+  x:'generation', y:'mean lineage depth',
+  what:'<b>Lineage depth</b> is how many successful mutation steps separate a design from the seed it descends from. Depth 1 is a seed\'s child; depth 10 is ten accepted improvements in a row.',
+  read:'Rising depth means the search is compounding rather than restarting. Section 7d shows whether the deep lines actually paid.'},
+ c_parts: {
+  x:'generation', y:'mean number of body parts per design',
+  what:'The structural operators can add and remove segments, so this is what the search is choosing to build.',
+  read:'Read it against the energy line in section 3: parts and energy feasibility move against each other.'},
+ c_pe: {
+  x:'number of parts', y:'percent of designs with that part count that are energy-infeasible',
+  what:'The same energy margin as section 3, conditioned on part count instead of on time.',
+  read:'A rising line is the search buying structural complexity with energy feasibility and not being charged for it.'},
+ c_tree: {
+  x:'lineage depth — generations of descent, not time',
+  y:'fitness of that design',
+  what:'One root and every descendant of it the report kept, drawn best-first. A line from left to right is a parent to a child. The highlighted path ends at the run\'s best design; every grey branch is a line that was tried and beaten.',
+  read:'Branches that climb are lines that improved. A wide grey fan at one depth is the search spending many children on a parent that went nowhere.'},
+ c_depth: {
+  x:'lineage depth', y:'number of designs at that depth',
+  what:'Every design the scout recorded, counted by how far it sits from a seed.',
+  read:'A distribution that falls away quickly is a search whose lines die young.'},
+ c_paid: {
+  x:'lineage depth', y:'percent of designs at that depth with a descendant that beat them',
+  what:'For each design, whether <code>best_descendant</code> — the best fitness anywhere below it — exceeds its own fitness.',
+  read:'A line falling with depth means continuing an old line pays less than starting a new one: the lineages are subcritical.'},
+};
+['c_pi','c_v','c_ent','c_kl','c_clip'].forEach(k=>{DEFS[k]={
+  x:'generation (one point per PPO update)',
+  y:'the quantity named in the heading, as logged by the update',
+  what:'Standard PPO diagnostics for the shared policy the search keeps as its variation operator. <b>policy loss</b> is the clipped surrogate objective, <b>value loss</b> the critic\'s mean squared error, <b>entropy</b> the policy\'s randomness, <b>KL</b> the approximate divergence between the policy before and after an update, <b>clip fraction</b> the share of samples that hit the clipping bound.',
+  read:'KL spiking with clip fraction is a step size too large for the batch; entropy collapsing early is premature commitment.'};});
+DEFS.c_tag={x:'segment tag', y:'mean reward attributed to that tag over the last 60 updates',
+  what:'Which parts of the mission the policy\'s reward is actually coming from.',
+  read:'A single tag dominating means the policy is being trained on one leg of a three-medium mission.'};
+
+function explain(id){
+  const d=DEFS[id], el=document.getElementById(id);
+  if(!d||!el) return;
+  const box=document.createElement('div');
+  box.className='explain';
+  box.innerHTML=`<div class="ax"><span><b>X</b> ${d.x}</span><span><b>Y</b> ${d.y}</span></div>`
+    +`<p>${d.what}</p>`+(d.read?`<p class="how">${d.read}</p>`:'');
+  el.parentNode.insertBefore(box, el.nextSibling);
+}
+
 function eventLegend(){
   const E=(typeof D!=='undefined' && D.events)||{};
   const bits=Object.entries(E).map(([k,v])=>{
@@ -666,5 +768,11 @@ document.getElementById('best').innerHTML=`
    992 N/m² airworthiness bar, so this is a machine that can actually carry its weight
    in lift: above 992 N/m² no attitude at any speed this mission flies produces the
    machine's weight in lift, and Tier-0 gates it.</p>`;
+
+/* Every chart says what it is showing, in what units, and how the number was
+   arrived at.  The axis labels are project shorthand and nobody outside this
+   repository can read them: `fitness` is a blend of population quantiles,
+   `mission fraction` is a five-factor product, `evaluated` is a running total. */
+Object.keys(DEFS).forEach(explain);
 </script>
 </div></div>

@@ -40,6 +40,15 @@ the top edge. The legend under the tiles names them with counts. This exists
 because arch35's `mission_corr` dip was read as a search trend when it was five
 auditor deletions.
 
+Every chart carries a block naming its X axis, its Y axis, what the quantity
+is and how it was arrived at. The axis labels are project shorthand that nobody
+outside this repository can read: `fitness` is not a score out of one but a
+blend of three population quantiles times the critic's discount, `mission
+fraction` is a five-factor product in which the weakest domain enters twice, and
+`evaluated` is a running total. The definitions in `DEFS` are taken from the
+code that produces the numbers — if a scoring term changes, that block changes
+with it.
+
 Section 7d draws the lineage: one root's whole descent with the winning line
 highlighted, designs by depth, and whether going deeper paid. It needs no extra
 telemetry — the scout's parent→child graph is pickled with the search state.
