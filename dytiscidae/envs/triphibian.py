@@ -1258,6 +1258,15 @@ class TriphibianEnv:
             airborne = (np.asarray(clearances) > 0.3) & (np.asarray(contacts) < 0.5)
             frac = float(np.sum(airborne) / n_want)
             if frac < 0.05:
+                # Even here.  `lift_margin` is what the airframe can lift, not
+                # what this episode did with it, and the ladder's bottom four
+                # rungs read it -- so leaving it out of any air path makes a
+                # design that never got clear indistinguishable from one with no
+                # wings.  Three paths leave this branch of `_score_segment` and
+                # all three publish it; the test below enforces that, because
+                # the first attempt at this changed one of the three and a grep
+                # for another key said that was all of them.
+                res.measurements["lift_margin"] = float(self.lift_margin)
                 return 0.0  # never left the surface: no flight to score
             idx = np.flatnonzero(airborne)
 
@@ -1293,6 +1302,22 @@ class TriphibianEnv:
                     "measured_sink_rate": 9.9,
                     "air_gates": float(len(gates)),
                     "airborne_seconds": float(np.sum(airborne) * self.timestep),
+                    # `lift_margin` crosses the "diagnostics but not the ladder
+                    # metrics" line above, and has to: it is a property of the
+                    # airframe, not of the episode.  Withholding it here says
+                    # "this machine landed too quickly for us to know whether it
+                    # has wings".  The rule this branch enforces is that a hop
+                    # must not climb a rung *on the strength of having
+                    # happened*, and a static lift measurement cannot -- it is
+                    # the same number however the segment went.
+                    #
+                    # It matters because this is the branch every falling design
+                    # takes.  The air spawn is 30 m, free fall from there is
+                    # 2.5 s, and 2.5 s is 31% of an 8 s segment -- under the 35%
+                    # bar above.  50 of arch37's first 180 evaluations came
+                    # through here and scored air rung 0 whatever their airframe
+                    # could do, which voided that launch.
+                    "lift_margin": float(self.lift_margin),
                 })
                 return float(credit * frac * 0.10)
 

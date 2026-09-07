@@ -2075,6 +2075,58 @@ def test_the_air_score_measures_flight() -> None:
     check("and a body halfway there outscores one that makes none",
           0 < partial < flying, f"margin 0.35 -> rung {partial}")
 
+    # 7. Every path out of the air branch publishes it.
+    #
+    # It has three, and the first attempt at this changed one of them: a grep
+    # for "airborne_fraction" said there was a single producer, and the branch
+    # that handles a hop too short to measure a sink rate over does not publish
+    # that key at all.  50 of arch37's first 180 evaluations went through it and
+    # scored air rung 0 whatever their airframe could do -- and that branch is
+    # the one *every falling design* takes, because free fall from the 30 m
+    # spawn lasts 2.5 s, which is 31% of an 8 s segment and under its 35% bar.
+    #
+    # So this asserts the property rather than one instance of it.
+    # The branch tests read `frac` and `airborne_seconds` against `n_want`,
+    # which is `duration / timestep` -- not the array length.  A duration that
+    # does not match the sample count dilutes every fraction and silently sends
+    # all three fixtures down the same path, which is what the first version of
+    # this did.
+    n_air = 96
+    dur_air = n_air * env.timestep
+    ones_a, zeros_a = np.ones(n_air), np.zeros(n_air)
+    paths = {
+        # never clear of the surface -> `frac < 0.05`
+        "never airborne": dict(clearances=zeros_a, contacts=ones_a),
+        # clear briefly -> the short-hop early return
+        "brief hop": dict(clearances=np.where(np.arange(n_air) < 12, 3.0, 0.0),
+                          contacts=np.where(np.arange(n_air) < 12, 0.0, 1.0)),
+        # clear throughout -> the full measurement
+        "airborne throughout": dict(clearances=ones_a * 5.0, contacts=zeros_a),
+    }
+    missing, seen = [], {}
+    for name, kw in paths.items():
+        r = SegmentResult(domain=Domain.AIR, duration=dur_air)
+        r.mean_speed = 0.0
+        env._score_segment(Domain.AIR, r, zeros_a, ones_a * 0.9, ones_a,
+                           kw["contacts"], clearances=kw["clearances"],
+                           vzs=zeros_a)
+        m = r.measurements
+        if "lift_margin" not in m:
+            missing.append(name)
+        # Each branch leaves a different fingerprint, so this records *which*
+        # one ran.  Without it the three fixtures could all be falling down the
+        # same path and the check would pass while testing one third of what it
+        # claims.
+        seen[name] = ("full" if "airborne_fraction" in m
+                      else "short-hop" if "airborne_seconds" in m
+                      else "never-airborne")
+    check("every path out of the air branch publishes lift_margin",
+          not missing,
+          "missing on: " + ", ".join(missing) if missing
+          else ", ".join(f"{k}={v}" for k, v in seen.items()))
+    check("and the three fixtures really do take three different paths",
+          len(set(seen.values())) == 3, ", ".join(sorted(set(seen.values()))))
+
 
 def test_takeoff_is_measured_where_the_machine_starts_on_the_ground() -> None:
     """The air segment is a launch, so nothing measured leaving the ground.
