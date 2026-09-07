@@ -92,6 +92,14 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
 .explain p{margin:4px 0 0;font-size:12.5px;color:var(--text-secondary);line-height:1.5}
 .explain p.how{color:var(--text-muted)}
 .explain code{font-size:11.5px;background:var(--surface-1)}
+.spec{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:14px}
+.spec table{font-size:12.5px}
+.spec td.n,.spec th.n{text-align:right;font-variant-numeric:tabular-nums}
+.spec .rname{font-weight:600}
+.warnbox{margin-top:14px;padding:11px 14px;border:1px solid var(--bad);
+  border-radius:9px;background:var(--surface-1)}
+.warnbox h3{color:var(--bad)}
+.warnbox p{margin:5px 0 0;font-size:12.5px;color:var(--text-secondary);line-height:1.55}
 </style>
 
 <div class="viz-root"><div class="wrap">
@@ -234,6 +242,41 @@ turn, a bounce off the beach scoring as a take-off. Each was visible on sight.</
     <p class="note">Percentage of designs at each depth with a descendant that beat
       them. A line falling with depth is a search whose lineages are subcritical.</p>
     <div id="c_paid"></div>
+  </div>
+</div>
+</section>
+
+<section id="sec_spec" hidden>
+<h2>7e · What the scores are made of</h2>
+<p class="sub">Every threshold on this page, read out of the code that applies
+it. A bar chart of competences cannot be read without this.</p>
+
+<div class="warnbox" id="spawn_warn"></div>
+
+<div class="card wide" style="margin-top:14px">
+  <h3>The mission</h3>
+  <div id="spec_mission"></div>
+</div>
+
+<h3 style="margin-top:22px">Competence ladders</h3>
+<p class="sub">A design's competence in a domain is the highest rung it reaches;
+<code>rung_reached</code> stops at the first unmet rung, so the rungs are a
+sequence and not a checklist.</p>
+<div class="spec" id="spec_ladders"></div>
+
+<div class="grid">
+  <div class="card">
+    <h3>The six islands and what each one scores</h3>
+    <p class="note">A specialist island reads only its own domains, so a design
+      that gave up the others is not punished for it. Immigrants must re-earn
+      their place under the receiving island's objective.</p>
+    <table class="cmp" id="spec_islands"></table>
+  </div>
+  <div class="card">
+    <h3>Curriculum stages</h3>
+    <p class="note">Each stage reads a different projection of the same
+      evaluation, and a cell must clear the bar to be asked the next question.</p>
+    <table class="cmp" id="spec_stages"></table>
   </div>
 </div>
 </section>
@@ -722,6 +765,54 @@ best anywhere below it ${fmt(n.best,4)} · ${n.kids} children${n.spine?' · on t
   lineChart(document.getElementById('c_paid'),
     [{pts:T.paid_by_depth.map(d=>[+d.k,d.v]),c:'var(--s2)',label:false}],
     {h:200,ylab:v=>fmt(v,0)+'%',events:false});
+}
+
+/* 7e what the scores are made of */
+if(D.scoring){
+  const S=D.scoring;
+  document.getElementById('sec_spec').hidden=false;
+  const sp=S.spawn||{};
+  document.getElementById('spawn_warn').innerHTML=
+    `<h3>Read every air and water number against where the segment starts</h3>`+
+    `<p>Each domain segment <em>places</em> the machine in its medium rather than
+      requiring it to get there. Air starts at <b>${sp.air?sp.air[2]:'?'} m</b> of
+      altitude with launch speed; water starts <b>${sp.water?Math.abs(sp.water[2]):'?'} m
+      below the surface</b>; land starts on the beach at
+      <b>${sp.land?sp.land[2]:'?'} m</b>.</p>`+
+    `<p>So an air competence is not evidence the machine can take off, and a water
+      competence is not evidence it can get wet — "reached 0.5 m of depth" is true
+      of 100% of every run measured so far, because the machine is released at
+      ${sp.water?Math.abs(sp.water[2]):'?'} m. The continuous mission has
+      <em>one</em> placement, which is why the filmed run reports max depth 0.0 m
+      while this page reports high water competences. Those are not in conflict;
+      they are measuring different things.</p>`;
+  document.getElementById('spec_mission').innerHTML=
+    `<p class="note">Domain cycle <b>${(S.cycle||[]).join(' → ')}</b>, repeated for the
+      configured number of cycles. Mission fraction is the product of five factors:</p>`+
+    `<p class="note" style="margin-top:6px"><code>min(competences)<sup>0.5</sup> ×
+      mean(competences) × energy_fraction × max(transition_fraction, 0.05) ×
+      max(takeoff_fraction, ${S.takeoff_floor})</code></p>`+
+    `<p class="note">The weakest domain enters twice, so the mission score is
+      dominated by whatever the machine cannot do. <code>takeoff_fraction</code> is
+      <code>clip(takeoff_height / ${S.takeoff_full}, 0, 1)</code> — full credit at
+      ${S.takeoff_full} m — and enters as a factor with a floor rather than as a
+      fourth competence, where a population-wide zero would delete every other
+      gradient.</p>`;
+  document.getElementById('spec_ladders').innerHTML=Object.entries(S.ladders||{})
+    .map(([dom,rows])=>`<div class="card"><h3>${dom}</h3><table class="cmp">
+      <tr><th>rung</th><th>name</th><th>metric</th><th class="n">at</th></tr>`+
+      rows.map(r=>`<tr><td class="n">${r.rung}</td><td class="rname">${r.name}</td>
+        <td><code>${r.metric}</code></td><td class="n">${r.at}</td></tr>`).join('')+
+      `</table></div>`).join('');
+  document.getElementById('spec_islands').innerHTML=
+    `<tr><th>island</th><th>scores</th><th>transitions</th></tr>`+
+    Object.entries(S.islands||{}).map(([k,v])=>
+      `<tr><td class="rname">${k}</td><td>${v.domains.join(' + ')}</td>
+       <td>${v.transitions.length?v.transitions.join(', '):'—'}</td></tr>`).join('');
+  document.getElementById('spec_stages').innerHTML=
+    `<tr><th>#</th><th>stage</th><th>asks</th><th class="n">bar</th></tr>`+
+    (S.stages||[]).map(x=>`<tr><td class="n">${x.i}</td><td class="rname">${x.name}</td>
+      <td>${x.asks}</td><td class="n">${x.bar||'—'}</td></tr>`).join('');
 }
 
 /* 8 archive */

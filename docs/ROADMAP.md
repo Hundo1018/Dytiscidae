@@ -419,6 +419,125 @@ covered no ground, and the water leg is 11.4 m away.
 
 ---
 
+## arch37 — the work list
+
+Set by four questions asked during arch36, each answered by reading the code and
+the telemetry rather than by opinion. Ordered by how much is broken.
+
+### A. The islands do not cover the pairing the whole take-off effort is about
+
+Six islands: `air`, `water`, `land` (singles), `amphibian` (water+land),
+`aerial_diver` (air+water), `generalist` (all three). Three singles, **two of the
+three pairs**, and the whole. The missing pair is **land+air**.
+
+Worse, `islands.py` gives each island a transition tuple, and **`land_to_air`
+appears in none of them**. The `land` island's only transition is
+`water_to_land` — arriving on land, never leaving it. So the search has been
+given a take-off ladder, a take-off factor in `mission_fraction`, and two gates
+on it, while **no island's objective asks a machine to depart from the ground**.
+
+And hybridisation cannot fill the gap. `Archipelago.migrate` crosses the three
+specialists pairwise — air×water, air×land, water×land — then:
+
+    for dst in ("generalist", "amphibian", "aerial_diver"):
+        if dst in self.archives:
+            out.append({...}); self.hybrids += 1
+            break
+
+The `break` fires on the first destination that exists, and `generalist` always
+exists, so **every hybrid ever made has gone to `generalist`**; `amphibian` and
+`aerial_diver` have received none. Confirmed by count: arch36 logged 156
+migrations and 39 hybrids over 13 migration events — 3 per event, exactly the
+three pairs, all to one island.
+
+So the air×land cross — a walking flyer, the thing this whole line of work
+wants — is built every migration and is only ever scored on an island that also
+demands water competence.
+
+**Do:** add a `land_air` island (`domains: ("land", "air")`, transitions
+including `land_to_air`); put `land_to_air` into the `land` island's transitions;
+and route each hybrid to the island that matches its parents rather than to the
+first one in a tuple. These are three small changes to `islands.py` and they are
+prerequisites for D below meaning anything.
+
+### B. Depth: the water score has the same defect the air score had
+
+**`max_depth >= 0.5 m` is true of 100% of evaluations, in every band of both
+runs.** Not "insufficient" — saturated. The cause is one line:
+
+    SPAWN[Domain.WATER] = (-8.0, 0.0, -4.0)
+
+The water segment **releases the machine four metres under the surface**. This
+is the same defect as `SPAWN[Domain.AIR]` being a 30 m launch — the finding that
+set arch35's entire work list — and nobody applied it to water.
+
+At a threshold inside the distribution, the capability is real and growing:
+depth ≥ 10 m ran **7.8% → 21.9%** over arch36 and median depth 4.89 → 6.48 m.
+Water competence 0.596 → 0.641.
+
+And the continuous mission reports **max depth 0.0 m**, because
+`run_continuous` has one placement. A water competence of 0.64 and a mission
+depth of 0.0 m are both true; they measure different things, and only the second
+is the mission.
+
+**Do:** the same treatment take-off got. Either measure depth as a *gain* over
+the spawn depth, or score a water segment that begins at the surface. Until
+then, no water number on any chart is evidence a machine can get wet. The report
+now says this in section 7e and its comparison chart uses 10 m.
+
+### C. Mass is free, energy is the only thing pushing back
+
+Measured over arch36's 12,338 evaluations:
+
+| | p10 | median | p90 | max |
+|---|---|---|---|---|
+| mass (kg) | 3.35 | 5.38 | 8.31 | **66.76** |
+| wing_area (m²) | **0.000** | 0.261 | 0.868 | 4.39 |
+| wing_loading (N/m²) | 70.6 | 218.6 | **300,314** | 1,604,419 |
+| battery (Wh) | 175.7 | 260.0 | 270.8 | 574.2 |
+| energy_margin | −0.95 | **−0.165** | +3.95 | +56.6 |
+
+Three things fall out:
+
+- **There is no mass cap anywhere in the codebase.** 66.76 kg was reached.
+- **The median design cannot power its own mission** (`energy_margin` −0.165).
+- **The search is not buying battery.** Mutation clamps `battery_wh` to
+  [10, 2000] Wh and the p90 is 271 Wh — it is nowhere near the ceiling. Either
+  the mass cost of a battery is over-modelled relative to its benefit, or
+  nothing in the score rewards carrying one.
+
+So the asymmetry the question proposed is real, but not as "energy too tight":
+energy is the *only* term that pushes back on structural growth, while mass and
+part count are free. The wing-loading p90 of 300,000 N/m² says at least a tenth
+of the population is carrying a token surface it could never fly on.
+
+**Do:** measure before changing anything. (i) Sweep `battery_wh` against
+`energy_margin` and `mission_fraction` on fixed morphologies — if a bigger
+battery is strictly better and the search is not taking it, the operator is at
+fault, not the model. (ii) Then decide between charging for parts (the standing
+item) and capping mass. Do not do both in one arm.
+
+### D. Score `land_to_air`, after A
+
+Unchanged in substance from the last two lists, and now explicitly blocked on A:
+scoring the transition is pointless while no island's objective contains it.
+
+### E. Everything else carries forward
+
+`descriptor_refit_every` (F, still unfixed and still needing its own arm), a
+tested resume path and a memory ceiling, identification at 67% of an evaluation,
+`np.cross` at 16%, charging for parts, and nothing rewarding travel toward the
+water. See the arch36 list above.
+
+### F. A contact-fraction gate on take-off
+
+arch36 left one segment in 3,247 scoring 4.16 m with a lifting surface, holding
+posture, and **touching the ground for 77% of the segment**. A departure means
+leaving, not visiting. `contact_fraction` is already measured. Not added
+mid-arch36 because a third gate would have destroyed that arm.
+
+---
+
 ## arch34's phases, kept for the measurements behind them
 
 Everything below is history as of 2026-09-05. It is kept because each

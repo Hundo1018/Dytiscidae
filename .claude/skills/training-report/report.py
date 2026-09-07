@@ -190,6 +190,7 @@ def build(run: Path) -> dict:
                     "wing_area", "wing_loading", "air", "water", "land",
                     "mission_fraction", "energy_margin")}
 
+    out["scoring"] = scoring_spec()
     out["events"] = event_marks(run, EV)
     out["comparable"] = comparable_series(E, G, REJ, n_gens)
     out["tree"] = lineage_tree(run)
@@ -212,6 +213,49 @@ MARK_KINDS = {
     "judge_tighten": ("bars", "judge raised a competence bar"),
     "migrate": ("migration", "designs moved between islands"),
 }
+
+
+def scoring_spec() -> dict | None:
+    """Every rung, island, stage and spawn, read out of the code that uses them.
+
+    A bar chart of competences cannot be read without knowing what earns a
+    competence, and none of it was written on the page: the ladders, the six
+    island objectives, the five curriculum stages and — the one that changes how
+    every air and water number should be read — where each segment *starts*.
+
+    Imported rather than transcribed, so a threshold that moves in the code
+    moves here on the next report instead of quietly disagreeing with it.
+    """
+    try:
+        import sys
+        root = str(Path(__file__).resolve().parents[3])
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        from dytiscidae.evolution.judge import LADDER
+        from dytiscidae.evolution.islands import ISLANDS
+        from dytiscidae.evolution.curriculum import STAGES
+        from dytiscidae.envs.triphibian import DOMAIN_CYCLE, TriphibianEnv
+        from dytiscidae.envs import evaluate as _ev
+    except Exception as exc:                                   # noqa: BLE001
+        print(f"  no scoring section: {type(exc).__name__}: {exc}")
+        return None
+
+    spawn = {d.value: list(v) for d, v in TriphibianEnv.SPAWN.items()}
+    return {
+        "ladders": {dom: [{"rung": i + 1, "name": n, "metric": m, "at": t}
+                          for i, (n, m, t) in enumerate(rows)]
+                    for dom, rows in LADDER.items()},
+        "islands": {k: {"domains": list(v["domains"]),
+                        "transitions": list(v["transitions"]),
+                        "note": v["note"]}
+                    for k, v in ISLANDS.items()},
+        "stages": [{"i": i, "name": n, "asks": d, "bar": b}
+                   for i, (n, d, b) in enumerate(STAGES)],
+        "cycle": [d.value for d in DOMAIN_CYCLE],
+        "spawn": spawn,
+        "takeoff_full": getattr(_ev, "TAKEOFF_FULL", None),
+        "takeoff_floor": getattr(_ev, "TAKEOFF_FLOOR", None),
+    }
 
 
 def event_marks(run: Path, EV: list) -> dict:
@@ -256,9 +300,15 @@ COMPARABLE = [
     ("upright", "fraction holding upright >= 0.7",
      lambda e: _lm(e, "land", "upright") is not None,
      lambda e: (_lm(e, "land", "upright") or 0) >= 0.7),
-    ("submerges", "fraction reaching max_depth >= 0.5 m",
+    # 10 m, not the 0.5 m `submerges` rung.  The water segment spawns the
+    # machine 4 m under the surface, so "reached half a metre of depth" is true
+    # of 100% of every run ever measured and the chart was a flat line at the
+    # top carrying no information.  Same rule as everywhere else in this
+    # project: set the threshold from the measured distribution.  Depth at 10 m
+    # ran 7.8% -> 21.9% over arch36 and separates designs.
+    ("deep", "fraction reaching max_depth >= 10 m",
      lambda e: e.get("max_depth") is not None,
-     lambda e: (e.get("max_depth") or 0) >= 0.5),
+     lambda e: (e.get("max_depth") or 0) >= 10.0),
     ("energy_feasible", "fraction with energy_margin >= 0",
      lambda e: e.get("energy_margin") is not None,
      lambda e: (e.get("energy_margin") or -1) >= 0),
