@@ -510,9 +510,115 @@ and where the segments start — not by looking at a score.
 
 ---
 
+## Why nothing has ever flown
+
+Asked after thirty-odd generations of footage showing free fall and limp
+non-motion and never flight. The observation was right and the telemetry says
+why. All figures from arch36's 14,048 evaluations and its 179 final elites.
+
+### 1. Three quarters of the population cannot fly, at any speed
+
+`_measure_trim_speed` sweeps pitch at a series of airspeeds looking for one
+where lift reaches the machine's weight. When none exists in `LAUNCH_SPEED_RANGE`
+= (6, 30) m/s it returns the **bottom** of the band — the design is dropped, not
+launched, which is the correct answer for something that cannot fly.
+
+**130 of 179 elites (72.6%) come back at exactly 6.0 m/s.** A real trim is
+`clip(v_stall * 1.2, 6, 30)` and `v_stall >= 6`, so 6.0 exactly can only be the
+cannot-fly branch. Three quarters of the archive is being dropped from 30 m.
+
+### 2. The air ladder's first two rungs are paid for falling
+
+`leaves_surface` and `stays_up` read `airborne_fraction` at 0.10 and 0.60. A
+body released at 30 m is airborne for the 2.5 s it takes to arrive, so in an 8 s
+window it scores 0.31 without doing anything. Measured: `airborne_fraction`
+median **0.445**, minimum **0.350** — which is exactly "fall, then lie in the
+water". 53% of the population reached one of those two rungs.
+
+Population median `sink_rate` is **9.900 m/s**. That is free fall.
+
+`holds_station`, `climbs` and `manoeuvres` were reached **zero times in 14,048
+evaluations**. `holds_height` 1.3%.
+
+### 3. The airworthiness gate certifies designs that cannot fly
+
+`MAX_WING_LOADING` is `0.5 * rho * LAUNCH_SPEED_RANGE[1]^2 * CL_MAX` — it asks
+"could this fly at 30 m/s". The gate flags **35.8%** while the measured trim says
+**72.6%** cannot fly at any speed. So roughly **37% of the archive is nominally
+airworthy and physically incapable**, and the gate cannot see it because it is a
+Tier-0 geometric check at a speed these machines never reach.
+
+Consistent with that, the designs scoring best on sink rate have *higher* wing
+loading than the population (289 against 158 N/m²). The score was not reading
+aerodynamics.
+
+### 4. There was no gradient between "makes no lift" and "flies"
+
+This is the one that matters. A design at lift ratio 0.1 and one at 0.9 scored
+identically — both fell — and the only rungs either could reach were the two
+that being dropped satisfies. Three quarters of the population had no direction
+to move in, which is why thirty generations produced no flight.
+
+### 5. Parameters are diluted by the structural operators
+
+`flap_hz` sits at exactly 2.20 for 50.4% of arch36 and 0.60 for 24.9% — the
+beetle and gannet seed defaults. The operator that jitters it, `global_energy`,
+fires normally (767 selections, 5.5%, 72.9% hit rate). The cause is the mix:
+structural operators run at 16-18% each against ~5.5% for each parameter
+operator, so over a lineage of depth 10 a given parameter has a ~57% chance of
+never being touched. Not a bug in one operator — `structural_bias` = 1.6 doing
+what it says. **Its own arm, not arch37's.**
+
+---
+
 ## arch37 — the work list
 
-Set by four questions asked during arch36, each answered by reading the code and
+**Two changes, both flight, bundled because their measurements do not overlap:**
+the island work is read from `land_to_air` transition scores and `land_air`
+promotions, the air work from the `lift_margin` distribution and the air ladder.
+That is what makes it unlike arch34's Phase 4, where two changes shared one
+metric.
+
+**A. Four `lift_margin` rungs at the bottom of the air ladder — done, unrun.**
+`lift_margin` is `best_lift(30 m/s) / weight`, already computed by the trim
+sweep and thrown away until now, so it costs no simulation. Thresholds from the
+measured distribution over arch36's 179 elites (min −1.105, median 0.333,
+p90 5.591):
+
+| rung | at | leaves standing |
+|---|---|---|
+| `makes_lift` | 0.10 | 72.1% |
+| `carries_a_third` | 0.30 | 51.4% |
+| `nearly_flies` | 0.60 | 36.9% |
+| `carries_itself` | 1.00 | **27.4%** |
+
+`lift_margin >= 1.0` and "has a real trim speed" select the same designs —
+27.4% both ways, 0 disagreements over 179 — which is the check that this is the
+right quantity.
+
+**The ordering is the gate.** `rung_reached` stops at the first unmet rung, so a
+body that makes no lift cannot reach the `airborne_fraction` rungs at all.
+Verified: a machine airborne for a whole segment at zero sink now scores air
+rung **0** if its lift margin is zero, and rung 8 if it is 1.5. Before this it
+scored four rungs for the same episode.
+
+**What it does not reward.** `lift_at` evaluates a fixed attitude at `t=0` with
+no flapping, so `lift_margin` is the *airframe's static lift* — a glider's wing,
+not flapping thrust. That is the right first question and it is not the whole
+one; propulsion is still measured only by the sink-rate rungs above.
+
+**B. The islands — done, unrun.** `land_air` island, `land_to_air` in the `land`
+and `generalist` transitions, and the hybrid routing fix.
+
+**Window length stays at 8 s.** The offline probe built to answer it failed
+three times, each time because it was not the evaluation path — the last one
+drove elites with their own stored `Policy` while the run had driven them with
+the shared PPO network. Its timing is the one usable output: with identification
+on, 17.52 / 19.68 / 21.82 s per design at 8 / 16 / 24 s, so **tripling the window
+costs 25%**, cheaper than the 1.35x ROADMAP measured without identification. A
+third change does not go in this arm.
+
+### The rest, set by four questions asked during arch36, each answered by reading the code and
 the telemetry rather than by opinion. Ordered by how much is broken.
 
 ### A. The islands do not cover the pairing the whole take-off effort is about
