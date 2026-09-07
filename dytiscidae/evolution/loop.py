@@ -23,6 +23,7 @@ the axes from scratch every time would cost more than the evaluation.
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -205,6 +206,19 @@ class SearchConfig:
     #: Continue a run in ``run_dir`` instead of starting over.
     resume: bool = False
     audits_per_review: int = 2
+
+    #: Stop cleanly if the search's own resident set crosses this, in MB.
+    #: 0 disables the check.
+    #:
+    #: arch35 was killed by the kernel OOM handler at generation 495 of 900,
+    #: twelve hours in, holding 2.7 GB across the parent and four workers while
+    #: something else on the machine took the last of it.  405 generations and
+    #: eleven hours were lost because the process was killed rather than asked
+    #: to stop: a checkpoint had been written at 10:36 and the run simply never
+    #: continued from it.  A clean stop that resumes is worth far more than an
+    #: OOM kill that does not, so the run watches its own footprint and gets out
+    #: while it still can.
+    memory_ceiling_mb: int = 0
 
     # --- the scout ---------------------------------------------------------
     #: Predicts a lineage's future lift, so a design that scores badly now but
@@ -1167,13 +1181,69 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 a.export_json(Path(cfg.run_dir) / f"archive_{name}.json")
             save_state(state, gen)
 
+            # Checked here and nowhere else: the state on disk is current at
+            # exactly this point, so stopping now costs nothing but the
+            # generations since the last checkpoint.
+            rss = _resident_mb()
+            if cfg.memory_ceiling_mb and rss > cfg.memory_ceiling_mb:
+                telemetry.event({"kind": "memory_stop", "gen": gen,
+                                 "resident_mb": round(rss),
+                                 "ceiling_mb": cfg.memory_ceiling_mb})
+                print(f"\nstopping at generation {gen}: resident set {rss:.0f} MB "
+                      f"is over the {cfg.memory_ceiling_mb} MB ceiling.\n"
+                      f"the checkpoint is current; continue with:\n"
+                      f"  ... --run {cfg.run_dir} --resume\n", flush=True)
+                break
+
     for name, a in archipelago.archives.items():
         a.save(Path(cfg.run_dir) / f"archive_{name}.pkl")
         a.export_json(Path(cfg.run_dir) / f"archive_{name}.json")
-    save_state(state, cfg.generations - 1)
+    # ``gen``, not ``cfg.generations - 1``.  They are the same when the loop
+    # runs to the end and they are not when it stops early, and writing the
+    # planned final generation into the checkpoint of a run that stopped at 600
+    # would tell ``--resume`` there was nothing left to do.
+    save_state(state, gen)
     pool.close()
     telemetry.close()
     return state
+
+
+def _resident_mb() -> float:
+    """This process and its workers, in MB, or 0.0 where /proc is not there.
+
+    The workers hold most of it -- arch35 was 745 MB in the parent against
+    2.0 GB across four children -- so a parent-only reading would have been a
+    third of the truth and would never have tripped a ceiling.
+    """
+    def rss(pid: str | int) -> float:
+        try:
+            for line in open(f"/proc/{pid}/status"):
+                if line.startswith("VmRSS:"):
+                    return float(line.split()[1]) / 1024.0
+        except Exception:                                      # noqa: BLE001
+            pass
+        return 0.0
+
+    total = rss("self")
+    if not total:
+        return 0.0
+    # Deliberately not wrapped in a blanket try: a missing import inside one
+    # would be swallowed and this would quietly return the parent's third of
+    # the truth, which is exactly what happened while writing it.  Only the
+    # per-process reads are guarded, because a worker really can exit between
+    # the listdir and the open.
+    me = os.getpid()
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        try:
+            with open(f"/proc/{entry}/stat") as f:
+                ppid = int(f.read().split(") ", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            continue
+        if ppid == me:
+            total += rss(entry)
+    return total
 
 
 #: Everything that has to survive a container being reclaimed, beyond the

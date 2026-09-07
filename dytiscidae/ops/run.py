@@ -169,6 +169,7 @@ def cmd_search(args) -> int:
         audit_every=args.audit_every,
         use_scout=not args.no_scout,
         resume=bool(getattr(args, "resume", False)),
+        memory_ceiling_mb=args.memory_ceiling_mb,
         scout_reserve=args.scout_reserve,
         mission_weight=args.mission_weight,
         descriptor_bins=args.descriptor_bins,
@@ -616,6 +617,11 @@ def main(argv=None) -> int:
     p.add_argument("--no-critic", action="store_true",
                    help="run without the learned critic")
     p.add_argument("--audit-every", type=int, default=30)
+    p.add_argument("--memory-ceiling-mb", type=int, default=0,
+                   help="stop cleanly and checkpoint if the search's own "
+                        "resident set (parent plus workers) passes this. "
+                        "0 disables. arch35 lost 405 generations to an OOM "
+                        "kill it could have resumed from")
     p.add_argument("--resume", action="store_true",
                    help="continue the run in --run instead of starting over")
     p.add_argument("--no-scout", action="store_true",
