@@ -289,8 +289,16 @@ def capture_episode(
     for i in range(n_steps):
         if controller is not None and controller.policy is not None and basis is not None \
                 and i % ctrl_every == 0:
-            cur = basis.command_params(params, controller.policy.act(env.observation()),
-                                       env.cpg.n)
+            # `observation(domain)`, not `observation()`.  The commanded half of
+            # the observation is a one-hot of the domain the mission wants, and
+            # omitting it hands the policy an all-zero command -- the machine is
+            # told it should be in no medium at all.  Every scoring path passes
+            # it (mission.py, batchroll.py, transitions.py, triphibian.py); this
+            # one did not, so the per-elite clips have always filmed a machine
+            # driven blind while the numbers beside them came from one that was
+            # told the mission.
+            cur = basis.command_params(
+                params, controller.policy.act(env.observation(domain)), env.cpg.n)
         alive = env.step(env.cpg.command(cur, env.data.time))
         pos = env.root_pos()
         if not np.all(np.isfinite(pos)) or np.abs(pos).max() > 300:
