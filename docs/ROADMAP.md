@@ -419,6 +419,97 @@ covered no ground, and the water leg is 11.4 m away.
 
 ---
 
+## What arch36 measured
+
+900 generations, 22.0 h, 14,048 evaluations, seed 20260901, `--workers 4
+--min-shard 4`. **It finished** — the first complete 900-generation run since
+arch34; arch35 died at 495 to a machine OOM. Identical configuration to arch35,
+so the only difference is the two take-off gates. One arm.
+
+### 1. The gates did exactly what they were specified to do
+
+Over 14,048 land segments: **zero** wingless segments above the 0.29 m cap,
+**zero** segments below the 0.7 posture bar scoring any take-off, and the
+uncontrolled tail is closed — maximum scored take-off 4.16 m against arch35's
+10.17 m, with only one segment in 3,247 above 1.0 m at the point that was
+checked.
+
+The diagnostic survived, which was the point of leaving
+`measured_takeoff_height` ungated: 18 segments in the first hundred generations
+scored 0.0 while their measured height read above 0.30 m, the largest at 1.55 m.
+Those are the bodies that used to be paid.
+
+### 2. Gated capability improved, and it is a modest effect
+
+Whole run, against arch35 with the same gates applied retroactively:
+
+| | arch35 (496 gens) | arch36 (900 gens) |
+|---|---|---|
+| hops | 9.3% | **11.7%** |
+| clears | 2.4% | **4.0%** |
+| climbs_out | 0.7% | 0.9% |
+| depth ≥ 10 m | 15.3% | 16.9% |
+
+arch36 is ahead in every band at matched generations, by roughly 10-40%. It is
+real and it is not large. **And it corrected the arch35 write-up**: that run's
+apparent climb from 4.2% to 11.8% at `clears` was about two thirds ungated tail.
+
+### 3. The posture gate delays the drift and does not stop it
+
+Share of the population below `stays_upright`, by band:
+
+| gens | arch35 | arch36 |
+|---|---|---|
+| 0–99 | 21.4% | 16.9% |
+| 100–199 | 27.4% | 16.1% |
+| 200–299 | 28.1% | 16.1% |
+| 300–399 | 30.2% | 21.0% |
+| 400–499 | 36.6% | 22.1% |
+| 800–899 | — | **42.5%** |
+
+At every matched band arch36 is 5–14 points lower. Its own final band is 42.5%,
+higher than anything arch35 reached before it died, and arch35 has no band past
+499 to compare against.
+
+The run's **best take-off band and worst posture band are the same band**
+(700–799: `climbs_out` 2.5%, posture 34.8%). The gate makes those consistent —
+everything scored is holding posture — and what it shows is that the search is
+now pushing hard toward leaving the ground and most of what it tries falls over.
+**Removing the payment did not remove the fact that the nearest reachable thing
+to flight, from this population, is a body that topples.** That is a
+variation-operator problem, not a scoring one.
+
+### 4. F is unfixed, in both, as expected
+
+Archive size at each refit: arch35 peaked at 151 over 19 refits and ended at 94
+(−38%); arch36 peaked at 121 over 34 refits and ended at 79 (−35%). arch36
+oscillated where arch35 declined monotonically, but both end well below peak.
+Nothing was done to `descriptor_refit_every` and nothing changed.
+
+### 5. The mission did not move. Three runs running.
+
+`showcase --design runs/arch36 --by mission` over 179 elites: fitness 0.8523,
+mission fraction 0.0495, aerial_diver island, 4.41 kg, 0.18 m span, aspect ratio
+0.3, density ratio 4.65, 2 DOF.
+
+    on-task 33%   transitions 0/2   max depth 0.0 m
+      leg 1 land   93%
+      leg 2 air     5%
+      leg 3 water   0%
+
+arch34, arch35 and arch36 all report **0/2 transitions and 0.0 m of depth**. The
+air leg moved 0% → 5%. The segment ladders have improved in every run and the
+continuous mission has not moved at all.
+
+**The arch37 list below says why, and neither reason is in the scoring.** No
+island's objective contains `land_to_air`, so nothing has ever asked a machine
+to leave the ground; and the water segment releases the machine four metres
+under the surface, so no water score has ever been evidence a machine can get
+wet. Those are structural, and they were found by asking what the islands cover
+and where the segments start — not by looking at a score.
+
+---
+
 ## arch37 — the work list
 
 Set by four questions asked during arch36, each answered by reading the code and
