@@ -288,7 +288,12 @@ def evaluate_tier1(
         clamped_any |= env.solver.diag.clamped
         r.segments[dom.value] = seg
 
-    for kind in ("air_to_water", "water_to_air", "water_to_land"):
+    # `land_to_air` was excluded because "nothing gets off the ground"
+    # (transitions.py records exactly that for all six seed plans).  Two
+    # runs of take-off scoring later, 4.0% of arch36 cleared 0.30 m with a
+    # lifting surface while holding posture, so the reason is spent.
+    for kind in ("air_to_water", "water_to_air", "water_to_land",
+                 "land_to_air"):
         tr = run_transition(env, kind, ctrl)
         r.transitions.results[kind] = tr
         r.transition_ok[kind] = tr.crossed

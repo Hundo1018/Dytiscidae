@@ -689,7 +689,12 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
             # why nothing denser is invented here.
             collector.finish(buffer, [s.competence for s in segs], tag=dom.value)
 
-    for kind in ("air_to_water", "water_to_air", "water_to_land"):
+    # `land_to_air` was excluded because "nothing gets off the ground"
+    # (transitions.py records exactly that for all six seed plans).  Two
+    # runs of take-off scoring later, 4.0% of arch36 cleared 0.30 m with a
+    # lifting surface while holding posture, so the reason is spent.
+    for kind in ("air_to_water", "water_to_air", "water_to_land",
+                 "land_to_air"):
         tcollector = None
         if shared is not None and buffer is not None:
             from ..learning.ppo import SegmentCollector

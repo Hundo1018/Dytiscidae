@@ -27,6 +27,11 @@ not have: deliberate hybridisation.
                        and go as far as the physics allows.
     amphibian          two media and the crossing between them.  The rung real
                        animals actually occupy.
+    aerial_diver       air and water: enter fast and come back out.
+    land_air           land and air, and the crossing between them.  Added after
+                       three runs filmed 0/2 transitions: `land_to_air` was in
+                       no island's objective, so nothing had ever been asked to
+                       leave the ground.
     generalist         the full mission, scored as everywhere else.
 
 Islands evolve independently.  Periodically the best of each migrates to its
@@ -65,8 +70,13 @@ ISLANDS: dict[str, dict] = {
     },
     "land": {
         "domains": ("land",),
-        "transitions": ("water_to_land",),
-        "note": "walk, climb the beach, carry itself",
+        # `land_to_air` was in no island's transitions at all, so nothing in the
+        # search has ever been asked to leave the ground -- while arch35 and
+        # arch36 spent two runs building a take-off ladder, gating it, and
+        # multiplying it into `mission_fraction`.  The land island's only
+        # transition was `water_to_land`: arriving, never leaving.
+        "transitions": ("water_to_land", "land_to_air"),
+        "note": "walk, climb the beach, carry itself, and get off it",
     },
     "amphibian": {
         "domains": ("water", "land"),
@@ -78,9 +88,19 @@ ISLANDS: dict[str, dict] = {
         "transitions": ("air_to_water", "water_to_air"),
         "note": "the gannet problem: enter fast, come back out",
     },
+    "land_air": {
+        "domains": ("land", "air"),
+        "transitions": ("land_to_air",),
+        # The pair the archipelago never had.  Six islands covered three
+        # singles, water+land and air+water, and left out the one crossing the
+        # mission is actually blocked on: three runs have filmed 0/2
+        # transitions and 0 m of depth while every elite sat on the beach.
+        "note": "the takeoff problem: carry yourself, then leave the ground",
+    },
     "generalist": {
         "domains": ("air", "water", "land"),
-        "transitions": ("air_to_water", "water_to_air", "water_to_land"),
+        "transitions": ("air_to_water", "water_to_air", "water_to_land",
+                        "land_to_air"),
         "note": "the whole mission, scored as it is everywhere else",
     },
 }
@@ -204,7 +224,17 @@ class Archipelago:
                 if not ga or not gb:
                     continue
                 child = crossover(ga[0], gb[0], rng)
-                for dst in ("generalist", "amphibian", "aerial_diver"):
+                # To the island whose objective is that pair, not to whichever
+                # name came first.  This loop used to run over
+                # ("generalist", "amphibian", "aerial_diver") and ``break`` on
+                # the first that existed -- and ``generalist`` always exists, so
+                # **every hybrid ever made went to generalist**: 39 of 39 in
+                # arch36, 24 of 24 in arch35, and none ever reached `amphibian`
+                # or `aerial_diver`.  The air x land cross in particular -- a
+                # walking flyer, which is the whole point of the take-off work --
+                # was built every migration and only ever scored on an island
+                # that also demanded water.
+                for dst in HYBRID_HOME.get(frozenset((a_name, b_name)), ()):
                     if dst in self.archives:
                         out.append({
                             "island": dst, "genome": child,
@@ -229,6 +259,15 @@ class Archipelago:
             "migrations": self.migrations,
             "hybrids": self.hybrids,
         }
+
+
+#: Which island's objective a cross of two specialists belongs to.  Ordered, so
+#: a destination that this run does not have falls through to the next.
+HYBRID_HOME: dict[frozenset, tuple[str, ...]] = {
+    frozenset(("air", "water")): ("aerial_diver", "generalist"),
+    frozenset(("water", "land")): ("amphibian", "generalist"),
+    frozenset(("air", "land")): ("land_air", "generalist"),
+}
 
 
 def _pairs(items: list) -> list:
