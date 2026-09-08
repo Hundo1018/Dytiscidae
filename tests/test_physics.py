@@ -2098,6 +2098,30 @@ def test_the_air_score_measures_flight() -> None:
           f"wobble {creep24['altitude_wobble']:.3f} m against excursion "
           f"{creep24['altitude_excursion']:.2f} m")
 
+    # And the gate that decides whether episode measurements are published at
+    # all must be window-invariant too, for the same reason and with a sharper
+    # consequence.  It was `0.35 * res.duration`; at `--segment-seconds 24` that
+    # became 8.4 s instead of 2.8 s and **1,571 of arch38's first 1,601 air
+    # segments took the short-hop exit** -- nine of fourteen air rungs, the
+    # thrust rungs among them, unreachable for 99.6% of the population, with the
+    # share falling because selection could not see what it was no longer being
+    # shown.
+    slow8 = 30.0 - 0.4 * np.arange(int(8.0 / dt)) * dt
+    slow24 = 30.0 - 0.4 * np.arange(int(24.0 / dt)) * dt
+    _s, m8 = air(0.0, clear=slow8, seconds=8.0)
+    _s, m24 = air(0.0, clear=slow24, seconds=24.0)
+    check("a machine measurable at 8 s is still measurable at 24 s",
+          "sink_rate" in m8 and "sink_rate" in m24,
+          "both reach the full measurement path")
+    # 4 s airborne clears the 2.8 s gate at either segment length; as a fraction
+    # of 24 s it is 0.167 and would not have cleared 0.35.
+    brief = np.concatenate([30.0 - 0.4 * np.arange(int(4.0 / dt)) * dt,
+                            np.zeros(int(20.0 / dt))])
+    _s, mb = air(0.0, clear=brief, seconds=24.0)
+    check("and four seconds aloft is measurable however long the segment is",
+          "sink_rate" in mb,
+          "0.167 of a 24 s window, and 4 s of flight either way")
+
     # The property that makes this safe to add mid-programme.  `rung_reached`
     # stops at the first rung whose metric is missing, and arch37's first launch
     # was voided by exactly that: a metric published on one of the air branch's
@@ -2198,15 +2222,23 @@ def test_the_air_score_measures_flight() -> None:
     # does not match the sample count dilutes every fraction and silently sends
     # all three fixtures down the same path, which is what the first version of
     # this did.
-    n_air = 96
+    # Long enough that "airborne throughout" clears
+    # `MEASURABLE_AIR_SECONDS`.  It used to be 96 samples -- 0.384 s -- which
+    # was fine while the gate was a fraction of the segment and stopped being
+    # fine the moment it became an absolute duration: the fixture quietly fell
+    # into the short-hop branch and this test found it, which is what the
+    # "three different paths" check below exists for.
+    n_air = int(2.0 * TriphibianEnv.MEASURABLE_AIR_SECONDS / env.timestep)
     dur_air = n_air * env.timestep
     ones_a, zeros_a = np.ones(n_air), np.zeros(n_air)
     paths = {
         # never clear of the surface -> `frac < 0.05`
         "never airborne": dict(clearances=zeros_a, contacts=ones_a),
         # clear briefly -> the short-hop early return
-        "brief hop": dict(clearances=np.where(np.arange(n_air) < 12, 3.0, 0.0),
-                          contacts=np.where(np.arange(n_air) < 12, 0.0, 1.0)),
+        # airborne, but for less than `MEASURABLE_AIR_SECONDS`
+        "brief hop": dict(
+            clearances=np.where(np.arange(n_air) < n_air // 8, 3.0, 0.0),
+            contacts=np.where(np.arange(n_air) < n_air // 8, 0.0, 1.0)),
         # clear throughout -> the full measurement
         "airborne throughout": dict(clearances=ones_a * 5.0, contacts=zeros_a),
     }

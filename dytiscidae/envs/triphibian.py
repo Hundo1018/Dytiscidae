@@ -460,6 +460,26 @@ class TriphibianEnv:
     #: change moves.
     STATION_WINDOW = 4.0
 
+    #: How long a machine must actually be airborne before the air segment will
+    #: publish episode measurements at all -- an absolute duration, in seconds,
+    #: for the same reason `STATION_WINDOW` is one.
+    #:
+    #: This was `0.35 * res.duration`, a fraction of a configurable window, and
+    #: at `--segment-seconds 24` it silently became 8.4 s instead of 2.8 s.
+    #: arch38's first launch is kept in `runs/arch38_void_window_gate/`: over its
+    #: first 1,601 air segments **1,571 took the short-hop exit and 24 took the
+    #: full one -- 1.5%** -- so `glides`, `holds_height`, the three thrust rungs,
+    #: `holds_station`, `climbs` and `manoeuvres`, nine of fourteen, were
+    #: unreachable for 99.6% of the population.  And the share was *falling*,
+    #: 2.4% to 0.4% over the first hundred generations, because selection could
+    #: not see the rungs above the gate and so stopped paying for staying up.
+    #:
+    #: 2.8 s is exactly what `0.35 * 8.0` meant, so nothing measured at an 8 s
+    #: segment moves.  The survival question the longer segment is *supposed* to
+    #: ask is still asked, by `airborne_fraction` and the two rungs that read
+    #: it, which remain fractions and do get harder as the segment grows.
+    MEASURABLE_AIR_SECONDS = 2.8
+
     SPAWN = {
         Domain.AIR: (-40.0, 0.0, 30.0),
         Domain.WATER: (-8.0, 0.0, -4.0),
@@ -1367,7 +1387,17 @@ class TriphibianEnv:
             # beach that rises to three metres calls a landed machine airborne.
             airborne = (np.asarray(clearances) > 0.3) & (np.asarray(contacts) < 0.5)
             frac = float(np.sum(airborne) / n_want)
-            if frac < 0.05:
+            # Absolute, like `MEASURABLE_AIR_SECONDS` and for the same reason:
+            # this asks "did it ever get clear", which is a fact about the
+            # machine, not a fact about how long we watched.  As a fraction it
+            # was 0.4 s at an 8 s segment and 1.2 s at a 24 s one, so the same
+            # half-second hop was classified two different ways by a flag.
+            #
+            # `airborne_fraction` itself stays a fraction, and the two rungs
+            # that read it stay fractions -- *those* are the survival question,
+            # and survival is supposed to get harder as the segment grows.  What
+            # must not move with the window is whether a measurement is taken.
+            if np.sum(airborne) * self.timestep < 0.4:
                 # Even here.  `lift_margin` is what the airframe can lift, not
                 # what this episode did with it, and the ladder's bottom four
                 # rungs read it -- so leaving it out of any air path makes a
@@ -1402,7 +1432,8 @@ class TriphibianEnv:
             # The partial credit for a brief hop was 0.25, which is what a
             # genuine glide at 1.0 m/s sink now scores.  A hop and a glide are
             # not the same achievement, so it is 0.10.
-            if np.sum(airborne) * self.timestep < 0.35 * res.duration:
+            if (np.sum(airborne) * self.timestep
+                    < self.MEASURABLE_AIR_SECONDS):
                 # The diagnostics, but deliberately not the ladder metrics: a
                 # hop that was too short to measure a sink rate over should not
                 # be able to climb a rung on the strength of having happened.

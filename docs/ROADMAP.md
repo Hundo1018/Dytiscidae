@@ -1317,7 +1317,40 @@ enough for the distinction to exist — the offline probe that was to decide the
 window length failed three times and was abandoned, its one usable output being
 that tripling the window costs 25%, not the 1.35x measured without identification.
 
-### I. A longer segment window — **done, unrun**, after the first answer here was wrong
+### I. A longer segment window — **done, and its first launch was void**
+
+**arch38's first launch ran 4.3 h and 1,601 air segments before it was killed,
+and it is kept in `runs/arch38_void_window_gate/`.** The window change was
+correct and the thing that read it was not.
+
+`_score_segment` gated episode measurements on
+`np.sum(airborne) * timestep < 0.35 * res.duration` — **a fraction of a
+configurable window**, exactly the defect this item is about, one level below
+where the item was looking. At 8 s it meant 2.8 s; at 24 s it silently meant
+8.4 s. Result: **1,571 of the first 1,601 air segments took the short-hop exit
+and 24 took the full one**, so `glides`, `holds_height`, the three new thrust
+rungs, `holds_station`, `climbs` and `manoeuvres` — nine of fourteen — were
+unreachable for 99.6% of the population. And the share was *falling*, 2.4% to
+0.4% over the first hundred generations, because selection could not see the
+rungs above the gate and stopped paying for staying airborne.
+
+**The rule that failed here is worth writing down.** "The changes must be
+measured by quantities that do not overlap" protects *attribution*. It does not
+protect against *interference* — one change disabling another's measurement.
+After bundling, the second question is: for each change, what else reads the
+thing it moved?
+
+Two gates are now absolute durations, `MEASURABLE_AIR_SECONDS = 2.8` and the
+0.4 s never-airborne branch, both being what the old fractions meant at an 8 s
+segment so nothing measured before moves. `submerged > 0.5` in water and
+`contact` on land were checked and left: those genuinely ask "was it there for
+most of the episode", which is a fraction by intent.
+
+Whether a measurement is *taken* no longer moves with the window. How long the
+machine had to survive still does, via `airborne_fraction` and the two rungs
+that read it, which is the point of the longer segment.
+
+### I (original). A longer segment window — after the first answer here was wrong
 
 This item was first written as "refuted": lengthening the window makes
 `station_keeping` harder, because a drifting machine has more time to leave the
