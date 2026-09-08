@@ -1113,6 +1113,14 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 (f"latent{i}", float(lo), float(hi), int(cfg.descriptor_bins))
                 for i, (lo, hi) in enumerate(learned.bounds())
             ]
+            # One event per refit, carrying the **archipelago** totals and a
+            # per-island breakdown.  It used to carry `stats` from outside this
+            # loop, which is the last island's numbers and nothing else -- so
+            # every judgement ever made about item F ("the archive shrinks 35%
+            # across a run") was made on one island out of six or seven.  The
+            # totals were never recorded, which is why the item has been
+            # deferred three times without ever being measured.
+            per, totals = {}, {"before": 0, "after": 0, "merged": 0}
             for name, a in archipelago.archives.items():
                 stats = a.rebin(axes, _reproject)
                 archipelago.curators[name].on_rebin()
@@ -1121,8 +1129,20 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 # cells, 9.6% of them naming a cell that still existed.
                 if name in state.curricula:
                     stats.update(state.curricula[name].rebuild_from(a))
-            telemetry.event({"kind": "descriptor_refit", "gen": gen, **stats,
-                             **learned.report()})
+                # Parents are drawn from `archive.fronts`, not from
+                # `archive.cells` (curator.py, "Drawn from the cells' full
+                # Pareto fronts"), and `rebin` re-populates fronts while cells
+                # collapse -- so cells lost is not the same as breeding stock
+                # lost, and both belong in the record.  arch37 ended at 1.36
+                # front members per cell, so the buffer is thin, but it is not
+                # nothing and the old event could not tell the difference.
+                stats["fronts"] = sum(len(v) for v in (a.fronts or {}).values())
+                per[name] = stats
+                for k in totals:
+                    totals[k] += int(stats.get(k, 0) or 0)
+            telemetry.event({"kind": "descriptor_refit", "gen": gen, **totals,
+                             "fronts": sum(s.get("fronts", 0) for s in per.values()),
+                             "islands": per, **learned.report()})
 
         # --- migration and hybridisation -------------------------------------
         if archipelago.due(gen):

@@ -2354,6 +2354,70 @@ def test_takeoff_is_measured_where_the_machine_starts_on_the_ground() -> None:
           f"{TAKEOFF_FULL} m full, {1 / TAKEOFF_FLOOR:.0f}x the floor")
 
 
+def test_depth_is_a_gain_not_a_spawn() -> None:
+    """The water ladder had the air ladder's defect and outlived its fix.
+
+    `SPAWN[Domain.WATER]` releases the machine four metres under, so the
+    **minimum** `max_depth` over arch37's 14,058 water segments is 3.34 m and
+    the first two water rungs -- `submerges` at 0.5 m, `dives` at 3.0 m
+    absolute -- were cleared by 100% of every evaluation this project has ever
+    run, by being dropped.  Exactly what `leaves_surface` and `stays_up` were
+    doing in air, three runs after that was fixed.
+    """
+    print("\ndepth: a gain over where the machine was released")
+    import numpy as np
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, SegmentResult, TriphibianEnv
+
+    env = TriphibianEnv(build(BODY_PLANS["eel"]()))
+    dt, dur = env.timestep, 8.0
+    n = int(dur / dt)
+
+    def water(depths):
+        r = SegmentResult(domain=Domain.WATER, duration=dur)
+        r.mean_speed = 0.5
+        r.max_depth = float(np.max(depths))
+        c = env._score_segment(
+            Domain.WATER, r, np.asarray(depths, float), -np.asarray(depths, float),
+            np.ones(n), np.zeros(n), np.zeros(n), vzs=np.zeros(n))
+        return c, r.measurements
+
+    held = 4.0 * np.ones(n)                                  # released and idle
+    dove = 4.0 + 9.0 * np.clip(np.arange(n) / (n / 2), 0, 1)  # 4 m -> 13 m
+    rose = 4.0 - 0.6 * np.clip(np.arange(n) / (n / 2), 0, 1)  # floats up
+
+    c_held, m_held = water(held)
+    c_dove, m_dove = water(dove)
+    c_rose, m_rose = water(rose)
+
+    check("a machine that stays where it was dropped gained nothing",
+          abs(m_held["depth_gain"]) < 1e-6 and m_held["max_depth"] >= 3.9,
+          f"max_depth {m_held['max_depth']:.2f} m, gain "
+          f"{m_held['depth_gain']:+.3f} m")
+    # `max_depth` is a maximum, so the gain is floored at zero by construction
+    # and a machine that only ever rises scores 0 rather than a negative.  That
+    # is the right floor -- "went no deeper than it was put" -- and it is worth
+    # a check because the number that motivated these thresholds was computed
+    # as `max_depth - 4.0` against a spawn that is randomised by 0.2 m, which
+    # produced apparent negatives that the real definition cannot have.
+    check("and one that only ever rises scores the floor, not a negative",
+          m_rose["depth_gain"] == 0.0 and c_rose < c_dove,
+          f"gain {m_rose['depth_gain']:+.3f} m, competence {c_rose:.4f} "
+          f"against {c_dove:.4f}")
+    check("while a real dive is measured from the release depth",
+          abs(m_dove["depth_gain"] - 9.0) < 1e-6,
+          f"4 m -> 13 m reads {m_dove['depth_gain']:+.2f} m, not "
+          f"{m_dove['max_depth']:.2f}")
+    check("the competence no longer pays for the spawn",
+          c_dove > c_held, f"idle {c_held:.4f} against diving {c_dove:.4f}")
+
+    # `max_depth` stays published unchanged, so every number measured before
+    # this change is still re-derivable from the record.
+    check("and the absolute depth is still on the record",
+          abs(m_held["max_depth"] - 4.0) < 1e-6, f"{m_held['max_depth']:.2f} m")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -2394,6 +2458,7 @@ def main() -> int:
     test_an_auto_reset_rollout_is_not_trusted()
     test_the_air_score_measures_flight()
     test_takeoff_is_measured_where_the_machine_starts_on_the_ground()
+    test_depth_is_a_gain_not_a_spawn()
     print("\n" + "=" * 68)
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")

@@ -1137,6 +1137,34 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
           0 < rung_reached("air", {**perfect, "lift_margin": 0.35}) < LIFT,
           f"margin 0.35 -> rung {rung_reached('air', {**perfect, 'lift_margin': 0.35})}")
 
+    # The water ladder had the same defect the air one had, and it outlived
+    # the fix by three runs: `submerges` at 0.5 m and `dives` at 3.0 m read
+    # `max_depth`, while `SPAWN[Domain.WATER]` releases the machine four metres
+    # under.  Over arch37's 14,058 water segments the **minimum** `max_depth` is
+    # 3.34 m, so both rungs were cleared by 100% of every evaluation ever run --
+    # by being dropped.  The ladder now reads the gain over the release depth,
+    # the way `takeoff_height` reads a gain over resting clearance.
+    GAIN = sum(1 for _n, m, _t in LADDER["water"] if m == "depth_gain")
+    deep_enough = {"depth_error": 0.5, "water_speed": 1.0}
+    check("a machine that stays where it was dropped scores nothing in water",
+          rung_reached("water", {**deep_enough, "max_depth": 4.0,
+                                 "depth_gain": 0.0}) == 0,
+          "four metres of depth, none of it earned")
+    check("and one that only ever rises scores nothing either",
+          rung_reached("water", {**deep_enough, "max_depth": 3.4,
+                                 "depth_gain": 0.0}) == 0,
+          "the gain is floored at zero, so rising is rung 0, not below it")
+    check("while one that dives past the release depth climbs the ladder",
+          rung_reached("water", {**deep_enough, "max_depth": 13.0,
+                                 "depth_gain": 9.0}) == len(LADDER["water"]),
+          f"a 9 m gain clears all {GAIN} depth rungs and the two above them")
+    check("and the depth rungs are ordered",
+          [rung_reached("water", {**deep_enough, "depth_gain": g})
+           for g in (0.1, 1.0, 3.0, 6.0)] == [0, 1, 2, 3],
+          "gains 0.1 / 1 / 3 / 6 m -> rungs "
+          + " ".join(str(rung_reached("water", {**deep_enough, "depth_gain": g}))
+                     for g in (0.1, 1.0, 3.0, 6.0)))
+
     # The within-rung bonus must never reach the next rung's score.
     below = j.score("air", {**flies, "airborne_fraction": 0.95, "sink_rate": -1.0,
                             "station_keeping": 0.8, "turn_rate_held": 0.0})
@@ -1238,7 +1266,7 @@ def test_auditor_can_invalidate_and_veto() -> None:
     # The veto rolls the judge back.
     j = Judge(quantile=0.9, update_every=1)
     for _ in range(200):
-        j.observe({"water": {"max_depth": 3.0}})
+        j.observe({"water": {"depth_gain": 3.0}})
     moves = j.maybe_tighten(1)
     raised = j.ratchets["water"].bar
     check("the judge tightened", moves and raised > 0.0, f"bar now {raised:.2f} m")
@@ -1259,7 +1287,7 @@ def test_auditor_can_invalidate_and_veto() -> None:
     def fresh_judge():
         jj = Judge(quantile=0.9, update_every=1)
         for _ in range(200):
-            jj.observe({"water": {"max_depth": 3.0}, "air": {"sink_rate": 4.0}})
+            jj.observe({"water": {"depth_gain": 3.0}, "air": {"sink_rate": 4.0}})
         mv = jj.maybe_tighten(1)
         return jj, mv
 
@@ -1268,7 +1296,7 @@ def test_auditor_can_invalidate_and_veto() -> None:
     check("two domains tightened together", water_bar > 0.0 and mv2,
           f"water {water_bar:.2f} m, air {air_bar:.2f} m/s")
     # A design invalidated on a shallow dive cannot have set the deep-water bar.
-    shallow = [{"water": {"max_depth": 0.4}, "air": {"sink_rate": 9.0}}]
+    shallow = [{"water": {"depth_gain": 0.4}, "air": {"sink_rate": 9.0}}]
     vetoed2 = a.review_tightening(j2, mv2, shallow)
     check("a design that never reached the bar cannot pull it down",
           not vetoed2
@@ -1281,7 +1309,7 @@ def test_auditor_can_invalidate_and_veto() -> None:
     w3 = j3.ratchets["water"].bar
     # One that dove past the bar is in the tail the quantile came from, so its
     # invalidation is a reason to undo the water bar -- and only that one.
-    deep = [{"water": {"max_depth": 9.0}, "air": {"sink_rate": 9.0}}]
+    deep = [{"water": {"depth_gain": 9.0}, "air": {"sink_rate": 9.0}}]
     a3_air = j3.ratchets["air"].bar
     vetoed3 = a.review_tightening(j3, mv3, deep)
     check("but one that set it does",
@@ -1527,7 +1555,7 @@ def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> 
 
     # A water specialist and a uniform failure both score ~0 on the mission.
     specialist = Res(0.02, 0.85, 0.03, 0.001,
-                     {"water": {"depth_error": 0.8, "max_depth": 10.0}})
+                     {"water": {"depth_error": 0.8, "max_depth": 10.0, "depth_gain": 6.0}})
     useless = Res(0.02, 0.03, 0.03, 0.001)
     t = Trans(0.34, 0.4)
 
@@ -1732,7 +1760,7 @@ def test_promotion_needs_a_nonzero_answer_to_the_next_question() -> None:
         seg = SimpleNamespace(
             competence=0.9,
             measurements={"depth_error": 0.5, "max_depth": 9.0,
-                          "water_speed": 0.5},
+                          "depth_gain": 5.0, "water_speed": 0.5},
         )
         return SimpleNamespace(segments={"water": seg}, mission_fraction=0.0)
 

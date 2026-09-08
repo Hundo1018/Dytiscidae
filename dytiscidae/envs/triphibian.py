@@ -1469,7 +1469,22 @@ class TriphibianEnv:
 
         if domain is Domain.WATER:
             target = self.TARGET_DEPTH
-            reached = float(np.clip(res.max_depth / target, 0.0, 1.0))
+            # Progress from where the machine was *released* toward the target,
+            # not absolute depth.  The segment starts it 4 m under, so
+            # `max_depth / target` handed every design 0.4 before it did
+            # anything -- measured p25 was 0.416 across arch37, i.e. a quarter
+            # of the population scored the spawn and nothing else.  Dividing the
+            # gain by the distance that remained makes 0.0 mean "went no deeper
+            # than it was put", and leaves the spread intact (new p25/median/p75
+            # 0.03 / 0.37 / 0.91 against 0.42 / 0.62 / 0.95).
+            #
+            # The ladder reads `depth_gain` for the same reason; a rung saying
+            # "gained nothing" beside a competence saying 0.4 is the kind of
+            # split this file has been bitten by before.
+            start_depth = float(depths[0]) if len(depths) else 0.0
+            gain = float(res.max_depth - start_depth)
+            reached = float(np.clip(gain / max(target - start_depth, 1e-6),
+                                    0.0, 1.0))
             submerged = float(np.sum(depths > 0.2) / n_want)
             # Holding depth matters as much as reaching it: a machine that
             # plummets to 10 m has not demonstrated depth control.
@@ -1477,8 +1492,30 @@ class TriphibianEnv:
             err = float(np.mean(np.abs(settled - target))) if len(settled) else target
             res.depth_error = err
             hold = float(np.clip(1.0 - err / target, 0.0, 1.0))
+            # Depth as a *gain*, the way ``takeoff_height`` is a gain over
+            # resting clearance -- because the water segment releases the
+            # machine four metres under (``SPAWN[Domain.WATER]``) and
+            # ``max_depth`` therefore starts at 4 m for a brick.
+            #
+            # Measured over arch37's 14,058 water segments: the **minimum**
+            # ``max_depth`` is 3.34 m, so the first two rungs of the water
+            # ladder -- ``submerges`` at 0.5 m and ``dives`` at 3.0 m -- were
+            # cleared by 100% of every run ever made, by being dropped.  Same
+            # defect as the air ladder's first two rungs being paid for falling,
+            # and it survived three runs after that one was found.
+            #
+            # The gain separates where the absolute did not: p25 +0.16 m,
+            # median +2.23 m, p90 +8.11 m.  It is floored at zero -- a maximum
+            # cannot be below the first sample -- so a machine that only rises
+            # scores 0 and now has somewhere to climb from, where before it
+            # scored the same rung as one that dove nine metres.
+            #
+            # Those quantiles are `max_depth - 4.0` against a release that is
+            # randomised by 0.2 m, so the lowest threshold is approximate to
+            # about that much.  arch38 measures the gain directly.
             res.measurements.update({
                 "max_depth": float(res.max_depth),
+                "depth_gain": gain,
                 "depth_error": err,
                 "water_speed": float(res.mean_speed) if submerged > 0.5 else 0.0,
             })

@@ -104,9 +104,26 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         ("manoeuvres", "turn_rate_held", 0.2),  # turns while holding height
     ],
     "water": [
-        ("submerges", "max_depth", 0.5),
-        ("dives", "max_depth", 3.0),
-        ("reaches_depth", "max_depth", 10.0),
+        # Depth as a gain over where the machine was released, not as an
+        # absolute.  ``SPAWN[Domain.WATER]`` puts it four metres under, so the
+        # minimum ``max_depth`` over arch37's 14,058 water segments is 3.34 m
+        # and the old first two rungs -- 0.5 m and 3.0 m absolute -- were
+        # cleared by **100% of every evaluation ever run**, by being dropped.
+        # That is the same defect the air ladder had, where ``leaves_surface``
+        # and ``stays_up`` were satisfied by falling, and it outlived the fix
+        # to that one by three runs.
+        #
+        # Thresholds from the measured gain distribution over those segments
+        # (p25 +0.16, median +2.23, p75 +5.45, p90 +8.11).  Shares left standing
+        # are in the comments.  Those quantiles are `max_depth - 4.0` against a
+        # release randomised by 0.2 m, so `submerges` is approximate to about
+        # that much; arch38 measures the gain directly.  The gain is floored at
+        # zero by construction -- a maximum cannot fall below the first sample --
+        # so a machine that only rises sits at rung 0 rather than below it.
+        ("submerges", "depth_gain", 0.25),      # 70.8% -- goes down at all
+        ("dives", "depth_gain", 2.0),           # 51.9%
+        ("reaches_depth", "depth_gain", 5.0),   # 28.8%
+        ("goes_deep", "depth_gain", 8.0),       # 10.4%
         ("holds_depth", "depth_error", 1.0),   # within 1 m of target
         ("manoeuvres", "water_speed", 0.5),    # makes way while holding depth
     ],
@@ -277,7 +294,12 @@ class Ratchet:
 #: bar tightens on the thing the population is currently trying hardest to do.
 HEADLINE = {
     "air": ("sink_rate", True, 6.0),
-    "water": ("max_depth", False, 0.0),
+    # `depth_gain`, not `max_depth`, for the same reason the water ladder reads
+    # it: the segment releases the machine 4 m under, so `max_depth` has a 4 m
+    # floor built into it and a bar set on that quantity is set on the spawn as
+    # much as on the machine.  Floor 0.0 now means "went no deeper than it was
+    # put", which is a real zero.
+    "water": ("depth_gain", False, 0.0),
     "land": ("land_speed", False, 0.0),
     "transition": ("exit_state", False, 0.0),
 }

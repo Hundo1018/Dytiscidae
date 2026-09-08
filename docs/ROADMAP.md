@@ -876,12 +876,18 @@ Two items that looked like the obvious arm are withdrawn here rather than
 deferred — B on three measurements and H on one — because a list that only ever
 grows stops being a record of what the evidence supports.
 
-**The arm this list recommends is no arm.** A costs nothing and changes no
-selection, so a run carrying only A is simultaneously the excursion measurement
-and a *replication of arch37 at a second seed* — and arch37's headline (lift
-rungs doubling the flyable share, glides up 9.7x) is currently n=1. Every other
-item here is either blocked on what A returns or, in C's case, not yet designed
-to a state where it can be run without destroying the gradient arch37 built.
+**Revised after the one-arm rule was challenged, and the challenge was right.**
+The rule exists so an effect can be attributed. Across arch34–arch37 exactly one
+run produced a large effect, so most of the time there is nothing to attribute
+and the rule buys a day for nothing. What actually has to hold is the weaker and
+more useful condition arch37 already used: **the changes must be measured by
+quantities that do not overlap.** That scales past two.
+
+So arch38 carries four changes with four separate measurements, and the ones
+that could not clear that bar were **measured and dropped rather than bundled**
+— a mass cap (§F), a longer segment window (§I), flap-frequency searchability
+(§B) and the actuator model (§H) are all refuted below, three of them by
+measurements taken while assembling this list.
 
 ### How long to run it — 900, read at 500, extend if it is still climbing
 
@@ -1009,25 +1015,91 @@ making airborne fraction the binding term — most likely by scoring the take-of
 attempt on its own ladder, as take-off already is, rather than by moving where
 the air segment begins.
 
-### D. The water spawn — carried forward unchanged, and now the oldest item here
+### D. Depth as a gain — **done, unrun.** The water ladder had the air ladder's defect
 
-`SPAWN[Domain.WATER] = (-8.0, 0.0, -4.0)` releases the machine four metres under.
-`max_depth >= 0.5 m` is therefore true of 100% of evaluations in every band of
-every run. Measure depth as a *gain* over the spawn depth, the way
-`takeoff_height` is a gain over resting clearance. Until then no water number is
-evidence a machine can get wet, and the report's comparison chart uses 10 m to
-say something at all.
+`SPAWN[Domain.WATER] = (-8.0, 0.0, -4.0)` releases the machine four metres under,
+and the **minimum `max_depth` over arch37's 14,058 water segments is 3.34 m**.
+So the water ladder's first two rungs — `submerges` at 0.5 m and `dives` at
+3.0 m absolute — were cleared by **100% of every evaluation this project has
+ever run, by being dropped.** That is precisely the defect the air ladder had,
+where `leaves_surface` and `stays_up` were paid for falling, and it **outlived
+the fix to that one by three runs** because nobody looked at the water column
+after fixing the air one.
 
-### E. Item F, `descriptor_refit_every` — three runs, three identical declines
+`depth_gain = max_depth − depth_at_release` is now published, and the ladder and
+the water headline bar both read it. Thresholds from the measured gain
+distribution (p25 +0.16 m, median +2.23 m, p75 +5.45 m, p90 +8.11 m):
 
-−35%, −35%, −38%. It needs its own arm and has been deferred three times.
+| rung | at | leaves standing |
+|---|---|---|
+| `submerges` | 0.25 m | 70.8% |
+| `dives` | 2.0 m | 51.9% |
+| `reaches_depth` | 5.0 m | 28.8% |
+| `goes_deep` | 8.0 m | 10.4% |
 
-### F. Mass is free; the battery sweep is written and unrun
+The gain is floored at zero by construction — a maximum cannot fall below the
+first sample — so a machine that only rises sits at rung 0 instead of scoring
+the same rung as one that dove nine metres. `max_depth` is still published
+unchanged, so the record stays honest and every old number stays re-derivable.
 
-`runs/probe_battery.py` exists and has never been run. It answers whether a
-bigger battery is strictly better on fixed morphologies — if it is and the search
-is not taking it, the operator is at fault and not the energy model. Only then
-decide between charging for parts and capping mass, and not both in one arm.
+**One correction, caught by the test rather than by review.** Those quantiles are
+`max_depth − 4.0` against a release randomised by 0.2 m, which produced apparent
+negative gains that the real definition cannot have. The claim "15.9% float up"
+was that artefact; the lowest rung is approximate to about the jitter, and
+arch38 measures the gain directly.
+
+**Water rungs and water competence are not comparable across arch37 → arch38.**
+The ladder went from 5 rungs to 6 and three of them changed metric.
+
+### E. Item F — **the telemetry was measuring one island. Fixed, unrun.**
+
+Deferred three times on a number that could not answer it. In `loop.py` the
+`descriptor_refit` event fired **outside** the per-island loop, so `stats` held
+whichever island happened to be iterated last. Every "the archive shrinks 35%
+across a run" claim in this file — arch35, arch36, arch37 — is one island out of
+six or seven, and the archipelago totals were never recorded at all.
+
+What the final archives actually hold: **arch36 428 cells, arch37 480 cells**
+across all islands, against the 79 and 65 those runs reported.
+
+And the loss is not what it looked like in a second way: **parents are drawn
+from `archive.fronts`, not `archive.cells`** (`curator.py`: "Drawn from the
+cells' full Pareto fronts"), and `rebin` re-populates fronts while cells
+collapse. arch37 ended at 1.36 front members per cell, so the buffer is thin —
+but a merged elite is not necessarily gone, and the old event could not tell the
+difference.
+
+The event now carries archipelago totals, a per-island breakdown, and the front
+population. **This is a measurement fix, not a change to the refit** — the
+interval stays at 400. arch38 is the first run that can say what item F costs.
+
+### F. Mass and battery — **both halves answered offline. Nothing to implement.**
+
+**The battery half.** `runs/probe_battery.py` was finally run: four body plans ×
+nine pack sizes from 60 to 2000 Wh. `energy_margin` rises monotonically with
+pack size for three of four plans and peaks at 1400–2000 Wh for all four — so a
+bigger pack *is* strictly better on the constraint. But the best
+`mission_fraction` sits at 260, 60, 900 and 900 Wh, nowhere near it. **The
+mission is not energy-limited, so battery mass is bought for nothing and the
+search refusing it is correct.** (The mission column is 0.00004–0.00056 and
+cannot be ranked; the monotonicity result rests on the margin column alone,
+which is clean.)
+
+**The mass half — a cap is refuted.** Set from arch37's distribution rather than
+from what a flying machine ought to weigh:
+
+| mass | n | `lift_margin >= 1` | `glides+` |
+|---|---|---|---|
+| 3–5 kg | 5,704 | 65.6% | 2.21% |
+| 5–8 kg | 4,357 | 64.2% | 5.53% |
+| **8–12 kg** | 2,279 | 58.0% | **15.93%** |
+| 12–20 kg | 476 | 41.2% | 8.82% |
+| > 20 kg | 34 | 17.6% | 0% |
+
+**The gliders are the heavy machines.** A 10 kg cap removes 14.9% of every
+glider in the run. The only cap that costs no gliders is 20 kg, which touches
+0.24% of the population — a change that does nothing. Mass being uncapped is not
+what is stopping flight.
 
 ### G. Retired: the contact-fraction gate on take-off
 
@@ -1039,6 +1111,22 @@ departure and called it a failure to depart. Revisit only against a window long
 enough for the distinction to exist — the offline probe that was to decide the
 window length failed three times and was abandoned, its one usable output being
 that tripling the window costs 25%, not the 1.35x measured without identification.
+
+### I. A longer segment window — refuted by its own arithmetic
+
+The obvious response to "`holds_station` is never reached" is to lengthen the
+8 s window, and the cost is affordable: identification does not scale with
+segment length, so tripling the air window alone is about +8%.
+
+**It makes the rung harder, not easier.** `station_keeping` is the fraction of
+the late window spent within a band of where the machine settled, so a longer
+window gives a drifting machine more time to leave the band. At 8 s the
+statistic is already nearly constant at 0.05–0.08 across the whole population;
+at 24 s it compresses further toward zero. Lengthening the window would raise
+the wall it was meant to lower.
+
+It would help the excursion diagnostic see an oscillation period, and that is
+not worth 8% on its own. Revisit once A says what the paths look like.
 
 ### H. On changing the actuator model
 

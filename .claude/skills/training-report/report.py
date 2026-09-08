@@ -329,6 +329,16 @@ COMPARABLE = [
                     "inside one station band",
      lambda e: _lm(e, "air", "excursion_ratio") is not None,
      lambda e: (_lm(e, "air", "excursion_ratio") or 9e9) < 1.0),
+    # The gain, not the absolute.  `deep` above is kept because it is the only
+    # depth series comparable with arch34-arch37, but it measures a machine
+    # released 4 m under: the minimum `max_depth` over arch37's 14,058 water
+    # segments is 3.34 m, so "reached half a metre" was true of 100% of every
+    # run ever made.  5 m of gain left 28.8% of arch37 standing, which is a
+    # threshold inside the distribution rather than under it.
+    ("dives_deeper", "fraction of water segments gaining >= 5 m below the "
+                     "depth they were released at",
+     lambda e: _lm(e, "water", "depth_gain") is not None,
+     lambda e: (_lm(e, "water", "depth_gain") or -9e9) >= 5.0),
 ]
 
 #: Named, with the reason, instead of being drawn against a baseline that would
