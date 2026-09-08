@@ -1980,15 +1980,17 @@ def test_the_air_score_measures_flight() -> None:
     n = int(dur / dt)
 
     def air(sink, *, spins=None, commands=None, responses=None, gates=(),
-            clear=None):
-        r = SegmentResult(domain=Domain.AIR, duration=dur)
+            clear=None, seconds=None):
+        secs = dur if seconds is None else seconds
+        m = int(secs / dt)
+        r = SegmentResult(domain=Domain.AIR, duration=secs)
         r.mean_speed = 20.0
         if clear is None:
-            clear = 30.0 - sink * np.arange(n) * dt
+            clear = 30.0 - sink * np.arange(m) * dt
         env.air_gates = list(gates)
         try:
             s = env._score_segment(
-                Domain.AIR, r, -clear, clear, np.ones(n), np.zeros(n), clear,
+                Domain.AIR, r, -clear, clear, np.ones(m), np.zeros(m), clear,
                 spins=spins, commands=commands, responses=responses)
         finally:
             env.air_gates = []
@@ -2033,6 +2035,68 @@ def test_the_air_score_measures_flight() -> None:
           f"window at 0.4 m/s")
     check("and holding height leaves almost none",
           held["altitude_excursion"] < 1e-6, f"{held['altitude_excursion']:.3g} m")
+
+    # 2c. The measurements must mean the same thing at any segment length.
+    #
+    # `station_keeping` is the fraction of its window spent within a band, so
+    # for a steady descent at v it is `band / (v * T)` -- which makes the rung
+    # threshold 0.6 an encoding of a *sink rate that depends on T*.  At 8 s it
+    # asks for <= 0.21 m/s and at 24 s it would ask for <= 0.069 m/s under the
+    # same name.  A ladder whose rungs change meaning with a config flag cannot
+    # do the job this one is for, and the fix is not to keep the segment short:
+    # a design that only holds height for four seconds is not holding height,
+    # and a longer segment reveals that rather than causing it.
+    #
+    # So the segment length and the measurement window are separated.  Survival
+    # is read by `airborne_fraction` and does get harder as the segment grows.
+    # Holding a height is read over a fixed window and does not.
+    _s, creep8 = air(0.4, seconds=8.0)
+    _s, creep24 = air(0.4, seconds=24.0)
+    check("a steady descent scores the same station at 8 s and at 24 s",
+          abs(creep8["station_keeping"] - creep24["station_keeping"]) < 0.02,
+          f"{creep8['station_keeping']:.3f} against "
+          f"{creep24['station_keeping']:.3f}")
+    check("and the same sink rate",
+          abs(creep8["sink_rate"] - creep24["sink_rate"]) < 0.02,
+          f"{creep8['sink_rate']:.3f} against {creep24['sink_rate']:.3f} m/s")
+
+    # And the oscillation amplitude is window-invariant too, which the
+    # excursion above is not -- `altitude_excursion` for a descent is the drift,
+    # and drift grows with the window.  Subtracting the fitted trend leaves the
+    # part that is not a descent at all.
+    def wobbler(secs, amp=2.0, period=4.0, sink=0.4):
+        tt = np.arange(int(secs / dt)) * dt
+        return 30.0 - sink * tt + amp * np.sin(2 * np.pi * tt / period)
+
+    _s, w8 = air(0.0, clear=wobbler(8.0), seconds=8.0)
+    _s, w24 = air(0.0, clear=wobbler(24.0), seconds=24.0)
+    check("an oscillation reads the same amplitude at 8 s and at 24 s",
+          abs(w8["altitude_wobble"] - w24["altitude_wobble"]) < 0.25,
+          f"{w8['altitude_wobble']:.2f} m against "
+          f"{w24['altitude_wobble']:.2f} m, both against a 2.0 m amplitude")
+    # The two are published together because they answer different questions,
+    # not because one is window-invariant and the other is not -- capping the
+    # window made both of those.  `altitude_excursion` reads the fixed tail
+    # window and includes the drift within it; `altitude_wobble` reads the whole
+    # airborne stretch and has the trend removed.  So a machine that thrashes
+    # early and settles is invisible to the first and obvious to the second,
+    # which is the case a segment long enough to have an early and a late part
+    # makes possible at all.
+    early = np.concatenate([
+        30.0 + 3.0 * np.sin(2 * np.pi * np.arange(int(12.0 / dt)) * dt / 4.0),
+        30.0 * np.ones(int(12.0 / dt)),
+    ])
+    _s, thrash = air(0.0, clear=early, seconds=24.0)
+    check("a machine that thrashes early and settles is caught by the wobble",
+          thrash["altitude_wobble"] > 1.0 and thrash["altitude_excursion"] < 0.1,
+          f"wobble {thrash['altitude_wobble']:.2f} m, tail excursion "
+          f"{thrash['altitude_excursion']:.3f} m -- the tail window alone "
+          f"cannot see the first twelve seconds")
+    check("and a straight descent has drift but no wobble",
+          creep24["altitude_wobble"] < 0.05
+          and creep24["altitude_excursion"] > 1.0,
+          f"wobble {creep24['altitude_wobble']:.3f} m against excursion "
+          f"{creep24['altitude_excursion']:.2f} m")
 
     # The property that makes this safe to add mid-programme.  `rung_reached`
     # stops at the first rung whose metric is missing, and arch37's first launch
@@ -2154,8 +2218,14 @@ def test_the_air_score_measures_flight() -> None:
                            kw["contacts"], clearances=kw["clearances"],
                            vzs=zeros_a)
         m = r.measurements
-        if "lift_margin" not in m:
-            missing.append(name)
+        # Both of the airframe properties, not just the one that caused the
+        # incident.  `lift_margin` was published on one exit of three and read
+        # by a rung, which voided arch37's first launch; `thrust_margin` is the
+        # same shape of quantity added the same way, so it gets the same check
+        # rather than the same accident.
+        if "lift_margin" not in m or "thrust_margin" not in m:
+            missing.append(name + " (" + ", ".join(
+                k for k in ("lift_margin", "thrust_margin") if k not in m) + ")")
         # Each branch leaves a different fingerprint, so this records *which*
         # one ran.  Without it the three fixtures could all be falling down the
         # same path and the check would pass while testing one third of what it
@@ -2163,7 +2233,7 @@ def test_the_air_score_measures_flight() -> None:
         seen[name] = ("full" if "airborne_fraction" in m
                       else "short-hop" if "airborne_seconds" in m
                       else "never-airborne")
-    check("every path out of the air branch publishes lift_margin",
+    check("every path out of the air branch publishes the airframe properties",
           not missing,
           "missing on: " + ", ".join(missing) if missing
           else ", ".join(f"{k}={v}" for k, v in seen.items()))

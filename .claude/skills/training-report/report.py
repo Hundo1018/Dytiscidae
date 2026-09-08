@@ -339,6 +339,15 @@ COMPARABLE = [
                      "depth they were released at",
      lambda e: _lm(e, "water", "depth_gain") is not None,
      lambda e: (_lm(e, "water", "depth_gain") or -9e9) >= 5.0),
+    # Trend removed, so this is oscillation and not descent, and it does not
+    # grow with the segment length -- which `steady_path` above does not
+    # guarantee, since the excursion it reads includes the drift inside its
+    # window.  One band is the definition's own boundary; no rung reads it and
+    # no capability threshold is being asserted before the distribution is known.
+    ("steady_flight", "fraction of air segments oscillating less than one "
+                      "station band about their own trajectory",
+     lambda e: _lm(e, "air", "wobble_ratio") is not None,
+     lambda e: (_lm(e, "air", "wobble_ratio") or 9e9) < 1.0),
 ]
 
 #: Named, with the reason, instead of being drawn against a baseline that would

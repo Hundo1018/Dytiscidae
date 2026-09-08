@@ -95,6 +95,36 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         ("stays_up", "airborne_fraction", 0.60),
         ("glides", "sink_rate", 3.0),          # sink below 3 m/s
         ("holds_height", "sink_rate", 0.5),    # sink below 0.5 m/s
+        # Thrust, which nothing in this project measured for four runs.
+        #
+        # Everything above this point can be earned by a glider: `lift_margin`
+        # is the airframe's static lift, and `sink_rate` rewards descending
+        # slowly.  A glider converts height into speed and comes down.  The two
+        # rungs *below* -- holding a station and climbing -- are exactly the
+        # ones that need the flapping to produce net forward force, and they had
+        # been reached once and never in 14,092 evaluations.  That is where lift
+        # was before arch37: the capability had no measurement, so it had no
+        # gradient, and the population optimised what it could see.
+        #
+        # `thrust_margin` is `(<Fx>_cycle - Fx_static) / drag` at the machine's
+        # own trim -- 1.0 means the gait produces the airframe's whole drag, so
+        # it holds speed instead of trading height for it.  Measured over
+        # arch37's 182 elites at their own gaits: **median -0.0030, max +0.2390,
+        # 3.3% above 0.10**, and every hand-built seed is in the same place (the
+        # gannet -0.0001, the teal -0.3796 -- its flapping costs 38% more drag
+        # than holding still).  Correlation with `lift_margin` is +0.242, so it
+        # is not the question the ladder already asks.
+        #
+        # The thresholds are inside that measured distribution and no higher:
+        # 0.00 is "flapping is not a net cost", which half the archive fails.
+        # Nothing is placed above +0.239 because nothing has been there --
+        # though a random search over 400 gaits reached **+0.8466** on the
+        # gannet at 10.95 Hz, so the headroom is real and the rung is a slope
+        # rather than a wall.  The gaits that make thrust run at 4.5-11 Hz with
+        # the joints spread across the cycle; the population sits at 2.2 Hz.
+        ("flaps_forward", "thrust_margin", 0.0),     # ~49% -- not a net cost
+        ("makes_thrust", "thrust_margin", 0.05),     # 7.7%
+        ("pushes_itself", "thrust_margin", 0.15),    # ~2%
         # Holding *a* height, not losing one slowly.  A machine gliding down at
         # 0.4 m/s clears ``holds_height`` for a whole segment while never
         # holding anything, which is why the two are separate rungs: this one
@@ -164,12 +194,37 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         ("climbs_out", "takeoff_height", 0.80),  # a departure, not a hop
     ],
     "transition": [
-        ("crosses", "crossed_fraction", 0.34),
-        ("crosses_all", "crossed_fraction", 0.99),
-        ("survives_entry", "shock", 0.5),
-        ("stays_controlled", "control", 0.6),
-        ("arrives_usable", "exit_state", 0.7),
-        ("crosses_efficiently", "economy", 0.7),
+        # Rebuilt from arch37's 14,092 evaluations.  The old ladder put 70.6% of
+        # the population on rung 1 and **0.3% above it**, for three reasons that
+        # are all visible in the distribution:
+        #
+        # 1. `crossed_fraction` counts how many of four transitions were made,
+        #    so it takes five values: 0, 0.25, 0.5, 0.75, 1.  A rung at 0.34
+        #    means "two of four" (70.9%) and the next one at 0.99 means "all
+        #    four" (0.3%).  Between them sat nothing, and three-of-four -- 17.1%
+        #    of the population -- had no rung of its own.
+        # 2. **Completeness came before quality.**  A machine that crossed two
+        #    boundaries beautifully scored the same rung as one that crossed two
+        #    badly, because every quality rung was placed above `crosses_all`
+        #    and `crosses_all` is 0.3%.
+        # 3. Two of the quality rungs were set at or above the population's
+        #    maximum.  `arrives_usable` asked for `exit_state >= 0.7` and the
+        #    **largest value ever measured is 0.689** -- a rung nobody can stand
+        #    on, which is the mistake this file records under `moves` at
+        #    0.1 m/s.  `stays_controlled` asked for `control >= 0.6` against a
+        #    p90 of 0.296.
+        #
+        # Every threshold below is inside the measured distribution and the
+        # shares decrease monotonically, so the ladder is a slope.  Shares are
+        # marginal, as the lift and depth rungs' were.
+        ("crosses", "crossed_fraction", 0.34),      # 70.9% -- two of four
+        ("stays_controlled", "control", 0.20),      # 56.4%
+        ("arrives_usable", "exit_state", 0.30),     # 48.2%
+        ("arrives_well", "exit_state", 0.37),       # 27.0%
+        ("crosses_three", "crossed_fraction", 0.60),  # 17.1% -- three of four
+        ("crosses_efficiently", "economy", 0.75),   # 17.1%
+        ("survives_entry", "shock", 0.50),          # 16.4%
+        ("crosses_all", "crossed_fraction", 0.99),  # 0.3% -- all four
     ],
 }
 

@@ -866,6 +866,157 @@ same relative decline for the third run running. Nothing was done to
 
 ---
 
+## Why nothing flies, measured a second time — and the answer is thrust
+
+Six questions asked on 2026-09-09, each answered from arch37's 14,092
+evaluations and its 182 final elites rather than from opinion. The last one
+changes the diagnosis in "What arch37 measured" §2 and supersedes it.
+
+### 1. Nothing in this project has ever measured thrust
+
+The air ladder reads `lift_margin` (the airframe's **static** lift, fixed
+attitude, no flapping), `airborne_fraction` (where the machine was), `sink_rate`
+(how fast it came down) and `station_keeping` (whether it stayed). Sustained
+flight is thrust >= drag. **In four runs and 14,092 evaluations no measurement
+anywhere read whether the flapping produces net forward force.**
+
+`thrust_margin` is the same quantity for propulsion that `lift_margin` is for
+lift — `(<Fx>_cycle − Fx_static) / drag` at the machine's own trim speed and
+pitch, so 1.0 is "the gait produces the airframe's entire drag" and the machine
+holds speed instead of trading height for it. Quasi-static, the same class of
+estimate `lift_at` already is, 0.12 s per phenotype, cached.
+
+Measured over arch37's 182 final elites at their own gaits:
+
+| | |
+|---|---|
+| median | **−0.0030** |
+| p90 | +0.0354 |
+| maximum | **+0.2390** |
+| share >= 0.10 | 3.3% |
+
+**Every hand-built seed plan is in the same place.** The gannet reads −0.0001;
+the teal, a 5 Hz flapper, reads **−0.3796** — its flapping produces 38% more
+drag than holding the wings still. Correlation with `lift_margin` is +0.242, so
+this is not the question the ladder already asks: 58.0% of the archive can hold
+its own weight up and 3.3% can push itself along.
+
+**And positive thrust is reachable**, which is what makes this a rung rather
+than a wall. A random search over 400 gaits per body:
+
+| plan | at its own gait | best of 400 | at |
+|---|---|---|---|
+| gannet | −0.0001 | **+0.8466** | 10.95 Hz |
+| teal | −0.3796 | +0.4633 | 7.78 Hz |
+| beetle | +0.0231 | +0.1731 | 4.50 Hz |
+| bat | −0.0074 | +0.1171 | 0.78 Hz |
+
+The gaits that make thrust run at **4.5–11 Hz with the joints spread across the
+cycle** — a travelling wave. The population sits at 2.2 Hz, the beetle seed
+default, and `corr(flap_hz, thrust_margin)` over the archive is **+0.009**
+because the whole archive is inside the dead zone.
+
+**So the chain is complete.** The population found gliders: 58% hold their
+weight statically, 12.6% glide, 6.8% hold height. A glider converts height into
+speed and comes down. `holds_station` and `climbs` are exactly the rungs that
+need thrust, and thrust was never in the score — which is precisely where lift
+was before arch37, when 72.6% of the archive could not lift its own weight and
+nothing said so. **This supersedes the "the paths are not straight" reading of
+the `holds_station` wall.** That inference may still be true and arch38's
+excursion diagnostic still tests it, but it is downstream of this: a machine
+with no thrust cannot hold station however straight its path.
+
+### 2. GRPO — the right algorithm, and not yet the binding constraint
+
+The observation already carries eight body-identity channels
+(`MORPHOLOGY_DIM = 8`: mass, density ratio, wing area, span, aspect ratio, wing
+loading, actuated count, battery), so "the critic cannot see the body" — the
+usual argument for a group baseline — does not apply here.
+
+What is true is that the reward is **one terminal scalar spread over ~2,000
+steps** by GAE, and the shared policy has measured as contributing nothing four
+times running (−0.0014 ± 0.0016 in-distribution). A group-relative advantage
+over several rollouts of the *same body* would cancel the body's contribution
+exactly and leave only "did this sampled action sequence beat this body's other
+attempts", which is the only signal that can teach the policy anything.
+
+**But it is not the binding constraint, and §1 says why: no controller can be
+rewarded for producing thrust when nothing measures thrust.** Put the signal in
+first; then GRPO has something worth approximating. Its cost is G rollouts per
+body, so a partial form — a handful of bodies per generation given G=4
+learning-only rollouts — is the affordable version when it is time.
+
+### 3. Topology growth is half productive
+
+Medians, first band to last, with the within-band correlation against reaching
+`glides`:
+
+| | gen 0–99 | gen 800–899 | corr (within band) |
+|---|---|---|---|
+| `n_parts` | 4 | 9 | **+0.191** (last band +0.29) |
+| `dof` | 8 | 15 | +0.119 |
+| `cppn_complexity` | 18 | **73** | +0.060, flat all run |
+
+Parts are the strongest predictor of flight in the whole body vector and growing
+them is reasonable. **CPPN complexity quadrupled and buys almost nothing** — and
+`dof` drives identification, which is 67% of an evaluation, so the drift is paid
+for in wall time every generation.
+
+### 4. Wing morphology is being evolved in the direction that does not matter
+
+**`aspect_ratio` correlates +0.004 with reaching `glides`** — and that is not a
+whole-run artefact: within every one of the nine generation bands it sits
+between −0.02 and +0.05. Over the same run it climbed **8.47 → 14.76, +74%**.
+
+What does correlate is `wing_area`, at +0.102, and **its correlation rises with
+the population** (+0.06 in the first band to +0.21 in the last). `wing_area` went
+0.215 → 0.230 — **+7%, essentially flat.**
+
+**The search grew the dimension that does nothing and left flat the one that
+buys.** No scoring defect has been identified behind this, so nothing is changed
+for it directly; the prediction is that `thrust_margin` fixes it as a side
+effect, because thrust scales with the area being flapped and nothing before now
+rewarded area for its own sake. **That is a prediction arch38 tests, not a
+result.**
+
+### 5. Sparsity is in the mission and the transitions, not in the ladders
+
+Share of arch37's evaluations at each ladder's rung 0, and where the rest sit:
+
+| ladder | rung 0 | shape |
+|---|---|---|
+| air | 9.8% | spread across rungs 1–6 — healthy, this is what arch37 bought |
+| water | 0.2% | **79.3% piled on rung 2** — the spawn handed out the first two |
+| land | 27.3% | 42.9% on rung 3 |
+| transition | 29.1% | **70.6% on rung 1, 0.3% above it** |
+
+And `mission_fraction` has a median of **0.000300** against a maximum of 0.2992
+— three orders of magnitude, a needle. The segment ladders are not the sparse
+part and have not been since arch37.
+
+### 6. The rewards conflict, specifically, and the conflict deepens
+
+Within-band correlations, so the shared time trend is removed:
+
+| | air competence | water competence |
+|---|---|---|
+| `wing_area` | **+0.076** | **−0.195** |
+| `density_ratio` | −0.086 | **+0.518** |
+| `mass` | +0.137 | −0.085 |
+
+**A wing costs two and a half times more in water than it buys in air.** And the
+competences themselves diverge as the run proceeds — `corr(air, water)` runs
++0.04, +0.05, +0.04, −0.05, −0.06, −0.05, −0.10, −0.16, **−0.17** across the nine
+bands, monotonically. **The more the population specialises, the more the two
+objectives fight.** That is the triphibian premise showing its cost, and the
+`land_air` island — added in arch37, second of seven, source of the run's
+mission-best — is the shape of the answer: pairs, not the whole.
+
+Separately, `corr(mission, structure) = +0.703` over the three objectives, so
+two of the three are largely one.
+
+---
+
 ## arch38 — the work list
 
 Ordered by what the evidence supports, not by what would be satisfying. The
@@ -920,6 +1071,60 @@ to do is fixed. **Run 900, read the report at 500, and extend to 1000+ only if
 the capability bands are still climbing.** At arch37's late slope the 100
 generations from 900 to 1000 cost 2.7 h (11%) and would be the single most
 productive hundred of the run.
+
+### J. `thrust_margin`, and three rungs on it — **done, unrun.** The largest item on this list
+
+The measurement and its distribution are in "Why nothing flies, measured a
+second time" §1 above. Published on **all three** exits of the air branch, like
+`lift_margin` and for the same reason — a rung reads it, and a metric published
+on one exit of three is what voided arch37's first launch.
+
+Three rungs, inserted between `holds_height` and `holds_station`:
+
+| rung | at | leaves standing |
+|---|---|---|
+| `flaps_forward` | 0.00 | ~49% — flapping is not a net cost |
+| `makes_thrust` | 0.05 | 7.7% |
+| `pushes_itself` | 0.15 | ~2% |
+
+**Above `holds_height`, not below it, and that placement is the whole design.**
+Everything below can be earned by a glider, so putting thrust at the bottom
+would cap 58% of the archive and destroy the gradient arch37 built. Everything
+above — holding a station, climbing — genuinely requires thrust, and those rungs
+have been reached once and never in 14,092 evaluations. So the change costs
+nothing that exists and adds a direction where the population is stuck.
+
+No rung is placed above +0.239, the largest value ever measured, even though the
+gait sweep reached +0.8466. The headroom is real; naming a rung in it before
+anything is near would be the `moves`-at-0.1-m/s mistake.
+
+**The reach is 6.8% of the population initially** — only designs that already
+hold height see these rungs. That is the honest cost of the ordering, and
+arch37 grew `holds_height+` seventeen-fold in one run, so the audience grows.
+
+### K. The transition ladder, rebuilt from its own distribution — **done, unrun**
+
+70.6% of arch37 sat on rung 1 and 0.3% above it, for three reasons all visible
+in the measurements:
+
+1. `crossed_fraction` counts how many of four transitions were made, so it takes
+   five values. A rung at 0.34 is "two of four" (70.9%) and the next at 0.99 is
+   "all four" (0.3%). **Three-of-four — 17.1% of the population — had no rung.**
+2. **Completeness was demanded before quality.** Every quality rung sat above
+   `crosses_all`, so a machine that crossed two boundaries beautifully scored
+   the same rung as one that crossed two badly.
+3. **Two quality rungs were set at or above the population's maximum.**
+   `arrives_usable` asked for `exit_state >= 0.7` and the largest value ever
+   measured is **0.689** — a rung nobody can stand on. `stays_controlled` asked
+   for `control >= 0.6` against a p90 of 0.296.
+
+Eight rungs now, every threshold inside the measured distribution, shares
+decreasing monotonically: `crosses` 70.9%, `stays_controlled` (0.20) 56.4%,
+`arrives_usable` (0.30) 48.2%, `arrives_well` (0.37) 27.0%, `crosses_three`
+(0.60) 17.1%, `crosses_efficiently` (0.75) 17.1%, `survives_entry` (0.50) 16.4%,
+`crosses_all` 0.3%.
+
+**Transition rungs are not comparable across arch37 → arch38.**
 
 ### A. Publish the altitude excursion. Costs nothing, decides everything below
 
@@ -1112,18 +1317,61 @@ enough for the distinction to exist — the offline probe that was to decide the
 window length failed three times and was abandoned, its one usable output being
 that tripling the window costs 25%, not the 1.35x measured without identification.
 
-### I. A longer segment window — refuted by its own arithmetic
+### I. A longer segment window — **done, unrun**, after the first answer here was wrong
 
-The obvious response to "`holds_station` is never reached" is to lengthen the
-8 s window, and the cost is affordable: identification does not scale with
-segment length, so tripling the air window alone is about +8%.
+This item was first written as "refuted": lengthening the window makes
+`station_keeping` harder, because a drifting machine has more time to leave the
+band, so it raises the wall it was meant to lower.
 
-**It makes the rung harder, not easier.** `station_keeping` is the fraction of
-the late window spent within a band of where the machine settled, so a longer
-window gives a drifting machine more time to leave the band. At 8 s the
-statistic is already nearly constant at 0.05–0.08 across the whole population;
-at 24 s it compresses further toward zero. Lengthening the window would raise
-the wall it was meant to lower.
+**That is an argument for not measuring the problem.** If a longer window
+produces more drift, the drift was already there and the short window was
+hiding it; a design that holds height for four seconds and not for twenty is not
+holding height. The correct target is a machine that works over an unbounded
+duration, and every previous fix on this list has the same shape — the 6 m air
+drop capped `airborne_fraction` at 0.15, the water spawn handed out 4 m,
+`sink_rate` reads two endpoints. **Each time the ceiling was the measurement,
+not the machine.**
+
+What the objection was really detecting is a genuine defect, and it is worse
+than "harder": **`station_keeping` is not a capability threshold at all, it is a
+sink-rate threshold that depends on the window length.** For a steady descent at
+v it evaluates to `band / (v · T)`, so the rung's 0.6 asks for
+
+| measurement window | sink rate `holds_station` actually demands |
+|---|---|
+| 4 s (today's 8 s segment) | ≤ 0.21 m/s |
+| 12 s (a 24 s segment) | ≤ 0.069 m/s |
+
+One rung name, two physical requirements, decided by a command-line flag. That
+breaks this ladder's own contract that a rung means the same thing on day one
+and day five, and the 24 s version would sit a factor of three beyond anything
+arch37 reached — the "`moves` at 0.1 m/s left 61.6% of the population with
+nowhere to stand" mistake, again.
+
+**The fix separates the segment from the measurement window.** A long segment
+asks two questions and they now have two answers:
+
+- *did it survive* — `airborne_fraction`, which gets harder as the segment
+  grows, which is the entire point of growing it;
+- *did it hold a height* — `sink_rate` and `station_keeping`, measured over a
+  fixed `TriphibianEnv.STATION_WINDOW` of 4.0 s regardless of segment length.
+
+4.0 s is what those statistics implicitly used at an 8 s segment, so **nothing
+measured before this moves and every arch37 number stays comparable.** Verified:
+a 0.4 m/s descent scores station 0.376 at 8 s and 0.375 at 24 s.
+
+And `altitude_wobble` is added beside `altitude_excursion` — the maximum
+deviation from the *fitted trend* over the whole airborne stretch, in metres and
+in band units. `sink_rate` carries the trend and the wobble carries what is left,
+so the two are orthogonal and neither grows with the window: a 2.0 m oscillation
+reads 2.24 m at both 8 s and 24 s, while a straight 0.4 m/s descent reads
+0.000 m of wobble against 1.60 m of excursion.
+
+**arch38 runs at `--segment-seconds 24`.** Identification does not scale with
+segment length, so the measured cost is +24.5% per design — about 102 s per
+generation against arch37's 82, or 25.5 h for 900 generations. `energy_required`
+is computed from `spec.seconds_per_domain`, not from the segment, so the energy
+term does not move with it.
 
 It would help the excursion diagnostic see an oscillation period, and that is
 not worth 8% on its own. Revisit once A says what the paths look like.
@@ -1145,6 +1393,45 @@ Order: publish the excursion (A), read it, then decide. If the excursion says
 the machines are oscillating at a frequency nothing in the body predicts, that
 is a control problem. If it says they stall and recover, that is the actuator
 model, and *then* the change is supported.
+
+---
+
+## arch39 — the work list, as it stands before arch38 has run
+
+Everything here is evidence-backed and deliberately **not** in arch38, because
+each depends on a distribution that arch38 is about to move.
+
+**L. Aspect ratio grows and buys nothing** (§4 above): +0.004 correlation with
+gliding in every band, while climbing 74% over the run, and `wing_area` — the
+thing that does correlate, increasingly — stayed flat. No scoring defect has
+been identified behind it. **First check whether `thrust_margin` fixes it as a
+side effect**, since thrust scales with the area being flapped. If arch38 shows
+area still flat with thrust rewarded, the next candidate is charging for span.
+
+**M. CPPN complexity drift** (§3): 18 → 73 over the run, correlation +0.060 and
+flat, while `n_parts` at +0.191 is the strongest predictor in the body vector.
+Charging for complexity is the obvious move and the obvious risk: complexity and
+part count are not independent, and part count is the thing that works.
+**Measure their correlation and the conditional effect of each before touching
+either.**
+
+**N. GRPO for the shared policy** (§2), once thrust is in the score. Partial
+form: G=4 learning-only rollouts for a few bodies per generation.
+
+**O. The air spawn** (item C), still the largest structural distortion and still
+without a safe design.
+
+**P. `descriptor_refit_every`** (item E), measurable for the first time in
+arch38 and unfixed.
+
+**Q. The triphibian conflict itself** (§6). `corr(air, water)` runs from +0.04 to
+−0.17 across arch37's nine bands, and a wing costs 2.5x more in water than it
+buys in air. The `land_air` island — added in arch37, finished second of seven,
+produced the run's mission-best — is evidence that pairs work where the whole
+does not. The question this raises is whether the mission should be a chain of
+pairs rather than a single machine asked to be good at three things at once.
+**That is a change to what this project is for, so it is written down and not
+acted on.**
 
 ---
 

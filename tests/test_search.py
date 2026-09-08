@@ -1106,16 +1106,22 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # derived rather than written out, so inserting another rung moves the
     # expectations instead of breaking them.
     LIFT = sum(1 for _n, m, _t in LADDER["air"] if m == "lift_margin")
+    # The thrust rungs sit between `holds_height` and `holds_station`, because
+    # everything below them can be earned by a glider and everything above them
+    # needs the flapping to make net forward force.  Derived, not written out,
+    # so inserting another rung moves the expectations instead of breaking them.
+    THR = sum(1 for _n, m, _t in LADDER["air"] if m == "thrust_margin")
     flies = {"lift_margin": 1.5}
+    pushes = {**flies, "thrust_margin": 2.0}
     seq = [
         ({**flies, "airborne_fraction": 0.05}, LIFT + 0),
         ({**flies, "airborne_fraction": 0.7, "sink_rate": 6.0}, LIFT + 2),
         ({**flies, "airborne_fraction": 0.7, "sink_rate": 2.0}, LIFT + 3),
         ({**flies, "airborne_fraction": 0.9, "sink_rate": 0.2}, LIFT + 4),
-        ({**flies, "airborne_fraction": 0.9, "sink_rate": 0.2,
-          "station_keeping": 0.8}, LIFT + 5),
-        ({**flies, "airborne_fraction": 0.95, "sink_rate": -1.0,
-          "station_keeping": 0.8, "turn_rate_held": 0.0}, LIFT + 6),
+        ({**pushes, "airborne_fraction": 0.9, "sink_rate": 0.2,
+          "station_keeping": 0.8}, LIFT + THR + 5),
+        ({**pushes, "airborne_fraction": 0.95, "sink_rate": -1.0,
+          "station_keeping": 0.8, "turn_rate_held": 0.0}, LIFT + THR + 6),
     ]
     ok = all(rung_reached("air", m) == k for m, k in seq)
     check("the ladder orders capability", ok,
@@ -1128,7 +1134,7 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # own weight at any speed, scored the two `airborne_fraction` rungs for
     # being dropped from 30 m, and had no gradient between "makes no lift" and
     # "flies".
-    perfect = {"airborne_fraction": 1.0, "sink_rate": -2.0,
+    perfect = {"airborne_fraction": 1.0, "sink_rate": -2.0, "thrust_margin": 2.0,
                "station_keeping": 0.9, "turn_rate_held": 0.5}
     check("a body that makes no lift scores nothing in air",
           rung_reached("air", {**perfect, "lift_margin": 0.0}) == 0,
@@ -1136,6 +1142,55 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     check("and one halfway there sits between that and flying",
           0 < rung_reached("air", {**perfect, "lift_margin": 0.35}) < LIFT,
           f"margin 0.35 -> rung {rung_reached('air', {**perfect, 'lift_margin': 0.35})}")
+
+    # A glider is not a flyer, and until arch38 the ladder could not say so.
+    # Everything up to `holds_height` is earnable by descending slowly;
+    # `holds_station` and `climbs` need thrust, and thrust was unmeasured for
+    # four runs -- median -0.0030 over arch37's 182 elites, every hand-built
+    # seed at zero or negative, and `holds_station` reached once in 14,092
+    # evaluations.
+    glider = {"lift_margin": 3.0, "airborne_fraction": 1.0, "sink_rate": 0.2,
+              "station_keeping": 0.9, "turn_rate_held": 0.5}
+    check("a glider stops where gliding stops, however well it held station",
+          rung_reached("air", {**glider, "thrust_margin": -0.2}) == LIFT + 4,
+          f"rung {rung_reached('air', {**glider, 'thrust_margin': -0.2})} -- "
+          f"held station 0.9 and climbed, and cannot make thrust")
+    check("and the same episode with thrust goes to the top",
+          rung_reached("air", {**glider, "sink_rate": -1.0,
+                               "thrust_margin": 2.0}) == len(LADDER["air"]),
+          "thrust is what separates the two")
+    check("the thrust rungs are ordered and sit above holds_height",
+          [rung_reached("air", {**glider, "thrust_margin": v})
+           for v in (-0.1, 0.02, 0.10, 0.20)]
+          == [LIFT + 4, LIFT + 5, LIFT + 6, LIFT + 7 + 1],
+          "margins -0.1 / 0.02 / 0.10 / 0.20 -> rungs "
+          + " ".join(str(rung_reached("air", {**glider, "thrust_margin": v}))
+                     for v in (-0.1, 0.02, 0.10, 0.20)))
+
+    # The transition ladder put 70.6% of arch37 on rung 1 and 0.3% above it,
+    # because completeness was demanded before quality and two of the quality
+    # rungs were set at or above the population's own maximum -- `arrives_usable`
+    # asked for `exit_state >= 0.7` against a largest-ever-measured 0.689.
+    t_ok = {"crossed_fraction": 0.5, "control": 0.25, "exit_state": 0.40,
+            "economy": 0.75, "shock": 0.55}
+    check("crossing two boundaries well now outscores crossing two badly",
+          rung_reached("transition", t_ok)
+          > rung_reached("transition", {**t_ok, "control": 0.0}),
+          f"rung {rung_reached('transition', t_ok)} against "
+          f"{rung_reached('transition', {**t_ok, 'control': 0.0})}, "
+          f"same two crossings")
+    check("and every transition rung is reachable",
+          all(rung_reached("transition", {**t_ok, "crossed_fraction": 1.0,
+                                          "exit_state": 0.69, "control": 0.68,
+                                          "shock": 1.0, "economy": 1.0}) ==
+              len(LADDER["transition"]) for _ in (0,)),
+          "the best values arch37 ever recorded clear the whole ladder")
+    check("the transition ladder is monotone in what it asks",
+          [rung_reached("transition", {"crossed_fraction": c, "control": 0.0,
+                                       "exit_state": 0.0, "economy": 0.0,
+                                       "shock": 0.0})
+           for c in (0.25, 0.5)] == [0, 1],
+          "two of four is rung 1; one of four is rung 0")
 
     # The water ladder had the same defect the air one had, and it outlived
     # the fix by three runs: `submerges` at 0.5 m and `dives` at 3.0 m read
@@ -1166,9 +1221,11 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
                      for g in (0.1, 1.0, 3.0, 6.0)))
 
     # The within-rung bonus must never reach the next rung's score.
-    below = j.score("air", {**flies, "airborne_fraction": 0.95, "sink_rate": -1.0,
+    # `pushes`, not `flies`: without a thrust margin both of these stop at the
+    # same rung and the check ties itself, which is not a test of anything.
+    below = j.score("air", {**pushes, "airborne_fraction": 0.95, "sink_rate": -1.0,
                             "station_keeping": 0.8, "turn_rate_held": 0.0})
-    top = j.score("air", {**flies, "airborne_fraction": 0.95, "sink_rate": -1.0,
+    top = j.score("air", {**pushes, "airborne_fraction": 0.95, "sink_rate": -1.0,
                           "station_keeping": 0.8, "turn_rate_held": 0.5})
     check("clearing six rungs never ties with clearing seven",
           below["total"] < top["total"], f"{below['total']:.3f} < {top['total']:.3f}")

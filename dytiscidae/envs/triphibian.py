@@ -452,6 +452,14 @@ class TriphibianEnv:
     #: two things that made it a *gift* are gone: a design with no trim speed
     #: anywhere is released at the bottom of the band rather than the top, and
     #: the air score no longer pays for the velocity it was handed.
+    #: The window `sink_rate` and `station_keeping` are measured over, in
+    #: seconds, independent of how long the segment is.  Without it both
+    #: statistics change meaning with `segment_seconds`, and the rungs that read
+    #: them stop being comparable between runs.  4.0 s is the value they had
+    #: implicitly at an 8 s segment, chosen so nothing measured before this
+    #: change moves.
+    STATION_WINDOW = 4.0
+
     SPAWN = {
         Domain.AIR: (-40.0, 0.0, 30.0),
         Domain.WATER: (-8.0, 0.0, -4.0),
@@ -707,6 +715,108 @@ class TriphibianEnv:
         Free: the trim sweep computes it and caches it per phenotype.
         """
         return float(self._trim()[2])
+
+    def thrust_margin(self, phases: int = 16) -> float:
+        """What the flapping adds forward, over the airframe's own drag.
+
+        ``lift_margin`` asks whether the airframe can hold its weight up.  This
+        asks whether the *gait* can hold its speed -- and nothing in this
+        project asked it before, in fourteen thousand evaluations across four
+        runs.  A glider that cannot make thrust converts height into speed and
+        sinks; ``holds_station`` and ``climbs`` are exactly the rungs that
+        require thrust, and they had been reached once and never in 14,092
+        evaluations.  That is precisely where lift was before arch37: the
+        capability had no measurement, so it had no gradient.
+
+            drag   = -Fx with the joints held at the cycle's mean angle
+            thrust = <Fx>_cycle - Fx_static
+            margin = thrust / drag
+
+        1.0 is "the flapping produces the airframe's entire drag at the speed it
+        trims for", i.e. level powered flight rather than a descent.
+
+        Measured over arch37's 182 final elites at their own gaits: **median
+        -0.0030, maximum +0.2390, and 3.3% above 0.10.**  Every hand-built seed
+        plan is in the same place -- the gannet reads -0.0001 and the teal, a
+        5 Hz flapper, reads -0.3796, so its flapping produces 38% more drag than
+        holding still.  Correlation with ``lift_margin`` is +0.242, so it is a
+        genuinely different question from the one the ladder already asks.
+
+        **And positive thrust is reachable**, which is what makes this a rung
+        and not a wall: a random search over 400 gaits took the gannet from
+        -0.0001 to **+0.8466** at 10.95 Hz, the teal to +0.4633 at 7.78 Hz.  The
+        gaits that make thrust run at 4.5-11 Hz with the joints spread across
+        the cycle -- a travelling wave -- while the population sits at 2.2 Hz,
+        the beetle seed default, with correlation +0.009 between ``flap_hz`` and
+        this quantity because the whole archive is inside the dead zone.
+
+        Quasi-static, like ``lift_at``: joint angles and rates are set around
+        one cycle and the solver is evaluated, without stepping the dynamics.
+        Same class of estimate the trim sweep already relies on, and about
+        0.12 s per phenotype, cached.
+        """
+        import math
+
+        cached = getattr(self.p, "_measured_thrust", None)
+        if cached is not None:
+            return float(cached)
+
+        out = 0.0
+        try:
+            mj, m, d = self._mj, self.model, self.data
+            v, pitch, _lift = self._trim()
+            jid = np.asarray(m.actuator_trnid[:, 0], int)
+            ok = jid >= 0
+            if m.nq >= 7 and m.nu > 0 and bool(ok.any()):
+                qadr = np.asarray(m.jnt_qposadr, int)[jid[ok]]
+                dadr = np.asarray(m.jnt_dofadr, int)[jid[ok]]
+                base = self.cpg.base
+                hz = max(float(getattr(base, "frequency", 2.0) or 2.0), 1e-3)
+                dt = 1.0 / (hz * phases)
+                x0, y0, z0 = self.SPAWN[Domain.AIR]
+
+                def fx(angles, rates):
+                    mj.mj_resetData(m, d)
+                    d.qpos[:3] = (x0, y0, z0)
+                    d.qpos[3:7] = (math.cos(-pitch / 2), 0.0,
+                                   math.sin(-pitch / 2), 0.0)
+                    d.qvel[:] = 0.0
+                    d.qvel[0] = v
+                    k = min(len(qadr), len(angles))
+                    d.qpos[qadr[:k]] = angles[:k]
+                    d.qvel[dadr[:k]] = rates[:k]
+                    self.solver.reset()
+                    mj.mj_forward(m, d)
+                    d.xfrc_applied[:] = 0.0
+                    self.solver.apply(d, 0.0)
+                    return float(d.xfrc_applied[:, 0].sum())
+
+                cmds = [np.asarray(self.cpg.command(base, k * dt), float)
+                        for k in range(phases)]
+                zero = np.zeros(len(dadr))
+                # Held at the cycle's mean angle, not at zero, so the comparison
+                # is against the same geometry the flapping passes through.
+                static = fx(np.mean(cmds, axis=0), zero)
+                moving = [
+                    fx(cmds[k],
+                       (cmds[(k + 1) % phases] - cmds[(k - 1) % phases]) / (2 * dt))
+                    for k in range(phases)
+                ]
+                self.solver.reset()
+                drag = -static
+                if drag > 1e-9:
+                    out = float((float(np.mean(moving)) - static) / drag)
+        except Exception:
+            # A body whose joints cannot be posed says nothing about thrust; it
+            # must not say "lots".  Zero is the honest answer and it is also the
+            # ladder's first rung, so such a design stops there.
+            out = 0.0
+        out = float(np.clip(out, -10.0, 10.0)) if np.isfinite(out) else 0.0
+        try:
+            self.p._measured_thrust = out
+        except Exception:
+            pass
+        return out
 
     def _trim(self) -> tuple:
         cached = getattr(self.p, "_measured_trim", None)
@@ -1267,6 +1377,7 @@ class TriphibianEnv:
                 # the first attempt at this changed one of the three and a grep
                 # for another key said that was all of them.
                 res.measurements["lift_margin"] = float(self.lift_margin)
+                res.measurements["thrust_margin"] = float(self.thrust_margin())
                 return 0.0  # never left the surface: no flight to score
             idx = np.flatnonzero(airborne)
 
@@ -1318,6 +1429,7 @@ class TriphibianEnv:
                     # through here and scored air rung 0 whatever their airframe
                     # could do, which voided that launch.
                     "lift_margin": float(self.lift_margin),
+                    "thrust_margin": float(self.thrust_margin()),
                 })
                 return float(credit * frac * 0.10)
 
@@ -1334,7 +1446,33 @@ class TriphibianEnv:
             # of its arc because the hill came up to meet it.  Scored 0.75 for
             # flight.  It is now released at the bottom of the launch band, and
             # gated above in any case.
-            late = idx[len(idx) // 2:]
+            # The late half of the airborne stretch, **capped at a fixed
+            # window**, so that what this measures does not change when the
+            # segment length does.
+            #
+            # `station_keeping` is the fraction of this window spent within a
+            # band of where the machine settled, so for a steady descent at v it
+            # is `band / (v * T)` -- the rung threshold 0.6 therefore encodes a
+            # sink rate that depends on T.  At an 8 s segment it asks for
+            # <= 0.21 m/s; at 24 s it would silently ask for <= 0.069 m/s.  Same
+            # rung name, two different physical requirements, which breaks this
+            # ladder's own contract that a rung means the same thing on day one
+            # and day five -- and would set a bar no design in arch37 came within
+            # a factor of three of, which is the "moves at 0.1 m/s left 61.6% of
+            # the population with nowhere to stand" mistake again.
+            #
+            # Capping the measurement window separates the two questions a long
+            # segment asks.  *Survive the segment* is read by
+            # `airborne_fraction`, and gets harder as the segment grows, which
+            # is the point of growing it.  *Hold a height* is read here over a
+            # constant window, and means the same thing at any segment length.
+            #
+            # At `segment_seconds` 8 this is exactly the old definition -- the
+            # airborne stretch cannot exceed 8 s, so its late half cannot exceed
+            # the 4 s cap -- so every arch37 number remains comparable.
+            half = max(len(idx) // 2, 1)
+            cap = max(int(self.STATION_WINDOW / self.timestep), 1)
+            late = idx[-min(half, cap):]
             if len(late) > 1:
                 span_s = (late[-1] - late[0]) * self.timestep
                 sink = float(
@@ -1402,6 +1540,27 @@ class TriphibianEnv:
                 # reads it.
                 excursion = None
 
+            # Oscillation, separated from trend, over the **whole** airborne
+            # stretch rather than a window.
+            #
+            # `excursion` above is the deviation from where the machine settled,
+            # so for a steady descent it is just the drift and it grows with the
+            # window -- useful, and not window-invariant.  Subtracting the fitted
+            # line leaves the part that is not a descent at all: the amplitude of
+            # whatever the machine is doing around its own trajectory.  That
+            # number does not grow with the window for a periodic motion, so it
+            # means the same thing at 8 s and at 24 s, and it is the quantity the
+            # arch37 inference was actually about -- `sink_rate` already carries
+            # the trend, and 173 segments held height on it while scoring a tenth
+            # of the station a straight descent would give.
+            if len(idx) > 2:
+                cc = np.asarray(clearances)[idx].astype(float)
+                tt = np.arange(len(idx), dtype=float) * self.timestep
+                slope, icept = np.polyfit(tt, cc, 1)
+                wobble = float(np.max(np.abs(cc - (slope * tt + icept))))
+            else:
+                wobble = None
+
             # Manoeuvring means the attitude change was *asked for*.
             authority, turn = _turn_authority(commands, responses)
 
@@ -1417,6 +1576,7 @@ class TriphibianEnv:
                 # is how 53% of arch36 was paid, and `rung_reached` stops
                 # at the first unmet rung, so the ordering is the gate.
                 "lift_margin": float(self.lift_margin),
+                "thrust_margin": float(self.thrust_margin()),
                 # The ladder reads these, so a gated design must not be able to
                 # climb it on numbers that do not mean what they say.  The
                 # measurements themselves are kept under their own names so the
@@ -1456,6 +1616,9 @@ class TriphibianEnv:
             if excursion is not None:
                 res.measurements["altitude_excursion"] = excursion
                 res.measurements["excursion_ratio"] = excursion / band
+            if wobble is not None:
+                res.measurements["altitude_wobble"] = wobble
+                res.measurements["wobble_ratio"] = wobble / band
             # Both of the terms that paid for something other than flying are
             # gone.  The flat 0.25 for being off the ground at all is now the
             # graded glide term, and the 0.2 for the launch velocity the
