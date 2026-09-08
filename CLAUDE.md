@@ -9,8 +9,8 @@ measurement behind every item — **read it before proposing anything**.
 ## Session start
 
 1. `git status` and `git log --oneline -5`.
-2. Read `docs/ROADMAP.md` §"arch35 — the work list". Items A and B are
-   implemented and unrun; the next training run is their test.
+2. Read `docs/ROADMAP.md` §"arch38 — the work list". Nothing in it is
+   implemented yet; item A is a free diagnostic and decides the rest.
 3. Canary — the three suites, filtered, ~15 min total:
 
 ```bash
@@ -78,9 +78,14 @@ steady state is ~74 s. Not a regression.
   something. Check `auditor.invalidated` before reaching for another explanation.
 - `on-task` in a showcase means *which medium the machine is in*, not whether it
   is doing anything: a machine sitting still on the beach scores 98% on land.
-- Air scores, and `mission_fraction`, are **not comparable across arch33→arch34
-  or arch34→arch35**. Each boundary redefined a term. Say "not comparable"
-  rather than shrinking the difference.
+- Air scores, and `mission_fraction`, are **not comparable across arch33→arch34,
+  arch34→arch35, or arch36→arch37** (the air ladder went from 7 rungs to 11).
+  Each boundary redefined a term. Say "not comparable" rather than shrinking the
+  difference.
+- **`sink_rate` is the difference between two endpoints** of the late half of the
+  airborne window, so it reads zero for a machine that goes down and comes back
+  up. `station_keeping` is the one that sees the shape between them; where the
+  two disagree, believe the second. arch37 measured the gap at 10x.
 
 ## Where the ground truth lives
 
@@ -88,8 +93,8 @@ steady state is ~74 s. Not a regression.
 |---|---|
 | `docs/ROADMAP.md` | work list + the measurement behind every decision |
 | `docs/CPU_LEGACY.md` | older backlog, superseded where they disagree |
-| `runs/arch34/report.html` | arch34's full chart report |
-| `runs/arch34_notes.md` | that run's configuration and findings |
+| `runs/arch37/report.html` | the latest run's full chart report |
+| `runs/archNN_notes.md` | each run's configuration and findings |
 | `.claude/skills/training-report/` | regenerates the report for any run |
 | `.claude/agents/` | six roles: explorer, mutator, assumption-breaker, adversary, judge, historian |
 
@@ -100,11 +105,13 @@ enough).
 
 ## The lesson this project keeps re-learning
 
-Three times a score has paid for uncontrolled motion — a wingless design thrown
-at 30 m/s scoring 0.853 for flight, a tumble scoring as a commanded turn, and a
-machine rebounding off the beach scoring as a take-off. Each time the fix was a
-**gate**, not a coefficient. When adding any measurement, ask what it reads for
-a machine that is falling.
+Four times a score has paid for uncontrolled motion — a wingless design thrown
+at 30 m/s scoring 0.853 for flight, a tumble scoring as a commanded turn, a
+machine rebounding off the beach scoring as a take-off, and arch37's
+`holds_height` rung cleared by a trajectory that drops and comes back (measured:
+a tenth of the `station_keeping` a straight descent at the same sink would give).
+Each time the fix was a **gate**, not a coefficient. When adding any measurement,
+ask what it reads for a machine that is falling — and for one that is bouncing.
 
 And: set thresholds from the measured distribution, never from what the
 capability ought to look like. `moves` at 0.1 m/s left 61.6% of arch34 below it

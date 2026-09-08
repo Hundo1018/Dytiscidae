@@ -5,9 +5,15 @@ built. Every item names the measurement that motivates it; nothing here is on
 the list because it seemed like a good idea, and nothing is marked done without
 the number it produced.
 
-Revised 2026-09-05, after arch34 ran. The six phases below are history now and
-keep the measurements that motivated them; **the current work list is
-[arch35](#arch35--the-work-list)**, immediately after the results.
+Revised 2026-09-08, after arch37 ran. Everything below is kept for the
+measurement that motivated it; **the current work list is
+[arch38](#arch38--the-work-list)**, at the end, after the four results sections.
+
+arch37 is the run that made flight visible to selection — the share of the
+archive that can hold its own weight went 27.4% -> 58.0% and gliding capability
+rose 9.7x — and its own data refutes the explanation that was about to be given
+for the rung above. Read [What arch37 measured](#what-arch37-measured) §2 before
+proposing anything about flight.
 
 Read [CPU_LEGACY.md](CPU_LEGACY.md) for the older backlog. This file supersedes
 it wherever the two disagree.
@@ -732,6 +738,238 @@ arch36 left one segment in 3,247 scoring 4.16 m with a lifting surface, holding
 posture, and **touching the ground for 77% of the segment**. A departure means
 leaving, not visiting. `contact_fraction` is already measured. Not added
 mid-arch36 because a third gate would have destroyed that arm.
+
+---
+
+## What arch37 measured
+
+900 generations, 24.0 h, 14,092 evaluations, 82 s/gen, seed 20260901, same pool
+shape as arch35 and arch36. Clean exit — no OOM, no `memory_stop`, no traceback.
+Two changes, A and B, measured by quantities that do not overlap.
+
+**The first launch was void and is kept in `runs/arch37_void_missing_liftmargin/`.**
+Two of the three exits from the air branch never published `lift_margin`, and a
+missing metric stops `rung_reached` where it stands, so 50 of 180 air segments
+scored rung 0 whatever their airframe could do. The short-hop exit is the path
+every falling design takes — free fall from the 30 m spawn is 2.5 s, 31% of an
+8 s segment, under that branch's 35% bar. Caught fifteen minutes after launch by
+checking the published measurement rather than the code that was edited.
+
+### 1. A worked, and it is the clearest result this project has had
+
+| | arch36 archive (gen900) | arch37 archive (gen900) |
+|---|---|---|
+| `lift_margin` median | 0.333 | **1.377** |
+| share >= 1.0 (can hold itself up somewhere) | 27.4% | **58.0%** |
+
+Endpoint to endpoint, elite to elite. Capability over *evaluations*, which no
+archive bookkeeping can move:
+
+| gens | glides+ | holds_height+ | holds_station+ |
+|---|---|---|---|
+| 0–99 | 1.3% | 0.4% | 0.1% |
+| 400–499 | 4.8% | 2.2% | 0 |
+| 800–899 | **12.6%** | **6.8%** | 0 |
+
+`glides` and above rose **9.7x**, `holds_height` and above **17x**, and both
+accelerated in the last third. A plateau called at gen600 off one flat band was
+wrong.
+
+The mechanism is visible in the split between the two populations: over the same
+bands the archive share at `lift_margin >= 1.0` rose 55.1% -> 62.0% while the
+*candidate stream* fell 64.9% -> 60.8%. Mutation degrades lift and always did;
+what changed is that selection can now see it and keep the flyers.
+
+### 2. The wall is `holds_station`, and the reason is not what the ladder assumes
+
+Reached once, in band 0–99, and never again in the remaining 12,400 evaluations.
+
+The first explanation — that the population lacks thrust, because among gliders
+the height-holders differ from the sinkers in `flap_hz` (2.690 against 2.200,
+the beetle seed default) and not in `lift_margin` (2.336 against 2.355) — is
+**refuted by the run's own data**. Over 740 glider segments (`lift_margin >= 1`,
+`|sink| < 3`):
+
+    corr(station_keeping, flap_hz)  -0.201     corr(., span) +0.015
+    corr(station_keeping, mass)     -0.143     corr(., dof)  -0.189
+
+Higher flap frequency scores *lower*, and the best band is 0–1 Hz — the gannet
+seed value. `station_keeping` is uncorrelated with everything the archive
+records, sitting at a median of 0.05–0.08 across every band of every body
+variable.
+
+**What it is instead: the flight paths are not straight.** Take the 173 segments
+that hold height on the ladder's own measure (`lift_margin >= 1`, `|sink| < 0.5`)
+and ask what a straight-line descent at that same sink rate would have scored,
+from the definitions in `triphibian.py` — band `max(0.25 * span, 0.5)` m, late
+window at most 4 s:
+
+| | median `station_keeping` | share >= 0.6 |
+|---|---|---|
+| straight descent at the measured sink | 0.704 | 59.5% |
+| **actually measured** | **0.062** | **0.58%** |
+
+A tenth of what the geometry allows. These machines return near their starting
+height by the end of the window while leaving it by more than a quarter of their
+own span in between — and `sink_rate`, which is the difference between the two
+endpoints of the late half, cannot see any of it.
+
+So `holds_height` is being cleared, in part, by a trajectory that goes down and
+comes back. **This is the fourth time a score has paid for uncontrolled motion**
+— after the 30 m/s wingless launch, the tumble scored as a turn and the rebound
+scored as a take-off — and it is the first time the gate was already in place:
+`station_keeping` refuses it correctly. The defect is in the rung *below* it.
+
+**What is missing is one altitude trace.** Every statement above is an inference
+from summary telemetry, because the run stores no trajectory and `showcase` does
+not load the shared PPO snapshot the run flew with (it trains a fresh controller
+or loads a pickle), so the flown path cannot be reconstructed offline. That is
+the arch38 item: publish the excursion, do not infer it.
+
+### 3. B is live, contributes, and is never crossed
+
+`land_air` finished with 73 elites, second of seven, and **produced the
+mission-best design of the run**. All seven islands took 18+ promotions evenly,
+so the hybrid routing fix works and the island's objective is reachable from the
+seeds. And `transition:land_to_air` carries a mean PPO reward of **+0.0025**
+against `water_to_land`'s +0.7130 and `water_to_air`'s +0.1847.
+
+Scored, wanted, essentially never achieved. **Making the search want something it
+cannot do does not make it happen** — which is the answer to the arch36 list's
+item D, and it is not the answer that list expected.
+
+### 4. The mission is unchanged for a fourth run — but the machine is not
+
+`showcase --by mission` over 188 elites: fitness 0.9945, `mission_fraction`
+0.2892, `land_air` island, 8.53 kg, 2.64 m span, **aspect ratio 16.7**, density
+ratio 0.74, 20 dof.
+
+    on-task 32%   transitions 0/2   max depth 0.0 m
+      leg 1 land   96%     leg 2 air   0%     leg 3 water   0%
+
+arch34, arch35, arch36 and arch37 all film **0/2 transitions, 0.0 m depth**.
+
+What changed is the body. arch36 filmed a dense lump — aspect ratio 0.3, 0.18 m
+span, density ratio 4.65. arch37 films a glider. **The airframe problem is being
+solved and the mission problem is not**, because the mission's air leg begins
+wherever the land leg left it and nothing can take off.
+
+`mission_fraction` **is not comparable across the arch36 -> arch37 boundary**:
+the air ladder went from 7 rungs to 11, so air competence sits at a different
+fraction of its ladder and the product that uses it moved with it.
+
+### 5. F, unchanged as designed
+
+34 refits, peak 100, final 65 (−35%). arch36: peak 121, final 79 (−35%). The
+same relative decline for the third run running. Nothing was done to
+`descriptor_refit_every` and nothing changed.
+
+---
+
+## arch38 — the work list
+
+Ordered by what the evidence supports, not by what would be satisfying. The
+headline is that **A solved the problem it was aimed at and revealed the next
+one**, and the next one is a measurement defect, not a hardware limit.
+
+### A. Publish the altitude excursion. Costs nothing, decides everything below
+
+`_score_segment` already holds `clearances` and the `late` index window. It
+publishes `sink_rate` (the two endpoints) and `station_keeping` (occupancy of a
+band) and throws away the shape between them. Add, ungated, next to
+`measured_sink_rate`:
+
+- `altitude_excursion` — `max|clearance − ref|` over the late window, in metres
+- `excursion_ratio` — the same divided by the station band, so it is comparable
+  across a 0.5 m machine and a 3 m one
+
+This is the `lift_margin` pattern exactly: a quantity the code already computes
+and discards, published as a diagnostic with no rung on it, so the question is
+answered by the next run for free. **Do not put a rung on it in arch38** — a
+threshold set before the distribution is known is the mistake this project keeps
+writing down.
+
+It settles, in one run, whether the population is porpoising (excursion ≫ band
+with sink ≈ 0), stalling and recovering, or whether the inference in §2 above is
+wrong and something else produces those numbers.
+
+### B. Make `flap_frequency` searchable — the standing item, now with a caveat
+
+50.4% of arch36 sat at exactly 2.20 Hz and 24.9% at 0.60 Hz, the two seed
+defaults. The operator that jitters it fires normally (5.5%, 72.9% hit rate);
+the cause is the mix — structural operators at 16–18% each against ~5.5% for
+each parameter operator, so a lineage of depth 10 has a ~57% chance of never
+touching frequency. `structural_bias` = 1.6 doing what it says.
+
+**The caveat is new and it matters.** The reason to do this used to be the
+height-holder discriminant (2.690 against 2.200). §2 refutes that as the
+explanation of the wall — station is *negatively* correlated with frequency. So
+this stays on the list because **half the population has never had a search
+variable touched at all**, which is a defect in the search regardless of what it
+buys, and it stops being justified as the fix for flight.
+
+Its own arm, and its measurement is the `flap_hz` distribution, not the ladder.
+
+### C. The air spawn, now the largest single distortion
+
+With the lift rungs in place a dropped machine scores what its airframe deserves
+and no more, so this is no longer paying for free fall. It still means **no air
+number in this project is evidence a machine got airborne on its own**, and it
+is why `land_to_air` can be scored, wanted and never crossed: the air segment
+does not need the transition, so nothing ever practises it.
+
+Same defect as the water spawn below, same treatment: score a segment that
+begins where the previous leg ended, or measure the air result as a gain over
+the spawn state.
+
+### D. The water spawn — carried forward unchanged, and now the oldest item here
+
+`SPAWN[Domain.WATER] = (-8.0, 0.0, -4.0)` releases the machine four metres under.
+`max_depth >= 0.5 m` is therefore true of 100% of evaluations in every band of
+every run. Measure depth as a *gain* over the spawn depth, the way
+`takeoff_height` is a gain over resting clearance. Until then no water number is
+evidence a machine can get wet, and the report's comparison chart uses 10 m to
+say something at all.
+
+### E. Item F, `descriptor_refit_every` — three runs, three identical declines
+
+−35%, −35%, −38%. It needs its own arm and has been deferred three times.
+
+### F. Mass is free; the battery sweep is written and unrun
+
+`runs/probe_battery.py` exists and has never been run. It answers whether a
+bigger battery is strictly better on fixed morphologies — if it is and the search
+is not taking it, the operator is at fault and not the energy model. Only then
+decide between charging for parts and capping mass, and not both in one arm.
+
+### G. Retired: the contact-fraction gate on take-off
+
+Listed in the arch37 work list and **withdrawn without being implemented.** In an
+8 s window `contact_fraction` measures how *quickly* a machine leaves, not
+whether it left: a machine that departs at t=6 s scores 0.75 and one that departs
+at t=2 s scores 0.25, and both departed. The gate would have punished the slower
+departure and called it a failure to depart. Revisit only against a window long
+enough for the distinction to exist — the offline probe that was to decide the
+window length failed three times and was abandoned, its one usable output being
+that tripling the window costs 25%, not the 1.35x measured without identification.
+
+### H. On changing the actuator model
+
+Raised externally: stage the work as flapping actuator -> fixed-rig lift test ->
+autonomous take-off -> water -> land, and stop trying to be triphibian first.
+
+The staging argument is the same one C and D make and it is right. The actuator
+change is **not yet supported by evidence**. The case for it was that the ladder
+had reached the limit of static airframe lift and the next rung needs thrust —
+but §2 shows `holds_station` is not gated by thrust in any way the data can see,
+and A above is the cheap measurement that would tell us. Changing the actuator
+model now would rebuild the physics on the strength of an inference that the
+run's own correlations refute.
+
+Order: publish the excursion (A), read it, then decide. If the excursion says
+the machines are oscillating at a frequency nothing in the body predicts, that
+is a control problem. If it says they stall and recover, that is the actuator
+model, and *then* the change is supported.
 
 ---
 
