@@ -1370,9 +1370,37 @@ class TriphibianEnv:
             band = max(0.25 * float(getattr(self.p, "max_span", 2.0)), 0.5)
             if len(late) > 1:
                 ref = float(clearances[late[0]])
-                station = float(np.mean(np.abs(clearances[late] - ref) < band))
+                dev = np.abs(clearances[late] - ref)
+                station = float(np.mean(dev < band))
+                # The shape between the endpoints, which neither of the other
+                # two measurements can see.  ``sink_rate`` is the difference
+                # between ``clearances[late[0]]`` and ``clearances[late[-1]]``,
+                # so it reads zero for a machine that drops and comes back;
+                # ``station_keeping`` sees that something is wrong but not what.
+                #
+                # arch37 measured the gap and it is a factor of ten: over the
+                # 173 segments holding height on the ladder's own measure
+                # (``lift_margin`` >= 1, |sink| < 0.5 m/s), a straight-line
+                # descent at the same sink rate would have scored 0.704 median
+                # station with 59.5% clearing ``holds_station``; the measured
+                # values are 0.062 and 0.58%.  A tenth of what the geometry
+                # allows, so the paths are not straight -- and every statement
+                # about *how* they are not straight was an inference, because
+                # nothing published the excursion.
+                #
+                # Now something does.  ``excursion_ratio`` is the same quantity
+                # in units of the machine's own station band, so a 0.5 m
+                # machine and a 3 m one are comparable.
+                excursion = float(dev.max())
             else:
                 station = 0.0
+                # Not zero.  A window too short to measure has no excursion to
+                # report, and 0.0 would read as "perfectly steady" -- a
+                # degenerate case scoring like the best possible one, which is
+                # the shape of every scoring bug in this file's history.  The
+                # key is simply absent, which is safe precisely because no rung
+                # reads it.
+                excursion = None
 
             # Manoeuvring means the attitude change was *asked for*.
             authority, turn = _turn_authority(commands, responses)
@@ -1398,6 +1426,21 @@ class TriphibianEnv:
                 "station_keeping": 0.0 if gates else station,
                 "measured_sink_rate": sink,
                 "measured_station_keeping": station,
+                # Diagnostics, ungated and with **no rung reading them**, which
+                # is the property that makes them safe to add mid-programme:
+                # ``rung_reached`` stops at the first rung whose metric is
+                # missing, and arch37's first launch was voided by exactly that
+                # -- a metric published on one of the air branch's three exits
+                # and read by a rung.  Nothing reads these, so a branch that
+                # never computes them costs nothing.
+                #
+                # A threshold is deliberately not set here.  The distribution
+                # is unknown, and setting a bar from what the capability ought
+                # to look like rather than from what was measured is the
+                # mistake this file keeps recording.
+                #
+                # Published just below, so a window too short to measure can
+                # leave them out rather than report a flattering zero.
                 "spin_rate": spin,
                 "turn_authority": authority,
                 # This used to be the mean rate of change of the up-vector over
@@ -1410,6 +1453,9 @@ class TriphibianEnv:
                 ) else 0.0,
                 "air_gates": float(len(gates)),
             })
+            if excursion is not None:
+                res.measurements["altitude_excursion"] = excursion
+                res.measurements["excursion_ratio"] = excursion / band
             # Both of the terms that paid for something other than flying are
             # gone.  The flat 0.25 for being off the ground at all is now the
             # graded glide term, and the 0.2 for the launch velocity the

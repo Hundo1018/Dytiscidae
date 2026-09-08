@@ -872,6 +872,49 @@ Ordered by what the evidence supports, not by what would be satisfying. The
 headline is that **A solved the problem it was aimed at and revealed the next
 one**, and the next one is a measurement defect, not a hardware limit.
 
+Two items that looked like the obvious arm are withdrawn here rather than
+deferred — B on three measurements and H on one — because a list that only ever
+grows stops being a record of what the evidence supports.
+
+**The arm this list recommends is no arm.** A costs nothing and changes no
+selection, so a run carrying only A is simultaneously the excursion measurement
+and a *replication of arch37 at a second seed* — and arch37's headline (lift
+rungs doubling the flyable share, glides up 9.7x) is currently n=1. Every other
+item here is either blocked on what A returns or, in C's case, not yet designed
+to a state where it can be run without destroying the gradient arch37 built.
+
+### How long to run it — 900, read at 500, extend if it is still climbing
+
+Asked as "900 -> 1000 or 900 -> 500?" and answered from what the last two runs
+did per generation rather than from what a longer run ought to buy.
+
+| | glides+ gain already present at gen 500 | slope, gens 300–599 | slope, gens 600–899 |
+|---|---|---|---|
+| arch36 | 38.4% | +0.67 pts/100gen | +1.00 pts/100gen |
+| arch37 | **31.3%** | +0.67 pts/100gen | **+2.15 pts/100gen** |
+
+arch37's `glides+` ran 1.31% -> 4.83% at gen 500 -> **12.57%** at gen 900. **The
+most productive third of the run is the last third, in both runs, and arch37's
+was still accelerating when it stopped.** Cutting to 500 generations discards
+roughly two thirds of the result and specifically the part that compounds.
+
+But that is only true of *capability* measurements. The two kinds separate
+cleanly:
+
+| what the arm measures | decidable by | evidence |
+|---|---|---|
+| a distribution over candidates | **gen 100–200** | arch37's `lift_margin >= 1` share ran 64.9% in band 0–99 and 63.4% in band 800–899 — flat all run, settled in the first band |
+| a capability | **not by 900** | `glides+` still accelerating in the final band |
+
+So neither 500 nor 1000 is a decision that has to be made in advance.
+`--resume` extends a finished run — `tests/test_search.py` runs 3 generations,
+resumes with `generations=6`, and checks that exactly 3 new evaluations happen —
+and the checkpoint bug that would have told a resumed run there was nothing left
+to do is fixed. **Run 900, read the report at 500, and extend to 1000+ only if
+the capability bands are still climbing.** At arch37's late slope the 100
+generations from 900 to 1000 cost 2.7 h (11%) and would be the single most
+productive hundred of the run.
+
 ### A. Publish the altitude excursion. Costs nothing, decides everything below
 
 `_score_segment` already holds `clearances` and the `late` index window. It
@@ -893,34 +936,78 @@ It settles, in one run, whether the population is porpoising (excursion ≫ band
 with sink ≈ 0), stalling and recovering, or whether the inference in §2 above is
 wrong and something else produces those numbers.
 
-### B. Make `flap_frequency` searchable — the standing item, now with a caveat
+### B. Make `flap_frequency` searchable — **withdrawn, on three measurements**
 
-50.4% of arch36 sat at exactly 2.20 Hz and 24.9% at 0.60 Hz, the two seed
-defaults. The operator that jitters it fires normally (5.5%, 72.9% hit rate);
-the cause is the mix — structural operators at 16–18% each against ~5.5% for
-each parameter operator, so a lineage of depth 10 has a ~57% chance of never
-touching frequency. `structural_bias` = 1.6 doing what it says.
+Kept here with its evidence because it was the obvious next arm and it is not
+one. Three things were checked before proposing it and each weakened it further.
 
-**The caveat is new and it matters.** The reason to do this used to be the
-height-holder discriminant (2.690 against 2.200). §2 refutes that as the
-explanation of the wall — station is *negatively* correlated with frequency. So
-this stays on the list because **half the population has never had a search
-variable touched at all**, which is a defect in the search regardless of what it
-buys, and it stops being justified as the fix for flight.
+**1. The premise is half gone. The search already moved the parameter.** Share
+of evaluations sitting on exactly a seed default (2.20 or 0.60 Hz):
 
-Its own arm, and its measurement is the `flap_hz` distribution, not the ladder.
+| | arch36 | arch37 |
+|---|---|---|
+| exactly a seed default | 75.4% | **47.7%** |
 
-### C. The air spawn, now the largest single distortion
+and arch37's most common single value is **2.690 Hz at 24.3%** — a mutated value
+that took a quarter of the population. **The operator mix was identical in both
+runs.** What changed was the ladder. The parameter was never unsearchable; it
+was unselectable, because nothing scored what a better frequency buys.
 
-With the lift rungs in place a dropped machine scores what its airframe deserves
-and no more, so this is no longer paying for free fall. It still means **no air
-number in this project is evidence a machine got airborne on its own**, and it
-is why `land_to_air` can be scored, wanted and never crossed: the air segment
-does not need the transition, so nothing ever practises it.
+**2. The bandit's credit says the suppressed operators are better, and a second
+instrument says they are not.** Over arch37's 31,139 selections:
 
-Same defect as the water spawn below, same treatment: score a segment that
-begins where the previous leg ended, or measure the air result as a gain over
-the spawn state.
+| | tries | bandit lifetime | bandit windowed | accepted into archive | mean `mission_fraction` |
+|---|---|---|---|---|---|
+| 13 parameter operators | 9,388 | 0.0873 | 0.0724 | **30.26%** | 0.00241 |
+| 8 structural operators | 20,463 | 0.0485 | 0.0386 | **30.34%** | 0.00175 |
+
+The bandit's own credit separates the two kinds cleanly and with no overlap —
+every parameter operator outranks every structural one, `global_energy` included
+at 0.0900 against a best structural 0.0531. And the archive **accepts them at
+the same rate to within 0.08 points over 31,000 trials.**
+
+So `structural_bias` is not costing the search acceptance, and the thing that
+needs explaining is why the bandit's reward and the archive's decision disagree
+this completely. That is a finding about the credit signal, not a licence to
+retune the tilt. **Do not change `structural_bias` on the strength of the bandit
+numbers alone** — they are the instrument under suspicion.
+
+**3. It was never the explanation of the wall anyway.** §2 above: station keeping
+correlates −0.201 with `flap_hz`.
+
+**What survives as work:** find out why bandit credit and archive acceptance
+disagree. It is offline, it costs nothing, and until it is answered every
+operator-mix decision is being made on a number that predicts nothing.
+
+### C. The air spawn — a real distortion with no safe fix yet designed
+
+**Not an arm until someone designs it, and the naive version is known to fail.**
+
+The distortion is real: **no air number in this project is evidence a machine got
+airborne on its own**, and it is why `land_to_air` can be scored, wanted and
+never crossed — the air segment does not need the transition, so nothing ever
+practises it.
+
+But "move the spawn to the ground" is the fix that was already tried and
+reverted, and the measurement is in `triphibian.py` beside `SPAWN`: the old
+6 m release gave 1.1 s of free fall inside an 8 s segment, capping
+`airborne_fraction` — which multiplies every air term — at 0.15 no matter how
+well the machine flew. Measured 0.136 to 0.173 across all five body plans, with
+air scores of 0.035 to 0.044. **The ceiling was the height of the drop, not
+aerodynamics.** Grounding the spawn now would put that ceiling back and take the
+gradient arch37 just built with it.
+
+So the machinery for a ground-up path already exists and is not the air segment:
+the `takeoff` ladder, its two arch36 gates, and the `land_to_air` transition.
+They are all in place, all scored, and the answer arch37 gave is that **making
+the search want something it cannot do does not make it happen.** Which makes
+this a capability question, not a scoring one — and A is the measurement that
+says which capability is missing.
+
+**Do:** wait for A. Then design a segment that starts on the ground *without*
+making airborne fraction the binding term — most likely by scoring the take-off
+attempt on its own ladder, as take-off already is, rather than by moving where
+the air segment begins.
 
 ### D. The water spawn — carried forward unchanged, and now the oldest item here
 

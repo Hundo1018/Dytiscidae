@@ -1979,10 +1979,12 @@ def test_the_air_score_measures_flight() -> None:
     dt, dur = env.timestep, 8.0
     n = int(dur / dt)
 
-    def air(sink, *, spins=None, commands=None, responses=None, gates=()):
+    def air(sink, *, spins=None, commands=None, responses=None, gates=(),
+            clear=None):
         r = SegmentResult(domain=Domain.AIR, duration=dur)
         r.mean_speed = 20.0
-        clear = 30.0 - sink * np.arange(n) * dt
+        if clear is None:
+            clear = 30.0 - sink * np.arange(n) * dt
         env.air_gates = list(gates)
         try:
             s = env._score_segment(
@@ -2001,6 +2003,47 @@ def test_the_air_score_measures_flight() -> None:
           creep["sink_rate"] < 0.5 and creep["station_keeping"] < 0.6,
           f"sink {creep['sink_rate']:.2f} m/s, station "
           f"{creep['station_keeping']:.2f}")
+
+    # 2b. And a machine that drops and comes back reads as holding height.
+    #
+    # `sink_rate` is the difference between the two endpoints of the late half
+    # of the airborne window, so a path that leaves its height and returns to it
+    # scores zero sink and clears `holds_height` while holding nothing.  arch37
+    # measured the consequence over 173 real segments: a straight descent at
+    # their measured sink rates would have scored 0.704 median
+    # `station_keeping`, and they scored 0.062 -- a tenth.  Every account of
+    # *how* those paths were not straight was an inference, because nothing
+    # published the shape.
+    #
+    # This is the fixture that inference describes, and `altitude_excursion` is
+    # what now sees it.
+    t_s = np.arange(n) * dt
+    bounce = 30.0 - 3.0 * np.sin(np.pi * np.clip((t_s - 4.0) / 4.0, 0.0, 1.0))
+    _s, bob = air(0.0, clear=bounce)
+    check("a path that drops 3 m and returns still reads as holding height",
+          abs(bob["sink_rate"]) < 0.5,
+          f"sink {bob['sink_rate']:+.3f} m/s over a 3 m excursion")
+    check("and the excursion is what says otherwise",
+          bob["altitude_excursion"] > 2.5 and bob["excursion_ratio"] > 2.0,
+          f"excursion {bob['altitude_excursion']:.2f} m = "
+          f"{bob['excursion_ratio']:.1f} station bands")
+    check("while a straight glide's excursion is just its drift",
+          creep["altitude_excursion"] < 0.4 * dur / 2 + 1e-6,
+          f"{creep['altitude_excursion']:.2f} m over a {dur / 2:.0f} s late "
+          f"window at 0.4 m/s")
+    check("and holding height leaves almost none",
+          held["altitude_excursion"] < 1e-6, f"{held['altitude_excursion']:.3g} m")
+
+    # The property that makes this safe to add mid-programme.  `rung_reached`
+    # stops at the first rung whose metric is missing, and arch37's first launch
+    # was voided by exactly that: a metric published on one of the air branch's
+    # three exits and read by a rung.  These are published on one exit too --
+    # and nothing reads them.
+    from dytiscidae.evolution.judge import LADDER
+    read_by_rungs = {m for rungs in LADDER.values() for _n, m, _t in rungs}
+    check("no rung reads the new diagnostics, so a branch that skips them is safe",
+          not read_by_rungs & {"altitude_excursion", "excursion_ratio"},
+          "excursion metrics are diagnostics, not rungs")
 
     # 3. A tumble is not a commanded turn.
     rng = np.random.default_rng(0)

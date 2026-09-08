@@ -312,6 +312,23 @@ COMPARABLE = [
     ("energy_feasible", "fraction with energy_margin >= 0",
      lambda e: e.get("energy_margin") is not None,
      lambda e: (e.get("energy_margin") or -1) >= 0),
+    # arch38's diagnostic.  `sink_rate` is the difference between the two
+    # endpoints of the late airborne window, so a machine that drops and comes
+    # back reads zero sink and clears `holds_height` while holding nothing;
+    # arch37's 173 height-holding segments scored a tenth of the
+    # `station_keeping` a straight descent at their own sink rate would give.
+    # `excursion_ratio` is the missing shape, in units of the machine's own
+    # station band, so 1.0 means "left the band it is judged against".
+    #
+    # No threshold is asserted as a capability bar -- this is a diagnostic and
+    # it has no rung.  1.0 is the definition's own boundary, which is the only
+    # number available before the distribution is known.  Runs before arch38 do
+    # not publish it, so `has` is false throughout and the series is dropped
+    # rather than drawn as a measured zero.
+    ("steady_path", "fraction of air segments whose altitude excursion stayed "
+                    "inside one station band",
+     lambda e: _lm(e, "air", "excursion_ratio") is not None,
+     lambda e: (_lm(e, "air", "excursion_ratio") or 9e9) < 1.0),
 ]
 
 #: Named, with the reason, instead of being drawn against a baseline that would
