@@ -1350,6 +1350,50 @@ Whether a measurement is *taken* no longer moves with the window. How long the
 machine had to survive still does, via `airborne_fraction` and the two rungs
 that read it, which is the point of the longer segment.
 
+### I, part two — the second launch was void too, and the item is **withdrawn**
+
+`runs/arch38_void_ladder_inverted/`, 6.2 h and 2,220 evaluations. The gate fix
+held — the full measurement path ran 65–75%, `thrust_margin` was published with
+zero omissions — and the ladder came apart one rung higher up.
+
+`stays_up` reads `airborne_fraction >= 0.60`. At a 24 s segment from a 30 m
+launch that is 14.4 s aloft, **a sink rate under about 2.08 m/s** — and the rung
+directly above it, `glides`, asks for `sink_rate < 3.0`. Measured over the run's
+1,588 full-path segments:
+
+| | share |
+|---|---|
+| `airborne_fraction >= 0.60` (rung 5) | **0.06%** |
+| `sink_rate < 3.0` (rung 6, above it) | **9.8%** |
+
+**The lower rung is 160x harder than the one above it.** `rung_reached` stops at
+the first unmet rung, so 1,418 of 2,220 evaluations recorded rung 5 and one
+recorded rung 6 — and the three thrust rungs at 8, 9 and 10 had an audience of
+zero. The run could not measure its own headline item.
+
+The ladder's contract is that it is a progression. **A fractional threshold
+inside a ladder is a threshold whose difficulty moves with a command-line flag,
+and at 3x the window it moved past the rung above it.** That is the third form
+of this defect found in one day, after `station_keeping` and the measurability
+gates, and it is the one that survives being careful about the first two:
+`airborne_fraction` *should* be a fraction, because it is the survival question
+— the mistake was raising the window while leaving a rung ordered against a
+different one.
+
+**Decision: the segment goes back to 8 s and this item is withdrawn.** The
+alternative — making the airborne rungs absolute at 0.8 s and 4.8 s, their
+meaning at an 8 s segment — restores the order, but then the longer window
+affects nothing in the ladder at all and buys only a longer diagnostic tail for
+**+74% wall time** (measured: 143 s/gen against arch37's 82, where the estimate
+had been 102). That is not worth a day.
+
+**What survives, and it is the durable part:** every gate that decides whether a
+measurement is *taken* is now an absolute duration — `MEASURABLE_AIR_SECONDS`,
+the 0.4 s never-airborne branch, `STATION_WINDOW` — so the segment length can be
+raised in a later run without any of this recurring. Revisit the window when
+there is a population that stays airborne, and re-derive the `airborne_fraction`
+rungs from that population's distribution at the same time.
+
 ### I (original). A longer segment window — after the first answer here was wrong
 
 This item was first written as "refuted": lengthening the window makes
