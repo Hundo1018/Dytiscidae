@@ -450,6 +450,85 @@ def cmd_showcase(args) -> int:
     print(p.summary())
 
     controller = None
+    # The control law the elite's scores were earned under, rebuilt from the run.
+    #
+    # `run_continuous` (mission.py) reads
+    # `params = controller.params if controller is not None else env.cpg.base`
+    # and `basis = ... else None`, so a showcase with no controller drove the
+    # machine **open-loop from the raw pattern generator, with no policy and no
+    # mobility basis**.  That is the failure ROADMAP finding 3 is about, and it
+    # is why five runs of footage showed machines that do not move: the filmed
+    # machine was not the machine that earned the score.  The elite filmed for
+    # arch38 records `land_speed` 0.788 m/s, `takeoff_height` 2.288 m and
+    # `max_depth` 9.60 m, and its film reported 0.0 m of depth and no motion.
+    #
+    # `SummedPolicy`'s own docstring names the showcase as one of the paths that
+    # needs it.  The pieces were all present and nothing wired them together:
+    # the elite's stored 168-weight policy, the run's shared network from
+    # `search_state.pkl`, and a mobility basis identified on this body the way
+    # `evaluate_tier1` does it.
+    if args.design and not args.controller and not args.train:
+        import pickle as _pickle
+
+        from ..control.cpg import Policy as _Policy
+        from ..envs.evaluate import SharedController, SummedPolicy
+        from ..envs.triphibian import Domain as _Dom
+
+        env0 = TriphibianEnv(p, seed=args.seed)
+        own = None
+        w = (elite.meta or {}).get("policy")
+        pol = _Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=6, hidden=0)
+        if w is not None and len(w) == pol.n_weights:
+            import numpy as _np
+            pol.weights = _np.asarray(w, float).copy()
+            own = pol
+        bases = {}
+        for dom in (_Dom.AIR, _Dom.WATER):
+            try:
+                bases[dom.value] = env0.identify(dom, seed=args.seed, max_modes=6)
+            except Exception as exc:                              # noqa: BLE001
+                print(f"  mobility identification failed in {dom.value}: {exc}")
+        shared = None
+        sp = Path(args.design) / "search_state.pkl"
+        if sp.exists():
+            try:
+                d = _pickle.load(open(sp, "rb"))
+                sd, shape = d.get("shared_state"), d.get("shared_shape")
+                if sd and shape:
+                    import torch as _torch
+
+                    from ..learning import ppo as _ppo
+                    # Inferred from the stored tensors, not assumed from a flag:
+                    # a width that does not match loads into the wrong shape, and
+                    # `--shared-hidden` is not even an argument of this
+                    # subcommand.  The first 2-D weight's row count is the trunk
+                    # width the run actually used.
+                    hid = next((int(v.shape[0]) for _k, v in sd.items()
+                                if getattr(v, "ndim", 0) == 2), 64)
+                    shared = _ppo.SharedPolicy(int(shape[0]), int(shape[1]),
+                                               hidden=hid)
+                    shared.load_state_dict(
+                        {k: _torch.as_tensor(v) for k, v in sd.items()})
+                    shared.eval()
+            except Exception as exc:                              # noqa: BLE001
+                print(f"  shared policy not recoverable: {exc}")
+        if own is not None or shared is not None:
+            if shared is not None:
+                controller = SharedController(
+                    params=env0.cpg.base, bases=bases,
+                    policy=SummedPolicy(own=own, shared=shared, n_modes=6))
+            else:
+                controller = Controller(params=env0.cpg.base, policy=own,
+                                        bases=bases)
+            print(f"  driving as evaluated: own policy "
+                  f"{'yes' if own is not None else 'NO'}, shared policy "
+                  f"{'yes' if shared is not None else 'NO'}, bases "
+                  f"{sorted(bases)}")
+        else:
+            print("  WARNING: neither a stored policy nor a shared network was "
+                  "recoverable; this film is the pattern generator open-loop "
+                  "and is not evidence about the design")
+
     if args.controller and Path(args.controller).exists():
         d = pickle.load(open(args.controller, "rb"))
         # Width comes from the pickle: a controller trained before the default
