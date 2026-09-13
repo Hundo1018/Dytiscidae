@@ -770,6 +770,34 @@ class TriphibianEnv:
         """
         return float(self._trim()[2])
 
+    def flap_travel(self, phases: int = 16) -> float:
+        """Peak-to-peak actuated-joint travel over one cycle, in radians.
+
+        `thrust_margin` is a *ratio* and a still wing produces exactly 0.0 of
+        it -- which is the honest answer, and is why the rung `flaps_forward` at
+        `thrust_margin >= 0.0` was cleared by flapping that produces nothing.
+        arch38 measured the consequence: selection bought the cheapest clearance,
+        the share at `>= 0.05` fell 7.7% -> 1.8% and the share at exactly zero
+        doubled.
+
+        This separates the two cases the ratio cannot.  A design that does not
+        move its joints and a design whose stroke cancels itself both read zero
+        thrust; only one of them is flapping.  Costs nothing -- the pattern
+        generator is evaluated, the solver is not.
+        """
+        base = self.cpg.base
+        hz = max(float(getattr(base, "frequency", 2.0) or 2.0), 1e-3)
+        dt = 1.0 / (hz * max(int(phases), 2))
+        try:
+            cmds = np.asarray(
+                [np.asarray(self.cpg.command(base, k * dt), float)
+                 for k in range(max(int(phases), 2))], float)
+        except Exception:                                         # noqa: BLE001
+            return 0.0
+        if cmds.ndim != 2 or cmds.size == 0:
+            return 0.0
+        return float(np.mean(cmds.max(axis=0) - cmds.min(axis=0)))
+
     def thrust_margin(self, phases: int = 16) -> float:
         """What the flapping adds forward, over the airframe's own drag.
 
@@ -813,9 +841,23 @@ class TriphibianEnv:
 
         cached = getattr(self.p, "_measured_thrust", None)
         if cached is not None:
-            return float(cached)
+            return None if cached is None else float(cached)
+        if hasattr(self.p, "_measured_thrust"):
+            return None
 
-        out = 0.0
+        # None, not 0.0, when this cannot be measured.
+        #
+        # The first version returned 0.0 for "no actuated joints", "no drag to
+        # divide by" and "the pose could not be set" as well as for "the flapping
+        # produces exactly nothing" -- four states, one number, and the rung
+        # `flaps_forward` was set at `>= 0.0`, so the unmeasurable ones cleared
+        # it.  Measured over 80 re-scored arch38 elites, 8 read exactly 0.0 and
+        # their median `flap_travel` is 0.8998 rad: they are flapping nearly a
+        # radian and the number is a guard, not a result.
+        #
+        # A missing metric stops `rung_reached` where it stands, which is the
+        # correct reading of "unknown" and is what `excursion` already does.
+        out = None
         try:
             mj, m, d = self._mj, self.model, self.data
             v, pitch, _lift = self._trim()
@@ -861,11 +903,11 @@ class TriphibianEnv:
                 if drag > 1e-9:
                     out = float((float(np.mean(moving)) - static) / drag)
         except Exception:
-            # A body whose joints cannot be posed says nothing about thrust; it
-            # must not say "lots".  Zero is the honest answer and it is also the
-            # ladder's first rung, so such a design stops there.
-            out = 0.0
-        out = float(np.clip(out, -10.0, 10.0)) if np.isfinite(out) else 0.0
+            # A body whose joints cannot be posed says nothing about thrust, and
+            # "nothing" is not zero: zero is a measurement some designs earn.
+            out = None
+        out = (float(np.clip(out, -10.0, 10.0))
+               if out is not None and np.isfinite(out) else None)
         try:
             self.p._measured_thrust = out
         except Exception:
@@ -1386,6 +1428,23 @@ class TriphibianEnv:
         intended length makes a truncated episode score the truncation.
         """
         if not res.survived or len(alts) == 0:
+            # The two airframe properties even here.  They are facts about the
+            # body -- a static lift sweep and a cycle-averaged thrust estimate,
+            # both computed from a fresh pose -- so they are the same numbers
+            # whatever the episode did, and the air ladder's bottom rungs read
+            # them.  Withholding them makes a design whose rollout went unstable
+            # indistinguishable from one with no wings: 243 of arch37's 14,092
+            # air segments left this path having published *nothing*, so they
+            # scored rung 0 for a `bad_qacc` rather than for an airframe.
+            #
+            # Same reasoning as the two exits below, and the same defect that
+            # voided arch38's first launch, one level lower down.
+            if domain is Domain.AIR:
+                res.measurements["lift_margin"] = float(self.lift_margin)
+                res.measurements["flap_travel"] = float(self.flap_travel())
+                _tm = self.thrust_margin()
+                if _tm is not None:
+                    res.measurements["thrust_margin"] = float(_tm)
             return 0.0
         upright = float(np.clip(np.mean(ups), 0.0, 1.0))
         # Samples the segment should have produced had it run to term.
@@ -1441,7 +1500,10 @@ class TriphibianEnv:
                 # the first attempt at this changed one of the three and a grep
                 # for another key said that was all of them.
                 res.measurements["lift_margin"] = float(self.lift_margin)
-                res.measurements["thrust_margin"] = float(self.thrust_margin())
+                res.measurements["flap_travel"] = float(self.flap_travel())
+                _tm = self.thrust_margin()
+                if _tm is not None:
+                    res.measurements["thrust_margin"] = float(_tm)
                 return 0.0  # never left the surface: no flight to score
             idx = np.flatnonzero(airborne)
 
@@ -1494,8 +1556,11 @@ class TriphibianEnv:
                     # through here and scored air rung 0 whatever their airframe
                     # could do, which voided that launch.
                     "lift_margin": float(self.lift_margin),
-                    "thrust_margin": float(self.thrust_margin()),
+                    "flap_travel": float(self.flap_travel()),
                 })
+                _tm = self.thrust_margin()
+                if _tm is not None:
+                    res.measurements["thrust_margin"] = float(_tm)
                 return float(credit * frac * 0.10)
 
             # Sink rate measured only over the airborne stretch, and only its
@@ -1641,7 +1706,7 @@ class TriphibianEnv:
                 # is how 53% of arch36 was paid, and `rung_reached` stops
                 # at the first unmet rung, so the ordering is the gate.
                 "lift_margin": float(self.lift_margin),
-                "thrust_margin": float(self.thrust_margin()),
+                "flap_travel": float(self.flap_travel()),
                 # The ladder reads these, so a gated design must not be able to
                 # climb it on numbers that do not mean what they say.  The
                 # measurements themselves are kept under their own names so the
@@ -1684,6 +1749,11 @@ class TriphibianEnv:
             if wobble is not None:
                 res.measurements["altitude_wobble"] = wobble
                 res.measurements["wobble_ratio"] = wobble / band
+            # Conditional for the same reason as the other three exits: a thrust
+            # margin that could not be measured is absent, not zero.
+            _tm = self.thrust_margin()
+            if _tm is not None:
+                res.measurements["thrust_margin"] = float(_tm)
             # Both of the terms that paid for something other than flying are
             # gone.  The flat 0.25 for being off the ground at all is now the
             # graded glide term, and the 0.2 for the launch velocity the
@@ -1756,7 +1826,24 @@ class TriphibianEnv:
             )
 
         # LAND
-        contact = float(np.sum(np.asarray(contacts) > 0.5) / n_want)
+        #
+        # Contact *while upright*, not contact.  Measured over arch38's eight
+        # highest-mission elites at one scattered initial condition, the ungated
+        # fraction reads 0.8197 with the policy driving and **0.8227 with the
+        # actuators held still** -- a machine lying on the beach is in contact
+        # with it, and `supports_itself` is the rung that reads this.  Switching
+        # the machine off moved the number by three parts in a thousand, in the
+        # wrong direction.
+        #
+        # Same treatment `land_speed` and `slope_climbed` just had, and the
+        # ungated figure is kept under its own name so the record stays
+        # re-derivable.
+        raw_contact = float(np.sum(np.asarray(contacts) > 0.5) / n_want)
+        _c = np.asarray(contacts, float)
+        _u = np.asarray(ups, float)
+        _n = min(len(_c), len(_u))
+        contact = float(
+            np.sum((_c[:_n] > 0.5) & (_u[:_n] > 0.5)) / n_want) if _n else 0.0
         progress = float(np.clip(res.mean_speed / 0.6, 0.0, 1.0))
         # Height gained against the beach's own slope: walking uphill is the
         # capability, not merely moving.
@@ -1878,7 +1965,10 @@ class TriphibianEnv:
                 u = np.asarray(ups, float)
                 u = (u[:len(t)] if len(u) >= len(t)
                      else np.pad(u, (0, len(t) - len(u))))
-                held = np.minimum.accumulate(u[::-1])[::-1]
+                # Per-window minimum of the upright trace: a window counts
+                # only if posture held for all of it.  (A suffix-minimum was
+                # computed here first and overwritten on the next line without
+                # ever being read.)
                 held = np.array([u[i:i + w + 1].min() for i in range(len(t) - w)])
                 d = np.where(np.isfinite(d) & (held > 0.5), d, 0.0)
                 peak = float(np.max(d) / (w * step)) if d.size else 0.0
@@ -1907,6 +1997,7 @@ class TriphibianEnv:
         res.measurements.update({
             "upright": upright,
             "contact_fraction": contact,
+            "measured_contact_fraction": raw_contact,
             # Gated, and the ungated figure kept beside it under its own name --
             # the same split as `sink_rate` against `measured_sink_rate` and
             # `takeoff_height` against `measured_takeoff_height`, so the record

@@ -122,9 +122,24 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         # gannet at 10.95 Hz, so the headroom is real and the rung is a slope
         # rather than a wall.  The gaits that make thrust run at 4.5-11 Hz with
         # the joints spread across the cycle; the population sits at 2.2 Hz.
-        ("flaps_forward", "thrust_margin", 0.0),     # ~49% -- not a net cost
-        ("makes_thrust", "thrust_margin", 0.05),     # 7.7%
-        ("pushes_itself", "thrust_margin", 0.15),    # ~2%
+        # Re-derived after arch38 falsified the first version in the opposite
+        # direction.  `flaps_forward` sat at `>= 0.0`, which is the floor of the
+        # quantity and was also the value returned when it could not be measured
+        # at all, so selection bought the cheapest clearance: the share at
+        # `>= 0.05` fell 7.7% -> 1.8% and the share at exactly zero doubled,
+        # while `corr(flap_hz, thrust_margin)` went negative where the gait sweep
+        # implied positive.  The unmeasurable case is now absent rather than
+        # zero, and the bars are strictly above the floor.
+        #
+        # Thresholds from 80 re-scored arch38 elites (p25 -0.0274, median 0.0000,
+        # p75 +0.0064, p90 +0.0189, max +0.0683).  They are much lower than
+        # arch37's because that run's distribution collapsed -- max +0.2390 to
+        # +0.0683 -- and this file's rule is to set a bar from the population
+        # that exists, not from the one that used to.  The ratchet tightens from
+        # here; the rung is what has to sit inside reach.
+        ("flaps_forward", "thrust_margin", 0.002),   # 36.2%
+        ("makes_thrust", "thrust_margin", 0.010),    # 21.2%
+        ("pushes_itself", "thrust_margin", 0.020),   # 7.5%
         # Holding *a* height, not losing one slowly.  A machine gliding down at
         # 0.4 m/s clears ``holds_height`` for a whole segment while never
         # holding anything, which is why the two are separate rungs: this one

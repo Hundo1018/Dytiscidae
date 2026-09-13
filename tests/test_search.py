@@ -1159,13 +1159,21 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
           rung_reached("air", {**glider, "sink_rate": -1.0,
                                "thrust_margin": 2.0}) == len(LADDER["air"]),
           "thrust is what separates the two")
+    # The probe values are derived from the rungs rather than written out, so
+    # re-deriving the thresholds from a new population moves the expectations
+    # instead of breaking the test -- which is what happened when arch38's
+    # collapsed distribution moved these bars from 0.0/0.05/0.15 down to
+    # 0.002/0.010/0.020.
+    THR_BARS = [t for _n, m, t in LADDER["air"] if m == "thrust_margin"]
+    probes = [THR_BARS[0] - 0.1] + [b + (THR_BARS[i + 1] - b) / 2
+                                    if i + 1 < len(THR_BARS) else b * 2.0
+                                    for i, b in enumerate(THR_BARS)]
     check("the thrust rungs are ordered and sit above holds_height",
-          [rung_reached("air", {**glider, "thrust_margin": v})
-           for v in (-0.1, 0.02, 0.10, 0.20)]
-          == [LIFT + 4, LIFT + 5, LIFT + 6, LIFT + 7 + 1],
-          "margins -0.1 / 0.02 / 0.10 / 0.20 -> rungs "
+          [rung_reached("air", {**glider, "thrust_margin": v}) for v in probes]
+          == [LIFT + 4, LIFT + 5, LIFT + 6, LIFT + 4 + THR + 1],
+          "margins " + " / ".join(f"{v:+.4f}" for v in probes) + " -> rungs "
           + " ".join(str(rung_reached("air", {**glider, "thrust_margin": v}))
-                     for v in (-0.1, 0.02, 0.10, 0.20)))
+                     for v in probes))
 
     # An archived elite has to carry what it takes to reproduce its own numbers.
     #

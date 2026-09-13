@@ -570,26 +570,6 @@ def _batched(pool, phenos, **kwargs):
     return batchroll.evaluate_tier1_batch(phenos, **kwargs)
 
 
-def seed_archive(state: SearchState, spec: MissionSpec) -> None:
-    """Populate the archive with the reference design and its neighbourhood."""
-    cfg = state.config
-    # Round-robin over every archetype, then random graphs.  Seeding only from
-    # one plan is what produced an archive of nothing but bilateral flappers:
-    # body plans are separated by valleys that mutation does not cross, so an
-    # unseeded plan is not merely rare, it is unreachable.
-    seeds: list[Genome] = list(seed_population(state.rng, cfg.n_reference_seeds))
-    seeds += [random_genome(state.rng) for _ in range(cfg.n_random_seeds)]
-
-    for i, g in enumerate(seeds):
-        g.genome_id = f"seed{i}"
-        pheno, result, ctrl = evaluate_candidate(
-            g, cfg, identify=True, spec=spec, seed=int(state.rng.integers(1 << 30))
-        )
-        state.evaluated += 1
-        state.curator.evaluations += 1
-        _place(state, g, pheno, result, ctrl, parent=None, operators=["seed"])
-
-
 def _meta_light(pheno, result) -> dict:
     """The subset of ``_meta`` the critic reads, without the expensive parts."""
     seg = result.segments
@@ -1482,6 +1462,32 @@ def load_state(state: SearchState) -> int:
     for attr in ("judge", "auditor", "critic", "scout", "descriptors"):
         if d.get(attr) is not None:
             setattr(state, attr, d[attr])
+
+    # A restored judge carries the ratchets it was pickled with, and a ratchet
+    # is a metric name plus a bar.  When the ladder changes metric the bar stops
+    # meaning anything -- and nothing errors, because both quantities are still
+    # published: arch38's water ratchet tracked `max_depth` while the ladder was
+    # rebuilt on `depth_gain`, so a resume would have gone on tightening a bar
+    # against a number the ladder no longer reads.  Quiet wrongness is the worst
+    # kind here, so say it and start that domain's bar again.
+    if state.judge is not None:
+        from .judge import HEADLINE, Ratchet
+        changed = []
+        for dom, (metric, lower, floor) in HEADLINE.items():
+            r = state.judge.ratchets.get(dom)
+            if r is None or getattr(r, "metric", None) == metric:
+                continue
+            changed.append(f"{dom}: {r.metric} -> {metric}")
+            state.judge.ratchets[dom] = Ratchet(
+                metric=metric, lower_is_better=lower, floor=floor,
+                quantile=state.judge.quantile)
+        if changed:
+            print(f"  (the ladder changed metric since this checkpoint; "
+                  f"{'; '.join(changed)} -- those bars start again rather than "
+                  "tighten against a quantity the ladder no longer reads)",
+                  flush=True)
+            state.telemetry.event({"kind": "ratchet_metric_changed",
+                                   "changed": changed})
     if d.get("curricula"):
         state.curricula.update(d["curricula"])
         # A checkpoint written before the blend became a moving quantity has

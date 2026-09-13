@@ -2122,6 +2122,30 @@ def test_the_air_score_measures_flight() -> None:
           "sink_rate" in mb,
           "0.167 of a 24 s window, and 4 s of flight either way")
 
+    # An unmeasurable thrust margin is absent, not zero.
+    #
+    # The first version returned 0.0 for "no actuated joints", "no drag to divide
+    # by", "the pose could not be set" *and* "the flapping produces exactly
+    # nothing" -- and the rung `flaps_forward` sat at `>= 0.0`, so the three
+    # unmeasurable states cleared it.  Over 80 re-scored arch38 elites, 8 read
+    # exactly 0.0 with a median `flap_travel` of 0.8998 rad: flapping nearly a
+    # radian, and the number was a guard rather than a result.
+    env.p._measured_thrust = None
+    try:
+        _s, unmeasured = air(0.0)
+        check("an unmeasurable thrust margin is absent rather than zero",
+              "thrust_margin" not in unmeasured and "flap_travel" in unmeasured,
+              "a missing metric stops `rung_reached` where it stands, which is "
+              "what 'unknown' means")
+    finally:
+        del env.p._measured_thrust
+
+    # And the stroke is reported separately, so "did not flap" and "flapped to no
+    # effect" are distinguishable in the record.
+    check("the stroke travel is published beside the margin",
+          held.get("flap_travel", 0.0) > 0.0,
+          f"{held.get('flap_travel', 0.0):.3f} rad of joint travel per cycle")
+
     # The property that makes this safe to add mid-programme.  `rung_reached`
     # stops at the first rung whose metric is missing, and arch37's first launch
     # was voided by exactly that: a metric published on one of the air branch's
@@ -2241,11 +2265,18 @@ def test_the_air_score_measures_flight() -> None:
             contacts=np.where(np.arange(n_air) < n_air // 8, 0.0, 1.0)),
         # clear throughout -> the full measurement
         "airborne throughout": dict(clearances=ones_a * 5.0, contacts=zeros_a),
+        # the rollout went unstable -> the `not res.survived` early return,
+        # which used to publish nothing at all.  243 of arch37's 14,092 air
+        # segments left by it and scored rung 0 for a `bad_qacc` rather than for
+        # an airframe.
+        "diverged": dict(clearances=ones_a * 5.0, contacts=zeros_a,
+                         survived=False),
     }
     missing, seen = [], {}
     for name, kw in paths.items():
         r = SegmentResult(domain=Domain.AIR, duration=dur_air)
         r.mean_speed = 0.0
+        r.survived = kw.get("survived", True)
         env._score_segment(Domain.AIR, r, zeros_a, ones_a * 0.9, ones_a,
                            kw["contacts"], clearances=kw["clearances"],
                            vzs=zeros_a)
@@ -2262,15 +2293,16 @@ def test_the_air_score_measures_flight() -> None:
         # one ran.  Without it the three fixtures could all be falling down the
         # same path and the check would pass while testing one third of what it
         # claims.
-        seen[name] = ("full" if "airborne_fraction" in m
+        seen[name] = ("diverged" if not r.survived
+                      else "full" if "airborne_fraction" in m
                       else "short-hop" if "airborne_seconds" in m
                       else "never-airborne")
     check("every path out of the air branch publishes the airframe properties",
           not missing,
           "missing on: " + ", ".join(missing) if missing
           else ", ".join(f"{k}={v}" for k, v in seen.items()))
-    check("and the three fixtures really do take three different paths",
-          len(set(seen.values())) == 3, ", ".join(sorted(set(seen.values()))))
+    check("and the four fixtures really do take four different paths",
+          len(set(seen.values())) == 4, ", ".join(sorted(set(seen.values()))))
 
 
 def test_takeoff_is_measured_where_the_machine_starts_on_the_ground() -> None:
