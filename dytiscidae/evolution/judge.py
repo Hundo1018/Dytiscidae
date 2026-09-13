@@ -169,10 +169,32 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         # stayed upright throughout -- measured over 64 arch34 elites its
         # median is 0.086 m/s against a 0.026 m/s mean, so this rung sits
         # inside the population rather than above it.
-        ("stirs", "land_peak_speed", 0.08),
-        ("moves", "land_speed", 0.1),
-        ("walks", "land_speed", 0.4),
-        ("climbs_slope", "slope_climbed", 0.5),
+        # Re-derived after `land_speed` and `slope_climbed` were gated.
+        #
+        # Both used to be computed from `res.distance`, ungated.  Measured over
+        # arch38's elites at one scattered initial condition, median
+        # `land_speed` was 0.4312 m/s with the policy driving and **0.4262 m/s
+        # with the actuators held still**, and `slope_climbed` 0.4139 against
+        # 0.4091: switching the machine off changed either by about one percent.
+        # Three of the six land rungs were reading a machine falling over and
+        # sliding down the beach.  `land_peak_speed` and `takeoff_height`, the
+        # two that carry posture gates, both read exactly 0.0 for the passive
+        # machine -- so the gate works and was simply not on these.
+        #
+        # Thresholds from the gated distribution over 80 re-scored elites
+        # (`land_speed` p25 0.0000, median 0.0101, p75 0.0355, p90 0.0801;
+        # `slope_climbed` median 0.0115, p75 0.1038, p90 0.4568).  The old 0.1
+        # and 0.4 bars leave 6.2% and about 1% standing on the gated quantity,
+        # which is the `moves`-at-0.1-m/s mistake arriving a second time by the
+        # same route: a threshold set against a number that has since been
+        # corrected downward by a factor of fifty.
+        #
+        # Ordered by the share left standing so the ladder is a slope; the
+        # shares are marginal, as the lift, depth and thrust rungs' were.
+        ("stirs", "land_peak_speed", 0.08),      # 48.8%
+        ("moves", "land_speed", 0.02),           # 35.0%
+        ("climbs_slope", "slope_climbed", 0.05),  # 31.2%
+        ("walks", "land_speed", 0.05),           # 15.0%
     ],
     # Take-off, and it is deliberately a ladder of its own rather than rungs
     # appended to ``land``.  ``rung_reached`` stops at the first unmet rung, and

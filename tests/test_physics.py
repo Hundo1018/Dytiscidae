@@ -2427,10 +2427,20 @@ def test_takeoff_is_measured_where_the_machine_starts_on_the_ground() -> None:
     xy[2 * hop:, 0] = 0.5
     env._score_segment(Domain.LAND, lurch, zeros, ones * 0.9, ones, ones,
                        clearances=ones * 0.05, vzs=zeros, xys=xy)
+    # The ratio, not the factor 8.  That 8 was calibrated against the fixture's
+    # hand-set `mean_speed` of 0.05, which used to *be* `land_speed`; the metric
+    # is now the gated mean of the same posture-masked windows the peak is taken
+    # over, so it is computed rather than stipulated.  For a 0.5 m lurch
+    # occupying one second of an eight-second segment the arithmetic ceiling on
+    # peak/mean is about 8 and the measured value is 7.0 -- the claim being made
+    # is that the peak sees a lurch the mean spreads out, which is a several-fold
+    # difference, not a specific constant.
     check("peak speed sees motion the segment mean averages away",
-          lurch.measurements["land_peak_speed"] > 8 * lurch.measurements["land_speed"],
-          f"mean {lurch.measurements['land_speed']:.3f} m/s vs peak "
-          f"{lurch.measurements['land_peak_speed']:.3f} m/s")
+          lurch.measurements["land_peak_speed"]
+          > 5 * lurch.measurements["land_speed"],
+          f"gated mean {lurch.measurements['land_speed']:.3f} m/s vs peak "
+          f"{lurch.measurements['land_peak_speed']:.3f} m/s, "
+          f"{lurch.measurements['land_peak_speed'] / max(lurch.measurements['land_speed'], 1e-9):.1f}x")
     sliding = SegmentResult(domain=Domain.LAND, duration=8.0)
     sliding.mean_speed = 0.05
     env._score_segment(Domain.LAND, sliding, zeros, ones * 0.9,

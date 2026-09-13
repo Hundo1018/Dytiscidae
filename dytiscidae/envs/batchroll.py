@@ -654,6 +654,11 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         for i in live:
             ctrls[i].bases = results[i].mobility
 
+    # See `evaluate_tier1`: the seed travels with the result so the archive can
+    # say what experiment produced the number.
+    for i in live:
+        results[i].eval_seed = int(seed)
+
     group = [envs[i] for i in live]
     bf = BatchedFluid(group)
 
@@ -665,8 +670,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         # ``hash(name)``, which is salted per process and would have made a
         # score depend on which interpreter ran it.  See TriphibianEnv.scatter
         # for why the canonical pose alone was not a training set.
-        scatter_seed = (int(seed) * 6364136223846793005
-                        + 0x9E3779B9 * (DOMAIN_CYCLE.index(dom) + 1)) & 0x7FFFFFFF
+        from .evaluate import _scatter_seed
+        scatter_seed = _scatter_seed(seed, dom)
         for i in live:
             envs[i].reset(dom)
             envs[i].scatter(np.random.default_rng(scatter_seed))

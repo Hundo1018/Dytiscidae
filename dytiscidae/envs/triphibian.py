@@ -659,8 +659,42 @@ class TriphibianEnv:
             # Scale whatever velocity the pose was set up with, then add to it,
             # so a deliberate entry speed stays an entry speed and stops being
             # the *only* entry speed.
+            #
+            # **The additive term is proportional to the speed already there.**
+            # It used to be a flat `normal(0, 0.35, 3)`, and a land segment
+            # begins at rest, so on land that term was the entire initial
+            # velocity: every scored land segment started with a shove of about
+            # 0.54 m/s and `land_speed` -- which is net displacement over the
+            # segment -- measured the machine coasting away from it.
+            #
+            # Attributed over arch38's eight highest-mission elites, median
+            # `land_speed`: 0.470 m/s scattered and actuated, **0.431 m/s
+            # scattered with the actuators switched off**, and 0.008 m/s
+            # actuated without the scatter.  Turning the machine off changed the
+            # number by 8%; turning the shove off changed it by 98%.  88% of
+            # them cleared the `moves` rung with no actuation at all.
+            #
+            # That is the fifth time a score in this project has paid for
+            # uncontrolled motion, and the largest: `land_speed` carries two
+            # rungs and the land competence, so the whole land ladder above
+            # `stirs` was reading the shove.
+            #
+            # What the scatter is *for* survives intact: the attitude
+            # perturbation, the angular kick, the stroke phase and the battery
+            # state are all untouched, and an air launch at 13 m/s is still
+            # widened by 15% of scale plus 35% of its own speed.  What is gone is
+            # translation invented for a body that was standing still.
+            # `min(speed, 1.0)`, not `speed`: the additive term keeps its
+            # original size wherever there is a velocity to widen -- an air
+            # launch at 13 m/s still gets the same 0.35 m/s it always got, and
+            # scaling by the full speed would have given it 4.55, which is a
+            # different experiment -- and goes to zero for a body at rest, which
+            # is the case where it was inventing the motion the score then
+            # measured.
+            speed = float(np.linalg.norm(self.data.qvel[:3]))
             self.data.qvel[:3] *= 1.0 + float(rng.normal(0.0, 0.15 * strength))
-            self.data.qvel[:3] += rng.normal(0.0, 0.35 * strength, 3)
+            self.data.qvel[:3] += rng.normal(
+                0.0, 0.35 * strength * min(speed, 1.0), 3)
             self.data.qvel[3:6] += rng.normal(0.0, 0.25 * strength, 3)
         b = self.budget.battery
         b.energy_j = float(rng.uniform(0.4, 1.0)) * b.capacity_j
@@ -1831,6 +1865,7 @@ class TriphibianEnv:
         # motion is a different capability from producing it, and the ladder
         # should be able to tell them apart.
         peak = 0.0
+        gated_mean, held_any = 0.0, False
         if len(alts) > 2 and res.duration > 0:
             step = res.duration / max(len(alts) - 1, 1)
             w = max(int(round(1.0 / step)), 1)
@@ -1847,12 +1882,40 @@ class TriphibianEnv:
                 held = np.array([u[i:i + w + 1].min() for i in range(len(t) - w)])
                 d = np.where(np.isfinite(d) & (held > 0.5), d, 0.0)
                 peak = float(np.max(d) / (w * step)) if d.size else 0.0
+                # The same gate, as a mean rather than a peak.
+                #
+                # `land_speed` was `res.mean_speed` -- net displacement over the
+                # segment, ungated -- and it is not a locomotion measurement.
+                # Measured over arch38's eight highest-mission elites at the same
+                # scattered initial condition, median `land_speed` is 0.4312 m/s
+                # with the policy driving and **0.4262 m/s with the actuators
+                # held still**: switching the machine off changes it by one
+                # percent.  `slope_climbed` is the same, 0.4139 against 0.4091,
+                # because it is computed from the same `res.distance`.  Between
+                # them those two carried three of the six land rungs -- `moves`,
+                # `walks` and `climbs_slope` -- so half the land ladder was
+                # scoring a machine falling over and sliding down the beach.
+                #
+                # The gate that works is the one already above: `land_peak_speed`
+                # and `takeoff_height` both read **exactly 0.0** for the passive
+                # machine, and both are gated on holding posture. So this is the
+                # same masked windows, averaged over all of them rather than
+                # maximised -- zeros included, so a single lucky window cannot
+                # earn it, and a machine that never held posture reads zero.
+                gated_mean = float(np.mean(d) / (w * step)) if d.size else 0.0
+                held_any = bool(d.size) and bool(np.any(d > 0.0))
         res.measurements.update({
             "upright": upright,
             "contact_fraction": contact,
-            "land_speed": float(res.mean_speed),
+            # Gated, and the ungated figure kept beside it under its own name --
+            # the same split as `sink_rate` against `measured_sink_rate` and
+            # `takeoff_height` against `measured_takeoff_height`, so the record
+            # stays honest and every old number stays re-derivable.
+            "land_speed": gated_mean,
+            "measured_land_speed": float(res.mean_speed),
             "land_peak_speed": peak,
-            "slope_climbed": max(climbed, 0.0),
+            "slope_climbed": max(climbed, 0.0) if held_any else 0.0,
+            "measured_slope_climbed": max(climbed, 0.0),
             "takeoff_height": takeoff,
             "measured_takeoff_height": measured,
         })

@@ -221,6 +221,17 @@ def finalise_tier1(r: MissionResult, clamped_any: bool) -> None:
 
 
 
+def _scatter_seed(seed: int, dom) -> int:
+    """The initial-condition draw for one domain, derived from the run seed.
+
+    Duplicated arithmetic is how two evaluation paths come to disagree, so this
+    is the one definition and `batchroll` imports it rather than repeating it.
+    """
+    from .triphibian import DOMAIN_CYCLE as _CYCLE
+    return (int(seed) * 6364136223846793005
+            + 0x9E3779B9 * (_CYCLE.index(dom) + 1)) & 0x7FFFFFFF
+
+
 def evaluate_tier1(
     p: Phenotype,
     *,
@@ -275,9 +286,28 @@ def evaluate_tier1(
         # same correction on the batched path.
         ctrl.bases = r.mobility
 
+    # The seed this score was produced under, carried on the result so the
+    # archive can record it.  Without it a stored elite's numbers cannot be
+    # reproduced: `scatter` draws the initial condition from it, and arch38's
+    # archived `takeoff_height` of 2.288 m re-measured as 0.000 for exactly that
+    # reason -- the design was preserved and the experiment was not.
+    r.eval_seed = int(seed)
+
     clamped_any = False
     for dom in DOMAIN_CYCLE:
         env.reset(dom)
+        # The same initial-condition pipeline the batched evaluator uses, with
+        # the same seed derivation, because a score and a verification of that
+        # score have to begin from the same state.
+        #
+        # `evaluate_tier1_batch` scatters after every reset and this did not, so
+        # the single-machine path -- Tier-2 verification, every probe, and the
+        # showcase's own re-measurement -- ran a different experiment from the
+        # one whose number it was checking.  Measured over arch38's eight
+        # highest-mission elites, median `land_speed` was 0.470 m/s through the
+        # batched path and 0.008 m/s through this one: a factor of sixty, on the
+        # same body with the same controller.
+        env.scatter(np.random.default_rng(_scatter_seed(seed, dom)))
         seg = env.rollout(
             segment_seconds,
             params=ctrl.params,

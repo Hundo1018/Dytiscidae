@@ -641,6 +641,25 @@ def _meta(pheno, result, ctrl) -> dict:
         "mobility_axes": {k: v.describe() for k, v in result.mobility.items()},
         "policy": (ctrl.policy.weights.tolist()
                    if ctrl is not None and ctrl.policy is not None else None),
+        # What it takes to reproduce this number, which the archive did not
+        # record and therefore could not do.
+        #
+        # The genome, the elite's own policy weights and the shared network's
+        # snapshots were all kept, so the *machine* survived a run.  The
+        # *experiment* did not: the per-candidate evaluation seed is drawn from
+        # the run's RNG stream (`int(rng.integers(1 << 30))`) and was never
+        # written down, and `scatter` draws the whole initial condition from it.
+        # Measured on arch38's mission-best: `max_depth` re-measured 9.51-9.69 m
+        # against an archived 9.60 -- robust to the initial condition -- while
+        # `takeoff_height` re-measured 0.000 m against an archived 2.288, and
+        # nothing on disk said which draw produced the second number.
+        #
+        # `gen` is here for the shared half: the policy this score was earned
+        # with is the network as it stood at that generation, and the snapshots
+        # are periodic, so without the generation you cannot even pick the right
+        # one.
+        "eval_seed": (int(getattr(result, "eval_seed", -1))
+                      if getattr(result, "eval_seed", None) is not None else None),
     }
 
 
@@ -750,7 +769,9 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
         state.curator.quarantine(bd, result.exploit, genome)
         state.telemetry.exploit(
             {"gen": state.archive.generation, "reason": result.exploit,
-             "descriptor": bd, "meta": _meta(pheno, result, ctrl)}
+             "descriptor": bd,
+             "meta": {**_meta(pheno, result, ctrl),
+                      "gen": int(state.archive.generation)}}
         )
         state.curator.credit(operators, "rejected", 0.0)
         state.curator.note_offspring(parent, "rejected")
@@ -758,6 +779,7 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
 
     previous = state.archive.cells[cell].fitness if cell in state.archive.cells else 0.0
     meta = _meta(pheno, result, ctrl)
+    meta["gen"] = int(state.archive.generation)
     # The raw feature vector travels with the elite.  A learned projection moves,
     # and re-binning has to re-project from the features rather than from a
     # latent coordinate that no longer means the same thing.

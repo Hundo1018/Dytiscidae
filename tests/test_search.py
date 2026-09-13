@@ -1167,6 +1167,30 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
           + " ".join(str(rung_reached("air", {**glider, "thrust_margin": v}))
                      for v in (-0.1, 0.02, 0.10, 0.20)))
 
+    # An archived elite has to carry what it takes to reproduce its own numbers.
+    #
+    # arch38 kept the genome, the elite's 168-weight policy and the shared
+    # network's periodic snapshots -- the machine survived the run -- and did not
+    # keep the per-candidate evaluation seed, which `scatter` draws the whole
+    # initial condition from.  So `max_depth` re-measured 9.51-9.69 m against an
+    # archived 9.60 (robust to the draw) while `takeoff_height` re-measured 0.000
+    # against an archived 2.288, and nothing on disk said which draw produced it.
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build as _build
+    from dytiscidae.envs import batchroll as _br
+    from dytiscidae.envs.evaluate import evaluate_tier1 as _t1
+    from dytiscidae.envs.triphibian import MissionSpec as _Spec
+
+    _p = _build(BODY_PLANS["gannet"]())
+    _r1 = _t1(_p, spec=_Spec(), segment_seconds=1.0, seed=4242)
+    _rb = _br.evaluate_tier1_batch([_p], spec=_Spec(), segment_seconds=1.0,
+                                   seed=777)
+    check("a score carries the seed it was produced under",
+          getattr(_r1, "eval_seed", None) == 4242
+          and getattr(_rb[0], "eval_seed", None) == 777,
+          f"single {getattr(_r1, 'eval_seed', None)}, "
+          f"batched {getattr(_rb[0], 'eval_seed', None)}")
+
     # The transition ladder put 70.6% of arch37 on rung 1 and 0.3% above it,
     # because completeness was demanded before quality and two of the quality
     # rungs were set at or above the population's own maximum -- `arrives_usable`
