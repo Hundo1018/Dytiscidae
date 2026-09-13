@@ -639,6 +639,34 @@ def _meta(pheno, result, ctrl) -> dict:
         "max_depth": round(max((s.max_depth for s in seg.values()), default=0.0), 2),
         "mobility_rank": {k: v.rank for k, v in result.mobility.items()},
         "mobility_axes": {k: v.describe() for k, v in result.mobility.items()},
+        # The basis itself, not just its rank and its description.
+        #
+        # `_refined_controller_for` justifies leaving this out as "a matrix per
+        # domain, too large to keep on every cell".  Measured, the matrices are
+        # (6, 22) to (6, 64) -- about 350 floats per elite across both domains,
+        # so roughly 650 kB for an archive of 230.  The stated reason is
+        # contradicted by the size, and the cost of not keeping it is that every
+        # consumer re-runs an identification: the showcase, Tier-2 verification,
+        # and any offline re-measurement.  Worse, identification is seeded, and
+        # the seed was not kept either, so what came back was not necessarily
+        # what the score was earned against.
+        #
+        # Read from the *controller* first and from the result second.  The
+        # number that gets archived comes from the noise-free re-score, which
+        # runs with `identify_axes=False`, so `result.mobility` is empty for most
+        # elites -- which is why arch38's archive has `mobility_axes: {}` on the
+        # design it filmed.  `ctrl.bases` is where the identifying pass left it,
+        # and it is the basis the score was actually earned against.
+        "mobility_basis": {
+            k: {"modes": np.asarray(v.modes, float).tolist(),
+                "effects": np.asarray(v.effects, float).tolist(),
+                "authority": np.asarray(v.authority, float).tolist(),
+                "medium": str(v.medium)}
+            for k, v in (
+                ((ctrl.bases if ctrl is not None and ctrl.bases else None)
+                 or result.mobility or {}).items())
+            if v is not None
+        },
         "policy": (ctrl.policy.weights.tolist()
                    if ctrl is not None and ctrl.policy is not None else None),
         # What it takes to reproduce this number, which the archive did not
@@ -1319,7 +1347,30 @@ def save_state(state: SearchState, gen: int) -> None:
         "island_visits": dict(state.island_visits),
         "curators": state.archipelago.curators,
         "islands": list(state.archipelago.names),
+        # The stream every candidate's evaluation seed is drawn from.  Without
+        # it a resumed run draws a different one, so no score survives the
+        # boundary and a stored elite cannot be re-measured -- arch38's archived
+        # `takeoff_height` of 2.288 m re-measured as 0.000 for exactly that
+        # reason.  A plain dict of ints and arrays, not a live object.
+        "rng_state": state.rng.bit_generator.state,
     }
+    # Adam's moments.  The network was checkpointed and its optimiser was not,
+    # so a resumed run continued with a warm network and a cold optimiser -- the
+    # first updates after a resume behaved like the first updates of a run, and
+    # nothing said so.  Stored as arrays for the same reason the network is:
+    # a pickled optimiser is a hostage to the torch version that wrote it.
+    if state.shared_opt is not None:
+        try:
+            osd = state.shared_opt.state_dict()
+            payload["shared_opt_state"] = {
+                "state": {int(pid): {k: (v.detach().cpu().numpy()
+                                         if hasattr(v, "detach") else v)
+                                     for k, v in st.items()}
+                          for pid, st in (osd.get("state") or {}).items()},
+                "param_groups": osd.get("param_groups"),
+            }
+        except Exception as exc:                                  # noqa: BLE001
+            print(f"  (optimiser state not checkpointed: {exc})", flush=True)
     # The shared policy is the most expensive learned thing in the run -- every
     # generation's transitions went into it -- and it was the one piece of
     # learned state the checkpoint did not carry, so an interrupted run resumed
@@ -1347,6 +1398,18 @@ def save_state(state: SearchState, gen: int) -> None:
     with open(tmp, "wb") as f:
         pickle.dump(payload, f)
     tmp.replace(path)  # atomic: a half-written checkpoint is worse than none
+
+    # And the portable form beside it.  This file pickles live `Judge`,
+    # `Curator` and `Curriculum` objects, so it is hostage to this package's
+    # class layout as well as to torch; `ops/checkpoint.py` writes the same
+    # learned state as arrays and JSON, which is what a checkpoint has to be to
+    # be used, fine-tuned or continued from outside the run that made it.
+    try:
+        from ..ops import checkpoint as _ck
+        _ck.write(state, gen)
+    except Exception as exc:                                      # noqa: BLE001
+        print(f"  (portable checkpoint not written: "
+              f"{type(exc).__name__}: {exc})", flush=True)
 
 
 def load_state(state: SearchState) -> int:
@@ -1477,6 +1540,39 @@ def load_state(state: SearchState) -> int:
                                    "stored": list(shape),
                                    "want": [state.shared.n_obs,
                                             state.shared.n_modes]})
+
+    # Adam's moments, if this run has an optimiser and the checkpoint carried
+    # one.  Without this a resumed run continued with a warm network and a cold
+    # optimiser: the moments start at zero, so the first updates take the full
+    # step a fresh run's would, against weights that are already fitted.  Loud
+    # on failure rather than silent, because the symptom -- a resume that
+    # regresses for a few generations and recovers -- looks like noise.
+    if state.shared_opt is not None and d.get("shared_opt_state"):
+        try:
+            import torch as _torch
+            osd = d["shared_opt_state"]
+            state.shared_opt.load_state_dict({
+                "state": {int(pid): {k: (_torch.as_tensor(v)
+                                         if isinstance(v, np.ndarray) else v)
+                                     for k, v in st.items()}
+                          for pid, st in (osd.get("state") or {}).items()},
+                "param_groups": osd.get("param_groups") or [],
+            })
+        except Exception as exc:                                  # noqa: BLE001
+            print(f"  (optimiser state not restored: "
+                  f"{type(exc).__name__}: {exc}; PPO continues with cold "
+                  "moments)", flush=True)
+            state.telemetry.event({"kind": "optimiser_state_not_restored",
+                                   "error": f"{type(exc).__name__}: {exc}"})
+
+    # And the seed stream, so the resumed half of a run draws the seeds the
+    # uninterrupted one would have.
+    if d.get("rng_state"):
+        try:
+            state.rng.bit_generator.state = d["rng_state"]
+        except Exception as exc:                                  # noqa: BLE001
+            print(f"  (rng state not restored: {exc}; seeds after this point "
+                  "are a different stream)", flush=True)
 
     # Say so when a resumed archive's controllers cannot be inherited.
     #

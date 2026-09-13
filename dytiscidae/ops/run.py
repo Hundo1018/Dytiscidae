@@ -474,23 +474,61 @@ def cmd_showcase(args) -> int:
         from ..envs.evaluate import SharedController, SummedPolicy
         from ..envs.triphibian import Domain as _Dom
 
+        import numpy as _np
+
+        from ..control.cpg import MobilityBasis as _Basis
+
         env0 = TriphibianEnv(p, seed=args.seed)
         own = None
         w = (elite.meta or {}).get("policy")
         pol = _Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=6, hidden=0)
         if w is not None and len(w) == pol.n_weights:
-            import numpy as _np
             pol.weights = _np.asarray(w, float).copy()
             own = pol
-        bases = {}
-        for dom in (_Dom.AIR, _Dom.WATER):
+
+        # The basis the score was earned against, if the run recorded it.
+        #
+        # Re-identifying is not the same experiment: `env.identify` is seeded,
+        # and until `eval_seed` was recorded there was no way to ask for the
+        # draw the score used.  So prefer what is stored and fall back to a
+        # fresh identification, saying which happened.
+        bases, basis_src = {}, "stored"
+        stored = (elite.meta or {}).get("mobility_basis") or {}
+        for dom_name, b in stored.items():
             try:
-                bases[dom.value] = env0.identify(dom, seed=args.seed, max_modes=6)
+                bases[dom_name] = _Basis(
+                    modes=_np.asarray(b["modes"], float),
+                    effects=_np.asarray(b["effects"], float),
+                    authority=_np.asarray(b["authority"], float),
+                    medium=str(b.get("medium") or dom_name))
             except Exception as exc:                              # noqa: BLE001
-                print(f"  mobility identification failed in {dom.value}: {exc}")
+                print(f"  stored basis for {dom_name} unusable: {exc}")
+        if not bases:
+            basis_src = "re-identified"
+            seed = (elite.meta or {}).get("eval_seed")
+            seed = int(seed) if isinstance(seed, (int, float)) else args.seed
+            for dom in (_Dom.AIR, _Dom.WATER):
+                try:
+                    bases[dom.value] = env0.identify(dom, seed=seed, max_modes=6)
+                except Exception as exc:                          # noqa: BLE001
+                    print(f"  mobility identification failed in "
+                          f"{dom.value}: {exc}")
         shared = None
+
+        # The portable checkpoint first: it carries the network as arrays and
+        # needs no project class unpickled.  `search_state.pkl` is the fallback
+        # for runs made before it existed.
+        try:
+            from . import checkpoint as _ckmod
+            _ck = _ckmod.read(args.design)
+            shared, _miss, _unex = _ckmod.load_network(_ck)
+            print(f"  network from {_ck.path.name} "
+                  f"(gen {_ck.generation}, git "
+                  f"{(_ck.meta.get('provenance') or {}).get('git', '')[:8]})")
+        except Exception:                                         # noqa: BLE001
+            shared = None
         sp = Path(args.design) / "search_state.pkl"
-        if sp.exists():
+        if shared is None and sp.exists():
             try:
                 d = _pickle.load(open(sp, "rb"))
                 sd, shape = d.get("shared_state"), d.get("shared_shape")
@@ -523,7 +561,7 @@ def cmd_showcase(args) -> int:
             print(f"  driving as evaluated: own policy "
                   f"{'yes' if own is not None else 'NO'}, shared policy "
                   f"{'yes' if shared is not None else 'NO'}, bases "
-                  f"{sorted(bases)}")
+                  f"{sorted(bases)} ({basis_src})")
         else:
             print("  WARNING: neither a stored policy nor a shared network was "
                   "recoverable; this film is the pattern generator open-loop "

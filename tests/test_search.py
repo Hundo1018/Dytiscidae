@@ -2131,6 +2131,107 @@ def test_every_path_agrees_on_the_control_law() -> None:
           in inspect.getsource(loop_mod._verify_and_label))
 
 
+def test_a_finished_run_is_a_checkpoint() -> None:
+    """A run has to preserve the experiment, not only the machine.
+
+    The genome, each elite's policy and the shared network's weights were all on
+    disk -- and Adam's moments were not, so a resumed run continued with a warm
+    network and a cold optimiser; the run's rng stream was not, so every
+    evaluation seed after a resume came from a different stream and no score
+    survived the boundary; and the mobility basis was not, so every consumer
+    re-identified it with a seed nobody had kept.  arch38's archived
+    `takeoff_height` of 2.288 m re-measured as 0.000 for that last reason, while
+    `max_depth` -- which barely depends on the initial condition -- came back at
+    9.51-9.69 against 9.60.
+    """
+    print("\nloop: a finished run is a checkpoint")
+    import shutil
+    import tempfile
+
+    import numpy as np
+
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.loop import SearchConfig, run_search, save_state
+    from dytiscidae.learning.ppo import AVAILABLE
+    from dytiscidae.ops import checkpoint as ck
+
+    if not AVAILABLE:
+        check("torch is available to test the checkpoint", True,
+              "skipped: torch not importable")
+        return
+    import torch
+
+    tmp = tempfile.mkdtemp(prefix="dyt-ckpt-")
+    try:
+        st = run_search(
+            SearchConfig(generations=2, batch=2, seed=11, segment_seconds=1.0,
+                         n_reference_seeds=2, n_random_seeds=0,
+                         islands=("water", "generalist"), tier2_every=999,
+                         audit_every=999, migrate_every=1, checkpoint_every=1,
+                         run_dir=tmp, identify_axes_every=1,
+                         use_shared_policy=True),
+            MissionSpec())
+        save_state(st, 2)
+        c = ck.read(tmp)
+
+        # The network, including the observation normaliser -- which is a
+        # `register_buffer` precisely so that it travels, and a normalisation
+        # that does not travel makes stored weights mean something else.
+        net2, missing, unexpected = ck.load_network(c)
+        obs = np.linspace(-1.0, 1.0, st.shared.n_obs).astype(np.float32)
+        with torch.no_grad():
+            a1 = st.shared.latent(torch.as_tensor(obs).unsqueeze(0)).mean.numpy()
+            a2 = net2.latent(torch.as_tensor(obs).unsqueeze(0)).mean.numpy()
+        check("the network reloads to the same outputs",
+              not missing and not unexpected
+              and float(np.max(np.abs(a1 - a2))) < 1e-12,
+              f"max|diff| {float(np.max(np.abs(a1 - a2))):.3e}, "
+              f"missing {list(missing)}, unexpected {list(unexpected)}")
+        check("and its observation normaliser travels with it",
+              float((st.shared.obs_mean - net2.obs_mean).abs().max()) < 1e-12
+              and float(st.shared.obs_count) == float(net2.obs_count),
+              f"obs_count {float(st.shared.obs_count):.1f}")
+
+        # Adam.  This is what "continue training" rather than "start training
+        # with a warm network" turns on.
+        back = ck.Checkpoint.optimiser_state(c)
+        live = st.shared_opt.state_dict()["state"]
+        worst, n = 0.0, 0
+        for pid, sd in live.items():
+            for k, v in sd.items():
+                if not hasattr(v, "detach"):
+                    continue
+                b = (back or {}).get("state", {}).get(int(pid), {}).get(k)
+                if b is None:
+                    continue
+                worst = max(worst,
+                            float(np.max(np.abs(v.detach().cpu().numpy() - b))))
+                n += 1
+        check("Adam's moments come back equal", n > 0 and worst < 1e-12,
+              f"{n} tensors compared, max|diff| {worst:.3e}")
+
+        # The seed stream.  Every candidate's evaluation seed is drawn from it.
+        want = int(st.rng.integers(1 << 30))
+        r2 = np.random.default_rng(0)
+        r2.bit_generator.state = c.rng_state()
+        check("and the rng resumes the same stream",
+              int(r2.integers(1 << 30)) == want, f"next draw {want}")
+
+        e = c.elite("mission")
+        check("the stored elite carries a genome, its policy and its bases",
+              e is not None and e.genome is not None and e.policy is not None
+              and sorted(e.bases) == ["air", "water"],
+              "" if e is None else
+              f"policy {None if e.policy is None else e.policy.shape}, "
+              f"bases {sorted(e.bases)}, eval_seed {e.eval_seed}")
+        check("and the ladder it was scored under",
+              bool((c.meta.get("provenance") or {}).get("ladder")),
+              "so a reader can tell whether a stored number still means what "
+              "its name means")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_the_shared_policy_survives_a_resume() -> None:
     """The most expensive learned thing in the run must outlive an interruption.
 
@@ -3055,6 +3156,7 @@ def main() -> int:
     test_the_search_is_pointed_at_the_mission_and_compounds()
     test_every_path_agrees_on_the_control_law()
     test_the_shared_policy_survives_a_resume()
+    test_a_finished_run_is_a_checkpoint()
     test_a_resume_says_when_controllers_cannot_be_inherited()
     test_learned_axes_survive_resume()
     test_the_loop_wires_every_layer_together()
