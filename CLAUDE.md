@@ -9,8 +9,10 @@ measurement behind every item — **read it before proposing anything**.
 ## Session start
 
 1. `git status` and `git log --oneline -5`.
-2. Read `docs/ROADMAP.md` §"arch38 — the work list". Nothing in it is
-   implemented yet; item A is a free diagnostic and decides the rest.
+2. Read `docs/ROADMAP.md` §"arch39 — the work list", and §"What is set by
+   measurement, and what is typed" before proposing any threshold. arch38 has
+   run; its result and the two void launches before it are in
+   `runs/arch38_notes.md`.
 3. Canary — the three suites, filtered, ~15 min total:
 
 ```bash
@@ -86,6 +88,17 @@ steady state is ~74 s. Not a regression.
   airborne window, so it reads zero for a machine that goes down and comes back
   up. `station_keeping` is the one that sees the shape between them; where the
   two disagree, believe the second. arch37 measured the gap at 10x.
+- **There are two evaluation paths and they are not interchangeable.**
+  `batchroll.evaluate_tier1_batch` is what the search scores with;
+  `evaluate.evaluate_tier1` is what Tier-2 verification, every offline probe and
+  the showcase use. They differed by 60x on land locomotion until the scatter
+  seed was shared, and they still differ in water when identification is on.
+  `tests/test_search.py` now asserts the agreement — read it before trusting an
+  offline re-measurement.
+- **`on-task` in a showcase, and the film itself, are not evidence about a
+  design unless the control law is the one that earned the score.** The showcase
+  prints `driving as evaluated: ...` and says whether the mobility basis was
+  stored or re-identified; re-identified is a different experiment.
 
 ## Where the ground truth lives
 
@@ -93,7 +106,8 @@ steady state is ~74 s. Not a regression.
 |---|---|
 | `docs/ROADMAP.md` | work list + the measurement behind every decision |
 | `docs/CPU_LEGACY.md` | older backlog, superseded where they disagree |
-| `runs/arch37/report.html` | the latest run's full chart report |
+| `runs/arch38/report.html` | the latest run's full chart report |
+| `runs/<run>/checkpoint.npz`, `.json` | the portable checkpoint: network, Adam moments, rng state, best elites with their bases, and the commit that wrote it |
 | `runs/archNN_notes.md` | each run's configuration and findings |
 | `.claude/skills/training-report/` | regenerates the report for any run |
 | `.claude/agents/` | six roles: explorer, mutator, assumption-breaker, adversary, judge, historian |
@@ -105,13 +119,23 @@ enough).
 
 ## The lesson this project keeps re-learning
 
-Four times a score has paid for uncontrolled motion — a wingless design thrown
+Six times a score has paid for uncontrolled motion — a wingless design thrown
 at 30 m/s scoring 0.853 for flight, a tumble scoring as a commanded turn, a
-machine rebounding off the beach scoring as a take-off, and arch37's
-`holds_height` rung cleared by a trajectory that drops and comes back (measured:
-a tenth of the `station_keeping` a straight descent at the same sink would give).
-Each time the fix was a **gate**, not a coefficient. When adding any measurement,
-ask what it reads for a machine that is falling — and for one that is bouncing.
+machine rebounding off the beach scoring as a take-off, arch37's `holds_height`
+rung cleared by a trajectory that drops and comes back, and then **`land_speed`
+and `slope_climbed`, which moved by one percent when the actuators were switched
+off** — 0.4312 against 0.4262 m/s, and 0.4139 against 0.4091 — because `scatter`
+shoved every land segment at 0.54 m/s and nothing gated the displacement on
+posture. Each time the fix was a **gate**, not a coefficient. When adding any
+measurement, ask what it reads for a machine that is falling, for one that is
+bouncing, and **for one with its actuators held still** — that last one is a
+two-line experiment and it has now caught two rungs.
+
+And: a quantity that means "I could not measure this" must not share a value with
+a quantity that means "I measured zero". `thrust_margin` returned 0.0 for both and
+the rung above it sat at `>= 0.0`; eight of eighty re-scored elites cleared it
+while flapping nearly a radian to no effect. Publish nothing instead — a missing
+metric stops `rung_reached` where it stands.
 
 And: set thresholds from the measured distribution, never from what the
 capability ought to look like. `moves` at 0.1 m/s left 61.6% of arch34 below it

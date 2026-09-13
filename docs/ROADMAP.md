@@ -1473,6 +1473,100 @@ model, and *then* the change is supported.
 
 ---
 
+## What is set by measurement, and what is typed
+
+Asked on 2026-09-13: which weights in this project are fabricated — a number
+with no measurement and no physics behind it. The answer is a short list, and it
+is worth separating from the much longer list of numbers that *are* derived,
+because lumping them together is how a real finding gets ignored.
+
+**Recorded, not changed.** Twelve coefficients and a handful of normalisers
+cannot be derived from anything; they decide what the search optimises. Changing
+them all at once would redefine selection pressure with no way to attribute the
+result, so they are written down here and left alone. If they are ever to be
+touched, the cheap first step is a sensitivity pass: perturb each one ±50%
+against a stored archive offline and report how far the elite ordering moves.
+What nothing depends on can be deleted; what matters has earned a derivation.
+
+### The blends
+
+| where | the coefficients |
+|---|---|
+| air competence, `triphibian.py` | `0.55·flight + 0.25·glide + 0.20·station` |
+| water competence | `0.35·reached + 0.25·hold + 0.2·submerged + 0.2·upright` |
+| land competence | `posture = 0.5·contact + 0.5·upright`, then `0.65·progress + 0.35·climb` |
+| `mission_fraction`, `evaluate.py` | the exponent in `min(competences) ** 0.5` |
+
+Each carries a comment explaining which terms were removed and why — real
+reasoning about the *shape* — and nothing at all about the numbers.
+
+### The normalisers, which set what "full marks" means
+
+- `flight = 1 − sink/1.5` — 1.5 m/s
+- `glide = 1 − sink/SINK_BALLISTIC`, and `SINK_BALLISTIC` is
+  `LAUNCH_SPEED_RANGE[0]` = 6.0 m/s: **a launch speed reused as a sink-rate
+  normaliser**, which is the clearest case on this page of a number doing a job
+  it was not measured for
+- `progress = mean_speed/0.6` — 0.6 m/s
+- `climb = climbed/0.5` — 0.5 m
+- `GATED_AIR_CREDIT = 0.05`, the `0.10` brief-hop credit, `TAKEOFF_FULL = 0.30`,
+  `TAKEOFF_FLOOR = 0.05`
+- `mission_weight = 0.3`, `reward_shaping = 0.2`, `descriptor_bins = 5`
+- the curator's regime table: `structural_bias` 1.6 / 1.5 / 0.7 / 2.2 / 2.6 with
+  `n_mutations` 2 / 2 / 1 / 3, and the four triggers that select between them —
+  `len(cells) < 20`, `cov_growth > 0.004`, `qd_growth > 0.01`,
+  `feasible_frac < 0.15`
+- the UCB exploration constant `c = 0.6`
+
+### What is *not* on this list, and should not be added to it
+
+Every ladder rung, each of which carries the share of the population it leaves
+standing — the lift rungs (72.1/51.4/36.9/27.4%), the depth-gain rungs
+(70.8/51.9/28.8/10.4%), the thrust rungs (36.2/21.2/7.5%), the re-derived land
+rungs (48.8/35.0/31.2/15.0%) and the rebuilt transition rungs. `CL_MAX = 1.8`
+(a post-stall flat plate), `MAX_WING_LOADING` (derived from `CL_MAX` and the
+launch band), `MAX_SPIN_RATE = 2π` (one revolution a second),
+`TAKEOFF_WINGLESS_CAP = 0.29` and `TAKEOFF_POSTURE_BAR = 0.7` (both from
+measurement), `MEASURABLE_AIR_SECONDS = 2.8` and `STATION_WINDOW = 4.0` (each
+the value its predecessor fraction had at an 8 s segment, chosen so nothing
+measured before moved). And `PLATEAU_ALPHA`, whose own comment records that it
+replaced two typed numbers precisely to stop this.
+
+---
+
+## The batched and single-machine evaluators disagree in water
+
+Found while making the cross-path agreement permanent (`tests/test_search.py`,
+"the batched and single-machine paths agree"). With `identify_axes=False` the two
+paths agree to about 2e-6 — floating-point summation order — in all three
+domains. With identification on, **land and air still agree to 2e-6 and water
+does not**: `depth_error` differs by 0.024 m and `water_speed` by 0.029 m/s on
+the two plans tested.
+
+`batchroll` asserts in a comment that it reuses "`basis_from_probes` the
+unbatched path uses, so the fitting is untouched". That is true of air and not of
+water, where the solver carries slam and wake history and the two paths clear it
+differently — `bf.reset_slam()` against `solver.reset()`.
+
+The residual is millimetres of depth error and centimetres per second of speed,
+well under the first water rung at 0.25 m of gain, so it is bounded in the test
+rather than treated as urgent. But it means **the water basis a score was earned
+against is not quite the one a verification reproduces**, and that is the class
+of thing that hid a factor of sixty on land until this week.
+
+**Do:** compare `identify_batch` and `identify_mobility` probe-for-probe on one
+body in water, and find which history the batched path is not clearing.
+
+---
+
+## The `--min-shard` default is still the documented trap
+
+`CLAUDE.md` records that `--min-shard 8` at batch 16 makes a single Tier-0
+rejection collapse the pool to one shard running in the parent, and that two
+generations in three ran that way before it was found. The measured optimum is 4.
+**The default in `SearchConfig` is still 8**, so the documented trap is what an
+invocation without the flag gets.
+
 ## arch39 — the work list, as it stands before arch38 has run
 
 Everything here is evidence-backed and deliberately **not** in arch38, because

@@ -2139,6 +2139,110 @@ def test_every_path_agrees_on_the_control_law() -> None:
           in inspect.getsource(loop_mod._verify_and_label))
 
 
+def test_the_two_evaluation_paths_score_the_same_machine_the_same() -> None:
+    """`rollout_batch` and `TriphibianEnv.rollout` are two implementations of one
+    loop, kept in step by a comment that says so.
+
+    They diverged by sixty times and nothing detected it.  `evaluate_tier1_batch`
+    calls `env.scatter(rng)` after every reset and `evaluate_tier1` did not, so
+    the single-machine path -- Tier-2 verification, every offline probe, and the
+    showcase's own re-measurement -- ran a different experiment from the one whose
+    number it was checking.  Median `land_speed` over arch38's twelve
+    highest-mission elites was 0.649 m/s batched against 0.011 m/s
+    single-machine, per-elite ratios from 1.7x to 438x, and the film that started
+    the search for it showed a machine standing still.
+
+    A comment cannot hold two implementations together.  This can.
+    """
+    print("\nevaluation: the batched and single-machine paths agree")
+    import numpy as np
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import batchroll
+    from dytiscidae.envs.evaluate import Controller, evaluate_tier1
+    from dytiscidae.envs.triphibian import MissionSpec, TriphibianEnv
+    from dytiscidae.control.cpg import Policy
+
+    spec, seed, secs = MissionSpec(), 7, 2.0
+    # Two plans rather than one: the defect was domain-specific -- it showed on
+    # land and hid in water, where `max_depth` barely depends on the initial
+    # condition -- so a single fixture could have agreed by luck.
+    for plan in ("beetle", "eel"):
+        p = build(BODY_PLANS[plan]())
+        pol = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=6, hidden=0)
+        rng = np.random.default_rng(3)
+        pol.weights = rng.normal(0.0, 0.2, pol.n_weights)
+
+        rb = batchroll.evaluate_tier1_batch(
+            [build(BODY_PLANS[plan]())], spec=spec,
+            controllers=[Controller(params=None, policy=pol)],
+            segment_seconds=secs, identify_axes=True, seed=seed)[0]
+        rs = evaluate_tier1(p, spec=spec,
+                            controller=Controller(params=None, policy=pol),
+                            segment_seconds=secs, identify_axes=True, seed=seed)
+
+        def worst_of(a_res, b_res, domains):
+            worst, key, n = 0.0, "", 0
+            for dom in domains:
+                sb = (a_res.segments or {}).get(dom)
+                ss = (b_res.segments or {}).get(dom)
+                if sb is None or ss is None:
+                    continue
+                mb, ms = sb.measurements or {}, ss.measurements or {}
+                for k in sorted(set(mb) & set(ms)):
+                    a, b = mb[k], ms[k]
+                    if not isinstance(a, (int, float)):
+                        continue
+                    if not isinstance(b, (int, float)):
+                        continue
+                    n += 1
+                    if abs(a - b) > worst:
+                        worst, key = abs(a - b), f"{dom}.{k} {a:.5f}/{b:.5f}"
+            return worst, key, n
+
+        # Land and air agree to floating-point summation order -- about 2e-6,
+        # not bit-for-bit; a five-decimal print made it look exact and it is not.
+        # 1e-5 is still five orders of magnitude below the defect this exists to
+        # catch, which was 0.638 m/s of `land_speed`.
+        w, key, n = worst_of(rb, rs, ("land", "air"))
+        check(f"{plan}: land and air agree to floating-point between the paths",
+              n > 6 and w < 1e-5,
+              f"{n} measurements, worst absolute difference {w:.6f}"
+              + (f" on {key}" if key else ""))
+
+        # Water does not, and the cause is the identification rather than the
+        # rollout: with `identify_axes=False` water agrees to the same 1e-5 the
+        # other two do, and with it on only water moves.  `batchroll`
+        # asserts in a comment that it reuses "`basis_from_probes` the unbatched
+        # path uses, so the fitting is untouched" -- true of air, not of water,
+        # where the solver carries slam and wake history that the two paths reset
+        # differently (`bf.reset_slam()` against `solver.reset()`).  Bounded here
+        # and recorded in the ROADMAP; the residual is millimetres of depth error
+        # and centimetres per second of speed, well under the first water rung.
+        w_w, key_w, n_w = worst_of(rb, rs, ("water",))
+        check(f"{plan}: and water agrees to within the identification's residual",
+              n_w > 2 and w_w < 0.05,
+              f"{n_w} measurements, worst absolute difference {w_w:.5f}"
+              + (f" on {key_w}" if key_w else ""))
+
+        # The strong form, which is what makes the diagnosis above a measurement
+        # rather than a story: take the identification out and water agrees too,
+        # so the residual is the identification and not the rollout.
+        rb0 = batchroll.evaluate_tier1_batch(
+            [build(BODY_PLANS[plan]())], spec=spec,
+            controllers=[Controller(params=None, policy=pol)],
+            segment_seconds=secs, identify_axes=False, seed=seed)[0]
+        rs0 = evaluate_tier1(build(BODY_PLANS[plan]()), spec=spec,
+                             controller=Controller(params=None, policy=pol),
+                             segment_seconds=secs, identify_axes=False, seed=seed)
+        w0, key0, n0 = worst_of(rb0, rs0, ("land", "air", "water"))
+        check(f"{plan}: without identification all three domains agree",
+              n0 > 10 and w0 < 1e-5,
+              f"{n0} measurements, worst absolute difference {w0:.6f}"
+              + (f" on {key0}" if key0 else ""))
+
+
 def test_a_finished_run_is_a_checkpoint() -> None:
     """A run has to preserve the experiment, not only the machine.
 
@@ -3165,6 +3269,7 @@ def main() -> int:
     test_every_path_agrees_on_the_control_law()
     test_the_shared_policy_survives_a_resume()
     test_a_finished_run_is_a_checkpoint()
+    test_the_two_evaluation_paths_score_the_same_machine_the_same()
     test_a_resume_says_when_controllers_cannot_be_inherited()
     test_learned_axes_survive_resume()
     test_the_loop_wires_every_layer_together()
