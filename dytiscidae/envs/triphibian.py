@@ -612,6 +612,11 @@ class TriphibianEnv:
             a = self.launch_pitch
             self.data.qpos[3:7] = (math.cos(-a / 2), 0.0, math.sin(-a / 2), 0.0)
         self.solver.reset()
+        # `JetSet.reset` existed and nothing called it, so a bell carried its
+        # volume history -- and, since the pumping load was added, its damping
+        # -- from one episode into the next.  `FluidSolver.reset` restores dry
+        # inertia here for exactly the same reason.
+        self.jets.reset(self.model)
         self.cpg.reset()
         self.budget.reset()
         self._mj.mj_forward(self.model, self.data)
