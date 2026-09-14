@@ -105,6 +105,9 @@ steady state is ~74 s. Not a regression.
 | | |
 |---|---|
 | `docs/ROADMAP.md` | work list + the measurement behind every decision |
+| `docs/MATH_AUDIT.md` | every physics/control/optimisation formula and constant: source, assumption, units, derivation and validation status, risk-ranked |
+| `derivations/` | one document per quantity, derived from its own premises, with the measurement that checks it |
+| `experiments/` | reproducible harnesses: `python experiments/<name>/run.py` re-derives every number the audit quotes |
 | `docs/CPU_LEGACY.md` | older backlog, superseded where they disagree |
 | `runs/arch38/report.html` | the latest run's full chart report |
 | `runs/<run>/checkpoint.npz`, `.json` | the portable checkpoint: network, Adam moments, rng state, best elites with their bases, and the commit that wrote it |

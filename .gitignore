@@ -6,3 +6,4 @@ runs/
 !docs/*.png
 .venv/
 MUJOCO_LOG.TXT
+experiments/_cache/

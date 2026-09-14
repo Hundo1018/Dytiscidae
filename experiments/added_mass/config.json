@@ -1,0 +1,10 @@
+{
+  "question": "does the added mass written into body_mass reach the dynamics, and does it know which way the body is pointing?",
+  "strip": {"chord_m": 0.20, "span_m": 1.0, "thickness_m": 0.002},
+  "dry_mass_kg": 12.0,
+  "applied_force_N": 40.0,
+  "settle_steps": 60,
+  "timestep_s": 0.001,
+  "depth_m": 5.0,
+  "note": "dry mass is set to a realistic vehicle mass so the solver's own force limiter (60x vehicle weight) does not clamp the added-mass gravity compensation and confound the measurement"
+}

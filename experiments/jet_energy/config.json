@@ -1,0 +1,12 @@
+{
+  "question": "who pays for the water a pulsed jet expels?",
+  "bell": {
+    "volume_m3": 0.004,
+    "stroke_fraction": 0.45,
+    "orifice_area_m2": 0.0012,
+    "joint_range_rad": [0.0, 1.2]
+  },
+  "drive": {"frequency_hz": 1.5, "seconds": 4.0, "timestep_s": 0.001},
+  "body": {"dry_mass_kg": 8.0, "depth_m": 5.0},
+  "actuator": {"motor_class": "geared", "mass_kg": 0.12, "gear_ratio": 20.0}
+}

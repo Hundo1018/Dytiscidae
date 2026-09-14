@@ -1,0 +1,513 @@
+{
+  "experiment": "dimensional_check",
+  "ok": true,
+  "commit": "65e21d5429c88c28b4b397f62e721b487b907c62-dirty",
+  "when": "2026-09-14T13:15:23Z",
+  "elapsed_s": 0.014,
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",
+  "config": {
+    "what": "every physics and control formula, restated dimensionally and tied to its source line",
+    "representative_state": {
+      "medium": "seawater",
+      "U_m_s": 8.0,
+      "chord_m": 0.18,
+      "omega_span_rad_s": 13.8,
+      "depth_m": 10.0
+    },
+    "fails_run_if": [
+      "a source snippet is gone",
+      "a dimension does not match"
+    ]
+  },
+  "data": {
+    "n_checks": 48,
+    "n_sound": 48,
+    "n_failing": 0,
+    "n_implicit_unit": 11,
+    "failing": [],
+    "checks": [
+      {
+        "name": "dynamic pressure  q = 0.5 rho U^2",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "m^-1.kg.s^-2",
+        "value": 32800.0,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "Reynolds number  Re = rho U c / mu",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "1",
+        "value": 1366666.6666666667,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "circulatory lift  L = q S CL",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "m.kg.s^-2",
+        "value": 5772.8,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "reduced frequency  k = |omega_s| c / (2 U)",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "1",
+        "value": 0.15525,
+        "implicit_unit": "",
+        "note": "dimensionally a reduced frequency; kinematically a reduced *pitch rate* -- omega_s is the instantaneous rate about the span axis, not the flapping angular frequency.  See MATH_AUDIT F-02.",
+        "detail": ""
+      },
+      {
+        "name": "LEV blend  lev = clip(k / 0.30, 0, 1)",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "1",
+        "value": 0.5175000000000001,
+        "implicit_unit": "none -- 0.30 is a reduced frequency, correctly dimensionless",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "stall angle  alpha_stall = 11 deg + 26 deg * lev",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "1",
+        "value": 0.41900000000000004,
+        "implicit_unit": "11.0 and 26.0 are degrees, made explicit by np.radians",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "low-Re stall knockdown  0.55 + 0.45 log10(Re)/5",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "1",
+        "value": 1.0252000000000001,
+        "implicit_unit": "the 5.0 divides log10(Re); it is 5 decades of Reynolds number, i.e. Re=1e5 is the anchor where the factor reaches 1.0.  Nothing in the code says so.",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "finite-wing lift slope  2 pi / (1 + 2/AR)",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "1",
+        "value": 4.1888,
+        "implicit_unit": "",
+        "note": "per radian; radian is dimensionless so this is [1].",
+        "detail": ""
+      },
+      {
+        "name": "induced drag  cd_i = CL^2 / (pi e AR)",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "1",
+        "value": 0.12838509586971356,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "skin friction, laminar branch  1.328 / sqrt(Re)",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "1",
+        "value": 0.0009634324601460957,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "skin friction, turbulent branch  0.074 / Re^0.2",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "1",
+        "value": 0.004106586730929821,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "skin friction blend centre  log10(Re) - 5.7",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "1",
+        "value": 0.7692307692307692,
+        "implicit_unit": "5.7 is log10(Re) at the transition centre, i.e. Re = 5.0e5; the 4.0 is 1/decade of blend width.",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "Kramer rotational force  C_rot rho U omega c^2 dr",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "m.kg.s^-2",
+        "value": 287.811144,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "strip added mass  rho pi c^2 / 4 per unit span",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "kg",
+        "value": 1.30415254875,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "bluff added mass  Ca rho V",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "kg",
+        "value": 2.05,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "added rotational inertia  m_add * lever^2",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "m^2.kg",
+        "value": 8.0,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "buoyancy  rho g V f_sub",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "m.kg.s^-2",
+        "value": 24.124359,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "slam force  |d(m_add)/dt * v_n|",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "m.kg.s^-2",
+        "value": 48000.0,
+        "implicit_unit": "",
+        "note": "FluidDiagnostics.slam is documented as a force in N; transitions.py divides it by an area to get a pressure.",
+        "detail": ""
+      },
+      {
+        "name": "bound circulation  Gamma = 0.5 CL U c",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "m^2.s^-1",
+        "value": 0.792,
+        "implicit_unit": "",
+        "note": "Kutta-Joukowski: L' = rho U Gamma with L' in N/m.",
+        "detail": ""
+      },
+      {
+        "name": "bluff axial force  0.5 rho |v| v (Cd A_front + Cf A_wet)",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "m.kg.s^-2",
+        "value": 1239.8400000000001,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "bluff cross-flow force  0.5 rho u_c^2 Cd_cross A_side",
+        "source": "dytiscidae/physics/fluid.py",
+        "status": "ok",
+        "dim": "m.kg.s^-2",
+        "value": 1804.0,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "hydrostatic pressure  p_atm + rho g h",
+        "source": "dytiscidae/physics/medium.py",
+        "status": "ok",
+        "dim": "m^-1.kg.s^-2",
+        "value": 201843.1625,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "Airy deep-water orbital speed  a omega e^{kz}",
+        "source": "dytiscidae/physics/medium.py",
+        "status": "ok",
+        "dim": "m.s^-1",
+        "value": 0.10990000000000001,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "geometric viscosity blend  mu_a^(1-f) mu_w^f",
+        "source": "dytiscidae/physics/medium.py",
+        "status": "ok",
+        "dim": "m^-1.kg.s^-1",
+        "value": 0.0002011833626691994,
+        "implicit_unit": "raising a dimensional quantity to a non-integer power is only meaningful because both factors carry the same unit and the exponents sum to 1.  It is a weighted geometric mean, and it is dimensionally sound *only* for that reason.",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "jet thrust  rho Q^2 / A",
+        "source": "dytiscidae/physics/jet.py",
+        "status": "ok",
+        "dim": "m.kg.s^-2",
+        "value": 5.338541666666668,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "jet volume rate from joint rate  -V0 f omega / span",
+        "source": "dytiscidae/physics/jet.py",
+        "status": "ok",
+        "dim": "m^3.s^-1",
+        "value": -0.018400000000000003,
+        "implicit_unit": "`span` is a joint-angle range in radians, so it is dimensionless and omega/span has units of 1/s.",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "tube second moment  pi (ro^4 - ri^4) / 4",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m^4",
+        "value": 1.8150045351562508e-09,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "section modulus  Z = I / ro",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m^3",
+        "value": 1.875e-07,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "elliptic root moment  L_semi b 4/(3 pi)",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m^2.kg.s^-2",
+        "value": 68.75499349055734,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "bending stress  sigma = M / Z",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m^-1.kg.s^-2",
+        "value": 368421052.6315789,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "flap angular acceleration  alpha = A (2 pi f)^2",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "s^-2",
+        "value": 133.30800000000002,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "swept-surface root moment  0.5 rho omega^2 Cd int(c r^3 dr)",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m^2.kg.s^-2",
+        "value": 486.875,
+        "implicit_unit": "",
+        "note": "the integral int(c(r) r^3 dr) carries m.m^3.m = m^5, not m^4; getting that wrong is exactly what this check is for.",
+        "detail": ""
+      },
+      {
+        "name": "inertial reversal moment  M = I alpha",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m^2.kg.s^-2",
+        "value": 119.97720000000002,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "cantilever tip deflection  q L^4 / (8 E I)",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m",
+        "value": 0.0405,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "hoop stress  p r / t",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m^-1.kg.s^-2",
+        "value": 6000000.0,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "shell buckling  E/(1-nu^2) (t/r)^3",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m^-1.kg.s^-2",
+        "value": 824175.8241758242,
+        "implicit_unit": "",
+        "note": "dimensionally sound; the *coefficient* is the (t/D)^3 one applied to (t/r)^3.  See MATH_AUDIT S-01.",
+        "detail": ""
+      },
+      {
+        "name": "Wagner slam pressure  0.5 rho v^2 (pi/tan beta)^2",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m^-1.kg.s^-2",
+        "value": 3936000.0,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "flat-panel slam bending  0.30 p b^2 / t^2",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m^-1.kg.s^-2",
+        "value": 2133333333.3333337,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "net buoyancy  rho g V - m g",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m.kg.s^-2",
+        "value": -77.472535,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "ballast pump power  dp Q / eta",
+        "source": "dytiscidae/physics/structure.py",
+        "status": "ok",
+        "dim": "m^2.kg.s^-3",
+        "value": 717.986875,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "copper loss  (tau / km)^2",
+        "source": "dytiscidae/physics/energy.py",
+        "status": "ok",
+        "dim": "m^2.kg.s^-3",
+        "value": 783.9999999999998,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "viscous loss  k_visc omega^2",
+        "source": "dytiscidae/physics/energy.py",
+        "status": "ok",
+        "dim": "m^2.kg.s^-3",
+        "value": 0.0038088000000000006,
+        "implicit_unit": "k_visc is documented as 'N.m per rad/s', which is N.m.s -- consistent.",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "iron loss  k_iron omega",
+        "source": "dytiscidae/physics/energy.py",
+        "status": "ok",
+        "dim": "m^2.kg.s^-3",
+        "value": 0.06624,
+        "implicit_unit": "k_iron = 0.02 * p_cont / 1000.0 is built from a POWER and a bare 1000.  For p_iron to be a power, k_iron must be W/(rad/s), so the 1000 is a reference speed of 1000 rad/s.  Nothing in the code says so.  See MATH_AUDIT E-01.",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "motor constant  km ~ mass^0.75",
+        "source": "dytiscidae/physics/energy.py",
+        "status": "ok",
+        "dim": "m.kg^1/2.s^-1/2",
+        "value": 0.04229485053762257,
+        "implicit_unit": "0.05 is N.m/sqrt(W) at a reference mass of 0.1 kg; 0.88 is BLDC_OUTRUNNER.efficiency_peak written as a literal, so editing that table entry rescales km for every motor class.  See MATH_AUDIT E-02.",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "stall torque  km sqrt(P) G eta",
+        "source": "dytiscidae/physics/energy.py",
+        "status": "ok",
+        "dim": "m^2.kg.s^-2",
+        "value": 3.640604345434972,
+        "implicit_unit": "",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "CPG joint command  offset + A sin(2 pi f t + phi)",
+        "source": "dytiscidae/control/cpg.py",
+        "status": "ok",
+        "dim": "1",
+        "value": 0.30000000000000004,
+        "implicit_unit": "",
+        "note": "joint angles are radians, hence dimensionless.  The CPG parameter vector therefore mixes radians (amplitude, phase, offset) with Hz (frequency) in one flat array.  See MATH_AUDIT C-01.",
+        "detail": ""
+      },
+      {
+        "name": "twist scaling  [1,1,1,0.3,0.3,0.3]",
+        "source": "dytiscidae/control/cpg.py",
+        "status": "ok",
+        "dim": "m.s^-1",
+        "value": 0.36,
+        "implicit_unit": "the three 0.3s must be a LENGTH in metres for an angular rate in rad/s to be commensurable with a linear rate in m/s.  Written as a bare number.  Every singular value, `reach`, cond(A) and the damping lambda inherit it.  See MATH_AUDIT C-02.",
+        "note": "",
+        "detail": ""
+      },
+      {
+        "name": "damping  lam = 0.01 tr(G)/r",
+        "source": "dytiscidae/control/cpg.py",
+        "status": "ok",
+        "dim": "m^2.s^-2",
+        "value": 0.008,
+        "implicit_unit": "G = A A^T carries (twist per coefficient)^2, so lam does too and the ridge is relative.  The additive 1e-12 is NOT: it is a bare number added to a dimensional one. It only survives because it is negligible except when tr(G) is exactly zero, which is the case it exists for. See MATH_AUDIT C-03.",
+        "note": "",
+        "detail": ""
+      }
+    ]
+  }
+}

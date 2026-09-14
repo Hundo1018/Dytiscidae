@@ -1,0 +1,163 @@
+{
+  "experiment": "added_mass",
+  "ok": true,
+  "commit": "65e21d5429c88c28b4b397f62e721b487b907c62-dirty",
+  "when": "2026-09-14T13:15:23Z",
+  "elapsed_s": 0.339,
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",
+  "config": {
+    "question": "does the added mass written into body_mass reach the dynamics, and does it know which way the body is pointing?",
+    "strip": {
+      "chord_m": 0.2,
+      "span_m": 1.0,
+      "thickness_m": 0.002
+    },
+    "dry_mass_kg": 12.0,
+    "applied_force_N": 40.0,
+    "settle_steps": 60,
+    "timestep_s": 0.001,
+    "depth_m": 5.0,
+    "note": "dry mass is set to a realistic vehicle mass so the solver's own force limiter (60x vehicle weight) does not clamp the added-mass gravity compensation and confound the measurement"
+  },
+  "data": {
+    "q1_reaches_dynamics": {
+      "no joints (one free body)": {
+        "dry_mass": 12.0,
+        "body_mass_after_apply": 44.201324699295384,
+        "bookkept_added_mass": 32.201324699295384,
+        "effective_mass": 12.0,
+        "dynamic_added_mass": 0.0,
+        "force_limiter_engaged": false,
+        "body_simple": [
+          1,
+          1
+        ],
+        "nv": 6
+      },
+      "one hinge added": {
+        "dry_mass": 12.0,
+        "body_mass_after_apply": 44.201324699295384,
+        "bookkept_added_mass": 32.201324699295384,
+        "effective_mass": 44.20232469929538,
+        "dynamic_added_mass": 32.20232469929538,
+        "force_limiter_engaged": false,
+        "body_simple": [
+          1,
+          0,
+          0
+        ],
+        "nv": 7
+      }
+    },
+    "q1_jointless_mass_ratio": 3.683527058274615,
+    "q2_directions": {
+      "WING": {
+        "chord (+X)": {
+          "dry_mass": 12.0,
+          "body_mass_after_apply": 44.201324699295384,
+          "bookkept_added_mass": 32.201324699295384,
+          "effective_mass": 44.20232463680493,
+          "dynamic_added_mass": 32.20232463680493,
+          "force_limiter_engaged": false,
+          "body_simple": [
+            1,
+            0,
+            0
+          ],
+          "nv": 7,
+          "strip_theory_kg": 0.0032201324699295377
+        },
+        "span  (+Y)": {
+          "dry_mass": 12.0,
+          "body_mass_after_apply": 44.201324699295384,
+          "bookkept_added_mass": 32.201324699295384,
+          "effective_mass": 44.2023246967954,
+          "dynamic_added_mass": 32.2023246967954,
+          "force_limiter_engaged": false,
+          "body_simple": [
+            1,
+            0,
+            0
+          ],
+          "nv": 7,
+          "strip_theory_kg": 0.0
+        },
+        "normal(+Z)": {
+          "dry_mass": 12.0,
+          "body_mass_after_apply": 44.201324699295384,
+          "bookkept_added_mass": 32.201324699295384,
+          "effective_mass": 44.20232469929538,
+          "dynamic_added_mass": 32.20232469929538,
+          "force_limiter_engaged": false,
+          "body_simple": [
+            1,
+            0,
+            0
+          ],
+          "nv": 7,
+          "strip_theory_kg": 32.201324699295384
+        },
+        "spread_fraction": 1.9405571111218756e-09
+      },
+      "BLUFF": {
+        "chord (+X)": {
+          "dry_mass": 12.0,
+          "body_mass_after_apply": 12.599072196545402,
+          "bookkept_added_mass": 0.5990721965454018,
+          "effective_mass": 12.603339113728211,
+          "dynamic_added_mass": 0.6033391137282109,
+          "force_limiter_engaged": false,
+          "body_simple": [
+            1,
+            0,
+            0
+          ],
+          "nv": 7,
+          "strip_theory_kg": NaN
+        },
+        "span  (+Y)": {
+          "dry_mass": 12.0,
+          "body_mass_after_apply": 12.022175297974558,
+          "bookkept_added_mass": 0.02217529797455775,
+          "effective_mass": 12.023958059262451,
+          "dynamic_added_mass": 0.023958059262451314,
+          "force_limiter_engaged": false,
+          "body_simple": [
+            1,
+            0,
+            0
+          ],
+          "nv": 7,
+          "strip_theory_kg": NaN
+        },
+        "normal(+Z)": {
+          "dry_mass": 12.0,
+          "body_mass_after_apply": 16.1,
+          "bookkept_added_mass": 4.100000000000001,
+          "effective_mass": 16.101000000000003,
+          "dynamic_added_mass": 4.101000000000003,
+          "force_limiter_engaged": false,
+          "body_simple": [
+            1,
+            0,
+            0
+          ],
+          "nv": 7,
+          "strip_theory_kg": NaN
+        },
+        "spread_fraction": 2.586792956263454
+      }
+    },
+    "q2_strip_theory_kg": {
+      "normal(+Z)": 32.201324699295384,
+      "chord (+X)": 0.0032201324699295377,
+      "span  (+Y)": 0.0
+    },
+    "q2_wing_edgewise_overstatement": 10000.31052682425,
+    "q2_chord_over_thickness_squared": 10000.0,
+    "q2_bluff_anisotropy_ratio": 6.797172446948964,
+    "strip_broadside_theory_kg": 32.201324699295384
+  }
+}

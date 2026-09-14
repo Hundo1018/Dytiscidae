@@ -1,0 +1,11 @@
+{
+  "what": "every physics and control formula, restated dimensionally and tied to its source line",
+  "representative_state": {
+    "medium": "seawater",
+    "U_m_s": 8.0,
+    "chord_m": 0.18,
+    "omega_span_rad_s": 13.8,
+    "depth_m": 10.0
+  },
+  "fails_run_if": ["a source snippet is gone", "a dimension does not match"]
+}
