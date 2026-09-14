@@ -1,0 +1,42 @@
+{
+  "question": "is lam = 0.01 * trace(G) / r the right ridge, or the first one tried?",
+  "plans": [
+    "bat",
+    "beetle",
+    "eel",
+    "gannet",
+    "medusa",
+    "ray",
+    "teal"
+  ],
+  "media": [
+    "air",
+    "water",
+    "land"
+  ],
+  "seeds": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "lambda_ratios": [
+    0.0,
+    0.001,
+    0.01,
+    0.1,
+    0.3,
+    1.0,
+    3.0,
+    10.0,
+    30.0,
+    100.0,
+    300.0,
+    1000.0
+  ],
+  "incumbent_ratio": 1.0,
+  "incumbent_formula": "lam0 = 0.01 * trace(G) / r + 1e-12",
+  "n_intents": 512,
+  "intent_seed": 20260914,
+  "max_modes": 6
+}

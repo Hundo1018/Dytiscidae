@@ -1,0 +1,265 @@
+{
+  "experiment": "analytic_vs_numerical",
+  "ok": true,
+  "commit": "65e21d5429c88c28b4b397f62e721b487b907c62-dirty",
+  "when": "2026-09-14T13:15:23Z",
+  "elapsed_s": 0.153,
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",
+  "config": {
+    "question": "where a quantity has a closed form, does the code's number match an independent computation of it?",
+    "fd_step_relative": 1e-06,
+    "cpg": {
+      "n_joints": 6,
+      "base_frequency": 2.0,
+      "times_s": [
+        0.0,
+        0.05,
+        0.3,
+        1.2,
+        4.0
+      ]
+    },
+    "alpha_sweep_deg": {
+      "lo": -90.0,
+      "hi": 90.0,
+      "n": 2001
+    },
+    "quadrature_points": 200001,
+    "tolerances": {
+      "cpg_jacobian_rel": 1e-06,
+      "cl_slope_rel": 1e-05,
+      "quadrature_rel": 1e-08
+    }
+  },
+  "data": {
+    "checks": [
+      {
+        "check": "A. CPG Jacobian, analytic vs central difference",
+        "kind": "derivative",
+        "analytic": 0.0,
+        "numerical": 5.664814478839605e-10,
+        "relative_error": 5.664814478839605e-10,
+        "tolerance": 1e-06,
+        "ok": true,
+        "note": "max relative element error over 5 sample times"
+      },
+      {
+        "check": "B. lift slope at 2 deg, 2 pi/(1+2/AR) vs difference",
+        "kind": "derivative",
+        "analytic": 4.1887902047863905,
+        "numerical": 3.7260439832431658,
+        "relative_error": 0.1104725228335523,
+        "tolerance": 0.02,
+        "ok": false,
+        "note": "the post-stall branch already carries weight 0.138 at alpha=0 and 0.182 at alpha=2 deg, because the blend is centred at 11.0 deg with a 6 deg width. There is no angle of attack at which the attached branch is clean: the weight never falls below 0.138.  The realised slope is -11.0% against the value the docstring names.",
+        "blend_weight_at_zero_alpha": 0.13784165696493575,
+        "blend_weight_at_2deg": 0.18242552380635638
+      },
+      {
+        "check": "B. CL blend C1 continuity, k=0 (gliding)",
+        "kind": "smoothness",
+        "analytic": 0.0,
+        "numerical": 0.018037124445726693,
+        "relative_error": 0.018037124445726693,
+        "tolerance": Infinity,
+        "ok": true,
+        "note": "max |d2CL| proxy 11.483"
+      },
+      {
+        "check": "B. CL blend C1 continuity, k=0.3 (strong LEV)",
+        "kind": "smoothness",
+        "analytic": 0.0,
+        "numerical": 0.030247496757877634,
+        "relative_error": 0.030247496757877634,
+        "tolerance": Infinity,
+        "ok": true,
+        "note": "max |d2CL| proxy 19.256"
+      },
+      {
+        "check": "B. CL odd symmetry, max |CL(a) + CL(-a)|",
+        "kind": "symmetry",
+        "analytic": 0.0,
+        "numerical": 0.0,
+        "relative_error": 0.0,
+        "tolerance": 1e-12,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "check": "C. CD non-negative over the alpha sweep",
+        "kind": "sign",
+        "analytic": 0.0,
+        "numerical": 0.0071096590213714055,
+        "relative_error": 0.0,
+        "tolerance": 0.0,
+        "ok": true,
+        "note": "the minimum is the skin-friction floor"
+      },
+      {
+        "check": "C. CD equals profile + induced + separated",
+        "kind": "identity",
+        "analytic": 0.0,
+        "numerical": 0.0,
+        "relative_error": 0.0,
+        "tolerance": 1e-12,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "check": "D. elliptic lift centroid, 4/(3 pi) vs quadrature",
+        "kind": "integral",
+        "analytic": 0.4244131815783876,
+        "numerical": 0.42441317916684956,
+        "relative_error": 5.682052606986363e-09,
+        "tolerance": 1e-05,
+        "ok": true,
+        "note": "this is the coefficient `spar_check` uses for the root moment"
+      },
+      {
+        "check": "E. tube area, pi(ro^2-ri^2) vs quadrature",
+        "kind": "integral",
+        "analytic": 6.832964021557796e-05,
+        "numerical": 6.832964021557798e-05,
+        "relative_error": 3.9668077025756277e-16,
+        "tolerance": 1e-06,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "check": "E. tube second moment, pi(ro^4-ri^4)/4 vs quadrature",
+        "kind": "integral",
+        "analytic": 1.8150060682262907e-09,
+        "numerical": 1.8150060682272514e-09,
+        "relative_error": 5.293482475343694e-13,
+        "tolerance": 1e-06,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "check": "E. section modulus, Z = I/ro",
+        "kind": "identity",
+        "analytic": 2.2687575852828632e-07,
+        "numerical": 2.2687575852828632e-07,
+        "relative_error": 0.0,
+        "tolerance": 1e-14,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "check": "F. cantilever UDL tip deflection, qL^4/(8EI) vs moment-area",
+        "kind": "integral",
+        "analytic": 0.0003347096247417385,
+        "numerical": 0.000334709624741737,
+        "relative_error": 4.534924989536535e-15,
+        "tolerance": 0.0001,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "check": "F. spar_deflection returns that, divided by semi-span",
+        "kind": "identity",
+        "analytic": 0.0003718995830463761,
+        "numerical": 0.0003718995830463761,
+        "relative_error": 0.0,
+        "tolerance": 1e-12,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "check": "G. hull buckling, classical n=2 ring vs the code's allowable",
+        "kind": "theory",
+        "analytic": 22045.855379188713,
+        "numerical": 105820.10582010582,
+        "relative_error": 0.7916666666666667,
+        "tolerance": 0.001,
+        "ok": false,
+        "note": "the code's expression before its own 0.6 knockdown is 176367 Pa, which is 8.0x the classical result -- the (t/D)^3 coefficient 2E/(1-nu^2) applied to (t/r)^3.  Net of the knockdown the allowable is 4.8x, i.e. non-conservative."
+      },
+      {
+        "check": "H. disc added-mass coefficient, Lamb vs the code's tensor",
+        "kind": "theory",
+        "analytic": 4.244131815783875,
+        "numerical": 5.0,
+        "relative_error": 0.1511736368432249,
+        "tolerance": 0.2,
+        "ok": true,
+        "note": "the code's own docstring claims 'within 18% of Lamb'; measured here it is +17.8%, so the claim holds.  The ratio is scale-free: the code gives D/(2h) and Lamb gives 4D/(3 pi h), a fixed 3 pi / 8 = 1.1781 apart.  The clip at 10.0 binds from D/h = 20 upward, where the code stops tracking Lamb at all."
+      },
+      {
+        "check": "H. sphere added-mass coefficient, 0.5 vs the code's tensor",
+        "kind": "theory",
+        "analytic": 0.5,
+        "numerical": 0.5,
+        "relative_error": 0.0,
+        "tolerance": 1e-12,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "check": "I. slam pressure coefficient at 20 deg deadrise",
+        "kind": "theory",
+        "analytic": 18.62550332282829,
+        "numerical": 74.50201329131316,
+        "relative_error": 0.75,
+        "tolerance": 4.0,
+        "ok": true,
+        "note": "the code uses (pi/tan beta)^2; the coefficient usually quoted for a Wagner wedge is (pi/(2 tan beta))^2, a factor of 4 lower.  This is conservative for structure, and it is an unresolved source question, not a demonstrated error."
+      },
+      {
+        "check": "J. allowable at 1e5 cycles equals the declared knockdown",
+        "kind": "identity",
+        "analytic": 256000000.0,
+        "numerical": 256000000.0,
+        "relative_error": 0.0,
+        "tolerance": 1e-12,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "check": "J. allowable stress monotone in cycles",
+        "kind": "monotonicity",
+        "analytic": 1.0,
+        "numerical": 1.0,
+        "relative_error": 0.0,
+        "tolerance": 0.0,
+        "ok": true,
+        "note": "1e3 -> 320.0 MPa, 1e5 -> 256.0 MPa"
+      },
+      {
+        "check": "K. d(net buoyancy)/d(depth), Boyle analytic vs the code's difference",
+        "kind": "derivative",
+        "analytic": -0.5025827817036833,
+        "numerical": -0.5025858978031295,
+        "relative_error": 6.200133071310012e-06,
+        "tolerance": 0.0001,
+        "ok": true,
+        "note": "negative means the vehicle gets heavier as it sinks"
+      }
+    ],
+    "cpg": {
+      "max_relative_error": 5.664814478839605e-10,
+      "frequency_column_norm": {
+        "0.0": 0.0,
+        "0.05": 0.2510893181079363,
+        "0.3": 1.5065359086476178,
+        "1.2": 6.026143634590469,
+        "4.0": 21.15857404537018
+      }
+    },
+    "lift_slope": {
+      "attached_slope_analytic": 4.1887902047863905,
+      "attached_slope_measured": 3.7260439832431658
+    },
+    "theory": {
+      "buckling_ratio_before_knockdown": 8.0,
+      "buckling_ratio_after_knockdown": 4.8,
+      "disc_ca_lamb": 4.244131815783875,
+      "disc_ca_coded": 5.0,
+      "slam_k_coded": 74.50201329131316,
+      "slam_k_quoted": 18.62550332282829
+    },
+    "n_differ": 2
+  }
+}

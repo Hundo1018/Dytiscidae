@@ -1,0 +1,11 @@
+{
+  "question": "is rank = #{sigma_i > 0.08 sigma_0} a numerical rank, or an engineering guess?",
+  "plans": ["bat", "beetle", "eel", "gannet", "medusa", "ray", "teal"],
+  "media": ["air", "water", "land"],
+  "seeds": [1, 2, 3, 4],
+  "thresholds": [0.001, 0.005, 0.01, 0.02, 0.05, 0.08, 0.10, 0.20],
+  "n_intents": 512,
+  "intent_seed": 20260914,
+  "incumbent_threshold": 0.08,
+  "probe": {"n_probes": 24, "probe_time_s": 1.2, "probe_scale": 0.35, "max_modes": 6}
+}
