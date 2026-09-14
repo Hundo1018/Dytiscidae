@@ -1,0 +1,588 @@
+{
+  "commit": "65e21d5429c88c28b4b397f62e721b487b907c62-dirty",
+  "when": "2026-09-14T14:01:49Z",
+  "elapsed_s": 181.469,
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "mujoco": "3.13.0",
+  "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",
+  "first_departing_layer": 2,
+  "layers": [
+    {
+      "number": 1,
+      "title": "rigid body",
+      "adds": "Newton-Euler only, no fluid, no contact",
+      "agrees": true,
+      "worst_error": 0.3236793103468011,
+      "checks": [
+        {
+          "layer": 1,
+          "name": "box inertia Ixx = m((2b)^2+(2c)^2)/12",
+          "reference": 0.065,
+          "simulated": 0.065,
+          "reference_kind": "closed form",
+          "error": 0.0,
+          "absolute": false,
+          "tolerance": 1e-12,
+          "agrees": true,
+          "note": ""
+        },
+        {
+          "layer": 1,
+          "name": "a = F/m along the applied force",
+          "reference": 4.459696053419884,
+          "simulated": 4.459696053419884,
+          "reference_kind": "closed form",
+          "error": 0.0,
+          "absolute": false,
+          "tolerance": 1e-12,
+          "agrees": true,
+          "note": ""
+        },
+        {
+          "layer": 1,
+          "name": "and the acceleration is parallel to the force",
+          "reference": 0.0,
+          "simulated": 8.881784197001252e-16,
+          "reference_kind": "closed form",
+          "error": 8.881784197001252e-16,
+          "absolute": true,
+          "tolerance": 1e-09,
+          "agrees": true,
+          "note": ""
+        },
+        {
+          "layer": 1,
+          "name": "alpha = I^-1 tau at rest",
+          "reference": 72.31514233267193,
+          "simulated": 72.31514233267193,
+          "reference_kind": "closed form",
+          "error": 0.0,
+          "absolute": false,
+          "tolerance": 1e-10,
+          "agrees": true,
+          "note": ""
+        },
+        {
+          "layer": 1,
+          "name": "ballistic flight converges at first order",
+          "reference": 1.0,
+          "simulated": 0.9999999999177215,
+          "reference_kind": "order-of-accuracy study",
+          "error": 8.227851733266789e-11,
+          "absolute": false,
+          "tolerance": 0.05,
+          "agrees": true,
+          "note": "|error| at dt = [0.002, 0.001, 0.0005, 0.00025]: ['9.807e-03', '4.903e-03', '2.452e-03', '1.226e-03'].  MuJoCo's semi-implicit schemes are first order, so p = 1 is the correct answer and any other value means the discretisation is not doing what it claims"
+        },
+        {
+          "layer": 1,
+          "name": "its 1 s height error stays under 5% of the smallest height rung",
+          "reference": 0.05,
+          "simulated": 0.03381603448265995,
+          "reference_kind": "closed form",
+          "error": 0.3236793103468011,
+          "absolute": false,
+          "tolerance": 1.0,
+          "agrees": true,
+          "note": "9.81 mm after 1 s of free flight at dt = 0.002, against the 0.29 m cap `clears` sits above.  It is exactly (1/2) g dt T, so it is systematic rather than noise: it biases every height the same way, and it grows linearly with the segment length."
+        },
+        {
+          "layer": 1,
+          "name": "free-rotation angular momentum drift converges at first order",
+          "reference": 1.0,
+          "simulated": 1.002301563956217,
+          "reference_kind": "order-of-accuracy study",
+          "error": 0.0022962789234133966,
+          "absolute": false,
+          "tolerance": 0.1,
+          "agrees": true,
+          "note": "|dL| at dt = [0.002, 0.001, 0.0005, 0.00025]: ['1.225e-03', '6.107e-04', '3.049e-04', '1.523e-04']"
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "title": "added mass",
+      "adds": "entrained fluid inertia, still fluid, no drag",
+      "agrees": false,
+      "worst_error": 0.7285155380930951,
+      "checks": [
+        {
+          "layer": 2,
+          "name": "plate c/t = 10: normal:chordwise added mass is (c/t)^2",
+          "reference": 100.0,
+          "simulated": 100.00000000000001,
+          "reference_kind": "closed form",
+          "error": 1.4210854715202002e-16,
+          "absolute": false,
+          "tolerance": 1e-12,
+          "agrees": true,
+          "note": "no simulation in this check; it establishes the reference the measured values below are compared against"
+        },
+        {
+          "layer": 2,
+          "name": "plate c/t = 100: normal:chordwise added mass is (c/t)^2",
+          "reference": 10000.0,
+          "simulated": 10000.000000000002,
+          "reference_kind": "closed form",
+          "error": 1.818989403545856e-16,
+          "absolute": false,
+          "tolerance": 1e-12,
+          "agrees": true,
+          "note": "no simulation in this check; it establishes the reference the measured values below are compared against"
+        },
+        {
+          "layer": 2,
+          "name": "plate c/t = 1000: normal:chordwise added mass is (c/t)^2",
+          "reference": 1000000.0,
+          "simulated": 1000000.0,
+          "reference_kind": "closed form",
+          "error": 0.0,
+          "absolute": false,
+          "tolerance": 1e-12,
+          "agrees": true,
+          "note": "no simulation in this check; it establishes the reference the measured values below are compared against"
+        },
+        {
+          "layer": 2,
+          "name": "and the spanwise added mass of a flat plate is zero",
+          "reference": 0.0,
+          "simulated": 0.0,
+          "reference_kind": "closed form",
+          "error": 0.0,
+          "absolute": true,
+          "tolerance": 1e-15,
+          "agrees": true,
+          "note": "a plate accelerating along its own span presents no normal extent, so strip theory entrains nothing"
+        },
+        {
+          "layer": 2,
+          "name": "jointed: effective mass pushing chordwise",
+          "reference": 12.003220132469929,
+          "simulated": 44.20142469867045,
+          "reference_kind": "closed form (strip theory)",
+          "error": 0.728442686761837,
+          "absolute": false,
+          "tolerance": 0.02,
+          "agrees": false,
+          "note": "dry 12.0 kg + 0.00322 kg entrained"
+        },
+        {
+          "layer": 2,
+          "name": "jointed: effective mass pushing spanwise",
+          "reference": 12.0,
+          "simulated": 44.2014246992704,
+          "reference_kind": "closed form (strip theory)",
+          "error": 0.7285155380930951,
+          "absolute": false,
+          "tolerance": 0.02,
+          "agrees": false,
+          "note": "dry 12.0 kg + 0.00000 kg entrained"
+        },
+        {
+          "layer": 2,
+          "name": "jointed: effective mass pushing normal",
+          "reference": 44.201324699295384,
+          "simulated": 44.20142469929539,
+          "reference_kind": "closed form (strip theory)",
+          "error": 2.262370515964698e-06,
+          "absolute": false,
+          "tolerance": 0.02,
+          "agrees": true,
+          "note": "dry 12.0 kg + 32.20132 kg entrained"
+        },
+        {
+          "layer": 2,
+          "name": "jointless: effective mass pushing chordwise",
+          "reference": 12.003220132469929,
+          "simulated": 12.0,
+          "reference_kind": "closed form (strip theory)",
+          "error": 0.00026827238310978246,
+          "absolute": false,
+          "tolerance": 0.02,
+          "agrees": true,
+          "note": "dry 12.0 kg + 0.00322 kg entrained"
+        },
+        {
+          "layer": 2,
+          "name": "jointless: effective mass pushing spanwise",
+          "reference": 12.0,
+          "simulated": 12.000000000000002,
+          "reference_kind": "closed form (strip theory)",
+          "error": 1.480297366166875e-16,
+          "absolute": false,
+          "tolerance": 0.02,
+          "agrees": true,
+          "note": "dry 12.0 kg + 0.00000 kg entrained"
+        },
+        {
+          "layer": 2,
+          "name": "jointless: effective mass pushing normal",
+          "reference": 44.201324699295384,
+          "simulated": 12.0,
+          "reference_kind": "closed form (strip theory)",
+          "error": 0.7285149238934169,
+          "absolute": false,
+          "tolerance": 0.02,
+          "agrees": false,
+          "note": "dry 12.0 kg + 32.20132 kg entrained"
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "title": "drag",
+      "adds": "quadratic pressure drag on a bluff volume",
+      "agrees": true,
+      "worst_error": 6.0515834120767695e-05,
+      "checks": [
+        {
+          "layer": 3,
+          "name": "speed after 6 s under a constant push",
+          "reference": 3.868575508591761,
+          "simulated": 3.8686979924307137,
+          "reference_kind": "RK45 rtol 1e-11 of the same force law",
+          "error": 3.1660222429427536e-05,
+          "absolute": false,
+          "tolerance": 0.005,
+          "agrees": true,
+          "note": ""
+        },
+        {
+          "layer": 3,
+          "name": "distance travelled in 6 s",
+          "reference": 22.378160775871876,
+          "simulated": 22.37951509089482,
+          "reference_kind": "RK45 rtol 1e-11 of the same force law",
+          "error": 6.0515834120767695e-05,
+          "absolute": false,
+          "tolerance": 0.005,
+          "agrees": true,
+          "note": ""
+        },
+        {
+          "layer": 3,
+          "name": "and it is approaching the terminal velocity",
+          "reference": 3.8685755086054847,
+          "simulated": 3.8686979924307137,
+          "reference_kind": "closed form",
+          "error": 3.1660218882061244e-05,
+          "absolute": false,
+          "tolerance": 0.05,
+          "agrees": true,
+          "note": "terminal 3.8686 m/s; after 6 s the body should be close but still below it"
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "title": "buoyancy",
+      "adds": "hydrostatic lift and the free-surface ramp",
+      "agrees": true,
+      "worst_error": 0.0006820052825398105,
+      "checks": [
+        {
+          "layer": 4,
+          "name": "fully submerged buoyant force",
+          "reference": 40.207265,
+          "simulated": 40.207265,
+          "reference_kind": "closed form (Archimedes)",
+          "error": 0.0,
+          "absolute": false,
+          "tolerance": 1e-12,
+          "agrees": true,
+          "note": ""
+        },
+        {
+          "layer": 4,
+          "name": "equilibrium depth of a floating body",
+          "reference": -0.010000000000000009,
+          "simulated": -0.010004878048779923,
+          "reference_kind": "closed form of the project's own ramp",
+          "error": 0.00048756704041073563,
+          "absolute": false,
+          "tolerance": 0.005,
+          "agrees": true,
+          "note": "f = clip(0.5 + 0.5 d/h) gives d* = 2h(m/(rho V) - 1/2) = 0.0100 m"
+        },
+        {
+          "layer": 4,
+          "name": "heave period of a floating body",
+          "reference": 0.8151401192978791,
+          "simulated": 0.8156964285711135,
+          "reference_kind": "closed form of the project's own ramp",
+          "error": 0.0006820052825398105,
+          "absolute": false,
+          "tolerance": 0.05,
+          "agrees": true,
+          "note": "k = rho_water g V/(2h) = 201.04 N/m against an effective mass of 3.384 kg -- 2.255 kg dry plus 1.129 kg entrained at the blended density 564.3 kg/m^3 the element sees at f = 0.55, not at the 1025 kg/m^3 of the water below it"
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "title": "jet propulsion",
+      "adds": "momentum flux out of a contracting cavity",
+      "agrees": false,
+      "worst_error": 0.9999215666804336,
+      "checks": [
+        {
+          "layer": 5,
+          "name": "pumping work equals the jet's kinetic energy",
+          "reference": 141.61164673784086,
+          "simulated": 141.61164673784086,
+          "reference_kind": "closed form",
+          "error": 0.0,
+          "absolute": false,
+          "tolerance": 1e-09,
+          "agrees": true,
+          "note": "p Q = (1/2) rho Q^3/A^2 and (1/2) m_dot ve^2 are the same quantity; both sides are analytic, so this pins the reference"
+        },
+        {
+          "layer": 5,
+          "name": "the actuator is charged for the water it expels",
+          "reference": 141.61164673784086,
+          "simulated": 0.011107071542909353,
+          "reference_kind": "closed form (energy conservation)",
+          "error": 0.9999215666804336,
+          "absolute": false,
+          "tolerance": 0.1,
+          "agrees": false,
+          "note": "measured as the difference between driving the bell with the jet on and with it off, so the bell's own inertia cancels"
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "title": "articulated body",
+      "adds": "internal joints, no external force",
+      "agrees": false,
+      "worst_error": 0.340134335196408,
+      "checks": [
+        {
+          "layer": 6,
+          "name": "internal-torque centre-of-mass drift converges at first order",
+          "reference": 1.0,
+          "simulated": 1.028434200043307,
+          "reference_kind": "order-of-accuracy study",
+          "error": 0.027648049862703656,
+          "absolute": false,
+          "tolerance": 0.05,
+          "agrees": true,
+          "note": "|drift| at dt = [0.002, 0.001, 0.0005, 0.00025]: ['3.738e-03', '1.793e-03', '8.885e-04', '4.389e-04'].  The drift is truncation, not a broken momentum balance: it is proportional to dt and vanishes with it."
+        },
+        {
+          "layer": 6,
+          "name": "RK4 at the same step conserves it to near machine precision",
+          "reference": 0.0,
+          "simulated": 4.4569291759640624e-09,
+          "reference_kind": "conservation law",
+          "error": 4.4569291759640624e-09,
+          "absolute": true,
+          "tolerance": 1e-07,
+          "agrees": true,
+          "note": "4.457e-09 m against 1.793e-03 m for the project's first-order scheme at the same dt -- a factor of 402395"
+        },
+        {
+          "layer": 6,
+          "name": "gannet: 8 s of gait in a vacuum moves its centre of mass",
+          "reference": 0.0,
+          "simulated": 0.0004012418129710779,
+          "reference_kind": "conservation law",
+          "error": 0.0004012418129710779,
+          "absolute": true,
+          "tolerance": 0.01,
+          "agrees": true,
+          "note": "1.93 mm at the project's dt = 0.004, 0.48 mm at 0.001, so the drift converges at order 1.00.  As a fraction of the 4.8 m a full-marks land segment covers, 0.040%."
+        },
+        {
+          "layer": 6,
+          "name": "beetle: 8 s of gait in a vacuum moves its centre of mass",
+          "reference": 0.0,
+          "simulated": 0.0033928558099478694,
+          "reference_kind": "conservation law",
+          "error": 0.0033928558099478694,
+          "absolute": true,
+          "tolerance": 0.01,
+          "agrees": true,
+          "note": "16.29 mm at the project's dt = 0.004, 4.02 mm at 0.001, so the drift converges at order 1.01.  As a fraction of the 4.8 m a full-marks land segment covers, 0.339%."
+        },
+        {
+          "layer": 6,
+          "name": "teal: 8 s of gait in a vacuum moves its centre of mass",
+          "reference": 0.0,
+          "simulated": 0.1787081485798637,
+          "reference_kind": "conservation law",
+          "error": 0.1787081485798637,
+          "absolute": true,
+          "tolerance": 0.01,
+          "agrees": false,
+          "note": "857.80 mm at the project's dt = 0.004, 343.64 mm at 0.001, so the drift converges at order 0.66.  As a fraction of the 4.8 m a full-marks land segment covers, 17.871%."
+        },
+        {
+          "layer": 6,
+          "name": "medusa: 8 s of gait in a vacuum moves its centre of mass",
+          "reference": 0.0,
+          "simulated": 0.00012295604880164273,
+          "reference_kind": "conservation law",
+          "error": 0.00012295604880164273,
+          "absolute": true,
+          "tolerance": 0.01,
+          "agrees": true,
+          "note": "0.59 mm at the project's dt = 0.004, 0.15 mm at 0.001, so the drift converges at order 1.01.  As a fraction of the 4.8 m a full-marks land segment covers, 0.012%."
+        },
+        {
+          "layer": 6,
+          "name": "and the worst plan's drift converges at first order",
+          "reference": 1.0,
+          "simulated": 0.659865664803592,
+          "reference_kind": "order-of-accuracy study",
+          "error": 0.340134335196408,
+          "absolute": false,
+          "tolerance": 0.15,
+          "agrees": false,
+          "note": "teal is the worst at 17.87% of a scored segment, and its order is 0.66.  An order of 1 means a smaller step fixes it; an order below 1 means the trajectory is changing under refinement rather than converging, and a smaller step does not."
+        },
+        {
+          "layer": 6,
+          "name": "M stays symmetric",
+          "reference": 0.0,
+          "simulated": 0.0,
+          "reference_kind": "definition of kinetic energy",
+          "error": 0.0,
+          "absolute": true,
+          "tolerance": 1e-12,
+          "agrees": true,
+          "note": ""
+        },
+        {
+          "layer": 6,
+          "name": "M stays positive definite",
+          "reference": 1.0,
+          "simulated": 1.0,
+          "reference_kind": "definition of kinetic energy",
+          "error": 0.0,
+          "absolute": false,
+          "tolerance": 0.0,
+          "agrees": true,
+          "note": "smallest eigenvalue 0.0196188"
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "title": "fluid surrogate",
+      "adds": "the assembled blade-element force",
+      "agrees": true,
+      "worst_error": 1.5590085789961588e-12,
+      "checks": [
+        {
+          "layer": 7,
+          "name": "assembled lift equals q S CL",
+          "reference": 7.001106796088826,
+          "simulated": 7.001106796082754,
+          "reference_kind": "closed form of the project's own coefficients",
+          "error": 8.672325467827392e-13,
+          "absolute": false,
+          "tolerance": 1e-09,
+          "agrees": true,
+          "note": ""
+        },
+        {
+          "layer": 7,
+          "name": "assembled drag equals q S CD",
+          "reference": 0.7486664804243536,
+          "simulated": 0.7486664804231864,
+          "reference_kind": "closed form of the project's own coefficients",
+          "error": 1.5590085789961588e-12,
+          "absolute": false,
+          "tolerance": 1e-09,
+          "agrees": true,
+          "note": ""
+        },
+        {
+          "layer": 7,
+          "name": "force scales as U^2 at matched Reynolds number",
+          "reference": 4.0,
+          "simulated": 4.0,
+          "reference_kind": "dimensional similarity",
+          "error": 0.0,
+          "absolute": false,
+          "tolerance": 1e-09,
+          "agrees": true,
+          "note": "doubling the speed and halving the viscosity holds Re fixed, so the force must quadruple exactly"
+        },
+        {
+          "layer": 7,
+          "name": "glide angle satisfies tan(gamma) = D/L",
+          "reference": 0.10693544638436264,
+          "simulated": 0.10693544638428867,
+          "reference_kind": "closed form",
+          "error": 6.91712724981598e-13,
+          "absolute": false,
+          "tolerance": 1e-09,
+          "agrees": true,
+          "note": "L/D = 9.35, so a steady glide at this incidence descends at 6.10 degrees"
+        }
+      ]
+    },
+    {
+      "number": 8,
+      "title": "controller",
+      "adds": "the identified basis against the machine",
+      "agrees": false,
+      "worst_error": 0.34101278904555654,
+      "checks": [
+        {
+          "layer": 8,
+          "name": "twist_of(c) equals A^T c",
+          "reference": 0.0,
+          "simulated": 0.0,
+          "reference_kind": "algebra",
+          "error": 0.0,
+          "absolute": true,
+          "tolerance": 1e-12,
+          "agrees": true,
+          "note": ""
+        },
+        {
+          "layer": 8,
+          "name": "doubling the command doubles the response",
+          "reference": 2.0,
+          "simulated": 1.317974421908887,
+          "reference_kind": "linearity of the fitted model",
+          "error": 0.34101278904555654,
+          "absolute": false,
+          "tolerance": 0.1,
+          "agrees": false,
+          "note": "a central difference about the base gait, so any drift independent of the command cancels; what is left is the nonlinearity of the parameter-to-twist map at the 0.35 probe scale the identification uses"
+        },
+        {
+          "layer": 8,
+          "name": "and does not change its direction",
+          "reference": 1.0,
+          "simulated": 0.9975077235285226,
+          "reference_kind": "linearity of the fitted model",
+          "error": 0.002492276471477428,
+          "absolute": false,
+          "tolerance": 0.05,
+          "agrees": true,
+          "note": "cosine between the response to c and to 2c"
+        },
+        {
+          "layer": 8,
+          "name": "the machine delivers the twist the basis predicts",
+          "reference": 0.0,
+          "simulated": 0.2634727675507789,
+          "reference_kind": "the identified model's own prediction",
+          "error": 0.2634727675507789,
+          "absolute": true,
+          "tolerance": 1.0,
+          "agrees": true,
+          "note": "relative error 0.263 on the same body the basis was fitted on.  This is not graded against a closed form because there isn't one; the tolerance is 1.0, i.e. 'the command did something rather than nothing'.  What the number is worth is in experiments/rank_threshold, which measures the identification's own reproducibility."
+        }
+      ]
+    }
+  ]
+}
