@@ -71,15 +71,20 @@ The most useful thing this experiment measured is not about the blend:
 
 | medium | strip-steps | median \|α\| | 90th | below the model's own stall angle |
 |---|---|---|---|---|
-| air | 1,108,000 | 33.2° | 83.3° | 27.8% |
-| water | 1,108,000 | 39.1° | 86.2° | 27.3% |
-| land | 1,108,000 | 42.7° | 88.6° | 28.0% |
-| **all** | **3,324,000** | **37.9°** | **86.1°** | **27.7%** |
+| air | 1,108,000 | 33.8° | 83.1° | 27.6% |
+| water | 1,108,000 | 39.5° | 86.3° | 26.9% |
+| land | 1,108,000 | 43.7° | 88.7° | 27.7% |
+| **all** | **3,324,000** | **38.3°** | **86.1°** | **27.4%** |
 
 The seed plans spend roughly three-quarters of their strip-steps **past** stall,
 and remarkably consistently across the three media. So the half of F-05 that
 matters most for these machines is the *second* half — the attached branch
 leaking upward — and not the zero-incidence tail the finding was written about.
+
+These are measured on the fixed tree, so the distribution is itself downstream
+of the change: under the logistic the same rollouts gave a median of 37.9° and
+27.7% below stall. The second digit moves because the machines fly slightly
+differently once the lift is corrected; the conclusion does not.
 
 ## What moved
 
