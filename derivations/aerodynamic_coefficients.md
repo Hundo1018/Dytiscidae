@@ -132,7 +132,7 @@ how much they move the answer.
 | `CL_max` | `1.10 + 0.80 * lev` | fitted interpolation |
 | `alpha_stall` | `11 deg + 26 deg * lev` | fitted interpolation |
 | low-Re knockdown | `0.55 + 0.45 log10(Re)/5` | fitted, anchored at Re = 1e5 |
-| blend width | `6 deg` sigmoid | smoothing choice |
+| separation width | `16 deg` past stall | measured, `experiments/stall_blend` |
 | `e` (Oswald) | `0.75` | planform-dependent, fixed |
 | `lev` scale | `k / 0.30` | fitted |
 
@@ -173,20 +173,37 @@ return np.clip(cl, -1.2*cl_max, 1.2*cl_max)
 
 Three departures worth recording.
 
-**The attached branch is never clean.** The sigmoid `w` is centred on
-`alpha_stall` with a 6 degree width, and a logistic is `0.5` at its centre and
-never reaches `0`. At `Re = 2e5`, `k = 0` the knockdown clips to 1.0 so
-`alpha_stall = 11 deg`, and
+**Neither branch was clean, and now both are.** `w` was a logistic centred on
+`alpha_stall` with a 6 degree width, and a logistic reaches neither `0` nor `1`.
+At `Re = 2e5`, `k = 0` the knockdown clips to 1.0 so `alpha_stall = 11 deg`, and
 
     w(0 deg) = 1/(1 + e^{11/6})  = 0.138
     w(2 deg) = 1/(1 + e^{9/6})   = 0.182
 
-So **13.8% of the post-stall plate branch is mixed in at zero incidence**, and
-there is no angle of attack at which the attached branch stands alone. The
-measured lift slope at 2 degrees is `3.726` against the `4.189` that (2) gives
+So **13.8% of the post-stall plate branch was mixed in at zero incidence**, and
+there was no angle of attack at which the attached branch stood alone. The
+measured lift slope at 2 degrees was `3.726` against the `4.189` that (2) gives
 and the docstring names — **11.0% low**, everywhere, for every wing in the
-project. Measured in `experiments/analytic_vs_numerical`, check B. Recorded as
-**F-05**.
+project. The mirror image is the same defect: `1 - w(alpha_stall + 10 deg) =
+0.159`, so an **unbounded** attached-flow extrapolation was still weighted a
+sixth ten degrees into the stall.
+
+A partition of unity is a statement about where each branch is valid, so the
+weight must be exactly `0` below some angle and exactly `1` above another. `w`
+is now the smoothstep
+
+    t = clip(|alpha| / (alpha_stall + SEPARATION_COMPLETE), 0, 1)
+    w = t^2 (3 - 2t)                                                        (8)
+
+the lowest-order polynomial with `w = w' = 0` at `t = 0` and `w = 1, w' = 0` at
+`t = 1`. Both endpoint conditions matter: `w(0) = 0` removes the lift the
+separated branch was contributing at zero incidence, and `w'(0) = 0` removes
+the *slope* it was contributing, so the realised slope at zero is (2) exactly —
+measured at `4.1887902` against `4.1887902`, a relative difference of `6.4e-12`.
+
+`SEPARATION_COMPLETE = 16 deg` is the only constant (8) introduces, and it is
+measured rather than chosen: see `experiments/stall_blend`. Recorded as
+**F-05**, closed.
 
 **`cl_plate` uses `CL_max` where (7) uses `CN_max/2`.** The code's post-stall
 lift peaks at `cl_max`, i.e. `1.10` statically, where (7) with the plate's own
@@ -196,7 +213,9 @@ and the lift branch does not, so the two branches are not resolved from the
 same normal force.
 
 **The clip is at `1.2 * cl_max`, not at `CL_MAX`.** The largest lift
-coefficient the model can produce is `1.2 * 1.9 = 2.28`.
+coefficient the model can produce is `1.2 * 1.9 = 2.28`, and under the logistic
+that ceiling was reached exactly. Under (8) the peak is `2.093`, so the clip no
+longer binds anywhere.
 `dytiscidae/envs/triphibian.py` declares
 
 ```python

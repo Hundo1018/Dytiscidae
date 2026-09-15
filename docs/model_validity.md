@@ -36,7 +36,7 @@ in `derivations/`. The measurements are in `experiments/`.
 | `CL_max = 1.10 + 0.80 lev` | **calibrated** | no source |
 | `alpha_stall = 11 + 26 lev` degrees | **calibrated** | no source |
 | low-Re stall knockdown | **calibrated** | anchored at `Re = 1e5` |
-| the 6-degree stall blend | **heuristic** | costs 11% of the attached lift slope |
+| the 16-degree separation width | **calibrated** | `experiments/stall_blend`; replaced a 6-degree logistic that cost 11% of the attached lift slope (F-05) |
 | `lev = clip(k/0.30, 0, 1)` | **heuristic** | no source, and `k` here is a pitch rate |
 
 Roughly: the *shapes* are derived and the *magnitudes at the regime boundaries*
