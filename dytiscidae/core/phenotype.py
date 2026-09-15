@@ -27,7 +27,7 @@ import numpy as np
 from ..physics import structure
 from ..physics.energy import Actuator, Battery
 from ..physics.fluid import BLUFF, WING, PanelSet
-from ..physics.materials import STRUCTURAL_MATERIALS, Material
+from ..physics.materials import PETG, STRUCTURAL_MATERIALS, Material
 from ..physics.medium import GRAVITY, SEAWATER
 from .cppn import SurfaceField, sample_surface
 from .genome import (
@@ -51,18 +51,72 @@ AVIONICS_MASS = 0.30
 SKIN_AREAL_DENSITY = 0.085
 
 
+#: The depth `hull_pressure_check` grades a hull at, and therefore the depth
+#: `hull_wall` sizes one for.  One constant, read by both, because the two
+#: drifting apart is what let an 8x-too-large allowable survive: the sizing
+#: rule had been fitted to it, so the wall and the check agreed with each other
+#: while neither agreed with the ring result.
+HULL_DESIGN_DEPTH_M = 12.0
+
+#: Allowable over applied at `HULL_DESIGN_DEPTH_M`.  1.3 is what the incumbent
+#: sizing constant happened to deliver against its own (wrong) allowable, kept
+#: so that correcting the physics does not silently also change how much margin
+#: a hull is designed to.  A design decision, not a measurement.
+HULL_BUCKLING_SAFETY = 1.3
+
+
 def hull_wall(radius: float) -> float:
     """Printable wall thickness for a pressure hull of a given radius, m.
 
     Sized by external-pressure buckling, which is the binding constraint at
-    shallow depth: ``p_cr ~ E * (t/r)^3`` means a PETG hull needs t/r ~ 0.035 to
-    survive 1 bar gauge, which for a 90 mm radius is a very printable 3.2 mm.
+    shallow depth: ``p_cr = E/(4(1-nu^2)) (t/r)^3`` for the n=2 ring mode, so a
+    PETG hull needs t/r = 0.076 to carry 1.3x the 12 m gauge pressure, which
+    for a 90 mm radius is 6.8 mm.  Every hull in the seed plans is PETG, which
+    is why the sizing rule names it; a hull of another material is graded
+    against its own modulus by `hull_pressure_check` and would be mis-sized
+    here.
+
+    Solved from `structure.wall_for_buckling` rather than carried as a literal,
+    so it cannot drift from the check that grades it.  It read ``0.038 *
+    radius`` until `experiments/hull_buckling` measured the allowable at 8x the
+    ring result; 0.038 was the wall that number asks for.
 
     This being a *fraction of radius* rather than a constant is the whole point:
     it is what makes a big dry volume expensive and pushes the search toward
     small pressure hulls with everything else flooded.
+
+    The clips are printability, not physics: below 1.8 mm an FDM wall is not
+    watertight, and above 12 mm the print time is not worth it.  Under the
+    corrected rule the upper clip binds at r = 158 mm rather than 316 mm, so a
+    hull larger than that is knowingly under-walled and fails its own check.
     """
-    return float(np.clip(0.038 * radius, 0.0018, 0.012))
+    t = structure.wall_for_buckling(
+        radius=radius, depth_m=HULL_DESIGN_DEPTH_M, material=PETG,
+        safety=HULL_BUCKLING_SAFETY)
+    return float(np.clip(t, 0.0018, 0.012))
+
+
+#: A bell wall's thickness as a fraction of radius.  This is `0.35 * 0.038`,
+#: the value it had when `hull_wall` still carried the 8x-too-large buckling
+#: allowable, written out as its own number rather than left riding on
+#: `hull_wall`.
+#:
+#: A bell is open, flooded and has to flex; external-pressure collapse of a
+#: sealed cylinder is not its load case, so there is no reason for its wall to
+#: move when the pressure-hull rule is corrected.  What its real load case is
+#: -- cyclic bending of an elastomeric dome at the flap frequency -- is not
+#: modelled anywhere, so this stays a HEURISTIC and is now labelled one
+#: instead of inheriting the appearance of physics from the function it used to
+#: call.
+BELL_WALL_FRACTION = 0.35 * 0.038
+
+#: Thinnest bell wall worth printing, m.
+BELL_WALL_MIN = 0.0012
+
+
+def bell_wall(radius: float) -> float:
+    """Wall thickness for a flexing, flooded bell, m.  See BELL_WALL_FRACTION."""
+    return max(BELL_WALL_FRACTION * radius, BELL_WALL_MIN)
 
 
 def tube_wall(radius: float) -> float:
@@ -520,7 +574,7 @@ def build(genome: Genome) -> Phenotype:
             # 15 kg for one dome, and the medusa plan failed its mass budget for
             # being the shape it exists to be.
             if s.kind == BELL:
-                wall = max(0.35 * hull_wall(s.radius), 0.0012)
+                wall = bell_wall(s.radius)
             elif s.kind in (HULL, BALLAST):
                 wall = hull_wall(s.radius)
             else:
@@ -549,7 +603,7 @@ def build(genome: Genome) -> Phenotype:
         elif s.kind == BELL:
             # A contracting cavity.  Its wall must flex, so it is thin and
             # elastomeric rather than a rigid pressure shell.
-            wall = max(0.35 * hull_wall(s.radius), 0.0012)
+            wall = bell_wall(s.radius)
             s.mass = structure.hull_mass(
                 radius=s.radius, wall=wall, length=s.length, material=mat
             )
@@ -825,7 +879,7 @@ def _structural_checks(p: Phenotype) -> None:
         # Design depth is a free variable: check the hull at the depth its own
         # buoyancy system could actually reach.
         structure.hull_pressure_check(
-            depth_m=12.0,
+            depth_m=HULL_DESIGN_DEPTH_M,
             radius=s.radius,
             wall=hull_wall(s.radius),
             length=s.length,

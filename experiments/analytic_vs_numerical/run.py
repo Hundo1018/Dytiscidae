@@ -318,16 +318,19 @@ def check_coefficients_against_theory(cfg: dict) -> dict:
                                     material=PETG)
     coded = c_buck.allowable
     coded_before_knockdown = coded / 0.6
+    legacy_before_knockdown = E / (1 - nu**2) * 2.0 * (t / r) ** 3
     report("G. hull buckling, classical n=2 ring vs the code's allowable",
-           classical, coded, 1e-3, kind="theory",
-           note=f"the code's expression before its own 0.6 knockdown is "
-                f"{coded_before_knockdown:.0f} Pa, which is "
-                f"{coded_before_knockdown / classical:.1f}x the classical "
+           classical, coded_before_knockdown, 1e-12, kind="theory",
+           note=f"compared before the code's own 0.6 knockdown, which is a "
+                f"declared imperfection allowance and not part of the ring "
+                f"result.  The expression this replaced gives "
+                f"{legacy_before_knockdown:.0f} Pa, "
+                f"{legacy_before_knockdown / classical:.1f}x the classical "
                 f"result -- the (t/D)^3 coefficient 2E/(1-nu^2) applied to "
-                f"(t/r)^3.  Net of the knockdown the allowable is "
-                f"{coded / classical:.1f}x, i.e. non-conservative.")
+                f"(t/r)^3.  S-01, closed; see experiments/hull_buckling.")
     out["buckling_ratio_before_knockdown"] = float(coded_before_knockdown / classical)
     out["buckling_ratio_after_knockdown"] = float(coded / classical)
+    out["legacy_buckling_ratio"] = float(legacy_before_knockdown / classical)
 
     # H. Added-mass coefficient of a thin disc moving normal to itself.
     #

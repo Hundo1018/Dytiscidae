@@ -46,13 +46,14 @@ within a few hundred generations. The module prefix is `F` fluid, `S` structure,
 |---|---|---|---|---|
 | ~~**J-01**~~ | a pulsed jet's pumping work was **100% uncharged**: thrust appeared with no reaction torque on the driving joint | was critical | **CLOSED** — the reaction is applied as joint damping; `tau*omega == p*Q` holds to 3.5e-4 | `tests/test_jet_energy.py` |
 | ~~**F-01**~~ | added mass written into `body_mass` **never reached the mass matrix** for a jointless machine | was critical | **CLOSED** — `FluidSolver._publish_inertia` rebuilds the derived constants where the model needs them | `tests/test_added_mass.py` |
-| **S-01** | hull buckling allowable is **4.8x non-conservative**: the `(t/D)^3` coefficient applied to `(t/r)^3` | **high** | measured | `experiments/analytic_vs_numerical` |
+| ~~**S-01**~~ | hull buckling allowable was **8x non-conservative**: the `(t/D)^3` coefficient applied to `(t/r)^3` | was high | **CLOSED** — the allowable is the n=2 ring result and `hull_wall` is its inverse, not a second fitted constant; costs 2.00x the wall and sinks one seed plan | `tests/test_hull_buckling.py` |
 | **C-07** | the mobility identification is **underdetermined on 5 of 7 seed plans**, and its residual reads exactly zero because of it | **high** | measured | `experiments/rank_threshold` |
 | **C-08** | the identified **parameter-side directions do not survive a reseed** (68-85 degree principal angles); the twist-side ones do | **high** | measured | `experiments/rank_threshold` |
 | **F-03** | wing added mass is **isotropic**, overstating edgewise entrained mass by `(chord/thickness)^2` | **high** | measured | `experiments/added_mass` |
 | **J-02** | jet thrust goes as the **square of the joint rate with no limiter** and no out-of-domain flag | **high** | measured | `experiments/jet_energy` |
 | **F-02** | the leading-edge-vortex term keys on the **instantaneous pitch rate**, not the reduced frequency its docstring named | **high** | **half closed** — named correctly now, measured at a 157% spread across one stroke; the model choice is open | `tests/test_reduced_frequency.py` |
 | **C-09** | the damping `lam` is about **30x too small**; at the incumbent value a command on land is worse than no command | **high** | measured | `experiments/damping_lambda` |
+| **S-04** | every `HULL` segment is walled for 12 m of seawater whether or not the design dives; closing S-01 doubled that wall and took the glider fixture's glide ratio from 5.31 to 2.93 with the surfaces unchanged | medium | measured | `experiments/hull_buckling` |
 | **C-06** | a **diverged probe returns a measured zero** twist rather than a missing observation | medium | derived | `derivations/mobility_jacobian.md` |
 | **F-05** | the stall blend puts **13.8% of the post-stall branch at zero incidence**; the realised lift slope is 11% below the docstring's | medium | measured | `experiments/analytic_vs_numerical` |
 | **C-02** | the twist scaling's three `0.3`s are an **undeclared reference length in metres**, fixed across bodies of different size | medium | measured | `experiments/dimensional_check` |
@@ -154,7 +155,7 @@ masses imply (0.27200 measured against 0.27149).
 
 ## The rest, in order
 
-### S-01 -- hull buckling is 4.8x non-conservative
+### S-01 -- hull buckling was 8x non-conservative  (CLOSED)
 
 ```python
 p_cr = 0.6 * 2.0 * material.E / (1.0 - nu**2) * (wall / max(radius, 1e-6)) ** 3
@@ -166,12 +167,62 @@ first available mode is `n = 2`, giving
 
     p_cr = E/(4(1-nu^2)) (t/r)^3  =  2E/(1-nu^2) (t/D)^3,   D the DIAMETER.
 
-The code uses the `(t/D)^3` prefactor with `(t/r)^3`. Measured on a PETG hull,
+The code used the `(t/D)^3` prefactor with `(t/r)^3`. Measured on a PETG hull,
 `t = 2 mm`, `r = 60 mm`: classical 22 046 Pa, the code before its own knockdown
 176 367 Pa (**8.0x**), the code's allowable after the 0.6 knockdown 105 820 Pa
-(**4.8x**). The docstring calls buckling "the real constraint" on hull design
-and says `p_cr` "scales as `E (t/r)^3`", which is true; the prefactor is the one
-belonging to the other form.
+(4.8x the *unknocked* classical result). The docstring called buckling "the real
+constraint" on hull design and said `p_cr` "scales as `E (t/r)^3`", which is
+true; the prefactor was the one belonging to the other form.
+
+`experiments/hull_buckling` put four explanations against the measurement. Only
+"the diameter coefficient on a radius ratio" predicted it: the factor is
+**8.000000000000** with spread `7.1e-15` over 256 `(E, nu, t, r)` points, and
+the expression returned **the same number for L/r from 1 to 100** — `length` was
+an argument it never read, which is what rules out a deliberate finite-length
+credit. The coefficient is also arithmetically the `(n^2-1)` of a five-lobe
+mode, and the long-cylinder minimiser is `n = 2`, so that is not a mode choice
+either.
+
+**What closing it cost.** At the wall it had, every seed hull passed at +0.300
+and every one fails the ring result at −0.838, so the sizing rule had to move
+with the allowable: `t/r` **0.0380 to 0.0760**, twice the wall and twice the
+hull mass, costing the six hull-carrying seed plans 9.6% to 18.2% of their dry
+mass. `phenotype.hull_wall` is now `structure.wall_for_buckling` inverted rather
+than a second constant fitted to the first, which is how the 8x survived: 0.038
+was the wall that number asks for, so the two agreed with each other and neither
+agreed with the ring result.
+
+**What it did not cost.** medusa is unchanged. Its bell wall rode on
+`0.35 * hull_wall(radius)` and would have gained 40% of the plan's mass on a
+correction with nothing to do with it; a bell is open, flooded and has to flex,
+so it now has its own `BELL_WALL_FRACTION`, frozen at the value it had and
+labelled the HEURISTIC it is.
+
+**What is still open, and it decides a seed plan.** The ring result is the
+**long**-cylinder limit, so the corrected allowable is a *lower bound*: a short
+cylinder is stiffer because its ends restrain the lobes, and the seed hulls run
+L/r from 5.1 to 14.3. Quantifying that needs a shell result this repository does
+not contain. **bat carries the corrected wall only if the credit is at least
+1.82x**; it now fails `positive_buoyancy_available` at −0.0403 and is left
+failing rather than rescued by a safety factor chosen to rescue it. The other
+five hull plans have 1.5x to 2.1x of headroom. See **S-04**.
+
+### S-04 -- the pressure-hull wall is applied to hulls that never dive
+
+`phenotype.build` sizes every `HULL` segment by `hull_wall`, which is the wall
+that survives 12 m of seawater, whether or not the design ever enters water.
+The hand-built glider in `tests/test_physics.py` is the clearest case: an
+air-only airframe whose 1.0 m x 70 mm fuselage is walled as a pressure hull.
+Correcting S-01 doubled that wall, took the fixture from 2.450 kg to 3.269 kg,
+and its glide ratio from 5.31 to 2.93 with the surfaces unchanged.
+
+For a triphibian machine this is arguably right -- the mission says it dives --
+but the depth is a constant rather than something the design's own buoyancy
+system is asked for, and `hull_pressure_check`'s own comment says "design depth
+is a free variable". Not fixed here: changing what depth a hull is sized for
+changes every mass in the archive, which is a separate experiment.
+
+Status: **measured, not fixed**. Risk: medium.
 
 ### C-07 / C-08 -- the mobility identification, and what it does and does not identify
 
@@ -607,8 +658,11 @@ is what changes if the number moves.
 | compliant knockdown | `0.35` | `HEURISTIC` | whether non-avian plans are feasible at all |
 | `min_tip_speed` | `1.5` m/s | `CALIBRATED` | sweep load |
 | tip-speed clip | `60` m/s | `NUMERICAL` | — |
-| buckling prefactor | `2E/(1-nu^2)` on `(t/r)^3` | **wrong form** | **S-01**, 8x |
-| buckling knockdown | `0.6` | `CALIBRATED` | hull wall |
+| buckling prefactor | `(n^2-1)/12` on `t^3/r^3` | `TEXTBOOK` ring | **S-01**, closed; was `2E/(1-nu^2)` on `(t/r)^3`, 8x |
+| buckling knockdown | `0.6` | `HEURISTIC` | hull wall — no measurement of a printed hull behind it |
+| `HULL_DESIGN_DEPTH_M` | `12.0` m | declared design decision | every hull mass — **S-04** |
+| `HULL_BUCKLING_SAFETY` | `1.3` | declared design decision | hull wall; the margin `0.038` happened to deliver |
+| `BELL_WALL_FRACTION` | `0.35 * 0.038` | `HEURISTIC` | bell mass; its real load case is not modelled |
 | UDL deflection `qL^4/(8EI)` | — | `TEXTBOOK`, quadratured | efficiency warning only |
 | Wagner `k = (pi/tan b)^2` | — | `UNKNOWN` | **S-02** |
 | Wagner cap | `250` | `NUMERICAL` | small-deadrise limit |
