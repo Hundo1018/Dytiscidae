@@ -50,7 +50,7 @@ within a few hundred generations. The module prefix is `F` fluid, `S` structure,
 | **C-07** | the mobility identification is **underdetermined on 5 of 7 seed plans**, and its residual reads exactly zero because of it | **high** | measured; now **reported** by `MobilityBasis.underdetermined` and in telemetry, not fixed | `experiments/rank_threshold` |
 | **C-08** | the identified **parameter-side directions do not survive a reseed** (68-85 degree principal angles); the twist-side ones do | **high** | measured | `experiments/rank_threshold` |
 | **F-03** | wing added mass is **isotropic**, overstating edgewise entrained mass by `(chord/thickness)^2` and the entrained mass a machine actually carries by **2.8x** | **high** | measured; the tensor is implemented behind `wing_added_mass_tensor` and **off** — it makes ladder layer 2 hold and runs 3 of 7 plans away at `dt = 0.004` | `experiments/wing_added_mass` |
-| **N-02** | **medusa already runs away** at the project's `dt = 0.004` with the solver as it ships — 2444 rad of joint travel against a command under 1 rad, and 1.01 rad with the actuators held still, so it is the drive | **high** | measured | `experiments/wing_added_mass` |
+| **N-02** | **medusa already runs away** at the project's `dt = 0.004` with the solver as it ships — **79045 rad** of joint travel against a command under 1 rad, and 1.02 rad with the actuators held still, so it is the drive | **high** | measured | `experiments/wing_added_mass` |
 | **J-02** | jet thrust goes as the **square of the joint rate with no limiter** and no out-of-domain flag | **high** | measured | `experiments/jet_energy` |
 | **F-02** | the leading-edge-vortex term keys on the **instantaneous pitch rate**, not the reduced frequency its docstring named | **high** | **half closed** — named correctly now, measured at a 157% spread across one stroke; the model choice is open | `tests/test_reduced_frequency.py` |
 | **C-09** | the damping `lam` is about **30x too small**, and probably should not be a constant multiple of `lam_0` at all: the optimum fits `sigma_min^0.86 sigma_max^1.29` at R^2 = 0.904 | **high** | measured | `experiments/damping_lambda` |
@@ -411,42 +411,53 @@ mass against a 5.445 kg dry mass.
 
 | plan | dt=0.004 | dt=0.002 | dt=0.001 | dt=0.0005 | still, 0.004 | incumbent driven | incumbent still |
 |---|---|---|---|---|---|---|---|
-| bat | 300.49 | 2404.01 | 0.78 | 1.06 | **3108.20** | 1.79 | 2.06 |
-| beetle | 0.39 | 0.35 | 0.38 | 0.38 | **75958.41** | 0.42 | 0.44 |
-| ray | 27395.72 | 2264.59 | 9.16 | 1.10 | **66929.76** | 1.76 | 1.14 |
-| medusa | 3275.52 | 1.35 | 1.12 | 1.16 | 11222.92 | **2443.84** | 1.01 |
+| bat | **1374.70** | 0.89 | 0.76 | 0.99 | **3433.07** | 1.18 | 2.25 |
+| beetle | **9466.69** | 1.24 | 1.15 | 1.11 | 1.67 | 1.33 | 0.85 |
+| ray | **5363.59** | 2238.56 | 1.92 | 1.14 | **32271.25** | 1.59 | 1.11 |
+| medusa | 16581.07 | 1.21 | 1.15 | 1.18 | 43745.30 | **79044.67** | 1.02 |
 | eel, gannet, teal | <= 1.5 everywhere | | | | | | |
 
 Largest joint angle over 5 s, in radians; the CPG commands under one. Bit-for-bit
 repeatable across runs.
 
-**bat, beetle and ray run away with the actuators held completely still**, and
-none of them does so under the incumbent, so it is not the controller. Every plan
-is stable at `dt = 0.0005`. The surplus inertia the scalar carries is what keeps
+**bat, beetle and ray run away when driven, and bat and ray also with the
+actuators held completely still**; none of them does so under the incumbent, so
+it is not the controller. Every plan is stable at `dt = 0.0005`. The surplus inertia the scalar carries is what keeps
 the **explicit** lift and drag stable at the current timestep: added mass goes
 into the mass matrix, for the reason `apply`'s own comment gives at length, but
 lift and drag go into `xfrc_applied` and are only stable because the wings are
 about three times too heavy. **Closing F-03 needs a smaller timestep or an
 implicit treatment of those forces, not a coefficient.**
 
-Two details worth keeping. `beetle` is stable driven (0.39) and catastrophic held
-still (75958) -- the gait is what keeps it up, so "actuators held still" is not a
-strictly gentler probe than driving. And `bat` is worse at `dt = 0.002` than at
-`0.004` before becoming stable at `0.001`, so "refine until stable" needs the
+Two details worth keeping. **Driven and held-still are different probes and
+neither dominates**: `beetle` was stable driven (0.39) and catastrophic held
+still (75958) under the logistic stall blend, and is catastrophic driven
+(9466.69) and quiet held still (1.67) under the compact one that closed F-05.
+The reading reverses with the lift model; what survives is that a plan can fail
+either probe while passing the other, so both are needed. And **convergence
+under refinement is not monotone** -- `ray` is 5363.59 at `dt = 0.004` and
+2238.56 at `0.002` before becoming stable -- so "refine until stable" needs the
 whole sweep and not two points.
 
-Measured on `main`, which does not carry F-05's compact stall blend. Under that
-lift model the same sweep names a different set of plans -- the motion differs,
-so the divergence does -- and reaches the same conclusion.
+Measured on `main` **with** F-05's compact stall blend, which is what the
+repository carries. Sections A to C barely move between the two lift models (the
+mean squared direction cosines go 0.2300 / 0.4137 / 0.3549 to 0.2306 / 0.4164 /
+0.3516); the stability section names a partly different set of plans, and
+`experiments/wing_added_mass/README.md` records both.
 
 ### N-02 -- medusa is already unstable at the project's timestep
 
 The same sweep, with `wing_added_mass_tensor` **off**, i.e. the solver exactly as
-it ships: `medusa` driven by its own base gait at `dt = 0.004` reaches **2443.84
+it ships: `medusa` driven by its own base gait at `dt = 0.004` reaches **79 045
 radians** of joint travel in 5 s against a command that never exceeds one. With
-the actuators held still it reaches 1.01 rad, so unlike F-03's divergences this
+the actuators held still it reaches 1.02 rad, so unlike F-03's divergences this
 one is the drive, not the passive coupling. At `dt = 0.002` and below it does not
 happen.
+
+The figure is lift-model dependent and got **32x worse** when F-05 closed: under
+the logistic stall blend the same run reached 2443.84 rad. Both are far outside
+anything commanded; the point is that closing one defect made this one much
+louder, and nothing in the search reports either.
 
 `medusa` is one of the six islands' seed plans. Nothing in the search would
 report this: a runaway still produces a score, and `diverged_rollouts` counts
