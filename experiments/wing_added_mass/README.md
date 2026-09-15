@@ -64,24 +64,26 @@ Then:
 
 | plan | dt=0.004 | dt=0.002 | dt=0.001 | dt=0.0005 | still, 0.004 | incumbent driven | incumbent still |
 |---|---|---|---|---|---|---|---|
-| bat | 300.49 | 2404.01 | 0.78 | 1.06 | **3108.20** | 1.79 | 2.06 |
-| beetle | 0.39 | 0.35 | 0.38 | 0.38 | **75958.41** | 0.42 | 0.44 |
-| eel | 0.48 | 1.11 | 1.49 | 0.33 | 0.43 | 0.55 | 0.44 |
-| gannet | 0.83 | 0.83 | 0.83 | 0.83 | 0.07 | 0.83 | 0.07 |
-| medusa | 3275.52 | 1.35 | 1.12 | 1.16 | 11222.92 | **2443.84** | 1.01 |
-| ray | 27395.72 | 2264.59 | 9.16 | 1.10 | **66929.76** | 1.76 | 1.14 |
-| teal | 1.21 | 1.34 | 1.32 | 1.26 | 0.59 | 1.17 | 0.43 |
+| bat | **1374.70** | 0.89 | 0.76 | 0.99 | **3433.07** | 1.18 | 2.25 |
+| beetle | **9466.69** | 1.24 | 1.15 | 1.11 | 1.67 | 1.33 | 0.85 |
+| eel | 1.20 | 1.42 | 1.16 | 0.48 | 0.60 | 0.73 | 1.16 |
+| gannet | 0.84 | 0.84 | 0.84 | 0.84 | 0.07 | 0.84 | 0.07 |
+| medusa | 16581.07 | 1.21 | 1.15 | 1.18 | 43745.30 | **79044.67** | 1.02 |
+| ray | **5363.59** | 2238.56 | 1.92 | 1.14 | **32271.25** | 1.59 | 1.11 |
+| teal | 1.36 | 1.25 | 1.37 | 1.40 | 0.42 | 1.30 | 0.34 |
 
 Largest joint angle over 5 s, in radians. The CPG commands under one.
 **Bit-for-bit repeatable across runs**, so every entry is one measurement and not
 a sample.
 
-* **bat, beetle and ray are destabilised by the tensor.** All three run away
-  with the **actuators held completely still**, and none of them does so under
-  the incumbent in either mode. It is not the controller.
-* **medusa was already unstable** — 2443.84 rad driven with the switch *off*.
-  That is a pre-existing defect and is counted separately, as `N-02`. Unlike the
-  others it is quiet with the actuators still (1.01 rad), so it is the drive.
+* **bat, beetle and ray are destabilised by the tensor** when driven, and **bat
+  and ray also with the actuators held completely still**. None of them runs
+  away under the incumbent in either mode. Two of the three do it with no
+  actuation at all, so it is not the controller.
+* **medusa was already unstable** — **79044.67 rad** driven with the switch
+  *off*, which is the solver exactly as it ships. A pre-existing defect, counted
+  separately as `N-02`. Unlike the others it is quiet with the actuators still
+  (1.02 rad), so that one *is* the drive.
 * Every plan is stable at **dt = 0.0005**.
 
 ## What that means
@@ -106,21 +108,37 @@ Closing F-03 therefore needs one of:
 
 ## Two details worth keeping
 
-**`beetle` is stable driven (0.39 rad) and catastrophic held still (75958 rad).**
-The gait is what keeps it up. So "hold the actuators still", the probe
-CLAUDE.md's lesson section prescribes, is not a strictly *gentler* test than
-driving — it is a different one, and both are needed.
+**Driven and held-still are different probes, and neither dominates — and which
+way round `beetle` falls depends on the lift model.** Under the logistic stall
+blend it was stable driven (0.39 rad) and catastrophic held still (75958); under
+the compact blend that closed F-05 it is catastrophic driven (9466.69) and quiet
+held still (1.67). The *specific* reading reverses. What survives is the rule:
+"hold the actuators still", the probe CLAUDE.md's lesson section prescribes, is
+not a strictly *gentler* test than driving, and a plan can be stable under one
+and not the other in either direction. Both are needed, and neither alone is
+evidence of stability.
 
-**`bat` is worse at `dt = 0.002` (2404) than at `dt = 0.004` (300)** before
-becoming stable at `0.001`. Convergence under refinement is not monotone here, so
-"refine until it stops" needs the whole sweep rather than two points.
+**Convergence under refinement is not monotone.** Under the logistic, `bat` was
+worse at `dt = 0.002` (2404) than at `0.004` (300) before becoming stable at
+`0.001`; under the compact blend `ray` does the same, 5363.59 at `0.004` and
+2238.56 at `0.002`. So "refine until it stops" needs the whole sweep rather than
+two points.
 
 ## Provenance
 
-Measured on `main`, which does not carry F-05's compact stall blend. Under that
-lift model the same sweep names a different set of plans — the motion differs, so
-the divergence does — and reaches the same conclusion: several run away at the
-coarse step, none at the finest.
+Measured on `main` **with** F-05's compact stall blend, which is what the
+repository carries. The table above was originally written before that merge and
+has been re-measured, because the stability section depends on the lift model
+through the motion: sections A to C barely move (the mean squared direction
+cosines go 0.2300 / 0.4137 / 0.3549 to 0.2306 / 0.4164 / 0.3516, and the 35.6 to
+36.0% ratios are unchanged), while section D names a partly different set of
+plans and one of them, `beetle`, reverses which probe catches it.
+
+For the record, under the logistic blend the same sweep gave bat 300.49 driven
+and 3108.20 still, beetle 0.39 and 75958.41, medusa 3275.52 and 11222.92 with an
+incumbent of 2443.84, ray 27395.72 and 66929.76. The conclusion is the same under
+both: several plans run away at the coarse step, none at the finest, and the
+runaway happens with no actuation.
 
 ## Files
 
