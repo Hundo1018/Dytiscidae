@@ -3,12 +3,14 @@
 
 0. The problem
 --------------
-`MobilityBasis.rank` counts singular values above 8% of the largest and calls
+`MobilityBasis.rank` counted singular values above 8% of the largest and called
 the result "how many genuinely independent things can this machine do".  That
-sentence is a claim about numerical rank.  Numerical rank is not a fraction
-someone picked; it is the count of singular values above the level at which the
-matrix's own uncertainty could have produced them.  The two coincide only by
-accident.
+sentence is a claim about numerical rank.  (This experiment is what produced the
+rename: the attribute is now `control_rank`, with `numerical_rank` beside it and
+the 8% exposed as `authority_threshold`.  The text below is kept in the tense it
+was measured in.)  Numerical rank is not a fraction someone picked; it is the
+count of singular values above the level at which the matrix's own uncertainty
+could have produced them.  The two coincide only by accident.
 
 1. Competing explanations for what the threshold should be
 ----------------------------------------------------------

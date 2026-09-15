@@ -88,6 +88,48 @@ Per medium, which the single ridge does not distinguish:
 **On land the incumbent scores 1.124, worse than sending no command at all.**
 Five of the twelve swept ratios do — everything at `lam/lam0 <= 1`.
 
+## Is the optimum predictable from something observable?
+
+Hardcoding 30 is better than hardcoding 1 and worse than not hardcoding. If the
+optimal ridge tracks a conditioning number a caller can compute from the basis
+it already holds, `lam` stops being a constant.
+
+Pearson correlation against `log10` of the best `lam/lam0`, bootstrapped over
+the 21 (body, medium) pairs:
+
+| predictor | r | 95% CI | |
+|---|---|---|---|
+| `log10 cond(A)` | **−0.511** | [−0.73, −0.19] | excludes 0 |
+| `log10 sigma_min/sigma_max` | **+0.518** | [+0.20, +0.74] | excludes 0 |
+| `log10 sigma_max` | −0.223 | [−0.70, +0.17] | includes 0 |
+| probe noise `\|\|dJ\|\|/sigma_0` | +0.322 | [−0.05, +0.59] | includes 0 |
+| residual fraction | +0.216 | [−0.16, +0.62] | includes 0 |
+| `n_probes / n_params` | +0.203 | [−0.15, +0.62] | includes 0 |
+| underdetermined | −0.158 | [−0.58, +0.19] | includes 0 |
+
+The two that survive are the same quantity with opposite sign, so it is one
+finding: **a better-conditioned basis wants a larger multiple of `lam_0`, and a
+worse-conditioned one a smaller.**
+
+That is what you would expect if the right *absolute* ridge tracks the weakest
+singular value rather than the mean — `lam_0` already carries `mean(sigma^2)`,
+so a ratio that falls with conditioning is a ratio correcting `lam_0` back
+toward something smaller. Fitting the absolute optimum directly:
+
+    log10(lam*) = a log10(sigma_min) + b log10(sigma_max) + c
+
+    a = +0.859    b = +1.286    c = +0.075    R^2 = 0.904,  n = 21
+
+For reference `lam ~ sigma_min^2` is `(2, 0)`, `lam ~ sigma_max^2` is `(0, 2)`,
+and **`lam ~ sigma_min * sigma_max` is `(1, 1)`** — which is close to what the
+data says, and is dimensionally sound since the exponents sum to 2.15 against
+the 2 that `lam`'s units require.
+
+So the candidate is `lam = kappa * sigma_min * sigma_max` — the geometric mean
+of the extreme squared gains — rather than `0.01 * mean(sigma^2)`. On 21 points
+that is a lead, not a law. What it does establish is that **the optimum is not
+a constant multiple of `lam_0`**, which is what the incumbent assumes.
+
 ## Conclusion
 
 Three separate statements, in increasing order of what they cost to act on.
@@ -95,7 +137,8 @@ Three separate statements, in increasing order of what they cost to act on.
 1. **`0.01` should be about `0.3`.** `lam = 0.3 * trace(G)/r` minimises
    out-of-sample error on this fleet, and the curve is broad enough that
    anything from 10x to 100x the incumbent is better than the incumbent.
-   Recorded as **C-09**.
+   Recorded as **C-09**. But see the section above: the better move may be to
+   stop hardcoding a multiple of `lam_0` at all.
 2. **The ridge should probably not be one number for three media.** Air wants
    10x and water and land want 30x, and the media differ in what they are
    identifying.
