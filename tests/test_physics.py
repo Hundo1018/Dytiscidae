@@ -11,6 +11,7 @@ Run with:  python -m pytest tests/ -q      (or)  python tests/test_physics.py
 
 from __future__ import annotations
 
+import copy
 import math
 import sys
 from pathlib import Path
@@ -1043,28 +1044,50 @@ def test_flight_is_expressible_in_the_genome() -> None:
                Edge(parent=0, child=2, pos_u=1.00, reflect=True)]
     g.battery_wh = 150.0
 
+    def glide(genome, speed=None) -> tuple[float, float, float]:
+        """Release with the controls dead and report (airborne, L/D, mass)."""
+        ph = build(genome)
+        e = TriphibianEnv(ph)
+        e.reset(Domain.AIR, randomise=False)
+        if speed is not None:
+            e.data.qvel[0] = speed
+        dead_u = np.zeros(e.model.nu)
+        x0, z0 = float(e.data.qpos[0]), float(e.data.qpos[2])
+        t = 0.0
+        for _ in range(int(18.0 / e.timestep)):
+            e.step(dead_u)
+            if e.data.qpos[2] < 2.0:
+                break
+            t = float(e.data.time)
+        dx = float(e.data.qpos[0]) - x0
+        dz = z0 - float(e.data.qpos[2])
+        return t, dx / max(dz, 1e-6), ph.mass
+
     p = build(g)
-    env = TriphibianEnv(p)
-    v_trim = env.launch_speed
-    env.reset(Domain.AIR, randomise=False)
-    dead = np.zeros(env.model.nu)
-    x0, z0 = float(env.data.qpos[0]), float(env.data.qpos[2])
-    airborne = 0.0
-    for _ in range(int(18.0 / env.timestep)):
-        env.step(dead)
-        if env.data.qpos[2] < 2.0:
-            break
-        airborne = float(env.data.time)
-    dx = float(env.data.qpos[0]) - x0
-    dz = z0 - float(env.data.qpos[2])
-    ld = dx / max(dz, 1e-6)
+    v_trim = TriphibianEnv(p).launch_speed
+    airborne, ld, mass = glide(g)
+
+    # The control: the same hull, released at the same speed, with the wings
+    # taken off.  An absolute glide-ratio threshold is a statement about the
+    # airframe's *weight* as much as its surfaces -- it moved from 5.31 to 2.93
+    # when the hull wall was corrected for buckling, on an unchanged wing --
+    # and this test is about whether the surfaces do anything.  Against a
+    # control they measurably do, at either wall.
+    bare = copy.deepcopy(g)
+    bare.parts = bare.parts[:1]
+    bare.edges = []
+    bare_airborne, bare_ld, bare_mass = glide(bare, speed=v_trim)
 
     check("the hand-built glider is released at a flying speed",
           6.0 < v_trim < 20.0, f"{v_trim:.1f} m/s")
-    check("and it stays up for several seconds with the controls dead",
-          airborne > 8.0, f"{airborne:.1f} s airborne")
+    check("its wings are what keeps it up",
+          airborne > 2.0 * bare_airborne,
+          f"{airborne:.1f} s airborne against {bare_airborne:.1f} s with the "
+          f"wings removed ({mass:.2f} kg against {bare_mass:.2f} kg)")
     check("trading height for distance rather than falling",
-          ld > 3.0, f"{dx:.0f} m covered for {dz:.0f} m lost -- glide ratio {ld:.1f}")
+          ld > 3.0 * bare_ld,
+          f"glide ratio {ld:.2f} against {bare_ld:.2f} wingless -- "
+          f"{ld/max(bare_ld, 1e-6):.1f}x")
 
 
 def test_bodies_generate_lift_and_a_pitching_moment() -> None:
@@ -1256,16 +1279,24 @@ def test_series_elasticity_needs_a_compliant_drive() -> None:
         return err, e.budget.mean_power
 
     # The cost of a soft drive shows up on a surface whose job is to *hold*, and
-    # it shows up in the steady state.  Measured across the reachable range the
-    # trade is monotone in both directions: sag 0.57 deg at kp x4 to 5.09 deg at
-    # kp x0.05, while mean power falls 17.8 W to 6.7 W.  Nine times the sag for
-    # under three times the power, which is a real choice for the search to make
-    # rather than a free lunch.
+    # it shows up in the steady state.  The trade is monotone in both
+    # directions: softening the drive costs incidence and saves power, which is
+    # a real choice for the search to make rather than a free lunch.
+    #
+    # How much power it saves depends on how heavy the machine is, so the
+    # threshold here is a floor and not a calibration.  On the gannet the
+    # saving measured 46% (12.5 W -> 6.7 W) while the hull carried the
+    # 8x-too-large buckling allowable, and 24% (13.4 W -> 10.2 W) once the wall
+    # was corrected and the machine gained 18% of its mass: a heavier wing sags
+    # further under a soft drive (5.09 deg -> 6.32 deg) and the servo pays for
+    # holding it there.  The claim being tested is that the saving exists, not
+    # that it has a particular size.
     hold_stiff, p_hold_stiff = hold_error(1.0)
     hold_soft, p_hold_soft = hold_error(0.05)
     check("softening the drive saves real power",
-          p_hold_soft < 0.75 * p_hold_stiff,
-          f"{p_hold_soft:.0f} W at kp x0.05 against {p_hold_stiff:.0f} W at full gain")
+          p_hold_soft < 0.85 * p_hold_stiff,
+          f"{p_hold_soft:.1f} W at kp x0.05 against {p_hold_stiff:.1f} W at "
+          f"full gain -- {100*(1 - p_hold_soft/p_hold_stiff):.0f}% saved")
     check("and it is paid for in incidence the surface does not keep",
           hold_soft > 1.5 * hold_stiff,
           f"a trim wing settles {math.degrees(hold_soft):.1f} deg off its command at "
@@ -1403,7 +1434,16 @@ def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
 
     flat_slow = enter(0.0, 4.0)
     flat_fast = enter(0.0, 8.0)
-    flat_dead = enter(0.0, 16.0)
+    # "Well past the hull limit" is a statement about the hull, so it is solved
+    # for rather than written down: the speed is raised until the score is zero.
+    # It was 16 m/s while the hull carried an 8x-too-large buckling allowable
+    # and a wall sized to match; correcting that doubled the wall and with it
+    # the slam capacity, which is linear in wall thickness, so a fixed 16 m/s
+    # stopped being past the limit at all.
+    v_dead = 4.0
+    while v_dead < 200.0 and enter(0.0, v_dead) > 0.0:
+        v_dead *= 1.25
+    flat_dead = enter(0.0, v_dead)
     nose_slow = enter(80.0, 4.0)
     nose_fast = enter(80.0, 8.0)
     # The gannet: faster than the flat entry that destroys the hull, and it
@@ -1420,11 +1460,14 @@ def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
         nose_fast > flat_slow,
         f"nose-first at 8 m/s scores {nose_fast:.3f}, flat at 4 m/s scores {flat_slow:.3f}",
     )
-    check("a flat entry well past the hull limit scores nothing", flat_dead == 0.0,
-          f"{flat_dead:.3f} at 16 m/s flat")
-    check("while a gannet entry faster still survives it",
+    check("a flat entry well past the hull limit scores nothing",
+          flat_dead == 0.0 and v_dead < 200.0,
+          f"{flat_dead:.3f} at {v_dead:.1f} m/s flat, against a slam capacity "
+          f"of {p.slam_pressure_capacity/1e3:.0f} kPa")
+    check("while a nose-first entry at a comparable speed survives it",
           gannet > 0.2,
-          f"{gannet:.3f} nose-first at 20 m/s against {flat_dead:.3f} flat at 16")
+          f"{gannet:.3f} nose-first at 20 m/s against {flat_dead:.3f} flat at "
+          f"{v_dead:.1f}")
 
 
 def test_free_surface_continuity() -> None:

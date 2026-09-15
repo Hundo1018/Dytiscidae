@@ -1,0 +1,257 @@
+{
+  "experiment": "hull_buckling",
+  "ok": true,
+  "commit": "cd6476c874da470d7d77a61632009beaf63c1ba6-dirty",
+  "when": "2026-09-15T01:36:35Z",
+  "elapsed_s": 6.204,
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",
+  "config": {
+    "question": "is the hull's external-pressure buckling allowable the classical ring result, and what does correcting it cost?",
+    "design_depth_m": 12.0,
+    "audit_depth_m": 10.0,
+    "seed_plans": [
+      "bat",
+      "beetle",
+      "eel",
+      "gannet",
+      "medusa",
+      "ray",
+      "teal"
+    ],
+    "coefficient_grid": {
+      "youngs_modulus_pa": [
+        800000000.0,
+        2000000000.0,
+        5000000000.0,
+        70000000000.0
+      ],
+      "poisson": [
+        0.25,
+        0.3,
+        0.35,
+        0.4
+      ],
+      "wall_m": [
+        0.0018,
+        0.0026,
+        0.004,
+        0.012
+      ],
+      "radius_m": [
+        0.04,
+        0.06,
+        0.09,
+        0.15
+      ]
+    },
+    "lobe_modes": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "knockdown": 0.6,
+    "tolerances": {
+      "ratio_exact_rel": 1e-12,
+      "wall_solve_rel": 1e-09
+    },
+    "sizing": {
+      "safety": 1.3,
+      "note": "allowable over applied at the design depth; 1.3 is what the incumbent t/r = 0.038 delivered against the 8x-too-large allowable, kept so correcting the physics does not also change how much margin a hull is designed to"
+    },
+    "legacy_wall_fraction": 0.038
+  },
+  "data": {
+    "module_vs_ring_worst_rel": 1.886359381454962e-16,
+    "module_vs_legacy_ratio_worst_err": 1.7763568394002505e-15,
+    "ratio_grid_points": 256,
+    "ratio_mean": 8.0,
+    "ratio_spread": 7.105427357601002e-15,
+    "allowable_vs_length_spread_pa": 0.0,
+    "equivalent_lobe_count": 5.0,
+    "ring_p_cr_by_n_bar": {
+      "2": 0.32661904761904753,
+      "3": 0.8709841269841267,
+      "4": 1.633095238095238,
+      "5": 2.6129523809523802,
+      "6": 3.8105555555555553
+    },
+    "argmin_lobe": 2,
+    "seed_hulls": [
+      {
+        "plan": "bat",
+        "radius_m": 0.062,
+        "length_m": 0.44,
+        "wall_m": 0.002356,
+        "t_over_r": 0.038,
+        "L_over_r": 7.096774193548387,
+        "p_gauge_pa": 120621.795,
+        "allowable_legacy_pa": 156777.14285714284,
+        "allowable_ring_pa": 19597.14285714286,
+        "margin_legacy": 0.2997414178519133,
+        "margin_ring": -0.8375323227685108
+      },
+      {
+        "plan": "beetle",
+        "radius_m": 0.078,
+        "length_m": 0.62,
+        "wall_m": 0.002964,
+        "t_over_r": 0.038,
+        "L_over_r": 7.948717948717949,
+        "p_gauge_pa": 120621.795,
+        "allowable_legacy_pa": 156777.14285714284,
+        "allowable_ring_pa": 19597.14285714286,
+        "margin_legacy": 0.2997414178519133,
+        "margin_ring": -0.8375323227685108
+      },
+      {
+        "plan": "eel",
+        "radius_m": 0.055,
+        "length_m": 0.28,
+        "wall_m": 0.00209,
+        "t_over_r": 0.038,
+        "L_over_r": 5.090909090909092,
+        "p_gauge_pa": 120621.795,
+        "allowable_legacy_pa": 156777.14285714284,
+        "allowable_ring_pa": 19597.14285714285,
+        "margin_legacy": 0.2997414178519133,
+        "margin_ring": -0.8375323227685109
+      },
+      {
+        "plan": "gannet",
+        "radius_m": 0.07,
+        "length_m": 1.0,
+        "wall_m": 0.00266,
+        "t_over_r": 0.038,
+        "L_over_r": 14.285714285714285,
+        "p_gauge_pa": 120621.795,
+        "allowable_legacy_pa": 156777.14285714284,
+        "allowable_ring_pa": 19597.14285714285,
+        "margin_legacy": 0.2997414178519133,
+        "margin_ring": -0.8375323227685109
+      },
+      {
+        "plan": "ray",
+        "radius_m": 0.07,
+        "length_m": 0.4,
+        "wall_m": 0.00266,
+        "t_over_r": 0.038,
+        "L_over_r": 5.714285714285714,
+        "p_gauge_pa": 120621.795,
+        "allowable_legacy_pa": 156777.14285714284,
+        "allowable_ring_pa": 19597.14285714285,
+        "margin_legacy": 0.2997414178519133,
+        "margin_ring": -0.8375323227685109
+      },
+      {
+        "plan": "teal",
+        "radius_m": 0.07,
+        "length_m": 0.9,
+        "wall_m": 0.00266,
+        "t_over_r": 0.038,
+        "L_over_r": 12.857142857142856,
+        "p_gauge_pa": 120621.795,
+        "allowable_legacy_pa": 156777.14285714284,
+        "allowable_ring_pa": 19597.14285714285,
+        "margin_legacy": 0.2997414178519133,
+        "margin_ring": -0.8375323227685109
+      }
+    ],
+    "pass_now": 6,
+    "pass_fixed": 0,
+    "n_hulls": 6,
+    "t_over_r_incumbent": 0.038,
+    "t_over_r_needed": 0.06964040253942867,
+    "t_over_r_sized": 0.07600503970504302,
+    "wall_factor": 2.0001326238169215,
+    "clip_radius_fixed_m": 0.157884267235029,
+    "clip_radius_now_m": 0.31578947368421056,
+    "mass_per_plan": [
+      {
+        "plan": "bat",
+        "mass_now_kg": 3.614124920719501,
+        "mass_sized_kg": 3.960229421851843,
+        "mass_change": 0.09576439905221627
+      },
+      {
+        "plan": "beetle",
+        "mass_now_kg": 4.457122079772074,
+        "mass_sized_kg": 5.128782337785249,
+        "mass_change": 0.15069370907774676
+      },
+      {
+        "plan": "eel",
+        "mass_now_kg": 1.9266798292458103,
+        "mass_sized_kg": 2.2585110003389643,
+        "mass_change": 0.17222953500429172
+      },
+      {
+        "plan": "gannet",
+        "mass_now_kg": 4.489752041899459,
+        "mass_sized_kg": 5.308710984457502,
+        "mass_change": 0.18240627431433146
+      },
+      {
+        "plan": "medusa",
+        "mass_now_kg": 10.446830510791585,
+        "mass_sized_kg": 10.446830510791585,
+        "mass_change": 0.0
+      },
+      {
+        "plan": "ray",
+        "mass_now_kg": 4.7925162588022685,
+        "mass_sized_kg": 5.444809872699376,
+        "mass_change": 0.13610670859990506
+      },
+      {
+        "plan": "teal",
+        "mass_now_kg": 4.597830640744236,
+        "mass_sized_kg": 5.344951079569116,
+        "mass_change": 0.16249411890124454
+      }
+    ],
+    "float_limits": [
+      {
+        "plan": "bat",
+        "t_over_r_float_limit": 0.0570517753027842,
+        "finite_length_credit_needed": 1.818763915334303
+      },
+      {
+        "plan": "beetle",
+        "t_over_r_float_limit": 0.29999999999999993,
+        "finite_length_credit_needed": 1.0
+      },
+      {
+        "plan": "eel",
+        "t_over_r_float_limit": 0.10403455422551663,
+        "finite_length_credit_needed": 1.0
+      },
+      {
+        "plan": "gannet",
+        "t_over_r_float_limit": 0.14354908362396734,
+        "finite_length_credit_needed": 1.0
+      },
+      {
+        "plan": "medusa",
+        "t_over_r_float_limit": 0.29999999999999993,
+        "finite_length_credit_needed": 1.0
+      },
+      {
+        "plan": "ray",
+        "t_over_r_float_limit": 0.13765608438599436,
+        "finite_length_credit_needed": 1.0
+      },
+      {
+        "plan": "teal",
+        "t_over_r_float_limit": 0.13718071741864135,
+        "finite_length_credit_needed": 1.0
+      }
+    ],
+    "plans_that_stop_floating": [
+      "bat"
+    ]
+  }
+}

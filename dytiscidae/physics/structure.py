@@ -362,6 +362,67 @@ def spar_deflection(
 # Pressure hull
 # --------------------------------------------------------------------------
 
+#: Knockdown on the elastic collapse pressure for the imperfections a printed
+#: hull certainly has: out-of-roundness, layer adhesion, wall variation.  A
+#: HEURISTIC -- there is no measurement of a printed hull behind it -- and it
+#: is applied multiplicatively so it can be read off the result.
+HULL_IMPERFECTION_KNOCKDOWN = 0.6
+
+#: The lowest circumferential lobe count a cylinder can buckle into.  n = 1 is
+#: a rigid translation of the section, not a buckle.  For a long cylinder the
+#: critical pressure is increasing in n, so the lowest available mode is the
+#: one that goes first.
+HULL_FIRST_LOBE = 2
+
+
+def hull_buckling_pressure(
+    *, radius: float, wall: float, material: Material, n: int = HULL_FIRST_LOBE,
+    knockdown: float = HULL_IMPERFECTION_KNOCKDOWN,
+) -> float:
+    """Elastic collapse pressure of a long cylinder under external pressure, Pa.
+
+    A unit-length slice of the wall is a ring of second moment ``I = t^3/12``
+    per unit width.  A ring under uniform external pressure buckling into ``n``
+    circumferential lobes goes unstable at ``p = (n^2-1) E' I / r^3``, with
+    ``E' = E/(1-nu^2)`` because the axial restraint of a long shell makes the
+    slice plane-strain.  At ``n = 2``,
+
+        p_cr = 3 E' t^3 / (12 r^3) = E / (4 (1 - nu^2)) * (t/r)^3
+
+    equivalently ``2E/(1-nu^2) * (t/D)^3`` with D the **diameter**.  The two
+    forms differ by ``2^3 = 8``, and this function carried the diameter
+    coefficient on the radius ratio until `experiments/hull_buckling` measured
+    the factor at exactly 8.000000 over 256 (E, nu, t, r) points.
+
+    **This is the long-cylinder limit and therefore a lower bound.**  A short
+    cylinder is stiffer under external pressure because its ends restrain the
+    lobes, and the seed hulls run L/r from 5.1 to 14.3, where that credit is
+    real.  Quantifying it needs a shell result this module does not contain, so
+    `length` is not an argument here: an allowable that ignored length while
+    claiming a length-dependent credit is how the 8x survived.
+    """
+    e_prime = material.E / (1.0 - material.poisson**2)
+    return knockdown * (n**2 - 1) * e_prime * wall**3 / (
+        12.0 * max(radius, 1e-6) ** 3)
+
+
+def wall_for_buckling(
+    *, radius: float, depth_m: float, material: Material,
+    safety: float = 1.0, n: int = HULL_FIRST_LOBE,
+    knockdown: float = HULL_IMPERFECTION_KNOCKDOWN,
+) -> float:
+    """The wall that makes `hull_buckling_pressure` cover `safety * p(depth)`.
+
+    `hull_buckling_pressure` inverted for t, so a sizing rule and the check
+    that grades it cannot drift apart.  They had: the sizing constant in
+    `phenotype.hull_wall` was fitted to the 8x-too-large allowable, so the two
+    agreed with each other and neither agreed with the ring result.
+    """
+    p = safety * SEAWATER.rho * GRAVITY * max(depth_m, 0.0)
+    e_prime = material.E / (1.0 - material.poisson**2)
+    t_over_r = (12.0 * p / (knockdown * (n**2 - 1) * e_prime)) ** (1.0 / 3.0)
+    return t_over_r * radius
+
 
 def hull_pressure_check(
     *,
@@ -392,10 +453,11 @@ def hull_pressure_check(
         note=f"p={p_gauge/1e5:.2f}bar r={radius*1e3:.0f}mm t={wall*1e3:.1f}mm",
     )
 
-    # Long-cylinder external pressure buckling, with a 0.6 knockdown for the
-    # imperfections a printed hull certainly has.
-    nu = material.poisson
-    p_cr = 0.6 * 2.0 * material.E / (1.0 - nu**2) * (wall / max(radius, 1e-6)) ** 3
+    # Long-cylinder external pressure buckling, knocked down for the
+    # imperfections a printed hull certainly has.  `length` is deliberately not
+    # used: see `hull_buckling_pressure` on why the finite-length credit is
+    # left out rather than approximated.
+    p_cr = hull_buckling_pressure(radius=radius, wall=wall, material=material)
     c_buck = Check(
         "hull_buckling",
         applied=p_gauge,

@@ -391,14 +391,25 @@ CHECKS: list[Check] = [
         lambda: Q.of(1.0e5, PRESSURE) * r_hull / t_wall,
     ),
     Check(
-        "shell buckling  E/(1-nu^2) (t/r)^3",
+        "shell buckling  (n^2-1) E' t^3 / (12 r^3)",
         "dytiscidae/physics/structure.py",
-        "p_cr = 0.6 * 2.0 * material.E / (1.0 - nu**2) * (wall / max(radius, 1e-6)) ** 3",
+        "return knockdown * (n**2 - 1) * e_prime * wall**3 / (",
         PRESSURE,
-        lambda: Q.of(0.6) * Q.of(2.0) * E / (Q.of(1.0) - Q.of(0.09))
-        * (t_wall / r_hull) ** 3,
-        note="dimensionally sound; the *coefficient* is the (t/D)^3 one applied "
-             "to (t/r)^3.  See MATH_AUDIT S-01.",
+        lambda: Q.of(0.6) * Q.of(3.0) * E / (Q.of(1.0) - Q.of(0.09))
+        * t_wall ** 3 / (Q.of(12.0) * r_hull ** 3),
+        note="the n=2 ring result.  It read 2E/(1-nu^2) (t/r)^3 -- the (t/D)^3 "
+             "coefficient on a radius ratio, 8x too large -- until S-01 was "
+             "closed; see experiments/hull_buckling.",
+    ),
+    Check(
+        "wall for a target buckling pressure  t/r = (12 p / (k (n^2-1) E'))^(1/3)",
+        "dytiscidae/physics/structure.py",
+        "t_over_r = (12.0 * p / (knockdown * (n**2 - 1) * e_prime)) ** (1.0 / 3.0)",
+        ONE,
+        lambda: (Q.of(12.0) * Q.of(1.2e5, PRESSURE)
+                 / (Q.of(0.6) * Q.of(3.0) * E)) ** (1.0 / 3.0),
+        note="the inverse of the line above, so a sizing rule and the check "
+             "that grades it cannot carry different physics.",
     ),
     Check(
         "Wagner slam pressure  0.5 rho v^2 (pi/tan beta)^2",

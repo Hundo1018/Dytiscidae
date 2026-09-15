@@ -1,9 +1,9 @@
 {
   "experiment": "analytic_vs_numerical",
   "ok": true,
-  "commit": "65e21d5429c88c28b4b397f62e721b487b907c62-dirty",
-  "when": "2026-09-14T13:15:23Z",
-  "elapsed_s": 0.153,
+  "commit": "cd6476c874da470d7d77a61632009beaf63c1ba6-dirty",
+  "when": "2026-09-15T01:36:41Z",
+  "elapsed_s": 0.041,
   "python": "3.11.15",
   "numpy": "2.4.6",
   "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",
@@ -171,11 +171,11 @@
         "check": "G. hull buckling, classical n=2 ring vs the code's allowable",
         "kind": "theory",
         "analytic": 22045.855379188713,
-        "numerical": 105820.10582010582,
-        "relative_error": 0.7916666666666667,
-        "tolerance": 0.001,
-        "ok": false,
-        "note": "the code's expression before its own 0.6 knockdown is 176367 Pa, which is 8.0x the classical result -- the (t/D)^3 coefficient 2E/(1-nu^2) applied to (t/r)^3.  Net of the knockdown the allowable is 4.8x, i.e. non-conservative."
+        "numerical": 22045.85537918872,
+        "relative_error": 3.300374373793601e-16,
+        "tolerance": 1e-12,
+        "ok": true,
+        "note": "compared before the code's own 0.6 knockdown, which is a declared imperfection allowance and not part of the ring result.  The expression this replaced gives 176367 Pa, 8.0x the classical result -- the (t/D)^3 coefficient 2E/(1-nu^2) applied to (t/r)^3.  S-01, closed; see experiments/hull_buckling."
       },
       {
         "check": "H. disc added-mass coefficient, Lamb vs the code's tensor",
@@ -253,13 +253,14 @@
       "attached_slope_measured": 3.7260439832431658
     },
     "theory": {
-      "buckling_ratio_before_knockdown": 8.0,
-      "buckling_ratio_after_knockdown": 4.8,
+      "buckling_ratio_before_knockdown": 1.0000000000000002,
+      "buckling_ratio_after_knockdown": 0.6000000000000001,
+      "legacy_buckling_ratio": 8.0,
       "disc_ca_lamb": 4.244131815783875,
       "disc_ca_coded": 5.0,
       "slam_k_coded": 74.50201329131316,
       "slam_k_quoted": 18.62550332282829
     },
-    "n_differ": 2
+    "n_differ": 1
   }
 }

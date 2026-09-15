@@ -1,7 +1,7 @@
 {
-  "commit": "cee103f61d8fd709f55883afe96fe2617d3e12ef",
-  "when": "2026-09-15T01:03:01Z",
-  "elapsed_s": 102.047,
+  "commit": "cd6476c874da470d7d77a61632009beaf63c1ba6-dirty",
+  "when": "2026-09-15T01:36:41Z",
+  "elapsed_s": 96.657,
   "python": "3.11.15",
   "numpy": "2.4.6",
   "mujoco": "3.13.0",
@@ -370,7 +370,7 @@
       "title": "articulated body",
       "adds": "internal joints, no external force",
       "agrees": false,
-      "worst_error": 0.340134335196408,
+      "worst_error": 0.319307199126318,
       "checks": [
         {
           "layer": 6,
@@ -400,37 +400,37 @@
           "layer": 6,
           "name": "gannet: 8 s of gait in a vacuum moves its centre of mass",
           "reference": 0.0,
-          "simulated": 0.0004012418129710779,
+          "simulated": 0.0003144697729609879,
           "reference_kind": "conservation law",
-          "error": 0.0004012418129710779,
+          "error": 0.0003144697729609879,
           "absolute": true,
           "tolerance": 0.01,
           "agrees": true,
-          "note": "1.93 mm at the project's dt = 0.004, 0.48 mm at 0.001, so the drift converges at order 1.00.  As a fraction of the 4.8 m a full-marks land segment covers, 0.040%."
+          "note": "1.51 mm at the project's dt = 0.004, 0.38 mm at 0.001, so the drift converges at order 1.00.  As a fraction of the 4.8 m a full-marks land segment covers, 0.031%."
         },
         {
           "layer": 6,
           "name": "beetle: 8 s of gait in a vacuum moves its centre of mass",
           "reference": 0.0,
-          "simulated": 0.0033928558099478694,
+          "simulated": 0.0026220933289142307,
           "reference_kind": "conservation law",
-          "error": 0.0033928558099478694,
+          "error": 0.0026220933289142307,
           "absolute": true,
           "tolerance": 0.01,
           "agrees": true,
-          "note": "16.29 mm at the project's dt = 0.004, 4.02 mm at 0.001, so the drift converges at order 1.01.  As a fraction of the 4.8 m a full-marks land segment covers, 0.339%."
+          "note": "12.59 mm at the project's dt = 0.004, 3.10 mm at 0.001, so the drift converges at order 1.01.  As a fraction of the 4.8 m a full-marks land segment covers, 0.262%."
         },
         {
           "layer": 6,
           "name": "teal: 8 s of gait in a vacuum moves its centre of mass",
           "reference": 0.0,
-          "simulated": 0.1787081485798637,
+          "simulated": 0.15252496245295744,
           "reference_kind": "conservation law",
-          "error": 0.1787081485798637,
+          "error": 0.15252496245295744,
           "absolute": true,
           "tolerance": 0.01,
           "agrees": false,
-          "note": "857.80 mm at the project's dt = 0.004, 343.64 mm at 0.001, so the drift converges at order 0.66.  As a fraction of the 4.8 m a full-marks land segment covers, 17.871%."
+          "note": "732.12 mm at the project's dt = 0.004, 284.95 mm at 0.001, so the drift converges at order 0.68.  As a fraction of the 4.8 m a full-marks land segment covers, 15.252%."
         },
         {
           "layer": 6,
@@ -448,13 +448,13 @@
           "layer": 6,
           "name": "and the worst plan's drift converges at first order",
           "reference": 1.0,
-          "simulated": 0.659865664803592,
+          "simulated": 0.680692800873682,
           "reference_kind": "order-of-accuracy study",
-          "error": 0.340134335196408,
+          "error": 0.319307199126318,
           "absolute": false,
           "tolerance": 0.15,
           "agrees": false,
-          "note": "teal is the worst at 17.87% of a scored segment, and its order is 0.66.  An order of 1 means a smaller step fixes it; an order below 1 means the trajectory is changing under refinement rather than converging, and a smaller step does not."
+          "note": "teal is the worst at 15.25% of a scored segment, and its order is 0.68.  An order of 1 means a smaller step fixes it; an order below 1 means the trajectory is changing under refinement rather than converging, and a smaller step does not."
         },
         {
           "layer": 6,
@@ -544,7 +544,7 @@
       "title": "controller",
       "adds": "the identified basis against the machine",
       "agrees": false,
-      "worst_error": 0.34101278904555654,
+      "worst_error": 0.3098837747950953,
       "checks": [
         {
           "layer": 8,
@@ -562,9 +562,9 @@
           "layer": 8,
           "name": "doubling the command doubles the response",
           "reference": 2.0,
-          "simulated": 1.317974421908887,
+          "simulated": 1.3802324504098094,
           "reference_kind": "linearity of the fitted model",
-          "error": 0.34101278904555654,
+          "error": 0.3098837747950953,
           "absolute": false,
           "tolerance": 0.1,
           "agrees": false,
@@ -574,9 +574,9 @@
           "layer": 8,
           "name": "and does not change its direction",
           "reference": 1.0,
-          "simulated": 0.9975077235285226,
+          "simulated": 0.9985066321647281,
           "reference_kind": "linearity of the fitted model",
-          "error": 0.002492276471477428,
+          "error": 0.0014933678352718749,
           "absolute": false,
           "tolerance": 0.05,
           "agrees": true,
@@ -586,13 +586,13 @@
           "layer": 8,
           "name": "the machine delivers the twist the basis predicts",
           "reference": 0.0,
-          "simulated": 0.2634727675507789,
+          "simulated": 0.26990437547550145,
           "reference_kind": "the identified model's own prediction",
-          "error": 0.2634727675507789,
+          "error": 0.26990437547550145,
           "absolute": true,
           "tolerance": 1.0,
           "agrees": true,
-          "note": "relative error 0.263 on the same body the basis was fitted on.  This is not graded against a closed form because there isn't one; the tolerance is 1.0, i.e. 'the command did something rather than nothing'.  What the number is worth is in experiments/rank_threshold, which measures the identification's own reproducibility."
+          "note": "relative error 0.270 on the same body the basis was fitted on.  This is not graded against a closed form because there isn't one; the tolerance is 1.0, i.e. 'the command did something rather than nothing'.  What the number is worth is in experiments/rank_threshold, which measures the identification's own reproducibility."
         }
       ]
     }
