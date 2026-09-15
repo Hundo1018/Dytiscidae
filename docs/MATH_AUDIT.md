@@ -54,6 +54,7 @@ within a few hundred generations. The module prefix is `F` fluid, `S` structure,
 | **F-02** | the leading-edge-vortex term keys on the **instantaneous pitch rate**, not the reduced frequency its docstring named | **high** | **half closed** — named correctly now, measured at a 157% spread across one stroke; the model choice is open | `tests/test_reduced_frequency.py` |
 | **C-09** | the damping `lam` is about **30x too small**, and probably should not be a constant multiple of `lam_0` at all: the optimum fits `sigma_min^0.86 sigma_max^1.29` at R^2 = 0.904 | **high** | measured | `experiments/damping_lambda` |
 | **C-06** | a **diverged probe returns a measured zero** twist rather than a missing observation | medium | derived | `derivations/mobility_jacobian.md` |
+| ~~**F-07**~~ | `fluid.py` and `mojo/src/fluid_gpu.mojo` are the same physics twice and **nothing asserted they carry the same constants**; six of eight provenance comments pointed at the wrong lines | was medium | **CLOSED** — names and block markers instead of line numbers, and a text-level constant comparison that needs no GPU toolchain | `tests/test_gpu_mirror.py` |
 | **F-05** | the stall blend puts **13.8% of the post-stall branch at zero incidence**; the realised lift slope is 11% below the docstring's | medium | measured | `experiments/analytic_vs_numerical` |
 | **C-02** | the twist scaling's three `0.3`s are an **undeclared reference length in metres**, fixed across bodies of different size | medium | measured | `experiments/dimensional_check` |
 | **C-03** | `rank` was an engineering threshold presented as a numerical rank | medium | **CLOSED** — split into `numerical_rank`, `control_rank` and a settable `authority_threshold`; the identification's own noise floor of `1.13 sigma_0` is documented on both | `dytiscidae/control/cpg.py` |
@@ -172,6 +173,34 @@ The code uses the `(t/D)^3` prefactor with `(t/r)^3`. Measured on a PETG hull,
 (**4.8x**). The docstring calls buckling "the real constraint" on hull design
 and says `p_cr` "scales as `E (t/r)^3`", which is true; the prefactor is the one
 belonging to the other form.
+
+### F-07 -- two implementations of the same physics, unchecked  (CLOSED)
+
+`batchroll.evaluate_tier1_batch` scores with `mojo/src/fluid_gpu.mojo` and
+`evaluate.evaluate_tier1` scores with `physics/fluid.py`. CLAUDE.md already
+records that the two are not interchangeable and have differed by 60x. What it
+did not record is that **nothing asserted they carry the same constants**.
+
+`tests/test_search.py` compares them numerically, which is the real check, and
+it needs the built extension -- so on a machine without a GPU toolchain (this
+container, among others) an edit to `lift_coefficient` that forgets the Mojo
+half is invisible until a search runs.
+
+The Mojo file cited its Python source as line numbers. **Six of the eight had
+drifted off target**: `fluid.py:292-305` claimed to be `drag_coefficient` and
+pointed into the middle of `lift_coefficient`'s docstring; `fluid.py:428-432`
+claimed to be the kinematics block and pointed at two assignments in
+`__init__`. A line number cannot be kept honest by anything.
+
+They are function names and block markers now, and `tests/test_gpu_mirror.py`
+reads both files as text: no `fluid.py:<line>` reference has come back, every
+name resolves, every marker occurs exactly once, and the numeric-literal sets
+of the three mirrored functions match -- 7, 15 and 5 shared constants. Changing
+`0.80` to `0.85` on the Mojo side alone fails it with
+`python-only [0.8], mojo-only [0.85]`.
+
+It catches one class of drift, not all of it. Agreement of the *formulas* is
+`test_search.py`'s job and stays there.
 
 ### C-07 / C-08 -- the mobility identification, and what it does and does not identify
 
