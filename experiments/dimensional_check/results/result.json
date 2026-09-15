@@ -1,9 +1,9 @@
 {
   "experiment": "dimensional_check",
   "ok": true,
-  "commit": "65e21d5429c88c28b4b397f62e721b487b907c62-dirty",
-  "when": "2026-09-14T13:15:23Z",
-  "elapsed_s": 0.014,
+  "commit": "8550c2994f57d4921f4e97430e815b8362551272-dirty",
+  "when": "2026-09-15T00:22:23Z",
+  "elapsed_s": 0.013,
   "python": "3.11.15",
   "numpy": "2.4.6",
   "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",
@@ -22,8 +22,8 @@
     ]
   },
   "data": {
-    "n_checks": 48,
-    "n_sound": 48,
+    "n_checks": 50,
+    "n_sound": 50,
     "n_failing": 0,
     "n_implicit_unit": 11,
     "failing": [],
@@ -59,22 +59,22 @@
         "detail": ""
       },
       {
-        "name": "reduced frequency  k = |omega_s| c / (2 U)",
+        "name": "reduced pitch rate  kappa = |alpha_dot| c / (2 U)",
         "source": "dytiscidae/physics/fluid.py",
         "status": "ok",
         "dim": "1",
         "value": 0.15525,
         "implicit_unit": "",
-        "note": "dimensionally a reduced frequency; kinematically a reduced *pitch rate* -- omega_s is the instantaneous rate about the span axis, not the flapping angular frequency.  See MATH_AUDIT F-02.",
+        "note": "dimensionally a reduced rate, and now named for the quantity it holds: omega_s is the instantaneous rate about the span axis, not the flapping angular frequency.  Whether the LEV term should key on it at all is MATH_AUDIT F-02.",
         "detail": ""
       },
       {
-        "name": "LEV blend  lev = clip(k / 0.30, 0, 1)",
+        "name": "LEV blend  lev = clip(kappa / 0.30, 0, 1)",
         "source": "dytiscidae/physics/fluid.py",
         "status": "ok",
         "dim": "1",
         "value": 0.5175000000000001,
-        "implicit_unit": "none -- 0.30 is a reduced frequency, correctly dimensionless",
+        "implicit_unit": "none -- 0.30 is a reduced rate, correctly dimensionless",
         "note": "",
         "detail": ""
       },
@@ -276,6 +276,26 @@
         "value": 5.338541666666668,
         "implicit_unit": "",
         "note": "",
+        "detail": ""
+      },
+      {
+        "name": "jet pumping power, as the docstring states it",
+        "source": "dytiscidae/physics/jet.py",
+        "status": "ok",
+        "dim": "m^2.kg.s^-3",
+        "value": 5.5609809027777795,
+        "implicit_unit": "",
+        "note": "anchored to the module docstring rather than to a line of code, because the implementation folds this into a damping coefficient and never forms the pressure as a named variable.  A documented relation is source too, and a docstring that drifts from its own dimensions is worth catching.",
+        "detail": ""
+      },
+      {
+        "name": "jet pumping load  c = 0.5 rho (dV/dtheta)^3 |omega| / A^2",
+        "source": "dytiscidae/physics/jet.py",
+        "status": "ok",
+        "dim": "m^2.kg.s^-1",
+        "value": 13.260937500000006,
+        "implicit_unit": "",
+        "note": "a damping coefficient, N.m.s per radian.  dV/dtheta is a volume per radian and radian is dimensionless, so it carries m^3; the cube of it over an area squared leaves m^5, and rho times that over a second is N.m.s.  It is applied through `dof_damping` rather than as an explicit torque because the explicit form diverges -- see the module docstring.",
         "detail": ""
       },
       {

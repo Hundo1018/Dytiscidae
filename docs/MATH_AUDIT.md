@@ -51,7 +51,7 @@ within a few hundred generations. The module prefix is `F` fluid, `S` structure,
 | **C-08** | the identified **parameter-side directions do not survive a reseed** (68-85 degree principal angles); the twist-side ones do | **high** | measured | `experiments/rank_threshold` |
 | **F-03** | wing added mass is **isotropic**, overstating edgewise entrained mass by `(chord/thickness)^2` | **high** | measured | `experiments/added_mass` |
 | **J-02** | jet thrust goes as the **square of the joint rate with no limiter** and no out-of-domain flag | **high** | measured | `experiments/jet_energy` |
-| **F-02** | `reduced_freq` holds the **instantaneous pitch rate**, not the reduced frequency its docstring names | **high** | derived | `derivations/reduced_frequency.md` |
+| **F-02** | the leading-edge-vortex term keys on the **instantaneous pitch rate**, not the reduced frequency its docstring named | **high** | **half closed** — named correctly now, measured at a 157% spread across one stroke; the model choice is open | `tests/test_reduced_frequency.py` |
 | **C-09** | the damping `lam` is about **30x too small**; at the incumbent value a command on land is worse than no command | **high** | measured | `experiments/damping_lambda` |
 | **C-06** | a **diverged probe returns a measured zero** twist rather than a missing observation | medium | derived | `derivations/mobility_jacobian.md` |
 | **F-05** | the stall blend puts **13.8% of the post-stall branch at zero incidence**; the realised lift slope is 11% below the docstring's | medium | measured | `experiments/analytic_vs_numerical` |
@@ -271,7 +271,21 @@ The same `omega_s` is used, correctly, for the Kramer rotational force on the
 following lines. One quantity, two roles, right in one of them.
 
 This is worth a factor of two in lift: at 25 degrees, `lev = 1` raises `CL` from
-0.941 to 1.898.
+0.941 to 1.898 — measured 2.02x.
+
+**Half closed.** The variable is now `reduced_pitch_rate`, the docstring states
+`kappa = |alpha_dot| c / (2U)` and says in terms what it is not, and
+`tests/test_reduced_frequency.py` measures the difference: over one stroke at
+`k = 0.1728`, `kappa` runs 0 to 0.1210, a **157% spread of its own mean**, zero
+at both extremes, following `alpha_0 |cos(Omega t)| k` to 2.8e-17. **No number
+changed.**
+
+The model choice is deliberately left open, because keying the LEV on something
+else changes `CL` on every wing by up to 2.02x. `derivations/
+reduced_frequency.md` costs the three options: leave it, plumb the CPG
+frequency into the solver, or give the LEV a history variable (non-dimensional
+travel since reversal, the Wagner / Beddoes-Leishman treatment). The third is
+right and is the largest change in that document.
 
 ### F-03 -- wing added mass has no direction in it
 
