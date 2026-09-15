@@ -49,7 +49,8 @@ within a few hundred generations. The module prefix is `F` fluid, `S` structure,
 | ~~**S-01**~~ | hull buckling allowable was **8x non-conservative**: the `(t/D)^3` coefficient applied to `(t/r)^3` | was high | **CLOSED** — the allowable is the n=2 ring result and `hull_wall` is its inverse, not a second fitted constant; costs 2.00x the wall and sinks one seed plan | `tests/test_hull_buckling.py` |
 | **C-07** | the mobility identification is **underdetermined on 5 of 7 seed plans**, and its residual reads exactly zero because of it | **high** | measured; now **reported** by `MobilityBasis.underdetermined` and in telemetry, not fixed | `experiments/rank_threshold` |
 | **C-08** | the identified **parameter-side directions do not survive a reseed** (68-85 degree principal angles); the twist-side ones do | **high** | measured | `experiments/rank_threshold` |
-| **F-03** | wing added mass is **isotropic**, overstating edgewise entrained mass by `(chord/thickness)^2` | **high** | measured | `experiments/added_mass` |
+| **F-03** | wing added mass is **isotropic**, overstating edgewise entrained mass by `(chord/thickness)^2` and the entrained mass a machine actually carries by **2.8x** | **high** | measured; the tensor is implemented behind `wing_added_mass_tensor` and **off** — it makes ladder layer 2 hold and runs 3 of 7 plans away at `dt = 0.004` | `experiments/wing_added_mass` |
+| **N-02** | **medusa already runs away** at the project's `dt = 0.004` with the solver as it ships — 2444 rad of joint travel against a command under 1 rad, and 1.01 rad with the actuators held still, so it is the drive | **high** | measured | `experiments/wing_added_mass` |
 | **J-02** | jet thrust goes as the **square of the joint rate with no limiter** and no out-of-domain flag | **high** | measured | `experiments/jet_energy` |
 | **F-02** | the leading-edge-vortex term keys on the **instantaneous pitch rate**, not the reduced frequency its docstring named | **high** | **half closed** — named correctly now, measured at a 157% spread across one stroke; the model choice is open | `tests/test_reduced_frequency.py` |
 | **C-09** | the damping `lam` is about **30x too small**, and probably should not be a constant multiple of `lam_0` at all: the optimum fits `sigma_min^0.86 sigma_max^1.29` at R^2 = 0.904 | **high** | measured | `experiments/damping_lambda` |
@@ -392,6 +393,68 @@ the constraint that closes the route to take-off, and says the structural check
 cannot see it. The added-mass model cannot see it either, in the opposite
 direction: folding buys nothing inertially.
 
+**What it is worth on a machine, which is not `(c/t)^2`.** That figure is the
+error in the pure edgewise direction. `experiments/wing_added_mass` records the
+direction the flow actually comes from at every wing strip of every seed plan in
+all three media -- 1.32 million strip-steps -- and it is **only 35.5% normal** by
+mean squared direction cosine: more chordwise (41.4%) than normal, and 23.0%
+spanwise, which the tensor says entrains nothing at all. Projected onto that
+distribution the correction is worth **35.6% to 36.0%** of the coded value, on
+every one of the seven plans. So about 2.8x, not 176x to 251x, which is what
+`(c/t)^2` gives on real wing sections. `ray` carries **209.88 kg** of wing added
+mass against a 5.445 kg dry mass.
+
+**Why it is not fixed.** The tensor is in the solver, behind
+`FluidSolver.wing_added_mass_tensor`, defaulting off. Switching it on makes
+`benchmarks/` layer 2 **hold at 8.3e-06** where it departs at 0.729 -- and then:
+
+| plan | dt=0.004 | dt=0.002 | dt=0.001 | dt=0.0005 | still, 0.004 | incumbent driven | incumbent still |
+|---|---|---|---|---|---|---|---|
+| bat | 300.49 | 2404.01 | 0.78 | 1.06 | **3108.20** | 1.79 | 2.06 |
+| beetle | 0.39 | 0.35 | 0.38 | 0.38 | **75958.41** | 0.42 | 0.44 |
+| ray | 27395.72 | 2264.59 | 9.16 | 1.10 | **66929.76** | 1.76 | 1.14 |
+| medusa | 3275.52 | 1.35 | 1.12 | 1.16 | 11222.92 | **2443.84** | 1.01 |
+| eel, gannet, teal | <= 1.5 everywhere | | | | | | |
+
+Largest joint angle over 5 s, in radians; the CPG commands under one. Bit-for-bit
+repeatable across runs.
+
+**bat, beetle and ray run away with the actuators held completely still**, and
+none of them does so under the incumbent, so it is not the controller. Every plan
+is stable at `dt = 0.0005`. The surplus inertia the scalar carries is what keeps
+the **explicit** lift and drag stable at the current timestep: added mass goes
+into the mass matrix, for the reason `apply`'s own comment gives at length, but
+lift and drag go into `xfrc_applied` and are only stable because the wings are
+about three times too heavy. **Closing F-03 needs a smaller timestep or an
+implicit treatment of those forces, not a coefficient.**
+
+Two details worth keeping. `beetle` is stable driven (0.39) and catastrophic held
+still (75958) -- the gait is what keeps it up, so "actuators held still" is not a
+strictly gentler probe than driving. And `bat` is worse at `dt = 0.002` than at
+`0.004` before becoming stable at `0.001`, so "refine until stable" needs the
+whole sweep and not two points.
+
+Measured on `main`, which does not carry F-05's compact stall blend. Under that
+lift model the same sweep names a different set of plans -- the motion differs,
+so the divergence does -- and reaches the same conclusion.
+
+### N-02 -- medusa is already unstable at the project's timestep
+
+The same sweep, with `wing_added_mass_tensor` **off**, i.e. the solver exactly as
+it ships: `medusa` driven by its own base gait at `dt = 0.004` reaches **2443.84
+radians** of joint travel in 5 s against a command that never exceeds one. With
+the actuators held still it reaches 1.01 rad, so unlike F-03's divergences this
+one is the drive, not the passive coupling. At `dt = 0.002` and below it does not
+happen.
+
+`medusa` is one of the six islands' seed plans. Nothing in the search would
+report this: a runaway still produces a score, and `diverged_rollouts` counts
+non-finite states, which this is not -- the joint angle grows large but stays
+finite.
+
+Status: **measured, not fixed**. Risk: high -- it is a seed plan scoring from a
+state no controller commanded.
+
 ### J-02 -- jet thrust has no limiter
 
 `thrust = rho Q^2 / A` with `Q` taken straight from the joint rate goes as the
@@ -656,7 +719,7 @@ is what changes if the number moves.
 | Oswald `e` | `0.75` | `CALIBRATED` | 1 | induced drag |
 | Kramer `C_rot = pi(0.75-x0)` | — | `TEXTBOOK` Sane & Dickinson | 1 | reversal force |
 | pitch axis `x0` | `0.25` | `TEXTBOOK` quarter-chord | 1 | `C_rot` |
-| strip added mass `rho pi c^2/4` | — | `TEXTBOOK` 2D plate | kg/m | **F-03** |
+| strip added mass `rho pi c^2/4` | — | `TEXTBOOK` 2D plate, **normal entry only** | kg/m | **F-03**; the other two entries are behind `wing_added_mass_tensor`, off |
 | bluff `Ca_i = 0.5(e_j+e_k)/(2 e_i)` | — | `CALIBRATED`, exact for a sphere, `3 pi/8` from Lamb for a disc | 1 | fin inertia |
 | `Ca` clip | `[0.05, 10]` | `NUMERICAL` | 1 | binds from `D/h = 20` |
 | force limit | `60 * weight` | `HEURISTIC` | 1 | **F-04** |
