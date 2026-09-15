@@ -1,9 +1,9 @@
 {
   "experiment": "dimensional_check",
   "ok": true,
-  "commit": "3998a8ebbe3c7fa970fad896b1d9a3b6a3c01b6e-dirty",
-  "when": "2026-09-15T11:06:06Z",
-  "elapsed_s": 0.011,
+  "commit": "74a1aa1e06a47be37a7d447c6fedacbe0971b7ed",
+  "when": "2026-09-15T11:59:35Z",
+  "elapsed_s": 0.013,
   "python": "3.11.15",
   "numpy": "2.4.6",
   "platform": "Linux-6.18.44-fc-v33-x86_64-with-glibc2.39",
