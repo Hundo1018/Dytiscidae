@@ -1,0 +1,18 @@
+{
+  "question": "the wing branch applies the plate's normal added mass in every direction -- what is that worth on a real machine, and what happens if it is corrected?",
+  "seed_plans": ["bat", "beetle", "eel", "gannet", "medusa", "ray", "teal"],
+  "rollout": {
+    "media": ["air", "water", "land"],
+    "seconds": 4.0,
+    "note": "the base CPG gait, no randomisation, so the sample repeats"
+  },
+  "stability": {
+    "timesteps": [0.004, 0.002, 0.001, 0.0005],
+    "seconds": 5.0,
+    "runaway_rad": 10.0,
+    "note": "0.004 is the project's own timestep. 10 rad of joint travel is far outside any commanded range (the CPG commands under 1 rad) and well below the thousands a runaway reaches, so it separates the two without being tuned to either."
+  },
+  "tolerances": {
+    "tensor_ratio_rel": 1e-12
+  }
+}
