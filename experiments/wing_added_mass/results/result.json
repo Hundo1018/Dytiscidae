@@ -1,0 +1,245 @@
+{
+  "experiment": "wing_added_mass",
+  "ok": true,
+  "commit": "06f25781a3a9f3cb5d83520fe492dc76dcb2c6a8-dirty",
+  "when": "2026-09-15T11:34:23Z",
+  "elapsed_s": 118.183,
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "platform": "Linux-6.18.44-fc-v33-x86_64-with-glibc2.39",
+  "config": {
+    "question": "the wing branch applies the plate's normal added mass in every direction -- what is that worth on a real machine, and what happens if it is corrected?",
+    "seed_plans": [
+      "bat",
+      "beetle",
+      "eel",
+      "gannet",
+      "medusa",
+      "ray",
+      "teal"
+    ],
+    "rollout": {
+      "media": [
+        "air",
+        "water",
+        "land"
+      ],
+      "seconds": 4.0,
+      "note": "the base CPG gait, no randomisation, so the sample repeats"
+    },
+    "stability": {
+      "timesteps": [
+        0.004,
+        0.002,
+        0.001,
+        0.0005
+      ],
+      "seconds": 5.0,
+      "runaway_rad": 10.0,
+      "note": "0.004 is the project's own timestep. 10 rad of joint travel is far outside any commanded range (the CPG commands under 1 rad) and well below the thousands a runaway reaches, so it separates the two without being tuned to either."
+    },
+    "tolerances": {
+      "tensor_ratio_rel": 1e-12
+    }
+  },
+  "data": {
+    "gannet_wing_strips": 60,
+    "gannet_m_normal_kg": 70.24166115954091,
+    "gannet_m_chord_kg": 0.3489607030927699,
+    "c_over_t": {
+      "min": 13.256556769192358,
+      "max": 15.835934235725375,
+      "median": 14.084000834056353
+    },
+    "flow_cosines": {
+      "air": [
+        0.30654321737218343,
+        0.4729986153659461,
+        0.22027634908005916
+      ],
+      "water": [
+        0.23693949213030052,
+        0.3643921173790106,
+        0.3966683904906658
+      ],
+      "land": [
+        0.14656011412244413,
+        0.40376959747392177,
+        0.447670288403634
+      ],
+      "all": [
+        0.23001427454165488,
+        0.41372011007294235,
+        0.3548716759914491
+      ]
+    },
+    "flow_samples": 1320000,
+    "per_plan": [
+      {
+        "plan": "bat",
+        "dry_mass_kg": 3.9602294218518423,
+        "coded_kg": 67.1787246108425,
+        "tensor_kg": 23.92527167648072,
+        "ratio": 0.35614358288396614
+      },
+      {
+        "plan": "beetle",
+        "dry_mass_kg": 5.128782337785249,
+        "coded_kg": 33.95169212761937,
+        "tensor_kg": 12.168705072748331,
+        "ratio": 0.3584123297009167
+      },
+      {
+        "plan": "eel",
+        "dry_mass_kg": 2.2585110003389643,
+        "coded_kg": 4.838576668732992,
+        "tensor_kg": 1.7255247189072196,
+        "ratio": 0.3566182447945085
+      },
+      {
+        "plan": "gannet",
+        "dry_mass_kg": 5.308710984457502,
+        "coded_kg": 70.24166115954091,
+        "tensor_kg": 25.071148080604424,
+        "ratio": 0.3569270382666486
+      },
+      {
+        "plan": "medusa",
+        "dry_mass_kg": 10.446830510791585,
+        "coded_kg": 3.5687281967103655,
+        "tensor_kg": 1.2843457753697223,
+        "ratio": 0.35988893089522067
+      },
+      {
+        "plan": "ray",
+        "dry_mass_kg": 5.444809872699376,
+        "coded_kg": 209.88304945800192,
+        "tensor_kg": 74.76275630989636,
+        "ratio": 0.35621150208633956
+      },
+      {
+        "plan": "teal",
+        "dry_mass_kg": 5.344951079569116,
+        "coded_kg": 69.86980190398245,
+        "tensor_kg": 24.938392362706548,
+        "ratio": 0.35692662184698576
+      }
+    ],
+    "stability": {
+      "timesteps": [
+        0.004,
+        0.002,
+        0.001,
+        0.0005
+      ],
+      "rows": [
+        {
+          "plan": "bat",
+          "driven": [
+            300.4916092215424,
+            2404.009310883991,
+            0.7774695533463424,
+            1.0594202033537414
+          ],
+          "still": 3108.203122007583,
+          "incumbent_driven": 1.7940054868761943,
+          "incumbent_still": 2.0595273668578264
+        },
+        {
+          "plan": "beetle",
+          "driven": [
+            0.3885734621424161,
+            0.35435352849339546,
+            0.38310469842358763,
+            0.3837930449947015
+          ],
+          "still": 75958.40846177549,
+          "incumbent_driven": 0.42340476404096367,
+          "incumbent_still": 0.441679504549439
+        },
+        {
+          "plan": "eel",
+          "driven": [
+            0.4761616766257924,
+            1.1145239467661328,
+            1.4929322918161905,
+            0.325675259279113
+          ],
+          "still": 0.42791219924888646,
+          "incumbent_driven": 0.5503913754077384,
+          "incumbent_still": 0.44218585881443406
+        },
+        {
+          "plan": "gannet",
+          "driven": [
+            0.8303508249370083,
+            0.8299883971566289,
+            0.8297978206886207,
+            0.8297041208608062
+          ],
+          "still": 0.07266282393003318,
+          "incumbent_driven": 0.8303270224157354,
+          "incumbent_still": 0.07228920161144266
+        },
+        {
+          "plan": "medusa",
+          "driven": [
+            3275.520511795268,
+            1.345755082678636,
+            1.1221998734029843,
+            1.1579017940984933
+          ],
+          "still": 11222.924083747217,
+          "incumbent_driven": 2443.8418794281138,
+          "incumbent_still": 1.0061660128416583
+        },
+        {
+          "plan": "ray",
+          "driven": [
+            27395.72204597594,
+            2264.5894354669354,
+            9.158074348909564,
+            1.1026967950948865
+          ],
+          "still": 66929.76446297453,
+          "incumbent_driven": 1.7576351327987791,
+          "incumbent_still": 1.1367397933434507
+        },
+        {
+          "plan": "teal",
+          "driven": [
+            1.2138395480213053,
+            1.3426316482772374,
+            1.3207671262084717,
+            1.2647952937487532
+          ],
+          "still": 0.5926881448786717,
+          "incumbent_driven": 1.1705382624546856,
+          "incumbent_still": 0.43002697391682754
+        }
+      ]
+    },
+    "pre_existing_runaway": [
+      "medusa"
+    ],
+    "destabilised_driven": [
+      "bat",
+      "ray"
+    ],
+    "destabilised_still": [
+      "bat",
+      "beetle",
+      "ray"
+    ],
+    "runaway_at_finest_dt": [],
+    "stable_only_when_driven": [
+      "beetle"
+    ],
+    "open_findings": [
+      "F-03  the flow at a wing strip is mostly not normal to it",
+      "F-03  correcting it is worth about 3x on a real machine, not (c/t)^2",
+      "F-03  the isotropic added mass is holding up the explicit lift and drag",
+      "N-02  medusa already runs away at dt = 0.004 with the solver as it ships"
+    ]
+  }
+}

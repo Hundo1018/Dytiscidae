@@ -474,6 +474,11 @@ class FluidSolver:
         # Opt-in state recording for the wake visualiser.  Off by default: the
         # search loop calls apply() millions of times and should not pay to
         # record anything nobody reads.
+        #: Apply the wing's full added-mass tensor rather than the plate's
+        #: normal entry in every direction.  **Off**: it is correct and the
+        #: solver does not survive it at this timestep.  See MATH_AUDIT F-03
+        #: and `experiments/wing_added_mass`.
+        self.wing_added_mass_tensor = False
         self.record_state = False
         self.last_state: dict | None = None
         # Scratch buffers reused every step.
@@ -636,11 +641,14 @@ class FluidSolver:
         #     axial load for anything slender, so flying sideways is expensive,
         #     which is the whole basis of weathercock stability.
         n_bluff = int((~is_wing).sum())
+        # The full (not strip-projected) relative flow direction, for every
+        # element.  Hoisted out of the bluff branch because the added-mass
+        # tensor below needs it for wings too; the values are unchanged.
+        U_full = np.linalg.norm(v_rel, axis=1)
+        U_full_safe = np.maximum(U_full, 1e-6)
+        d_full = v_rel / U_full_safe[:, None]
         if n_bluff:
             b = ~is_wing
-            U_full = np.linalg.norm(v_rel, axis=1)
-            U_full_safe = np.maximum(U_full, 1e-6)
-            d_full = v_rel / U_full_safe[:, None]
             ex, ey, ez = p.ext_local[:, 0], p.ext_local[:, 1], p.ext_local[:, 2]
 
             # Split the stream into flow along the element's own long axis and
@@ -737,24 +745,67 @@ class FluidSolver:
         ca_axis = np.clip(
             0.5 * (e[:, [1, 2, 0]] + e[:, [2, 0, 1]]) / (2.0 * e), 0.05, 10.0
         )
-        if n_bluff:
-            # Direction cosines in the element's own frame, from the same
-            # relative-velocity direction the drag used.
-            dc = np.stack([
-                np.einsum("ni,ni->n", d_full, s_hat),
-                np.einsum("ni,ni->n", d_full, c_hat),
-                np.einsum("ni,ni->n", d_full, n_hat),
-            ], axis=1) ** 2
-        else:
-            dc = np.zeros((p.n, 3))
+        # Direction cosines in the element's own (span, chord, normal) frame,
+        # from the same relative-velocity direction the drag used.  Computed
+        # for every element: the wing branch below projects onto them too.
+        dc = np.stack([
+            np.einsum("ni,ni->n", d_full, s_hat),
+            np.einsum("ni,ni->n", d_full, c_hat),
+            np.einsum("ni,ni->n", d_full, n_hat),
+        ], axis=1) ** 2
+        moving = dc.sum(axis=1) > 1e-6
         ca_eff = np.einsum("ni,ni->n", dc, ca_axis)
         # A body momentarily at rest has no direction of motion to project onto;
         # fall back to the isotropic mean rather than to zero.
-        ca_eff = np.where(dc.sum(axis=1) > 1e-6, ca_eff, ca_axis.mean(axis=1))
+        ca_eff = np.where(moving, ca_eff, ca_axis.mean(axis=1))
+
+        # A wing strip's added mass is a **tensor** and the default here is a
+        # scalar: the plate's normal value `rho pi c^2/4 per unit span` applied
+        # whichever way the strip accelerates.  Strip theory gives all three,
+        #
+        #     m_span = 0      m_chord = rho pi t^2/4 b      m_normal = rho pi c^2/4 b
+        #
+        # verified against the closed form at c/t = 10, 100 and 1000 in
+        # `benchmarks/layers.py` layer 2 with no simulation in the chain.
+        # `docs/MATH_AUDIT.md` **F-03**.
+        #
+        # The tensor is here, behind `wing_added_mass_tensor`, and it is **off**.
+        # `experiments/wing_added_mass` says why: switching it on makes layer 2
+        # hold (0.729 -> 8.3e-06) and takes a gannet's wing added mass from
+        # 70.2 kg to 25.1 kg, and then four of the seven seed plans run away at
+        # this project's dt = 0.004 -- three of them with the actuators held
+        # completely still.  Every plan is stable at dt = 0.001.
+        #
+        # So the surplus inertia the scalar carries is what keeps the
+        # *explicit* lift and drag stable at the current timestep.  The comment
+        # above explains why added mass goes into the mass matrix rather than
+        # into `xfrc_applied`; lift and drag do not, and they are only stable
+        # because the wings are carrying about three times the entrained mass
+        # they should.  Closing F-03 needs a smaller timestep or an implicit
+        # treatment of those forces, which is a larger change than a
+        # coefficient -- so the switch exists, defaults off, and the experiment
+        # is what turns it on.
+        if self.wing_added_mass_tensor:
+            t_wing = np.maximum(p.ext_local[:, 2], 1e-5)
+            # `rho` is per element -- one straddling the free surface carries a
+            # blended density -- so it joins `dr` in the column factor.  Writing
+            # it as `rho * ... * p.dr[:, None]` broadcasts (N,) against (N,1)
+            # into (N,N), which a single-panel benchmark does not catch.
+            m_wing_axis = (rho * p.dr)[:, None] * (np.pi * 0.25) * np.stack([
+                np.zeros(p.n),      # spanwise: a flat plate entrains nothing
+                t_wing**2,          # chordwise
+                p.chord**2,         # normal
+            ], axis=1)
+            m_wing = np.einsum("ni,ni->n", dc, m_wing_axis)
+            # At rest the same fallback the bluff branch uses: the mean of the
+            # three, not zero, and not the normal entry.
+            m_wing = np.where(moving, m_wing, m_wing_axis.mean(axis=1))
+        else:
+            m_wing = rho * np.pi * p.chord**2 * 0.25 * p.dr
 
         m_add = np.where(
             is_wing,
-            rho * np.pi * p.chord**2 * 0.25 * p.dr,
+            m_wing,
             ca_eff * rho * p.volume,
         ) * self.added_mass_scale
 
@@ -834,6 +885,15 @@ class FluidSolver:
                 "chord_axis": c_hat.copy(),
                 "normal_axis": n_hat.copy(),
                 "alpha": alpha.copy(),
+                # Direction cosines of the full relative flow in each
+                # element's own (span, chord, normal) frame.  What the
+                # added-mass tensor is projected onto, so a probe can ask
+                # which way the fluid is actually being pushed.
+                "flow_cosines": np.stack([
+                    np.einsum("ni,ni->n", d_full, s_hat),
+                    np.einsum("ni,ni->n", d_full, c_hat),
+                    np.einsum("ni,ni->n", d_full, n_hat),
+                ], axis=1),
                 "submerged": subf.copy(),
                 # Structural force: everything the member physically carries.
                 #
