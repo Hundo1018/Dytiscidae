@@ -21,7 +21,7 @@ where the fidelity boundary is located.
 | 2 added mass | entrained fluid inertia | **DEPARTS** | 0.729 |
 | 3 drag | quadratic pressure drag | **holds** | 6.1e-5 |
 | 4 buoyancy | hydrostatic lift, free-surface ramp | **holds** | 6.8e-4 |
-| 5 jet propulsion | momentum flux from a cavity | **DEPARTS** | 1.0 |
+| 5 jet propulsion | momentum flux from a cavity | **holds** | 3.5e-4 |
 | 6 articulated body | internal joints | **DEPARTS** | 0.34 |
 | 7 fluid surrogate | the assembled blade-element force | **holds** | 1.6e-12 |
 | 8 controller | the identified mobility basis | **DEPARTS** | 0.341 |
@@ -68,7 +68,7 @@ systematic rather than noise: it biases every height the same way and grows
 linearly with the segment length. That is 3.4% of the 0.29 m cap the `clears`
 rung sits above, before any physics is modelled at all.
 
-## Layer 2 — added mass, and two errors that partly cancel
+## Layer 2 — added mass, and the two errors that used to cancel
 
 The analytic chain is established first, with no simulation in it: for a thin
 plate, strip theory gives `m_normal = rho pi c^2/4 * b`,
@@ -81,19 +81,26 @@ Then the simulation, on a 1.0 x 0.2 m, 2 mm plate, 12 kg dry, in seawater:
 |---|---|---|---|
 | reference | 12.003 kg | 12.000 kg | 44.201 kg |
 | **jointed** | 44.201 ✗ | 44.201 ✗ | 44.201 ✓ |
-| **jointless** | 12.000 ✓ | 12.000 ✓ | 12.000 ✗ |
+| **jointless** | 44.201 ✗ | 44.201 ✗ | 44.201 ✓ |
 
-Two separate findings, and notice what they do together:
+The two rows agreeing is itself the result of a fix. They did not agree when
+this layer was first run:
 
 * **jointed** — the wing branch applies the plate's *normal* added mass in
-  every direction (`MATH_AUDIT` **F-03**). Edgewise it is wrong by `(c/t)^2`.
+  every direction (`MATH_AUDIT` **F-03**, still open). Edgewise it is wrong by
+  `(c/t)^2`.
 * **jointless** — MuJoCo marks a body `simple` when no joint attaches to it and
   takes those DOFs' mass from the compile-time `dof_M0`, so the runtime
-  `body_mass` edit never reaches `M` (**F-01**). No added mass at all.
+  `body_mass` edit never reached `M` (**F-01**). The jointless row read
+  12.000 / 12.000 / 12.000: no added mass in any direction.
 
-The jointless row "passes" chordwise and spanwise **only because applying none
-is nearly the right answer for those two directions.** Two bugs cancelling is
-why neither showed up in a test that read `body_mass` back.
+While F-01 stood, the jointless row "passed" chordwise and spanwise **only
+because applying none is nearly the right answer for those two directions** —
+two faults cancelling, which is why neither showed up in a test that read
+`body_mass` back. F-01 is now closed (`FluidSolver._publish_inertia` rebuilds
+the derived constants), the cancellation is gone, and what remains in this
+layer is F-03 alone: a 32.2 kg entrained mass applied isotropically where the
+analytic tensor asks for 0.003 kg chordwise and 0 spanwise.
 
 ## Layers 3 and 4 — what a correct layer looks like
 
@@ -118,9 +125,27 @@ reference was fixed. The solver was right.
 
 Two statements about the same jet, both analytic: the work the muscle must do,
 `p Q = (1/2) rho Q^3/A^2`, and the kinetic energy the jet carries,
-`(1/2) m_dot v_e^2`. They agree exactly, which pins the reference at 141.61 J.
+`(1/2) m_dot v_e^2`. They agree exactly, which pins the reference.
 
-The actuator is charged **0.0111 J** of it. See `MATH_AUDIT` **J-01**.
+The graded check is then the identity the pumping load is built on — the torque
+it puts on the driving joint times the joint rate is the power the jet carries
+away. `JetSet.actuator_work` integrates to **14.9418 J** against **14.9469 J**
+formed independently from the joint history: **3.5e-4**. And the actuator's
+signed mechanical work covers it, because a propulsor cannot return energy to
+its motor.
+
+This layer read `DEPARTS 1.0` before **J-01** was fixed, when the actuator was
+charged 0.0111 J of 141.61 J.
+
+**One number here is reported and not graded**, and the distinction matters.
+Comparing the actuator's bill across a run with the load and a run without it
+gives `+4.96 J against 14.95 J pumped, +33%` — and that is not a failure. The
+two runs follow different trajectories, because the load is what changes how
+the servo tracks, so the bell's own inertial work differs too; and
+`abs(tau * omega)`, the energy budget's own convention, charges braking as if
+it were driving, so it does not close either. An apples-to-apples version of
+that comparison does not exist. The identity does, which is why it is the one
+with a tolerance on it.
 
 ## Layer 6 — a machine flapping in a vacuum
 

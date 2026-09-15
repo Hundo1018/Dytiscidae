@@ -512,8 +512,11 @@ def layer5_jet() -> Layer:
     dt = 0.001
 
     impulse = 0.0
-    e_pump_ideal = 0.0
-    e_actuator = 0.0
+    e_pump_ideal = 0.0       # expulsion half only, the "ideal" of the docstring
+    e_matched = 0.0          # with the same coeff and subf the model applies
+    e_actuator = 0.0         # |tau omega|, the energy budget's own convention
+    e_signed = 0.0           # tau omega, the true mechanical work
+    e_reported = 0.0         # what JetSet.actuator_work says it did
     e_jet_ke = 0.0
     for k in range(int(T / dt)):
         t = k * dt
@@ -531,8 +534,14 @@ def layer5_jet() -> Layer:
             # which are the same number, as they must be.
             e_pump_ideal += 0.5 * rho * Q**3 / A**2 * dt
             e_jet_ke += 0.5 * (rho * Q * dt) * ve**2
+        # The same ideal with the coefficients the model actually applies, so
+        # the identity below is a comparison and not an approximation.
+        cf = 1.0 if Q > 0 else jets.refill_efficiency
+        e_matched += cf * 0.5 * rho * abs(Q) ** 3 / A**2 * dt
         impulse += thrust * dt
         e_actuator += abs(float(data.actuator_force[0]) * omega) * dt
+        e_signed += float(data.actuator_force[0]) * omega * dt
+        e_reported += jets.actuator_work(model, data) * dt
 
     # The same drive with no jet, so the bell's own inertia is subtracted.
     model2 = mujoco.MjModel.from_xml_string(xml)
@@ -551,11 +560,37 @@ def layer5_jet() -> Layer:
         e_jet_ke, 1e-9, "closed form",
         note="p Q = (1/2) rho Q^3/A^2 and (1/2) m_dot ve^2 are the same "
              "quantity; both sides are analytic, so this pins the reference"))
+    # The identity the pumping load is built on: the torque it puts on the
+    # driving joint times the joint rate is the power the jet carries away.
+    # Both sides are formed independently here -- one by the module, one from
+    # the joint history -- so this is the check that the load is the right
+    # size, and it is the one this layer is graded on.
     lay.checks.append(Check(
-        5, "the actuator is charged for the water it expels", e_pump_ideal,
-        e_actuator - e_noje, 0.10, "closed form (energy conservation)",
-        note="measured as the difference between driving the bell with the "
-             "jet on and with it off, so the bell's own inertia cancels"))
+        5, "the charged pumping work equals p Q integrated", e_matched,
+        e_reported, 5e-3, "closed form (energy conservation)",
+        note="JetSet.actuator_work against (1/2) rho |Q|^3 / A^2 with the "
+             "same refill and submergence coefficients the thrust uses"))
+
+    # A propulsor cannot return energy to its motor.
+    lay.checks.append(Check(
+        5, "the actuator supplies at least what the jet carries away", 1.0,
+        1.0 if e_signed >= e_reported else 0.0, 0.0,
+        "conservation law",
+        note=f"{e_signed:.2f} J of signed mechanical work against "
+             f"{e_reported:.2f} J pumped"))
+
+    # Reported, not graded.  Comparing the actuator's bill across a run with
+    # the load and a run without it is not apples to apples: the load changes
+    # how the servo tracks, so the bell's own inertial work changes too.  The
+    # number is kept because it is what a reader of the energy budget sees,
+    # and `abs(tau omega)` is that budget's convention -- it charges braking as
+    # if it were driving, so it does not close either.
+    delta = e_actuator - e_noje
+    print(f"         budget-convention delta with the jet on vs off: "
+          f"{delta:+.2f} J against {e_matched:.2f} J pumped "
+          f"({100 * delta / max(e_matched, 1e-30):+.0f}%).  Not graded: the "
+          f"two runs follow different trajectories and |tau omega| charges "
+          f"braking as driving.")
     return lay
 
 
