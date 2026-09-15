@@ -68,7 +68,7 @@ systematic rather than noise: it biases every height the same way and grows
 linearly with the segment length. That is 3.4% of the 0.29 m cap the `clears`
 rung sits above, before any physics is modelled at all.
 
-## Layer 2 — added mass, and two errors that partly cancel
+## Layer 2 — added mass, and the two errors that used to cancel
 
 The analytic chain is established first, with no simulation in it: for a thin
 plate, strip theory gives `m_normal = rho pi c^2/4 * b`,
@@ -81,19 +81,26 @@ Then the simulation, on a 1.0 x 0.2 m, 2 mm plate, 12 kg dry, in seawater:
 |---|---|---|---|
 | reference | 12.003 kg | 12.000 kg | 44.201 kg |
 | **jointed** | 44.201 ✗ | 44.201 ✗ | 44.201 ✓ |
-| **jointless** | 12.000 ✓ | 12.000 ✓ | 12.000 ✗ |
+| **jointless** | 44.201 ✗ | 44.201 ✗ | 44.201 ✓ |
 
-Two separate findings, and notice what they do together:
+The two rows agreeing is itself the result of a fix. They did not agree when
+this layer was first run:
 
 * **jointed** — the wing branch applies the plate's *normal* added mass in
-  every direction (`MATH_AUDIT` **F-03**). Edgewise it is wrong by `(c/t)^2`.
+  every direction (`MATH_AUDIT` **F-03**, still open). Edgewise it is wrong by
+  `(c/t)^2`.
 * **jointless** — MuJoCo marks a body `simple` when no joint attaches to it and
   takes those DOFs' mass from the compile-time `dof_M0`, so the runtime
-  `body_mass` edit never reaches `M` (**F-01**). No added mass at all.
+  `body_mass` edit never reached `M` (**F-01**). The jointless row read
+  12.000 / 12.000 / 12.000: no added mass in any direction.
 
-The jointless row "passes" chordwise and spanwise **only because applying none
-is nearly the right answer for those two directions.** Two bugs cancelling is
-why neither showed up in a test that read `body_mass` back.
+While F-01 stood, the jointless row "passed" chordwise and spanwise **only
+because applying none is nearly the right answer for those two directions** —
+two faults cancelling, which is why neither showed up in a test that read
+`body_mass` back. F-01 is now closed (`FluidSolver._publish_inertia` rebuilds
+the derived constants), the cancellation is gone, and what remains in this
+layer is F-03 alone: a 32.2 kg entrained mass applied isotropically where the
+analytic tensor asks for 0.003 kg chordwise and 0 spanwise.
 
 ## Layers 3 and 4 — what a correct layer looks like
 
