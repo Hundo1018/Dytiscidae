@@ -1,6 +1,7 @@
 """GPU kinematics for the fluid solver.
 
-Ports the block at `physics/fluid.py:428-432`: rotate each panel's local span,
+Ports the block marked `--- kinematics` in `physics/fluid.py`: rotate each
+panel's local span,
 chord and normal into world frame and place its centroid.  Four einsums and a
 gather in numpy, one thread per panel here.
 
@@ -103,7 +104,7 @@ comptime DEG: Float64 = PI_D / 180.0
 
 @always_inline
 def _skin_friction_cd(re_in: Float64) -> Float64:
-    """`fluid.py:241-253`.  Blasius blended into the 1/7-power law."""
+    """Mirrors `fluid.skin_friction_cd`.  Blasius blended into the 1/7-power law."""
     var re = re_in if re_in > 1.0 else 1.0
     var lam = 1.328 / sqrt(re)
     var turb = 0.074 / powd(re, 0.2)
@@ -115,7 +116,7 @@ def _skin_friction_cd(re_in: Float64) -> Float64:
 def _lift_coefficient(
     alpha: Float64, re: Float64, ar: Float64, reduced_freq: Float64
 ) -> Float64:
-    """`fluid.py:256-289`.  Attached, LEV-augmented and post-stall."""
+    """Mirrors `fluid.lift_coefficient`.  Attached, LEV-augmented, post-stall."""
     var lev = clampd(reduced_freq / 0.30, 0.0, 1.0)
     var cl_max = 1.10 + 0.80 * lev
     var re_c = re if re > 10.0 else 10.0
@@ -136,7 +137,7 @@ def _lift_coefficient(
 def _drag_coefficient(
     alpha: Float64, re: Float64, ar: Float64, cl: Float64
 ) -> Float64:
-    """`fluid.py:292-305`.  Profile, induced and separated."""
+    """Mirrors `fluid.drag_coefficient`.  Profile, induced and separated."""
     var ar_c = ar if ar > 0.5 else 0.5
     var cd_i = cl * cl / (PI_D * 0.75 * ar_c)
     var cd_p = 1.98 * (1.0 - cosd(2.0 * alpha)) * 0.5
@@ -162,7 +163,9 @@ def bluff_kernel(
     cd_scale: Float64,
     n: Int32,
 ):
-    """Munk slender-body plus Allen-Perkins cross-flow, `fluid.py:533-578`.
+    """Munk slender-body plus Allen-Perkins cross-flow.
+
+    Mirrors the block marked `--- bluff-body drag` in `fluid.py`.
 
     `d_full` is written for every panel, wing or not: it is computed over all N
     in the Python (the `~is_wing` mask is only applied at the accumulate), and
@@ -264,7 +267,9 @@ def added_mass_kernel(
     has_bluff: Int32,
     n: Int32,
 ):
-    """Anisotropic added mass and its scatter, `fluid.py:627-661`.
+    """Anisotropic added mass and its scatter.
+
+    Mirrors the block marked `--- added mass` in `fluid.py`.
 
     The scatter is `np.add.at(m_body, body_id, m_add)`: many panels share a
     body, so the collisions are the rule and not the exception.  Float64
@@ -397,7 +402,9 @@ def strip_kernel(
     lift_axis: UnsafePointer[Float64, MutAnyOrigin],
     n: Int32,
 ):
-    """Strip theory, `fluid.py:462-487`.  One thread per panel."""
+    """Strip theory, the block marked `--- strip theory` in `fluid.py`.
+
+    One thread per panel."""
     var i = Int(global_idx.x)
     if Int32(i) >= n:
         return
@@ -794,14 +801,14 @@ def velocity_kernel(
     vrel_out: UnsafePointer[Float64, MutAnyOrigin],
     n: Int32,
 ):
-    """Panel relative flow, `fluid.py:441-457`.
+    """Panel relative flow, the block marked `--- kinematics` in `fluid.py`.
 
     `vel6` is one 6-vector per body from mj_objectVelocity -- angular in 0..2,
     linear in 3..5, both world frame at the body frame origin.  That call is a
     per-body CPU loop and stays on the host; everything downstream of it is
     per-panel and lands here.
 
-    The Python's comment at fluid.py:435-440 explains why data.cvel is not used
+    The Python's comment in that block explains why data.cvel is not used
     instead: its linear part is referenced to a com-based frame whose origin is
     not the body frame origin, and reconstructing element velocity from it
     disagreed with mj_objectVelocity by ~0.5 m/s.  Same reasoning applies here;
