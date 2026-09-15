@@ -1,9 +1,9 @@
 {
   "experiment": "hull_buckling",
   "ok": true,
-  "commit": "553d70817d915c24ee8a1df5480204b13c6fa161-dirty",
-  "when": "2026-09-15T01:30:30Z",
-  "elapsed_s": 6.095,
+  "commit": "647d6eb04296c0204d5e28a0449630845de9d778",
+  "when": "2026-09-15T01:33:42Z",
+  "elapsed_s": 6.1,
   "python": "3.11.15",
   "numpy": "2.4.6",
   "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",
