@@ -1,9 +1,9 @@
 {
   "experiment": "rank_threshold",
   "ok": true,
-  "commit": "65e21d5429c88c28b4b397f62e721b487b907c62-dirty",
-  "when": "2026-09-14T13:15:25Z",
-  "elapsed_s": 10.396,
+  "commit": "8550c2994f57d4921f4e97430e815b8362551272-dirty",
+  "when": "2026-09-15T00:29:44Z",
+  "elapsed_s": 4.803,
   "python": "3.11.15",
   "numpy": "2.4.6",
   "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",

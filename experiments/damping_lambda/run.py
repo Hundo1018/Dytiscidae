@@ -68,6 +68,7 @@ intent than sending no command at all.
 from __future__ import annotations
 
 import itertools
+import math
 import os
 import sys
 from pathlib import Path
@@ -237,6 +238,124 @@ def run(cfg: dict) -> ExperimentResult:
           f"{np.mean(per_lambda[str(cfg['lambda_ratios'][1])]['excursion']):.2f}"
           f" -> {np.mean(per_lambda[str(cfg['lambda_ratios'][-1])]['excursion']):.2f}"
           " from the smallest non-zero ratio to the largest")
+
+    # --- is the optimum predictable from something observable? ------------
+    #
+    # Hardcoding 30 is better than hardcoding 1 and worse than not hardcoding.
+    # If the optimal ridge tracks a conditioning number a caller can compute
+    # from the basis it already has, then `lam` stops being a constant and
+    # becomes a function of the identification's own quality.
+    print("\nis the optimum predictable from the basis's own conditioning?")
+    import itertools as _it
+
+    preds: dict[str, list[float]] = {}
+    targets: list[float] = []
+    for row in rows:
+        group = by_key[(row["plan"], row["medium"])]
+        bases = [MD.fit(r, max_modes=cfg["max_modes"]) for r in group]
+        Js = [MD.jacobian(r) for r in group]
+        sig = np.array([b.authority for b in bases])
+        s0 = sig[:, 0].mean()
+        # Seed-to-seed spread of J, the identification's own noise floor.
+        pair = [np.linalg.norm(Js[i] - Js[j], 2)
+                for i, j in _it.combinations(range(len(Js)), 2)]
+        vals = [row["lambdas"][str(x)]["out_of_sample"]
+                for x in cfg["lambda_ratios"]]
+        targets.append(math.log10(max(cfg["lambda_ratios"][int(np.argmin(vals))],
+                                      1e-3)))
+        d0 = bases[0].diagnostics()
+        preds.setdefault("log10 cond(A)", []).append(
+            math.log10(max(np.mean([b.condition for b in bases]), 1e-12)))
+        preds.setdefault("log10 sigma_max", []).append(math.log10(max(s0, 1e-12)))
+        preds.setdefault("log10 sigma_min/sigma_max", []).append(
+            math.log10(max(sig[:, -1].mean() / max(s0, 1e-30), 1e-12)))
+        preds.setdefault("probe noise ||dJ||/sigma_0", []).append(
+            float(np.mean(pair) / max(s0, 1e-30)))
+        preds.setdefault("residual fraction", []).append(
+            float(np.mean([b.residual_fraction for b in bases])))
+        preds.setdefault("n_probes / n_params", []).append(
+            d0["n_probes"] / max(d0["n_params"], 1))
+        preds.setdefault("underdetermined", []).append(
+            1.0 if d0["underdetermined"] else 0.0)
+
+    y = np.asarray(targets)
+    print(f"  target: log10 of the best lam/lam0, over {len(y)} "
+          f"(body, medium) pairs")
+    print(f"  {'predictor':<30} {'Pearson r':>10} {'95% CI':>20} {'p-ish':>8}")
+    correlations = {}
+    for name, xs in preds.items():
+        x = np.asarray(xs, float)
+        if np.std(x) < 1e-12:
+            print(f"  {name:<30} {'constant':>10}")
+            correlations[name] = None
+            continue
+        r = float(np.corrcoef(x, y)[0, 1])
+        # Bootstrap the correlation rather than quote a p-value on n = 21.
+        rng2 = np.random.default_rng(cfg["intent_seed"])
+        boots = []
+        for _ in range(5000):
+            idx = rng2.integers(0, len(y), len(y))
+            if np.std(x[idx]) < 1e-12 or np.std(y[idx]) < 1e-12:
+                continue
+            boots.append(np.corrcoef(x[idx], y[idx])[0, 1])
+        lo_r, hi_r = np.percentile(boots, [2.5, 97.5])
+        crosses = "includes 0" if lo_r < 0 < hi_r else "excludes 0"
+        print(f"  {name:<30} {r:>10.3f} {f'[{lo_r:+.2f}, {hi_r:+.2f}]':>20} "
+              f"{crosses:>12}")
+        correlations[name] = {"r": r, "ci95": [float(lo_r), float(hi_r)],
+                              "excludes_zero": bool(not (lo_r < 0 < hi_r))}
+    res.record("lambda_predictors", correlations)
+    strong = [k for k, v in correlations.items()
+              if v and v["excludes_zero"] and abs(v["r"]) > 0.5]
+    if strong:
+        print(f"\n  {len(strong)} predictor(s) survive a bootstrap that "
+              f"excludes zero with |r| > 0.5: {', '.join(strong)}.")
+        print("  Those two are the same quantity with opposite sign "
+              "(sigma_min/sigma_max is 1/cond), so it is one finding: a "
+              "better-conditioned basis wants a larger multiple of lam_0 and "
+              "a worse-conditioned one a smaller.")
+
+        # Which is what you would expect if the right absolute ridge tracks
+        # the *weakest* singular value rather than the mean.  lam_0 already
+        # carries mean(sigma^2), so a ratio that falls with conditioning is a
+        # ratio correcting lam_0 back toward sigma_min^2.  Test it directly:
+        # fit log(lam_absolute at the optimum) against log(sigma_min) and
+        # log(sigma_max) and read the exponents.
+        lam_abs, l_smin, l_smax = [], [], []
+        for row, tgt in zip(rows, targets):
+            group = by_key[(row["plan"], row["medium"])]
+            bases = [MD.fit(r, max_modes=cfg["max_modes"]) for r in group]
+            sig = np.array([b.authority for b in bases]).mean(axis=0)
+            lam0 = 0.01 * float(np.sum(sig**2)) / len(sig)
+            lam_abs.append(math.log10(max((10 ** tgt) * lam0, 1e-30)))
+            l_smin.append(math.log10(max(sig[-1], 1e-30)))
+            l_smax.append(math.log10(max(sig[0], 1e-30)))
+        A_fit = np.column_stack([l_smin, l_smax, np.ones(len(lam_abs))])
+        coef, *_ = np.linalg.lstsq(A_fit, np.asarray(lam_abs), rcond=None)
+        pred = A_fit @ coef
+        ss_res = float(np.sum((np.asarray(lam_abs) - pred) ** 2))
+        ss_tot = float(np.sum((np.asarray(lam_abs) - np.mean(lam_abs)) ** 2))
+        r2 = 1.0 - ss_res / max(ss_tot, 1e-30)
+        print(f"\n  fitting log10(lam at the optimum) = a log10(sigma_min) "
+              f"+ b log10(sigma_max) + c:")
+        print(f"    a = {coef[0]:+.3f}   b = {coef[1]:+.3f}   "
+              f"c = {coef[2]:+.3f}   R^2 = {r2:.3f}")
+        print(f"    For reference, lam ~ sigma_min^2 is (a, b) = (2, 0) and "
+              f"the incumbent lam ~ mean(sigma^2) is closer to (0, 2).")
+        res.record("lambda_exponent_fit",
+                   {"a_sigma_min": float(coef[0]), "b_sigma_max": float(coef[1]),
+                    "c": float(coef[2]), "r2": float(r2), "n": len(lam_abs)})
+        print(f"    n = {len(lam_abs)}.  A two-predictor fit on 21 points is a "
+              f"lead, not a law: what it says is that the optimum is not a "
+              f"constant multiple of lam_0, and roughly which direction the "
+              f"correction runs.")
+    else:
+        print("\n  None of them survives a bootstrap that excludes zero with "
+              "|r| > 0.5.")
+        print("  On this sample the optimal ridge is NOT predictable from the "
+              "basis's own conditioning, so a constant is the honest choice "
+              "and the measured one is about 30x the incumbent.  n = 21: this "
+              "rules out a strong relationship, not a weak one.")
 
     point, lo, hi = bootstrap_ci(
         [a - b for a, b in zip(per_lambda[str(cfg['incumbent_ratio'])]["out"],

@@ -303,8 +303,12 @@ def cmd_train(args) -> int:
     print()
     print(f"  {result.summary()}")
     for medium, basis in result.bases.items():
-        print(f"  discovered axes ({medium}), rank {basis.rank}:")
-        for line in basis.describe()[: basis.rank or 1]:
+        d = basis.diagnostics()
+        print(f"  discovered axes ({medium}), control rank {d['control_rank']}"
+              f" of {d['numerical_rank']} numerical, cond {d['condition']:.1f}"
+              f", {d['n_probes']} probes for {d['n_params']} parameters"
+              f"{' -- UNDERDETERMINED' if d['underdetermined'] else ''}:")
+        for line in basis.describe()[: basis.control_rank or 1]:
             print(f"      {line}")
 
     with open(out / f"{stem}_controller.pkl", "wb") as f:

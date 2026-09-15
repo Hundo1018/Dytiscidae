@@ -47,16 +47,16 @@ within a few hundred generations. The module prefix is `F` fluid, `S` structure,
 | **J-01** | a pulsed jet's pumping work is **100% uncharged**: thrust appears with no reaction torque on the driving joint | **critical** | measured | `experiments/jet_energy` |
 | **F-01** | added mass written into `body_mass` **never reaches the mass matrix** for a jointless machine | **critical** | measured | `experiments/added_mass`, `tests/test_math.py` |
 | **S-01** | hull buckling allowable is **4.8x non-conservative**: the `(t/D)^3` coefficient applied to `(t/r)^3` | **high** | measured | `experiments/analytic_vs_numerical` |
-| **C-07** | the mobility identification is **underdetermined on 5 of 7 seed plans**, and its residual reads exactly zero because of it | **high** | measured | `experiments/rank_threshold` |
+| **C-07** | the mobility identification is **underdetermined on 5 of 7 seed plans**, and its residual reads exactly zero because of it | **high** | measured; now **reported** by `MobilityBasis.underdetermined` and in telemetry, not fixed | `experiments/rank_threshold` |
 | **C-08** | the identified **parameter-side directions do not survive a reseed** (68-85 degree principal angles); the twist-side ones do | **high** | measured | `experiments/rank_threshold` |
 | **F-03** | wing added mass is **isotropic**, overstating edgewise entrained mass by `(chord/thickness)^2` | **high** | measured | `experiments/added_mass` |
 | **J-02** | jet thrust goes as the **square of the joint rate with no limiter** and no out-of-domain flag | **high** | measured | `experiments/jet_energy` |
 | **F-02** | `reduced_freq` holds the **instantaneous pitch rate**, not the reduced frequency its docstring names | **high** | derived | `derivations/reduced_frequency.md` |
-| **C-09** | the damping `lam` is about **30x too small**; at the incumbent value a command on land is worse than no command | **high** | measured | `experiments/damping_lambda` |
+| **C-09** | the damping `lam` is about **30x too small**, and probably should not be a constant multiple of `lam_0` at all: the optimum fits `sigma_min^0.86 sigma_max^1.29` at R^2 = 0.904 | **high** | measured | `experiments/damping_lambda` |
 | **C-06** | a **diverged probe returns a measured zero** twist rather than a missing observation | medium | derived | `derivations/mobility_jacobian.md` |
 | **F-05** | the stall blend puts **13.8% of the post-stall branch at zero incidence**; the realised lift slope is 11% below the docstring's | medium | measured | `experiments/analytic_vs_numerical` |
 | **C-02** | the twist scaling's three `0.3`s are an **undeclared reference length in metres**, fixed across bodies of different size | medium | measured | `experiments/dimensional_check` |
-| **C-03** | `rank = #{sigma > 0.08 sigma_0}` is an engineering threshold presented as a numerical rank; the identification's own noise floor is `1.13 sigma_0` | medium | measured | `experiments/rank_threshold` |
+| **C-03** | `rank` was an engineering threshold presented as a numerical rank | medium | **CLOSED** — split into `numerical_rank`, `control_rank` and a settable `authority_threshold`; the identification's own noise floor of `1.13 sigma_0` is documented on both | `dytiscidae/control/cpg.py` |
 | **C-04** | a saturated intent delivers `sigma^2/(sigma^2+lam)` of a body's reach, not all of it -- 55% on a weak axis | medium | tested | `tests/test_math.py` |
 | **F-06** | `CL_MAX = 1.8` is declared as "the largest CL the strip model will produce"; the model peaks at **2.280** | medium | tested | `tests/test_math.py` |
 | **C-10** | the frequency mode's authority scales with `probe_time`, which nothing asserts is equal across the two identification paths | medium | measured | `experiments/analytic_vs_numerical` |
