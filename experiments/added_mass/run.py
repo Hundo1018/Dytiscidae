@@ -165,21 +165,41 @@ def run(cfg: dict) -> ExperimentResult:
     lost = q1["no joints (one free body)"]
     kept = q1["one hinge added"]
     ratio = kept["effective_mass"] / max(lost["effective_mass"], 1e-12)
-    print(f"\n    The jointless model discards all "
-          f"{lost['bookkept_added_mass']:.2f} kg of entrained water: its "
-          f"effective mass is {lost['effective_mass']:.2f} kg against "
-          f"{kept['effective_mass']:.2f} kg for the same body with one hinge "
-          f"in it, a factor of {ratio:.2f}.")
-    print(f"    Mechanism: MuJoCo marks a body 'simple' when nothing is jointed "
-          f"to it and takes those DOFs' mass from the compile-time constant "
-          f"`dof_M0`, so a runtime `body_mass` edit never reaches them.  "
-          f"`mj_setConst` is what rebuilds it and nothing in this project "
-          f"calls it.")
-    print(f"    This project has produced jointless designs before: arch33's "
-          f"mission champion had zero actuated degrees of freedom.  In water "
-          f"such a design accelerates {ratio:.2f}x more easily than the "
-          f"physics the solver computed, for free, and every diagnostic in "
-          f"the project reports the added mass as applied.")
+    shortfall = 1.0 - (lost["dynamic_added_mass"]
+                       / max(lost["bookkept_added_mass"], 1e-12))
+    print()
+    if abs(shortfall) < 0.01:
+        print(f"    Both reach the integrator.  The jointless model applies "
+              f"{lost['dynamic_added_mass']:.2f} kg of the "
+              f"{lost['bookkept_added_mass']:.2f} kg it bookkeeps, and its "
+              f"effective mass of {lost['effective_mass']:.2f} kg matches the "
+              f"{kept['effective_mass']:.2f} kg of the same body with a hinge "
+              f"in it to a factor of {ratio:.3f}.")
+        print(f"    This is F-01 closed.  MuJoCo marks a body 'simple' when "
+              f"nothing is jointed to it and takes those DOFs' mass from the "
+              f"compile-time constant `dof_M0`; a runtime `body_mass` edit "
+              f"does not reach them until the constants are rebuilt. "
+              f"`FluidSolver._publish_inertia` now rebuilds them, gated on "
+              f"whether the model needs it, so a machine with joints pays "
+              f"nothing.")
+    else:
+        print(f"    The jointless model discards "
+              f"{100 * shortfall:.1f}% of the "
+              f"{lost['bookkept_added_mass']:.2f} kg of entrained water it "
+              f"bookkeeps: its effective mass is "
+              f"{lost['effective_mass']:.2f} kg against "
+              f"{kept['effective_mass']:.2f} kg for the same body with one "
+              f"hinge in it, a factor of {ratio:.2f}.")
+        print(f"    Mechanism: MuJoCo marks a body 'simple' when nothing is "
+              f"jointed to it and takes those DOFs' mass from the "
+              f"compile-time constant `dof_M0`, so a runtime `body_mass` edit "
+              f"never reaches them.  `mj_setConst` is what rebuilds it.")
+        print(f"    This project has produced jointless designs: arch33's "
+              f"mission champion had zero actuated degrees of freedom.  In "
+              f"water such a design accelerates {ratio:.2f}x more easily than "
+              f"the physics the solver computed, for free, and every "
+              f"diagnostic reports the added mass as applied.")
+    res_shortfall = shortfall
 
     # ------------------------------------------------------------------ Q2
     print("\nQ2. is the wing branch anisotropic?")
@@ -224,6 +244,7 @@ def run(cfg: dict) -> ExperimentResult:
 
     res.record("q1_reaches_dynamics", q1)
     res.record("q1_jointless_mass_ratio", float(ratio))
+    res.record("q1_jointless_added_mass_shortfall", float(res_shortfall))
     res.record("q2_directions", q2)
     res.record("q2_strip_theory_kg", theory)
     res.record("q2_wing_edgewise_overstatement", float(over))

@@ -44,8 +44,8 @@ within a few hundred generations. The module prefix is `F` fluid, `S` structure,
 
 | id | finding | risk | status | reproduce with |
 |---|---|---|---|---|
-| **J-01** | a pulsed jet's pumping work is **100% uncharged**: thrust appears with no reaction torque on the driving joint | **critical** | measured | `experiments/jet_energy` |
-| **F-01** | added mass written into `body_mass` **never reaches the mass matrix** for a jointless machine | **critical** | measured | `experiments/added_mass`, `tests/test_math.py` |
+| ~~**J-01**~~ | a pulsed jet's pumping work was **100% uncharged**: thrust appeared with no reaction torque on the driving joint | was critical | **CLOSED** — the reaction is applied as joint damping; `tau*omega == p*Q` holds to 3.5e-4 | `tests/test_jet_energy.py` |
+| ~~**F-01**~~ | added mass written into `body_mass` **never reached the mass matrix** for a jointless machine | was critical | **CLOSED** — `FluidSolver._publish_inertia` rebuilds the derived constants where the model needs them | `tests/test_added_mass.py` |
 | **S-01** | hull buckling allowable is **4.8x non-conservative**: the `(t/D)^3` coefficient applied to `(t/r)^3` | **high** | measured | `experiments/analytic_vs_numerical` |
 | **C-07** | the mobility identification is **underdetermined on 5 of 7 seed plans**, and its residual reads exactly zero because of it | **high** | measured | `experiments/rank_threshold` |
 | **C-08** | the identified **parameter-side directions do not survive a reseed** (68-85 degree principal angles); the twist-side ones do | **high** | measured | `experiments/rank_threshold` |
@@ -72,7 +72,7 @@ within a few hundred generations. The module prefix is `F` fluid, `S` structure,
 
 ---
 
-## The critical two
+## The critical two, both now closed
 
 ### J-01 -- a pulsed jet produces thrust and nothing pays for the water
 
@@ -96,9 +96,17 @@ so the search could discover a medusa. Every previous instance of this pattern
 in the project's history took a few hundred generations to be found and
 exploited.
 
-The fix is one term: `tau_reaction = p * dV/dtheta`, opposing the contraction,
-which the existing battery accounting then picks up unchanged — and which makes
-the orifice trade the `jet.py` docstring argues for actually exist.
+**Closed.** The fix is one term: `tau = p * |dV/dtheta|`, opposing the
+contraction, which the existing battery accounting picks up unchanged through
+`data.actuator_force`. It is applied as joint *damping* rather than an explicit
+torque: `tau = -c(omega) omega` with `c` running into hundreds of N.m.s/rad
+against a bell inertia of thousandths of a kg.m^2, and the explicit form
+diverges for the same reason added mass does — the first attempt reached a jet
+velocity of 7.4e6 m/s in four seconds. `tests/test_jet_energy.py` pins
+`tau*omega == p*Q` to 3.5e-4 and `P_actuator >= P_jet`. It also created the
+orifice-and-rate optimum the module docstring has always claimed exists:
+thrust per joule now peaks at 2 Hz where before more frequency was always more
+thrust at zero cost.
 
 ### F-01 -- a jointless machine swims with none of its entrained water
 
@@ -127,8 +135,20 @@ actuated degrees of freedom — and for those, water costs nothing to accelerate
 through while every diagnostic reports the added mass as applied.
 
 `tests/test_physics.py::test_added_mass_is_anisotropic` reads
-`model.body_mass[bid]` back and checks the bookkeeping. That is the gap: nothing
-asked MuJoCo what it did with the number.
+`model.body_mass[bid]` back and checks the bookkeeping. That was the gap:
+nothing asked MuJoCo what it did with the number.
+
+**Closed.** `FluidSolver._publish_inertia` is now the single place the
+augmented inertia is written, and it rebuilds MuJoCo's derived constants
+(`dof_M0`, `body_subtreemass` and the inverse weights) where the model needs
+them. Two details made it non-trivial: the rebuild is gated on whether any
+panel-carrying body is `simple`, because no seed plan has one and a real
+machine must pay nothing; and it is handed a throwaway `MjData`, because
+`mj_setConst(model, data)` resets `data` to `qpos0` — called on the live state
+it would teleport the machine back to spawn every step, silently.
+`tests/test_added_mass.py` checks `M` itself with `mj_fullM`, not the getter,
+and that scaling the added mass changes the trajectory by the ratio the two
+masses imply (0.27200 measured against 0.27149).
 
 ---
 

@@ -1,9 +1,9 @@
 {
   "experiment": "added_mass",
   "ok": true,
-  "commit": "65e21d5429c88c28b4b397f62e721b487b907c62-dirty",
-  "when": "2026-09-14T13:15:23Z",
-  "elapsed_s": 0.339,
+  "commit": "8550c2994f57d4921f4e97430e815b8362551272-dirty",
+  "when": "2026-09-15T00:15:09Z",
+  "elapsed_s": 0.196,
   "python": "3.11.15",
   "numpy": "2.4.6",
   "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",
@@ -27,8 +27,8 @@
         "dry_mass": 12.0,
         "body_mass_after_apply": 44.201324699295384,
         "bookkept_added_mass": 32.201324699295384,
-        "effective_mass": 12.0,
-        "dynamic_added_mass": 0.0,
+        "effective_mass": 44.201324699295384,
+        "dynamic_added_mass": 32.201324699295384,
         "force_limiter_engaged": false,
         "body_simple": [
           1,
@@ -51,7 +51,8 @@
         "nv": 7
       }
     },
-    "q1_jointless_mass_ratio": 3.683527058274615,
+    "q1_jointless_mass_ratio": 1.000022623756342,
+    "q1_jointless_added_mass_shortfall": 0.0,
     "q2_directions": {
       "WING": {
         "chord (+X)": {

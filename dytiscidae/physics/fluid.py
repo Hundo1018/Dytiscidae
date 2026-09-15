@@ -376,6 +376,33 @@ class FluidSolver:
             r = panels.pos_local[sel] - model.body_ipos[b]
             self._lever2[b] = float(np.mean(np.sum(r**2, axis=1)))
 
+        # Whether this model needs MuJoCo's derived constants rebuilt after the
+        # mass edit below.
+        #
+        # `body_mass` is an input to `cinert`, which `mj_crb` turns into the
+        # mass matrix -- except for bodies MuJoCo has marked `simple`, whose
+        # DOFs take their mass from `dof_M0`, a constant computed when the
+        # model was compiled.  A body is simple when nothing is jointed to it,
+        # which for this project means a machine with no actuated degrees of
+        # freedom: exactly the degenerate designs the search keeps producing.
+        # For those, writing into `body_mass` updated `cinert` and never
+        # reached `M`, so the machine swam with none of its entrained water --
+        # measured at +32.20 kg bookkept against +0.00 kg applied.
+        #
+        # `mj_setConst` rebuilds `dof_M0` and the other derived constants, and
+        # costs 1.8 us with a reused scratch.  It is gated on detection because
+        # no panel-carrying body of any seed plan is simple, so a real machine
+        # pays nothing: it is only the jointless case that needs it.
+        #
+        # The scratch `MjData` is not optional.  `mj_setConst(model, data)`
+        # leaves `data` at `qpos0` -- it resets the simulation state -- so it
+        # must be handed a throwaway.
+        self._needs_const = bool(
+            len(panels.body_id)
+            and np.any(model.body_simple[np.unique(panels.body_id)])
+        )
+        self._const_scratch = None
+
         # Previous normal velocity and added mass, for the slam *diagnostic*.
         self._prev_vn = np.zeros(panels.n)
         self._prev_ma = np.zeros(panels.n)
@@ -397,6 +424,21 @@ class FluidSolver:
         self._vel6 = np.zeros(6)
         self._bodies = np.unique(panels.body_id)
 
+    def _publish_inertia(self, mass: np.ndarray, inertia: np.ndarray) -> None:
+        """Write the augmented inertia into the model so the solver uses it.
+
+        The write is the easy half.  The other half is making sure MuJoCo
+        derives the mass matrix from it -- see `_needs_const` in `__init__`.
+        """
+        self.model.body_mass[:] = mass
+        self.model.body_inertia[:] = inertia
+        if self._needs_const:
+            import mujoco
+
+            if self._const_scratch is None:
+                self._const_scratch = mujoco.MjData(self.model)
+            mujoco.mj_setConst(self.model, self._const_scratch)
+
     def reset(self) -> None:
         self._prev_vn[:] = 0.0
         self._prev_ma[:] = 0.0
@@ -404,8 +446,7 @@ class FluidSolver:
         self._primed = False
         # Restore dry inertia: leaving a previous episode's entrained water in
         # the mass matrix would silently make the next episode heavier.
-        self.model.body_mass[:] = self._dry_mass
-        self.model.body_inertia[:] = self._dry_inertia
+        self._publish_inertia(self._dry_mass, self._dry_inertia)
         self.diag = FluidDiagnostics()
 
     # ------------------------------------------------------------------ step
@@ -603,7 +644,10 @@ class FluidSolver:
         #
         # Instead the added mass is folded into the *mass matrix*, which MuJoCo
         # inverts implicitly, so it is unconditionally stable no matter how far
-        # the added mass exceeds the structural mass.  Two corrections come with
+        # the added mass exceeds the structural mass.  Folding it in is done by
+        # `_publish_inertia`, which also rebuilds MuJoCo's derived constants
+        # where the model needs it -- writing `body_mass` is not the same as
+        # MuJoCo using it, and for a jointless machine it was not using it.  Two corrections come with
         # that: MuJoCo would otherwise apply gravity to the added mass (added
         # mass has inertia but no weight), and the translational term also has
         # to appear as rotational inertia about the body's CoM.
@@ -652,10 +696,10 @@ class FluidSolver:
 
         m_body = np.zeros(self._nbody)
         np.add.at(m_body, p.body_id, m_add)
-        self.model.body_mass[:] = self._dry_mass + m_body
-        self.model.body_inertia[:] = self._dry_inertia + (
-            m_body * self._lever2
-        )[:, None]
+        self._publish_inertia(
+            self._dry_mass + m_body,
+            self._dry_inertia + (m_body * self._lever2)[:, None],
+        )
         # Cancel the weight MuJoCo will apply to the entrained fluid.
         F[:, 2] += m_add * GRAVITY
 
