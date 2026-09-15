@@ -18,11 +18,13 @@ bookkeeping. Nothing asks MuJoCo what it did with it.
 
 | model | `body_mass` says | the integrator says | `body_simple` |
 |---|---|---|---|
-| no joints (one free body) | +32.20 kg | **+0.00 kg** | `[1, 1]` |
+| no joints (one free body) | +32.20 kg | **+0.00 kg** *(before the fix)* → **+32.20 kg** *(after)* | `[1, 1]` |
 | one hinge added | +32.20 kg | +32.20 kg | `[1, 0, 0]` |
 
-The jointless model discards all 32.20 kg: its effective mass is 12.00 kg
-against 44.20 kg for the same body with a hinge in it.
+Before the fix the jointless model discarded all 32.20 kg: its effective mass
+was 12.00 kg against 44.20 kg for the same body with a hinge in it. **F-01 is
+now closed** and the run above reports both at 44.20 kg; the history is kept
+here because the mechanism is the point.
 
 **Mechanism.** MuJoCo marks a body `simple` when no joint attaches to it, and
 takes those DOFs' mass from `dof_M0`, a constant computed at compile time. A
@@ -33,8 +35,12 @@ directly:
     edited:   cinert[9]=32.36000 Mdiag=[0.16  0.16  0.16 ]
     setConst: cinert[9]=32.36000 Mdiag=[32.36 32.36 32.36]
 
-`mj_setConst` is what rebuilds it, and nothing in this project calls it — the
-string does not appear anywhere outside the mujoco package itself.
+`mj_setConst` is what rebuilds it, and nothing in this project called it — the
+string did not appear anywhere outside the mujoco package itself.
+`FluidSolver._publish_inertia` now does, gated on whether any panel-carrying
+body is `simple` (none of the seed plans' are, so a real machine pays nothing)
+and handed a throwaway `MjData`, because `mj_setConst(model, data)` resets
+`data` to `qpos0`.
 
 **Why it matters here.** This search has produced jointless designs: arch33's
 mission champion had zero actuated degrees of freedom. Such a machine swims
@@ -88,12 +94,10 @@ direction: folding buys nothing inertially.
 
 ## What would fix each
 
-**F-01.** Either call `mj_setConst(model, data)` after the mass edit — which
-costs a full constant recomputation per step and would want measuring — or
-guarantee every machine has at least one joint, or apply a residual force for
-the `body_simple` DOFs only. The cheapest correct move is probably to assert at
-model build time that no body carrying panels is `simple`, so the failure is
-loud rather than silent.
+**F-01 — done.** `mj_setConst` after the mass edit, gated on detection and
+handed a scratch `MjData`. Measured cost: 1.8 us per call with the scratch
+reused, and zero for every seed plan because none of them triggers it. See
+`tests/test_added_mass.py`.
 
 **F-03.** The bluff branch already computes `Ca_eff = d_hat^T diag(Ca) d_hat`
 from the element's three extents. A wing strip has three extents too

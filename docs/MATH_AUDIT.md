@@ -44,14 +44,14 @@ within a few hundred generations. The module prefix is `F` fluid, `S` structure,
 
 | id | finding | risk | status | reproduce with |
 |---|---|---|---|---|
-| **J-01** | a pulsed jet's pumping work is **100% uncharged**: thrust appears with no reaction torque on the driving joint | **critical** | measured | `experiments/jet_energy` |
-| **F-01** | added mass written into `body_mass` **never reaches the mass matrix** for a jointless machine | **critical** | measured | `experiments/added_mass`, `tests/test_math.py` |
+| ~~**J-01**~~ | a pulsed jet's pumping work was **100% uncharged**: thrust appeared with no reaction torque on the driving joint | was critical | **CLOSED** — the reaction is applied as joint damping; `tau*omega == p*Q` holds to 3.5e-4 | `tests/test_jet_energy.py` |
+| ~~**F-01**~~ | added mass written into `body_mass` **never reached the mass matrix** for a jointless machine | was critical | **CLOSED** — `FluidSolver._publish_inertia` rebuilds the derived constants where the model needs them | `tests/test_added_mass.py` |
 | **S-01** | hull buckling allowable is **4.8x non-conservative**: the `(t/D)^3` coefficient applied to `(t/r)^3` | **high** | measured | `experiments/analytic_vs_numerical` |
 | **C-07** | the mobility identification is **underdetermined on 5 of 7 seed plans**, and its residual reads exactly zero because of it | **high** | measured | `experiments/rank_threshold` |
 | **C-08** | the identified **parameter-side directions do not survive a reseed** (68-85 degree principal angles); the twist-side ones do | **high** | measured | `experiments/rank_threshold` |
 | **F-03** | wing added mass is **isotropic**, overstating edgewise entrained mass by `(chord/thickness)^2` | **high** | measured | `experiments/added_mass` |
 | **J-02** | jet thrust goes as the **square of the joint rate with no limiter** and no out-of-domain flag | **high** | measured | `experiments/jet_energy` |
-| **F-02** | `reduced_freq` holds the **instantaneous pitch rate**, not the reduced frequency its docstring names | **high** | derived | `derivations/reduced_frequency.md` |
+| **F-02** | the leading-edge-vortex term keys on the **instantaneous pitch rate**, not the reduced frequency its docstring named | **high** | **half closed** — named correctly now, measured at a 157% spread across one stroke; the model choice is open | `tests/test_reduced_frequency.py` |
 | **C-09** | the damping `lam` is about **30x too small**; at the incumbent value a command on land is worse than no command | **high** | measured | `experiments/damping_lambda` |
 | **C-06** | a **diverged probe returns a measured zero** twist rather than a missing observation | medium | derived | `derivations/mobility_jacobian.md` |
 | **F-05** | the stall blend puts **13.8% of the post-stall branch at zero incidence**; the realised lift slope is 11% below the docstring's | medium | measured | `experiments/analytic_vs_numerical` |
@@ -72,7 +72,7 @@ within a few hundred generations. The module prefix is `F` fluid, `S` structure,
 
 ---
 
-## The critical two
+## The critical two, both now closed
 
 ### J-01 -- a pulsed jet produces thrust and nothing pays for the water
 
@@ -96,9 +96,17 @@ so the search could discover a medusa. Every previous instance of this pattern
 in the project's history took a few hundred generations to be found and
 exploited.
 
-The fix is one term: `tau_reaction = p * dV/dtheta`, opposing the contraction,
-which the existing battery accounting then picks up unchanged — and which makes
-the orifice trade the `jet.py` docstring argues for actually exist.
+**Closed.** The fix is one term: `tau = p * |dV/dtheta|`, opposing the
+contraction, which the existing battery accounting picks up unchanged through
+`data.actuator_force`. It is applied as joint *damping* rather than an explicit
+torque: `tau = -c(omega) omega` with `c` running into hundreds of N.m.s/rad
+against a bell inertia of thousandths of a kg.m^2, and the explicit form
+diverges for the same reason added mass does — the first attempt reached a jet
+velocity of 7.4e6 m/s in four seconds. `tests/test_jet_energy.py` pins
+`tau*omega == p*Q` to 3.5e-4 and `P_actuator >= P_jet`. It also created the
+orifice-and-rate optimum the module docstring has always claimed exists:
+thrust per joule now peaks at 2 Hz where before more frequency was always more
+thrust at zero cost.
 
 ### F-01 -- a jointless machine swims with none of its entrained water
 
@@ -127,8 +135,20 @@ actuated degrees of freedom — and for those, water costs nothing to accelerate
 through while every diagnostic reports the added mass as applied.
 
 `tests/test_physics.py::test_added_mass_is_anisotropic` reads
-`model.body_mass[bid]` back and checks the bookkeeping. That is the gap: nothing
-asked MuJoCo what it did with the number.
+`model.body_mass[bid]` back and checks the bookkeeping. That was the gap:
+nothing asked MuJoCo what it did with the number.
+
+**Closed.** `FluidSolver._publish_inertia` is now the single place the
+augmented inertia is written, and it rebuilds MuJoCo's derived constants
+(`dof_M0`, `body_subtreemass` and the inverse weights) where the model needs
+them. Two details made it non-trivial: the rebuild is gated on whether any
+panel-carrying body is `simple`, because no seed plan has one and a real
+machine must pay nothing; and it is handed a throwaway `MjData`, because
+`mj_setConst(model, data)` resets `data` to `qpos0` — called on the live state
+it would teleport the machine back to spawn every step, silently.
+`tests/test_added_mass.py` checks `M` itself with `mj_fullM`, not the getter,
+and that scaling the added mass changes the trajectory by the ratio the two
+masses imply (0.27200 measured against 0.27149).
 
 ---
 
@@ -251,7 +271,21 @@ The same `omega_s` is used, correctly, for the Kramer rotational force on the
 following lines. One quantity, two roles, right in one of them.
 
 This is worth a factor of two in lift: at 25 degrees, `lev = 1` raises `CL` from
-0.941 to 1.898.
+0.941 to 1.898 — measured 2.02x.
+
+**Half closed.** The variable is now `reduced_pitch_rate`, the docstring states
+`kappa = |alpha_dot| c / (2U)` and says in terms what it is not, and
+`tests/test_reduced_frequency.py` measures the difference: over one stroke at
+`k = 0.1728`, `kappa` runs 0 to 0.1210, a **157% spread of its own mean**, zero
+at both extremes, following `alpha_0 |cos(Omega t)| k` to 2.8e-17. **No number
+changed.**
+
+The model choice is deliberately left open, because keying the LEV on something
+else changes `CL` on every wing by up to 2.02x. `derivations/
+reduced_frequency.md` costs the three options: leave it, plumb the CPG
+frequency into the solver, or give the LEV a history variable (non-dimensional
+travel since reversal, the Wagner / Beddoes-Leishman treatment). The third is
+right and is the largest change in that document.
 
 ### F-03 -- wing added mass has no direction in it
 

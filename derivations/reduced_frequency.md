@@ -173,12 +173,18 @@ frequency in it at all.
 ## Validation
 
 * **Dimensions**: `experiments/dimensional_check` — passes.
-* **The `alpha_0 |cos|` relation**: algebra above; not yet measured against a
-  rollout of a real machine. What that measurement would be: record `omega_s`,
-  `U` and `chord` per strip over one stroke of a flapping elite and plot
-  `kappa(t)` against the constant `k` of the same stroke. Nothing in the project
-  records those three together today, which is why this section says "not
-  measured" rather than quoting a number.
+* **The `alpha_0 |cos|` relation**: measured in
+  `tests/test_reduced_frequency.py`, which drives a strip through a full
+  sinusoidal stroke at `k = 0.1728` and reads the quantity the solver forms.
+  It follows `alpha_0 |cos(Omega t)| k` to 2.8e-17, runs from 0 to 0.1210
+  against the constant 0.1728 — **a spread of 157% of its own mean** — and is
+  zero at both stroke extremes. Halving the pitch amplitude halves it at the
+  same `k`, so two wings at the same reduced frequency get different
+  leading-edge-vortex credit if their pitch amplitudes differ.
+* **The scalings both quantities share**: same file. `kappa` is proportional to
+  `1/U` and to the chord and to the rate in its numerator, each to a log-log
+  slope of 1.000000000000, and is invariant under a similarity rescale to
+  1e-15. Whatever else is true, it is a dimensionless reduced rate.
 * **The consequence for lift**: `lift_coefficient` is a function of `lev`, so
   the sensitivity is measurable offline without any rollout —
   `experiments/analytic_vs_numerical` already measures that `lev = 1` raises
@@ -200,5 +206,30 @@ frequency in it at all.
   is in that regime, so the error is never visible in the telemetry. A cheap
   fix would be to record `max(kappa)` per rollout beside `max_alpha`, which
   `FluidDiagnostics` already does for incidence.
+
+## What a fix would have to choose between
+
+The naming is corrected; the model is not, because changing what the LEV term
+keys on changes `CL` on every wing in the project by up to **2.02x** (measured
+at 25 degrees of incidence) and that is a decision about the physics, not a
+defect to patch. Three options, with what each costs:
+
+1. **Leave `kappa`, documented as it now is.** Zero change to any score. The
+   model keeps a leading-edge vortex whose strength collapses at stroke
+   reversal, which is backwards, and carries a pitch-amplitude dependence the
+   reduced frequency does not have.
+2. **Feed the true `k = Omega c / (2U)`.** `Omega` is the CPG's flapping
+   frequency, which the solver does not know: it sees only instantaneous
+   kinematics. Plumbing it down couples the fluid model to the controller,
+   which is a real architectural cost, and it is wrong for any surface not
+   being driven at the CPG frequency.
+3. **Give the LEV a history variable.** The standard treatment
+   (Wagner, Beddoes-Leishman) indexes vortex growth on the *non-dimensional
+   travel* since the last reversal, in chord lengths. That is the physically
+   right answer and it makes the solver stateful per strip, which it currently
+   is not except for the slam diagnostic.
+
+Option 3 is the one that would make a flapping wing's lift behave like a
+flapping wing's lift. It is also the largest change in this document.
 * **Compressibility.** `k` assumes incompressible flow. Irrelevant at this
   project's speeds; recorded so nobody re-derives it later.
