@@ -112,22 +112,23 @@ CHECKS: list[Check] = [
         lambda: (0.5 * rho_w * U**2) * S_area * Q.of(1.1),
     ),
     Check(
-        "reduced frequency  k = |omega_s| c / (2 U)",
+        "reduced pitch rate  kappa = |alpha_dot| c / (2 U)",
         "dytiscidae/physics/fluid.py",
-        "reduced_freq = np.abs(omega_s) * p.chord / (2.0 * U_safe)",
+        "reduced_pitch_rate = np.abs(omega_s) * p.chord / (2.0 * U_safe)",
         ONE,
         lambda: abs(alpha_rate) * c / (2.0 * U),
-        note="dimensionally a reduced frequency; kinematically a reduced "
-             "*pitch rate* -- omega_s is the instantaneous rate about the span "
-             "axis, not the flapping angular frequency.  See MATH_AUDIT F-02.",
+        note="dimensionally a reduced rate, and now named for the quantity it "
+             "holds: omega_s is the instantaneous rate about the span axis, "
+             "not the flapping angular frequency.  Whether the LEV term should "
+             "key on it at all is MATH_AUDIT F-02.",
     ),
     Check(
-        "LEV blend  lev = clip(k / 0.30, 0, 1)",
+        "LEV blend  lev = clip(kappa / 0.30, 0, 1)",
         "dytiscidae/physics/fluid.py",
-        "lev = np.clip(reduced_freq / 0.30, 0.0, 1.0)",
+        "lev = np.clip(reduced_pitch_rate / 0.30, 0.0, 1.0)",
         ONE,
         lambda: abs(alpha_rate) * c / (2.0 * U) / Q.of(0.30),
-        implicit_unit="none -- 0.30 is a reduced frequency, correctly dimensionless",
+        implicit_unit="none -- 0.30 is a reduced rate, correctly dimensionless",
     ),
     Check(
         "stall angle  alpha_stall = 11 deg + 26 deg * lev",
@@ -283,9 +284,35 @@ CHECKS: list[Check] = [
     Check(
         "jet thrust  rho Q^2 / A",
         "dytiscidae/physics/jet.py",
-        "thrust_mag = coeff * rho * q * np.abs(q) / np.maximum(self.orifice_area, 1e-6)",
+        "thrust_mag = coeff * rho * q * np.abs(q) / area",
         FORCE,
         lambda: rho_w * Q_flow * abs(Q_flow) / A_orifice,
+    ),
+    Check(
+        "jet pumping power, as the docstring states it",
+        "dytiscidae/physics/jet.py",
+        "P_pump = p * Q = 0.5 * rho * Q^3 / A^2 = 0.5 * m_dot * v_e^2",
+        POWER,
+        lambda: Q.of(0.5) * rho_w * Q_flow**3 / A_orifice**2,
+        note="anchored to the module docstring rather than to a line of code, "
+             "because the implementation folds this into a damping "
+             "coefficient and never forms the pressure as a named variable.  "
+             "A documented relation is source too, and a docstring that "
+             "drifts from its own dimensions is worth catching.",
+    ),
+    Check(
+        "jet pumping load  c = 0.5 rho (dV/dtheta)^3 |omega| / A^2",
+        "dytiscidae/physics/jet.py",
+        "c_pump = (coeff * 0.5 * rho * dv_dtheta**3 * np.abs(omega) * subf",
+        MOMENT * S,
+        lambda: Q.of(1.0) * Q.of(0.5) * rho_w
+        * Q.of(1.5e-3, M3) ** 3 * omega * Q.of(0.8) / A_orifice**2,
+        note="a damping coefficient, N.m.s per radian.  dV/dtheta is a volume "
+             "per radian and radian is dimensionless, so it carries m^3; the "
+             "cube of it over an area squared leaves m^5, and rho times that "
+             "over a second is N.m.s.  It is applied through `dof_damping` "
+             "rather than as an explicit torque because the explicit form "
+             "diverges -- see the module docstring.",
     ),
     Check(
         "jet volume rate from joint rate  -V0 f omega / span",

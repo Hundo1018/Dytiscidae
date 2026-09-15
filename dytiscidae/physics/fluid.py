@@ -23,7 +23,7 @@ Each lifting surface is discretised into spanwise strips.  For strip *i*:
     alpha  = atan2(v_2d . n_hat, v_2d . c_hat)  (angle of attack)
     q      = 0.5 * rho * |v_2d|^2
 
-    L      = q * dS * CL(alpha, Re, AR, k)  along  (s_hat x d_hat)
+    L      = q * dS * CL(alpha, Re, AR, kappa)  along  (s_hat x d_hat)
     D      = q * dS * CD(alpha, Re, AR, CL)  along  d_hat
     F_rot  = C_rot * rho * |v_2d| * omega_s * c^2 * dr   along the lift axis
     F_am   = -d(m_added * v_normal)/dt                   along n_hat
@@ -254,7 +254,8 @@ def skin_friction_cd(re: np.ndarray) -> np.ndarray:
 
 
 def lift_coefficient(
-    alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, reduced_freq: np.ndarray
+    alpha: np.ndarray, re: np.ndarray, ar: np.ndarray,
+    reduced_pitch_rate: np.ndarray
 ) -> np.ndarray:
     """Lift coefficient spanning attached, LEV-augmented and post-stall regimes.
 
@@ -262,14 +263,34 @@ def lift_coefficient(
     lift-slope correction ``2*pi / (1 + 2/AR)``.  Above stall it behaves like a
     flat plate, ``CL_max * sin(2*alpha)``.
 
-    ``CL_max`` and the stall angle are both raised by the reduced frequency
-    ``k = omega * c / (2 * U)``.  This is the leading-edge-vortex term: a wing
-    that is flapping fast relative to its own translation carries a stable LEV
-    and keeps generating lift far past the static stall angle, which is the
-    whole reason flapping flight is competitive at this scale.  A gliding wing
-    (k -> 0) gets the conventional static behaviour.
+    ``CL_max`` and the stall angle are both raised by the **reduced pitch
+    rate**
+
+        kappa = |alpha_dot| * c / (2 * U)
+
+    This is the leading-edge-vortex term: a wing that is pitching fast relative
+    to its own translation carries a stable LEV and keeps generating lift far
+    past the static stall angle, which is the whole reason flapping flight is
+    competitive at this scale.  A gliding wing (kappa -> 0) gets the
+    conventional static behaviour.
+
+    **`kappa` is not the reduced frequency, and this used to say it was.**
+    The reduced frequency `k = Omega c / (2U)` is a constant of an oscillation;
+    `kappa` is instantaneous.  For `alpha(t) = alpha_0 sin(Omega t)` they are
+    related by `kappa = alpha_0 |cos(Omega t)| k`, so `kappa` carries a pitch
+    amplitude that `k` does not and falls to zero at both stroke extremes --
+    where a vortex that grew over the preceding half-stroke is largest.
+    Measured over one stroke at `k = 0.1728`, `kappa` runs 0 to 0.121, a spread
+    of 157% of its own mean.
+
+    Both are legitimate dimensionless groups and `kappa` is the standard
+    variable in dynamic-stall correlations, so this is a naming correction, not
+    a model change: nothing here computes a different number than it did.
+    Whether the LEV should key on a history variable instead is
+    `docs/MATH_AUDIT.md` F-02, and `tests/test_reduced_frequency.py` measures
+    the difference.
     """
-    lev = np.clip(reduced_freq / 0.30, 0.0, 1.0)
+    lev = np.clip(reduced_pitch_rate / 0.30, 0.0, 1.0)
 
     cl_max = 1.10 + 0.80 * lev  # 1.1 static flat plate -> 1.9 with a strong LEV
     alpha_stall = np.radians(11.0 + 26.0 * lev)  # 11 deg static -> 37 deg flapping
@@ -376,6 +397,33 @@ class FluidSolver:
             r = panels.pos_local[sel] - model.body_ipos[b]
             self._lever2[b] = float(np.mean(np.sum(r**2, axis=1)))
 
+        # Whether this model needs MuJoCo's derived constants rebuilt after the
+        # mass edit below.
+        #
+        # `body_mass` is an input to `cinert`, which `mj_crb` turns into the
+        # mass matrix -- except for bodies MuJoCo has marked `simple`, whose
+        # DOFs take their mass from `dof_M0`, a constant computed when the
+        # model was compiled.  A body is simple when nothing is jointed to it,
+        # which for this project means a machine with no actuated degrees of
+        # freedom: exactly the degenerate designs the search keeps producing.
+        # For those, writing into `body_mass` updated `cinert` and never
+        # reached `M`, so the machine swam with none of its entrained water --
+        # measured at +32.20 kg bookkept against +0.00 kg applied.
+        #
+        # `mj_setConst` rebuilds `dof_M0` and the other derived constants, and
+        # costs 1.8 us with a reused scratch.  It is gated on detection because
+        # no panel-carrying body of any seed plan is simple, so a real machine
+        # pays nothing: it is only the jointless case that needs it.
+        #
+        # The scratch `MjData` is not optional.  `mj_setConst(model, data)`
+        # leaves `data` at `qpos0` -- it resets the simulation state -- so it
+        # must be handed a throwaway.
+        self._needs_const = bool(
+            len(panels.body_id)
+            and np.any(model.body_simple[np.unique(panels.body_id)])
+        )
+        self._const_scratch = None
+
         # Previous normal velocity and added mass, for the slam *diagnostic*.
         self._prev_vn = np.zeros(panels.n)
         self._prev_ma = np.zeros(panels.n)
@@ -397,6 +445,21 @@ class FluidSolver:
         self._vel6 = np.zeros(6)
         self._bodies = np.unique(panels.body_id)
 
+    def _publish_inertia(self, mass: np.ndarray, inertia: np.ndarray) -> None:
+        """Write the augmented inertia into the model so the solver uses it.
+
+        The write is the easy half.  The other half is making sure MuJoCo
+        derives the mass matrix from it -- see `_needs_const` in `__init__`.
+        """
+        self.model.body_mass[:] = mass
+        self.model.body_inertia[:] = inertia
+        if self._needs_const:
+            import mujoco
+
+            if self._const_scratch is None:
+                self._const_scratch = mujoco.MjData(self.model)
+            mujoco.mj_setConst(self.model, self._const_scratch)
+
     def reset(self) -> None:
         self._prev_vn[:] = 0.0
         self._prev_ma[:] = 0.0
@@ -404,8 +467,7 @@ class FluidSolver:
         self._primed = False
         # Restore dry inertia: leaving a previous episode's entrained water in
         # the mass matrix would silently make the next episode heavier.
-        self.model.body_mass[:] = self._dry_mass
-        self.model.body_inertia[:] = self._dry_inertia
+        self._publish_inertia(self._dry_mass, self._dry_inertia)
         self.diag = FluidDiagnostics()
 
     # ------------------------------------------------------------------ step
@@ -478,9 +540,13 @@ class FluidSolver:
         # project trimmed at an absurd attitude or not at all.
         alpha = alpha + 2.0 * p.camber
 
-        # Angular rate about the span axis -> reduced frequency and Kramer lift.
+        # Angular rate about the span axis.  This is the strip's *pitch* rate,
+        # and it drives two different things below: the reduced pitch rate that
+        # indexes the leading-edge vortex, and the Kramer rotational force,
+        # which wants the pitch rate and is the one of the two this variable
+        # was always right for.
         omega_s = np.einsum("ni,ni->n", omega, s_hat)
-        reduced_freq = np.abs(omega_s) * p.chord / (2.0 * U_safe)
+        reduced_pitch_rate = np.abs(omega_s) * p.chord / (2.0 * U_safe)
 
         is_wing = p.kind == WING
         lift_axis = _cross3(s_hat, d_hat)
@@ -489,7 +555,10 @@ class FluidSolver:
         F = np.zeros((p.n, 3))
 
         # Circulatory lift and drag, on the lifting strips only.
-        cl = np.where(is_wing, lift_coefficient(alpha, re, p.aspect_ratio, reduced_freq), 0.0)
+        cl = np.where(
+            is_wing,
+            lift_coefficient(alpha, re, p.aspect_ratio, reduced_pitch_rate),
+            0.0)
         cd = np.where(is_wing, drag_coefficient(alpha, re, p.aspect_ratio, cl), 0.0)
         L = q * p.area * cl * self.lift_scale
         D = q * p.area * cd * self.cd_scale
@@ -603,7 +672,10 @@ class FluidSolver:
         #
         # Instead the added mass is folded into the *mass matrix*, which MuJoCo
         # inverts implicitly, so it is unconditionally stable no matter how far
-        # the added mass exceeds the structural mass.  Two corrections come with
+        # the added mass exceeds the structural mass.  Folding it in is done by
+        # `_publish_inertia`, which also rebuilds MuJoCo's derived constants
+        # where the model needs it -- writing `body_mass` is not the same as
+        # MuJoCo using it, and for a jointless machine it was not using it.  Two corrections come with
         # that: MuJoCo would otherwise apply gravity to the added mass (added
         # mass has inertia but no weight), and the translational term also has
         # to appear as rotational inertia about the body's CoM.
@@ -652,10 +724,10 @@ class FluidSolver:
 
         m_body = np.zeros(self._nbody)
         np.add.at(m_body, p.body_id, m_add)
-        self.model.body_mass[:] = self._dry_mass + m_body
-        self.model.body_inertia[:] = self._dry_inertia + (
-            m_body * self._lever2
-        )[:, None]
+        self._publish_inertia(
+            self._dry_mass + m_body,
+            self._dry_inertia + (m_body * self._lever2)[:, None],
+        )
         # Cancel the weight MuJoCo will apply to the entrained fluid.
         F[:, 2] += m_add * GRAVITY
 

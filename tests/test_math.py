@@ -300,14 +300,15 @@ def test_added_mass_reaches_the_integrator() -> None:
     dry_s, eff_s = effective_mass(False)
     check("a jointed machine feels its entrained water",
           eff_j > dry_j * 2.0, f"{dry_j:.2f} kg dry -> {eff_j:.2f} kg effective")
-    gap("F-01", "a jointless machine does not feel its entrained water",
-        eff_s < dry_s * 1.01,
-        f"{dry_s:.2f} kg dry -> {eff_s:.2f} kg effective, against "
-        f"{eff_j:.2f} kg for the same body with one hinge in it.  MuJoCo marks "
-        f"a body `simple` when no joint attaches to it and takes those DOFs' "
-        f"mass from `dof_M0`, a compile-time constant, so the runtime "
-        f"`body_mass` edit never reaches the mass matrix.  `mj_setConst` after "
-        f"the edit is what rebuilds it.  See experiments/added_mass.")
+    check("a jointless machine feels it too",
+          eff_s > dry_s * 2.0,
+          f"{dry_s:.2f} kg dry -> {eff_s:.2f} kg effective, matching the "
+          f"{eff_j:.2f} kg of the same body with one hinge in it.  MuJoCo "
+          f"marks a body `simple` when no joint attaches to it and takes those "
+          f"DOFs' mass from `dof_M0`, a compile-time constant, so the runtime "
+          f"`body_mass` edit did not reach the mass matrix until "
+          f"`FluidSolver._publish_inertia` started rebuilding it.  F-01, "
+          f"closed; the detail is in tests/test_added_mass.py.")
 
 
 def test_a_passive_body_cannot_gain_energy() -> None:
