@@ -617,7 +617,14 @@ def _meta(pheno, result, ctrl) -> dict:
         "water": round(seg["water"].competence, 3) if "water" in seg else 0.0,
         "land": round(seg["land"].competence, 3) if "land" in seg else 0.0,
         "max_depth": round(max((s.max_depth for s in seg.values()), default=0.0), 2),
-        "mobility_rank": {k: v.rank for k, v in result.mobility.items()},
+        # `control_rank`, not `rank`: the number of axes worth commanding,
+        # which is a judgement with a threshold behind it.  The conditioning
+        # rides along so a telemetry reader can tell a well-identified basis
+        # from one the damped inverse is carrying.
+        "mobility_rank": {k: v.control_rank for k, v in result.mobility.items()},
+        "mobility_cond": {k: v.condition for k, v in result.mobility.items()},
+        "mobility_underdetermined": {
+            k: v.underdetermined for k, v in result.mobility.items()},
         "mobility_axes": {k: v.describe() for k, v in result.mobility.items()},
         # The basis itself, not just its rank and its description.
         #

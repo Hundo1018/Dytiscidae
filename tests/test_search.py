@@ -83,8 +83,9 @@ def test_mobility_recovers_known_basis() -> None:
     basis = identify_mobility(step_fn, lambda: None, n_params, n_probes=14,
                               rng=np.random.default_rng(1))
 
-    check("the two strong axes are found", basis.rank == 2,
-          f"rank={basis.rank} sigmas={np.round(basis.authority, 3)}")
+    check("the two strong axes are found", basis.control_rank == 2,
+          f"control_rank={basis.control_rank} "
+          f"sigmas={np.round(basis.authority, 3)}")
     check("a 3.6%-authority axis is not claimed as usable",
           basis.authority[2] < 0.08 * basis.authority[0],
           f"sigma2/sigma0={basis.authority[2]/basis.authority[0]:.3f}")
@@ -104,8 +105,9 @@ def test_mobility_recovers_known_basis() -> None:
 
     strong = identify_mobility(step_strong, lambda: None, n_params, n_probes=14,
                                rng=np.random.default_rng(1))
-    check("raising that axis's gain makes it count", strong.rank == 3,
-          f"rank={strong.rank} sigmas={np.round(strong.authority, 3)}")
+    check("raising that axis's gain makes it count", strong.control_rank == 3,
+          f"control_rank={strong.control_rank} "
+          f"sigmas={np.round(strong.authority, 3)}")
 
     check("constant drift is cancelled, not reported as an axis",
           not np.any(np.abs(basis.effects[:, 2]) > 0.97),
@@ -3047,7 +3049,7 @@ def test_sharding_a_generation_does_not_change_a_score() -> None:
             pool.close()
         return ([r.mission_fraction for r in res],
                 [sorted(c.bases or {}) for c in ctrls],
-                [r.mobility["air"].rank for r in res])
+                [r.mobility["air"].control_rank for r in res])
 
     one = run(1)
     many = run(3)

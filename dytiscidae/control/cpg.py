@@ -169,6 +169,13 @@ class MobilityBasis:
         with near-zero authority is an axis this body does not have.
     medium : str
         Which medium the probe was run in.
+
+    Rank comes in three flavours and this class used to offer one called
+    ``rank``, which read like the linear-algebra one and was the engineering
+    one.  They are now named apart: ``numerical_rank`` is the definition,
+    ``control_rank`` is the judgement, and neither is what the identification
+    can resolve -- ``underdetermined`` and ``experiments/rank_threshold``
+    are about that.
     """
 
     modes: np.ndarray
@@ -176,18 +183,101 @@ class MobilityBasis:
     authority: np.ndarray
     medium: str = "air"
     base: np.ndarray | None = None
+    #: The fraction of `sigma_0` below which a mode is not worth commanding.
+    #: A parameter, not a constant: see `control_rank`.
+    authority_threshold: float = 0.08
+    #: How many probes the fit behind this basis had, and what fraction of the
+    #: response a linear model explained.  Zero on a basis unpickled from a run
+    #: that predates them, which is why `underdetermined` guards on it.
+    n_probes: int = 0
+    residual_fraction: float = 0.0
 
     @property
-    def rank(self) -> int:
-        """Number of axes with meaningful authority.
+    def numerical_rank(self) -> int:
+        """Rank in the linear-algebra sense: singular values above the level
+        floating point could have manufactured.
 
-        Thresholded relative to the strongest mode, so it answers "how many
-        genuinely independent things can this machine do" rather than counting
-        numerical noise.
+        `tol = max(shape) * eps * sigma_0`, the standard definition and the one
+        `np.linalg.matrix_rank` uses.  On a fitted `J` this is **almost always
+        full**, which is the point: it says the matrix has no exactly
+        degenerate directions, and nothing about whether any of them mean
+        anything.  For that, see `control_rank` below, and for what the
+        identification can actually resolve, see the note there.
         """
         if len(self.authority) == 0:
             return 0
-        return int(np.sum(self.authority > 0.08 * self.authority[0]))
+        tol = max(self.modes.shape) * np.finfo(float).eps * self.authority[0]
+        return int(np.sum(self.authority > tol))
+
+    @property
+    def control_rank(self) -> int:
+        """How many axes are worth commanding.  An engineering threshold.
+
+        `#{sigma_i > authority_threshold * sigma_0}`.  This is a judgement
+        about usefulness, not a property of the matrix, and it is a parameter
+        rather than a constant because the sweep behind it is smooth: over 84
+        identifications, rank, reconstruction error, control error, condition
+        number and joint excursion are all monotone in the threshold with no
+        knee, and 30.2% of non-leading singular values land within a factor of
+        two of the default -- a real spectral gap would put that near zero.
+
+        Neither this nor `numerical_rank` is the number of axes the
+        identification can *resolve*.  That floor is the seed-to-seed spread of
+        `J` itself, measured at `||dJ||_2 / sigma_0 = 1.132` (95% CI
+        1.039-1.219) across the seed plans -- above `sigma_0`, so by Weyl's
+        inequality no singular value is resolvable from a single
+        identification.  `experiments/rank_threshold` is that measurement, and
+        `underdetermined` below is most of the reason.
+        """
+        if len(self.authority) == 0:
+            return 0
+        return int(np.sum(self.authority > self.authority_threshold
+                          * self.authority[0]))
+
+    @property
+    def condition(self) -> float:
+        """`sigma_0 / sigma_r` over the retained modes.  Infinite if any is 0.
+
+        Reported so a consumer can see whether a basis is worth trusting
+        without re-deriving it.  A large condition number does not say the
+        basis is wrong; it says the damped inverse is doing most of the work.
+        """
+        if len(self.authority) == 0:
+            return float("inf")
+        lo = float(self.authority[-1])
+        return float(self.authority[0]) / lo if lo > 0 else float("inf")
+
+    @property
+    def underdetermined(self) -> bool:
+        """Whether the fit behind this basis had fewer probes than parameters.
+
+        A machine with `n` joints presents `P = 3n+1` parameters.  With fewer
+        probes than that, `lstsq` returns the minimum-norm solution inside the
+        row space of whichever directions were drawn, the residual reads
+        **exactly zero** because an underdetermined system always fits, and a
+        second seed lands in a different subspace.  Measured across the seed
+        plans: the parameter-side directions of two identifications sit 68-85
+        degrees apart, while the twist-side ones sit 30-41 degrees apart and
+        the singular values reproduce to a CV of 0.15-0.21.
+
+        What the machine can do is identified.  How to ask for it is not.
+        """
+        return bool(self.n_probes > 0 and self.n_probes < self.modes.shape[1])
+
+    def diagnostics(self) -> dict:
+        """Everything a consumer needs to judge this basis, in one call."""
+        return {
+            "numerical_rank": self.numerical_rank,
+            "control_rank": self.control_rank,
+            "authority_threshold": float(self.authority_threshold),
+            "condition": self.condition,
+            "sigma_max": float(self.authority[0]) if len(self.authority) else 0.0,
+            "sigma_min": float(self.authority[-1]) if len(self.authority) else 0.0,
+            "n_probes": int(self.n_probes),
+            "n_params": int(self.modes.shape[1]) if self.modes.size else 0,
+            "underdetermined": self.underdetermined,
+            "residual_fraction": float(self.residual_fraction),
+        }
 
     def describe(self) -> list[str]:
         """Human-readable names for the discovered axes.
@@ -306,6 +396,22 @@ class MobilityBasis:
         return A.T @ c[:r]
 
 
+def required_probes(n_params: int, *, margin: float = 1.5) -> int:
+    """Probes needed for the mobility fit to be determined, with headroom.
+
+    `P = 3n+1` parameters need more than `P` probes for `lstsq` to be solving
+    rather than choosing, and a system that is only just determined can still
+    be badly conditioned -- hence the margin.  Five of the seven seed plans sit
+    below this at the current default of 24: medusa presents 49 parameters,
+    teal 31, ray 28, bat and gannet 25.
+
+    Nothing calls this to set a default yet.  Raising `n_probes` changes every
+    identification and therefore every score, so it is a measurement to run
+    before it is a change to make.
+    """
+    return int(np.ceil(margin * max(int(n_params), 1)))
+
+
 def identify_mobility(
     step_fn,
     reset_fn,
@@ -379,13 +485,23 @@ def basis_from_probes(deltas, responses, *, medium: str = "air",
     J, *_ = np.linalg.lstsq(deltas, Y, rcond=None)  # (n_params, 6)
     U, S, Vt = np.linalg.svd(J, full_matrices=False)  # U:(P,k) S:(k,) Vt:(k,6)
 
+    # How much of the response a linear J explains at all.  Carried on the
+    # basis because a reader of a stored elite has no other way to ask, and
+    # because it reads exactly zero when the fit is underdetermined -- which
+    # is the opposite of what a zero residual usually means.
+    resid = Y - deltas @ J
+    residual_fraction = float(
+        np.linalg.norm(resid) / max(np.linalg.norm(Y), 1e-30))
+
     r = min(max_modes, len(S))
     modes = U[:, :r].T  # (r, P) parameter-space directions
     effects = Vt[:r]  # (r, 6) twist directions
     # Normalise the effect rows so they read as directions.
     norms = np.linalg.norm(effects, axis=1, keepdims=True)
     effects = effects / np.maximum(norms, 1e-12)
-    return MobilityBasis(modes=modes, effects=effects, authority=S[:r], medium=medium)
+    return MobilityBasis(modes=modes, effects=effects, authority=S[:r],
+                         medium=medium, n_probes=int(deltas.shape[0]),
+                         residual_fraction=residual_fraction)
 
 
 @dataclass(eq=False)
