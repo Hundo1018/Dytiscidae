@@ -1,9 +1,9 @@
 {
   "experiment": "analytic_vs_numerical",
   "ok": true,
-  "commit": "647d6eb04296c0204d5e28a0449630845de9d778-dirty",
-  "when": "2026-09-15T01:33:48Z",
-  "elapsed_s": 0.038,
+  "commit": "cd6476c874da470d7d77a61632009beaf63c1ba6-dirty",
+  "when": "2026-09-15T01:36:41Z",
+  "elapsed_s": 0.041,
   "python": "3.11.15",
   "numpy": "2.4.6",
   "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",

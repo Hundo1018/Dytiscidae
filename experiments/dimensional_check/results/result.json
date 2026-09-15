@@ -1,8 +1,8 @@
 {
   "experiment": "dimensional_check",
   "ok": true,
-  "commit": "647d6eb04296c0204d5e28a0449630845de9d778-dirty",
-  "when": "2026-09-15T01:33:48Z",
+  "commit": "cd6476c874da470d7d77a61632009beaf63c1ba6",
+  "when": "2026-09-15T01:36:35Z",
   "elapsed_s": 0.011,
   "python": "3.11.15",
   "numpy": "2.4.6",
