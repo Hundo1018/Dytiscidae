@@ -253,6 +253,22 @@ def skin_friction_cd(re: np.ndarray) -> np.ndarray:
     return 2.0 * ((1.0 - w) * lam + w * turb)
 
 
+#: How far past the stall angle the flow is taken to be fully separated: the
+#: handover reaches the separated branch here and carries none of the attached
+#: one beyond it.
+#:
+#: Measured, not chosen.  `experiments/stall_blend` sweeps it against the
+#: 3.3 million strip-steps the seven seed plans actually visit, and 16 degrees
+#: is an interior minimum of how much the change perturbs the lift in use --
+#: 3.8%, against 4.4% at 13 degrees and 4.5% at 20 -- among the widths that
+#: both deliver the attached slope at zero incidence and never reach the
+#: `1.2 * CL_max` clip.  That is a conservatism criterion and not a physical
+#: one: the purpose of the change is to remove F-05, not to re-tune the lift
+#: model, so among the widths that remove it the one that moves the model
+#: least is the one that does it.
+SEPARATION_COMPLETE = np.radians(16.0)
+
+
 def lift_coefficient(
     alpha: np.ndarray, re: np.ndarray, ar: np.ndarray,
     reduced_pitch_rate: np.ndarray
@@ -262,6 +278,12 @@ def lift_coefficient(
     Below stall the strip behaves like a finite wing with the Helmholtz
     lift-slope correction ``2*pi / (1 + 2/AR)``.  Above stall it behaves like a
     flat plate, ``CL_max * sin(2*alpha)``.
+
+    Both statements are exact, which they were not: the handover between the
+    two is compactly supported, so at zero incidence the attached branch stands
+    alone and past ``alpha_stall + SEPARATION_COMPLETE`` the separated one
+    does.  A logistic, which is what this was, reaches neither end and so
+    evaluated each branch outside its own domain.  MATH_AUDIT F-05.
 
     ``CL_max`` and the stall angle are both raised by the **reduced pitch
     rate**
@@ -302,9 +324,23 @@ def lift_coefficient(
 
     cl_plate = cl_max * np.sin(2.0 * alpha)
 
-    # Smooth handover so the optimiser never sees a kink to exploit.
-    blend_width = np.radians(6.0)
-    w = 1.0 / (1.0 + np.exp(-(np.abs(alpha) - alpha_stall) / blend_width))
+    # Handover.  Smooth, so the optimiser never sees a kink to exploit, and
+    # **compactly supported**, so neither branch is evaluated where it does not
+    # apply.
+    #
+    # This was a logistic of width 6 degrees.  A logistic is never 0 and never
+    # 1, so each branch leaked into the other's domain: `w(0) = 0.138` at the
+    # static stall angle, which put 13.8% of the separated branch at zero
+    # incidence and cost a gliding wing up to 9.6% of the attached lift slope
+    # the docstring names, while 10 degrees past stall an unbounded linear
+    # branch still carried 16% of the weight.  MATH_AUDIT F-05.
+    #
+    # The smoothstep is the lowest-order polynomial that is C1 at both ends, so
+    # `w` and `w'` are both exactly zero at zero incidence: the separated
+    # branch contributes neither lift nor slope there, which is the property a
+    # logistic cannot have at any width.
+    t = np.clip(np.abs(alpha) / (alpha_stall + SEPARATION_COMPLETE), 0.0, 1.0)
+    w = t * t * (3.0 - 2.0 * t)
     cl = (1.0 - w) * cl_linear + w * cl_plate
     # Never exceed the plate envelope; the linear branch is unbounded.
     return np.clip(cl, -1.2 * cl_max, 1.2 * cl_max)

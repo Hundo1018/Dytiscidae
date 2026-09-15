@@ -1,12 +1,12 @@
 {
   "experiment": "analytic_vs_numerical",
   "ok": true,
-  "commit": "cd6476c874da470d7d77a61632009beaf63c1ba6-dirty",
-  "when": "2026-09-15T01:36:41Z",
-  "elapsed_s": 0.041,
+  "commit": "7d55b320804c9c9c5e1f580829ff2f7c8362e933-dirty",
+  "when": "2026-09-15T11:02:24Z",
+  "elapsed_s": 0.045,
   "python": "3.11.15",
   "numpy": "2.4.6",
-  "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",
+  "platform": "Linux-6.18.44-fc-v33-x86_64-with-glibc2.39",
   "config": {
     "question": "where a quantity has a closed form, does the code's number match an independent computation of it?",
     "fd_step_relative": 1e-06,
@@ -46,36 +46,46 @@
         "note": "max relative element error over 5 sample times"
       },
       {
-        "check": "B. lift slope at 2 deg, 2 pi/(1+2/AR) vs difference",
+        "check": "B. lift slope at zero incidence, 2 pi/(1+2/AR) vs difference",
         "kind": "derivative",
         "analytic": 4.1887902047863905,
-        "numerical": 3.7260439832431658,
-        "relative_error": 0.1104725228335523,
-        "tolerance": 0.02,
-        "ok": false,
-        "note": "the post-stall branch already carries weight 0.138 at alpha=0 and 0.182 at alpha=2 deg, because the blend is centred at 11.0 deg with a 6 deg width. There is no angle of attack at which the attached branch is clean: the weight never falls below 0.138.  The realised slope is -11.0% against the value the docstring names.",
-        "blend_weight_at_zero_alpha": 0.13784165696493575,
-        "blend_weight_at_2deg": 0.18242552380635638
+        "numerical": 4.188790204759523,
+        "relative_error": 6.4141186076180925e-12,
+        "tolerance": 1e-06,
+        "ok": true,
+        "note": "the blend weight is 0.000000 at alpha=0 and its derivative there is zero too, so the attached branch stands alone: this is what closing F-05 bought, and it read 3.726 against 4.189 before."
+      },
+      {
+        "check": "B. lift slope over the first 2 deg, same reference",
+        "kind": "derivative",
+        "analytic": 4.1887902047863905,
+        "numerical": 4.096906645489895,
+        "relative_error": 0.0219355839763718,
+        "tolerance": 0.03,
+        "ok": true,
+        "note": "the separated branch carries weight 0.0156 by 2 degrees, because the blend runs from 0 to alpha_stall + 16 deg and has therefore begun: the realised slope here is -2.2%, against -11.0% under the logistic it replaced.  A compactly supported blend that starts at zero incidence must begin somewhere; what it guarantees is the value and the slope *at* zero, checked above.",
+        "blend_weight_at_zero_alpha": 0.0,
+        "blend_weight_at_2deg": 0.015648021134989584
       },
       {
         "check": "B. CL blend C1 continuity, k=0 (gliding)",
         "kind": "smoothness",
         "analytic": 0.0,
-        "numerical": 0.018037124445726693,
-        "relative_error": 0.018037124445726693,
+        "numerical": 0.03954620928897423,
+        "relative_error": 0.03954620928897423,
         "tolerance": Infinity,
         "ok": true,
-        "note": "max |d2CL| proxy 11.483"
+        "note": "max |d2CL| proxy 25.176"
       },
       {
         "check": "B. CL blend C1 continuity, k=0.3 (strong LEV)",
         "kind": "smoothness",
         "analytic": 0.0,
-        "numerical": 0.030247496757877634,
-        "relative_error": 0.030247496757877634,
+        "numerical": 0.018727849847906874,
+        "relative_error": 0.018727849847906874,
         "tolerance": Infinity,
         "ok": true,
-        "note": "max |d2CL| proxy 19.256"
+        "note": "max |d2CL| proxy 11.923"
       },
       {
         "check": "B. CL odd symmetry, max |CL(a) + CL(-a)|",
@@ -250,7 +260,7 @@
     },
     "lift_slope": {
       "attached_slope_analytic": 4.1887902047863905,
-      "attached_slope_measured": 3.7260439832431658
+      "attached_slope_measured": 4.096906645489895
     },
     "theory": {
       "buckling_ratio_before_knockdown": 1.0000000000000002,
@@ -261,6 +271,6 @@
       "slam_k_coded": 74.50201329131316,
       "slam_k_quoted": 18.62550332282829
     },
-    "n_differ": 1
+    "n_differ": 0
   }
 }

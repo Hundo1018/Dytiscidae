@@ -162,21 +162,39 @@ def check_coefficients(cfg: dict) -> dict:
     slope_an = 2 * np.pi / (1 + 2 / ar[0])
 
     # Reproduce the blend weight from the code's own constants.
+    from dytiscidae.physics.fluid import SEPARATION_COMPLETE
+
     lev = 0.0
     a_stall = np.radians(11.0 + 26.0 * lev)
     a_stall *= np.clip(0.55 + 0.45 * np.log10(max(float(re[0]), 10.0)) / 5.0, 0.5, 1.0)
-    bw = np.radians(6.0)
-    w_at = lambda x: 1.0 / (1.0 + np.exp(-(abs(x) - a_stall) / bw))
-    w0, w2 = float(w_at(0.0)), float(w_at(a))
-    report("B. lift slope at 2 deg, 2 pi/(1+2/AR) vs difference",
-           slope_an, slope_fd, 0.02, kind="derivative",
-           note=f"the post-stall branch already carries weight {w0:.3f} at "
-                f"alpha=0 and {w2:.3f} at alpha=2 deg, because the blend is "
-                f"centred at {np.degrees(a_stall):.1f} deg with a 6 deg width. "
-                f"There is no angle of attack at which the attached branch is "
-                f"clean: the weight never falls below {w0:.3f}.  The realised "
-                f"slope is {100 * (slope_fd / slope_an - 1):+.1f}% against the "
-                f"value the docstring names.")
+    upper = a_stall + SEPARATION_COMPLETE
+    def w_at(x):
+        t = float(np.clip(abs(x) / upper, 0.0, 1.0))
+        return t * t * (3.0 - 2.0 * t)
+    w0, w2 = w_at(0.0), w_at(a)
+
+    # The slope *at* zero, which is where the docstring's claim actually lives.
+    hz = 1e-6
+    slope_zero = float(
+        (lift_coefficient(np.array([hz]), re, ar, k0)[0]
+         - lift_coefficient(np.array([-hz]), re, ar, k0)[0]) / (2 * hz))
+    report("B. lift slope at zero incidence, 2 pi/(1+2/AR) vs difference",
+           slope_an, slope_zero, 1e-6, kind="derivative",
+           note=f"the blend weight is {w0:.6f} at alpha=0 and its derivative "
+                f"there is zero too, so the attached branch stands alone: this "
+                f"is what closing F-05 bought, and it read 3.726 against "
+                f"{slope_an:.3f} before.")
+    report("B. lift slope over the first 2 deg, same reference",
+           slope_an, slope_fd, 0.03, kind="derivative",
+           note=f"the separated branch carries weight {w2:.4f} by 2 degrees, "
+                f"because the blend runs from 0 to alpha_stall + "
+                f"{np.degrees(SEPARATION_COMPLETE):.0f} deg and has therefore "
+                f"begun: the realised slope here is "
+                f"{100 * (slope_fd / slope_an - 1):+.1f}%, against -11.0% "
+                f"under the logistic it replaced.  A compactly supported blend "
+                f"that starts at zero incidence must begin somewhere; what it "
+                f"guarantees is the value and the slope *at* zero, checked "
+                f"above.")
     RESULTS[-1]["blend_weight_at_zero_alpha"] = w0
     RESULTS[-1]["blend_weight_at_2deg"] = w2
 

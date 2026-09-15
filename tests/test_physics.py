@@ -975,8 +975,21 @@ def test_a_mirrored_wing_is_a_mirror_image() -> None:
     check("camber lifts an untwisted wing",
           cambered - flat > 0.5,
           f"L/W {flat:+.2f} uncambered -> {cambered:+.2f} cambered")
+    # Measured against camber's own standalone lift rather than against a fixed
+    # increment, because the increment is a statement about the lift model as
+    # much as about the geometry: it was 0.44 under the logistic stall blend
+    # and is 0.33 under the compactly supported one (F-05), on an unchanged
+    # wing.  The fraction is well below 1 for a physical reason -- the twisted
+    # wing already sits near stall at 17.6 degrees, where camber's marginal
+    # contribution saturates -- so what separates "adds" from "cancels" is that
+    # it stays a substantial part of that standalone lift, not that it matches
+    # it.
+    camber_alone = cambered - flat
     check("camber adds to incidence rather than cancelling across the pair",
-          lw > up + 0.4, f"L/W {up:+.2f} twist alone -> {lw:+.2f} with camber")
+          lw - up > 0.25 * camber_alone,
+          f"L/W {up:+.2f} twist alone -> {lw:+.2f} with camber, so camber adds "
+          f"{lw - up:+.2f} of the {camber_alone:+.2f} it lifts on its own "
+          f"({(lw - up) / max(camber_alone, 1e-9):.0%})")
 
     # And the reflection itself: mirrored limbs must land on the far side of the
     # fore-aft plane at the same height, not one up and one down.

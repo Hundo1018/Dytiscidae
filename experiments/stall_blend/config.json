@@ -1,0 +1,90 @@
+{
+  "question": "the stall blend is a partition of unity between an attached branch and a separated one -- how much of each leaks into the other's domain, and what does confining them cost?",
+  "incumbent_blend_width_deg": 6.0,
+  "alpha_grid_deg": {
+    "lo": -90.0,
+    "hi": 90.0,
+    "n": 3601
+  },
+  "regime": {
+    "aspect_ratio": [
+      2.0,
+      4.0,
+      8.0,
+      16.0
+    ],
+    "reynolds": [
+      10000.0,
+      50000.0,
+      100000.0,
+      500000.0,
+      1000000.0
+    ],
+    "reduced_pitch_rate": [
+      0.0,
+      0.05,
+      0.1,
+      0.15,
+      0.3
+    ]
+  },
+  "candidates": {
+    "logistic_fraction": [
+      0.5,
+      0.35,
+      0.25,
+      0.15,
+      0.1
+    ],
+    "smoothstep_symmetric": [
+      1.0,
+      0.75,
+      0.5,
+      0.25
+    ],
+    "smoothstep_edges": {
+      "lower_fraction_of_stall": [
+        0.0
+      ],
+      "upper_deg_past_stall": [
+        4.0,
+        9.0,
+        13.0,
+        15.0,
+        16.0,
+        17.0,
+        18.0,
+        19.0,
+        20.0,
+        22.0,
+        24.0,
+        30.0
+      ]
+    },
+    "note": "the asymmetric family is the two-parameter one: where separation starts, as a fraction of the stall angle, and how far past stall it is complete.  A lower edge at 0 removes the leak at zero incidence by construction but says separation begins at zero incidence, which is not a claim anyone would make; the sweep is what shows whether a lower edge above 0 also clears the criterion."
+  },
+  "seed_plans": [
+    "bat",
+    "beetle",
+    "eel",
+    "gannet",
+    "medusa",
+    "ray",
+    "teal"
+  ],
+  "tolerances": {
+    "slope_deficit_at_zero": 0.005,
+    "continuity_rel": 1e-09,
+    "partition_sum": 1e-12
+  },
+  "rollout": {
+    "segment_seconds": 8.0,
+    "media": [
+      "air",
+      "water",
+      "land"
+    ],
+    "note": "matches the search's --segment-seconds 8; the base CPG gait, no randomisation, so the sample is the same experiment every time",
+    "seed": 0
+  }
+}

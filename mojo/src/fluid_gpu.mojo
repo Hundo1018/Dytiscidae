@@ -127,8 +127,10 @@ def _lift_coefficient(
     var cl_linear = (2.0 * PI_D / (1.0 + 2.0 / ar_c)) * alpha
     var cl_plate = cl_max * sind(2.0 * alpha)
 
-    var blend = 6.0 * DEG
-    var w = 1.0 / (1.0 + expd(-(abs(alpha) - stall) / blend))
+    # Compactly supported handover; see `fluid.SEPARATION_COMPLETE`.
+    var sep = 16.0 * DEG
+    var t = clampd(abs(alpha) / (stall + sep), 0.0, 1.0)
+    var w = t * t * (3.0 - 2.0 * t)
     var cl = (1.0 - w) * cl_linear + w * cl_plate
     return clampd(cl, -1.2 * cl_max, 1.2 * cl_max)
 

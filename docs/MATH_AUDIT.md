@@ -56,11 +56,12 @@ within a few hundred generations. The module prefix is `F` fluid, `S` structure,
 | **S-04** | every `HULL` segment is walled for 12 m of seawater whether or not the design dives; closing S-01 doubled that wall and took the glider fixture's glide ratio from 5.31 to 2.93 with the surfaces unchanged | medium | measured | `experiments/hull_buckling` |
 | **C-06** | a **diverged probe returns a measured zero** twist rather than a missing observation | medium | derived | `derivations/mobility_jacobian.md` |
 | ~~**F-07**~~ | `fluid.py` and `mojo/src/fluid_gpu.mojo` are the same physics twice and **nothing asserted they carry the same constants**; six of eight provenance comments pointed at the wrong lines | was medium | **CLOSED** — names and block markers instead of line numbers, and a text-level constant comparison that needs no GPU toolchain | `tests/test_gpu_mirror.py` |
-| **F-05** | the stall blend puts **13.8% of the post-stall branch at zero incidence**; the realised lift slope is 11% below the docstring's | medium | measured | `experiments/analytic_vs_numerical` |
+| ~~**F-05**~~ | the stall blend put **13.8% of the separated branch at zero incidence** and **16% of an unbounded attached branch 10 degrees past stall**: a logistic is never 0 and never 1, so each branch was evaluated where it does not apply | was medium | **CLOSED** — a compactly supported smoothstep, `w` and `w'` both exactly zero at zero incidence; the envelope clip stops binding and the model peak falls 2.280 to 2.093 | `tests/test_stall_blend.py` |
+| **F-08** | the model has **no post-stall lift loss**: CL climbs from the stall angle to the separated branch's own peak at 45 degrees, and no choice of blend changes that, because it is a property of `CL_max sin(2 alpha)` | medium | measured | `experiments/stall_blend` |
 | **C-02** | the twist scaling's three `0.3`s are an **undeclared reference length in metres**, fixed across bodies of different size | medium | measured | `experiments/dimensional_check` |
 | **C-03** | `rank` was an engineering threshold presented as a numerical rank | medium | **CLOSED** — split into `numerical_rank`, `control_rank` and a settable `authority_threshold`; the identification's own noise floor of `1.13 sigma_0` is documented on both | `dytiscidae/control/cpg.py` |
 | **C-04** | a saturated intent delivers `sigma^2/(sigma^2+lam)` of a body's reach, not all of it -- 55% on a weak axis | medium | tested | `tests/test_math.py` |
-| **F-06** | `CL_MAX = 1.8` is declared as "the largest CL the strip model will produce"; the model peaks at **2.280** | medium | tested | `tests/test_math.py` |
+| **F-06** | `CL_MAX = 1.8` is declared as "the largest CL the strip model will produce"; the model peaks at **2.093** | medium | tested; **improved** by closing F-05, which took the peak from 2.280 and stopped the clip binding at all | `tests/test_math.py` |
 | **C-10** | the frequency mode's authority scales with `probe_time`, which nothing asserts is equal across the two identification paths | medium | measured | `experiments/analytic_vs_numerical` |
 | **C-01** | the CPG parameter vector mixes radians with hertz, so `\|\|dp\|\|` has no units and "a unit vector in parameter space" has no physical content | medium | measured | `experiments/dimensional_check` |
 | **O-01** | CMA-ES's eigen-update staleness counter is in **generations** where the reference algorithm counts **evaluations** -- a factor of `lambda` | medium | measured | `tests/test_math.py` |
@@ -416,20 +417,83 @@ measure this' must not share a value with a quantity that means 'I measured
 zero'" — in a place it has not yet been applied. `thrust_margin` was the
 previous instance.
 
-### F-05 -- the attached branch is never clean
+### F-05 -- neither branch was clean  (CLOSED)
 
 `w = 1/(1 + exp(-(|alpha| - alpha_stall)/6deg))` is a logistic centred on
-`alpha_stall`, and a logistic never reaches zero. At `Re = 2e5`, `k = 0`, where
-`alpha_stall` clips to 11 degrees:
+`alpha_stall`, and a logistic reaches neither 0 nor 1. At `Re = 2e5`, `k = 0`,
+where `alpha_stall` clips to 11 degrees:
 
     w(0 deg) = 0.138        w(2 deg) = 0.182
 
-**13.8% of the post-stall plate branch is mixed in at zero incidence**, and
-there is no angle of attack at which the attached branch stands alone. Measured
-lift slope at 2 degrees: 3.726 against the 4.189 the docstring names — 11.0%
-low, everywhere, for every wing. The blend itself is smooth (largest slope jump
-0.018/rad on a 0.09 degree grid), so the optimiser sees no kink; it is simply
-wider than the linear region it is handing over from.
+**13.8% of the separated branch was mixed in at zero incidence**, and there was
+no angle of attack at which the attached branch stood alone. Measured lift slope
+at 2 degrees: 3.726 against the 4.189 the docstring names — 11.0% low; over the
+whole `(AR, Re, kappa)` grid the worst was **9.6%**, at the largest aspect ratio
+and lowest Reynolds number.
+
+The mirror image is the same defect and had not been stated: **10 degrees past
+stall an unbounded attached-flow extrapolation still carried 16% of the weight**
+(41.7% two degrees past it). Each branch was being evaluated where it does not
+apply, and the one that leaked *into* the attached region cost lift while the
+one that leaked *out* of it added lift that has no physical basis.
+
+It is a **gliding-wing** defect specifically. A high reduced pitch rate raises
+`alpha_stall` from 11 to 37 degrees, which pushes the tail away from zero: the
+mean slope deficit is 6.96% at `kappa = 0` and 0.03% at `kappa = 0.30`. So it
+taxed exactly the behaviour the air ladder exists to reward.
+
+**The fix.** A partition of unity is a statement about where each branch is
+valid, so the weight has to be exactly 0 below some angle and exactly 1 above
+another, which a logistic cannot be at any width. `w` is now a smoothstep
+`t^2(3-2t)` on `[0, alpha_stall + SEPARATION_COMPLETE]` — the lowest-order
+polynomial that is C1 at both ends, so `w` and `w'` are both exactly zero at
+zero incidence and the separated branch contributes neither lift nor slope
+there.
+
+`SEPARATION_COMPLETE = 16 degrees` is measured rather than chosen.
+`experiments/stall_blend` records the arguments the solver hands
+`lift_coefficient` over 3.3 million strip-steps of the seven seed plans in all
+three media, and sweeps the width against that sample: 16 degrees is an
+**interior minimum** of how much the change perturbs the lift actually in use
+(3.8%, against 4.4% at 13 degrees and 4.5% at 20), among the widths that both
+deliver the attached slope and never reach the `1.2 CL_max` clip. That is a
+conservatism criterion and is labelled one: the purpose was to remove a defect,
+not to re-tune the lift model.
+
+**What it moved.** On the hand-built glider fixture, twist-alone lift goes
+`L/W 1.26 -> 1.39` and camber-alone `0.99 -> 1.09`, both about +10%, because a
+wing below stall now carries the full attached slope. The envelope clip stops
+binding at all (max `|CL|` reaches 97.4% of it, against 100.00%), which also
+takes F-06's overstatement from +27% to +16%.
+
+**What the same measurement showed, and did not fix.** The seed plans spend
+most of their time past stall: median `|alpha|` is 37.9 degrees and only 27.7%
+of strip-steps are below the model's own stall angle, consistently across air,
+water and land. So the half of F-05 that matters most for these machines is the
+second half -- the attached branch leaking upward -- and not the zero-incidence
+tail the finding was originally written about.
+
+### F-08 -- the model has no post-stall lift loss
+
+`experiments/stall_blend` sweeps where CL peaks, in units of the model's own
+stall angle, over every candidate blend. The answer is **4.50 for all of them**:
+the separated branch is `CL_max sin(2 alpha)`, which peaks at 45 degrees, and no
+blend changes that.
+
+So this model has no stall in the usual sense. CL rises monotonically from the
+stall angle to 45 degrees; a real wing peaks at or just past stall and drops
+before recovering toward the flat-plate curve. At `alpha_stall = 10 degrees`
+and `CL_max = 1.1` the model says a wing lifts 0.73 at its stall angle and 1.10
+at 45 degrees.
+
+Whether that matters depends on what the search rewards: a design that holds a
+surface at 45 degrees is credited with more lift than one at its stall angle,
+and no term anywhere penalises the difference. Not fixed here — giving the model
+a post-stall drop means adding a third branch, which is a larger change than
+correcting a handover, and the seed plans' operating distribution above says it
+would touch most of their strip-steps.
+
+Status: **measured, not fixed**. Risk: medium.
 
 ### C-02 -- the twist scaling hides a length
 
@@ -495,7 +559,10 @@ CL_MAX = 1.8
 ```
 
 `lift_coefficient` clips at `1.2 * cl_max` with `cl_max` reaching 1.9, so the
-model's ceiling is 2.28. Measured peak over the whole `alpha`/`k` domain: 2.280.
+model's ceiling is 2.28. The measured peak over the whole `alpha`/`k` domain was
+2.280 -- the clip itself, reached exactly -- and closing F-05 took it to
+**2.093**, so the clip no longer binds anywhere and the gap to `CL_MAX` is +16%
+rather than +27%. The declaration and the value still disagree.
 `MAX_WING_LOADING` is derived from `CL_MAX`, so the Tier-0 wing-loading gate is
 27% conservative. The declaration and the value disagree; the parenthetical in
 the same comment describes the real ceiling and then a different number is
@@ -650,7 +717,7 @@ is what changes if the number moves.
 | `CL_max` | `1.10 + 0.80*lev` | `CALIBRATED` | 1 | all post-stall lift |
 | `alpha_stall` | `11 + 26*lev` deg | `CALIBRATED` | deg | where stall begins |
 | low-Re knockdown | `0.55 + 0.45 log10(Re)/5` | `CALIBRATED`, anchored Re=1e5 | 1 | small-wing stall |
-| blend width | `6` deg | `HEURISTIC` | deg | **F-05**: 11% of the lift slope |
+| separation width | `16` deg | `CALIBRATED` | deg | **F-05**, closed; an interior minimum against the visited sample. Was a `6` deg logistic width, `HEURISTIC` |
 | `lev` scale | `k/0.30` | `HEURISTIC` | 1 | LEV onset |
 | lift clip | `1.2 * cl_max` | `HEURISTIC` | 1 | the model's CL ceiling, **F-06** |
 | Oswald `e` | `0.75` | `CALIBRATED` | 1 | induced drag |

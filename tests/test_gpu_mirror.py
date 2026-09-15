@@ -96,14 +96,39 @@ def mojo_numbers(src: str, name: str) -> set[float]:
     return {float(m) for m in re.findall(r"(?<![\w.])(\d+\.\d+|\d+)(?![\w.])", body)}
 
 
+def _consts(node) -> set[float]:
+    return {float(n.value) for n in ast.walk(node)
+            if isinstance(n, ast.Constant)
+            and isinstance(n.value, (int, float))
+            and not isinstance(n.value, bool)}
+
+
 def python_numbers(src: str, name: str) -> set[float]:
-    for node in ast.walk(ast.parse(src)):
-        if isinstance(node, ast.FunctionDef) and node.name == name:
-            return {float(n.value) for n in ast.walk(node)
-                    if isinstance(n, ast.Constant)
-                    and isinstance(n.value, (int, float))
-                    and not isinstance(n.value, bool)}
-    raise KeyError(f"{name} is not in {PY_PATH.name}")
+    """Literals in the function, plus those of the module constants it reads.
+
+    Following the names matters: lifting `6.0` out of the body into a
+    documented `SEPARATION_COMPLETE = np.radians(16.0)` is exactly the sort of
+    tidy-up this guard has to see through, because the Mojo has no module
+    constant to lift it into and writes the number inline.
+    """
+    tree = ast.parse(src)
+    fn = next((n for n in ast.walk(tree)
+               if isinstance(n, ast.FunctionDef) and n.name == name), None)
+    if fn is None:
+        raise KeyError(f"{name} is not in {PY_PATH.name}")
+
+    module_consts: dict[str, ast.AST] = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    module_consts[t.id] = node.value
+
+    out = _consts(fn)
+    for n in ast.walk(fn):
+        if isinstance(n, ast.Name) and n.id in module_consts:
+            out |= _consts(module_consts[n.id])
+    return out
 
 
 # --------------------------------------------------------------------------
