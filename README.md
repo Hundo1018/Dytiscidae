@@ -276,11 +276,49 @@ dytiscidae/
   learning/    ppo (the shared policy), distill (is a shared policy reachable?)
   viz/         dashboard (self-contained HTML), render (offscreen video),
                showcase (one mission, wake and stress overlaid)
-  ops/         telemetry (JSONL), run (CLI)
-tests/         test_physics.py  — 162 checks pinning conventions and magnitudes
-               test_search.py   — 305 checks on the search machinery
-               test_ppo.py      — 8 checks on the shared PPO learner
+  ops/         telemetry (JSONL), run (CLI), checkpoint (the portable artefact)
+
+  --- the job layer.  Hexagonal: the three below import no torch, no mujoco,
+      no numpy and no sqlite3, and tests/test_architecture.py fails the build
+      if that stops being true.  See docs/ARCHITECTURE.md.
+  domain/      TrainingJob (an eight-state lifecycle), TrainingPlan (the
+               configuration, content-hashed), TrainingState (the runtime
+               state), Experiment (the record), CheckpointRecord, Dataset
+  ports/       Trainer, DatasetRepository, CheckpointStore, ExperimentStore,
+               JobStore, ControlChannel, JobLauncher, MetricSink, EventLog, Clock
+  application/ the use cases: StartTraining, PauseTraining, ResumeTraining,
+               CancelTraining, CreateExperiment, LoadCheckpoint, ExportModel
+  adapters/    filesystem/ (JSON + JSONL), sqlite/ (the record and the
+               lifecycle, never a checkpoint), trainers/ (the MAP-Elites search
+               behind the port, and a dependency-free reference trainer),
+               launchers (own-session subprocess, and inline), cli, composition
+  worker/      python -m dytiscidae.worker — a job's own process
+tests/         test_physics.py        — checks pinning conventions and magnitudes
+               test_search.py         — checks on the search machinery
+               test_ppo.py            — checks on the shared PPO learner
+               test_architecture.py   — the dependency rule, as a gate
+               test_domain.py         — the lifecycle, with no IO at all
+               test_application.py    — the use cases, over in-memory fakes
+               test_search_adapter.py — translation and checkpoint ordering
+               test_adapters.py       — real files, real SQLite, real forks
+               test_worker.py         — real worker processes: pause, resume,
+                                        cancel, failure, SIGTERM, orphaning
 ```
+
+### Running a search as a job
+
+```bash
+python -m dytiscidae.ops.run experiment new --name arch39 --trainer search \
+    --steps 900 --seed 20260901 --set batch=16 --set segment_seconds=8
+python -m dytiscidae.ops.run job start  --experiment arch39 --workers 4 --min-shard 4
+python -m dytiscidae.ops.run job status <job-id>
+python -m dytiscidae.ops.run job pause  <job-id>     # at the next generation
+python -m dytiscidae.ops.run job resume <job-id>     # refuses without a checkpoint
+```
+
+`python -m dytiscidae.ops.run search` still works exactly as before; the job
+commands are additive, and the only change to `evolution/loop.py` is a 43-line
+stop hook that is off by default.
 
 ---
 
