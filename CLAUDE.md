@@ -26,7 +26,40 @@ There is no pytest; every suite is a script with a `main()`. `test_search.py`
 takes ~25 min — run it detached with `setsid nohup … &`, never in a tool call
 that can time out and kill it.
 
+The job/ports layer has its own five suites, and together they take under two
+minutes, so they are cheap enough to run on every change:
+
+```bash
+for s in architecture domain application search_adapter adapters worker; do
+    PYTHONPATH=. .venv/bin/python tests/test_$s.py | tail -1
+done
+```
+
+`test_architecture.py` is the one that matters most: it fails the build if
+anything in `domain/`, `ports/` or `application/` starts importing torch,
+mujoco, numpy or sqlite3. See `docs/ARCHITECTURE.md`.
+
 ## Running a search
+
+Two ways, and they do the same search.
+
+**As a job**, which is what `docs/ARCHITECTURE.md` describes: the run is
+recorded, it can be paused and resumed by name instead of by pid, a failure
+lands in the record with its traceback, and SIGTERM becomes a resumable pause
+rather than a lost run.
+
+```bash
+python -m dytiscidae.ops.run experiment new --name arch39 --trainer search \
+    --steps 900 --seed 20260901 --hypothesis "..." \
+    --set batch=16 --set segment_seconds=8 --set controller_refine_steps=2 \
+    --set use_shared_policy=true
+python -m dytiscidae.ops.run job start --experiment arch39 --workers 4 --min-shard 4
+python -m dytiscidae.ops.run job status <job-id>      # progress, eta, what is at risk
+python -m dytiscidae.ops.run job pause  <job-id>      # honoured at the next generation
+python -m dytiscidae.ops.run job resume <job-id>      # refuses without a checkpoint
+```
+
+**Directly**, unchanged, which is what every stored run used:
 
 ```bash
 setsid nohup .venv/bin/python -u -m dytiscidae.ops.run search \
@@ -105,6 +138,7 @@ steady state is ~74 s. Not a regression.
 | | |
 |---|---|
 | `docs/ROADMAP.md` | work list + the measurement behind every decision |
+| `docs/ARCHITECTURE.md` | the job/ports layer: what a run *is*, how it is started, paused, resumed, cancelled and recorded |
 | `docs/MATH_AUDIT.md` | every physics/control/optimisation formula and constant: source, assumption, units, derivation and validation status, risk-ranked |
 | `derivations/` | one document per quantity, derived from its own premises, with the measurement that checks it |
 | `experiments/` | reproducible harnesses: `python experiments/<name>/run.py` re-derives every number the audit quotes |

@@ -271,6 +271,12 @@ class SearchState:
     #: The policy shared by every morphology, or None when not in use.
     shared: object = None
     shared_opt: object = None
+    #: The generation the loop actually stopped at, and why, when it stopped
+    #: before ``cfg.generations``.  None for a run that went to the end.  Read
+    #: by the job layer, which has to tell a run that finished from one that was
+    #: paused -- the archives look the same either way.
+    stopped_at: int | None = None
+    stop_reason: str | None = None
 
     @property
     def archive(self) -> Archive:
@@ -877,8 +883,21 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
 
 
 def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
-               on_generation=None) -> SearchState:
+               on_generation=None, should_stop=None) -> SearchState:
     """Run the whole loop.  Returns the final state, checkpointed as it goes.
+
+    ``should_stop`` is an optional callable taking ``(generation, report)`` and
+    returning something truthy to stop.  It is polled once per generation,
+    immediately after the periodic checkpoint block, and a stop forces a
+    checkpoint before breaking -- so honouring one costs at most the generation
+    in flight and never the generations since the last periodic write.  Leaving
+    it None is exactly the behaviour every run before it existed had.
+
+    It is the seam the job layer drives a pause or a cancel through
+    (``adapters/trainers/search.py``).  Polled per generation rather than per
+    evaluation because a generation boundary is where the archives, the shared
+    policy and the RNG stream are all consistent; stopping anywhere else would
+    mean a checkpoint that cannot be resumed from.
 
     The shape of one generation:
 
@@ -1248,6 +1267,28 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                                  "ceiling_mb": cfg.memory_ceiling_mb})
                 print(f"\nstopping at generation {gen}: resident set {rss:.0f} MB "
                       f"is over the {cfg.memory_ceiling_mb} MB ceiling.\n"
+                      f"the checkpoint is current; continue with:\n"
+                      f"  ... --run {cfg.run_dir} --resume\n", flush=True)
+                break
+
+        # Polled every generation, not only on the checkpoint cadence: at
+        # ``checkpoint_every`` 10 and ~74 s a generation, the cadence alone
+        # would make a pause take up to twelve minutes to take effect.  The
+        # write below is what makes stopping here as safe as stopping in the
+        # block above -- the archives and the learned state go to disk first,
+        # and only then does the loop break.
+        if should_stop is not None:
+            reason = should_stop(gen, report)
+            if reason:
+                telemetry.event({"kind": "requested_stop", "gen": gen,
+                                 "reason": str(reason)})
+                for name, a in archipelago.archives.items():
+                    a.save(Path(cfg.run_dir) / f"archive_{name}.pkl")
+                    a.export_json(Path(cfg.run_dir) / f"archive_{name}.json")
+                save_state(state, gen)
+                state.stopped_at = gen
+                state.stop_reason = str(reason)
+                print(f"\nstopping at generation {gen}: {reason}\n"
                       f"the checkpoint is current; continue with:\n"
                       f"  ... --run {cfg.run_dir} --resume\n", flush=True)
                 break

@@ -857,6 +857,22 @@ def main(argv=None) -> int:
     p.add_argument("--seed", type=int, default=0)
     p.set_defaults(fn=cmd_distill)
 
+    # The job/experiment command group lives in ``adapters/cli.py``, which is a
+    # driving adapter over the application layer.  It is registered here rather
+    # than written here so that this module stays what it has always been --
+    # the direct commands -- and so that the new ones stay free of any decision
+    # the use cases should be making.
+    p = sub.add_parser(
+        "checkpoints", help="list a job's checkpoints, newest step last")
+    p.add_argument("job_id")
+    p.add_argument("--root", default=None)
+    p.add_argument("--store", default=None, choices=("files", "sqlite"))
+    p.add_argument("--verify", action="store_true",
+                   help="fetch each one and check it against its digest")
+    from ..adapters import cli as _cli
+    p.set_defaults(fn=_cli.cmd_checkpoints)
+    _cli.build_parsers(sub)
+
     args = ap.parse_args(argv)
     return args.fn(args)
 
