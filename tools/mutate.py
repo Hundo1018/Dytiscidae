@@ -367,6 +367,15 @@ MUTATIONS: tuple = (
                "erasing your own control is worth points",
         suites=("test_physics",), item="net of passive"),
 
+    Mutation(
+        id="batched-fluid-diagnostics-stay-default",
+        path="dytiscidae/envs/batchroll.py",
+        find='                e.solver.diag.mean_submerged = float(o["subf"][pa:pb].mean())',
+        replace="                pass",
+        defect="the batched path leaves diag.mean_submerged at 0.0, so the "
+               "policy the search scores is told it is dry however deep it is",
+        suites=("test_search",), item="path agreement"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

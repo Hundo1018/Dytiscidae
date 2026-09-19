@@ -378,6 +378,31 @@ class BatchedFluid:
                 self.dry_inertia[i] + (mb * self.lever2[i])[:, None])
             e.solver.diag.clamped = bool(self.clamped[i])
             pa, pb = self.poff[i], self.poff[i + 1]
+            # `FluidSolver.apply` (the single-machine path) refreshes every
+            # field of `diag` each call.  This path only ever wrote `.clamped`
+            # and `.slam`, so the rest -- most importantly `.mean_submerged`,
+            # which `TriphibianEnv.observation` feeds straight into the
+            # policy -- stayed frozen at `FluidDiagnostics()`'s defaults (0.0)
+            # for the life of a batched rollout.  In water that is a real,
+            # wrong observation (the machine reads as permanently dry no
+            # matter how submerged it is), not a diagnostic-only omission:
+            # the policy conditions its action on it, so a batched and a
+            # single-machine run of the *same* policy command different
+            # things once either path is actually under water.
+            if pb > pa:
+                e.solver.diag.mean_submerged = float(o["subf"][pa:pb].mean())
+                e.solver.diag.max_submerged = float(o["subf"][pa:pb].max())
+                e.solver.diag.max_alpha = float(np.abs(o["alpha"][pa:pb]).max())
+                e.solver.diag.max_dynamic_pressure = float(o["q"][pa:pb].max())
+            else:
+                e.solver.diag.mean_submerged = 0.0
+                e.solver.diag.max_submerged = 0.0
+                e.solver.diag.max_alpha = 0.0
+                e.solver.diag.max_dynamic_pressure = 0.0
+            e.solver.diag.lift = float(np.abs(o["lift"][pa:pb]).sum())
+            e.solver.diag.drag = float(np.abs(o["drag"][pa:pb]).sum())
+            e.solver.diag.buoyancy = float(o["buoy"][pa:pb].sum())
+            e.solver.diag.added_mass = float(mb.sum())
             if self._primed[i] and self._prev_t[i] is not None:
                 dt = max(t - self._prev_t[i], 1e-6)
                 e.solver.diag.slam = float(np.abs(

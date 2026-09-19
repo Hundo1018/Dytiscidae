@@ -159,6 +159,7 @@ BatchedEvaluation:
     - tests.test_search::test_the_two_evaluation_paths_score_the_same_machine_the_same
     - tests.test_search::test_a_kernel_older_than_its_source_is_not_usable
     - tests.test_search::test_the_batched_passive_twin_leaves_no_trace
+    - tests.test_search::test_the_batched_path_tells_the_policy_it_is_wet
   note: the path the search scores with; not interchangeable with evaluate_tier1
 
 Vectorisation:

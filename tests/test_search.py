@@ -2723,6 +2723,58 @@ def test_the_two_evaluation_paths_score_the_same_machine_the_same() -> None:
               + (f" on {key0}" if key0 else ""))
 
 
+def test_the_batched_path_tells_the_policy_it_is_wet() -> None:
+    """The batched evaluator must fill the fluid diagnostics the policy reads.
+
+    `BatchedFluid.apply` wrote only `diag.clamped` and `diag.slam`, so every
+    other field stayed at FluidDiagnostics()'s default of 0.0 for the life of a
+    batched rollout -- including `mean_submerged`, which
+    `TriphibianEnv.observation` feeds straight into the policy's observation
+    vector. Under the path the search scores with, a policy therefore perceived
+    the machine as bone dry however deep it was, while every verification, probe
+    and film saw the truth. That is the whole of the water disagreement the
+    ROADMAP recorded as an identification residual: with it fixed the two paths
+    agree to 0.00000 in water, and the divergence had appeared at the second
+    control decision, with the fluid force itself still agreeing to 1e-11.
+    """
+    print("\nbatched: the policy is told whether it is wet")
+    if needs_batched_evaluator("test_the_batched_path_tells_the_policy_it_is_wet"):
+        return
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.batchroll import BatchedFluid, rollout_batch
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    plans = ("beetle", "eel")
+    envs = [TriphibianEnv(build(BODY_PLANS[n]()), seed=3) for n in plans]
+    for e in envs:
+        e.reset(Domain.WATER)
+        e.scatter(np.random.default_rng(11))
+    bf = BatchedFluid(envs)
+    bf.reset_slam()
+    rollout_batch(envs, bf, 2.0, [e.cpg.base for e in envs], Domain.WATER,
+                  passive_control=False)
+    for name, e in zip(plans, envs):
+        d = e.solver.diag
+        check(f"{name}: submerged in water reads submerged, not 0.0",
+              d.mean_submerged > 0.5, f"mean_submerged {d.mean_submerged:.3f}")
+        check(f"{name}: and the rest of the diagnostics are live too",
+              d.buoyancy != 0.0 and d.added_mass != 0.0,
+              f"buoyancy {d.buoyancy:.3f}, added_mass {d.added_mass:.3f}")
+
+    # Dry, the same channel must read ~0 -- otherwise "always wet" would pass
+    # the check above just as "always dry" passed before it.
+    envs = [TriphibianEnv(build(BODY_PLANS["beetle"]()), seed=3)]
+    envs[0].reset(Domain.AIR)
+    bf = BatchedFluid(envs)
+    bf.reset_slam()
+    rollout_batch(envs, bf, 2.0, [envs[0].cpg.base], Domain.AIR,
+                  passive_control=False)
+    check("and in the air it reads dry",
+          envs[0].solver.diag.mean_submerged < 0.05,
+          f"mean_submerged {envs[0].solver.diag.mean_submerged:.3f}")
+
+
 def test_the_batched_passive_twin_leaves_no_trace() -> None:
     """The batched evaluator's twin must be as invisible as the single one's.
 
@@ -3894,6 +3946,7 @@ def main() -> int:
         test_the_search_is_pointed_at_the_mission_and_compounds,
         test_every_path_agrees_on_the_control_law,
         test_the_shared_policy_survives_a_resume,
+        test_the_batched_path_tells_the_policy_it_is_wet,
         test_the_batched_passive_twin_leaves_no_trace,
         test_a_kernel_older_than_its_source_is_not_usable,
         test_a_checkpoint_names_the_commit_the_process_started_from,
