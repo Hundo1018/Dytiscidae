@@ -7,7 +7,9 @@ the number it produced.
 
 Revised 2026-09-19, after arch38 ran. Everything below is kept for the
 measurement that motivated it; **the current work list is
-[arch39](#arch39--the-work-list)**, at the end, after the five results sections.
+[arch40](#arch40--the-work-list)**; arch39's list is kept below it, and
+[What 2026-09-20 fixed](#what-2026-09-20-fixed-and-what-is-not-comparable-across-it)
+is the boundary across which nothing is comparable.
 
 Two things to read before proposing anything.
 
@@ -2026,6 +2028,50 @@ designs under 0.05 rad clear nothing, with a maximum thrust of exactly +0.0000.
 Thrust needs stroke velocity, so the post-arch38 threshold at 0.002 — strictly
 above the floor — already does the gate's work, and a travel gate would penalise
 small-amplitude high-frequency flapping, which is real thrust. **Do not add it.**
+
+---
+
+## arch40 — the work list
+
+Written 2026-09-20, after the day's fixes and before any run on them.
+
+**The first arm is a baseline, not a hypothesis.** Every competence in every
+medium was redefined, the curriculum's two lowest stages changed, the operator
+bandit gained a floor, and the GPU physics moved five weeks forward. Nothing
+from arch34–arch39 can be compared with what comes out. So arch40 is **one run
+that changes nothing further**, and its only job is to say what the new
+distributions are: net forward speed per medium, net depth gain, the share of
+children each operator makes, and how far the archives get. Read at generation
+200, which is where distributions settle.
+
+What it costs to skip this: every number in the next list would be read against
+arch39's, and arch38 already showed what that produces -- a replication failure
+nobody could attribute.
+
+Then, in this order:
+
+1. **Re-derive the water ladder** from arch40's own `depth_gain_net`
+   distribution (§6 above). Not from arch39's, where the median machine dives
+   less than gravity.
+2. **The air ladder, the same way.** `stays_up` and `glides` are cleared by
+   falling from 30 m with the actuators off; `sink_reduction` is published now
+   and its distribution over arch40 is what the rungs should sit in.
+3. **S, `mut_gait`, re-run.** arch39 never tested it: the bandit spent 0.7% of
+   children on it and none at all between generations 58 and 141. With the
+   exploration floor it gets ~2%, and the offline Monte Carlo (80.4% / 94.0% /
+   69.5% of draws clearing the first thrust rung against 0–2.4% for every
+   single-axis operator) is the number it is judged against.
+4. **V, the replication arm** -- arch37's seed under current code -- is now
+   subsumed by arch40 itself, which is a fresh baseline for everything.
+5. **O, the air spawn**, unchanged and still the largest structural distortion:
+   every air score is earned from a 30 m launch, and the filmed machine that
+   scores air 0.768 spends 0% of its air leg airborne because it starts on the
+   beach. With forward distance netted against a passive twin, the launch's free
+   glide no longer *scores*, which removes the reason the spawn was tolerable.
+6. **R, `shared_ent_coef`**, still the value measured to do nothing, still
+   un-swept.
+7. **Q, the triphibian conflict**, unchanged and still written down rather than
+   acted on.
 
 ---
 
