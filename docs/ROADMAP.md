@@ -1877,6 +1877,65 @@ thing on this list and the only one that can tell a seed effect from a bundle
 cost. It does not overlap S: S is judged on `thrust_margin`, this on `glides+`
 and `lift_margin`.
 
+### W. The specialist islands were selecting for water — curriculum **fixed, unrun**; water score **measured, not fixed**
+
+Raised 2026-09-20 during arch39: a pure-habitat island's elites should not be
+better in another medium than in the island's own. Measured on the archives,
+elites better elsewhere than in their own island's medium:
+
+| | air island | land island | water island |
+|---|---|---|---|
+| arch39, gen 180 | **96.4%** (73/83 best in water) | **96.4%** (103/110 in water) | 7.9% |
+| arch38, gen 899 | **97.1%** | **75.9%** | 20.3% |
+
+Median own competence 0.032 on the air island and 0.055 on the land island.
+**This is two failures in series, and they need separate fixes.**
+
+**1. The channel — the curriculum was island-blind. Fixed (`b2db2e6`), unrun.**
+`stage_score` read all three media at every stage and `run_search` built each
+island's curriculum without telling it which island it served; stage 0 scored
+"the best medium anywhere" with the island's own score at the 0.25 handover
+floor. Now every stage reads only the island's own media and crossings
+(`islands.curriculum_for`). The generalist is unchanged at every stage; a
+curriculum unpickled from an earlier run keeps the old behaviour, so a resumed
+run does not change selection mid-run. On arch39's air archive the stage-0 top
+ten go from ten water machines (air 0.00–0.03) to air 0.71 / 0.67 / 0.60 at the
+top.
+
+**2. The source — water competence is paid for sinking. Measured, not fixed.**
+With every actuator held still, the seed plans score:
+
+| medium | own gait | **actuators still** | still ÷ own |
+|---|---|---|---|
+| water | 0.510 | **0.533** | **104%** |
+| air | 0.029 | 0.032 | 112% |
+| land | 0.048 | 0.010 | 20% |
+
+A still machine sinks — the eel gains +4.45 m with its actuators held against
++4.52 m flapping, the bat +3.02 m — and every water term pays for it: `reached`
+(depth gained toward 10 m), `hold` (nearness to 10 m), `submerged` (released
+underwater), `upright` (a hull is passively stable). Item D replaced absolute
+depth with depth *gained*, which removed the free 4 m of the release and not the
+free metres of sinking: the air ladder's "paid for falling" defect, in water.
+**Seventh instance of the recurring lesson.** Land is the one medium where the
+actuators matter, because it was gated after the same probe caught it.
+
+Why it is not fixed alongside 1: water competence feeds `mission_fraction`, the
+water ladder's rungs, three islands' own scores and PPO's water reward, so a
+change to it redefines all of them — and arch38 showed that a water change
+bundled with anything else cannot be attributed. Candidates, as gates rather
+than coefficients: score depth against the design's own passive sink over the
+same segment (one extra actuator-still water rollout per design, cacheable per
+phenotype like `_measured_thrust`); or gate `reached` and `hold` on the
+machine arriving *and staying* where passive sinking does not put it. Pick
+from a measured distribution, and run it as its own arm.
+
+**Order matters.** 1 alone moves the air and land islands' curriculum onto their
+own media, but the water, amphibian and aerial-diver islands still select for
+sinking. 2 alone changes which medium is cheapest and the island-blind leak
+would find the next one. With 1 in, 2 is contained to the islands that own
+water.
+
 ### L. Aspect ratio grows and buys nothing — and thrust did not fix it
 
 Carried from before arch38 with its conditional now answered. The instruction was
