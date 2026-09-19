@@ -100,6 +100,9 @@ def test_the_weight_is_compactly_supported() -> None:
           "incidence", abs(got / attached_slope(ar) - 1.0) < 1e-9,
           f"slope {got:.6f} against {attached_slope(ar):.6f}")
 
+    # One check carrying the worst point, rather than an early return and a
+    # trailing `check(..., True)` that could not fail even on an empty loop.
+    worst, where, n = 0.0, "", 0
     for ar, re, k in itertools.product((4.0,), RE, KAPPA):
         a_s = stall_angle(re, k)
         past = a_s + SEPARATION_COMPLETE + np.radians(0.5)
@@ -107,14 +110,14 @@ def test_the_weight_is_compactly_supported() -> None:
         cmax = 1.10 + 0.80 * lev
         want = cmax * np.sin(2.0 * past)
         got = float(cl([past], ar, re, k)[0])
-        if abs(got - want) > 1e-9:
-            check("past the separation width it is the separated branch alone",
-                  False, f"{got:.6f} against {want:.6f} at Re={re:.0e} "
-                         f"kappa={k}")
-            return
-    check("past the separation width it is the separated branch alone", True,
-          f"no attached-branch contribution beyond alpha_stall + "
-          f"{np.degrees(SEPARATION_COMPLETE):.0f} deg")
+        n += 1
+        if abs(got - want) > worst:
+            worst, where = abs(got - want), f"Re={re:.0e} kappa={k}"
+    check("past the separation width it is the separated branch alone",
+          n > 0 and worst <= 1e-9,
+          f"{n} points beyond alpha_stall + "
+          f"{np.degrees(SEPARATION_COMPLETE):.0f} deg, worst residual "
+          f"{worst:.2e}" + (f" at {where}" if where else ""))
 
 
 def test_it_has_no_kink() -> None:

@@ -37,12 +37,111 @@ from dytiscidae.evolution.cmaes import CMAES  # noqa: E402
 from dytiscidae.evolution.curator import Curator, OperatorBandit  # noqa: E402
 
 FAILURES: list[str] = []
+SKIPPED: list[str] = []
+
+#: Errors that mean "this machine lacks the hardware", not "the code is wrong".
+#: Explicit rather than a bare ``except``: a new kind of environmental breakage
+#: should be reported as a failure, not quietly absorbed into the skip count.
+BLOCKED_MARKERS = (
+    "GPU fluid extension not importable",
+    "No module named 'full_pipeline'",
+)
 
 
 def check(name: str, cond: bool, detail: str = "") -> None:
     print(f"  [{'ok  ' if cond else 'FAIL'}] {name}{('  -- ' + detail) if detail else ''}")
     if not cond:
         FAILURES.append(name)
+
+
+def skip(name: str, reason: str) -> None:
+    """A check that did not run.  Not ``check(name, True, "skipped: ...")``.
+
+    That form printed ``[ok  ]`` and counted as a pass, so a machine without
+    torch produced the same summary as one where the checkpoint and the shared
+    policy had actually been tested.
+    """
+    print(f"  [skip] {name}  -- {reason}")
+    SKIPPED.append(name)
+
+
+def needs_batched_evaluator(fn_name: str) -> bool:
+    """True when the caller should return: the batched evaluator is unavailable.
+
+    Six functions here drive a real ``run_search``, which needs the Mojo GPU
+    fluid extension.  Three of them *raise* on a machine without it and
+    ``run_all`` skips them; the other three do not, because ``run_search``
+    catches a failed generation, records it in telemetry and carries on with
+    nothing evaluated.  Those three then failed their own assertions with
+    "0 promotions", "0 tensors compared" and an identification that found six
+    modes instead of four -- five red checks that say nothing about the code and
+    everything about the machine.
+
+    Declaring the requirement at the top of the function is the difference
+    between a suite that reports what it could not run and one that reports a
+    defect it did not find.
+    """
+    from dytiscidae.envs import batchroll
+
+    if batchroll.AVAILABLE:
+        return False
+    skip(fn_name, f"{batchroll.UNAVAILABLE_REASON} — needs "
+                  f"`cd mojo && pixi run build-all`")
+    return True
+
+
+def run_all(functions) -> None:
+    """Run every test, and never let one of them stop the rest.
+
+    ``main()`` used to be a flat list of calls, so the first function that
+    raised ended the file and everything after it silently never ran.  On a
+    machine without the Mojo GPU fluid extension that is what happens, and the
+    console shows a traceback rather than a list of what was lost:
+    ``tools/suite_probe.py`` is what turns that into a count.
+
+    A blocked function is reported as ``[skip]`` and counted separately, because
+    "did not run" and "passed" must not share a line in the summary.
+    """
+    import traceback
+
+    for fn in functions:
+        mark = len(FAILURES)
+        try:
+            fn()
+        except Exception as exc:                                  # noqa: BLE001
+            text = f"{type(exc).__name__}: {exc}"
+            if any(m in text for m in BLOCKED_MARKERS):
+                # The function stopped partway.  Whatever it printed before it
+                # stopped is not evidence about the code -- several of these
+                # check a run that never got to evaluate anything -- so its
+                # checks are withdrawn rather than counted as failures.  They
+                # are not counted as passes either: the function is skipped.
+                partial = len(FAILURES) - mark
+                del FAILURES[mark:]
+                SKIPPED.append(fn.__name__)
+                note = f", {partial} partial checks withdrawn" if partial else ""
+                print(f"  [skip] {fn.__name__}{note}  "
+                      f"-- {text.splitlines()[0][:100]}")
+            else:
+                FAILURES.append(f"{fn.__name__} raised")
+                print(f"  [FAIL] {fn.__name__} raised")
+                traceback.print_exc()
+
+
+def report(label: str) -> int:
+    """The summary.  A skip is never folded into the success line."""
+    print("\n" + "=" * 68)
+    if SKIPPED:
+        print(f"{len(SKIPPED)} SKIPPED — needs the Mojo GPU fluid extension "
+              f"(`cd mojo && pixi run build-all`), not a defect: "
+              f"{', '.join(SKIPPED)}")
+    if FAILURES:
+        print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
+        return 1
+    # Unqualified only when nothing was skipped, so the string a reader greps
+    # for cannot appear on a run that did not run everything.
+    print(label if not SKIPPED else f"{label}, {len(SKIPPED)} skipped")
+    return 0
 
 
 # --------------------------------------------------------------------------
@@ -175,13 +274,16 @@ def test_bandit_learns_which_operator_pays() -> None:
     top = b.report()[0]
     check("report ranks the paying operator first", top["operator"] == "good",
           f"{top}")
-    check("credit is split across co-applied operators",
-          True)  # covered by construction; asserted below
+    # The `check(..., True)` that used to sit here said "covered by
+    # construction; asserted below" in its own comment, and printed [ok  ] for
+    # something it did not check.  The assertion below is the whole of it, now
+    # naming both operators so a one-sided split fails.
     b2 = OperatorBandit(["x", "y"])
     b2.update(["x", "y"], 1.0)
-    check("two operators each get half the reward",
-          abs(b2.stats["x"].lifetime_mean - 0.5) < 1e-9,
-          f"{b2.stats['x'].lifetime_mean}")
+    halves = [b2.stats[k].lifetime_mean for k in ("x", "y")]
+    check("credit is split evenly across co-applied operators",
+          all(abs(h - 0.5) < 1e-9 for h in halves),
+          f"x={halves[0]:.9f}, y={halves[1]:.9f}")
 
 
 def test_curator_regimes_respond_to_the_run() -> None:
@@ -1093,6 +1195,8 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     qualitatively different capabilities, declared once.  *Where the bar sits*
     inside the current rung is a population quantile that ratchets.
     """
+    if needs_batched_evaluator("test_judge_ladder_is_fixed_and_bar_only_tightens"):
+        return
     print("\njudge: fixed ladder, ratcheting bar")
     from dytiscidae.evolution.judge import LADDER, Judge, rung_reached
 
@@ -1754,6 +1858,8 @@ def test_a_run_can_be_picked_up_where_it_stopped() -> None:
     promised resumption and the code had checkpointing, which is not the same
     thing.
     """
+    if needs_batched_evaluator("test_a_run_can_be_picked_up_where_it_stopped"):
+        return
     print("\nloop: a run resumes where it stopped")
     import shutil
     import tempfile
@@ -1922,6 +2028,8 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
     the refined weights on the elite is what makes the second payment worth
     anything to the archive rather than only to the critic.
     """
+    if needs_batched_evaluator("test_promotion_spends_refinement_and_keeps_what_it_buys"):
+        return
     print("\nloop: promotion spends refinement and keeps what it buys")
     import json
     import shutil
@@ -2052,6 +2160,8 @@ def test_the_identification_width_reaches_the_policy() -> None:
     (4,) (6,)` in the middle of a rollout.  A config field that can only hold
     one value is worse than no field.
     """
+    if needs_batched_evaluator("test_the_identification_width_reaches_the_policy"):
+        return
     print("\nloop: the identification width follows the configured one")
     from dytiscidae.core.bodyplans import beetle
     from dytiscidae.envs.triphibian import MissionSpec
@@ -2156,6 +2266,8 @@ def test_the_two_evaluation_paths_score_the_same_machine_the_same() -> None:
 
     A comment cannot hold two implementations together.  This can.
     """
+    if needs_batched_evaluator("test_the_two_evaluation_paths_score_the_same_machine_the_same"):
+        return
     print("\nevaluation: the batched and single-machine paths agree")
     import numpy as np
 
@@ -2258,6 +2370,8 @@ def test_a_finished_run_is_a_checkpoint() -> None:
     `max_depth` -- which barely depends on the initial condition -- came back at
     9.51-9.69 against 9.60.
     """
+    if needs_batched_evaluator("test_a_finished_run_is_a_checkpoint"):
+        return
     print("\nloop: a finished run is a checkpoint")
     import shutil
     import tempfile
@@ -2270,8 +2384,8 @@ def test_a_finished_run_is_a_checkpoint() -> None:
     from dytiscidae.ops import checkpoint as ck
 
     if not AVAILABLE:
-        check("torch is available to test the checkpoint", True,
-              "skipped: torch not importable")
+        skip("torch is available to test the checkpoint",
+             "torch is not importable here")
         return
     import torch
 
@@ -2363,8 +2477,8 @@ def test_the_shared_policy_survives_a_resume() -> None:
     from dytiscidae.envs.triphibian import MissionSpec
 
     if not AVAILABLE:
-        check("torch is available to test the shared policy", True,
-              "skipped: torch not importable")
+        skip("torch is available to test the shared policy",
+             "torch is not importable here")
         return
 
     tmp = tempfile.mkdtemp(prefix="dyt-shared-resume-")
@@ -3016,6 +3130,8 @@ def test_sharding_a_generation_does_not_change_a_score() -> None:
     it is worth asserting rather than assuming -- a shared generator anywhere in
     that chain would make a design's score depend on its position in the batch.
     """
+    if needs_batched_evaluator("test_sharding_a_generation_does_not_change_a_score"):
+        return
     print("\nactors: a shard boundary is not visible in a score")
     from dytiscidae.core.bodyplans import BODY_PLANS
     from dytiscidae.core.phenotype import build
@@ -3237,57 +3353,54 @@ def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
     print("=" * 68)
-    test_mobility_recovers_known_basis()
-    test_archive_placement_and_improvement()
-    test_bandit_learns_which_operator_pays()
-    test_curator_regimes_respond_to_the_run()
-    test_curator_quarantines_repeat_exploits()
-    test_cmaes_optimises_a_known_function()
-    test_cppn_fields_are_deterministic_and_bounded()
-    test_every_mutation_operator_keeps_the_genome_buildable()
-    test_phenotype_invariants()
-    test_cpg_respects_joint_limits()
-    test_a_rare_capability_survives_the_learned_projection()
-    test_learned_descriptors_replace_the_hand_picked_axes()
-    test_cells_hold_a_pareto_front_not_a_weighted_sum()
-    test_intervention_is_triggered_by_evidence_not_a_schedule()
-    test_no_dataclass_can_raise_on_equality()
-    test_arriving_somewhere_is_not_one_lucky_timestep()
-    test_transitions_are_graded_not_pass_fail()
-    test_an_attempted_takeoff_outscores_never_leaving_the_ground()
-    test_judge_ladder_is_fixed_and_bar_only_tightens()
-    test_auditor_can_invalidate_and_veto()
-    test_critic_learns_the_exploit_signature()
-    test_the_island_objective_takes_its_weight_back()
-    test_curriculum_and_islands_give_gradient_where_the_mission_gives_none()
-    test_scout_finds_dark_horses_and_may_only_protect()
-    test_a_run_can_be_picked_up_where_it_stopped()
-    test_promotion_needs_a_nonzero_answer_to_the_next_question()
-    test_the_headline_is_the_mission()
-    test_promotion_spends_refinement_and_keeps_what_it_buys()
-    test_a_shared_command_means_the_same_thing_on_every_body()
-    test_the_identification_width_reaches_the_policy()
-    test_the_search_is_pointed_at_the_mission_and_compounds()
-    test_every_path_agrees_on_the_control_law()
-    test_the_shared_policy_survives_a_resume()
-    test_a_finished_run_is_a_checkpoint()
-    test_the_two_evaluation_paths_score_the_same_machine_the_same()
-    test_a_resume_says_when_controllers_cannot_be_inherited()
-    test_learned_axes_survive_resume()
-    test_the_loop_wires_every_layer_together()
-    test_the_body_plan_outlives_the_lineage_window()
-    test_something_asks_a_machine_to_leave_the_ground()
-    test_every_island_is_reached_by_verification_and_audit()
-    test_a_long_leg_runs_on_promotion_candidates_only()
-    test_the_shared_controller_question_is_answered_with_a_number()
-    test_sharding_a_generation_does_not_change_a_score()
-    test_structure_can_be_recombined_and_duplicated()
-    print("\n" + "=" * 68)
-    if FAILURES:
-        print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
-        return 1
-    print("all search-machinery checks passed")
-    return 0
+    run_all([
+        test_mobility_recovers_known_basis,
+        test_archive_placement_and_improvement,
+        test_bandit_learns_which_operator_pays,
+        test_curator_regimes_respond_to_the_run,
+        test_curator_quarantines_repeat_exploits,
+        test_cmaes_optimises_a_known_function,
+        test_cppn_fields_are_deterministic_and_bounded,
+        test_every_mutation_operator_keeps_the_genome_buildable,
+        test_phenotype_invariants,
+        test_cpg_respects_joint_limits,
+        test_a_rare_capability_survives_the_learned_projection,
+        test_learned_descriptors_replace_the_hand_picked_axes,
+        test_cells_hold_a_pareto_front_not_a_weighted_sum,
+        test_intervention_is_triggered_by_evidence_not_a_schedule,
+        test_no_dataclass_can_raise_on_equality,
+        test_arriving_somewhere_is_not_one_lucky_timestep,
+        test_transitions_are_graded_not_pass_fail,
+        test_an_attempted_takeoff_outscores_never_leaving_the_ground,
+        test_judge_ladder_is_fixed_and_bar_only_tightens,
+        test_auditor_can_invalidate_and_veto,
+        test_critic_learns_the_exploit_signature,
+        test_the_island_objective_takes_its_weight_back,
+        test_curriculum_and_islands_give_gradient_where_the_mission_gives_none,
+        test_scout_finds_dark_horses_and_may_only_protect,
+        test_a_run_can_be_picked_up_where_it_stopped,
+        test_promotion_needs_a_nonzero_answer_to_the_next_question,
+        test_the_headline_is_the_mission,
+        test_promotion_spends_refinement_and_keeps_what_it_buys,
+        test_a_shared_command_means_the_same_thing_on_every_body,
+        test_the_identification_width_reaches_the_policy,
+        test_the_search_is_pointed_at_the_mission_and_compounds,
+        test_every_path_agrees_on_the_control_law,
+        test_the_shared_policy_survives_a_resume,
+        test_a_finished_run_is_a_checkpoint,
+        test_the_two_evaluation_paths_score_the_same_machine_the_same,
+        test_a_resume_says_when_controllers_cannot_be_inherited,
+        test_learned_axes_survive_resume,
+        test_the_loop_wires_every_layer_together,
+        test_the_body_plan_outlives_the_lineage_window,
+        test_something_asks_a_machine_to_leave_the_ground,
+        test_every_island_is_reached_by_verification_and_audit,
+        test_a_long_leg_runs_on_promotion_candidates_only,
+        test_the_shared_controller_question_is_answered_with_a_number,
+        test_sharding_a_generation_does_not_change_a_score,
+        test_structure_can_be_recombined_and_duplicated,
+    ])
+    return report("all search-machinery checks passed")
 
 
 if __name__ == "__main__":

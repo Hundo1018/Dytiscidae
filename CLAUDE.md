@@ -39,17 +39,48 @@ done
 anything in `domain/`, `ports/` or `application/` starts importing torch,
 mujoco, numpy or sqlite3. See `docs/ARCHITECTURE.md`.
 
-**What each canary actually needs.** `test_physics.py` and `test_search.py` both
-reach `envs/batchroll.evaluate_tier1_batch`, so both need the Mojo GPU fluid
-extension built (`cd mojo && pixi run build-all`) and a GPU to run it on; without
-it they stop where they first touch it, and that is a missing accelerator rather
-than a defect. `test_ppo.py` no longer does: its learner, buffer, algorithm and
-checkpoint checks run on a bare CPU with only numpy and torch, and only its last
-section needs the evaluator, which it **skips with the reason printed**. The six
-suites in the loop above need no third-party package at all — `test_index.py`
-included — which is what `.github/workflows/checks.yml` runs on a hosted runner.
-A headless machine also needs `MUJOCO_GL=disable`, because MuJoCo 3.13 imports a
+**A skip is not a pass, and the summary line says so.** Every suite that can
+skip now prints `[skip]`, counts skips separately, and appends `, N skipped` to
+its success line. The bare strings above — `all physics checks passed`,
+`all search-machinery checks passed` — appear **only** on a run where nothing
+was skipped, which is what makes them safe to grep for.
+
+**No suite stops at the first blocked function any more.** `main()` in
+`test_physics.py` and `test_search.py` runs every test through `run_all`, which
+reports a function that hits the missing GPU extension as `[skip]` and
+*withdraws the checks it printed before it stopped* — a function that did not
+finish is evidence neither way. Measured cost of the old flat call list:
+`test_physics` ran 144 checks and now runs 203, `test_search` ran 133 and now
+runs 317.
+
+**What each canary actually needs.** Only `test_search.py` still needs a GPU:
+it skips 3 of its 45 functions without one. `test_physics.py` needs MuJoCo and
+**not** a GPU — 36 of its 37 functions pass on a bare CPU — so it is in CI now.
+`test_ppo.py` needs numpy and torch and nothing else; only its last section
+wants the evaluator. The suites in the loop above need no third-party package at
+all. `.github/workflows/checks.yml` runs all three tiers.
+
+**A headless machine needs `MUJOCO_GL=disable`**, because MuJoCo 3.13 imports a
 renderer at `import mujoco`.
+
+## Judging whether a test is worth anything
+
+Four instruments, all of which run without a GPU:
+
+```bash
+PYTHONPATH=. .venv/bin/python tools/mutate.py            # break it on purpose
+PYTHONPATH=. .venv/bin/python tools/suite_probe.py --all # what can run at all
+PYTHONPATH=. .venv/bin/python tools/assertion_audit.py   # assertions that cannot fail
+PYTHONPATH=. .venv/bin/python tools/coverage_report.py   # lines nothing touches
+```
+
+`tools/mutate.py` is the one that matters. A green suite proves nothing about
+its own effectiveness: it found that **removing PPO's clipping entirely left all
+54 checks in `test_ppo.py` green**, and that the check on `torch.manual_seed`
+passed on a `run_search` that no longer called it, because the check grepped the
+source and a commented-out call still contains the string. **Add a mutation
+whenever you add a gate**, and treat a survivor as a hole in the tests rather
+than a curiosity. Findings and method: `docs/TEST_AUDIT.md`.
 
 ## Running a search
 
@@ -193,6 +224,7 @@ needs no third-party package and runs in about a second.
 | `docs/ARCHITECTURE.md` | the job/ports layer: what a run *is*, how it is started, paused, resumed, cancelled and recorded |
 | `docs/MATH_AUDIT.md` | every physics/control/optimisation formula and constant: source, assumption, units, derivation and validation status, risk-ranked |
 | `docs/LEARNER_AUDIT.md` | the RL half against a standard checklist: what holds, what is deliberate, what is a gap, and the four things it changed |
+| `docs/TEST_AUDIT.md` | whether the tests are worth anything: mutation survival, coverage, assertions that cannot fail, and what cannot be run here |
 | `docs/index/` | **where everything is.** `FEATURES.yaml` by hand, `MODULES.md` and `SYMBOLS.md` generated — see "Before adding anything" below |
 | `derivations/` | one document per quantity, derived from its own premises, with the measurement that checks it |
 | `experiments/` | reproducible harnesses: `python experiments/<name>/run.py` re-derives every number the audit quotes |

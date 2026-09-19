@@ -165,8 +165,11 @@ def _job_store_contract(label: str, jobs, experiments) -> None:
     jobs.delete(JobId("j2"))
     check(f"[{label}] delete removes it",
           "j2" not in [str(j.job_id) for j in jobs.list()])
+    before = sorted(str(j.job_id) for j in jobs.list())
     jobs.delete(JobId("j2"))
-    check(f"[{label}] delete is idempotent", True)
+    check(f"[{label}] delete is idempotent",
+          sorted(str(j.job_id) for j in jobs.list()) == before,
+          "a second delete changes nothing rather than merely not raising")
 
     # A job under an experiment that does not exist: SQLite refuses it, the
     # file store cannot.  Both are acceptable, and what must not happen is
@@ -349,8 +352,12 @@ def test_latest_is_the_highest_step_and_pruning_never_eats_the_best() -> None:
     assert final.step == 60
 
     store.delete(made[0].checkpoint_id)
+    before = sorted(str(c.checkpoint_id) for c in store.list(made[0].job_id))
     store.delete(made[0].checkpoint_id)
-    check("delete is idempotent", True)
+    check("delete is idempotent",
+          sorted(str(c.checkpoint_id) for c in store.list(made[0].job_id))
+          == before,
+          "a second delete changes nothing rather than merely not raising")
     raised = False
     try:
         store.get(CheckpointId("nothing-here"))
@@ -410,19 +417,31 @@ def test_two_processes_updating_one_job_do_not_lose_a_write() -> None:
 
     # And the lock itself: a second holder must wait rather than proceed.
     lock_path = root / "contended.lock"
-    with FileLock(lock_path, timeout=0.2):
+    with FileLock(lock_path, timeout=0.2) as outer:
         raised = False
+        inner_held = False
         try:
-            with FileLock(lock_path, timeout=0.2):
-                pass
+            with FileLock(lock_path, timeout=0.2) as inner:
+                inner_held = inner._fh is not None
         except TimeoutError:
             raised = True
         # On a platform with flock, a lock is per file-description rather than
         # per process, so a re-entrant acquire from the *same* process may or
-        # may not block.  What must hold is that it did not silently succeed
-        # while another holder was inside; both outcomes are recorded.
+        # may not block.  Both outcomes are legitimate.
+        #
+        # This check was a literal `True`, which meant it also accepted the one
+        # outcome the sentence above forbids -- an acquire that returned without
+        # holding anything.  Naming the two legitimate results as a disjunction
+        # is what makes that third one fail.
         check("a contended lock either waits out its timeout or is re-entrant",
-              True, "raised TimeoutError" if raised else "re-entrant in-process")
+              raised or inner_held,
+              "raised TimeoutError" if raised
+              else f"re-entrant in-process, holding={inner_held}")
+        # And the invariant the comment was really about: whatever the inner
+        # attempt did, it must not have taken the outer holder's lock away.
+        check("and the outer holder still has its own lock afterwards",
+              outer._fh is not None,
+              "the second acquire did not displace the first")
 
 
 def test_the_control_channel_never_downgrades_an_instruction() -> None:
@@ -459,7 +478,9 @@ def test_the_control_channel_never_downgrades_an_instruction() -> None:
     channel.clear(job)
     check("clearing removes it", channel.poll(job) is None)
     channel.clear(job)
-    check("clearing twice is not an error", True)
+    check("clearing twice leaves it cleared",
+          channel.poll(job) is None,
+          "a second clear changes nothing rather than merely not raising")
 
     # An unparseable file must not stop a twenty-one-hour run.
     path = Path(channel.root) / "jobs" / "j1" / "control.json"

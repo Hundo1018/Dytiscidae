@@ -64,6 +64,20 @@ FORBIDDEN_INTERNAL = frozenset({
 FAILURES: list[str] = []
 
 
+SKIPPED: list[str] = []
+
+
+def skip(name: str, reason: str) -> None:
+    """A check that did not run.  Not ``check(name, True, "SKIPPED: ...")``.
+
+    That form printed ``[ok  ]`` and counted as a pass, so a run where the
+    search trainer could not be imported reported the same summary as one where
+    it was checked.  "Did not run" and "passed" do not share a line.
+    """
+    print(f"  [skip] {name}  -- {reason}")
+    SKIPPED.append(name)
+
+
 def check(name: str, cond: bool, detail: str = "") -> None:
     print(f"  [{'ok  ' if cond else 'FAIL'}] {name}{('  -- ' + detail) if detail else ''}")
     if not cond:
@@ -397,8 +411,8 @@ def test_the_adapters_satisfy_the_ports_they_claim() -> None:
     try:
         from dytiscidae.adapters.trainers.search import SearchTrainer
     except Exception as exc:                                      # noqa: BLE001
-        check("SearchTrainer satisfies Trainer", True,
-              f"SKIPPED: {type(exc).__name__}: {exc}")
+        skip("SearchTrainer satisfies Trainer",
+             f"not importable here: {type(exc).__name__}: {exc}")
     else:
         check("SearchTrainer satisfies Trainer",
               isinstance(SearchTrainer(), Trainer))
@@ -417,10 +431,14 @@ def main() -> int:
     test_the_adapters_satisfy_the_ports_they_claim()
 
     print("\n" + "=" * 68)
+    if SKIPPED:
+        print(f"{len(SKIPPED)} SKIPPED, not run on this machine: "
+              f"{', '.join(SKIPPED)}")
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
         return 1
-    print("all architecture checks passed")
+    print("all architecture checks passed" if not SKIPPED
+          else f"all architecture checks passed, {len(SKIPPED)} skipped")
     return 0
 
 
