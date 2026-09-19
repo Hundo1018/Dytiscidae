@@ -323,6 +323,15 @@ MUTATIONS: tuple = (
                "so the air and land islands fill with water machines",
         suites=("test_search",), item="island purity"),
 
+    Mutation(
+        id="bandit-without-an-exploration-floor",
+        path="dytiscidae/evolution/curator.py",
+        find="                 epsilon: float = 0.2) -> None:",
+        replace="                 epsilon: float = 0.0) -> None:",
+        defect="the tilted argmax alone decides every slot, so a non-structural "
+               "operator with a good mean can go unpicked for 80 generations",
+        suites=("test_search",), item="operator dormancy"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

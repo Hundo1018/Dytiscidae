@@ -84,11 +84,31 @@ class OperatorBandit:
     windowed and the lifetime figure is kept only for reporting.
     """
 
-    def __init__(self, names: list[str] | None = None, c: float = 0.6) -> None:
+    def __init__(self, names: list[str] | None = None, c: float = 0.6,
+                 epsilon: float = 0.2) -> None:
         names = names or list(MUTATION_OPERATORS)
         self.stats = {n: OperatorStats(n) for n in names}
         self.c = c
         self.total = 0
+        #: Chance that a slot is drawn uniformly instead of by the tilted argmax.
+        #:
+        #: The argmax is deterministic and the regime multiplies the eight
+        #: structural operators by 1.5-2.6 in every regime but ``refining``.
+        #: Measured over arch39's generations 60-200 (2,060 mutated children):
+        #: structural operators took **68.9%** of operator slots against a
+        #: uniform 36%, and ``gait`` -- measured offline to reach thrust on 70-80%
+        #: of draws where every single-axis operator reached 0-2.4% -- made
+        #: **0.7%** of children, after a stretch from generation 58 to 141 in
+        #: which it made none: an operator outside the top two or three can have
+        #: a good windowed mean and no picks, and then its window never updates.
+        #:
+        #: The floor keeps every operator's statistics alive without removing
+        #: the tilt: at 0.2 each operator gets at least 0.2/22 of slots, about 2%
+        #: of children at 2.3 mutations per child, and the structural share
+        #: falls only to about 62%.  0.2 is chosen from that arithmetic, not
+        #: from a sweep.  A bandit unpickled from an earlier run has no floor and
+        #: keeps the old behaviour, so a resumed run does not change mid-run.
+        self.epsilon = float(epsilon)
 
     def select(self, rng: np.random.Generator, *, structural_bias: float = 1.0,
                exclude: tuple = ()) -> str:
@@ -103,6 +123,11 @@ class OperatorBandit:
         was requesting never happened once.
         """
         self.total += 1
+        eps = getattr(self, "epsilon", 0.0)
+        if eps > 0.0 and rng.random() < eps:
+            pool = [n for n in self.stats if n not in exclude]
+            if pool:
+                return pool[int(rng.integers(len(pool)))]
         scores = {}
         for name, s in self.stats.items():
             if name in exclude:

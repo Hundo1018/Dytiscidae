@@ -299,6 +299,59 @@ def test_bandit_learns_which_operator_pays() -> None:
           f"x={halves[0]:.9f}, y={halves[1]:.9f}")
 
 
+def test_no_operator_can_go_dormant_under_the_structural_tilt() -> None:
+    """A good operator outside the top slots must still be tried.
+
+    Measured over arch39's generations 60-200: structural operators took 68.9%
+    of operator slots against a uniform 36%, and ``gait`` -- the operator the
+    arm existed to test -- made 0.7% of children after 83 generations with none.
+    The argmax is deterministic and the regime multiplies the eight structural
+    operators by up to 2.6, so a non-structural operator with a good windowed
+    mean and no picks never updates its window.  Rebuilt here: the real 22
+    operators, arch39's famine tilt and three slots per child, and statistics
+    frozen so only the selection rule is under test.
+    """
+    print("\ncurator: no operator goes dormant under the structural tilt")
+    from dytiscidae.core.genome import STRUCTURAL_OPERATORS
+
+    def shares(bandit, children=700):
+        rng = np.random.default_rng(5)
+        for name, st in bandit.stats.items():
+            st.tries = 30
+            st.recent.clear()
+            st.recent.extend([0.15 if name in STRUCTURAL_OPERATORS else 0.10] * 30)
+        made = {n: 0 for n in bandit.stats}
+        for _ in range(children):
+            picked = []
+            for _slot in range(3):
+                picked.append(bandit.select(rng, structural_bias=2.6,
+                                            exclude=tuple(picked)))
+            for n in set(picked):
+                made[n] += 1
+        return {n: m / children for n, m in made.items()}
+
+    floor = shares(OperatorBandit())
+    frozen = OperatorBandit()
+    frozen.epsilon = 0.0
+    argmax = shares(frozen)
+    dead = sorted(n for n, v in argmax.items() if v == 0.0)
+    check("without the floor, operators outside the top slots get nothing",
+          len(dead) >= 10, f"{len(dead)} of {len(argmax)} never chosen")
+    worst = min(floor, key=floor.get)
+    check("with it, every operator makes at least 1% of children",
+          floor[worst] >= 0.01, f"lowest: {worst} {floor[worst]:.1%}")
+    s_floor = sum(v for n, v in floor.items() if n in STRUCTURAL_OPERATORS)
+    s_argmax = sum(v for n, v in argmax.items() if n in STRUCTURAL_OPERATORS)
+    check("and the structural tilt still favours structural operators",
+          s_floor > 0.5 * s_argmax and s_floor / 8 > (3 - s_floor) / 14,
+          f"structural children-share {s_argmax:.2f} -> {s_floor:.2f} (of 3 slots)")
+
+    old = OperatorBandit()
+    del old.__dict__["epsilon"]            # as unpickled from an earlier run
+    check("a bandit pickled before the floor keeps its old behaviour",
+          shares(old) == argmax)
+
+
 def test_curator_regimes_respond_to_the_run() -> None:
     print("\ncurator: regime detection")
     a = Archive([("m", 0.0, 1.0, 8), ("d", 0.0, 1.0, 8)])
@@ -3670,6 +3723,7 @@ def main() -> int:
         test_mobility_recovers_known_basis,
         test_archive_placement_and_improvement,
         test_bandit_learns_which_operator_pays,
+        test_no_operator_can_go_dormant_under_the_structural_tilt,
         test_curator_regimes_respond_to_the_run,
         test_curator_quarantines_repeat_exploits,
         test_cmaes_optimises_a_known_function,

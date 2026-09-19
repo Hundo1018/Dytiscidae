@@ -2,7 +2,7 @@
 
 # Modules
 
-98 modules, 30,682 lines, 946 indexed symbols.
+98 modules, 30,707 lines, 946 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -113,7 +113,7 @@ is what makes a violation visible while reading.
 | `evolution.auditor` | The third party: a check on both the designs and the judge. | 358 | — | `numpy` | — |
 | `evolution.cmaes` | CMA-ES for controller weights. | 231 | — | `numpy` | — |
 | `evolution.critic` | The critic: a learned adversary trained to catch what cheap evaluation misses. | 281 | — | `numpy` | — |
-| `evolution.curator` | The curator: active management of the search, not just survival of the fittest. | 759 | — | `numpy` | `core.genome`, `evolution.archive` |
+| `evolution.curator` | The curator: active management of the search, not just survival of the fittest. | 784 | — | `numpy` | `core.genome`, `evolution.archive` |
 | `evolution.curriculum` | Staged evaluation: learn one medium, then a crossing, then the chain. | 499 | — | `numpy` | — |
 | `evolution.descriptors` | Learned behaviour descriptors, so the archive axes stop being my guesses. | 228 | — | `numpy` | — |
 | `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 319 | — | `numpy` | `evolution.curriculum` |

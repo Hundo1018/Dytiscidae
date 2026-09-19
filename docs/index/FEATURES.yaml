@@ -230,6 +230,7 @@ Curation:
     - evolution.curator.Regime
   tests:
     - tests.test_search::test_bandit_learns_which_operator_pays
+    - tests.test_search::test_no_operator_can_go_dormant_under_the_structural_tilt
     - tests.test_search::test_curator_regimes_respond_to_the_run
 
 Curriculum:

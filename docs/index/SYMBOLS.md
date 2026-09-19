@@ -919,32 +919,32 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Curator` | class | 160 | — | Decides who breeds, how, and what gets verified. |
+| `Curator` | class | 185 | — | Decides who breeds, how, and what gets verified. |
 | `OperatorBandit` | class | 76 | — | UCB over mutation operators, on a sliding window. |
 | `OperatorStats` | class | 57 | — | Running record for one mutation operator. |
-| `Regime` | class | 150 | — | The curator's read on what the run is currently doing. |
-| `Curator.__init__` | method | 172 | `(self, archive: Archive, *, seed: int=0, tier2_budget_fraction: float=0.08, crowding_limit: int=14) -> None` | — |
-| `Curator.check_famine` | method | 583 | `(self) -> list[str]` | Detect domains no design in the archive can perform, and act. |
-| `Curator.choose_operators` | method | 220 | `(self) -> list[str]` | — |
-| `Curator.cohort_report` | method | 716 | `(self, cohort: list[Elite]) -> list[dict]` | A compact, printable description of an approved cohort. |
-| `Curator.credit` | method | 229 | `(self, operators: list[str], status: str, gain: float) -> None` | Pay an operator for the improvement it produced. |
-| `Curator.domain_bests` | method | 532 | `(self) -> dict[str, float]` | Best competence any elite achieves in each domain. |
-| `Curator.generation_report` | method | 738 | `(self) -> dict` | — |
-| `Curator.note_offspring` | method | 335 | `(self, parent: Elite \| None, status: str) -> None` | — |
-| `Curator.observe_domains` | method | 542 | `(self, meta: dict) -> None` | Record one evaluation's per-domain competences. |
-| `Curator.on_rebin` | method | 364 | `(self) -> None` | Forget everything keyed by cell coordinate. |
-| `Curator.plateau_p` | method | 560 | `(self, domain: str) -> float` | How surprising the current drought is, if the search were still |
-| `Curator.prune` | method | 464 | `(self, max_prunes: int=3) -> int` | Drop marginal elites from over-dense regions. |
-| `Curator.quarantine` | method | 385 | `(self, descriptor: np.ndarray, reason: str, genome=None) -> None` | Record an exploit and taint the region it came from. |
-| `Curator.record_promotion` | method | 375 | `(self, elite: Elite, tier2_fitness: float) -> None` | — |
-| `Curator.select_cohort` | method | 670 | `(self, n: int \| None=None, *, require_feasible: bool=True, require_verified: bool=False) -> list[Elite]` | Approve a cohort to carry into the next round. |
-| `Curator.select_parent` | method | 267 | `(self) -> Elite \| None` | Pick who to breed from, weighting four independent signals. |
-| `Curator.should_promote` | method | 344 | `(self, elite: Elite) -> bool` | Whether this elite has earned a high-fidelity re-evaluation. |
-| `Curator.update_regime` | method | 410 | `(self) -> Regime` | Classify the run and set search pressure accordingly. |
-| `OperatorBandit.__init__` | method | 87 | `(self, names: list[str] \| None=None, c: float=0.6) -> None` | — |
-| `OperatorBandit.report` | method | 138 | `(self) -> list[dict]` | — |
-| `OperatorBandit.select` | method | 93 | `(self, rng: np.random.Generator, *, structural_bias: float=1.0, exclude: tuple=()) -> str` | Pick an operator by UCB, tilted by the current structural appetite. |
-| `OperatorBandit.update` | method | 120 | `(self, names: list[str], reward: float) -> None` | Credit every operator that contributed to one child. |
+| `Regime` | class | 175 | — | The curator's read on what the run is currently doing. |
+| `Curator.__init__` | method | 197 | `(self, archive: Archive, *, seed: int=0, tier2_budget_fraction: float=0.08, crowding_limit: int=14) -> None` | — |
+| `Curator.check_famine` | method | 608 | `(self) -> list[str]` | Detect domains no design in the archive can perform, and act. |
+| `Curator.choose_operators` | method | 245 | `(self) -> list[str]` | — |
+| `Curator.cohort_report` | method | 741 | `(self, cohort: list[Elite]) -> list[dict]` | A compact, printable description of an approved cohort. |
+| `Curator.credit` | method | 254 | `(self, operators: list[str], status: str, gain: float) -> None` | Pay an operator for the improvement it produced. |
+| `Curator.domain_bests` | method | 557 | `(self) -> dict[str, float]` | Best competence any elite achieves in each domain. |
+| `Curator.generation_report` | method | 763 | `(self) -> dict` | — |
+| `Curator.note_offspring` | method | 360 | `(self, parent: Elite \| None, status: str) -> None` | — |
+| `Curator.observe_domains` | method | 567 | `(self, meta: dict) -> None` | Record one evaluation's per-domain competences. |
+| `Curator.on_rebin` | method | 389 | `(self) -> None` | Forget everything keyed by cell coordinate. |
+| `Curator.plateau_p` | method | 585 | `(self, domain: str) -> float` | How surprising the current drought is, if the search were still |
+| `Curator.prune` | method | 489 | `(self, max_prunes: int=3) -> int` | Drop marginal elites from over-dense regions. |
+| `Curator.quarantine` | method | 410 | `(self, descriptor: np.ndarray, reason: str, genome=None) -> None` | Record an exploit and taint the region it came from. |
+| `Curator.record_promotion` | method | 400 | `(self, elite: Elite, tier2_fitness: float) -> None` | — |
+| `Curator.select_cohort` | method | 695 | `(self, n: int \| None=None, *, require_feasible: bool=True, require_verified: bool=False) -> list[Elite]` | Approve a cohort to carry into the next round. |
+| `Curator.select_parent` | method | 292 | `(self) -> Elite \| None` | Pick who to breed from, weighting four independent signals. |
+| `Curator.should_promote` | method | 369 | `(self, elite: Elite) -> bool` | Whether this elite has earned a high-fidelity re-evaluation. |
+| `Curator.update_regime` | method | 435 | `(self) -> Regime` | Classify the run and set search pressure accordingly. |
+| `OperatorBandit.__init__` | method | 87 | `(self, names: list[str] \| None=None, c: float=0.6, epsilon: float=0.2) -> None` | — |
+| `OperatorBandit.report` | method | 163 | `(self) -> list[dict]` | — |
+| `OperatorBandit.select` | method | 113 | `(self, rng: np.random.Generator, *, structural_bias: float=1.0, exclude: tuple=()) -> str` | Pick an operator by UCB, tilted by the current structural appetite. |
+| `OperatorBandit.update` | method | 145 | `(self, names: list[str], reward: float) -> None` | Credit every operator that contributed to one child. |
 | `OperatorStats.lifetime_mean` | property | 72 | `(self) -> float` | — |
 | `OperatorStats.mean_reward` | property | 66 | `(self) -> float` | — |
 
