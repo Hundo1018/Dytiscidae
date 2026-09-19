@@ -1,0 +1,67 @@
+# The checks a hosted runner can actually make.
+#
+# Two jobs, split by what they need rather than by what they test:
+#
+#   hexagon  -- a bare interpreter, no pip install at all.  That is not a
+#               convenience, it is the test: `tests/test_architecture.py`
+#               asserts that domain/, ports/ and application/ load in an
+#               interpreter where torch, mujoco and numpy are not importable,
+#               and the cheapest way to be sure of that is a runner where they
+#               are not installed.
+#   learner  -- numpy and a CPU torch, for the shared PPO learner.
+#
+# What is deliberately absent: tests/test_physics.py and tests/test_search.py.
+# Both go through `envs/batchroll.evaluate_tier1_batch`, which needs the Mojo
+# GPU fluid extension (`cd mojo && pixi run build-all`) and a GPU to run it on.
+# A hosted runner has neither, so running them here would report a red build for
+# a missing accelerator rather than for a defect.  They are the canary in
+# CLAUDE.md and are run on the machine that has the hardware.
+
+name: checks
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  hexagon:
+    name: hexagon + index (no third-party packages)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: the navigation index is what the source generates
+        run: PYTHONPATH=. python tools/index_gen.py check
+
+      - name: the suites that need nothing installed
+        run: |
+          set -e
+          for s in index architecture domain application adapters worker; do
+              echo "=== tests/test_$s.py ==="
+              PYTHONPATH=. python "tests/test_$s.py"
+          done
+
+  learner:
+    name: shared PPO learner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: install numpy and a CPU torch
+        run: python -m pip install --quiet numpy "torch>=2.2"
+
+      - name: the learner, its buffer and its determinism
+        # The integration checks at the end of this suite need the batched
+        # evaluator and skip themselves, with the reason printed, when it is
+        # not importable.  Everything before them is the algorithm alone.
+        run: PYTHONPATH=. python tests/test_ppo.py
+
+      - name: the search adapter
+        run: PYTHONPATH=. python tests/test_search_adapter.py

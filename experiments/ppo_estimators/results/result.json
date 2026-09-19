@@ -1,0 +1,132 @@
+{
+  "experiment": "ppo_estimators",
+  "ok": true,
+  "commit": "fcd664501a47024faaeca4d21243a71abca50b19-dirty",
+  "when": "2026-09-19T01:51:05Z",
+  "elapsed_s": 34.773,
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39",
+  "config": {
+    "question": "do the three scalars ppo_update computes about itself -- the entropy bonus, the KL it stops on, and the importance ratio it starts from -- measure what they are named after?",
+    "n_obs": 14,
+    "n_modes": 4,
+    "hidden": 32,
+    "seed": 5,
+    "gradient_probe": {
+      "batch": 4096,
+      "repeats": 32
+    },
+    "entropy_sweep": {
+      "coefficients": [
+        0.0,
+        0.01,
+        0.1,
+        1.0
+      ],
+      "updates": 30,
+      "trajectories_per_update": 8,
+      "steps_per_trajectory": 64,
+      "lr": 0.003,
+      "epochs": 4,
+      "minibatch": 256
+    },
+    "kl_probe": {
+      "updates": 40,
+      "epochs": 4,
+      "minibatch": 256,
+      "target_kl": 0.015
+    },
+    "ratio_probe": {
+      "trajectories": 16,
+      "steps": 64,
+      "saturating_log_std": 2.0
+    },
+    "note": "no MuJoCo and no fluid solver anywhere in this file. Every number comes from the learner alone, on synthetic observations, so it reproduces on a machine with neither a GPU nor the Mojo extension built."
+  },
+  "data": {
+    "entropy_gradient": {
+      "n_repeats": 32,
+      "d_used_mean": -0.00013107542326906696,
+      "d_used_se": 0.0018813514351024051,
+      "d_true_mean": 0.431136978790164,
+      "d_true_se": 0.0010553412324035521,
+      "t_used": -0.06967088701422353,
+      "t_true": 408.52850770195386
+    },
+    "entropy_sweep": {
+      "0.0": {
+        "log_std": [
+          -0.5374007821083069,
+          -0.44622981548309326,
+          -0.5191842317581177,
+          -0.47453567385673523
+        ],
+        "log_std_mean": -0.49433761835098267,
+        "sigma_mean": 0.6103702783584595
+      },
+      "0.01": {
+        "log_std": [
+          -0.525793731212616,
+          -0.437453031539917,
+          -0.5063440799713135,
+          -0.46252065896987915
+        ],
+        "log_std_mean": -0.4830278754234314,
+        "sigma_mean": 0.6172885894775391
+      },
+      "0.1": {
+        "log_std": [
+          -0.42354756593704224,
+          -0.3673338294029236,
+          -0.39847391843795776,
+          -0.368831604719162
+        ],
+        "log_std_mean": -0.3895467519760132,
+        "sigma_mean": 0.6775460243225098
+      },
+      "1.0": {
+        "log_std": [
+          -0.2790040075778961,
+          -0.2799563705921173,
+          -0.28390783071517944,
+          -0.2839406728744507
+        ],
+        "log_std_mean": -0.2817022204399109,
+        "sigma_mean": 0.7545002102851868
+      },
+      "spread_over_sweep": 0.21263539791107178,
+      "largest_minus_zero": 0.21263539791107178
+    },
+    "kl_estimators": {
+      "n_minibatches": 320,
+      "naive_mean": 0.0074733235422172585,
+      "naive_min": -0.0071729738265275955,
+      "naive_fraction_negative": 0.2,
+      "k3_mean": 0.007860777510359185,
+      "k3_min": 0.0,
+      "k3_fraction_negative": 0.0,
+      "k3_over_naive": 1.051844934312448,
+      "target_kl": 0.015,
+      "fraction_naive_under_bound_k3_over": 0.06875
+    },
+    "ratio_identity": {
+      "operating": {
+        "tag": "log_std=-0.5 (initial)",
+        "n": 1024,
+        "max_abs_ratio_error": 2.86102294921875e-06,
+        "fraction_over_1e-3": 0.0,
+        "fraction_over_1e-2": 0.0,
+        "fraction_action_over_0.999": 0.0
+      },
+      "saturated": {
+        "tag": "log_std=2.0",
+        "n": 1024,
+        "max_abs_ratio_error": 107.1395034790039,
+        "fraction_over_1e-3": 0.8046875,
+        "fraction_over_1e-2": 0.7919921875,
+        "fraction_action_over_0.999": 0.604248046875
+      }
+    }
+  }
+}
