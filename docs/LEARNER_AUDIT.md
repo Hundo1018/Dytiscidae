@@ -215,8 +215,10 @@ the seam is shaped by two cases rather than one.
 
 `tests/test_ppo.py` went from **8 checks to 54**, and from one function that a
 missing GPU extension could take down entirely to four sections of which only
-the last needs one. `tests/test_index.py` is new (17 checks). Both run on a
-machine with no GPU and no Mojo build.
+the last two need anything beyond numpy and torch. `tests/test_index.py` is new
+(17 checks). Both run on a machine with no GPU and no Mojo build: 47 of the 54
+run with numpy and torch alone, the other 7 need a compiled MuJoCo model and
+skip with their reason printed.
 
 ## 1. Unit
 

@@ -757,17 +757,28 @@ def test_the_shaping_reads_the_channels_it_thinks_it_does() -> None:
     So each index is checked against the quantity recomputed from the
     environment's own accessors, which is not the same information twice.
     Needs a compiled model, and nothing more -- not the batched evaluator.
+
+    The skip guard is on ``import mujoco`` rather than on the project modules,
+    and that distinction is the whole of it: the project modules import without
+    MuJoCo, which ``core/mjcf.compile_phenotype`` then imports *lazily* at the
+    moment it compiles.  Guarding the visible imports therefore guards nothing,
+    and this test raised on a runner with numpy and torch and no MuJoCo rather
+    than skipping.  It is the lazy-import case ``tests/test_architecture.py``
+    spawns a whole interpreter to catch, met here in a test of its own.
+    Everything after the guard is outside a ``try``, so a real failure still
+    fails.
     """
     print("\nintegration: the shaping's view of the observation")
     try:
-        from dytiscidae.core.bodyplans import beetle
-        from dytiscidae.core.phenotype import build
-        from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+        import mujoco  # noqa: F401
     except Exception as exc:                                     # noqa: BLE001
-        check("a model can be compiled", True,
+        check("MuJoCo is available to compile a model", True,
               f"SKIPPED: {type(exc).__name__}: {exc}")
         return
 
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
     from dytiscidae.learning import ppo as _ppo
 
     env = TriphibianEnv(build(beetle()))
