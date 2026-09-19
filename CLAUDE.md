@@ -63,6 +63,23 @@ all. `.github/workflows/checks.yml` runs all three tiers.
 **A headless machine needs `MUJOCO_GL=disable`**, because MuJoCo 3.13 imports a
 renderer at `import mujoco`.
 
+**After editing anything in `mojo/src`, rebuild:**
+
+```bash
+cd mojo && pixi run build-all      # full_pipeline.so, fluid_gpu.so, and the manifest
+```
+
+`mojo/build/*.so` is a compiled mirror of `physics/fluid.py`, and the search
+scores through it while every verification, probe and film uses the numpy half.
+Measured 2026-09-20: the built kernel was from 2026-08-04 and `mojo/src` had
+been changed on 09-15 by F-05 (the stall blend became a smoothstep), so the two
+paths ran different physics for five weeks, including all of arch39 — air
+measurements differed between the paths by up to 2.0, and agree to 0.000002
+after a rebuild. `tests/test_gpu_mirror.py` did not catch it: it compares the
+two *sources*, which agreed. A build now writes `BUILD_MANIFEST.json` and
+`batchroll.usable()` refuses a kernel older than its source, so a run says so at
+t=0 instead of scoring with physics nobody is verifying.
+
 ## Judging whether a test is worth anything
 
 Four instruments, all of which run without a GPU:
