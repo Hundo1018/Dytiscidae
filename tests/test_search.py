@@ -1804,6 +1804,76 @@ def test_one_islands_archive_is_read_alone_not_through_the_merge() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_a_specialist_islands_curriculum_reads_only_its_own_medium() -> None:
+    """A pure-habitat island must not select on another medium.
+
+    Every curriculum stage read all three media, and ``run_search`` never told
+    an island's curriculum which island it served.  Measured at arch39's
+    generation-180 checkpoint: 96.4% of the air island's elites and 96.4% of
+    the land island's were better in another medium than their own, nearly all
+    in water, and the air island's stage-0 top ten were all water machines with
+    air competence 0.00-0.03.  Water was the medium that won because a machine
+    with its actuators held still scores 0.533 there -- it sinks, and depth
+    gain, hold, submerged and upright all pay for sinking.
+    """
+    print("\ncurriculum: a specialist island reads only its own medium")
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.evolution.curriculum import Curriculum, stage_score
+    from dytiscidae.evolution.islands import ISLANDS, curriculum_for
+
+    def seg(c, **m):
+        return NS(competence=c, measurements=m)
+    # Good at sitting underwater, poor in the air: the measured shape.
+    res = NS(mission_fraction=0.01, segments={
+        "air": seg(0.03, sink_rate=2.4),
+        "water": seg(0.90, depth_error=0.5),
+        "land": seg(0.05, land_speed=0.02)})
+
+    class TS:
+        def __init__(self, results):
+            self.results = results
+        def component_means(self):
+            keys = next(iter(self.results.values())).components.keys()
+            return {k: float(np.mean([r.components[k] for r in self.results.values()]))
+                    for k in keys}
+    good = dict(crossed=1.0, shock=1.0, control=1.0, settle=1.0, exit_state=1.0, economy=1.0)
+    bad = {k: 0.0 for k in good}
+    ts = TS({"water_to_land": NS(components=good), "air_to_water": NS(components=bad),
+             "water_to_air": NS(components=bad), "land_to_air": NS(components=bad)})
+
+    air = dict(domains=("air",), transition_names=tuple(ISLANDS["air"]["transitions"]))
+    check("unrestricted, stage 0 pays the air island for water",
+          stage_score(0, res) == 0.90)
+    check("restricted, stage 0 reads air and nothing else",
+          stage_score(0, res, **air) == 0.03, f"{stage_score(0, res, **air)}")
+    check("stage 1 reads only the island's own directed measure",
+          stage_score(1, res, **air) == float(np.clip(1 - 2.4 / 3.0, 0, 1)),
+          f"{stage_score(1, res, **air):.3f} (unrestricted {stage_score(1, res):.3f})")
+    check("stage 2 reads only the island's own crossings",
+          stage_score(2, res, ts, **air) == 0.0 and stage_score(2, res, ts) > 0.0,
+          f"own {stage_score(2, res, ts, **air)}, all {stage_score(2, res, ts):.3f}")
+    check("stage 3 pairs a single-medium island's medium with itself",
+          abs(stage_score(3, res, ts, **air) - 0.03 * 0.1) < 1e-12,
+          f"{stage_score(3, res, ts, **air)}")
+
+    gen = dict(domains=tuple(ISLANDS["generalist"]["domains"]),
+               transition_names=tuple(ISLANDS["generalist"]["transitions"]))
+    check("the generalist's own set is every medium, so it scores exactly as before",
+          all(stage_score(k, res, ts, **gen) == stage_score(k, res, ts)
+              for k in range(5)))
+
+    cell = (0, 0)
+    sr = curriculum_for("air").evaluate(cell, res, ts)
+    check("run_search's constructor hands the air island an air curriculum",
+          sr.detail["here"] == 0.03, f"{sr.detail}")
+    old = Curriculum()
+    for k in ("domains", "transition_names"):
+        old.__dict__.pop(k, None)          # as unpickled from an earlier run
+    check("a curriculum pickled before the fix keeps reading every medium",
+          old.evaluate(cell, res, ts).detail["here"] == 0.90)
+
+
 def test_an_islands_best_is_judged_on_its_own_domains() -> None:
     """"The air island's best design" must be a machine that flies.
 
@@ -3620,6 +3690,7 @@ def main() -> int:
         test_judge_ladder_is_fixed_and_bar_only_tightens,
         test_auditor_can_invalidate_and_veto,
         test_critic_learns_the_exploit_signature,
+        test_a_specialist_islands_curriculum_reads_only_its_own_medium,
         test_an_islands_best_is_judged_on_its_own_domains,
         test_one_islands_archive_is_read_alone_not_through_the_merge,
         test_the_island_objective_takes_its_weight_back,

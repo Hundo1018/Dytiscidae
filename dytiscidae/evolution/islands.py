@@ -145,6 +145,23 @@ def island_score(island: str, result, transitions=None) -> float:
     return float(base * max(quality, 0.15))
 
 
+def curriculum_for(island: str):
+    """A curriculum that asks an island's questions in the island's own media.
+
+    ``run_search`` built every island's curriculum with no idea which island it
+    served, so each one scored "the best medium anywhere" -- see
+    ``curriculum.stage_score``.  An island outside ``ISLANDS`` gets the
+    unrestricted curriculum, which is what the generalist's set amounts to.
+    """
+    from .curriculum import Curriculum
+
+    spec = ISLANDS.get(island)
+    if spec is None:
+        return Curriculum()
+    return Curriculum(domains=tuple(spec["domains"]),
+                      transition_names=tuple(spec["transitions"]))
+
+
 def own_domain_score(island: str, meta: dict) -> float:
     """How good a stored elite is at *its island's own* domains, from its meta.
 

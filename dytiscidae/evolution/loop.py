@@ -54,7 +54,7 @@ from .critic import Critic, critic_features
 from .curator import Curator
 from .curriculum import STAGES, Curriculum
 from .descriptors import LearnedDescriptors, episode_features
-from .islands import ISLANDS, Archipelago, island_score
+from .islands import ISLANDS, Archipelago, curriculum_for, island_score
 from .judge import Judge
 from .scout import Scout, novelty_of, scout_features
 
@@ -964,7 +964,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         a = Archive(boot_axes)
         cur = Curator(a, seed=cfg.seed)
         archipelago.register(name, a, cur)
-        curricula[name] = Curriculum()
+        curricula[name] = curriculum_for(name)
         # So that pruning or quarantining a cell also drops its stage: the
         # curriculum is keyed by cell and nothing else was telling it when a
         # cell stopped existing.

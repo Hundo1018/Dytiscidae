@@ -81,21 +81,56 @@ class StageResult:
     detail: dict = field(default_factory=dict)
 
 
-def stage_score(stage: int, result, transitions=None) -> float:
+def _own_crossings(transitions, names) -> dict:
+    """``component_means`` over the named crossings only.
+
+    Same semantics as ``TransitionSet.component_means`` -- a crossing that was
+    tested and failed contributes zero to every component -- restricted to the
+    transitions an island owns.  A named crossing that was never tested is
+    absent, not zero, exactly as it is there.
+    """
+    results = getattr(transitions, "results", {}) or {}
+    own = [r for k, r in results.items() if k in names]
+    if not own:
+        return {}
+    keys = own[0].components.keys()
+    return {k: float(np.mean([r.components[k] for r in own])) for k in keys}
+
+
+def stage_score(stage: int, result, transitions=None, *,
+                domains=None, transition_names=None) -> float:
     """How well a result answers the question *this* stage asks.
 
     Each stage reads a different projection of the same evaluation, which is
     what makes the ladder a difficulty ladder rather than a weighting.
+
+    ``domains`` and ``transition_names`` restrict every stage to an island's own
+    media and crossings.  Without them the stages read all three media, and on a
+    specialist island that pays for someone else's.  Measured at arch39's
+    generation-180 checkpoint: 96.4% of the air island's elites and 96.4% of the
+    land island's were better in another medium than in their own -- 73 of 83
+    and 103 of 110 of them in *water* -- with a median own competence of 0.032
+    and 0.055; arch38 showed the same (97.1% and 75.9%).  Stage 0 read "the best
+    medium anywhere" with the island half at the 0.25 handover floor, so three
+    quarters of a specialist island's selection went to whatever medium was
+    cheapest.  None means every medium, which is the generalist's own set and
+    what a curriculum unpickled from an earlier run keeps.
     """
     segs = getattr(result, "segments", {}) or {}
     if not segs:
         return 0.0
+    if domains is not None:
+        segs = {d: s for d, s in segs.items() if d in domains}
+        if not segs:
+            return 0.0
     comps = {d: float(getattr(s, "competence", 0.0)) for d, s in segs.items()}
     meas = {d: dict(getattr(s, "measurements", {}) or {}) for d, s in segs.items()}
     tc = {}
     if transitions is not None:
         try:
-            tc = transitions.component_means()
+            tc = (_own_crossings(transitions, transition_names)
+                  if transition_names is not None
+                  else transitions.component_means())
         except Exception:
             tc = {}
 
@@ -133,8 +168,17 @@ def stage_score(stage: int, result, transitions=None) -> float:
         # all three.  This is the rung where an amphibian lives and a triphibian
         # does not yet have to.
         vals = sorted(comps.values(), reverse=True)
-        if len(vals) < 2:
+        if not vals:
             return 0.0
+        if len(vals) < 2:
+            # A single-medium island has no second medium of its own to chain.
+            # Its pair is its own medium with itself -- operate in it, and get in
+            # and out of it across the island's own crossings -- rather than a
+            # zero that would cap every specialist island at stage 2, or a
+            # foreign medium that would reopen the leak this function closes.
+            if domains is None:
+                return 0.0
+            vals = [vals[0], vals[0]]
         pair = float(np.sqrt(vals[0] * vals[1]))
         return pair * max(float(tc.get("crossed", 0.0)), 0.1)
 
@@ -155,6 +199,12 @@ class Curriculum:
     stages: dict = field(default_factory=dict)
     promotions: int = 0
     demotions: int = 0
+    #: The island's own media and crossings; every stage reads only these.
+    #: None reads all of them -- the generalist's set, and what a curriculum
+    #: pickled before this field existed keeps, so resuming an earlier run does
+    #: not change its selection mid-run.  See ``stage_score``.
+    domains: tuple | None = None
+    transition_names: tuple | None = None
 
     #: Recent (island_score, curriculum_score) pairs *per stage*.  Bounded
     #: window: this is a question about the population now, not about the whole
@@ -335,8 +385,10 @@ class Curriculum:
     def evaluate(self, cell, result, transitions=None) -> StageResult:
         """Score a design at its cell's stage, and at the next one up."""
         s = self.stage_of(cell)
-        here = stage_score(s, result, transitions)
-        nxt = stage_score(min(s + 1, N_STAGES - 1), result, transitions)
+        own = dict(domains=getattr(self, "domains", None),
+                   transition_names=getattr(self, "transition_names", None))
+        here = stage_score(s, result, transitions, **own)
+        nxt = stage_score(min(s + 1, N_STAGES - 1), result, transitions, **own)
         bar = STAGES[s][2]
         return StageResult(
             stage=s,

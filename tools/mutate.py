@@ -314,6 +314,15 @@ MUTATIONS: tuple = (
                "an elite that lost its cell to another island is never filmed",
         suites=("test_search",), item="per-island best"),
 
+    Mutation(
+        id="curriculum-reads-every-medium",
+        path="dytiscidae/evolution/curriculum.py",
+        find="    if domains is not None:\n        segs = {d: s for d, s in segs.items() if d in domains}",
+        replace="    if False:\n        segs = {d: s for d, s in segs.items() if d in domains}",
+        defect="a specialist island's curriculum pays for another medium again, "
+               "so the air and land islands fill with water machines",
+        suites=("test_search",), item="island purity"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",
