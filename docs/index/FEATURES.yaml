@@ -1,0 +1,477 @@
+# What this project can do, and where each capability lives.
+#
+# The one file in docs/index/ that a person writes.  MODULES.md and SYMBOLS.md
+# are generated from the AST by tools/index_gen.py and must not be edited; this
+# one records the thing an import graph cannot recover -- that six functions
+# spread across four packages together implement one capability.
+# `evaluate_tier1_batch` and `evaluate_tier1` are two implementations of the
+# same feature and do not import each other at all.
+#
+# Grammar (a strict subset of YAML; tools/index_gen.py:load_features parses it
+# and raises with a line number on anything outside it):
+#
+#     FeatureName:
+#       implementation:
+#         - <dotted path, with or without the dytiscidae. prefix>
+#       tests:
+#         - tests.<module>            # or tests.<module>::<function>
+#       note: one line, optional
+#
+# tests/test_index.py fails the build when an entry names something that no
+# longer exists, when a feature has no test, or when a package of the project is
+# named by no feature at all.  Read this file first when looking for where
+# something is implemented; then SYMBOLS.md; then the source.
+
+# --------------------------------------------------------------- the learner
+
+SharedPolicy:
+  implementation:
+    - learning.ppo.SharedPolicy
+    - learning.ppo.SharedPolicy.latent
+    - learning.ppo.SharedPolicy.entropy
+    - learning.ppo.SharedPolicy.log_prob_and_entropy
+    - learning.ppo.SharedPolicy.act
+    - learning.ppo.SharedPolicy.act_many
+    - learning.ppo.SharedPolicy.observe
+  tests:
+    - tests.test_ppo::test_one_decision_has_the_right_shape
+    - tests.test_ppo::test_batched_and_single_decisions_agree_when_deterministic
+    - tests.test_ppo::test_the_observation_normaliser_is_associative
+    - tests.test_search
+  note: one Gaussian policy and value head for every morphology in the search
+
+PPO:
+  implementation:
+    - learning.ppo.ppo_update
+  tests:
+    - tests.test_ppo::test_it_learns_a_reward_with_a_known_optimum
+    - tests.test_ppo::test_the_reported_kl_cannot_be_negative
+    - tests.test_ppo::test_the_entropy_bonus_has_a_gradient
+    - tests.test_ppo::test_a_non_finite_batch_is_refused_rather_than_consumed
+  note: one update per generation over everything the generation rolled out
+
+RolloutBuffer:
+  implementation:
+    - learning.ppo.RolloutBuffer
+    - learning.ppo.Trajectory
+    - learning.ppo.SegmentCollector
+  tests:
+    - tests.test_ppo::test_gae_matches_an_independent_reference
+    - tests.test_ppo::test_one_trajectory_never_bootstraps_off_another
+    - tests.test_ppo::test_terminal_rewards_are_scaled_within_their_own_kind
+
+AdvantageAndReturn:
+  implementation:
+    - learning.ppo.RolloutBuffer.build
+  tests:
+    - tests.test_ppo::test_gae_matches_an_independent_reference
+    - tests.test_ppo::test_the_discount_behaves_at_both_ends
+  note: GAE, with a zero terminal bootstrap because a segment ends when it ends
+
+RewardShaping:
+  implementation:
+    - learning.ppo.potential_of
+  tests:
+    - tests.test_ppo::test_potential_shaping_telescopes_to_nothing
+  note: potential-based, so it cannot change what is optimal
+
+LearnerDeterminism:
+  implementation:
+    - learning.ppo.ppo_update
+    - evolution.loop.SearchState
+    - evolution.loop.save_state
+    - evolution.loop.load_state
+  tests:
+    - tests.test_ppo::test_the_update_is_reproducible_from_its_stream
+    - tests.test_ppo::test_the_search_seeds_torch_before_it_builds_the_policy
+    - tests.test_ppo::test_both_learner_streams_survive_a_checkpoint
+
+PolicyDistillation:
+  implementation:
+    - learning.distill.distil
+    - learning.distill.Teacher
+    - learning.distill.teacher_targets
+    - learning.distill.sample_states
+  tests:
+    - tests.test_search
+
+# ------------------------------------------------------------- the controller
+
+CPG:
+  implementation:
+    - control.cpg.CPG
+    - control.cpg.CPGParams
+    - control.cpg.Policy
+  tests:
+    - tests.test_search::test_cpg_respects_joint_limits
+    - tests.test_physics
+
+MobilityIdentification:
+  implementation:
+    - control.cpg.MobilityBasis
+    - control.cpg.identify_mobility
+    - control.cpg.basis_from_probes
+    - control.cpg.required_probes
+    - envs.batchroll.identify_batch
+  tests:
+    - tests.test_search::test_mobility_recovers_known_basis
+    - tests.test_mobility_cache
+  note: the measured map from command to body twist; what makes one policy drive every body
+
+ControllerSearch:
+  implementation:
+    - control.train.train_controller
+    - evolution.cmaes.CMAES
+    - evolution.cmaes.Emitter
+  tests:
+    - tests.test_search::test_cmaes_optimises_a_known_function
+
+# ----------------------------------------------------- the evaluation ladder
+
+MissionEvaluation:
+  implementation:
+    - envs.triphibian.TriphibianEnv
+    - envs.triphibian.MissionSpec
+    - envs.triphibian.MissionResult
+    - envs.triphibian.evaluate_tier0
+    - envs.evaluate.evaluate_tier1
+    - envs.evaluate.evaluate_tier1_5
+    - envs.evaluate.evaluate_tier2
+    - envs.evaluate.finalise_tier1
+  tests:
+    - tests.test_physics
+    - tests.test_search::test_the_headline_is_the_mission
+  note: Tier 0 geometry, Tier 1 rollouts, Tier 1.5 one long leg, Tier 2 the whole mission
+
+BatchedEvaluation:
+  implementation:
+    - envs.batchroll.evaluate_tier1_batch
+    - envs.batchroll.rollout_batch
+    - envs.batchroll.step_batch
+    - envs.batchroll.BatchedFluid
+    - envs.batchroll.run_transition_batch
+  tests:
+    - tests.test_gpu_mirror
+    - tests.test_search::test_the_two_evaluation_paths_score_the_same_machine_the_same
+  note: the path the search scores with; not interchangeable with evaluate_tier1
+
+Vectorisation:
+  implementation:
+    - envs.actors.ActorPool
+    - envs.actors.split
+  tests:
+    - tests.test_search::test_sharding_a_generation_does_not_change_a_score
+  note: process pool and shard shape, decoupled from what is being evaluated
+
+Transitions:
+  implementation:
+    - envs.transitions.run_transition
+    - envs.transitions.TransitionResult
+    - envs.transitions.TransitionSet
+  tests:
+    - tests.test_search::test_transitions_are_graded_not_pass_fail
+
+ContinuousMission:
+  implementation:
+    - envs.mission.run_continuous
+    - envs.mission.build_schedule
+    - envs.mission.continuous_score
+  tests:
+    - tests.test_search
+
+ActuatorSkills:
+  implementation:
+    - envs.skills.DepthHold
+    - envs.skills.ResonanceSeek
+    - envs.skills.BuoyancyEngine
+    - envs.skills.LinearSkillPolicy
+  tests:
+    - tests.test_physics
+
+BehaviourDescriptors:
+  implementation:
+    - envs.evaluate.behaviour_descriptor
+    - evolution.descriptors.LearnedDescriptors
+    - evolution.descriptors.episode_features
+  tests:
+    - tests.test_search::test_learned_descriptors_replace_the_hand_picked_axes
+
+# ---------------------------------------------------------------- the search
+
+QualityDiversity:
+  implementation:
+    - evolution.archive.Archive
+    - evolution.archive.Elite
+    - evolution.loop.run_search
+    - evolution.loop.SearchConfig
+    - evolution.loop.SearchState
+  tests:
+    - tests.test_search::test_archive_placement_and_improvement
+    - tests.test_search::test_the_loop_wires_every_layer_together
+
+Islands:
+  implementation:
+    - evolution.islands.Archipelago
+    - evolution.islands.island_score
+  tests:
+    - tests.test_search::test_the_island_objective_takes_its_weight_back
+    - tests.test_search::test_every_island_is_reached_by_verification_and_audit
+
+Curation:
+  implementation:
+    - evolution.curator.Curator
+    - evolution.curator.OperatorBandit
+    - evolution.curator.Regime
+  tests:
+    - tests.test_search::test_bandit_learns_which_operator_pays
+    - tests.test_search::test_curator_regimes_respond_to_the_run
+
+Curriculum:
+  implementation:
+    - evolution.curriculum.Curriculum
+    - evolution.curriculum.stage_score
+  tests:
+    - tests.test_search::test_curriculum_and_islands_give_gradient_where_the_mission_gives_none
+
+Judge:
+  implementation:
+    - evolution.judge.Judge
+    - evolution.judge.Ratchet
+    - evolution.judge.rung_reached
+  tests:
+    - tests.test_search::test_judge_ladder_is_fixed_and_bar_only_tightens
+
+Auditor:
+  implementation:
+    - evolution.auditor.Auditor
+    - evolution.auditor.check_energy_conservation
+    - evolution.auditor.check_scaling
+  tests:
+    - tests.test_search::test_auditor_can_invalidate_and_veto
+
+Critic:
+  implementation:
+    - evolution.critic.Critic
+    - evolution.critic.critic_features
+  tests:
+    - tests.test_search::test_critic_learns_the_exploit_signature
+
+Scout:
+  implementation:
+    - evolution.scout.Scout
+    - evolution.scout.novelty_of
+  tests:
+    - tests.test_search::test_scout_finds_dark_horses_and_may_only_protect
+
+# --------------------------------------------------------------- the genome
+
+Genome:
+  implementation:
+    - core.genome.Genome
+    - core.genome.Part
+    - core.genome.Edge
+    - core.genome.crossover
+    - core.genome.graft_subtree
+  tests:
+    - tests.test_search::test_every_mutation_operator_keeps_the_genome_buildable
+    - tests.test_search::test_structure_can_be_recombined_and_duplicated
+
+Phenotype:
+  implementation:
+    - core.phenotype.build
+    - core.phenotype.Phenotype
+    - core.phenotype.build_panels
+    - core.mjcf.compile_phenotype
+    - core.mjcf.build_model_xml
+    - core.sdf.body_panels
+  tests:
+    - tests.test_search::test_phenotype_invariants
+    - tests.test_physics
+
+CPPN:
+  implementation:
+    - core.cppn.CPPN
+    - core.cppn.new_surface_cppn
+    - core.sdf.new_body_cppn
+  tests:
+    - tests.test_search::test_cppn_fields_are_deterministic_and_bounded
+
+SeedPlans:
+  implementation:
+    - core.bodyplans.seed_population
+    - core.bodyplans.beetle
+    - core.bodyplans.gannet
+    - core.reference.reference_genome
+  tests:
+    - tests.test_search
+    - tests.test_physics
+
+# --------------------------------------------------------------- the physics
+
+FluidSolver:
+  implementation:
+    - physics.fluid.FluidSolver
+    - physics.fluid.PanelSet
+    - physics.fluid.lift_coefficient
+    - physics.fluid.drag_coefficient
+    - physics.fluid.skin_friction_cd
+  tests:
+    - tests.test_physics
+    - tests.test_stall_blend
+    - tests.test_reduced_frequency
+
+AddedMass:
+  implementation:
+    - physics.fluid.FluidSolver.apply
+  tests:
+    - tests.test_added_mass
+
+Medium:
+  implementation:
+    - physics.medium.MediumField
+    - physics.medium.SeaState
+    - physics.medium.hydrostatic_pressure
+  tests:
+    - tests.test_physics
+
+PulsedJet:
+  implementation:
+    - physics.jet.JetSet
+    - core.phenotype.build_jets
+  tests:
+    - tests.test_jet_energy
+
+Structure:
+  implementation:
+    - physics.structure.hull_buckling_pressure
+    - physics.structure.hull_pressure_check
+    - physics.structure.flapping_inertial_check
+    - physics.structure.StructuralReport
+  tests:
+    - tests.test_hull_buckling
+    - tests.test_physics
+
+EnergyBudget:
+  implementation:
+    - physics.energy.mission_energy_wh
+    - physics.energy.cruise_power_air
+    - physics.energy.cruise_power_water
+    - physics.energy.crawl_power_land
+    - physics.energy.Battery
+  tests:
+    - tests.test_physics
+    - tests.test_math
+
+Wake:
+  implementation:
+    - physics.wake.VortexWake
+    - physics.wake.attach_wake_probe
+  tests:
+    - tests.test_physics
+
+Materials:
+  implementation:
+    - physics.materials.Material
+    - physics.materials.MotorClass
+  tests:
+    - tests.test_physics
+
+# ------------------------------------------------------ the job layer (hexagon)
+
+TrainingJob:
+  implementation:
+    - domain.job.TrainingJob
+    - domain.plan.TrainingPlan
+    - domain.state.TrainingState
+    - domain.experiment.Experiment
+  tests:
+    - tests.test_domain
+
+TrainerPort:
+  implementation:
+    - ports.trainer.Trainer
+    - ports.trainer.TrainingContext
+    - ports.trainer.TrainerCapabilities
+    - ports.trainer.TrainingOutcome
+  tests:
+    - tests.test_architecture
+    - tests.test_application
+
+TrainingService:
+  implementation:
+    - application.training.StartTraining
+    - application.training.PauseTraining
+    - application.training.ResumeTraining
+    - application.training.CancelTraining
+    - application.services.TrainingApplication
+    - application.create_experiment.CreateExperiment
+    - application.queries.GetJobStatus
+  tests:
+    - tests.test_application
+
+SearchTrainer:
+  implementation:
+    - adapters.trainers.search.SearchTrainer
+    - adapters.trainers.synthetic.SyntheticTrainer
+  tests:
+    - tests.test_search_adapter
+
+Storage:
+  implementation:
+    - adapters.filesystem.job_store.FileJobStore
+    - adapters.filesystem.experiment_store.FileExperimentStore
+    - adapters.filesystem.checkpoint_store.FileCheckpointStore
+    - adapters.sqlite.store.SqliteStore
+    - adapters.composition.Lab
+    - adapters.composition.build
+  tests:
+    - tests.test_adapters
+
+TrainingWorker:
+  implementation:
+    - worker.runtime.TrainingWorker
+    - worker.runtime.WorkerContext
+    - adapters.launchers.SubprocessLauncher
+  tests:
+    - tests.test_worker
+
+CommandLine:
+  implementation:
+    - adapters.cli.build_parsers
+    - adapters.cli.cmd_job
+    - adapters.cli.cmd_experiment
+    - ops.run.cmd_search
+    - ops.run.cmd_showcase
+  tests:
+    - tests.test_adapters
+    - tests.test_search_adapter
+
+# ------------------------------------------------------------- observability
+
+Telemetry:
+  implementation:
+    - ops.telemetry.Telemetry
+  tests:
+    - tests.test_search
+
+RunCheckpoint:
+  implementation:
+    - ops.checkpoint.write
+    - ops.checkpoint.read
+    - ops.checkpoint.load_network
+    - evolution.loop.save_state
+    - evolution.loop.load_state
+  tests:
+    - tests.test_search::test_a_finished_run_is_a_checkpoint
+    - tests.test_search::test_a_run_can_be_picked_up_where_it_stopped
+    - tests.test_ppo::test_both_learner_streams_survive_a_checkpoint
+
+Rendering:
+  implementation:
+    - viz.showcase.render_mission
+    - viz.render.render_episode
+    - viz.render.capture_episode
+    - viz.dashboard.build_dashboard
+  tests:
+    - tests.test_search
+  note: film and charts; the showcase prints whether the control law is the one that earned the score

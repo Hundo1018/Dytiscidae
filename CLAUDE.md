@@ -26,11 +26,11 @@ There is no pytest; every suite is a script with a `main()`. `test_search.py`
 takes ~25 min — run it detached with `setsid nohup … &`, never in a tool call
 that can time out and kill it.
 
-The job/ports layer has its own five suites, and together they take under two
-minutes, so they are cheap enough to run on every change:
+The job/ports layer and the index have their own suites, and together they take
+under two minutes, so they are cheap enough to run on every change:
 
 ```bash
-for s in architecture domain application search_adapter adapters worker; do
+for s in index architecture domain application search_adapter adapters worker; do
     PYTHONPATH=. .venv/bin/python tests/test_$s.py | tail -1
 done
 ```
@@ -38,6 +38,18 @@ done
 `test_architecture.py` is the one that matters most: it fails the build if
 anything in `domain/`, `ports/` or `application/` starts importing torch,
 mujoco, numpy or sqlite3. See `docs/ARCHITECTURE.md`.
+
+**What each canary actually needs.** `test_physics.py` and `test_search.py` both
+reach `envs/batchroll.evaluate_tier1_batch`, so both need the Mojo GPU fluid
+extension built (`cd mojo && pixi run build-all`) and a GPU to run it on; without
+it they stop where they first touch it, and that is a missing accelerator rather
+than a defect. `test_ppo.py` no longer does: its learner, buffer, algorithm and
+checkpoint checks run on a bare CPU with only numpy and torch, and only its last
+section needs the evaluator, which it **skips with the reason printed**. The six
+suites in the loop above need no third-party package at all — `test_index.py`
+included — which is what `.github/workflows/checks.yml` runs on a hosted runner.
+A headless machine also needs `MUJOCO_GL=disable`, because MuJoCo 3.13 imports a
+renderer at `import mujoco`.
 
 ## Running a search
 
@@ -133,6 +145,46 @@ steady state is ~74 s. Not a regression.
   prints `driving as evaluated: ...` and says whether the mobility basis was
   stored or re-identified; re-identified is a different experiment.
 
+## Before adding anything: look for it first
+
+98 modules, 30,000 lines, 939 indexed symbols. The expensive mistake here is not
+a missing feature, it is a **second implementation of one that already exists
+under a name nobody searched for**. `docs/index/` exists so that "does this
+already exist, and where?" is cheap to answer.
+
+Go in this order, and do not stop early because the first search came back
+empty — a different name is the normal case, not the exception:
+
+1. `docs/index/FEATURES.yaml` — 47 capabilities, each mapped to the symbols that
+   implement it and the tests that hold it. Start here, because it is the only
+   one that records "these six functions across four packages are one feature".
+2. `docs/index/SYMBOLS.md` — every public class, function, method and property
+   with its file and line.
+3. `docs/index/MODULES.md` — what each module is for, its size, its imports, and
+   whether it is inside the hexagon.
+4. The source, then its usages and its tests.
+5. Only then `rg`, with more than one spelling of the name.
+6. Only after all of that is it fair to conclude it does not exist.
+
+Then prefer, in this order: **reuse → extend → refactor → create.** Do not add a
+class, function or module that overlaps an existing one without first saying
+which one it overlaps and why extending it does not work.
+
+**After changing any source file, regenerate the index:**
+
+```bash
+PYTHONPATH=. .venv/bin/python tools/index_gen.py write   # MODULES.md, SYMBOLS.md
+PYTHONPATH=. .venv/bin/python tools/index_gen.py check   # exit 1 on drift
+PYTHONPATH=. .venv/bin/python tests/test_index.py        # + FEATURES.yaml resolves
+```
+
+`MODULES.md` and `SYMBOLS.md` are generated from the AST and **must not be
+edited by hand**. `FEATURES.yaml` is maintained by hand and must be updated when
+a feature gains, loses or moves an entry point — `tests/test_index.py` fails the
+build when it names something that no longer exists, when a feature has no test,
+or when a package of the project is named by no feature at all. `test_index.py`
+needs no third-party package and runs in about a second.
+
 ## Where the ground truth lives
 
 | | |
@@ -140,6 +192,8 @@ steady state is ~74 s. Not a regression.
 | `docs/ROADMAP.md` | work list + the measurement behind every decision |
 | `docs/ARCHITECTURE.md` | the job/ports layer: what a run *is*, how it is started, paused, resumed, cancelled and recorded |
 | `docs/MATH_AUDIT.md` | every physics/control/optimisation formula and constant: source, assumption, units, derivation and validation status, risk-ranked |
+| `docs/LEARNER_AUDIT.md` | the RL half against a standard checklist: what holds, what is deliberate, what is a gap, and the four things it changed |
+| `docs/index/` | **where everything is.** `FEATURES.yaml` by hand, `MODULES.md` and `SYMBOLS.md` generated — see "Before adding anything" below |
 | `derivations/` | one document per quantity, derived from its own premises, with the measurement that checks it |
 | `experiments/` | reproducible harnesses: `python experiments/<name>/run.py` re-derives every number the audit quotes |
 | `docs/CPU_LEGACY.md` | older backlog, superseded where they disagree |

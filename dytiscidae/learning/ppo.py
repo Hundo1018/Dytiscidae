@@ -191,10 +191,60 @@ class SharedPolicy(nn.Module if AVAILABLE else object):
     def log_prob(self, obs, act):
         """Log-density of an already-squashed action, with the tanh Jacobian."""
         base = self.latent(obs)
+        return self._log_prob_under(base, act)
+
+    @staticmethod
+    def _log_prob_under(base, act):
         a = act.clamp(-1.0 + 1e-6, 1.0 - 1e-6)
         u = torch.atanh(a)
         return (base.log_prob(u).sum(-1)
                 - torch.log1p(-a.pow(2) + 1e-6).sum(-1))
+
+    def entropy(self, obs):
+        """Differential entropy of this policy at ``obs``, one-sample estimate.
+
+        A tanh-squashed Gaussian has no closed-form entropy, so this is
+        ``-log pi(a)`` with ``a`` **drawn from this policy by ``rsample``** --
+        reparameterised, so the gradient has a path down to ``log_std`` and the
+        trunk.
+
+        Which sample it is drawn from is the whole point, and getting it wrong
+        is what this method exists to stop.  ``ppo_update`` used to estimate the
+        entropy as ``-log pi_new(a)`` with ``a`` taken from the rollout, i.e.
+        drawn from ``pi_old``.  That is the cross entropy H(pi_old, pi_new), and
+        at the on-policy point where every PPO update starts, its gradient is
+        *exactly zero*:
+
+            E_{a~pi}[grad log pi(a)] = grad integral pi(a) da = grad 1 = 0.
+
+        Measured, over 32 independently initialised policies at a batch of 4096
+        (``experiments/ppo_estimators``): d/d(log_std) of the term as it was
+        used is -0.00013 +/- 0.00188 (t = -0.07), against +0.43114 +/- 0.00106
+        (t = +409) for this estimator.  End to end, sweeping ``ent_coef`` from
+        0 to 1.0 -- a hundred times the default -- moved the learned mean
+        ``log_std`` by -0.0063, *downward*.  The entropy bonus was inert at
+        every coefficient, and the ``entropy`` number in the ppo telemetry line
+        was a cross entropy under a name that made it look like a collapse
+        detector.
+        """
+        return self.entropy_of(self.latent(obs))
+
+    @staticmethod
+    def entropy_of(base):
+        """The estimator above, on an already-computed ``latent`` distribution."""
+        u = base.rsample()
+        a = torch.tanh(u)
+        return -(base.log_prob(u).sum(-1)
+                 - torch.log1p(-a.pow(2) + 1e-6).sum(-1)).mean()
+
+    def log_prob_and_entropy(self, obs, act):
+        """Both, from one forward pass through the actor trunk.
+
+        Separately they cost two, and the trunk is the expensive part; they are
+        both functions of the same ``latent(obs)``.
+        """
+        base = self.latent(obs)
+        return self._log_prob_under(base, act), self.entropy_of(base)
 
     def act_many(self, obs_np, *, deterministic: bool = False):
         """One decision per row, in a single forward pass.
@@ -412,7 +462,7 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
                minibatch: int = 2048, clip: float = 0.2,
                vf_coef: float = 0.5, ent_coef: float = 0.01,
                max_grad_norm: float = 0.5, target_kl: float = 0.015,
-               lr_fraction: float = 1.0, optimiser=None) -> dict:
+               lr_fraction: float = 1.0, optimiser=None, rng=None) -> dict:
     """One PPO update over everything the generation collected.
 
     The defaults were raised after the first full run that used this.  At
@@ -457,6 +507,39 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
     n^0.388).  A *fixed* learning rate alone produces that signature, so it was
     never evidence that the gradient direction rotates -- which is why the
     anneal is in this arm and no conclusion was drawn from the old runs.
+
+    ``rng``, and why it is not optional in a run
+    -------------------------------------------
+
+    The minibatch order used to come from ``np.random.shuffle``, which draws on
+    the process-global legacy ``RandomState``.  Nothing seeded it from
+    ``cfg.seed`` and nothing put it in the checkpoint, so the same run at the
+    same seed took a different sequence of gradient steps every time, and a
+    resume took a different one again -- while ``adapters/trainers/search.py``
+    declared ``deterministic=True``.  Measured: two updates identical in every
+    other input differ by ||dW|| = 0.155 in the first actor layer when only that
+    stream differs, and by 0 when it matches.
+
+    So the stream is a parameter.  ``run_search`` owns one, seeded from
+    ``cfg.seed`` and checkpointed beside the archives.  Passing ``None`` is
+    still allowed, for a probe that does not care, and it is *reported*: the
+    returned diagnostics carry ``"deterministic": False``, because a fallback
+    this quiet is exactly the kind that cost this project two timing probes on
+    the CPU.
+
+    Non-finite input
+    ----------------
+
+    A single NaN reward -- one segment scored on a rollout that diverged --
+    makes every advantage in the batch NaN after the batch-wide
+    standardisation, and one optimiser step then writes NaN into every weight of
+    a policy shared by every machine in the search.  The next forward pass
+    raises inside ``torch.distributions.Normal``, several stack frames away from
+    the cause, and any checkpoint written in between holds a dead network.  So
+    the batch is checked before it is used, and a batch that is not finite is
+    refused with a reason rather than consumed: the project's rule that "I could
+    not measure this" must not share a value with "I measured zero", applied to
+    the learner.
     """
     if not AVAILABLE:
         raise RuntimeError(f"torch unavailable: {UNAVAILABLE_REASON}")
@@ -465,6 +548,16 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
         return {"transitions": n, "skipped": True}
 
     obs_np, act, logp_old, adv, ret, val_old = buffer.build()
+
+    nonfinite = {k: int((~np.isfinite(v)).sum()) for k, v in
+                 (("obs", obs_np), ("act", act), ("logp", logp_old),
+                  ("advantage", adv), ("return", ret), ("value", val_old))}
+    nonfinite = {k: v for k, v in nonfinite.items() if v}
+    if nonfinite:
+        return {"transitions": n, "trajectories": len(buffer.trajectories),
+                "skipped": True, "reason": "non-finite batch",
+                "non_finite": nonfinite}
+
     obs = torch.as_tensor(obs_np)
     act = torch.as_tensor(act)
     logp_old = torch.as_tensor(logp_old)
@@ -486,6 +579,7 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
     for group in opt.param_groups:
         group["lr"] = lr_now
     idx = np.arange(n)
+    shuffler = rng if rng is not None else np.random.default_rng()
     stats = {"pi_loss": 0.0, "v_loss": 0.0, "kl": 0.0, "entropy": 0.0,
              "clipfrac": 0.0, "n_batches": 0}
 
@@ -493,11 +587,11 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
     for _ in range(epochs):
         if stopped_early:
             break
-        np.random.shuffle(idx)
+        shuffler.shuffle(idx)
         epoch_kl, epoch_batches = 0.0, 0
         for s in range(0, n, minibatch):
             b = torch.as_tensor(idx[s:s + minibatch].copy())
-            logp = policy.log_prob(obs[b], act[b])
+            logp, ent = policy.log_prob_and_entropy(obs[b], act[b])
             ratio = (logp - logp_old[b]).exp()
             a = adv[b]
             pi_loss = -torch.min(
@@ -510,10 +604,11 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
             v_clipped = val_old[b] + (v - val_old[b]).clamp(-clip, clip)
             v_loss = 0.5 * torch.max((v - ret[b]) ** 2,
                                      (v_clipped - ret[b]) ** 2).mean()
-            # A squashed Gaussian has no closed-form entropy, so this is the
-            # one-sample estimator -- unbiased, and the only term the bonus
-            # needs a gradient through.
-            ent = -logp.mean()
+            # ``ent`` came out of ``log_prob_and_entropy``: the entropy of
+            # *this* policy on a reparameterised sample of its own, not
+            # ``-logp.mean()`` over the rollout's actions.  See
+            # ``SharedPolicy.entropy`` for what the second one measured and for
+            # the measurement that says it measured nothing.
             loss = pi_loss + vf_coef * v_loss - ent_coef * ent
 
             opt.zero_grad()
@@ -521,7 +616,18 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
             torch.nn.utils.clip_grad_norm_(policy.parameters(), max_grad_norm)
             opt.step()
 
-            kl = float((logp_old[b] - logp).mean().item())
+            # k3 (Schulman): ``(r - 1) - log r``, unbiased for KL(old||new) and
+            # non-negative by construction.  The plain ``log pi_old - log pi_new``
+            # this replaces is unbiased too and has enough variance to come out
+            # *negative*, which a divergence cannot be: measured over 320
+            # minibatches of real updates it was negative on 20.0% of them,
+            # bottomed at -0.0072, and ran 5% below k3 on average -- so on 6.9%
+            # of minibatches it reported the update as inside the 0.015 bound
+            # while k3 put it at or over.  ``target_kl`` was being asked to stop
+            # the epoch loop on a number that could be the wrong sign.
+            with torch.no_grad():
+                logr = logp.detach() - logp_old[b]
+                kl = float((logr.exp() - 1.0 - logr).mean().item())
             stats["pi_loss"] += float(pi_loss.item())
             stats["v_loss"] += float(v_loss.item())
             stats["kl"] += kl
@@ -555,5 +661,10 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
         "lr": lr_now,
         "grad_steps": stats["n_batches"],
         "stopped_early": stopped_early,
+        #: False where the caller supplied no ``rng``, so the minibatch order
+        #: came from a stream nothing seeded and nothing checkpoints.  Recorded
+        #: rather than assumed: ``TrainerCapabilities.deterministic`` is a claim
+        #: a caller plans against.
+        "deterministic": rng is not None,
         "skipped": False,
     }

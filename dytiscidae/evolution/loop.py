@@ -271,6 +271,14 @@ class SearchState:
     #: The policy shared by every morphology, or None when not in use.
     shared: object = None
     shared_opt: object = None
+    #: The stream PPO draws its minibatch order from.  Separate from ``rng``,
+    #: which draws evaluation seeds: mixing them would make the number of
+    #: gradient steps in a generation change which body the next one breeds.
+    #: Seeded from ``cfg.seed`` and checkpointed, because ``ppo_update`` used to
+    #: shuffle with the process-global legacy ``RandomState`` -- seeded by
+    #: nothing, saved by nothing -- while this trainer declared
+    #: ``deterministic=True``.
+    learner_rng: object = None
     #: The generation the loop actually stopped at, and why, when it stopped
     #: before ``cfg.generations``.  None for a run that went to the end.  Read
     #: by the job layer, which has to tell a run that finished from one that was
@@ -969,6 +977,13 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 "Refusing to run silently without the thing that was asked "
                 "for -- see the CPU-fallback note in envs/batchroll.py.")
         import torch as _torch
+        # Seed torch *before* the network exists, because what it decides is the
+        # network's initial weights.  Nothing did this: two runs at the same
+        # `--seed` started from policies ||dW|| = 7.4 apart in the first actor
+        # layer, and `adapters/trainers/search.py` declared `deterministic=True`
+        # anyway.  The worker pool seeds itself per shard (`envs/actors.py`),
+        # which covers the rollout's exploration noise and not this.
+        _torch.manual_seed(int(cfg.seed))
         # TWIST_DIM, not n_modes: the shared policy commands a body twist,
         # which is the same six axes on every machine, where a mode index is a
         # private coordinate that means something different on each.
@@ -977,6 +992,9 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         # eps 1e-5 rather than torch's 1e-8; see ``ppo_update``.
         state.shared_opt = _torch.optim.Adam(
             state.shared.parameters(), lr=cfg.shared_lr, eps=1e-5)
+        # Its own stream, derived from the same seed but not shared with the
+        # one that draws evaluation seeds; see ``SearchState.learner_rng``.
+        state.learner_rng = np.random.default_rng(cfg.seed ^ 0x5EED5EED)
 
     for c in archipelago.curators.values():
         c.scout = state.scout
@@ -1096,7 +1114,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                               target_kl=cfg.shared_target_kl,
                               ent_coef=cfg.shared_ent_coef,
                               lr_fraction=frac,
-                              optimiser=state.shared_opt)
+                              optimiser=state.shared_opt,
+                              rng=state.learner_rng)
             # The reward the update actually saw, per segment kind, so a later
             # reading can tell a policy that stopped learning from one that was
             # never given a gradient.  arch31's ppo line reported neither, and
@@ -1382,6 +1401,23 @@ def save_state(state: SearchState, gen: int) -> None:
         # reason.  A plain dict of ints and arrays, not a live object.
         "rng_state": state.rng.bit_generator.state,
     }
+    # The learner's two streams, for the same reason and with the same failure
+    # mode one level down.  ``learner_rng_state`` is the minibatch order;
+    # ``torch_rng_state`` is the exploration noise every rollout samples with.
+    # Without them a resume continues with the checkpointed weights and the
+    # checkpointed moments and then takes a *different* sequence of gradient
+    # steps from the one the uninterrupted run would have -- which is the
+    # optimiser-moment bug again, in the only two places it was still possible.
+    if state.learner_rng is not None:
+        payload["learner_rng_state"] = state.learner_rng.bit_generator.state
+    if state.shared is not None:
+        try:
+            import torch as _torch
+            payload["torch_rng_state"] = (
+                _torch.get_rng_state().numpy().copy())
+        except Exception as exc:                                  # noqa: BLE001
+            print(f"  (torch rng state not saved: {type(exc).__name__}: {exc})",
+                  flush=True)
     # Adam's moments.  The network was checkpointed and its optimiser was not,
     # so a resumed run continued with a warm network and a cold optimiser -- the
     # first updates after a resume behaved like the first updates of a run, and
@@ -1627,6 +1663,29 @@ def load_state(state: SearchState) -> int:
         except Exception as exc:                                  # noqa: BLE001
             print(f"  (rng state not restored: {exc}; seeds after this point "
                   "are a different stream)", flush=True)
+
+    # The learner's two streams.  Loud on failure for the reason the optimiser
+    # moments are: a resume that quietly takes a different sequence of gradient
+    # steps looks exactly like ordinary run-to-run noise.
+    if state.learner_rng is not None and d.get("learner_rng_state"):
+        try:
+            state.learner_rng.bit_generator.state = d["learner_rng_state"]
+        except Exception as exc:                                  # noqa: BLE001
+            print(f"  (learner rng not restored: {exc}; PPO's minibatch order "
+                  "after this point is a different stream)", flush=True)
+            state.telemetry.event({"kind": "learner_rng_not_restored",
+                                   "error": f"{type(exc).__name__}: {exc}"})
+    if state.shared is not None and d.get("torch_rng_state") is not None:
+        try:
+            import torch as _torch
+            state_arr = np.asarray(d["torch_rng_state"], dtype=np.uint8)
+            _torch.set_rng_state(_torch.as_tensor(state_arr, dtype=_torch.uint8))
+        except Exception as exc:                                  # noqa: BLE001
+            print(f"  (torch rng not restored: {type(exc).__name__}: {exc}; "
+                  "exploration noise after this point is a different stream)",
+                  flush=True)
+            state.telemetry.event({"kind": "torch_rng_not_restored",
+                                   "error": f"{type(exc).__name__}: {exc}"})
 
     # Say so when a resumed archive's controllers cannot be inherited.
     #

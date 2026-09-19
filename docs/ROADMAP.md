@@ -1604,6 +1604,27 @@ pairs rather than a single machine asked to be good at three things at once.
 **That is a change to what this project is for, so it is written down and not
 acted on.**
 
+**R. `shared_ent_coef` now does something, and has never been tuned.** The
+entropy bonus in `ppo_update` weighted the cross entropy H(π_old, π_new), whose
+expected gradient at the on-policy point is *exactly zero* by the score-function
+identity — so the coefficient was inert at every value it has ever been set to.
+Measured over 32 initialisations: d/d(log_std) of the term as used was
+**−0.00013 ± 0.00188 (t = −0.07)** against **+0.43114 ± 0.00106 (t = +409)** for
+a real estimator, and sweeping the coefficient from 0 to 1.0 — a hundred times
+the default — moved the learned mean `log_std` by **−0.0063**, downward. With the
+estimator fixed the same sweep moves it by **+0.2126**.
+
+So the default 0.01 is not a tuned value, it is a value that was measured to do
+nothing; at the fix it buys +0.0113 on `log_std` against the same run with the
+bonus off, and 0.1 buys +0.1048. **Pick it
+from a sweep before arch39, not by inheritance**, and note that exploration is
+not comparable across the boundary. `experiments/ppo_estimators/run.py`
+re-derives both sides and needs no GPU. Two other findings travel with it and
+are already closed: the KL that `target_kl` stops on was negative on 20.0% of
+minibatches (now k3), and the shared policy's initial weights were not
+reproducible from `--seed` at all (‖dW‖ = 7.4 between runs). Full audit in
+`docs/LEARNER_AUDIT.md`.
+
 ---
 
 ## arch34's phases, kept for the measurements behind them

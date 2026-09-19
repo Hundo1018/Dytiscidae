@@ -1,0 +1,14 @@
+{
+  "question": "do the three scalars ppo_update computes about itself -- the entropy bonus, the KL it stops on, and the importance ratio it starts from -- measure what they are named after?",
+  "n_obs": 14,
+  "n_modes": 4,
+  "hidden": 32,
+  "seed": 5,
+  "gradient_probe": {"batch": 4096, "repeats": 32},
+  "entropy_sweep": {"coefficients": [0.0, 0.01, 0.1, 1.0], "updates": 30,
+                    "trajectories_per_update": 8, "steps_per_trajectory": 64,
+                    "lr": 3e-3, "epochs": 4, "minibatch": 256},
+  "kl_probe": {"updates": 40, "epochs": 4, "minibatch": 256, "target_kl": 0.015},
+  "ratio_probe": {"trajectories": 16, "steps": 64, "saturating_log_std": 2.0},
+  "note": "no MuJoCo and no fluid solver anywhere in this file. Every number comes from the learner alone, on synthetic observations, so it reproduces on a machine with neither a GPU nor the Mojo extension built."
+}
