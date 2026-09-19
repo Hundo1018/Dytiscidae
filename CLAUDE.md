@@ -142,7 +142,13 @@ steady state is ~74 s. Not a regression.
   while the true instantaneous split was 100% / 0%. Sample `/proc/<pid>/stat`
   jiffies over a window instead.
 - Pipe chatty output. MuJoCo prints a `WARNING: Nan, Inf or huge value in QACC`
-  block per unstable rollout: `grep -viE "WARNING: Nan|^$"`.
+  block per unstable rollout: `grep -viE "WARNING: Nan|^$"`. **What it means:**
+  MuJoCo then *auto-resets the state and keeps stepping* — a teleport to the
+  default pose. It prints once per `mjData` until `mj_resetData`, so the log
+  count is a lower bound; the real rate is `diverged_rollouts / rollouts` in
+  `generations.jsonl` (arch39: 0.15%). Scored segments are gated on `bad_qacc`
+  and a divergence zeroes them; any *new* rollout loop must read the counter
+  too, because position checks cannot see a reset. `mj_forward` never resets.
 
 ## Reading telemetry without being fooled
 
