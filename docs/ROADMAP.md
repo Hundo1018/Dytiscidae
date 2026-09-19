@@ -1877,6 +1877,122 @@ thing on this list and the only one that can tell a seed effect from a bundle
 cost. It does not overlap S: S is judged on `thrust_margin`, this on `glides+`
 and `lift_margin`.
 
+## What 2026-09-20 fixed, and what is not comparable across it
+
+arch39 was stopped at generation 200 by the user ("39 does not need to
+continue; fix everything that should be fixed first"), and the day's work is
+below. **Nothing measured before today is comparable with anything measured
+after**, for two independent reasons: the GPU physics changed (it had been
+frozen five weeks behind its source) and every medium's competence was
+redefined.
+
+### 1. The GPU kernel was five weeks older than its source — the largest of them
+
+`mojo/build/full_pipeline.so`, which `evaluate_tier1_batch` scores with, was
+built 2026-08-04. `mojo/src` was changed 2026-09-15 by F-05, which replaced the
+stall blend: a logistic `1/(1+exp(-(|a|-stall)/6deg))` in the binary against a
+compactly supported smoothstep `t^2(3-2t)` over `stall+16deg` in the source and
+in `fluid.py`. So the search scored with one physics while Tier-2 verification,
+every probe and the showcase used another.
+
+`test_the_two_evaluation_paths_score_the_same_machine_the_same` exists to catch
+this and could not run: the driver mismatch fixed the same morning made it one
+of seventeen crashes. On the stale binary it fails; rebuilt:
+
+    air + land agree              worst 1.040857, 2.001011  ->  0.000000, 0.000002
+    all three, no identification  worst 0.171108, 0.573743  ->  0.000000
+    water with identification     the known residual, 0.05023, still open
+
+`tests/test_gpu_mirror.py` passed throughout, because it compares the two
+*sources*, which agreed. Nothing compared the running binary to its source.
+`pixi run build-all` — named by every "build it with" message in the Python half
+and absent from `pixi.toml` — now builds both extensions and writes a manifest
+of source hashes; `batchroll.usable()` refuses a stale kernel; the checkpoint
+records which kernel scored the run.
+
+**arch39's scores were produced by the 08-04 kernel and cannot be reproduced
+with today's code.** Its own record is internally consistent.
+
+### 2. Competence is what the machine did beyond doing nothing
+
+The inert probe, through the scored path, on the seed plans:
+
+| medium | own gait | actuators held still | still / own |
+|---|---|---|---|
+| water | 0.510 | **0.533** | **104%** |
+| air | 0.029 | 0.032 | 112% |
+| land | 0.048 | 0.010 | 20% |
+
+A still machine sinks — the eel gains +4.45 m held still against +4.52 m
+flapping — and depth gained, depth held, being submerged and being upright all
+paid for it. Item D had replaced absolute depth with depth *gained*, removing
+the free 4 m of the release and not the free metres of gravity: the air
+ladder's "paid for falling", in water, and the **seventh** instance of the
+recurring lesson.
+
+Every segment now runs a twin from the same state with every joint held at the
+angle it starts at, and scores the difference. **Motion is netted** — forward
+distance and the medium's motion terms. **State is a gate** — airborne,
+submerged, upright, posture, served multiply, because netting a state would
+score a stable hull 0 and a tumbling-but-corrected one 1, i.e. reward being
+passively unstable. A twin that does not survive leaves no baseline and the
+segment scores 0, so blowing up when held still cannot erase your own control.
+
+**Forward distance carries 0.6 of every medium** (the user's decision: "forward
+distance matters more"), where air and water had no distance term at all. Full
+marks is one rule across the three: land keeps 0.6 m/s, which is the 0.993
+quantile of its own net-speed distribution over 140 arch39 elites driven as they
+were scored; water and air take the same quantile of theirs — **0.45 and
+6.2 m/s**. Measured net speeds:
+
+    land   p50 +0.024  p90 +0.168  p99 +0.416  max +7.283 m/s
+    water  p50 +0.007  p90 +0.191  p99 +0.437  max +0.575
+    air    p50 -0.028  p90 +1.739  p99 +5.611  max +9.348
+
+The twin leaves no trace: the scored run is bit-identical with and without it on
+both evaluators in all three media. Held still, every plan scores exactly
+0.000000 where the eel's gross water score is 0.6301.
+
+### 3. No operator can go dormant
+
+`OperatorBandit.select` is a deterministic argmax over `(mean + UCB) x tilt`,
+and every regime but `refining` multiplies the eight structural operators by
+1.5–2.6. Measured over arch39 generations 60–200, 2,060 mutated children:
+structural operators took **68.9%** of operator slots against a uniform 36%, and
+`gait` made **0.7%** after making none from generation 58 to 141. An operator
+outside the top slots can hold a good windowed mean and never be tried again,
+so its window never updates. A 0.2 exploration floor gives every operator at
+least ~2% of children and leaves the structural share near 62%.
+
+### 4. Smaller, with their measurements
+
+- **A MuJoCo auto-reset was a teleport the continuous mission never saw.** On a
+  bad acceleration MuJoCo resets the state and keeps stepping; `run_continuous`
+  checked only for non-finite or >400 m, which a reset never trips. Injected at
+  step 400 it ran all 1,500 steps reporting `survived=True`. Scored segments
+  were already gated on `bad_qacc`; the thrust and lift rigs never step, so
+  `thrust_margin` could not be hit. 0.15% of arch39's scored rollouts diverged.
+- **A checkpoint named whatever HEAD was at write time**, not the code running:
+  arch39 launched from 09bab3b and its generation-200 checkpoint says ca05812.
+- **`showcase --island` chose among the elites that survived the cross-island
+  merge** (34 of the air island's 78), and could not rank by the island's own
+  domains at all — so "the air island's best" was a land machine.
+- **`min_shard` defaulted to 8**, the documented trap, in all three places.
+- **`batchroll.AVAILABLE` was an import-time answer**, so a driver mismatch read
+  as available and turned three suites' skips into seventeen failures.
+
+### 5. T — the thrust rungs need no motion gate. Closed by measurement
+
+`flap_travel` is computed and read by nothing, and the plan was to gate the
+thrust rungs on it. Measured over 3,224 arch39 air evaluations: **every**
+evaluation clearing `flaps_forward` has `flap_travel >= 0.104 rad`, and the 127
+designs under 0.05 rad clear nothing, with a maximum thrust of exactly +0.0000.
+Thrust needs stroke velocity, so the post-arch38 threshold at 0.002 — strictly
+above the floor — already does the gate's work, and a travel gate would penalise
+small-amplitude high-frequency flapping, which is real thrust. **Do not add it.**
+
+---
+
 ### W. The specialist islands were selecting for water — curriculum **fixed, unrun**; water score **measured, not fixed**
 
 Raised 2026-09-20 during arch39: a pure-habitat island's elites should not be
@@ -1902,7 +2018,9 @@ run does not change selection mid-run. On arch39's air archive the stage-0 top
 ten go from ten water machines (air 0.00–0.03) to air 0.71 / 0.67 / 0.60 at the
 top.
 
-**2. The source — water competence is paid for sinking. Measured, not fixed.**
+**2. The source — water competence is paid for sinking. Fixed 2026-09-20**
+(`6a21af6`; see §"What 2026-09-20 fixed" §2 for the design and the numbers).
+The measurement that motivated it:
 With every actuator held still, the seed plans score:
 
 | medium | own gait | **actuators still** | still ÷ own |
@@ -1920,15 +2038,19 @@ free metres of sinking: the air ladder's "paid for falling" defect, in water.
 **Seventh instance of the recurring lesson.** Land is the one medium where the
 actuators matter, because it was gated after the same probe caught it.
 
-Why it is not fixed alongside 1: water competence feeds `mission_fraction`, the
-water ladder's rungs, three islands' own scores and PPO's water reward, so a
-change to it redefines all of them — and arch38 showed that a water change
-bundled with anything else cannot be attributed. Candidates, as gates rather
-than coefficients: score depth against the design's own passive sink over the
-same segment (one extra actuator-still water rollout per design, cacheable per
-phenotype like `_measured_thrust`); or gate `reached` and `hold` on the
-machine arriving *and staying* where passive sinking does not put it. Pick
-from a measured distribution, and run it as its own arm.
+It was fixed by the first of those candidates, for all three media rather than
+water alone: every segment runs an actuators-held-still twin from the same
+state and scores the difference. It redefines `mission_fraction`, the islands'
+own scores and PPO's reward in every medium at once, which is why **nothing
+before 2026-09-20 is comparable with anything after** — and why arch40 gets a
+replication arm before anything is concluded from it.
+
+**Still open:** the ladder rungs read the *gross* measurements, so the water
+rungs are cleared by sinking (a still eel gains 4.45 m, clearing the 2 m rung)
+and the curriculum's stage 1 reads `sink_rate`, `depth_error` and `land_speed`
+gross. The net forms are published now (`depth_gain_net`,
+`depth_error_reduction`, `sink_reduction`, `land_speed_net`); moving the rungs
+onto them needs thresholds re-derived from their own distribution.
 
 **Order matters.** 1 alone moves the air and land islands' curriculum onto their
 own media, but the water, amphibian and aerial-diver islands still select for

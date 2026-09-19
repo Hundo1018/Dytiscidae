@@ -1499,6 +1499,25 @@ class TriphibianEnv:
             "control_net": c_net,
             "passive_competence": float(twin.competence),
         })
+        # The net form of each medium's headline motion measurement, published
+        # beside the gross one rather than replacing it, so a ladder can be moved
+        # onto it from a measured distribution and the old numbers stay readable.
+        # Gross depth gain is what a brick earns by sinking: the eel gains
+        # +4.45 m with its actuators held still.
+        tm, pm = res.measurements, twin.measurements
+        if key == "water":
+            if "depth_gain" in tm and "depth_gain" in pm:
+                tm["depth_gain_net"] = float(tm["depth_gain"] - pm["depth_gain"])
+            if "depth_error" in tm and "depth_error" in pm:
+                # Lower is better, so the net is how much closer to the target
+                # the machine held than gravity put it.
+                tm["depth_error_reduction"] = float(pm["depth_error"] - tm["depth_error"])
+        elif key == "air":
+            if "sink_rate" in tm and "sink_rate" in pm:
+                tm["sink_reduction"] = float(pm["sink_rate"] - tm["sink_rate"])
+        elif key == "land":
+            if "land_speed" in tm and "land_speed" in pm:
+                tm["land_speed_net"] = float(tm["land_speed"] - pm["land_speed"])
         if not res.survived or not twin.survived:
             if not twin.survived:
                 res.measurements["passive_unstable"] = 1.0
