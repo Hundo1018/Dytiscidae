@@ -1981,6 +1981,42 @@ least ~2% of children and leaves the structural share near 62%.
 - **`batchroll.AVAILABLE` was an import-time answer**, so a driver mismatch read
   as available and turned three suites' skips into seventeen failures.
 
+### 6. The ladders stay on the gross measurements, and that is a decision
+
+The curriculum's stage 1 -- which is *selection* -- read `sink_rate`,
+`depth_error` and `land_speed` gross, so it paid for sinking and for gliding
+from the 30 m launch. It now reads `sink_reduction`, `depth_error_reduction`
+and `land_speed_net`, scaled by the p90 of each over the same 140 elites:
+6.2 m/s, 0.54 m and land's own 0.4 m/s (whose p90 is 0.214, left where it was so
+land does not move under this change).
+
+**The judge's ladders were left on the gross quantities**, deliberately.
+Measured over those elites:
+
+    water.depth_gain       p50 +1.421  p90 +7.318  max +11.163 m
+    water.depth_gain_net   p50 -0.128  p90 +0.618  max  +3.306 m
+
+    rung           gross occupancy   net occupancy
+    >= 0.25 m          67.1%            15.0%
+    >= 2.00 m          45.0%             1.4%
+    >= 5.00 m          18.6%             0.0%
+    >= 8.00 m           7.1%             0.0%
+
+**The median machine dives less than gravity alone would.** Moving the rungs
+onto the net quantity at these thresholds would empty the ladder, and choosing
+thresholds that keep the old occupancy would put the first rung at a *negative*
+net gain -- paying for sinking again, under a new name. Setting a bar that
+leaves most of the population with nowhere to stand is the error this file
+records at `moves` (0.1 m/s left 61.6% of arch34 below it).
+
+So the ladders remain the cross-run comparability anchor and `rung_reached` in
+water is still clearable by sinking. What that costs: rung telemetry, the
+judge's within-rung bar and the scout's features are inflated in water. What it
+buys: arch34–arch39 rung numbers stay readable. **The right fix is not a
+threshold change, it is a population that can dive under power** -- which is
+what forward-distance-dominant, net-of-passive competence is now selecting for.
+Re-derive the water ladder from arch40's distribution, not from arch39's.
+
 ### 5. T — the thrust rungs need no motion gate. Closed by measurement
 
 `flap_travel` is computed and read by nothing, and the plan was to gate the

@@ -376,6 +376,15 @@ MUTATIONS: tuple = (
                "policy the search scores is told it is dry however deep it is",
         suites=("test_search",), item="path agreement"),
 
+    Mutation(
+        id="stage-one-reads-gross-measurements",
+        path="dytiscidae/evolution/curriculum.py",
+        find='        best = max(best, float(np.clip(air.get("sink_reduction", 0.0) / 6.2, 0.0, 1.0)))',
+        replace='        best = max(best, float(np.clip(1.0 - air.get("sink_rate", 9.9) / 3.0, 0.0, 1.0)))',
+        defect="the curriculum's directed stage pays for gliding from the 30 m "
+               "launch again, which a machine with its actuators off also does",
+        suites=("test_search",), item="net of passive"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

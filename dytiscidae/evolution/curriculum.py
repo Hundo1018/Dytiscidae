@@ -143,13 +143,24 @@ def stage_score(stage: int, result, transitions=None, *,
         # Going somewhere, in whichever medium it is best at.  Reads the raw
         # ladder measurements rather than competence, because "held depth" and
         # "scored well in water" are not the same claim.
+        #
+        # Each one is the *net* form -- what the machine did beyond a twin of
+        # itself with the actuators held still -- for the reason the competences
+        # are: gross, this stage paid for sinking and for gliding from the 30 m
+        # launch.  A machine that does nothing reads 0 in all three.  The scales
+        # are the p90 of each net quantity over 140 arch39 elites driven as they
+        # were scored (`runs/probe_net_measurements.py`): depth error reduced by
+        # 0.54 m, sink rate reduced by 6.2 m/s, and land speed's own 0.4 m/s,
+        # whose p90 is 0.214 and which is left where it was so land does not
+        # move under this change.
         best = 0.0
         air = meas.get("air", {})
-        best = max(best, float(np.clip(1.0 - air.get("sink_rate", 9.9) / 3.0, 0.0, 1.0)))
+        best = max(best, float(np.clip(air.get("sink_reduction", 0.0) / 6.2, 0.0, 1.0)))
         water = meas.get("water", {})
-        best = max(best, float(np.clip(1.0 - water.get("depth_error", 99.0) / 10.0, 0.0, 1.0)))
+        best = max(best, float(np.clip(
+            water.get("depth_error_reduction", 0.0) / 0.54, 0.0, 1.0)))
         land = meas.get("land", {})
-        best = max(best, float(np.clip(land.get("land_speed", 0.0) / 0.4, 0.0, 1.0)))
+        best = max(best, float(np.clip(land.get("land_speed_net", 0.0) / 0.4, 0.0, 1.0)))
         return best
 
     if stage == 2:

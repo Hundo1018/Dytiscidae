@@ -1879,9 +1879,9 @@ def test_a_specialist_islands_curriculum_reads_only_its_own_medium() -> None:
         return NS(competence=c, measurements=m)
     # Good at sitting underwater, poor in the air: the measured shape.
     res = NS(mission_fraction=0.01, segments={
-        "air": seg(0.03, sink_rate=2.4),
-        "water": seg(0.90, depth_error=0.5),
-        "land": seg(0.05, land_speed=0.02)})
+        "air": seg(0.03, sink_rate=2.4, sink_reduction=1.24),
+        "water": seg(0.90, depth_error=0.5, depth_error_reduction=0.54),
+        "land": seg(0.05, land_speed=0.02, land_speed_net=0.01)})
 
     class TS:
         def __init__(self, results):
@@ -1901,7 +1901,8 @@ def test_a_specialist_islands_curriculum_reads_only_its_own_medium() -> None:
     check("restricted, stage 0 reads air and nothing else",
           stage_score(0, res, **air) == 0.03, f"{stage_score(0, res, **air)}")
     check("stage 1 reads only the island's own directed measure",
-          stage_score(1, res, **air) == float(np.clip(1 - 2.4 / 3.0, 0, 1)),
+          abs(stage_score(1, res, **air) - 1.24 / 6.2) < 1e-12
+          and stage_score(1, res) == 1.0,          # water's reduction is full marks
           f"{stage_score(1, res, **air):.3f} (unrestricted {stage_score(1, res):.3f})")
     check("stage 2 reads only the island's own crossings",
           stage_score(2, res, ts, **air) == 0.0 and stage_score(2, res, ts) > 0.0,
@@ -2115,8 +2116,12 @@ def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> 
             self.mission_fraction = mf
 
     # A water specialist and a uniform failure both score ~0 on the mission.
+    # The net measurements are what stage 1 reads: what this machine did beyond
+    # a twin of itself with the actuators held still.
     specialist = Res(0.02, 0.85, 0.03, 0.001,
-                     {"water": {"depth_error": 0.8, "max_depth": 10.0, "depth_gain": 6.0}})
+                     {"water": {"depth_error": 0.8, "max_depth": 10.0,
+                                "depth_gain": 6.0, "depth_gain_net": 2.4,
+                                "depth_error_reduction": 1.6}})
     useless = Res(0.02, 0.03, 0.03, 0.001)
     t = Trans(0.34, 0.4)
 
