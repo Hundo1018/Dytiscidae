@@ -2,7 +2,7 @@
 
 # Modules
 
-98 modules, 30,387 lines, 942 indexed symbols.
+98 modules, 30,450 lines, 943 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -73,7 +73,7 @@ is what makes a violation visible while reading.
 |---|---|---:|---|---|---|
 | `core.bodyplans` | Body-plan archetypes: the seeds the search starts from. | 692 | — | `numpy` | `core.cppn`, `core.genome`, `core.sdf` |
 | `core.cppn` | Compositional Pattern Producing Networks -- the implicit shape representation. | 435 | — | `numpy` | — |
-| `core.genome` | The morphology genome: a recursive module graph plus implicit surface fields. | 1116 | — | `numpy` | `core.cppn`, `core.sdf` |
+| `core.genome` | The morphology genome: a recursive module graph plus implicit surface fields. | 1172 | — | `numpy` | `core.cppn`, `core.sdf` |
 | `core.mjcf` | Phenotype -> MJCF.  Builds the MuJoCo model and the triphibian scene. | 661 | — | `mujoco`, `numpy` | `core.genome`, `core.phenotype`, `physics.medium` |
 | `core.phenotype` | Genome -> phenotype: expand the module graph, size everything, weigh it. | 1199 | — | `mujoco`, `numpy` | `core.cppn`, `core.genome`, `core.sdf`, `physics`, `physics.energy`, `physics.fluid`, `physics.jet`, `physics.materials`, `physics.medium`, `physics.structure` |
 | `core.reference` | A hand-designed reference machine. | 208 | — | `numpy` | `core.cppn`, `core.genome` |
@@ -118,7 +118,7 @@ is what makes a violation visible while reading.
 | `evolution.descriptors` | Learned behaviour descriptors, so the archive axes stop being my guesses. | 228 | — | `numpy` | — |
 | `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 275 | — | `numpy` | — |
 | `evolution.judge` | The judge: a scoring standard that gets stricter as the population improves. | 478 | — | `numpy` | — |
-| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 2009 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
+| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 2014 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
 | `evolution.scout` | The scout: a network that predicts a lineage's potential, not its score. | 493 | — | `numpy` | — |
 
 ## `learning`
@@ -133,7 +133,7 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `ops.checkpoint` | A run's finished state as one portable artefact. | 375 | — | `numpy`, `torch` | `evolution.judge`, `learning`, `learning.ppo` |
-| `ops.run` | Command-line entry point. | 881 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `viz.dashboard`, `viz.render`, `viz.showcase` |
+| `ops.run` | Command-line entry point. | 883 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `viz.dashboard`, `viz.render`, `viz.showcase` |
 | `ops.telemetry` | Structured telemetry. | 111 | — | `numpy` | — |
 
 ## `physics`

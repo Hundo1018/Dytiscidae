@@ -5,11 +5,26 @@ built. Every item names the measurement that motivates it; nothing here is on
 the list because it seemed like a good idea, and nothing is marked done without
 the number it produced.
 
-Revised 2026-09-08, after arch37 ran. Everything below is kept for the
+Revised 2026-09-19, after arch38 ran. Everything below is kept for the
 measurement that motivated it; **the current work list is
-[arch38](#arch38--the-work-list)**, at the end, after the four results sections.
+[arch39](#arch39--the-work-list)**, at the end, after the five results sections.
 
-arch37 is the run that made flight visible to selection — the share of the
+Two things to read before proposing anything.
+
+[What arch38 measured](#what-arch38-measured) §3 and §6: rewarding thrust moved
+the thrust distribution **down**, because the rung at the floor was cleared by
+flapping that does nothing — the fifth time a score has paid for absent motion;
+and arch38's replication failure showed that "the changes must be measured by
+quantities that do not overlap" protects attribution but **not selection
+pressure**, which is shared and finite.
+
+[Thrust needs a joint move](#thrust-needs-a-joint-move-and-every-gait-operator-is-axis-aligned),
+measured after arch38: thrust is reachable in the model and unreachable by this
+search, because every variation operator moves one gait coordinate and the target
+needs four moved together. That is a search defect, not evidence about the
+physics, and it un-promotes item H.
+
+arch37 is still the run that made flight visible to selection — the share of the
 archive that can hold its own weight went 27.4% -> 58.0% and gliding capability
 rose 9.7x — and its own data refutes the explanation that was about to be given
 for the rung above. Read [What arch37 measured](#what-arch37-measured) §2 before
@@ -1473,6 +1488,124 @@ model, and *then* the change is supported.
 
 ---
 
+## What arch38 measured
+
+900 generations in 24.3 h, 83 s/gen, 14,066 evaluations, Tier-0 rejection 3.2%,
+seed 20260908. Report at `runs/arch38/report.html`, full record in
+`runs/arch38_notes.md`, which also holds the two void launches that preceded it.
+Every comparison below is computed for arch38 **and arch37 by the same code** —
+`runs/verify_arch38_predictions.py` and `runs/probe_thrust.py` — because the two
+runs' ladders differ and only identical computation is comparable.
+
+| | prediction, written before the run | verdict |
+|---|---|---|
+| **A** | excursion published, `wobble_ratio` above 1.0 | **confirmed, and not close** |
+| **D** | water rung occupancy spreads | **confirmed — the run's real result** |
+| **J** | thrust share moves off 7.7% | **falsified; it moved down** |
+| **K** | transition occupancy spreads off 70.6% | **confirmed** |
+| **E** | archipelago near 480 cells | works; the predicted number was wrong |
+| **repl.** | arch37's headline reproduces | **failed, and it cannot be attributed** |
+
+### 1. A — nothing has ever held an altitude, and now that is measured
+
+53.6% of air segments carry the metrics. `wobble_ratio` median **9.59** over all
+7,390 published, 22.1 for gliders and **25.4 for height-holders**, against a
+prediction of 8–10 from the arch37 arithmetic. `excursion_ratio` median 36.0.
+**100.0% of published air segments are above 1.0, in every subset**, and the
+report's `steady_path` and `steady_flight` series read **0.0% in all 18 bands**:
+across 900 generations not one air segment kept its altitude inside the station
+band it is judged against.
+
+So the arch37 inference was right and nothing below A is blocked. It also
+settles §H: what the paths do is now measured rather than inferred.
+
+### 2. D — a gradient was the missing thing in water, exactly as it was for lift
+
+Marginal shares at the four gain rungs went **39.9 / 15.0 / 4.0 / 0.6%** early to
+**70.2 / 58.2 / 30.7 / 12.1%** in generations 800–899. The share gaining 5 m went
+**4.0% → 30.7%**. arch37 had **99.8% clearing the first two rungs by being
+dropped** 4 m under; occupancy is now spread across all six.
+
+The early shares also refute the prediction that produced them — 71 / 52 / 29 /
+10% was computed from `max_depth − 4.0` on arch37 and overstated the true gain.
+That is the reason arch38 measures the gain directly.
+
+### 3. J — falsified in the opposite direction, and the mechanism is visible
+
+Elite to elite, the same probe on both archives: the share at
+`thrust_margin >= 0.05` went **7.7% → 1.8%**, and the archive maximum **fell from
++0.2390 to +0.0905**. Over evaluations the share rose to 5.6% by generation 300
+and **decayed back to 2.0%** by 899.
+
+What moved is the rung at zero. `>= 0.00` went **28.0% → 45.4%**, and the share
+within ±0.001 of *exactly* zero went 10.7% → 16.6% of evaluations and 9.3% →
+18.3% of elites. `flap_hz` median rose 1.80 → 3.50 Hz, but only 9.4% sits in the
+4.5–11 Hz band where the gait sweep found thrust, and
+**`corr(flap_hz, thrust_margin)` is −0.129 over evaluations and −0.149 over
+elites** — the prediction required it to be positive.
+
+`thrust = <Fx>_cycle − Fx_static`, so **a wing that barely moves reads exactly
+0.0 and clears `flaps_forward`.** The population converged on the cheapest
+clearance and the two rungs above it lost their audience. **This is the fifth
+time a score has paid for absent or uncontrolled motion**, and the rule this file
+keeps re-deriving says the answer is a gate, not a coefficient: ask what the
+measurement reads for a machine that is not flapping.
+
+### 4. K — occupancy spread, and `land_to_air` moved the way nothing predicted
+
+Occupancy 24.2 / 38.5 / 7.2 / 11.7 / 13.3 / 0.0 / 0.2 / 4.9 / 0.06% against
+arch37's 70.6% on rung 1 and 0.3% above it. Nobody is stuck at
+`crosses_efficiently`, which is worth a look before the next rebuild.
+
+`transition:land_to_air` PPO reward, measured the same way for both runs:
+**+0.0066 → +0.0143** weighted mean, nonzero on **88/900 → 181/900** updates,
+last hundred updates +0.0185 → +0.0363 — roughly double on both measures against
+a prediction of "probably still no". It is still 5% of `water_to_land`'s +0.70.
+
+### 5. E — the telemetry works and retires a claim this file repeated
+
+Archipelago totals are **660 cells median before a refit, 891 at most**, not the
+~480 predicted. Merge loss per refit is **19.0% median, 11.1–31.2%** for the
+archipelago. **Every "the archive shrinks 35%" claim in the earlier sections of
+this file is one island out of six or seven** — read them with that correction.
+The interval is unchanged at 400; this run only made the item measurable.
+
+### 6. Replication failed, and the bundle is why it cannot be attributed
+
+`glides+` in generations 800–899: **arch37 12.57% → arch38 2.69%.** The
+measurement-based form agrees (`sink_rate <= 3.0` among published, 24.55% →
+12.86%), so this is not a rung-index artefact. `lift_margin >= 1.0` among
+published: **63.4% → 31.7%.** PPO air reward is flat across arch38
+(+0.0185 → +0.0194) where arch37's quadrupled (+0.0110 → +0.0452).
+
+Seed variance or a cost of the bundle **cannot be separated from this run.** D
+gave water a real gradient for the first time and water PPO reward rose
++0.4123 → +0.5843 while air went flat: a fixed evaluation budget moved to the
+domain that had just been given somewhere to climb.
+
+**So the non-overlap rule needs its second amendment.** The four changes were
+checked for non-overlapping *measurements* and they were non-overlapping. Nothing
+checked that they did not compete for **selection pressure**, which is shared and
+finite. That is the same class of error as the first void launch — "what else
+reads the thing it moved" — one level up, at selection rather than at
+measurement. Answering it needs an arm that changes water alone, or arch37's seed
+re-run under arch38's code.
+
+### 7. What arch38 does not license
+
+- **Not comparable across arch37 → arch38:** water rungs and water competence,
+  transition rungs, air rungs above `holds_height`, and therefore
+  `mission_fraction`. `airborne_fraction` and its two rungs are not comparable
+  either, because the third launch ran at 8 s after two void launches at 24 s.
+- **H, the actuator model, is not promoted by this run.** arch38's own notes read
+  its pre-registered criterion as promoting H, and the gait measurement of
+  2026-09-13 below withdraws that: thrust is unreachable *by this search* because
+  the variation operators are axis-aligned, which is a search defect and not
+  evidence about the physics. H stays unsupported until a joint gait move has
+  been tried.
+
+---
+
 ## What is set by measurement, and what is typed
 
 Asked on 2026-09-13: which weights in this project are fabricated — a number
@@ -1637,61 +1770,166 @@ before the run, what fraction of draws reach positive thrust. If that fraction
 is near zero the operator is wrong and no run is needed to find out; if it is
 appreciable, the run has a stated number to be judged against.
 
-## arch39 — the work list, as it stands before arch38 has run
+## arch39 — the work list
 
-Everything here is evidence-backed and deliberately **not** in arch38, because
-each depends on a distribution that arch38 is about to move.
+Revised 2026-09-19, after arch38 ran and after the gait measurement above.
+Status against the source was audited the same day; every "not implemented"
+below was checked in the code, not read off this file.
 
-**L. Aspect ratio grows and buys nothing** (§4 above): +0.004 correlation with
-gliding in every band, while climbing 74% over the run, and `wing_area` — the
-thing that does correlate, increasingly — stayed flat. No scoring defect has
-been identified behind it. **First check whether `thrust_margin` fixes it as a
-side effect**, since thrust scales with the area being flapped. If arch38 shows
-area still flat with thrust rewarded, the next candidate is charging for span.
+**The headline is S, and it is the only item here that has a pre-registered
+prediction.** Everything else is either cheap and open, or waiting on a
+distribution S is about to move.
 
-**M. CPPN complexity drift** (§3): 18 → 73 over the run, correlation +0.060 and
-flat, while `n_parts` at +0.191 is the strongest predictor in the body vector.
-Charging for complexity is the obvious move and the obvious risk: complexity and
-part count are not independent, and part count is the thing that works.
-**Measure their correlation and the conditional effect of each before touching
-either.**
+### S. `mut_gait` — a joint gait move. **Not implemented; the arch39 arm**
 
-**N. GRPO for the shared policy** (§2), once thrust is in the score. Partial
-form: G=4 learning-only rollouts for a few bodies per generation.
+The measurement is §"Thrust needs a joint move" above: thrust is reachable in the
+model and unreachable by this search, because every variation operator is
+axis-aligned and the target needs all four gait coordinates moved together. Audit
+of `MUTATION_OPERATORS` (`dytiscidae/core/genome.py:1017`) confirms it — three
+operators touch gait and each moves one coordinate:
 
-**O. The air spawn** (item C), still the largest structural distortion and still
-without a safe design.
+| operator | file:line | what it moves |
+|---|---|---|
+| `mut_global_energy` | `core/genome.py:984` | global `flap_frequency`, on one roll in four |
+| `mut_stroke` | `core/genome.py:521` | **one** movable part: amplitude *or* rest offset, one of four branches |
+| `mut_phase_gradient` | `core/genome.py:499` | `phase_offset` only |
 
-**P. `descriptor_refit_every`** (item E), measurable for the first time in
-arch38 and unfixed.
+`mut_gait` resamples frequency, per-part stroke amplitude, phase and rest offset
+across the actuated set **at once**, drawn the way `random_genome` draws them for
+a fresh design rather than jittered from the parent. The precedent is in this
+repository: `mut_drivetrain`'s docstring reads "Together, because separately
+neither is worth anything."
 
-**Q. The triphibian conflict itself** (§6). `corr(air, water)` runs from +0.04 to
-−0.17 across arch37's nine bands, and a wing costs 2.5x more in water than it
-buys in air. The `land_air` island — added in arch37, finished second of seven,
-produced the run's mission-best — is evidence that pairs work where the whole
-does not. The question this raises is whether the mission should be a chain of
-pairs rather than a single machine asked to be good at three things at once.
-**That is a change to what this project is for, so it is written down and not
-acted on.**
+**Pre-register before the run, not after.** Monte Carlo the operator offline
+against `thrust_margin` on the seed plans and record the fraction of draws
+reaching positive thrust. **If that fraction is near zero the operator is wrong
+and no run is needed to find out**; if it is appreciable, the run has a stated
+number to be judged against. The single-coordinate sweep already gives the
+baseline it must beat — gannet −0.0001, beetle +0.0228, teal −0.3765 from the
+default gait, against +0.7693 / +0.1658 / +0.6916 when all four move together.
 
-**R. `shared_ent_coef` now does something, and has never been tuned.** The
-entropy bonus in `ppo_update` weighted the cross entropy H(π_old, π_new), whose
-expected gradient at the on-policy point is *exactly zero* by the score-function
-identity — so the coefficient was inert at every value it has ever been set to.
-Measured over 32 initialisations: d/d(log_std) of the term as used was
-**−0.00013 ± 0.00188 (t = −0.07)** against **+0.43114 ± 0.00106 (t = +409)** for
-a real estimator, and sweeping the coefficient from 0 to 1.0 — a hundred times
-the default — moved the learned mean `log_std` by **−0.0063**, downward. With the
-estimator fixed the same sweep moves it by **+0.2126**.
+Its measurement is the `thrust_margin` distribution, which overlaps nothing else
+on this list.
 
-So the default 0.01 is not a tuned value, it is a value that was measured to do
-nothing; at the fix it buys +0.0113 on `log_std` against the same run with the
-bonus off, and 0.1 buys +0.1048. **Pick it
-from a sweep before arch39, not by inheritance**, and note that exploration is
-not comparable across the boundary. `experiments/ppo_estimators/run.py`
-re-derives both sides and needs no GPU. Two other findings travel with it and
-are already closed: the KL that `target_kl` stops on was negative on 20.0% of
-minibatches (now k3), and the shared policy's initial weights were not
+### T. The thrust rungs are gated by a coefficient, and the gate is sitting unread
+
+Half done. After arch38, `thrust_margin()` returns `None` rather than `0.0` when
+it cannot be measured (`envs/triphibian.py:806`), `rung_reached` treats `None` as
+failing (`evolution/judge.py:273`), and the three rungs were re-derived from
+arch38's own 80 re-scored elites to 0.002 / 0.010 / 0.020
+(`evolution/judge.py:140`). That removes the "unmeasurable scored as measured
+zero" defect, which was the worst of it.
+
+**What is still a coefficient is the bar itself.** 0.002 is a number chosen so
+that a wing which barely moves falls below it. This file's own rule — restated
+six times, most recently by `land_speed` and `slope_climbed` moving one percent
+with the actuators switched off — is that the answer is a **gate**, not a
+coefficient. And the gate already exists: `flap_travel()`
+(`envs/triphibian.py:778`) is computed and written into `res.measurements` at
+four call sites and **read by nothing** — `grep flap_travel evolution/judge.py`
+is empty. The land rungs have their held-still control (`judge.py:187`); the
+thrust rungs have none.
+
+Cheap, and it belongs with S because S is the thing that will finally push
+designs at those rungs.
+
+### U. `min_shard` still defaults to 8 in all three places
+
+`evolution/loop.py:90`, `envs/actors.py:166` and the CLI at `ops/run.py:681` all
+default to 8. CLAUDE.md and §"The `--min-shard` default is still the documented
+trap" above both record that at batch 16 a single Tier-0 rejection makes
+`15 // 8 = 1`, one shard, and the pool silently runs in the parent with the
+workers idle — two generations in three before it was found — and that the swept
+optimum is 4. `adapters/trainers/search.py:51` documents the trap in a comment
+without changing the number. Change the default; the flag stays.
+
+### R. `shared_ent_coef` — the estimator is fixed, the coefficient is not swept
+
+Half done, and the half that is done is the hard half. The entropy term is now a
+real estimator (`learning/ppo.py:203`, sampling from π_new) rather than the cross
+entropy H(π_old, π_new) whose expected gradient at the on-policy point is exactly
+zero — measured **−0.00013 ± 0.00188 (t = −0.07)** against **+0.43114 ± 0.00106
+(t = +409)**. `experiments/ppo_estimators/run.py` re-derives both sides and needs
+no GPU.
+
+**The default is still 0.01, which is the value that was measured to do nothing.**
+`experiments/ppo_estimators/` reproduces the diagnostic, not a tuning sweep. At
+the fix, 0.01 buys +0.0113 on the learned `log_std` against the bonus off and 0.1
+buys +0.1048. Pick it from a sweep before it rides along in a run, and note that
+exploration is **not comparable** across the boundary.
+
+Two findings travel with it and are closed: the KL `target_kl` stops on was
+negative on 20.0% of minibatches (now k3), and the shared policy's initial
+weights were not reproducible from `--seed` at all (‖dW‖ = 7.4). Full audit in
+`docs/LEARNER_AUDIT.md`.
+
+### V. The replication failure needs its own arm, and it is not S
+
+arch38's `glides+` came in at 2.69% against arch37's 12.57% at matched
+generations, and §6 of "What arch38 measured" says why it cannot be attributed:
+the bundle's four changes had non-overlapping *measurements* but competed for
+**selection pressure**, which is shared and finite. D gave water a gradient and
+water PPO reward rose while air went flat.
+
+The arm that answers it is **arch37's seed (20260901) re-run under arch38's
+code**, changing nothing else. It needs no new code, which makes it the cheapest
+thing on this list and the only one that can tell a seed effect from a bundle
+cost. It does not overlap S: S is judged on `thrust_margin`, this on `glides+`
+and `lift_margin`.
+
+### L. Aspect ratio grows and buys nothing — and thrust did not fix it
+
+Carried from before arch38 with its conditional now answered. The instruction was
+"first check whether `thrust_margin` fixes it as a side effect, since thrust
+scales with the area being flapped." **arch38 rewarded thrust and the thrust
+distribution moved down**, so the side effect was never available and L is
+unanswered rather than resolved. No cost on span or aspect ratio exists anywhere
+in `fitness()` (`envs/evaluate.py:618`); `aspect_ratio` is an aerodynamic
+coefficient and a descriptor feature and nothing else. **Re-ask it after S**,
+which is the first change that would make flapping area worth paying for.
+
+### M. CPPN complexity drift — measure the confound before charging for it
+
+18 → 73 over a run, correlation +0.060 and flat, while `n_parts` at +0.191 is the
+strongest predictor in the body vector. `Genome.complexity`
+(`core/genome.py:281`) is recorded as metadata and charged nowhere. Charging for
+it is the obvious move and the obvious risk: complexity and part count are not
+independent and part count is the thing that works. **Measure their correlation
+and the conditional effect of each before touching either.**
+
+### N. GRPO for the shared policy
+
+Not implemented — `learning/` holds `ppo.py` and `distill.py` and no GRPO
+anywhere. Right algorithm, still not the binding constraint, and it waits on
+thrust being in the score in a form the search can climb. Partial form when it
+comes: G=4 learning-only rollouts for a few bodies per generation.
+
+### O. The air spawn — still the largest structural distortion, still no safe fix
+
+`SPAWN[Domain.AIR] = (-40.0, 0.0, 30.0)` at `envs/triphibian.py:483`, read
+unchanged at three sites, varied by nothing but 0.2 m of reset noise. Every air
+score in this project has been earned from a 30 m launch. No design yet exists
+that lowers it without making the air ladder unreachable for everything.
+
+### P. `descriptor_refit_every`
+
+Still 400 (`evolution/loop.py:181`, CLI `ops/run.py:733`). arch38 made it
+measurable for the first time and measured it: **19.0% median merge loss per
+refit, 11.1–31.2%, over 660 median archipelago cells.** Unfixed, and now with a
+number to judge a change against.
+
+### Q. The triphibian conflict itself
+
+`corr(air, water)` runs +0.04 to −0.17 across arch37's nine bands and a wing
+costs 2.5x more in water than it buys in air. arch38 added a second instance of
+the same shape: a fixed evaluation budget moved to water the moment water had
+somewhere to climb. The `land_air` island — added in arch37, finished second of
+seven, produced that run's mission-best — is evidence that pairs work where the
+whole does not.
+
+**Whether the mission should be a chain of pairs rather than one machine asked to
+be good at three things at once is a change to what this project is for, so it is
+written down and not acted on.** It is now supported by two runs rather than one.
 reproducible from `--seed` at all (‖dW‖ = 7.4 between runs). Full audit in
 `docs/LEARNER_AUDIT.md`.
 

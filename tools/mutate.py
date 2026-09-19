@@ -256,6 +256,31 @@ MUTATIONS: tuple = (
                 "test_physics::test_jet_thrust_matches_momentum_flux"),
         item="C formula"),
 
+    # --- the variation operators ------------------------------------------
+    #
+    # `mut_gait` exists only to be a *joint* move; every way it can quietly
+    # become axis-aligned looks identical to every other genome test, because
+    # the children still build and still differ from their parents.
+    Mutation(
+        id="gait-drops-phase-and-rest",
+        path="dytiscidae/core/genome.py",
+        find="        part.phase_offset = float(rng.uniform(0.0, 2 * math.pi))\n"
+             "        part.neutral = float(rng.uniform(0.2, 0.8))",
+        replace="        pass  # phase and rest left where the parent had them",
+        defect="mut_gait degrades to an amplitude-and-frequency move, so two of "
+               "the four coordinates the thrust sweep needed never move",
+        suites=("test_search",), item="arch39 S jointness"),
+    Mutation(
+        id="gait-touches-one-part",
+        path="dytiscidae/core/genome.py",
+        find="    g.flap_frequency = float(rng.uniform(1.5, 8.0))\n"
+             "    for part in movable:",
+        replace="    g.flap_frequency = float(rng.uniform(1.5, 8.0))\n"
+                "    for part in movable[:1]:",
+        defect="mut_gait resamples one part rather than the actuated set, which "
+               "is what mut_stroke already did",
+        suites=("test_search",), item="arch39 S jointness"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

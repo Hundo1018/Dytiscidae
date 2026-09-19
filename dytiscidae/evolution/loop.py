@@ -87,7 +87,12 @@ class SearchConfig:
     #: raising ``batch``, which is a search-design decision, not a throughput
     #: one -- so it is left to the caller rather than done here.
     workers: int = 1
-    min_shard: int = 8
+    #: 4, not 8.  At ``batch`` 16 a default of 8 makes a *single* Tier-0
+    #: rejection compute ``15 // 8 == 1``: one shard, run in the parent, every
+    #: worker idle -- and two generations in three ran that way before it was
+    #: found.  4 is the swept optimum, not a guess: 4 shards of 4 take 31.7 s
+    #: where 1x16 takes 72.2, 2x8 47.6, 8x2 51.8 and 16x1 93.3.
+    min_shard: int = 4
 
     # Fidelity
     segment_seconds: float = 8.0

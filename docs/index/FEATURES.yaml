@@ -272,9 +272,13 @@ Genome:
     - core.genome.Edge
     - core.genome.crossover
     - core.genome.graft_subtree
+    # The one variation operator named here, because it is the only joint move
+    # in MUTATION_OPERATORS and the arch39 arm is judged on what it reaches.
+    - core.genome.mut_gait
   tests:
     - tests.test_search::test_every_mutation_operator_keeps_the_genome_buildable
     - tests.test_search::test_structure_can_be_recombined_and_duplicated
+    - tests.test_search::test_the_gait_operator_moves_every_coordinate_at_once
 
 Phenotype:
   implementation:

@@ -163,7 +163,7 @@ class ActorPool:
     compare against.
     """
 
-    def __init__(self, workers: int = 1, *, min_shard: int = 8) -> None:
+    def __init__(self, workers: int = 1, *, min_shard: int = 4) -> None:
         self.workers = max(int(workers), 1)
         self.min_shard = max(int(min_shard), 1)
         self._pool = None

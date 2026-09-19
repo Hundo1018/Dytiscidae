@@ -678,11 +678,13 @@ def main(argv=None) -> int:
                         "is not worth a batch's fixed cost, so the pool never "
                         "makes more than --batch // --min-shard of them: to "
                         "use more cores, raise --batch.")
-    p.add_argument("--min-shard", type=int, default=8,
+    p.add_argument("--min-shard", type=int, default=4,
                    help="fewest machines a worker is given at once. Measured "
                         "per machine-step: 238 us alone, 149 in a shard of "
                         "four, 105 in eight, 89 in sixteen -- so a smaller "
-                        "shard spends the parallelism it gains")
+                        "shard spends the parallelism it gains. 4 is the swept "
+                        "optimum end to end; 8 collapses the pool to one shard "
+                        "as soon as one machine is rejected at batch 16")
     p.add_argument("--segment-seconds", type=float, default=8.0,
                    help="Tier-1 episode length; the main cost/fidelity dial")
     p.add_argument("--refine-steps", type=int, default=0,

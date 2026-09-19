@@ -546,6 +546,61 @@ def mut_stroke(g: Genome, rng: np.random.Generator) -> bool:
     return True
 
 
+def mut_gait(g: Genome, rng: np.random.Generator) -> bool:
+    """Resample the whole gait at once: frequency, amplitude, phase and rest.
+
+    Together, because separately none of them is worth anything -- the same
+    reason ``mut_drivetrain`` bundles stiffness with gear ratio, and the only
+    other place in this file where that argument was applied.
+
+    Measured 2026-09-13, sweeping each gait coordinate alone from the seed
+    default, 250 draws each, best ``thrust_margin`` reached:
+
+        =================  =========  =========  =========
+        varied             gannet     beetle     teal
+        =================  =========  =========  =========
+        default gait        -0.0001    +0.0228    -0.3765
+        frequency alone     -0.0001    +0.1210    -0.1490
+        amplitude alone     -0.0001    +0.1447    +0.0030
+        phase alone         +0.0003    +0.0230    -0.0725
+        offset alone        +0.0000    +0.0296    -0.0931
+        **all four**       **+0.7693**  +0.1658  **+0.6916**
+        =================  =========  =========  =========
+
+    On two of the three plans *no single coordinate produces any thrust at all
+    and all four together produce two thirds of the airframe's drag*.  Every
+    other gait operator in ``MUTATION_OPERATORS`` is axis-aligned:
+    ``mut_global_energy`` moves the global frequency on one roll in four,
+    ``mut_stroke`` moves amplitude *or* rest on **one** part, and
+    ``mut_phase_gradient`` moves phase.  So the target is reachable in the model
+    and was unreachable by this search, which is what arch38's three thrust
+    rungs failed on -- not the actuator model, and not the frequency band, which
+    8.91% of arch38's evaluations were already inside.
+
+    Drawn the way ``random_genome`` draws a fresh design rather than jittered
+    from the parent, because a jitter is what a chain of axis-aligned operators
+    already is: ``flap_frequency`` moves only through ``mut_global_energy``, at
+    0.0113 touches per child, and a lineage of depth 10 starting at 2.2 Hz
+    reaches 4.5 Hz in **0.00%** of 20,000 trials.
+
+    This is a large jump and it is meant to be.  It destroys whatever gait the
+    parent had, so it is a move the curator's bandit should learn to spend
+    sparingly -- which is the right place for that decision, not here.
+    """
+    movable = [p for p in g.parts if p.joint != "none" and p.actuated]
+    if not movable:
+        return False
+    # The same draws as ``random_genome``, deliberately: the distribution a
+    # fresh design's gait comes from is the one the sweep above sampled.
+    g.flap_frequency = float(rng.uniform(1.5, 8.0))
+    for part in movable:
+        part.stroke_amplitude = (
+            0.0 if rng.random() < 0.2 else float(rng.uniform(0.15, 0.9)))
+        part.phase_offset = float(rng.uniform(0.0, 2 * math.pi))
+        part.neutral = float(rng.uniform(0.2, 0.8))
+    return True
+
+
 def mut_jet(g: Genome, rng: np.random.Generator) -> bool:
     """Tune a bell's nozzle and stroke.
 
@@ -1018,6 +1073,7 @@ MUTATION_OPERATORS: dict[str, callable] = {
     "radial_symmetry": mut_radial_symmetry,
     "phase_gradient": mut_phase_gradient,
     "stroke": mut_stroke,
+    "gait": mut_gait,
     "jet": mut_jet,
     "part_dimensions": mut_part_dimensions,
     "joint": mut_joint,

@@ -397,6 +397,97 @@ def test_cppn_fields_are_deterministic_and_bounded() -> None:
     check("survives a serialisation round trip", np.allclose(f3.chord, f4.chord))
 
 
+def test_the_gait_operator_moves_every_coordinate_at_once() -> None:
+    """``mut_gait`` is only worth anything if it is *joint*.
+
+    The whole case for it is that no single gait coordinate produces thrust on
+    two of the three seed plans and all four together produce two thirds of the
+    airframe's drag.  An operator that quietly degraded to moving one
+    coordinate, or to moving one part, would look identical in every other test
+    in this file -- genomes still build, children still differ from parents --
+    and the arch39 arm would measure nothing.  So the jointness is asserted
+    directly.
+    """
+    print("\ngenome: the gait operator is a joint move")
+    from dytiscidae.core.genome import mut_gait
+
+    rng = np.random.default_rng(11)
+
+    # ``reference_genome`` rather than ``random_genome``: a random draw carries
+    # at most two actuated joints (measured: 2 is the maximum over 200 draws),
+    # and "every part" needs more than two parts to mean anything.
+    g = reference_genome()
+    movable_n = len([p for p in g.parts if p.joint != "none" and p.actuated])
+    check("the reference genome has at least three actuated parts",
+          movable_n >= 3, f"{movable_n}")
+    if movable_n < 3:
+        return
+
+    movable = [p for p in g.parts if p.joint != "none" and p.actuated]
+    before_f = g.flap_frequency
+    before = [(p.stroke_amplitude, p.phase_offset, p.neutral) for p in movable]
+
+    # 30 applications, because each coordinate can redraw close to where it was.
+    moved = {"frequency": 0, "amplitude": 0, "phase": 0, "neutral": 0}
+    all_parts_moved = 0
+    for _ in range(30):
+        c = g.copy()
+        ok = mut_gait(c, rng)
+        if not ok:
+            continue
+        cm = [p for p in c.parts if p.joint != "none" and p.actuated]
+        moved["frequency"] += c.flap_frequency != before_f
+        touched = 0
+        for k, part in enumerate(cm):
+            a, ph, ne = before[k]
+            moved["amplitude"] += part.stroke_amplitude != a
+            moved["phase"] += part.phase_offset != ph
+            moved["neutral"] += part.neutral != ne
+            touched += (part.stroke_amplitude != a and part.phase_offset != ph
+                        and part.neutral != ne)
+        all_parts_moved += touched == len(cm)
+
+    check("it redraws the global frequency every time",
+          moved["frequency"] == 30, f"{moved['frequency']}/30")
+    n = 30 * len(movable)
+    check("and every actuated part's amplitude, phase and rest offset",
+          moved["amplitude"] > 0.9 * n and moved["phase"] > 0.9 * n
+          and moved["neutral"] > 0.9 * n,
+          f"amp {moved['amplitude']}/{n}, phase {moved['phase']}/{n}, "
+          f"rest {moved['neutral']}/{n} -- a redraw can land on its own value, "
+          f"so this is 90%, not 100%")
+    check("all four coordinates on all parts in the same application",
+          all_parts_moved >= 27, f"{all_parts_moved}/30 applications")
+
+    # The axis-aligned operators are the contrast, and they must stay that way:
+    # if one of them starts moving the whole gait, the comparison arch39 is
+    # judged on stops meaning anything.
+    from dytiscidae.core.genome import (mut_global_energy, mut_phase_gradient,
+                                        mut_stroke)
+    for name, op in (("stroke", mut_stroke), ("phase_gradient",
+                     mut_phase_gradient), ("global_energy", mut_global_energy)):
+        joint = 0
+        for _ in range(60):
+            c = g.copy()
+            op(c, rng)
+            cm = [p for p in c.parts if p.joint != "none" and p.actuated]
+            f_moved = c.flap_frequency != before_f
+            per = [(part.stroke_amplitude != before[k][0],
+                    part.phase_offset != before[k][1],
+                    part.neutral != before[k][2]) for k, part in enumerate(cm)]
+            joint += f_moved and all(all(t) for t in per)
+        check(f"`{name}` is still axis-aligned and never a whole-gait move",
+              joint == 0, f"moved the whole gait on {joint}/60 applications")
+
+    # No actuated joints: nothing to resample, and it must say so rather than
+    # reporting a mutation the curator will then credit or blame.
+    empty = g.copy()
+    for part in empty.parts:
+        part.actuated = False
+    check("and it declines a genome with nothing actuated",
+          mut_gait(empty, rng) is False)
+
+
 def test_every_mutation_operator_keeps_the_genome_buildable() -> None:
     """No operator may produce a genome that cannot be built and compiled.
 
@@ -3361,6 +3452,7 @@ def main() -> int:
         test_curator_quarantines_repeat_exploits,
         test_cmaes_optimises_a_known_function,
         test_cppn_fields_are_deterministic_and_bounded,
+        test_the_gait_operator_moves_every_coordinate_at_once,
         test_every_mutation_operator_keeps_the_genome_buildable,
         test_phenotype_invariants,
         test_cpg_respects_joint_limits,

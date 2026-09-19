@@ -425,34 +425,35 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `crossover` | function | 1082 | `(a: Genome, b: Genome, rng: np.random.Generator) -> Genome` | Blend two designs. |
-| `descendants` | function | 624 | `(g: Genome, start: int) -> list[int]` | Part indices reachable from ``start``, itself included, each once. |
+| `crossover` | function | 1138 | `(a: Genome, b: Genome, rng: np.random.Generator) -> Genome` | Blend two designs. |
+| `descendants` | function | 679 | `(g: Genome, start: int) -> list[int]` | Part indices reachable from ``start``, itself included, each once. |
 | `Edge` | class | 185 | — | An attachment of ``child`` onto ``parent``. |
-| `estimated_bodies` | function | 642 | `(g: Genome, *, cap: int=4096, max_depth: int=8) -> int` | How many rigid bodies this graph expands to, near enough to budget with. |
+| `estimated_bodies` | function | 697 | `(g: Genome, *, cap: int=4096, max_depth: int=8) -> int` | How many rigid bodies this graph expands to, near enough to budget with. |
 | `Genome` | class | 207 | — | A complete design. |
-| `graft_subtree` | function | 819 | `(child: Genome, donor: Genome, rng: np.random.Generator) -> bool` | Move a subtree of ``donor`` onto ``child``.  Graph-level recombination. |
+| `graft_subtree` | function | 874 | `(child: Genome, donor: Genome, rng: np.random.Generator) -> bool` | Move a subtree of ``donor`` onto ``child``.  Graph-level recombination. |
 | `mut_actuator` | function | 446 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_add_part` | function | 677 | `(g: Genome, rng: np.random.Generator) -> bool` | Grow a new module and attach it somewhere. |
-| `mut_body_field` | function | 932 | `(g: Genome, rng: np.random.Generator) -> bool` | Reshape a part's implicit volume. |
-| `mut_cppn_structure` | function | 970 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_cppn_weights` | function | 963 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_add_part` | function | 732 | `(g: Genome, rng: np.random.Generator) -> bool` | Grow a new module and attach it somewhere. |
+| `mut_body_field` | function | 987 | `(g: Genome, rng: np.random.Generator) -> bool` | Reshape a part's implicit volume. |
+| `mut_cppn_structure` | function | 1025 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_cppn_weights` | function | 1018 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
 | `mut_drivetrain` | function | 403 | `(g: Genome, rng: np.random.Generator) -> bool` | Move a joint's series spring and its drive compliance together. |
-| `mut_duplicate_part` | function | 757 | `(g: Genome, rng: np.random.Generator) -> bool` | Copy a module, attach the copy beside the original, and let it diverge. |
+| `mut_duplicate_part` | function | 812 | `(g: Genome, rng: np.random.Generator) -> bool` | Copy a module, attach the copy beside the original, and let it diverge. |
 | `mut_edge_placement` | function | 467 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_edge_topology` | function | 569 | `(g: Genome, rng: np.random.Generator) -> bool` | Rewire, reflect, or change the recursion depth of an attachment. |
-| `mut_global_buoyancy` | function | 995 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_global_energy` | function | 984 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_jet` | function | 549 | `(g: Genome, rng: np.random.Generator) -> bool` | Tune a bell's nozzle and stroke. |
+| `mut_edge_topology` | function | 624 | `(g: Genome, rng: np.random.Generator) -> bool` | Rewire, reflect, or change the recursion depth of an attachment. |
+| `mut_gait` | function | 549 | `(g: Genome, rng: np.random.Generator) -> bool` | Resample the whole gait at once: frequency, amplitude, phase and rest. |
+| `mut_global_buoyancy` | function | 1050 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_global_energy` | function | 1039 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_jet` | function | 604 | `(g: Genome, rng: np.random.Generator) -> bool` | Tune a bell's nozzle and stroke. |
 | `mut_joint` | function | 431 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_material` | function | 924 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_material` | function | 979 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
 | `mut_part_dimensions` | function | 390 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_part_kind` | function | 904 | `(g: Genome, rng: np.random.Generator) -> bool` | Reinterpret a module as a different kind. |
+| `mut_part_kind` | function | 959 | `(g: Genome, rng: np.random.Generator) -> bool` | Reinterpret a module as a different kind. |
 | `mut_phase_gradient` | function | 499 | `(g: Genome, rng: np.random.Generator) -> bool` | Shift the oscillator phases, which is what turns flapping into swimming. |
 | `mut_radial_symmetry` | function | 479 | `(g: Genome, rng: np.random.Generator) -> bool` | Change how many times an attachment is replicated around its parent. |
-| `mut_remove_part` | function | 882 | `(g: Genome, rng: np.random.Generator) -> bool` | Delete a module and everything attached below it. |
-| `mut_scale` | function | 1006 | `(g: Genome, rng: np.random.Generator) -> bool` | Scale the whole machine. |
+| `mut_remove_part` | function | 937 | `(g: Genome, rng: np.random.Generator) -> bool` | Delete a module and everything attached below it. |
+| `mut_scale` | function | 1061 | `(g: Genome, rng: np.random.Generator) -> bool` | Scale the whole machine. |
 | `mut_stroke` | function | 521 | `(g: Genome, rng: np.random.Generator) -> bool` | Change how far a part strokes, and where it sits at rest. |
-| `mutate` | function | 1050 | `(g: Genome, rng: np.random.Generator, *, operators: list[str] \| None=None, n_ops: int=1) -> tuple[Genome, list[str]]` | Apply the named operators.  Returns the child and what was applied. |
+| `mutate` | function | 1106 | `(g: Genome, rng: np.random.Generator, *, operators: list[str] \| None=None, n_ops: int=1) -> tuple[Genome, list[str]]` | Apply the named operators.  Returns the child and what was applied. |
 | `Part` | class | 67 | — | One module type.  May be instantiated many times by the expansion. |
 | `random_genome` | function | 290 | `(rng: np.random.Generator, *, target_scale: float=1.0) -> Genome` | A random but structurally sensible starting design. |
 | `Edge.copy` | method | 202 | `(self) -> 'Edge'` | — |
@@ -683,7 +684,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 |---|---|---:|---|---|
 | `ActorPool` | class | 154 | — | A persistent pool of worker processes, each with its own batched evaluator. |
 | `split` | function | 127 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
-| `ActorPool.__init__` | method | 166 | `(self, workers: int=1, *, min_shard: int=8) -> None` | — |
+| `ActorPool.__init__` | method | 166 | `(self, workers: int=1, *, min_shard: int=4) -> None` | — |
 | `ActorPool.close` | method | 274 | `(self) -> None` | — |
 | `ActorPool.evaluate_tier1` | method | 184 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
 
@@ -1023,18 +1024,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 555 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `evaluate_candidate` | function | 320 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 373 | `(genomes, cfg: SearchConfig, *, inherited=None, identify: bool=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `load_state` | function | 1479 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 893 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 1378 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 560 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `evaluate_candidate` | function | 325 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 378 | `(genomes, cfg: SearchConfig, *, inherited=None, identify: bool=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `load_state` | function | 1484 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 898 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 1383 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 63 | — | Everything adjustable about a run. |
-| `SearchState` | class | 233 | — | — |
-| `seed_archipelago` | function | 1738 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `SearchState.archive` | property | 290 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 294 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 298 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 238 | — | — |
+| `seed_archipelago` | function | 1743 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `SearchState.archive` | property | 295 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 299 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 303 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
