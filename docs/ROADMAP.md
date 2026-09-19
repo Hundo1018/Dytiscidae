@@ -1567,6 +1567,76 @@ generations in three ran that way before it was found. The measured optimum is 4
 **The default in `SearchConfig` is still 8**, so the documented trap is what an
 invocation without the flag gets.
 
+## Thrust needs a joint move, and every gait operator is axis-aligned
+
+Measured 2026-09-13, before arch39, and it supersedes the reading that arch38's
+thrust failure was about flap frequency.
+
+**1. The frequency band where thrust exists is already populated.** The gait
+sweep found positive thrust at 4.5–11 Hz and the population's median sits near
+2.2, which looked like the explanation. It is not: **8.91% of arch38's
+evaluations are already at `flap_hz >= 4.5`**, p99 is 6.89 Hz and the maximum is
+12.61 Hz. `random_genome` draws `uniform(1.5, 8.0)`, so the random seeds land in
+the band without any drift being needed.
+
+Drift could not have got there, which is worth recording separately.
+`flap_frequency` moves only through `mut_global_energy`, which touches it on one
+roll in four, by `x * exp(normal(0, 0.22))`. Measured over arch38: that operator
+fires on 1.94% of applications, so **0.0113 frequency touches per child**. Walked
+with no selection, a lineage of depth 10 starting at 2.2 Hz reaches 4.5 Hz in
+**0.00%** of 20,000 trials; depth 100 reaches it in 0.65%. Analytically 2.2 →
+10.95 Hz is 7.3 sigma of log step, about 53 touches, which is 4,689 children in
+one lineage.
+
+**2. So frequency is not the binding constraint, and one variable at a time is.**
+Sweeping each gait coordinate alone from the seed default, 250 draws each, best
+`thrust_margin` reached:
+
+| | gannet | beetle | teal |
+|---|---|---|---|
+| default gait | −0.0001 | +0.0228 | −0.3765 |
+| frequency alone | −0.0001 | +0.1210 | −0.1490 |
+| amplitude alone | −0.0001 | +0.1447 | +0.0030 |
+| phase alone | +0.0003 | +0.0230 | −0.0725 |
+| offset alone | +0.0000 | +0.0296 | −0.0931 |
+| **all four together** | **+0.7693** | +0.1658 | **+0.6916** |
+
+On two of the three plans **no single coordinate produces any thrust at all and
+all four together produce two thirds of the airframe's drag.** The earlier sweep
+that found +0.8466 varied all four at once and the result was attributed to
+frequency because frequency is what got printed.
+
+**3. Every gait operator moves one coordinate, and most move it on one part.**
+`mut_global_energy` changes the global `flap_frequency`, and only on one roll in
+four. `mut_stroke` changes `stroke_amplitude` on **one movable part**.
+`mut_phase_gradient` shifts phases. Nothing in `MUTATION_OPERATORS` moves
+frequency, amplitude, phase and offset together across the actuated set.
+
+So thrust is reachable in the model and unreachable by this search, and the
+mechanism is now named: **the variation operators are axis-aligned and the target
+requires a joint move.** No ladder can fix that, which is why arch38's rungs
+failed, and it is not evidence about the actuator model either — ROADMAP item H
+should be un-promoted until this is tried.
+
+**The precedent is in this repository.** `mut_drivetrain`'s docstring reads
+"Together, because separately neither is worth anything" — spring stiffness and
+gear ratio, bundled for exactly this reason, and the principle was applied there
+and nowhere else.
+
+### What arch39 should carry
+
+**A `mut_gait` operator that resamples the whole gait at once** — frequency,
+per-part stroke amplitude, phase and rest offset across the actuated set, drawn
+the way `random_genome` draws them for a fresh design rather than jittered from
+the parent. Its measurement is the `thrust_margin` distribution, which does not
+overlap anything else on the arch39 list.
+
+**And it is pre-registerable, which arch38's thrust arm was not.** Monte Carlo
+the new operator offline against `thrust_margin` on the seed plans and record,
+before the run, what fraction of draws reach positive thrust. If that fraction
+is near zero the operator is wrong and no run is needed to find out; if it is
+appreciable, the run has a stated number to be judged against.
+
 ## arch39 — the work list, as it stands before arch38 has run
 
 Everything here is evidence-backed and deliberately **not** in arch38, because
