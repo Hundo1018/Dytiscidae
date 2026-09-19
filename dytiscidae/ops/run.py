@@ -411,6 +411,137 @@ def cmd_cohort(args) -> int:
     return 0
 
 
+class _Cached(Exception):
+    """Control flow only: the run's shared network is already loaded."""
+
+
+#: The shared network of a run, by run directory.  Rebuilding it costs a torch
+#: import and a checkpoint read, and a probe over an archive asks for it once per
+#: elite.
+_SHARED_NETWORK_CACHE: dict = {}
+
+
+def controller_for_elite(design_dir, elite, p, seed: int, *, log=print):
+    """The control law an archived elite's scores were earned under, rebuilt.
+
+    Lifted out of ``cmd_showcase`` unchanged so that anything re-measuring an
+    elite drives it the way the search did -- its own stored policy, the run's
+    shared network, and the mobility basis it was scored against -- rather than
+    the pattern generator open-loop, which is a different experiment.  Returns
+    None, having said so, when neither policy is recoverable.
+    """
+    from ..control.cpg import Policy  # noqa: F401  (kept for parity with the original)
+    from ..envs.evaluate import Controller
+    from ..envs.triphibian import TriphibianEnv
+
+    import pickle as _pickle
+
+    from ..control.cpg import Policy as _Policy
+    from ..envs.evaluate import SharedController, SummedPolicy
+    from ..envs.triphibian import Domain as _Dom
+
+    import numpy as _np
+
+    from ..control.cpg import MobilityBasis as _Basis
+
+    env0 = TriphibianEnv(p, seed=seed)
+    own = None
+    w = (elite.meta or {}).get("policy")
+    pol = _Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=6, hidden=0)
+    if w is not None and len(w) == pol.n_weights:
+        pol.weights = _np.asarray(w, float).copy()
+        own = pol
+
+    # The basis the score was earned against, if the run recorded it.
+    #
+    # Re-identifying is not the same experiment: `env.identify` is seeded,
+    # and until `eval_seed` was recorded there was no way to ask for the
+    # draw the score used.  So prefer what is stored and fall back to a
+    # fresh identification, saying which happened.
+    bases, basis_src = {}, "stored"
+    stored = (elite.meta or {}).get("mobility_basis") or {}
+    for dom_name, b in stored.items():
+        try:
+            bases[dom_name] = _Basis(
+                modes=_np.asarray(b["modes"], float),
+                effects=_np.asarray(b["effects"], float),
+                authority=_np.asarray(b["authority"], float),
+                medium=str(b.get("medium") or dom_name))
+        except Exception as exc:                              # noqa: BLE001
+            log(f"  stored basis for {dom_name} unusable: {exc}")
+    if not bases:
+        basis_src = "re-identified"
+        seed = (elite.meta or {}).get("eval_seed")
+        seed = int(seed) if isinstance(seed, (int, float)) else seed
+        for dom in (_Dom.AIR, _Dom.WATER):
+            try:
+                bases[dom.value] = env0.identify(dom, seed=seed, max_modes=6)
+            except Exception as exc:                          # noqa: BLE001
+                log(f"  mobility identification failed in "
+                      f"{dom.value}: {exc}")
+    shared = _SHARED_NETWORK_CACHE.get(str(design_dir))
+
+    # The portable checkpoint first: it carries the network as arrays and
+    # needs no project class unpickled.  `search_state.pkl` is the fallback
+    # for runs made before it existed.
+    try:
+        if shared is not None:
+            raise _Cached
+        from . import checkpoint as _ckmod
+        _ck = _ckmod.read(design_dir)
+        shared, _miss, _unex = _ckmod.load_network(_ck)
+        log(f"  network from {_ck.path.name} "
+              f"(gen {_ck.generation}, git "
+              f"{(_ck.meta.get('provenance') or {}).get('git', '')[:8]})")
+    except _Cached:
+        pass
+    except Exception:                                         # noqa: BLE001
+        shared = None
+    sp = Path(design_dir) / "search_state.pkl"
+    if shared is None and sp.exists():
+        try:
+            d = _pickle.load(open(sp, "rb"))
+            sd, shape = d.get("shared_state"), d.get("shared_shape")
+            if sd and shape:
+                import torch as _torch
+
+                from ..learning import ppo as _ppo
+                # Inferred from the stored tensors, not assumed from a flag:
+                # a width that does not match loads into the wrong shape, and
+                # `--shared-hidden` is not even an argument of this
+                # subcommand.  The first 2-D weight's row count is the trunk
+                # width the run actually used.
+                hid = next((int(v.shape[0]) for _k, v in sd.items()
+                            if getattr(v, "ndim", 0) == 2), 64)
+                shared = _ppo.SharedPolicy(int(shape[0]), int(shape[1]),
+                                           hidden=hid)
+                shared.load_state_dict(
+                    {k: _torch.as_tensor(v) for k, v in sd.items()})
+                shared.eval()
+        except Exception as exc:                              # noqa: BLE001
+            log(f"  shared policy not recoverable: {exc}")
+    if shared is not None:
+        _SHARED_NETWORK_CACHE[str(design_dir)] = shared
+    controller = None
+    if own is not None or shared is not None:
+        if shared is not None:
+            controller = SharedController(
+                params=env0.cpg.base, bases=bases,
+                policy=SummedPolicy(own=own, shared=shared, n_modes=6))
+        else:
+            controller = Controller(params=env0.cpg.base, policy=own,
+                                    bases=bases)
+        log(f"  driving as evaluated: own policy "
+              f"{'yes' if own is not None else 'NO'}, shared policy "
+              f"{'yes' if shared is not None else 'NO'}, bases "
+              f"{sorted(bases)} ({basis_src})")
+    else:
+        log("  WARNING: neither a stored policy nor a shared network was "
+              "recoverable; this film is the pattern generator open-loop "
+              "and is not evidence about the design")
+    return controller
+
+
 def cmd_showcase(args) -> int:
     """Train a controller and film one continuous mission with flow and stress."""
     import pickle
@@ -502,104 +633,7 @@ def cmd_showcase(args) -> int:
     # `search_state.pkl`, and a mobility basis identified on this body the way
     # `evaluate_tier1` does it.
     if args.design and not args.controller and not args.train:
-        import pickle as _pickle
-
-        from ..control.cpg import Policy as _Policy
-        from ..envs.evaluate import SharedController, SummedPolicy
-        from ..envs.triphibian import Domain as _Dom
-
-        import numpy as _np
-
-        from ..control.cpg import MobilityBasis as _Basis
-
-        env0 = TriphibianEnv(p, seed=args.seed)
-        own = None
-        w = (elite.meta or {}).get("policy")
-        pol = _Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=6, hidden=0)
-        if w is not None and len(w) == pol.n_weights:
-            pol.weights = _np.asarray(w, float).copy()
-            own = pol
-
-        # The basis the score was earned against, if the run recorded it.
-        #
-        # Re-identifying is not the same experiment: `env.identify` is seeded,
-        # and until `eval_seed` was recorded there was no way to ask for the
-        # draw the score used.  So prefer what is stored and fall back to a
-        # fresh identification, saying which happened.
-        bases, basis_src = {}, "stored"
-        stored = (elite.meta or {}).get("mobility_basis") or {}
-        for dom_name, b in stored.items():
-            try:
-                bases[dom_name] = _Basis(
-                    modes=_np.asarray(b["modes"], float),
-                    effects=_np.asarray(b["effects"], float),
-                    authority=_np.asarray(b["authority"], float),
-                    medium=str(b.get("medium") or dom_name))
-            except Exception as exc:                              # noqa: BLE001
-                print(f"  stored basis for {dom_name} unusable: {exc}")
-        if not bases:
-            basis_src = "re-identified"
-            seed = (elite.meta or {}).get("eval_seed")
-            seed = int(seed) if isinstance(seed, (int, float)) else args.seed
-            for dom in (_Dom.AIR, _Dom.WATER):
-                try:
-                    bases[dom.value] = env0.identify(dom, seed=seed, max_modes=6)
-                except Exception as exc:                          # noqa: BLE001
-                    print(f"  mobility identification failed in "
-                          f"{dom.value}: {exc}")
-        shared = None
-
-        # The portable checkpoint first: it carries the network as arrays and
-        # needs no project class unpickled.  `search_state.pkl` is the fallback
-        # for runs made before it existed.
-        try:
-            from . import checkpoint as _ckmod
-            _ck = _ckmod.read(args.design)
-            shared, _miss, _unex = _ckmod.load_network(_ck)
-            print(f"  network from {_ck.path.name} "
-                  f"(gen {_ck.generation}, git "
-                  f"{(_ck.meta.get('provenance') or {}).get('git', '')[:8]})")
-        except Exception:                                         # noqa: BLE001
-            shared = None
-        sp = Path(args.design) / "search_state.pkl"
-        if shared is None and sp.exists():
-            try:
-                d = _pickle.load(open(sp, "rb"))
-                sd, shape = d.get("shared_state"), d.get("shared_shape")
-                if sd and shape:
-                    import torch as _torch
-
-                    from ..learning import ppo as _ppo
-                    # Inferred from the stored tensors, not assumed from a flag:
-                    # a width that does not match loads into the wrong shape, and
-                    # `--shared-hidden` is not even an argument of this
-                    # subcommand.  The first 2-D weight's row count is the trunk
-                    # width the run actually used.
-                    hid = next((int(v.shape[0]) for _k, v in sd.items()
-                                if getattr(v, "ndim", 0) == 2), 64)
-                    shared = _ppo.SharedPolicy(int(shape[0]), int(shape[1]),
-                                               hidden=hid)
-                    shared.load_state_dict(
-                        {k: _torch.as_tensor(v) for k, v in sd.items()})
-                    shared.eval()
-            except Exception as exc:                              # noqa: BLE001
-                print(f"  shared policy not recoverable: {exc}")
-        if own is not None or shared is not None:
-            if shared is not None:
-                controller = SharedController(
-                    params=env0.cpg.base, bases=bases,
-                    policy=SummedPolicy(own=own, shared=shared, n_modes=6))
-            else:
-                controller = Controller(params=env0.cpg.base, policy=own,
-                                        bases=bases)
-            print(f"  driving as evaluated: own policy "
-                  f"{'yes' if own is not None else 'NO'}, shared policy "
-                  f"{'yes' if shared is not None else 'NO'}, bases "
-                  f"{sorted(bases)} ({basis_src})")
-        else:
-            print("  WARNING: neither a stored policy nor a shared network was "
-                  "recoverable; this film is the pattern generator open-loop "
-                  "and is not evidence about the design")
+        controller = controller_for_elite(args.design, elite, p, args.seed)
 
     if args.controller and Path(args.controller).exists():
         d = pickle.load(open(args.controller, "rb"))

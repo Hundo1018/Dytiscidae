@@ -350,6 +350,23 @@ MUTATIONS: tuple = (
                "the search and every verification run different physics",
         suites=("test_search",), item="kernel freshness"),
 
+    Mutation(
+        id="competence-ignores-the-passive-twin",
+        path="dytiscidae/envs/triphibian.py",
+        find="        fwd_m = float(res.distance - twin.distance)",
+        replace="        fwd_m = float(res.distance)",
+        defect="forward distance is gross again, so a glide from the 30 m launch "
+               "and a sink under gravity are paid for",
+        suites=("test_physics",), item="net of passive"),
+    Mutation(
+        id="unstable-twin-falls-back-to-gross",
+        path="dytiscidae/envs/triphibian.py",
+        find="        if not res.survived or not twin.survived:",
+        replace="        if False:",
+        defect="a design whose passive twin blows up keeps its gross score, so "
+               "erasing your own control is worth points",
+        suites=("test_physics",), item="net of passive"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

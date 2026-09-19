@@ -2690,11 +2690,99 @@ def test_depth_is_a_gain_not_a_spawn() -> None:
           abs(m_held["max_depth"] - 4.0) < 1e-6, f"{m_held['max_depth']:.2f} m")
 
 
+def test_a_machine_that_does_nothing_scores_nothing() -> None:
+    """Every medium's competence is what the machine did beyond a passive twin.
+
+    Measured with every actuator held still, before this: water competence 0.533
+    against 0.510 moving, air 0.032 against 0.029, land 0.010 against 0.048. A
+    still machine sinks -- the eel gains +4.45 m of depth held still against
+    +4.52 m flapping -- and depth gained, depth held, being submerged and being
+    upright all paid for it. That is the seventh time a score here has paid for
+    absent motion.
+
+    So each segment now also runs a twin from the same state with every joint
+    held at the angle it starts at, and the competence is the difference. Three
+    things have to hold: the twin leaves no trace on the scored run, a machine
+    that does nothing scores zero, and *state* is not netted -- only motion is.
+    """
+    print("\ncompetence: a machine that does nothing scores nothing")
+    from dytiscidae.control.cpg import CPGParams
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, SegmentResult, TriphibianEnv
+
+    NEW = {"forward_net_m", "passive_distance", "control_net",
+           "passive_competence", "passive_unstable"}
+
+    def rolled(plan, dom, twin, inert=False):
+        env = TriphibianEnv(build(BODY_PLANS[plan]()), seed=3)
+        env.reset(dom)
+        env.scatter(np.random.default_rng(11))
+        params = None
+        if inert:
+            b = env.cpg.base
+            params = CPGParams(
+                amplitude=np.zeros(env.cpg.n), phase=np.asarray(b.phase, float),
+                offset=np.asarray(env.data.qpos[env._act_qadr], float),
+                frequency=float(b.frequency))
+        return env.rollout(8.0, params=params, domain=dom, passive_control=twin)
+
+    for plan in ("beetle", "eel"):
+        for dom in (Domain.AIR, Domain.WATER, Domain.LAND):
+            plain, netted = rolled(plan, dom, False), rolled(plan, dom, True)
+            same = (plain.distance == netted.distance
+                    and plain.competence == netted.competence_gross
+                    and all(plain.measurements.get(k) == netted.measurements.get(k)
+                            for k in plain.measurements if k not in NEW))
+            check(f"{plan} {dom.value}: the twin leaves the scored run untouched",
+                  same, f"distance {plain.distance:.6f}/{netted.distance:.6f}, "
+                        f"gross {plain.competence:.6f}/{netted.competence_gross:.6f}")
+            still = rolled(plan, dom, True, inert=True)
+            check(f"{plan} {dom.value}: held still it scores zero",
+                  still.competence == 0.0,
+                  f"{still.competence:.6f} (gross {still.competence_gross:.4f})")
+
+    # The blend, on fabricated parts, so the weights are asserted and not
+    # inferred from a rollout.
+    env = TriphibianEnv(build(BODY_PLANS["beetle"]()), seed=0)
+    def netted(gate, ctrl_a, ctrl_p, d_a, d_p, dom=Domain.WATER, alive=True):
+        a = SegmentResult(domain=dom, duration=8.0, distance=d_a, survived=True)
+        a.parts = {"gate": gate, "control": ctrl_a}
+        a.competence = 0.0
+        p = SegmentResult(domain=dom, duration=8.0, distance=d_p, survived=alive)
+        p.parts = {"gate": gate, "control": ctrl_p}
+        env._net_of_passive(a, p, 8.0, dom)
+        return a
+    v = env.FORWARD_REF_SPEED["water"] * 8.0
+    r = netted(1.0, 0.5, 0.2, v, 0.0)
+    check("forward distance carries 0.6 of it and the motion terms 0.4",
+          abs(r.competence - (0.6 * 1.0 + 0.4 * 0.3)) < 1e-12, f"{r.competence:.6f}")
+    check("and the gate multiplies the whole of it",
+          abs(netted(0.5, 0.5, 0.2, v, 0.0).competence - 0.5 * r.competence) < 1e-12)
+    check("a twin that went as far leaves no forward credit",
+          netted(1.0, 0.2, 0.2, v, v).competence == 0.0)
+    check("and one that went further does not score negative",
+          netted(1.0, 0.2, 0.2, v, 2 * v).competence == 0.0)
+    check("a twin that did not survive leaves no baseline, so the segment is zero",
+          netted(1.0, 0.9, 0.0, v, 0.0, alive=False).competence == 0.0
+          and netted(1.0, 0.9, 0.0, v, 0.0, alive=False)
+              .measurements.get("passive_unstable") == 1.0)
+
+    # State is a gate, not a net term: two machines with identical motion and
+    # different posture differ by their gate, and neither is rewarded for being
+    # passively worse.
+    good, bad = netted(1.0, 0.4, 0.1, v, 0.0), netted(0.25, 0.4, 0.1, v, 0.0)
+    check("posture scales the score rather than being netted against the twin",
+          abs(bad.competence - 0.25 * good.competence) < 1e-12,
+          f"{good.competence:.4f} vs {bad.competence:.4f}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
     print("=" * 68)
     run_all([
+        test_a_machine_that_does_nothing_scores_nothing,
         test_lift_sign_and_magnitude,
         test_buoyancy,
         test_bluff_drag_is_orientation_dependent,

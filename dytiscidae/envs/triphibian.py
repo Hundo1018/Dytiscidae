@@ -128,6 +128,14 @@ class SegmentResult:
     #: separate from ``competence`` because the ladder must stay comparable
     #: across a whole run while the scoring on top of it moves.
     measurements: dict = field(default_factory=dict)
+    #: What the competence is made of, recorded by ``_score_segment`` at the
+    #: exit it took: ``gate`` (state preconditions, multiplied), ``control``
+    #: (the medium's motion terms in [0, 1]) and the raw forward distance in
+    #: ``distance``.  ``rollout`` combines these with the passive twin's.
+    parts: dict = field(default_factory=dict)
+    #: The competence as ``_score_segment`` returns it, before the passive
+    #: control is subtracted -- kept so the net can be audited against it.
+    competence_gross: float = 0.0
 
     @property
     def cost_of_transport(self) -> float:
@@ -1304,6 +1312,28 @@ class TriphibianEnv:
     #: so the sensed error and the scored error cannot drift apart.
     TARGET_DEPTH = 10.0
 
+    #: Share of every medium's competence that is forward distance, net of the
+    #: passive twin; the rest is the medium's own motion terms, also net.
+    #: Decided with the user 2026-09-20: forward distance matters more.
+    FORWARD_WEIGHT = 0.6
+    #: Net forward speed that earns full marks, per medium.
+    #:
+    #: One rule for all three, so the media are calibrated the same way: land
+    #: keeps the 0.6 m/s its progress term has always used, and air and water
+    #: sit at the same *quantile* of their own distributions.  Measured over 140
+    #: arch39 elites driven by the control laws they were scored under (8 s
+    #: segments, `runs/probe_net_forward.py`), net of each design's passive
+    #: twin:
+    #:
+    #:     land   p50 +0.024  p90 +0.168  p99 +0.416  max +7.283 m/s
+    #:     water  p50 +0.007  p90 +0.191  p99 +0.437  max +0.575
+    #:     air    p50 -0.028  p90 +1.739  p99 +5.611  max +9.348
+    #:
+    #: 0.6 m/s is land's 0.993 quantile; the same quantile is +0.452 in water
+    #: and +6.204 in air.  So full marks is what about one design in a hundred
+    #: currently reaches -- demanding, with headroom, and nothing saturates.
+    FORWARD_REF_SPEED = {"air": 6.2, "water": 0.45, "land": 0.6}
+
     # ------------------------------------------------------------------ stepping
 
     def step(self, target_angles: np.ndarray) -> bool:
@@ -1330,9 +1360,22 @@ class TriphibianEnv:
         basis: MobilityBasis | None = None,
         domain: Domain = Domain.AIR,
         control_hz: float = 25.0,
+        passive_control: bool = True,
     ) -> SegmentResult:
-        """Run one segment and measure what happened."""
+        """Run one segment and measure what happened.
+
+        With ``passive_control`` the same segment is first run from the same
+        state with every actuator held at the angle it starts at, and the
+        competence is what the machine did *beyond* that twin -- so a machine
+        that does nothing scores zero by construction.  Measured with the
+        actuators held still, the seed plans scored water competence 0.533
+        against 0.510 moving, and air 0.032 against 0.029: a still machine sinks,
+        or glides from its 30 m launch, and every term paid for it.  The twin
+        leaves no trace: everything it touched is put back, and the scored run is
+        bit-identical to one without it.
+        """
         p = params or self.cpg.base
+        twin = self._passive_twin(duration, domain) if passive_control else None
         res = SegmentResult(domain=domain, duration=duration)
         n_steps = int(duration / self.timestep)
         control_every = max(1, int(1.0 / (control_hz * self.timestep)))
@@ -1396,7 +1439,75 @@ class TriphibianEnv:
             spins=np.array(spins), commands=commands, responses=responses,
             vzs=np.array(vzs), xys=np.array(xys),
         )
+        if twin is not None:
+            self._net_of_passive(res, twin, duration, domain)
         return res
+
+    def _passive_twin(self, duration: float, domain: Domain) -> "SegmentResult":
+        """The same segment, from the same state, with every actuator held still.
+
+        "Held still" is held at the angle each joint starts at -- not at its
+        rest offset, which would move it -- with no policy and no basis.  The
+        whole of MuJoCo's state is copied out and back (``mj_copyData``), because
+        a hand-picked snapshot leaks the solver warm start, applied forces and
+        the warning counter from the twin into the scored run; the subsystems
+        ``reset`` re-initialises are re-initialised the same way, and the gait
+        phase ``scatter`` drew is put back.
+        """
+        mj = self._mj
+        spare = mj.MjData(self.model)
+        mj.mj_copyData(spare, self.model, self.data)
+        phase = self.cpg.phase_offset
+        base = self.cpg.base
+        n = self.cpg.n
+        hold = (np.asarray(self.data.qpos[self._act_qadr], float).copy()
+                if len(self._act_qadr) == n else np.asarray(base.offset, float).copy())
+        held = CPGParams(amplitude=np.zeros(n), phase=np.asarray(base.phase, float).copy(),
+                         offset=hold, frequency=float(base.frequency))
+        twin = self.rollout(duration, params=held, policy=None, basis=None,
+                            domain=domain, passive_control=False)
+        mj.mj_copyData(self.data, self.model, spare)
+        self.solver.reset()
+        self.jets.reset(self.model)
+        self.cpg.reset()
+        self.cpg.phase_offset = phase
+        self.budget.reset()
+        mj.mj_forward(self.model, self.data)
+        return twin
+
+    def _net_of_passive(self, res: "SegmentResult", twin: "SegmentResult",
+                        duration: float, domain: Domain) -> None:
+        """Replace ``res.competence`` with what the machine did beyond its twin.
+
+        Motion is net: forward distance, and the medium's motion terms, each the
+        scored run's minus the twin's, floored at zero.  State is not: the gate
+        (airborne, submerged, upright, posture, served) is the scored run's own,
+        because netting a state would reward being passively unstable.
+
+        A twin that did not survive leaves no baseline, and the segment scores
+        zero rather than falling back to the gross score -- otherwise a design
+        that blows up when held still would erase its own control.
+        """
+        res.competence_gross = float(res.competence)
+        key = domain.value
+        fwd_m = float(res.distance - twin.distance)
+        c_net = float(np.clip(res.parts.get("control", 0.0)
+                              - twin.parts.get("control", 0.0), 0.0, 1.0))
+        res.measurements.update({
+            "forward_net_m": fwd_m,
+            "passive_distance": float(twin.distance),
+            "control_net": c_net,
+            "passive_competence": float(twin.competence),
+        })
+        if not res.survived or not twin.survived:
+            if not twin.survived:
+                res.measurements["passive_unstable"] = 1.0
+            res.competence = 0.0
+            return
+        v = float(self.FORWARD_REF_SPEED[key])
+        f_net = float(np.clip(fwd_m / max(v * duration, 1e-9), 0.0, 1.0))
+        w = float(self.FORWARD_WEIGHT)
+        res.competence = float(res.parts.get("gate", 0.0) * (w * f_net + (1.0 - w) * c_net))
 
     def _score_segment(self, domain, res, depths, alts, ups, contacts,
                        clearances=None, *, spins=None, commands=None,
@@ -1566,6 +1677,7 @@ class TriphibianEnv:
                 _tm = self.thrust_margin()
                 if _tm is not None:
                     res.measurements["thrust_margin"] = float(_tm)
+                res.parts = {"gate": float(credit * frac), "control": 0.10}
                 return float(credit * frac * 0.10)
 
             # Sink rate measured only over the airborne stretch, and only its
@@ -1766,6 +1878,8 @@ class TriphibianEnv:
             # machine on speed it did not produce is what made the launch a
             # gift worth having.  Every term that remains is a property of the
             # trajectory the machine flew.
+            res.parts = {"gate": float(credit * frac),
+                         "control": float(0.55 * flight + 0.25 * glide + 0.20 * station)}
             return float(
                 credit * frac * (0.55 * flight + 0.25 * glide + 0.20 * station)
             )
@@ -1826,6 +1940,12 @@ class TriphibianEnv:
             # staying upright for a tenth of a second is not a demonstration of
             # either, and a machine that ends its episode early has not done the
             # thing it was asked to do.
+            # For the net score, being submerged and being upright are *state*
+            # and multiply; reaching and holding depth are what the machine
+            # does.  Netting a state term against the passive twin would score a
+            # stable hull 0 and a tumbling-but-corrected one 1.
+            res.parts = {"gate": float(served * submerged * (0.5 + 0.5 * upright)),
+                         "control": float((0.35 * reached + 0.25 * hold) / 0.60)}
             return served * float(
                 0.35 * reached + 0.25 * hold + 0.2 * submerged + 0.2 * upright
             )
@@ -2036,6 +2156,7 @@ class TriphibianEnv:
         # magnitude: the spread across these six plans goes from 1.1x to 36x.
         posture = 0.5 * contact + 0.5 * upright
         climb = float(np.clip(max(climbed, 0.0) / 0.5, 0.0, 1.0))
+        res.parts = {"gate": float(served * posture), "control": float(climb)}
         return served * posture * float(0.65 * progress + 0.35 * climb)
 
     # ------------------------------------------------------------- mobility ID

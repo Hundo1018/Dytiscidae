@@ -501,9 +501,53 @@ def identify_batch(envs, domain, *, probe_time: float = 1.2, n_probes: int = 24,
                               max_modes=max_modes) for i in range(k)]
 
 
+def _passive_twin_batch(envs, bf: "BatchedFluid", duration: float, domain):
+    """``TriphibianEnv._passive_twin`` for a whole batch.
+
+    Every environment's whole MuJoCo state is copied out and back, the
+    subsystems ``reset`` re-initialises are re-initialised, the gait phase
+    ``scatter`` drew is put back, and the batched fluid's own history -- the
+    added mass and time it differences against, and whether each machine is
+    primed -- is restored to what ``reset_slam`` left it as.  The twin runs with
+    no policy, no basis, no shared network and no collector, so it draws
+    nothing from any generator the scored run uses and banks no trajectory.
+    """
+    from ..control.cpg import CPGParams
+
+    spares, phases, held = [], [], []
+    for e in envs:
+        spare = e._mj.MjData(e.model)
+        e._mj.mj_copyData(spare, e.model, e.data)
+        spares.append(spare)
+        phases.append(e.cpg.phase_offset)
+        base, n = e.cpg.base, e.cpg.n
+        hold = (np.asarray(e.data.qpos[e._act_qadr], float).copy()
+                if len(e._act_qadr) == n else np.asarray(base.offset, float).copy())
+        held.append(CPGParams(amplitude=np.zeros(n),
+                              phase=np.asarray(base.phase, float).copy(),
+                              offset=hold, frequency=float(base.frequency)))
+    bf_hist = (bf._prev_ma.copy(), list(bf._prev_t),
+               list(getattr(bf, "_primed", [False] * bf.nm)), bf.clamped.copy())
+    twins = rollout_batch(envs, bf, duration, held, domain, passive_control=False)
+    for e, spare, ph in zip(envs, spares, phases):
+        e._mj.mj_copyData(e.data, e.model, spare)
+        e.solver.reset()
+        e.jets.reset(e.model)
+        e.cpg.reset()
+        e.cpg.phase_offset = ph
+        e.budget.reset()
+        e._mj.mj_forward(e.model, e.data)
+    bf._prev_ma[:] = bf_hist[0]
+    bf._prev_t = bf_hist[1]
+    bf._primed = bf_hist[2]
+    bf.clamped[:] = bf_hist[3]
+    return twins
+
+
 def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                   domain, control_hz: float = 25.0, policies=None,
-                  bases=None, shared=None, collector=None):
+                  bases=None, shared=None, collector=None,
+                  passive_control: bool = True):
     """`TriphibianEnv.rollout` for a whole batch, one GPU call per timestep.
 
     Mirrors the single-machine version step for step, including which sample
@@ -516,6 +560,11 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
     `_score_segment`, so the scoring is untouched by batching.
     """
     from .triphibian import SegmentResult
+
+    # See TriphibianEnv.rollout: the competence is what the machine did beyond
+    # a twin run from the same state with every actuator held still.
+    twins = (_passive_twin_batch(envs, bf, duration, domain)
+             if passive_control else None)
 
     k = len(envs)
     res = [SegmentResult(domain=domain, duration=duration) for _ in envs]
@@ -646,6 +695,8 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
             spins=np.array(r["spins"]), commands=r["cmds"],
             responses=r["resp"], vzs=np.array(r["vzs"]),
             xys=np.array(r["xys"]))
+        if twins is not None:
+            e._net_of_passive(res[m], twins[m], duration, domain)
     return res
 
 

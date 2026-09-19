@@ -2723,6 +2723,48 @@ def test_the_two_evaluation_paths_score_the_same_machine_the_same() -> None:
               + (f" on {key0}" if key0 else ""))
 
 
+def test_the_batched_passive_twin_leaves_no_trace() -> None:
+    """The batched evaluator's twin must be as invisible as the single one's.
+
+    It restores every environment's whole MuJoCo state and the batched fluid's
+    own history -- the added mass and time it differences against, and whether
+    each machine is primed.  If any of that leaked, the scored run would differ
+    from the same run without a twin, and the search would be scoring something
+    nobody measured.
+    """
+    print("\nbatched: the passive twin leaves no trace")
+    if needs_batched_evaluator("test_the_batched_passive_twin_leaves_no_trace"):
+        return
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.batchroll import BatchedFluid, rollout_batch
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    NEW = {"forward_net_m", "passive_distance", "control_net",
+           "passive_competence", "passive_unstable"}
+    plans = ("gannet", "beetle", "eel")
+
+    def batch(dom, twin):
+        envs = [TriphibianEnv(build(BODY_PLANS[n]()), seed=3) for n in plans]
+        for e in envs:
+            e.reset(dom)
+            e.scatter(np.random.default_rng(11))
+        bf = BatchedFluid(envs)
+        bf.reset_slam()
+        return rollout_batch(envs, bf, 8.0, [e.cpg.base for e in envs], dom,
+                             passive_control=twin)
+
+    for dom in (Domain.AIR, Domain.WATER, Domain.LAND):
+        plain, netted = batch(dom, False), batch(dom, True)
+        for name, a, b in zip(plans, plain, netted):
+            same = (a.distance == b.distance
+                    and a.competence == b.competence_gross
+                    and all(a.measurements.get(k) == b.measurements.get(k)
+                            for k in a.measurements if k not in NEW))
+            check(f"{dom.value} {name}: scored run identical with and without the twin",
+                  same, f"distance {a.distance:.6f}/{b.distance:.6f}")
+
+
 def test_a_kernel_older_than_its_source_is_not_usable() -> None:
     """The GPU kernel is a compiled mirror of the numpy solver; nothing compared them.
 
@@ -3852,6 +3894,7 @@ def main() -> int:
         test_the_search_is_pointed_at_the_mission_and_compounds,
         test_every_path_agrees_on_the_control_law,
         test_the_shared_policy_survives_a_resume,
+        test_the_batched_passive_twin_leaves_no_trace,
         test_a_kernel_older_than_its_source_is_not_usable,
         test_a_checkpoint_names_the_commit_the_process_started_from,
         test_a_finished_run_is_a_checkpoint,
