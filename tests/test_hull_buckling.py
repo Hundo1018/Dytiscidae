@@ -37,6 +37,15 @@ FAILURES: list[str] = []
 MATERIALS = (PETG, PETG_CF, CFRP_TUBE, AL6061)
 
 
+SKIPPED: list[str] = []
+
+
+def skip(name: str, reason: str) -> None:
+    """A check with nothing to check.  Counted apart from the passes."""
+    print(f"  [skip] {name}  -- {reason}")
+    SKIPPED.append(name)
+
+
 def check(name: str, cond: bool, detail: str = "") -> None:
     print(f"  [{'ok  ' if cond else 'FAIL'}] {name}"
           f"{('  -- ' + detail) if detail else ''}")
@@ -121,20 +130,25 @@ def test_the_sizing_rule_inverts_the_check() -> None:
 def test_the_phenotype_uses_it() -> None:
     """`hull_wall` must be the inverse of the check, not a refitted literal."""
     print("\nhull buckling: what phenotype.hull_wall is")
+    # One check carrying the worst point, rather than an early return and a
+    # trailing `check(..., True)`: a literal True cannot fail, so a loop that
+    # silently ran zero iterations reported a pass.
+    worst, worst_r, n_checked = 0.0, None, 0
     for r in (0.03, 0.05, 0.07, 0.10, 0.15):
         want = structure.wall_for_buckling(
             radius=r, depth_m=phenotype.HULL_DESIGN_DEPTH_M, material=PETG,
             safety=phenotype.HULL_BUCKLING_SAFETY)
         got = phenotype.hull_wall(r)
-        clipped = not (0.0018 <= want <= 0.012)
-        if clipped:
+        if not (0.0018 <= want <= 0.012):       # the print clips bind here
             continue
-        if abs(got - want) / want >= 1e-12:
-            check(f"hull_wall({r}) is wall_for_buckling", False,
-                  f"{got:.9f} against {want:.9f}")
-            return
+        n_checked += 1
+        rel = abs(got - want) / want
+        if rel > worst:
+            worst, worst_r = rel, r
     check("hull_wall is wall_for_buckling wherever the print clips do not bind",
-          True, "checked at r = 30, 50, 70, 100, 150 mm")
+          n_checked > 0 and worst < 1e-12,
+          f"{n_checked} radii unclipped, worst relative difference {worst:.2e}"
+          + (f" at r = {worst_r}" if worst_r is not None else ""))
 
     # The margin it is designed to, read back off the check it is graded by.
     p_gauge = SEAWATER.rho * GRAVITY * phenotype.HULL_DESIGN_DEPTH_M
@@ -170,7 +184,10 @@ def test_the_seed_plans() -> None:
         rep = build(getattr(bodyplans, name)()).report
         buck = [c for c in rep.checks if c.name == "hull_buckling"]
         if not buck:
-            check(f"{name} carries no pressure hull", True, "no hull_buckling")
+            # Not a pass: this plan has nothing for the rule to apply to, and
+            # saying so as `[skip]` keeps it out of the passed count.
+            skip(f"{name}'s hull clears buckling by the declared safety",
+                 "this plan carries no pressure hull")
             continue
         m = min(c.margin for c in buck)
         check(f"{name}'s hull clears buckling by the declared safety",
@@ -200,12 +217,16 @@ def main() -> int:
     test_the_bell_did_not_move()
     test_the_seed_plans()
     print()
+    if SKIPPED:
+        print(f"{len(SKIPPED)} SKIPPED, nothing to check: "
+              f"{', '.join(SKIPPED)}")
     if FAILURES:
         print(f"{len(FAILURES)} checks failed:")
         for f in FAILURES:
             print(f"  - {f}")
         return 1
-    print("hull buckling checks passed")
+    print("hull buckling checks passed" if not SKIPPED
+          else f"hull buckling checks passed, {len(SKIPPED)} skipped")
     return 0
 
 

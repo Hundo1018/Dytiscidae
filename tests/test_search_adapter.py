@@ -578,8 +578,13 @@ def main() -> int:
         from dytiscidae.evolution import loop
         assert numpy.__version__ and loop.run_search is not None
     except Exception as exc:                                      # noqa: BLE001
-        print(f"\nSKIP: the search loop is not importable here "
-              f"({type(exc).__name__}: {exc})")
+        # Exit 0, because a machine without numpy is not a defect in this
+        # adapter -- but the last line must not be the one a reader greps for
+        # as success, or "nothing ran" and "everything passed" look identical
+        # to anything reading the tail of the log.
+        print(f"\n{'=' * 68}")
+        print(f"ENTIRE SUITE SKIPPED, nothing was checked: the search loop is "
+              f"not importable here ({type(exc).__name__}: {exc})")
         return 0
 
     try:

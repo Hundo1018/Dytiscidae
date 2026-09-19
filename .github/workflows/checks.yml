@@ -9,13 +9,19 @@
 #               and the cheapest way to be sure of that is a runner where they
 #               are not installed.
 #   learner  -- numpy and a CPU torch, for the shared PPO learner.
+#   physics  -- numpy, scipy and a headless MuJoCo.  No GPU, no Mojo build.
 #
-# What is deliberately absent: tests/test_physics.py and tests/test_search.py.
-# Both go through `envs/batchroll.evaluate_tier1_batch`, which needs the Mojo
-# GPU fluid extension (`cd mojo && pixi run build-all`) and a GPU to run it on.
-# A hosted runner has neither, so running them here would report a red build for
-# a missing accelerator rather than for a defect.  They are the canary in
-# CLAUDE.md and are run on the machine that has the hardware.
+# The physics job exists because of a measurement, not a guess.  `tools/
+# suite_probe.py` ran every test function of `tests/test_physics.py` in its own
+# interpreter on a machine with no GPU fluid extension: **36 of the 37 pass and
+# exactly one is blocked.**  The suite used to abort on that one and take four
+# more down with it, which is why it looked like a suite that needed hardware.
+# It does not; it needs `MUJOCO_GL=disable` and one function skipped, and it
+# brings 203 checks that previously ran in no automated place at all.
+#
+# What is still absent: tests/test_search.py.  It takes roughly half an hour and
+# skips three functions here, so it stays the canary that runs on the machine
+# with the hardware rather than on every push.
 
 name: checks
 
@@ -75,3 +81,35 @@ jobs:
 
       - name: the search adapter
         run: PYTHONPATH=. python tests/test_search_adapter.py
+
+  physics:
+    name: physics and the numeric suites
+    runs-on: ubuntu-latest
+    env:
+      # MuJoCo 3.13 imports a renderer at `import mujoco`, which needs a GL
+      # backend a hosted runner does not have.  `disable` skips it; nothing
+      # below renders.
+      MUJOCO_GL: disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: install the CPU-only scientific stack
+        run: python -m pip install --quiet numpy scipy "mujoco>=3.1"
+
+      - name: the fast numeric suites
+        run: |
+          set -e
+          for s in math added_mass hull_buckling jet_energy reduced_frequency \
+                   stall_blend mobility_cache gpu_mirror; do
+              echo "=== tests/test_$s.py ==="
+              PYTHONPATH=. python "tests/test_$s.py"
+          done
+
+      - name: the physics suite
+        # One function needs the Mojo GPU extension and reports itself as
+        # [skip]; the summary line carries the count, so a run that skipped
+        # something cannot be read as a clean pass.
+        run: PYTHONPATH=. python tests/test_physics.py

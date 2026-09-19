@@ -47,12 +47,29 @@ from dytiscidae.learning.ppo import (AVAILABLE, UNAVAILABLE_REASON,  # noqa: E40
 N_OBS, N_MODES = 14, 4
 
 FAILURES: list[str] = []
+SKIPPED: list[str] = []
 
 
 def check(name: str, cond: bool, detail: str = "") -> None:
     print(f"  [{'ok  ' if cond else 'FAIL'}] {name}{('  -- ' + detail) if detail else ''}")
     if not cond:
         FAILURES.append(name)
+
+
+def skip(name: str, reason: str) -> None:
+    """A check that did not run, rendered as itself.
+
+    This existed as ``check(name, True, "SKIPPED: ...")``, which printed
+    ``[ok  ]`` and was counted as a pass.  Measured on the runner CI actually
+    uses -- numpy and torch, no MuJoCo -- that made "shared PPO checks passed"
+    the summary of a run where two test functions never executed: 48 checks ran
+    there against 56 here, and the missing eight said nothing about themselves.
+    A skip is a third state and prints as one, and the success line carries the
+    count, so the string a reader greps for cannot appear on a run that did not
+    run everything.
+    """
+    print(f"  [skip] {name}  -- {reason}")
+    SKIPPED.append(name)
 
 
 def _rollout(policy, rng, n_steps, reward_fn, tag: str = "", phi=None):
@@ -414,6 +431,76 @@ def test_an_empty_generation_is_skipped_not_crashed_on() -> None:
           f"moved ||dW|| = {np.linalg.norm(after - before):.3e}")
 
 
+def test_the_batch_boundaries() -> None:
+    """One step, one trajectory, a negative reward, and an enormous one.
+
+    A generation can produce any of these: a segment that terminated on its
+    first control decision, a batch where every candidate but one failed Tier 0,
+    a competence of zero against a scaled mean, and -- once a new rung is added
+    -- a reward larger than anything the scaler has seen.  None of them was
+    covered, and each is a place where an off-by-one or an overflow lives.
+    """
+    print("\nupdate: the boundaries of a batch")
+    import torch
+
+    # A one-step trajectory.  GAE over a single step is the terminal delta and
+    # nothing else, and the loop that builds it must not index past the end.
+    one = RolloutBuffer(gamma=0.99, lam=0.95, shaping=0.0)
+    one.add(_fabricate([0.25], 1.0))
+    _o, _a, _l, adv, ret, val = one.build()
+    want = 1.0 / 0.05 - 0.25          # reward/scale + gamma*0 - V(s_0)
+    check("a one-step trajectory gives one advantage, the terminal delta",
+          adv.shape == (1,) and abs(float(adv[0]) - want) < 1e-12,
+          f"advantage {float(adv[0]):.6f} against {want:.6f} by hand")
+    check("and its return is that plus the value it started from",
+          abs(float(ret[0]) - (want + 0.25)) < 1e-12, f"{float(ret[0]):.6f}")
+
+    # One transition in the whole batch: below the floor ppo_update refuses at,
+    # because a batch of one cannot be standardised (its std is zero).
+    torch.manual_seed(40)
+    p = SharedPolicy(N_OBS, N_MODES, hidden=16)
+    before = p.state_dict()["actor.0.weight"].detach().numpy().copy()
+    tiny = RolloutBuffer()
+    tiny.add(_fabricate([0.1], 1.0))
+    info = ppo_update(p, tiny, rng=np.random.default_rng(0))
+    after = p.state_dict()["actor.0.weight"].detach().numpy()
+    check("a batch of one transition is refused, and the policy is untouched",
+          info.get("skipped") is True and np.array_equal(before, after),
+          f"{info}")
+
+    # Two is the smallest batch it will act on.
+    pair = RolloutBuffer()
+    pair.add(_fabricate([0.1, 0.2], 1.0))
+    info2 = ppo_update(p, pair, epochs=1, minibatch=2,
+                       rng=np.random.default_rng(0))
+    check("two is the smallest batch it acts on",
+          info2.get("skipped") is False and info2["transitions"] == 2,
+          f"transitions {info2['transitions']}, grad_steps {info2['grad_steps']}")
+
+    # Negative and enormous rewards.  Advantages are standardised across the
+    # batch, so the scale should not reach the loss -- but nothing checked that
+    # a 1e9 reward does not simply overflow on the way there.
+    for label, rewards in (("negative", (-1.0, -0.5, -2.0, -0.25)),
+                           ("enormous", (1e9, 2e9, 5e8, 1.5e9)),
+                           ("all zero", (0.0, 0.0, 0.0, 0.0))):
+        torch.manual_seed(41)
+        q = SharedPolicy(N_OBS, N_MODES, hidden=16)
+        b = RolloutBuffer()
+        for r in rewards:
+            b.add(_fabricate([0.1, 0.2, 0.3], r, tag="x"))
+        got = ppo_update(q, b, epochs=2, minibatch=6,
+                         rng=np.random.default_rng(0))
+        w = q.state_dict()["actor.0.weight"].detach().numpy()
+        finite = (got.get("skipped") is False
+                  and all(np.isfinite(got[k]) for k in
+                          ("pi_loss", "v_loss", "kl", "entropy"))
+                  and np.isfinite(w).all())
+        check(f"a {label} reward leaves the update finite",
+              finite,
+              f"pi_loss {got.get('pi_loss')}, v_loss {got.get('v_loss')}, "
+              f"kl {got.get('kl')}, weights finite {np.isfinite(w).all()}")
+
+
 def test_a_non_finite_batch_is_refused_rather_than_consumed() -> None:
     """One NaN reward used to write NaN into every weight of the shared policy.
 
@@ -477,6 +564,71 @@ def test_the_rate_anneal_reaches_the_optimiser() -> None:
           seen[0][1] == 1e-3 and seen[2][1] == 0.0
           and seen[3][1] == 1e-3 and seen[4][1] == 0.0,
           f"frac 2.0 -> {seen[3][1]:.2e}, frac -1.0 -> {seen[4][1]:.2e}")
+
+
+def test_the_clip_actually_clips() -> None:
+    """The `P` in PPO. Mutation testing found this untested.
+
+    Replacing ``min(r*A, clamp(r, 1-c, 1+c)*A)`` with ``min(r*A, r*A)`` -- the
+    unclipped surrogate, i.e. vanilla policy gradient with importance weights --
+    left every one of the 54 checks in this file green
+    (``tools/mutate.py --only clip``).  The previous audit claimed clip was
+    covered; it was not.
+
+    The oracle is the ``clip`` argument itself, and it does not re-implement the
+    objective.  If the clamp is real, a tight clip and a loose one must take the
+    policy to different places; if it is gone, ``clip`` no longer reaches
+    ``pi_loss`` and the actor's gradient is identical either way.  (It still
+    reaches the *value* loss, but the actor and critic are separate stacks, so
+    the actor's weights are the discriminating measurement.)
+
+    ``clipfrac`` is asserted nonzero on the tight arm, because a test that never
+    drove the ratio outside the band would pass whether or not the clamp exists.
+
+    ``vf_coef=0`` is what makes the threshold below non-arbitrary rather than a
+    guess.  ``clip`` has a second route into the actor -- it bounds the value
+    loss too, and ``clip_grad_norm_`` normalises over *all* parameters at once,
+    so a changed critic gradient rescales the actor's.  With the value loss left
+    on, removing the clamp still left the two arms 0.000936 apart against a
+    0.171 signal: a 180x margin, but one that a future change to ``vf_coef``
+    could erode silently.  With the value loss off, ``clip`` reaches the actor
+    through the clamp or not at all, so the mutated code gives **exactly** zero
+    and the margin is no longer a number anyone has to keep calibrated.
+    """
+    print("\nupdate: the clip")
+    import torch
+
+    def run(clip):
+        torch.manual_seed(31)
+        rng = np.random.default_rng(31)
+        p = SharedPolicy(N_OBS, N_MODES, hidden=32)
+        opt = torch.optim.Adam(p.parameters(), lr=1e-2, eps=1e-5)
+        b = RolloutBuffer()
+        for _ in range(8):
+            b.add(_rollout(p, rng, 64, lambda a: float(a[:, 0].mean())))
+        # target_kl off: the epoch loop must run to the end on both arms, or the
+        # difference measured below could be "one arm stopped earlier".
+        info = ppo_update(p, b, epochs=6, minibatch=128, clip=clip,
+                          target_kl=0.0, vf_coef=0.0, optimiser=opt,
+                          rng=np.random.default_rng(32))
+        return (p.state_dict()["actor.0.weight"].detach().numpy().copy(), info)
+
+    w_tight, i_tight = run(0.05)
+    w_loose, i_loose = run(10.0)
+
+    check("the update leaves the clip band, so the clamp is exercised at all",
+          i_tight["clipfrac"] > 0.05 and i_loose["clipfrac"] == 0.0,
+          f"clipfrac {i_tight['clipfrac']:.4f} at clip=0.05, "
+          f"{i_loose['clipfrac']:.4f} at clip=10.0")
+    moved = float(np.linalg.norm(w_tight - w_loose))
+    check("and a tight clip takes the actor somewhere a loose one does not",
+          moved > 0.01,
+          f"actor ||dW|| between clip=0.05 and clip=10.0 = {moved:.6f} "
+          f"(0.000000 with the clamp removed)")
+    check("the clipped surrogate is the smaller objective, as min() requires",
+          i_tight["pi_loss"] > i_loose["pi_loss"],
+          f"pi_loss {i_tight['pi_loss']:+.5f} clipped against "
+          f"{i_loose['pi_loss']:+.5f} unclipped")
 
 
 def test_the_reported_kl_cannot_be_negative() -> None:
@@ -644,29 +796,66 @@ def test_the_search_seeds_torch_before_it_builds_the_policy() -> None:
     constructions sit ||dW|| = 7.4 apart in the first actor layer.  The worker
     pool seeds itself per shard, which covers the rollout's exploration noise
     and not this.
+
+    This check used to read ``inspect.getsource(run_search)`` for the string
+    ``manual_seed``.  Mutation testing killed it: commenting the call out leaves
+    the string in the source as a comment, so the check passed on a
+    ``run_search`` that no longer seeded anything
+    (``tools/mutate.py --only torch-seed``).  A test whose oracle is the text of
+    the code cannot tell a call from a mention of one.
+
+    So it runs the real ``run_search`` and reads the weights it actually built.
+    ``seed_archipelago`` is swapped for a probe that grabs them and stops the
+    run before the first evaluation, which is also why this needs no MuJoCo and
+    no GPU: nothing before that point compiles a model.  The ambient torch state
+    is deliberately *different* before each call, so matching weights can only
+    come from ``run_search`` having seeded torch itself.
     """
     print("\nsearch: the seed reaches the network")
-    import inspect
-
-    from dytiscidae.evolution import loop as _loop
-
-    src = inspect.getsource(_loop.run_search)
-    seeded = src.index("manual_seed") if "manual_seed" in src else -1
-    built = src.index("SharedPolicy(") if "SharedPolicy(" in src else -1
-    check("run_search seeds torch, and does it before the network exists",
-          0 <= seeded < built, f"manual_seed at offset {seeded}, "
-                               f"SharedPolicy at {built}")
+    import shutil
+    import tempfile
 
     import torch
-    torch.manual_seed(21)
-    a = SharedPolicy(N_OBS, N_MODES, hidden=16).state_dict()["actor.0.weight"]
-    torch.manual_seed(21)
-    b = SharedPolicy(N_OBS, N_MODES, hidden=16).state_dict()["actor.0.weight"]
-    c = SharedPolicy(N_OBS, N_MODES, hidden=16).state_dict()["actor.0.weight"]
-    check("and the same seed gives the same initial weights",
-          float((a - b).norm()) == 0.0 and float((a - c).norm()) > 1.0,
-          f"same seed ||dW|| = {float((a - b).norm()):.1e}, "
-          f"next draw ||dW|| = {float((a - c).norm()):.3f}")
+
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution import loop as _loop
+
+    class _StopBeforeEvaluating(Exception):
+        pass
+
+    def weights_at_birth(seed: int, ambient: int):
+        torch.manual_seed(ambient)
+        tmp = tempfile.mkdtemp(prefix="dyt-seed-")
+        grabbed: dict = {}
+        original = _loop.seed_archipelago
+
+        def stop_here(state, spec):
+            grabbed["w"] = (state.shared.state_dict()["actor.0.weight"]
+                            .detach().numpy().copy())
+            raise _StopBeforeEvaluating
+
+        _loop.seed_archipelago = stop_here
+        try:
+            _loop.run_search(_loop.SearchConfig(
+                generations=1, batch=1, seed=seed, run_dir=tmp, workers=1,
+                islands=("generalist",), use_shared_policy=True), MissionSpec())
+        except _StopBeforeEvaluating:
+            pass
+        finally:
+            _loop.seed_archipelago = original       # never leave it patched
+            shutil.rmtree(tmp, ignore_errors=True)
+        return grabbed.get("w")
+
+    a = weights_at_birth(1234, ambient=999)
+    b = weights_at_birth(1234, ambient=7)
+    c = weights_at_birth(4321, ambient=999)
+    same = float(np.linalg.norm(a - b))
+    other = float(np.linalg.norm(a - c))
+    check("the same --seed builds the same policy, whatever torch was doing",
+          same == 0.0, f"||dW|| = {same:.3e} across two different ambient "
+                       f"torch states")
+    check("and a different --seed builds a different one",
+          other > 1.0, f"||dW|| = {other:.4f}")
 
 
 # ==========================================================================
@@ -772,8 +961,8 @@ def test_the_shaping_reads_the_channels_it_thinks_it_does() -> None:
     try:
         import mujoco  # noqa: F401
     except Exception as exc:                                     # noqa: BLE001
-        check("MuJoCo is available to compile a model", True,
-              f"SKIPPED: {type(exc).__name__}: {exc}")
+        skip("the shaping's view of the observation",
+             f"no MuJoCo here: {type(exc).__name__}: {exc}")
         return
 
     from dytiscidae.core.bodyplans import beetle
@@ -835,9 +1024,8 @@ def test_the_learner_is_wired_to_the_evaluator() -> None:
     from dytiscidae.envs import batchroll as _br
 
     if not _br.AVAILABLE:
-        check("the batched evaluator is available", True,
-              f"SKIPPED: {_br.UNAVAILABLE_REASON}")
-        print("       (the checks below need `cd mojo && pixi run build-all`)")
+        skip("the learner against the batched evaluator",
+             f"{_br.UNAVAILABLE_REASON} — needs `cd mojo && pixi run build-all`")
         return
 
     import torch
@@ -911,8 +1099,10 @@ def main() -> int:
     test_terminal_rewards_are_scaled_within_their_own_kind()
 
     test_an_empty_generation_is_skipped_not_crashed_on()
+    test_the_batch_boundaries()
     test_a_non_finite_batch_is_refused_rather_than_consumed()
     test_the_rate_anneal_reaches_the_optimiser()
+    test_the_clip_actually_clips()
     test_the_reported_kl_cannot_be_negative()
     test_the_entropy_bonus_has_a_gradient()
     test_it_learns_a_reward_with_a_known_optimum()
@@ -925,10 +1115,16 @@ def main() -> int:
     test_the_learner_is_wired_to_the_evaluator()
 
     print("\n" + "=" * 68)
+    if SKIPPED:
+        print(f"{len(SKIPPED)} SKIPPED, not run on this machine: "
+              f"{', '.join(SKIPPED)}")
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
         return 1
-    print("shared PPO checks passed")
+    # Unqualified only when nothing was skipped: the string a reader greps for
+    # must not appear on a run that did not run everything.
+    print("shared PPO checks passed" if not SKIPPED
+          else f"shared PPO checks passed, {len(SKIPPED)} skipped")
     return 0
 
 
