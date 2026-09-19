@@ -214,9 +214,11 @@ Islands:
   implementation:
     - evolution.islands.Archipelago
     - evolution.islands.island_score
+    - evolution.islands.own_domain_score
   tests:
     - tests.test_search::test_the_island_objective_takes_its_weight_back
     - tests.test_search::test_every_island_is_reached_by_verification_and_audit
+    - tests.test_search::test_an_islands_best_is_judged_on_its_own_domains
 
 Curation:
   implementation:

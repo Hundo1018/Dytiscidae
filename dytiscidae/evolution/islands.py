@@ -145,6 +145,33 @@ def island_score(island: str, result, transitions=None) -> float:
     return float(base * max(quality, 0.15))
 
 
+def own_domain_score(island: str, meta: dict) -> float:
+    """How good a stored elite is at *its island's own* domains, from its meta.
+
+    Not the same question as fitness, and at arch39's generation-160 checkpoint
+    not the same answer on five islands of seven: fitness blends the island's
+    score with the curriculum stage's as population quantiles, and stage 0
+    ("single") reads the design's best medium *anywhere*, so the air island's
+    fitness champion scored air 0.033 and land 0.744 while an elite with air
+    0.768 sat in the same archive.  Filming "the air island's best" by fitness
+    films a land machine.
+
+    This is :func:`island_score`'s base term -- the weakest own domain, square
+    rooted, times their mean -- computed from the competences an elite's meta
+    stores.  The transition-quality factor is left out because the archive does
+    not store it.  The generalist island's own objective is the mission.
+    """
+    meta = meta or {}
+    spec = ISLANDS.get(island)
+    if spec is None or island == "generalist":
+        v = meta.get("mission_fraction")
+        return float(v) if isinstance(v, (int, float)) else 0.0
+    comps = [float(meta.get(d) or 0.0) for d in spec["domains"]]
+    if not comps:
+        return 0.0
+    return float(np.min(comps)) ** 0.5 * float(np.mean(comps))
+
+
 @dataclass(eq=False)
 class Archipelago:
     """Several archives, evolved in parallel, with migration and hybridisation.

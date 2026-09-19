@@ -432,6 +432,15 @@ def cmd_showcase(args) -> int:
         # to exist.
         if args.by == "mission":
             key = lambda e: (e.meta or {}).get("mission_fraction") or 0.0
+        elif args.by == "island":
+            # Best at the island's own domains, which fitness is not: stage 0
+            # of the curriculum reads the best medium anywhere, so an island's
+            # fitness champion can be a specialist in someone else's medium.
+            from ..evolution.islands import own_domain_score
+
+            def key(e):
+                meta = e.meta or {}
+                return own_domain_score(args.island or meta.get("island", ""), meta)
         else:
             key = lambda e: e.fitness
         elite = max(pool, key=key)
@@ -819,9 +828,12 @@ def main(argv=None) -> int:
                    help="restrict --design to one island's archive")
     p.add_argument("--plan", default=None,
                    help="film a named body plan instead (beetle, gannet, ...)")
-    p.add_argument("--by", choices=("fitness", "mission"), default="fitness",
+    p.add_argument("--by", choices=("fitness", "mission", "island"), default="fitness",
                    help="which elite counts as best: the curator's fitness "
-                        "ranking, or the mission fraction the machine achieved")
+                        "ranking, the mission fraction the machine achieved, or "
+                        "competence at the island's own domains (use with "
+                        "--island; an island's fitness champion can be a "
+                        "specialist in another medium)")
     p.add_argument("--controller", default=None, help="load a trained controller pickle")
     p.add_argument("--train", action="store_true", help="train one first")
     p.add_argument("--iterations", type=int, default=22)

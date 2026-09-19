@@ -1751,6 +1751,42 @@ def test_critic_learns_the_exploit_signature() -> None:
           f"calibration {blind.calibration:.2f}, discount x{blind.discount(np.zeros(16)):.3f}")
 
 
+def test_an_islands_best_is_judged_on_its_own_domains() -> None:
+    """"The air island's best design" must be a machine that flies.
+
+    Measured at arch39's generation-160 checkpoint: the air island's fitness
+    champion scored air 0.033 and land 0.744, because stage 0 of the curriculum
+    reads the best medium anywhere, while an elite with air 0.768 sat in the
+    same archive.  ``own_domain_score`` is what ``showcase --by island`` and
+    the per-island report rank by, so it is pinned on that exact pair.
+    """
+    print("\nislands: an island's best is judged on its own domains")
+    from dytiscidae.evolution.islands import own_domain_score
+
+    lander = {"air": 0.033, "water": 0.181, "land": 0.744, "mission_fraction": 0.0321}
+    flier = {"air": 0.768, "water": 0.695, "land": 0.000, "mission_fraction": 0.0}
+    check("on the air island the flier beats the land specialist",
+          own_domain_score("air", flier) > own_domain_score("air", lander),
+          f"{own_domain_score('air', flier):.3f} vs {own_domain_score('air', lander):.3f}")
+    check("and on the land island the order reverses",
+          own_domain_score("land", lander) > own_domain_score("land", flier))
+
+    # A two-domain island needs both: its weakest domain gates it, exactly as
+    # island_score's base term does.  Reading the best one instead is the
+    # defect that makes a specialist win a pairing island.
+    one_sided = {"water": 0.95, "land": 0.0}
+    both = {"water": 0.5, "land": 0.5}
+    check("an amphibian that cannot walk scores nothing on the amphibian island",
+          own_domain_score("amphibian", one_sided) == 0.0
+          and own_domain_score("amphibian", both) > 0.0,
+          f"one-sided {own_domain_score('amphibian', one_sided):.3f}, "
+          f"both {own_domain_score('amphibian', both):.3f}")
+    check("the generalist island's own objective is the mission",
+          own_domain_score("generalist", lander) == 0.0321)
+    check("and missing competences read as zero rather than raising",
+          own_domain_score("aerial_diver", {}) == 0.0)
+
+
 def test_the_island_objective_takes_its_weight_back() -> None:
     """The blend between curriculum and island objective must not be a constant.
 
@@ -3531,6 +3567,7 @@ def main() -> int:
         test_judge_ladder_is_fixed_and_bar_only_tightens,
         test_auditor_can_invalidate_and_veto,
         test_critic_learns_the_exploit_signature,
+        test_an_islands_best_is_judged_on_its_own_domains,
         test_the_island_objective_takes_its_weight_back,
         test_curriculum_and_islands_give_gradient_where_the_mission_gives_none,
         test_scout_finds_dark_horses_and_may_only_protect,

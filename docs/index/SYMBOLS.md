@@ -992,14 +992,15 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Archipelago` | class | 149 | — | Several archives, evolved in parallel, with migration and hybridisation. |
+| `Archipelago` | class | 176 | — | Several archives, evolved in parallel, with migration and hybridisation. |
 | `island_score` | function | 109 | `(island: str, result, transitions=None) -> float` | Score a design on one island's own terms. |
-| `Archipelago.due` | method | 185 | `(self, generation: int) -> bool` | — |
-| `Archipelago.emigrants` | method | 188 | `(self, name: str) -> list` | The designs this island sends abroad: its best, by its own lights. |
-| `Archipelago.migrate` | method | 196 | `(self, generation: int, rng: np.random.Generator, crossover=None) -> list` | Move genomes between islands and cross specialists. |
-| `Archipelago.names` | property | 176 | `(self) -> list` | — |
-| `Archipelago.register` | method | 179 | `(self, name: str, archive, curator) -> None` | — |
-| `Archipelago.report` | method | 252 | `(self) -> dict` | — |
+| `own_domain_score` | function | 148 | `(island: str, meta: dict) -> float` | How good a stored elite is at *its island's own* domains, from its meta. |
+| `Archipelago.due` | method | 212 | `(self, generation: int) -> bool` | — |
+| `Archipelago.emigrants` | method | 215 | `(self, name: str) -> list` | The designs this island sends abroad: its best, by its own lights. |
+| `Archipelago.migrate` | method | 223 | `(self, generation: int, rng: np.random.Generator, crossover=None) -> list` | Move genomes between islands and cross specialists. |
+| `Archipelago.names` | property | 203 | `(self) -> list` | — |
+| `Archipelago.register` | method | 206 | `(self, name: str, archive, curator) -> None` | — |
+| `Archipelago.report` | method | 279 | `(self) -> dict` | — |
 
 ## `evolution.judge` — `dytiscidae/evolution/judge.py`
 
@@ -1137,17 +1138,17 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `cmd_cohort` | function | 336 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_dashboard` | function | 615 | `(args) -> int` | — |
-| `cmd_distill` | function | 640 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_dashboard` | function | 624 | `(args) -> int` | — |
+| `cmd_distill` | function | 649 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
 | `cmd_reference` | function | 104 | `(args) -> int` | — |
-| `cmd_render` | function | 622 | `(args) -> int` | — |
+| `cmd_render` | function | 631 | `(args) -> int` | — |
 | `cmd_search` | function | 139 | `(args) -> int` | — |
 | `cmd_showcase` | function | 395 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
 | `cmd_skills` | function | 231 | `(args) -> int` | — |
 | `cmd_train` | function | 265 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 97 | `(args) -> int` | — |
 | `load_run_archive` | function | 31 | `(run_dir)` | The archive of a run, however that run stored it. |
-| `main` | function | 657 | `(argv=None) -> int` | — |
+| `main` | function | 666 | `(argv=None) -> int` | — |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`
 

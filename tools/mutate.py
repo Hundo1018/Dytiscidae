@@ -294,6 +294,17 @@ MUTATIONS: tuple = (
                "1500 of 1500 steps after a reset at step 400)",
         suites=("test_search",), item="QACC auto-reset"),
 
+    Mutation(
+        id="island-best-reads-the-best-domain",
+        path="dytiscidae/evolution/islands.py",
+        find="    return float(np.min(comps)) ** 0.5 * float(np.mean(comps))\n\n\n"
+             "@dataclass(eq=False)",
+        replace="    return float(np.max(comps)) ** 0.5 * float(np.mean(comps))\n\n\n"
+                "@dataclass(eq=False)",
+        defect="an island's best is judged on its strongest own domain, so a "
+               "one-medium specialist wins a pairing island",
+        suites=("test_search",), item="per-island best"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

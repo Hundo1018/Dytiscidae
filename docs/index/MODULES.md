@@ -2,7 +2,7 @@
 
 # Modules
 
-98 modules, 30,553 lines, 944 indexed symbols.
+98 modules, 30,592 lines, 945 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -116,7 +116,7 @@ is what makes a violation visible while reading.
 | `evolution.curator` | The curator: active management of the search, not just survival of the fittest. | 759 | — | `numpy` | `core.genome`, `evolution.archive` |
 | `evolution.curriculum` | Staged evaluation: learn one medium, then a crossing, then the chain. | 447 | — | `numpy` | — |
 | `evolution.descriptors` | Learned behaviour descriptors, so the archive axes stop being my guesses. | 228 | — | `numpy` | — |
-| `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 275 | — | `numpy` | — |
+| `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 302 | — | `numpy` | — |
 | `evolution.judge` | The judge: a scoring standard that gets stricter as the population improves. | 478 | — | `numpy` | — |
 | `evolution.loop` | The co-evolution loop: morphology and control, curated. | 2030 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
 | `evolution.scout` | The scout: a network that predicts a lineage's potential, not its score. | 493 | — | `numpy` | — |
@@ -133,7 +133,7 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `ops.checkpoint` | A run's finished state as one portable artefact. | 375 | — | `numpy`, `torch` | `evolution.judge`, `learning`, `learning.ppo` |
-| `ops.run` | Command-line entry point. | 883 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `viz.dashboard`, `viz.render`, `viz.showcase` |
+| `ops.run` | Command-line entry point. | 895 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.islands`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `viz.dashboard`, `viz.render`, `viz.showcase` |
 | `ops.telemetry` | Structured telemetry. | 111 | — | `numpy` | — |
 
 ## `physics`
