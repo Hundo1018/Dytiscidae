@@ -341,6 +341,15 @@ MUTATIONS: tuple = (
                "the code the process is running",
         suites=("test_search",), item="provenance"),
 
+    Mutation(
+        id="stale-kernel-used-anyway",
+        path="dytiscidae/envs/batchroll.py",
+        find='        if state == "stale":\n            _USABLE = (False, why)\n            return _USABLE\n',
+        replace="",
+        defect="a GPU kernel older than its source is used to score anyway, so "
+               "the search and every verification run different physics",
+        suites=("test_search",), item="kernel freshness"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

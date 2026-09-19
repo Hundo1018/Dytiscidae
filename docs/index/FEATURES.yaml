@@ -150,9 +150,13 @@ BatchedEvaluation:
     - envs.batchroll.step_batch
     - envs.batchroll.BatchedFluid
     - envs.batchroll.run_transition_batch
+    - envs.kernel.freshness
+    - envs.kernel.write_manifest
+    - envs.kernel.source_hashes
   tests:
     - tests.test_gpu_mirror
     - tests.test_search::test_the_two_evaluation_paths_score_the_same_machine_the_same
+    - tests.test_search::test_a_kernel_older_than_its_source_is_not_usable
   note: the path the search scores with; not interchangeable with evaluate_tier1
 
 Vectorisation:

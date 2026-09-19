@@ -2723,6 +2723,71 @@ def test_the_two_evaluation_paths_score_the_same_machine_the_same() -> None:
               + (f" on {key0}" if key0 else ""))
 
 
+def test_a_kernel_older_than_its_source_is_not_usable() -> None:
+    """The GPU kernel is a compiled mirror of the numpy solver; nothing compared them.
+
+    Measured 2026-09-20: `mojo/build` held a kernel built 2026-08-04 while
+    `mojo/src` was changed 2026-09-15 by F-05, which replaced the stall blend --
+    a logistic in the binary, a smoothstep in the source and in `fluid.py`. The
+    search scored with one physics and every verification, probe and film used
+    the other. With the stale binary the two paths' air and land measurements
+    differed by up to 2.0; rebuilt, they agree to 0.000002.
+    """
+    print("\nkernel: a build older than its source is not usable")
+    import shutil
+    import tempfile
+
+    from dytiscidae.envs import kernel
+
+    tmp = Path(tempfile.mkdtemp(prefix="dyt-kernel-"))
+    try:
+        src, build = tmp / "src", tmp / "build"
+        src.mkdir(); build.mkdir()
+        (src / "fluid_gpu.mojo").write_text("var blend = 6.0 * DEG\n")
+        check("with no manifest the kernel is unverified, not fresh and not stale",
+              kernel.freshness(src, build)[0] == "unverified")
+        kernel.write_manifest(src, build)
+        check("after a build it is fresh", kernel.freshness(src, build)[0] == "fresh")
+        (src / "fluid_gpu.mojo").write_text("var sep = 16.0 * DEG\n")   # F-05
+        state, why = kernel.freshness(src, build)
+        check("an edited source makes it stale, and says which file",
+              state == "stale" and "fluid_gpu.mojo" in why, f"{state}: {why[:60]}")
+        (src / "medium_gpu.mojo").write_text("new file\n")
+        check("so does a source the build never saw",
+              "medium_gpu.mojo" in kernel.freshness(src, build)[1])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # And a stale kernel must not be *used*: the run takes the CPU path and says
+    # why, rather than scoring with physics that is not the project's any more.
+    # The extension itself is not needed for this: the construction probe is
+    # stubbed, so the check runs on a machine with no GPU and inside the
+    # mutation harness, which copies only tracked files and so has no build.
+    from dytiscidae.envs import batchroll
+
+    class Ok:
+        returncode, stdout, stderr = 0, "ok", ""
+
+    saved = (kernel.freshness, batchroll._USABLE, batchroll.AVAILABLE,
+             batchroll.subprocess.run if hasattr(batchroll, "subprocess") else None)
+    import subprocess as _sp
+    saved_run = _sp.run
+    try:
+        batchroll.AVAILABLE = True
+        _sp.run = lambda *a, **k: Ok()
+        kernel.freshness = lambda *a, **k: ("stale", "stale for the test")
+        batchroll._USABLE = None
+        ok, why = batchroll.usable()
+        check("a stale kernel is not usable, and says so",
+              ok is False and "stale" in why, f"{ok}, {why[:60]}")
+        kernel.freshness = lambda *a, **k: ("fresh", "")
+        batchroll._USABLE = None
+        check("a fresh one is usable", batchroll.usable() == (True, ""))
+    finally:
+        _sp.run = saved_run
+        kernel.freshness, batchroll._USABLE, batchroll.AVAILABLE = saved[:3]
+
+
 def test_a_checkpoint_names_the_commit_the_process_started_from() -> None:
     """A commit made during a run must not be stamped on that run's checkpoints.
 
@@ -3787,6 +3852,7 @@ def main() -> int:
         test_the_search_is_pointed_at_the_mission_and_compounds,
         test_every_path_agrees_on_the_control_law,
         test_the_shared_policy_survives_a_resume,
+        test_a_kernel_older_than_its_source_is_not_usable,
         test_a_checkpoint_names_the_commit_the_process_started_from,
         test_a_finished_run_is_a_checkpoint,
         test_the_two_evaluation_paths_score_the_same_machine_the_same,

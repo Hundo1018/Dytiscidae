@@ -21,3 +21,11 @@ test = "mojo run -I src tests/test_mathx.mojo"
 # Build the Python extension.  The module name must match PyInit_<name> and the
 # filename, or the import fails with a bare "dynamic module does not define".
 build = "mojo build --emit shared-lib -I src src/fluid_gpu.mojo -o build/fluid_gpu.so"
+# What every "build it with" message in the Python half has always named, and
+# what did not exist: `full_pipeline.so` is the extension `envs.batchroll`
+# imports, and nothing here built it.  Its kernel was five weeks older than its
+# source before this task was written.  The manifest is what makes that
+# visible -- see dytiscidae/envs/kernel.py.
+build-all = """mojo build --emit shared-lib -I src src/full_pipeline.mojo -o build/full_pipeline.so && \
+mojo build --emit shared-lib -I src src/fluid_gpu.mojo -o build/fluid_gpu.so && \
+PYTHONPATH=.. python -c 'from dytiscidae.envs.kernel import write_manifest; print(write_manifest())'"""

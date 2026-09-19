@@ -141,6 +141,18 @@ def usable(timeout: float = 180.0) -> tuple:
         _USABLE = (False, f"probe did not run: {type(exc).__name__}: {exc}")
         return _USABLE
     if r.returncode == 0 and "ok" in r.stdout:
+        # It constructs.  Whether it is the *current* physics is a separate
+        # question, and the answer was no for five weeks: see envs.kernel.
+        from . import kernel as _kernel
+
+        state, why = _kernel.freshness()
+        if state == "stale":
+            _USABLE = (False, why)
+            return _USABLE
+        if state == "unverified":
+            import sys as _sys
+            print(f"\n*** GPU kernel freshness unverified: {why} ***\n",
+                  file=_sys.stderr, flush=True)
         _USABLE = (True, "")
         return _USABLE
     tail = (r.stderr or r.stdout or "").strip().splitlines()

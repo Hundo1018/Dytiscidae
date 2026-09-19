@@ -256,6 +256,14 @@ def write(state, gen: int) -> Path | None:
                           for d, rungs in LADDER.items()}
     except Exception:                                             # noqa: BLE001
         pass
+    # Which GPU kernel scored this run.  arch39's numbers came from a kernel
+    # built five weeks before its source; a record that does not name the
+    # kernel cannot tell a later reader that.
+    try:
+        from ..envs.kernel import freshness, source_hashes
+        prov["kernel"] = {"freshness": freshness()[0], "sources": source_hashes()}
+    except Exception:                                             # noqa: BLE001
+        pass
     meta["provenance"] = prov
 
     if not arrays and not meta.get("elites"):

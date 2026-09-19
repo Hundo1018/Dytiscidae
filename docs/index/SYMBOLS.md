@@ -694,16 +694,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `BatchedFluid` | class | 197 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 640 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `identify_batch` | function | 417 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `rollout_batch` | function | 492 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 816 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 381 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `BatchedFluid` | class | 209 | — | One GPU pipeline serving N environments stepped in lockstep. |
+| `evaluate_tier1_batch` | function | 652 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `identify_batch` | function | 429 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `rollout_batch` | function | 504 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 828 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 393 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 90 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
-| `BatchedFluid.__init__` | method | 208 | `(self, envs)` | — |
-| `BatchedFluid.apply` | method | 295 | `(self, t: float, active=None) -> None` | Run the fluid for every environment and write their xfrc_applied. |
-| `BatchedFluid.reset_slam` | method | 282 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
+| `BatchedFluid.__init__` | method | 220 | `(self, envs)` | — |
+| `BatchedFluid.apply` | method | 307 | `(self, t: float, active=None) -> None` | Run the fluid for every environment and write their xfrc_applied. |
+| `BatchedFluid.reset_slam` | method | 294 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
@@ -726,6 +726,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `Controller.basis_for` | method | 49 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
 | `SharedController.basis_for` | method | 112 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
 | `SummedPolicy.act` | method | 82 | `(self, obs) -> np.ndarray` | — |
+
+## `envs.kernel` — `dytiscidae/envs/kernel.py`
+
+> Is the built GPU kernel the one its source says it should be?
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `freshness` | function | 46 | `(src: Path \| None=None, build: Path \| None=None) -> tuple` | ``(state, reason)`` where state is "fresh", "stale" or "unverified". |
+| `source_hashes` | function | 29 | `(src: Path \| None=None) -> dict` | — |
+| `write_manifest` | function | 37 | `(src: Path \| None=None, build: Path \| None=None) -> Path` | Record what was compiled.  Called by ``pixi run build-all``. |
 
 ## `envs.mission` — `dytiscidae/envs/mission.py`
 
@@ -1119,18 +1129,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Checkpoint` | class | 301 | — | A run's finished state, read back without unpickling anything. |
-| `Elite` | class | 287 | — | One stored design, with everything needed to drive it. |
-| `load_network` | function | 372 | `(ck: Checkpoint)` | Rebuild the shared policy from a checkpoint, weights loaded. |
-| `read` | function | 354 | `(where: str \| Path) -> Checkpoint` | Load a checkpoint from a run directory or from the ``.npz`` itself. |
+| `Checkpoint` | class | 309 | — | A run's finished state, read back without unpickling anything. |
+| `Elite` | class | 295 | — | One stored design, with everything needed to drive it. |
+| `load_network` | function | 380 | `(ck: Checkpoint)` | Rebuild the shared policy from a checkpoint, weights loaded. |
+| `read` | function | 362 | `(where: str \| Path) -> Checkpoint` | Load a checkpoint from a run directory or from the ``.npz`` itself. |
 | `write` | function | 182 | `(state, gen: int) -> Path \| None` | Write the portable checkpoint beside the archives.  Returns its path. |
-| `Checkpoint.elite` | method | 338 | `(self, by: str='mission') -> Elite \| None` | — |
-| `Checkpoint.generation` | property | 309 | `(self) -> int` | — |
-| `Checkpoint.net_shape` | method | 317 | `(self) -> tuple` | — |
-| `Checkpoint.net_state` | method | 312 | `(self) -> dict` | The shared network's ``state_dict``, as numpy arrays. |
-| `Checkpoint.optimiser_state` | method | 322 | `(self) -> dict \| None` | Adam's state, in the shape ``load_state_dict`` wants. |
-| `Checkpoint.rng_state` | method | 335 | `(self) -> dict \| None` | — |
-| `Elite.eval_seed` | property | 296 | `(self)` | — |
+| `Checkpoint.elite` | method | 346 | `(self, by: str='mission') -> Elite \| None` | — |
+| `Checkpoint.generation` | property | 317 | `(self) -> int` | — |
+| `Checkpoint.net_shape` | method | 325 | `(self) -> tuple` | — |
+| `Checkpoint.net_state` | method | 320 | `(self) -> dict` | The shared network's ``state_dict``, as numpy arrays. |
+| `Checkpoint.optimiser_state` | method | 330 | `(self) -> dict \| None` | Adam's state, in the shape ``load_state_dict`` wants. |
+| `Checkpoint.rng_state` | method | 343 | `(self) -> dict \| None` | — |
+| `Elite.eval_seed` | property | 304 | `(self)` | — |
 
 ## `ops.run` — `dytiscidae/ops/run.py`
 
