@@ -202,6 +202,16 @@ def run_continuous(
 
     # Start in the first commanded domain -- the only placement in the run.
     env.reset(schedule[0][0], randomise=False)
+    # MuJoCo's answer to a bad acceleration is to *reset the state* and carry
+    # on: the machine is teleported to its default pose mid-mission, which is
+    # finite and inside 400 m, so the position check below never sees it -- and
+    # the pose it lands in can sit in a different medium, which this loop would
+    # then count as a transition.  Measured on MuJoCo 3.11.0: the auto-reset
+    # also resets the warning counter to 1, so only the *first* divergence on
+    # an mjData moves it.  ``reset`` above zeroes it and nothing below resets
+    # again, so "the counter moved" is exactly "the first divergence happened".
+    _bad = env._mj.mjtWarning.mjWARN_BADQACC
+    bad0 = int(env.data.warning[_bad].number)
     params = controller.params if controller is not None else env.cpg.base
     ctrl_every = max(1, int(1.0 / (control_hz * env.timestep)))
 
@@ -231,6 +241,10 @@ def run_continuous(
                 cur = basis.command_params(params, coeffs, env.cpg.n)
 
             alive = env.step(env.cpg.command(cur, env.data.time))
+            if int(env.data.warning[_bad].number) > bad0:
+                result.survived = False
+                result.failure = "unstable"
+                break
             pos = env.root_pos()
             if not np.all(np.isfinite(pos)) or np.abs(pos).max() > 400.0:
                 result.survived = False

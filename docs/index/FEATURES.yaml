@@ -178,6 +178,7 @@ ContinuousMission:
     - envs.mission.continuous_score
   tests:
     - tests.test_search
+    - tests.test_search::test_a_mujoco_auto_reset_ends_the_continuous_mission
 
 ActuatorSkills:
   implementation:

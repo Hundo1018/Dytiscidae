@@ -281,6 +281,19 @@ MUTATIONS: tuple = (
                "is what mut_stroke already did",
         suites=("test_search",), item="arch39 S jointness"),
 
+    Mutation(
+        id="continuous-mission-ignores-auto-reset",
+        path="dytiscidae/envs/mission.py",
+        find="            if int(env.data.warning[_bad].number) > bad0:\n"
+             "                result.survived = False\n"
+             "                result.failure = \"unstable\"\n"
+             "                break\n",
+        replace="",
+        defect="a MuJoCo auto-reset teleports the machine mid-mission and the "
+               "mission carries on across the jump (measured: survived=True, "
+               "1500 of 1500 steps after a reset at step 400)",
+        suites=("test_search",), item="QACC auto-reset"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

@@ -1140,6 +1140,56 @@ def test_arriving_somewhere_is_not_one_lucky_timestep() -> None:
               f"land on-task {land.on_task_fraction*100:.1f}%, entered={land.entered}")
 
 
+def test_a_mujoco_auto_reset_ends_the_continuous_mission() -> None:
+    """A teleport is not a mission.
+
+    On a bad acceleration MuJoCo resets the state and keeps stepping: the
+    machine reappears at its default pose, which is finite and inside 400 m, so
+    ``run_continuous``'s position check never fired and the mission carried on
+    across the jump -- measuring leg distance through it, and able to credit a
+    domain change the machine never made.  The scored segments were already
+    gated on ``bad_qacc``; the continuous mission, which the showcase films and
+    controller training's continuous mode scores, read nothing.
+
+    The divergence is injected rather than waited for, because the rate on real
+    designs is 0.15% of scored rollouts and a test cannot wait for that.
+    """
+    print("\nmission: a MuJoCo auto-reset ends the continuous mission")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.mission import build_schedule, run_continuous
+    from dytiscidae.envs.triphibian import MissionSpec, TriphibianEnv
+
+    spec = MissionSpec(cycles=1, seconds_per_domain=2.0)
+
+    def mission(inject_at):
+        env = TriphibianEnv(build(BODY_PLANS["gannet"]()), seed=0)
+        orig, k = env.step, [0]
+
+        def step(angles):
+            k[0] += 1
+            if inject_at is not None and k[0] == inject_at:
+                env.data.qfrc_applied[2] = 1e300     # one bad qacc
+            ok = orig(angles)
+            env.data.qfrc_applied[:] = 0.0
+            return ok
+        env.step = step
+        r = run_continuous(env, None, build_schedule(
+            spec, np.random.default_rng(0), leg_seconds=2.0))
+        return r, k[0]
+
+    clean, _ = mission(None)
+    check("the same mission without an injected divergence survives",
+          clean.survived, f"failure {clean.failure!r}")
+
+    hit, steps = mission(400)
+    check("an auto-reset mid-mission fails it, as 'unstable'",
+          not hit.survived and hit.failure == "unstable",
+          f"survived={hit.survived}, failure={hit.failure!r}")
+    check("and it stops at the reset rather than stepping on from the teleport",
+          steps == 400, f"stepped {steps} times, injected at step 400")
+
+
 def test_transitions_are_graded_not_pass_fail() -> None:
     """A crossing must be scored on how it was done, not only on whether it
     happened.
@@ -3475,6 +3525,7 @@ def main() -> int:
         test_intervention_is_triggered_by_evidence_not_a_schedule,
         test_no_dataclass_can_raise_on_equality,
         test_arriving_somewhere_is_not_one_lucky_timestep,
+        test_a_mujoco_auto_reset_ends_the_continuous_mission,
         test_transitions_are_graded_not_pass_fail,
         test_an_attempted_takeoff_outscores_never_leaving_the_ground,
         test_judge_ladder_is_fixed_and_bar_only_tightens,

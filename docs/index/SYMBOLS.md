@@ -694,15 +694,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `BatchedFluid` | class | 124 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 567 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `identify_batch` | function | 344 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `rollout_batch` | function | 419 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 743 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 308 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
-| `BatchedFluid.__init__` | method | 135 | `(self, envs)` | — |
-| `BatchedFluid.apply` | method | 222 | `(self, t: float, active=None) -> None` | Run the fluid for every environment and write their xfrc_applied. |
-| `BatchedFluid.reset_slam` | method | 209 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
+| `BatchedFluid` | class | 197 | — | One GPU pipeline serving N environments stepped in lockstep. |
+| `evaluate_tier1_batch` | function | 640 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `identify_batch` | function | 417 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `rollout_batch` | function | 492 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 816 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 381 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `usable` | function | 90 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
+| `BatchedFluid.__init__` | method | 208 | `(self, envs)` | — |
+| `BatchedFluid.apply` | method | 295 | `(self, t: float, active=None) -> None` | Run the fluid for every environment and write their xfrc_applied. |
+| `BatchedFluid.reset_slam` | method | 282 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
@@ -733,7 +734,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `build_schedule` | function | 167 | `(spec: MissionSpec, rng: np.random.Generator, leg_seconds: float \| None=None) -> list[tuple[Domain, float]]` | Random starting domain, then cycle, as specified. |
-| `continuous_score` | function | 294 | `(result: ContinuousResult, spec: MissionSpec) -> float` | A single number for the continuous mission, in [0, 1]. |
+| `continuous_score` | function | 308 | `(result: ContinuousResult, spec: MissionSpec) -> float` | A single number for the continuous mission, in [0, 1]. |
 | `ContinuousResult` | class | 59 | — | What one unbroken mission produced. |
 | `current_domain` | function | 156 | `(env: TriphibianEnv) -> Domain` | Which domain the machine is physically in right now. |
 | `LegRecord` | class | 39 | — | One commanded stretch of the mission. |
@@ -1027,12 +1028,12 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `batchroll_eval` | function | 560 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
 | `evaluate_candidate` | function | 325 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
 | `evaluate_candidates` | function | 378 | `(genomes, cfg: SearchConfig, *, inherited=None, identify: bool=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `load_state` | function | 1484 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `load_state` | function | 1500 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
 | `run_search` | function | 898 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 1383 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `save_state` | function | 1399 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 63 | — | Everything adjustable about a run. |
 | `SearchState` | class | 238 | — | — |
-| `seed_archipelago` | function | 1743 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `seed_archipelago` | function | 1759 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
 | `SearchState.archive` | property | 295 | `(self) -> Archive` | — |
 | `SearchState.curator` | property | 299 | `(self) -> Curator` | — |
 | `SearchState.curriculum` | property | 303 | `(self) -> Curriculum` | — |
