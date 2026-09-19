@@ -2723,6 +2723,34 @@ def test_the_two_evaluation_paths_score_the_same_machine_the_same() -> None:
               + (f" on {key0}" if key0 else ""))
 
 
+def test_a_checkpoint_names_the_commit_the_process_started_from() -> None:
+    """A commit made during a run must not be stamped on that run's checkpoints.
+
+    ``_git_sha`` asked git at every checkpoint write, so arch39 -- launched from
+    09bab3b -- wrote a generation-200 checkpoint claiming ca05812, a commit made
+    five hours in.  A checkpoint names its code so that its numbers can be
+    re-derived; naming the wrong code is worse than naming none.
+    """
+    print("\ncheckpoint: it names the commit the process started from")
+    from dytiscidae.ops import checkpoint as ck
+
+    saved, orig = ck._PROCESS_SHA, ck.subprocess.run
+
+    class Out:
+        returncode = 0
+        stdout = "launch-sha\n"
+    try:
+        ck._PROCESS_SHA = None
+        ck.subprocess.run = lambda *a, **k: Out()
+        first = ck._git_sha()
+        Out.stdout = "mid-run-sha\n"            # HEAD moved during the run
+        later = ck._git_sha()
+    finally:
+        ck.subprocess.run, ck._PROCESS_SHA = orig, saved
+    check("a checkpoint written after a mid-run commit still names the launch commit",
+          first == later == "launch-sha", f"first {first!r}, later {later!r}")
+
+
 def test_a_finished_run_is_a_checkpoint() -> None:
     """A run has to preserve the experiment, not only the machine.
 
@@ -3759,6 +3787,7 @@ def main() -> int:
         test_the_search_is_pointed_at_the_mission_and_compounds,
         test_every_path_agrees_on_the_control_law,
         test_the_shared_policy_survives_a_resume,
+        test_a_checkpoint_names_the_commit_the_process_started_from,
         test_a_finished_run_is_a_checkpoint,
         test_the_two_evaluation_paths_score_the_same_machine_the_same,
         test_a_resume_says_when_controllers_cannot_be_inherited,

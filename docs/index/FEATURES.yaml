@@ -474,6 +474,7 @@ RunCheckpoint:
     - evolution.loop.load_state
   tests:
     - tests.test_search::test_a_finished_run_is_a_checkpoint
+    - tests.test_search::test_a_checkpoint_names_the_commit_the_process_started_from
     - tests.test_search::test_a_run_can_be_picked_up_where_it_stopped
     - tests.test_ppo::test_both_learner_streams_survive_a_checkpoint
 

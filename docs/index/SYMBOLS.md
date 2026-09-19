@@ -1030,12 +1030,12 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `batchroll_eval` | function | 560 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
 | `evaluate_candidate` | function | 325 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
 | `evaluate_candidates` | function | 378 | `(genomes, cfg: SearchConfig, *, inherited=None, identify: bool=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `load_state` | function | 1500 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `load_state` | function | 1508 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
 | `run_search` | function | 898 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 1399 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `save_state` | function | 1407 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 63 | — | Everything adjustable about a run. |
 | `SearchState` | class | 238 | — | — |
-| `seed_archipelago` | function | 1759 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `seed_archipelago` | function | 1767 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
 | `SearchState.archive` | property | 295 | `(self) -> Archive` | — |
 | `SearchState.curator` | property | 299 | `(self) -> Curator` | — |
 | `SearchState.curriculum` | property | 303 | `(self) -> Curriculum` | — |
@@ -1119,18 +1119,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Checkpoint` | class | 286 | — | A run's finished state, read back without unpickling anything. |
-| `Elite` | class | 272 | — | One stored design, with everything needed to drive it. |
-| `load_network` | function | 357 | `(ck: Checkpoint)` | Rebuild the shared policy from a checkpoint, weights loaded. |
-| `read` | function | 339 | `(where: str \| Path) -> Checkpoint` | Load a checkpoint from a run directory or from the ``.npz`` itself. |
-| `write` | function | 167 | `(state, gen: int) -> Path \| None` | Write the portable checkpoint beside the archives.  Returns its path. |
-| `Checkpoint.elite` | method | 323 | `(self, by: str='mission') -> Elite \| None` | — |
-| `Checkpoint.generation` | property | 294 | `(self) -> int` | — |
-| `Checkpoint.net_shape` | method | 302 | `(self) -> tuple` | — |
-| `Checkpoint.net_state` | method | 297 | `(self) -> dict` | The shared network's ``state_dict``, as numpy arrays. |
-| `Checkpoint.optimiser_state` | method | 307 | `(self) -> dict \| None` | Adam's state, in the shape ``load_state_dict`` wants. |
-| `Checkpoint.rng_state` | method | 320 | `(self) -> dict \| None` | — |
-| `Elite.eval_seed` | property | 281 | `(self)` | — |
+| `Checkpoint` | class | 301 | — | A run's finished state, read back without unpickling anything. |
+| `Elite` | class | 287 | — | One stored design, with everything needed to drive it. |
+| `load_network` | function | 372 | `(ck: Checkpoint)` | Rebuild the shared policy from a checkpoint, weights loaded. |
+| `read` | function | 354 | `(where: str \| Path) -> Checkpoint` | Load a checkpoint from a run directory or from the ``.npz`` itself. |
+| `write` | function | 182 | `(state, gen: int) -> Path \| None` | Write the portable checkpoint beside the archives.  Returns its path. |
+| `Checkpoint.elite` | method | 338 | `(self, by: str='mission') -> Elite \| None` | — |
+| `Checkpoint.generation` | property | 309 | `(self) -> int` | — |
+| `Checkpoint.net_shape` | method | 317 | `(self) -> tuple` | — |
+| `Checkpoint.net_state` | method | 312 | `(self) -> dict` | The shared network's ``state_dict``, as numpy arrays. |
+| `Checkpoint.optimiser_state` | method | 322 | `(self) -> dict \| None` | Adam's state, in the shape ``load_state_dict`` wants. |
+| `Checkpoint.rng_state` | method | 335 | `(self) -> dict \| None` | — |
+| `Elite.eval_seed` | property | 296 | `(self)` | — |
 
 ## `ops.run` — `dytiscidae/ops/run.py`
 

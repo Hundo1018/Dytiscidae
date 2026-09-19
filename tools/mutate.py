@@ -332,6 +332,15 @@ MUTATIONS: tuple = (
                "operator with a good mean can go unpicked for 80 generations",
         suites=("test_search",), item="operator dormancy"),
 
+    Mutation(
+        id="checkpoint-asks-git-at-every-write",
+        path="dytiscidae/ops/checkpoint.py",
+        find="    if _PROCESS_SHA is not None:\n        return _PROCESS_SHA\n",
+        replace="",
+        defect="each checkpoint names whatever HEAD is when it is written, not "
+               "the code the process is running",
+        suites=("test_search",), item="provenance"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

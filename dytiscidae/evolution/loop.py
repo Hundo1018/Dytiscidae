@@ -943,6 +943,14 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             _br.AVAILABLE = False
             _br.UNAVAILABLE_REASON = _why
 
+    # Pin the commit the checkpoints will name to the one this process started
+    # from; see ``ops.checkpoint._git_sha``.
+    try:
+        from ..ops import checkpoint as _ckpt
+        _ckpt._git_sha()
+    except Exception:                                             # noqa: BLE001
+        pass
+
     rng = np.random.default_rng(cfg.seed)
     telemetry = Telemetry(cfg.run_dir, event_sample=cfg.event_sample)
 

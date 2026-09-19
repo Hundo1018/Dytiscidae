@@ -94,13 +94,28 @@ def _genome_dict(genome) -> dict | None:
         return None
 
 
+#: The commit this *process* was started from, asked once.
+#:
+#: Asking git at every checkpoint write records whatever HEAD is at that moment,
+#: which is not the code that is running: arch39 was launched from 09bab3b and
+#: its generation-200 checkpoint says ca05812, a commit made five hours into the
+#: run.  The first call answers for the process; ``run_search`` makes that call
+#: before its first generation, so the answer is the launch commit.
+_PROCESS_SHA: str | None = None
+
+
 def _git_sha() -> str:
+    global _PROCESS_SHA
+    if _PROCESS_SHA is not None:
+        return _PROCESS_SHA
     try:
         out = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
-                             text=True, timeout=5)
-        return out.stdout.strip() if out.returncode == 0 else ""
+                             text=True, timeout=5,
+                             cwd=Path(__file__).resolve().parents[2])
+        _PROCESS_SHA = out.stdout.strip() if out.returncode == 0 else ""
     except Exception:                                             # noqa: BLE001
-        return ""
+        _PROCESS_SHA = ""
+    return _PROCESS_SHA
 
 
 def _hidden_of(state_dict) -> int:
