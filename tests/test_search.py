@@ -2325,10 +2325,14 @@ def test_promotion_needs_a_nonzero_answer_to_the_next_question() -> None:
     from dytiscidae.evolution.curriculum import Curriculum
 
     def result_water_specialist():
+        # Stage 1 reads the *net* measurements -- what this machine did beyond
+        # a twin of itself with the actuators held still -- so the specialist
+        # has to state its depth-holding in those terms to pass the bar at all.
         seg = SimpleNamespace(
             competence=0.9,
             measurements={"depth_error": 0.5, "max_depth": 9.0,
-                          "depth_gain": 5.0, "water_speed": 0.5},
+                          "depth_gain": 5.0, "water_speed": 0.5,
+                          "depth_error_reduction": 0.54, "depth_gain_net": 2.0},
         )
         return SimpleNamespace(segments={"water": seg}, mission_fraction=0.0)
 
