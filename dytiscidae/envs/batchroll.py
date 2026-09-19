@@ -39,10 +39,19 @@ and grows to about 1.4e-6 in mission_fraction over a full evaluation.
 """
 from __future__ import annotations
 
+import os as _os
+
 import numpy as np
 
 from ..physics.medium import GRAVITY
 from .triphibian import Domain
+
+#: ``mojo/build``, as an absolute path.  Used both to put the extension on
+#: ``sys.path`` here and to tell :func:`usable`'s subprocess where it is.
+_BUILD_DIR = _os.path.join(
+    _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))),
+    "mojo", "build")
+
 
 def _add_build_dir_to_path() -> None:
     """Put mojo/build on sys.path so the extension imports without PYTHONPATH.
@@ -54,14 +63,10 @@ def _add_build_dir_to_path() -> None:
     0% utilisation and gave it away.  A fallback this quiet is worse than no
     fallback: the run still finishes and the numbers still look plausible.
     """
-    import os
     import sys
 
-    build = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "mojo", "build")
-    if os.path.isdir(build) and build not in sys.path:
-        sys.path.insert(0, build)
+    if _os.path.isdir(_BUILD_DIR) and _BUILD_DIR not in sys.path:
+        sys.path.insert(0, _BUILD_DIR)
 
 
 _add_build_dir_to_path()
@@ -75,6 +80,74 @@ except Exception as exc:  # pragma: no cover
     _fp = None
     AVAILABLE = False
     UNAVAILABLE_REASON = f"{type(exc).__name__}: {exc}"
+
+
+#: Cached result of :func:`usable`, because the probe costs an interpreter
+#: start and the answer cannot change inside one process.
+_USABLE: tuple | None = None
+
+
+def usable(timeout: float = 180.0) -> tuple:
+    """Can the extension actually *run*, or does it only import?
+
+    ``AVAILABLE`` above is decided at **import** time, and the failure mode that
+    matters is not an import failure.  Measured 2026-09-19 on a machine whose
+    loaded kernel module was 580.173.02 under a userspace library at
+    580.178.04::
+
+        AVAILABLE = True | reason: (none)
+        FullPipeline FAILED: ValueError ... Failed to initialize NVML: 18
+
+    ``import full_pipeline`` succeeded, so every guard that reads ``AVAILABLE``
+    passed, and the ValueError arrived later at ``FullPipeline(*cap)``.  For a
+    search that means the run starts, builds its archive and dies at the first
+    batch -- hours after the terminal was closed -- instead of refusing at t=0
+    and saying why.  For the suites it meant 17 functions reported ``[fail]``
+    where the documented contract is three ``[skip]``.
+
+    Probed in a **subprocess**, not here, for two reasons this file already
+    documents: the pipeline's capacity cannot grow after the first allocation,
+    and constructing a second one in the same process hangs.  A probe that
+    allocated the real pipeline in the parent would either take the capacity
+    decision away from the first real batch or wedge the run.
+
+    Returns ``(ok, reason)``.  ``reason`` is empty when ``ok``.
+    """
+    global _USABLE
+    if _USABLE is not None:
+        return _USABLE
+    if not AVAILABLE:
+        _USABLE = (False, UNAVAILABLE_REASON)
+        return _USABLE
+
+    import subprocess
+    import sys
+
+    # The build directory is put on ``sys.path`` by ``_add_build_dir_to_path``
+    # in *this* process; a bare subprocess inherits neither that nor PYTHONPATH,
+    # so it is passed explicitly.  Without it the probe reports
+    # ModuleNotFoundError and a working GPU looks broken.
+    src = (
+        "import sys;"
+        f"sys.path.insert(0, {_BUILD_DIR!r});"
+        "import full_pipeline as f;"
+        "f.FullPipeline(64, 64, 4);"
+        "print('ok')"
+    )
+    try:
+        r = subprocess.run([sys.executable, "-c", src],
+                           capture_output=True, text=True, timeout=timeout)
+    except Exception as exc:  # pragma: no cover - probe itself failed
+        _USABLE = (False, f"probe did not run: {type(exc).__name__}: {exc}")
+        return _USABLE
+    if r.returncode == 0 and "ok" in r.stdout:
+        _USABLE = (True, "")
+        return _USABLE
+    tail = (r.stderr or r.stdout or "").strip().splitlines()
+    detail = next((ln for ln in reversed(tail) if ln.strip()
+                   and "MODULAR_DEBUG" not in ln), "no output")
+    _USABLE = (False, f"the extension imports but cannot be constructed: {detail}")
+    return _USABLE
 
 
 #: One pipeline for the whole process, reused.

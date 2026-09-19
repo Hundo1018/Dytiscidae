@@ -927,6 +927,22 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
          specialists from different ones
     """
     spec = spec or MissionSpec()
+
+    # Decide once, here, whether the GPU path can actually run -- not merely
+    # whether it imports.  ``batchroll.AVAILABLE`` is an import-time answer and
+    # a driver version mismatch does not surface until the pipeline is
+    # constructed, so a run could pass every guard, build its archive and die at
+    # the first batch hours later.  ``usable()`` probes construction in a
+    # subprocess; a failure downgrades AVAILABLE so the per-generation guard
+    # below takes the CPU path and says so, at t=0, with the reason.
+    from ..envs import batchroll as _br
+
+    if _br.AVAILABLE:
+        _ok, _why = _br.usable()
+        if not _ok:
+            _br.AVAILABLE = False
+            _br.UNAVAILABLE_REASON = _why
+
     rng = np.random.default_rng(cfg.seed)
     telemetry = Telemetry(cfg.run_dir, event_sample=cfg.event_sample)
 

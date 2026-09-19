@@ -1023,9 +1023,14 @@ def test_the_learner_is_wired_to_the_evaluator() -> None:
     print("\nintegration: the learner against the batched evaluator")
     from dytiscidae.envs import batchroll as _br
 
-    if not _br.AVAILABLE:
+    # ``usable()``, not ``AVAILABLE``: the import can succeed while every
+    # construction raises, and then this function does not skip -- it takes the
+    # whole suite down with a traceback before it ever prints a summary line.
+    _ok, _why = _br.usable()
+    if not _ok:
         skip("the learner against the batched evaluator",
-             f"{_br.UNAVAILABLE_REASON} — needs `cd mojo && pixi run build-all`")
+             f"{_why} — needs `cd mojo && pixi run build-all`, and a driver "
+             f"whose kernel module matches its userspace")
         return
 
     import torch

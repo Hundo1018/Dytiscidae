@@ -49,6 +49,13 @@ SKIPPED: list[str] = []
 BLOCKED_MARKERS = (
     "GPU fluid extension not importable",
     "No module named 'full_pipeline'",
+    # The extension imports and every construction fails -- a driver whose
+    # kernel module does not match its userspace library.  Measured 2026-09-19:
+    # NVRM 580.173.02 loaded under libnvidia-ml.so.580.178.04 raised
+    # "Failed to initialize NVML: 18" from FullPipeline() while the import
+    # succeeded, so this arrived as a traceback where the contract is a skip.
+    "Failed to initialize NVML",
+    "cannot be constructed",
 )
 
 

@@ -45,6 +45,13 @@ SKIPPED: list[str] = []
 BLOCKED_MARKERS = (
     "GPU fluid extension not importable",
     "No module named 'full_pipeline'",
+    # The extension imports and every construction fails -- a driver whose
+    # kernel module does not match its userspace library.  Measured 2026-09-19:
+    # NVRM 580.173.02 loaded under libnvidia-ml.so.580.178.04 raised
+    # "Failed to initialize NVML: 18" from FullPipeline() while the import
+    # succeeded, so this arrived as a traceback where the contract is a skip.
+    "Failed to initialize NVML",
+    "cannot be constructed",
 )
 
 
@@ -83,10 +90,16 @@ def needs_batched_evaluator(fn_name: str) -> bool:
     """
     from dytiscidae.envs import batchroll
 
-    if batchroll.AVAILABLE:
+    # ``usable()`` rather than ``AVAILABLE``: the latter is decided at import
+    # time, and a driver mismatch lets the import succeed and the construction
+    # fail.  Measured 2026-09-19, that difference turned the documented three
+    # ``[skip]`` into seventeen ``[fail]`` -- a suite reporting defects it had
+    # not found, which is the one thing this file exists to prevent.
+    ok, why = batchroll.usable()
+    if ok:
         return False
-    skip(fn_name, f"{batchroll.UNAVAILABLE_REASON} — needs "
-                  f"`cd mojo && pixi run build-all`")
+    skip(fn_name, f"{why} — needs `cd mojo && pixi run build-all`, "
+                  f"and a driver whose kernel module matches its userspace")
     return True
 
 
