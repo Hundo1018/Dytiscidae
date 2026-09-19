@@ -2,7 +2,7 @@
 
 # Modules
 
-98 modules, 30,592 lines, 945 indexed symbols.
+98 modules, 30,613 lines, 945 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -133,7 +133,7 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `ops.checkpoint` | A run's finished state as one portable artefact. | 375 | — | `numpy`, `torch` | `evolution.judge`, `learning`, `learning.ppo` |
-| `ops.run` | Command-line entry point. | 895 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.islands`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `viz.dashboard`, `viz.render`, `viz.showcase` |
+| `ops.run` | Command-line entry point. | 916 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.islands`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `viz.dashboard`, `viz.render`, `viz.showcase` |
 | `ops.telemetry` | Structured telemetry. | 111 | — | `numpy` | — |
 
 ## `physics`

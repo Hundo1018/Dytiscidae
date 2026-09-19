@@ -1751,6 +1751,59 @@ def test_critic_learns_the_exploit_signature() -> None:
           f"calibration {blind.calibration:.2f}, discount x{blind.discount(np.zeros(16)):.3f}")
 
 
+def test_one_islands_archive_is_read_alone_not_through_the_merge() -> None:
+    """``showcase --island air`` must choose among the air island's elites.
+
+    It filtered the *merged* archive, and the merge keeps one occupant per cell
+    across all islands -- so an air elite that lost its cell to another
+    island's occupant was dropped before the filter ever ran.  On arch39's
+    generation-160 checkpoint the air archive held 78 elites and the filter
+    saw 34, and the best flier was not one of them.  Built here as the smallest
+    case that loses: two islands, one shared cell, the air copy scoring lower.
+    """
+    print("\nops: one island's archive is read alone, not through the merge")
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution.archive import Archive, Elite
+    from dytiscidae.ops.run import load_run_archive
+
+    axes = [("a", 0.0, 1.0, 4), ("b", 0.0, 1.0, 4)]
+    tmp = Path(tempfile.mkdtemp(prefix="dyt-island-archive-"))
+    try:
+        air, land = Archive(axes), Archive(axes)
+        shared, only_air = (1, 1), (2, 3)
+        air.cells[shared] = Elite(genome="air-flier", fitness=0.30,
+                                  descriptor=np.zeros(2), cell=shared)
+        air.cells[only_air] = Elite(genome="air-other", fitness=0.20,
+                                    descriptor=np.zeros(2), cell=only_air)
+        land.cells[shared] = Elite(genome="land-walker", fitness=0.90,
+                                   descriptor=np.zeros(2), cell=shared)
+        air.save(tmp / "archive_air.pkl")
+        land.save(tmp / "archive_land.pkl")
+
+        merged, _ = load_run_archive(tmp)
+        via_filter = [e.genome for e in merged.cells.values()
+                      if (e.meta or {}).get("island") == "air"]
+        check("the merge still keeps the better occupant of a shared cell",
+              merged.cells[shared].genome == "land-walker")
+        check("which is why filtering the merge loses an island's elite",
+              "air-flier" not in via_filter, f"filter saw {via_filter}")
+
+        alone, names = load_run_archive(tmp, island="air")
+        genomes = sorted(e.genome for e in alone.cells.values())
+        check("read alone, the island keeps every elite it filed",
+              genomes == ["air-flier", "air-other"] and names == ["air"],
+              f"{genomes}")
+        check("and each is tagged with the island it was read from",
+              all(e.meta.get("island") == "air" for e in alone.cells.values()))
+        miss, have = load_run_archive(tmp, island="water")
+        check("an island the run does not have is reported with the ones it does",
+              miss is None and sorted(have) == ["air", "land"], f"{have}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_an_islands_best_is_judged_on_its_own_domains() -> None:
     """"The air island's best design" must be a machine that flies.
 
@@ -3568,6 +3621,7 @@ def main() -> int:
         test_auditor_can_invalidate_and_veto,
         test_critic_learns_the_exploit_signature,
         test_an_islands_best_is_judged_on_its_own_domains,
+        test_one_islands_archive_is_read_alone_not_through_the_merge,
         test_the_island_objective_takes_its_weight_back,
         test_curriculum_and_islands_give_gradient_where_the_mission_gives_none,
         test_scout_finds_dark_horses_and_may_only_protect,

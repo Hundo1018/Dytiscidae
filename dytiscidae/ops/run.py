@@ -28,8 +28,17 @@ from pathlib import Path
 import numpy as np
 
 
-def load_run_archive(run_dir):
+def load_run_archive(run_dir, island: str | None = None):
     """The archive of a run, however that run stored it.
+
+    ``island`` reads that island's archive **alone**.  Filtering the merged
+    archive by ``meta["island"]`` is not the same thing, and it is what
+    ``showcase --island`` did: the merge keeps one occupant per cell across all
+    islands, so an island's elite that lost its cell to another island's
+    occupant was gone before the filter ran.  Measured on arch39's
+    generation-160 checkpoint, the air island's archive held 78 elites and the
+    filtered merge held 34 of them -- and the air island's best flier was not
+    among the 34.
 
     A single-population run writes ``archive.pkl``.  An archipelago writes one
     per island and no combined file, so every downstream command that hard-coded
@@ -63,6 +72,16 @@ def load_run_archive(run_dir):
     parts = sorted(run_dir.glob("archive_*.pkl"))
     if not parts:
         return None, []
+    names = [q.stem[len("archive_"):] for q in parts]
+    if island is not None:
+        if island not in names:
+            return None, names
+        a = Archive.load(run_dir / f"archive_{island}.pkl")
+        for e in a.cells.values():
+            e.meta = dict(e.meta or {})
+            e.meta.setdefault("island", island)
+            e.meta["islands"] = [island]
+        return a, [island]
 
     merged, islands = None, []
     for path in parts:
@@ -412,9 +431,11 @@ def cmd_showcase(args) -> int:
     # found.  ``--design`` names a run whose archive to take the best elite
     # from, optionally restricted to one island.
     if args.design:
-        archive, islands = load_run_archive(args.design)
+        archive, islands = load_run_archive(args.design, island=args.island)
         if archive is None:
-            print(f"no archive in {args.design}")
+            print(f"no archive in {args.design}"
+                  + (f" for island {args.island!r} (have: {', '.join(islands)})"
+                     if args.island and islands else ""))
             return 1
         pool = [e for e in archive.cells.values()
                 if not args.island or (e.meta or {}).get("island") == args.island]

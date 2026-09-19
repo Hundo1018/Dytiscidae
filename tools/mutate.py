@@ -305,6 +305,15 @@ MUTATIONS: tuple = (
                "one-medium specialist wins a pairing island",
         suites=("test_search",), item="per-island best"),
 
+    Mutation(
+        id="island-archive-read-through-the-merge",
+        path="dytiscidae/ops/run.py",
+        find="    if island is not None:\n        if island not in names:",
+        replace="    if False:\n        if island not in names:",
+        defect="one island's archive is read through the cross-island merge, so "
+               "an elite that lost its cell to another island is never filmed",
+        suites=("test_search",), item="per-island best"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

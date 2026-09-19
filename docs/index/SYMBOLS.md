@@ -1137,18 +1137,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `cmd_cohort` | function | 336 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_dashboard` | function | 624 | `(args) -> int` | — |
-| `cmd_distill` | function | 649 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_reference` | function | 104 | `(args) -> int` | — |
-| `cmd_render` | function | 631 | `(args) -> int` | — |
-| `cmd_search` | function | 139 | `(args) -> int` | — |
-| `cmd_showcase` | function | 395 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 231 | `(args) -> int` | — |
-| `cmd_train` | function | 265 | `(args) -> int` | Train a controller for one design and render what it learned. |
-| `cmd_verify` | function | 97 | `(args) -> int` | — |
-| `load_run_archive` | function | 31 | `(run_dir)` | The archive of a run, however that run stored it. |
-| `main` | function | 666 | `(argv=None) -> int` | — |
+| `cmd_cohort` | function | 355 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_dashboard` | function | 645 | `(args) -> int` | — |
+| `cmd_distill` | function | 670 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_reference` | function | 123 | `(args) -> int` | — |
+| `cmd_render` | function | 652 | `(args) -> int` | — |
+| `cmd_search` | function | 158 | `(args) -> int` | — |
+| `cmd_showcase` | function | 414 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 250 | `(args) -> int` | — |
+| `cmd_train` | function | 284 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_verify` | function | 116 | `(args) -> int` | — |
+| `load_run_archive` | function | 31 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
+| `main` | function | 687 | `(argv=None) -> int` | — |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`
 

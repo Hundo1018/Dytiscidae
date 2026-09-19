@@ -219,6 +219,7 @@ Islands:
     - tests.test_search::test_the_island_objective_takes_its_weight_back
     - tests.test_search::test_every_island_is_reached_by_verification_and_audit
     - tests.test_search::test_an_islands_best_is_judged_on_its_own_domains
+    - tests.test_search::test_one_islands_archive_is_read_alone_not_through_the_merge
 
 Curation:
   implementation:
