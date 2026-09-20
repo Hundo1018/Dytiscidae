@@ -129,13 +129,9 @@ class SegmentResult:
     #: across a whole run while the scoring on top of it moves.
     measurements: dict = field(default_factory=dict)
     #: What the competence is made of, recorded by ``_score_segment`` at the
-    #: exit it took: ``gate`` (state preconditions, multiplied), ``control``
-    #: (the medium's motion terms in [0, 1]) and the raw forward distance in
-    #: ``distance``.  ``rollout`` combines these with the passive twin's.
+    #: exit it took: ``gate`` (state preconditions, multiplied) and ``control``
+    #: (the medium's motion terms in [0, 1]).  Their product is ``competence``.
     parts: dict = field(default_factory=dict)
-    #: The competence as ``_score_segment`` returns it, before the passive
-    #: control is subtracted -- kept so the net can be audited against it.
-    competence_gross: float = 0.0
 
     @property
     def cost_of_transport(self) -> float:
@@ -1312,27 +1308,30 @@ class TriphibianEnv:
     #: so the sensed error and the scored error cannot drift apart.
     TARGET_DEPTH = 10.0
 
-    #: Share of every medium's competence that is forward distance, net of the
-    #: passive twin; the rest is the medium's own motion terms, also net.
-    #: Decided with the user 2026-09-20: forward distance matters more.
+    #: Share of the water competence that is headway; the rest is the depth
+    #: terms.  Decided with the user 2026-09-20: forward distance matters more.
+    #: Air and land score their own motion terms and do not read this -- the
+    #: uniform "net forward distance in every medium" form it was written for
+    #: was removed with the passive twin on 2026-09-21.
     FORWARD_WEIGHT = 0.6
-    #: Net forward speed that earns full marks, per medium.
+    #: Water speed that earns full marks, on the **gross** horizontal speed the
+    #: water branch now reads, set at the same 0.993 quantile of its own
+    #: measured distribution that land's 0.6 m/s sits at in its.
     #:
-    #: One rule for all three, so the media are calibrated the same way: land
-    #: keeps the 0.6 m/s its progress term has always used, and air and water
-    #: sit at the same *quantile* of their own distributions.  Measured over 140
-    #: arch39 elites driven by the control laws they were scored under (8 s
-    #: segments, `runs/probe_net_forward.py`), net of each design's passive
-    #: twin:
+    #: Measured over the 985 water segments of
+    #: `runs/arch40_stopped_passive_twin`, scored through the real path:
     #:
-    #:     land   p50 +0.024  p90 +0.168  p99 +0.416  max +7.283 m/s
-    #:     water  p50 +0.007  p90 +0.191  p99 +0.437  max +0.575
-    #:     air    p50 -0.028  p90 +1.739  p99 +5.611  max +9.348
+    #:     median 0.112   p90 0.291   p99 0.700   q0.993 0.788   max 1.002 m/s
     #:
-    #: 0.6 m/s is land's 0.993 quantile; the same quantile is +0.452 in water
-    #: and +6.204 in air.  So full marks is what about one design in a hundred
-    #: currently reaches -- demanding, with headroom, and nothing saturates.
-    FORWARD_REF_SPEED = {"air": 6.2, "water": 0.45, "land": 0.6}
+    #: So full marks is what about one segment in a hundred currently reaches,
+    #: and nothing saturates.  The previous 0.45 was the same quantile of the
+    #: *net* distribution, which no longer exists; on the gross numbers it
+    #: would have handed the median 0.25 for drifting.  A machine released
+    #: without its actuators still drifts at a median 0.106 m/s, which is 0.13
+    #: here, so drift is cheap rather than free -- the release cannot be made
+    #: to give nothing without a twin to subtract, and this is the price of not
+    #: running one.
+    FORWARD_REF_SPEED = {"water": 0.79}
 
     # ------------------------------------------------------------------ stepping
 
@@ -1360,22 +1359,19 @@ class TriphibianEnv:
         basis: MobilityBasis | None = None,
         domain: Domain = Domain.AIR,
         control_hz: float = 25.0,
-        passive_control: bool = True,
     ) -> SegmentResult:
         """Run one segment and measure what happened.
 
-        With ``passive_control`` the same segment is first run from the same
-        state with every actuator held at the angle it starts at, and the
-        competence is what the machine did *beyond* that twin -- so a machine
-        that does nothing scores zero by construction.  Measured with the
-        actuators held still, the seed plans scored water competence 0.533
-        against 0.510 moving, and air 0.032 against 0.029: a still machine sinks,
-        or glides from its 30 m launch, and every term paid for it.  The twin
-        leaves no trace: everything it touched is put back, and the scored run is
-        bit-identical to one without it.
+        One rollout, and nothing else: the passive twin this used to run first
+        -- the same segment with every actuator held still, subtracted from the
+        scored one -- was removed 2026-09-21.  It doubled the cost of every
+        segment (2.084 s against 1.047 s on an 8 s water segment, +38% on a
+        whole generation) to defend a score that is now defended by gates
+        instead: the water branch's ``active`` requirement, and the state terms
+        it stopped adding.  See ``_score_segment``'s water branch for the
+        measurement that replaced it.
         """
         p = params or self.cpg.base
-        twin = self._passive_twin(duration, domain) if passive_control else None
         res = SegmentResult(domain=domain, duration=duration)
         n_steps = int(duration / self.timestep)
         control_every = max(1, int(1.0 / (control_hz * self.timestep)))
@@ -1439,94 +1435,7 @@ class TriphibianEnv:
             spins=np.array(spins), commands=commands, responses=responses,
             vzs=np.array(vzs), xys=np.array(xys),
         )
-        if twin is not None:
-            self._net_of_passive(res, twin, duration, domain)
         return res
-
-    def _passive_twin(self, duration: float, domain: Domain) -> "SegmentResult":
-        """The same segment, from the same state, with every actuator held still.
-
-        "Held still" is held at the angle each joint starts at -- not at its
-        rest offset, which would move it -- with no policy and no basis.  The
-        whole of MuJoCo's state is copied out and back (``mj_copyData``), because
-        a hand-picked snapshot leaks the solver warm start, applied forces and
-        the warning counter from the twin into the scored run; the subsystems
-        ``reset`` re-initialises are re-initialised the same way, and the gait
-        phase ``scatter`` drew is put back.
-        """
-        mj = self._mj
-        spare = mj.MjData(self.model)
-        mj.mj_copyData(spare, self.model, self.data)
-        phase = self.cpg.phase_offset
-        base = self.cpg.base
-        n = self.cpg.n
-        hold = (np.asarray(self.data.qpos[self._act_qadr], float).copy()
-                if len(self._act_qadr) == n else np.asarray(base.offset, float).copy())
-        held = CPGParams(amplitude=np.zeros(n), phase=np.asarray(base.phase, float).copy(),
-                         offset=hold, frequency=float(base.frequency))
-        twin = self.rollout(duration, params=held, policy=None, basis=None,
-                            domain=domain, passive_control=False)
-        mj.mj_copyData(self.data, self.model, spare)
-        self.solver.reset()
-        self.jets.reset(self.model)
-        self.cpg.reset()
-        self.cpg.phase_offset = phase
-        self.budget.reset()
-        mj.mj_forward(self.model, self.data)
-        return twin
-
-    def _net_of_passive(self, res: "SegmentResult", twin: "SegmentResult",
-                        duration: float, domain: Domain) -> None:
-        """Replace ``res.competence`` with what the machine did beyond its twin.
-
-        Motion is net: forward distance, and the medium's motion terms, each the
-        scored run's minus the twin's, floored at zero.  State is not: the gate
-        (airborne, submerged, upright, posture, served) is the scored run's own,
-        because netting a state would reward being passively unstable.
-
-        A twin that did not survive leaves no baseline, and the segment scores
-        zero rather than falling back to the gross score -- otherwise a design
-        that blows up when held still would erase its own control.
-        """
-        res.competence_gross = float(res.competence)
-        key = domain.value
-        fwd_m = float(res.distance - twin.distance)
-        c_net = float(np.clip(res.parts.get("control", 0.0)
-                              - twin.parts.get("control", 0.0), 0.0, 1.0))
-        res.measurements.update({
-            "forward_net_m": fwd_m,
-            "passive_distance": float(twin.distance),
-            "control_net": c_net,
-            "passive_competence": float(twin.competence),
-        })
-        # The net form of each medium's headline motion measurement, published
-        # beside the gross one rather than replacing it, so a ladder can be moved
-        # onto it from a measured distribution and the old numbers stay readable.
-        # Gross depth gain is what a brick earns by sinking: the eel gains
-        # +4.45 m with its actuators held still.
-        tm, pm = res.measurements, twin.measurements
-        if key == "water":
-            if "depth_gain" in tm and "depth_gain" in pm:
-                tm["depth_gain_net"] = float(tm["depth_gain"] - pm["depth_gain"])
-            if "depth_error" in tm and "depth_error" in pm:
-                # Lower is better, so the net is how much closer to the target
-                # the machine held than gravity put it.
-                tm["depth_error_reduction"] = float(pm["depth_error"] - tm["depth_error"])
-        elif key == "air":
-            if "sink_rate" in tm and "sink_rate" in pm:
-                tm["sink_reduction"] = float(pm["sink_rate"] - tm["sink_rate"])
-        elif key == "land":
-            if "land_speed" in tm and "land_speed" in pm:
-                tm["land_speed_net"] = float(tm["land_speed"] - pm["land_speed"])
-        if not res.survived or not twin.survived:
-            if not twin.survived:
-                res.measurements["passive_unstable"] = 1.0
-            res.competence = 0.0
-            return
-        v = float(self.FORWARD_REF_SPEED[key])
-        f_net = float(np.clip(fwd_m / max(v * duration, 1e-9), 0.0, 1.0))
-        w = float(self.FORWARD_WEIGHT)
-        res.competence = float(res.parts.get("gate", 0.0) * (w * f_net + (1.0 - w) * c_net))
 
     def _score_segment(self, domain, res, depths, alts, ups, contacts,
                        clearances=None, *, spins=None, commands=None,
@@ -1928,6 +1837,34 @@ class TriphibianEnv:
             err = float(np.mean(np.abs(settled - target))) if len(settled) else target
             res.depth_error = err
             hold = float(np.clip(1.0 - err / target, 0.0, 1.0))
+            # Station keeping in depth, the same measurement the air branch
+            # makes on height and for the same reason.  `depth_error` is the
+            # mean distance from the target over the late half, so a machine
+            # sinking straight through the target at a constant rate scores
+            # well on it, and `depth_gain` is a maximum, which a brick earns by
+            # being denser than water.  Neither can see the *shape*: this is
+            # the fraction of the late submerged window spent within a band of
+            # the depth the machine settled at.  Measured with the actuators
+            # held still, the seed plans' water competence was 104% of their
+            # driven competence -- sinking paid for `reached`, `hold`,
+            # `submerged` and `upright` at once -- and this is the term that
+            # separates diving from sinking without needing a passive twin to
+            # subtract.
+            sub_idx = np.flatnonzero(np.asarray(depths, float) > 0.2)
+            if len(sub_idx) > 1:
+                s_half = max(len(sub_idx) // 2, 1)
+                s_cap = max(int(self.STATION_WINDOW / self.timestep), 1)
+                s_late = sub_idx[-min(s_half, s_cap):]
+                # The same band as the air branch: a quarter of the machine's
+                # own span, floored at half a metre, so a 0.4 m machine and a
+                # 3 m one face the same test.
+                s_band = max(0.25 * float(getattr(self.p, "max_span", 2.0)), 0.5)
+                s_ref = float(depths[s_late[0]])
+                s_dev = np.abs(np.asarray(depths, float)[s_late] - s_ref)
+                station = float(np.mean(s_dev < s_band))
+                excursion = float(s_dev.max() / s_band)
+            else:
+                station, excursion = 0.0, 0.0
             # Depth as a *gain*, the way ``takeoff_height`` is a gain over
             # resting clearance -- because the water segment releases the
             # machine four metres under (``SPAWN[Domain.WATER]``) and
@@ -1954,20 +1891,45 @@ class TriphibianEnv:
                 "depth_gain": gain,
                 "depth_error": err,
                 "water_speed": float(res.mean_speed) if submerged > 0.5 else 0.0,
+                "depth_station_keeping": station,
+                "depth_excursion_ratio": excursion,
             })
             # ``served`` closes the same truncation hole here: holding depth and
             # staying upright for a tenth of a second is not a demonstration of
             # either, and a machine that ends its episode early has not done the
             # thing it was asked to do.
-            # For the net score, being submerged and being upright are *state*
-            # and multiply; reaching and holding depth are what the machine
-            # does.  Netting a state term against the passive twin would score a
-            # stable hull 0 and a tumbling-but-corrected one 1.
-            res.parts = {"gate": float(served * submerged * (0.5 + 0.5 * upright)),
-                         "control": float((0.35 * reached + 0.25 * hold) / 0.60)}
-            return served * float(
-                0.35 * reached + 0.25 * hold + 0.2 * submerged + 0.2 * upright
-            )
+            #
+            # Being underwater and being upright are *state*, so they gate the
+            # motion terms rather than adding to them.  Measured over the 985
+            # segments of `runs/arch40_stopped_passive_twin`, with the policy
+            # driving and against a twin of the same design with every actuator
+            # held still: the additive form paid a still machine **0.422** in
+            # water, against 0.002 in air and 0.006 on land, which are already
+            # gated.  Two fifths of that 0.422 was the constant
+            # ``0.2 * submerged + 0.2 * upright`` -- the machine is *released*
+            # four metres under and a hull is passively stable, so the score was
+            # paid for existing.  That is the leak behind §W: 96.4% of the air
+            # island's elites were better in water than in air, because water
+            # was the cheapest medium in the run.
+            #
+            # What is left is motion, and motion has to be chosen.  Decided with
+            # the user 2026-09-21: **sinking is not a capability on its own; in
+            # water a machine must at least make headway or hold a depth.**  So
+            # the depth terms are multiplied by ``active``, which is the better
+            # of the two.  A machine that neither moves nor holds -- one falling
+            # through the target -- scores zero however deep it gets.
+            headway = float(np.clip(res.mean_speed / self.FORWARD_REF_SPEED["water"],
+                                    0.0, 1.0))
+            active = float(max(headway, station))
+            gate = float(served * submerged * (0.5 + 0.5 * upright))
+            depth_control = float(np.clip((0.35 * reached + 0.25 * hold) / 0.60,
+                                          0.0, 1.0))
+            w = float(self.FORWARD_WEIGHT)
+            motion = float(w * headway + (1.0 - w) * depth_control)
+            res.measurements["water_headway"] = headway
+            res.measurements["water_active"] = active
+            res.parts = {"gate": gate * active, "control": motion}
+            return float(gate * active * motion)
 
         # LAND
         #

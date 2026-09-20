@@ -351,21 +351,37 @@ MUTATIONS: tuple = (
         suites=("test_search",), item="kernel freshness"),
 
     Mutation(
-        id="competence-ignores-the-passive-twin",
+        id="water-scores-being-underwater",
         path="dytiscidae/envs/triphibian.py",
-        find="        fwd_m = float(res.distance - twin.distance)",
-        replace="        fwd_m = float(res.distance)",
-        defect="forward distance is gross again, so a glide from the 30 m launch "
-               "and a sink under gravity are paid for",
-        suites=("test_physics",), item="net of passive"),
+        find="            res.parts = {\"gate\": gate * active, \"control\": motion}\n"
+             "            return float(gate * active * motion)",
+        replace="            res.parts = {\"gate\": gate, \"control\": motion}\n"
+                "            return served * float(\n"
+                "                0.35 * reached + 0.25 * hold + 0.2 * submerged"
+                " + 0.2 * upright\n            )",
+        defect="water pays 0.2 for being submerged and 0.2 for being upright "
+               "again -- the machine is released four metres under and a hull "
+               "is passively stable, so two fifths of the score is paid for "
+               "existing, which is what made water every island's cheapest "
+               "medium",
+        suites=("test_physics",), item="sinking is not a capability"),
     Mutation(
-        id="unstable-twin-falls-back-to-gross",
+        id="sinking-opens-the-water-gate",
         path="dytiscidae/envs/triphibian.py",
-        find="        if not res.survived or not twin.survived:",
-        replace="        if False:",
-        defect="a design whose passive twin blows up keeps its gross score, so "
-               "erasing your own control is worth points",
-        suites=("test_physics",), item="net of passive"),
+        find="            active = float(max(headway, station))",
+        replace="            active = 1.0",
+        defect="the water score stops requiring headway or station keeping, so "
+               "a machine falling through the target depth scores for the "
+               "depth it fell to",
+        suites=("test_physics",), item="sinking is not a capability"),
+    Mutation(
+        id="water-station-keeping-cannot-fail",
+        path="dytiscidae/envs/triphibian.py",
+        find="                station = float(np.mean(s_dev < s_band))",
+        replace="                station = 1.0",
+        defect="depth station keeping reads full marks for every trace, so a "
+               "steady sink is indistinguishable from holding a depth",
+        suites=("test_physics",), item="sinking is not a capability"),
 
     Mutation(
         id="batched-fluid-diagnostics-stay-default",
@@ -379,11 +395,11 @@ MUTATIONS: tuple = (
     Mutation(
         id="stage-one-reads-gross-measurements",
         path="dytiscidae/evolution/curriculum.py",
-        find='        best = max(best, float(np.clip(air.get("sink_reduction", 0.0) / 6.2, 0.0, 1.0)))',
-        replace='        best = max(best, float(np.clip(1.0 - air.get("sink_rate", 9.9) / 3.0, 0.0, 1.0)))',
+        find='            air.get("station_keeping", 0.0) / 0.17, 0.0, 1.0)))',
+        replace='            1.0 - air.get("sink_rate", 9.9) / 3.0, 0.0, 1.0)))',
         defect="the curriculum's directed stage pays for gliding from the 30 m "
                "launch again, which a machine with its actuators off also does",
-        suites=("test_search",), item="net of passive"),
+        suites=("test_search",), item="sinking is not a capability"),
 
     # --- the job layer ----------------------------------------------------
     Mutation(

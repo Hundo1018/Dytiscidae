@@ -144,23 +144,36 @@ def stage_score(stage: int, result, transitions=None, *,
         # ladder measurements rather than competence, because "held depth" and
         # "scored well in water" are not the same claim.
         #
-        # Each one is the *net* form -- what the machine did beyond a twin of
-        # itself with the actuators held still -- for the reason the competences
-        # are: gross, this stage paid for sinking and for gliding from the 30 m
-        # launch.  A machine that does nothing reads 0 in all three.  The scales
-        # are the p90 of each net quantity over 140 arch39 elites driven as they
-        # were scored (`runs/probe_net_measurements.py`): depth error reduced by
-        # 0.54 m, sink rate reduced by 6.2 m/s, and land speed's own 0.4 m/s,
-        # whose p90 is 0.214 and which is left where it was so land does not
-        # move under this change.
+        # Each one is a *gross* measurement that is nevertheless not paid for
+        # doing nothing, because each is gated or shaped rather than netted.
+        # The passive twin these three used to be measured against was removed
+        # 2026-09-21: it doubled the cost of every segment, and the user's
+        # decision is that passive forward motion -- a glide, or a hull that
+        # carries itself through water -- is a capability and should score.
+        #
+        #   air    `station_keeping`, the fraction of the late airborne window
+        #          spent within a band of the height the machine settled at.
+        #          A machine falling from the 30 m launch scores ~0 on it,
+        #          which is what `sink_reduction` was there to ensure.
+        #   water  `water_headway`, the gross horizontal speed over
+        #          `FORWARD_REF_SPEED`.  The other half of the user's rule --
+        #          holding station instead of moving -- is in the water
+        #          competence's `active` gate rather than here, because stage 1
+        #          asks whether the machine is *going somewhere*.
+        #   land   `land_speed`, which is already gated on posture.
+        #
+        # The scales are each quantity's own 0.999 quantile over the 985
+        # segments of `runs/arch40_stopped_passive_twin`, which is where land's
+        # 0.4 m/s already sat, so land does not move under this change:
+        # air 0.167, land 0.384.  `water_headway` arrives normalised.
         best = 0.0
         air = meas.get("air", {})
-        best = max(best, float(np.clip(air.get("sink_reduction", 0.0) / 6.2, 0.0, 1.0)))
-        water = meas.get("water", {})
         best = max(best, float(np.clip(
-            water.get("depth_error_reduction", 0.0) / 0.54, 0.0, 1.0)))
+            air.get("station_keeping", 0.0) / 0.17, 0.0, 1.0)))
+        water = meas.get("water", {})
+        best = max(best, float(np.clip(water.get("water_headway", 0.0), 0.0, 1.0)))
         land = meas.get("land", {})
-        best = max(best, float(np.clip(land.get("land_speed_net", 0.0) / 0.4, 0.0, 1.0)))
+        best = max(best, float(np.clip(land.get("land_speed", 0.0) / 0.4, 0.0, 1.0)))
         return best
 
     if stage == 2:

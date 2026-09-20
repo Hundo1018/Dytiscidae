@@ -277,6 +277,19 @@ measurement, ask what it reads for a machine that is falling, for one that is
 bouncing, and **for one with its actuators held still** — that last one is a
 two-line experiment and it has now caught two rungs.
 
+And the seventh instance is the one that proves the rule twice over: water paid
+a machine with its actuators held still **0.422** of a competence, against 0.002
+in air and 0.006 on land, because `0.2 * submerged + 0.2 * upright` was *added*
+— the machine is released four metres under and a hull is passively stable. The
+first fix, 2026-09-20, was a subtraction: run every segment a second time with
+the actuators held still and score the difference. It worked and it cost 38% of
+every generation, and it also refused to score a glide. On 2026-09-21 the user
+replaced it with a gate, which is what the paragraph above says to reach for:
+state multiplies instead of adding, and the motion terms are gated on
+`max(headway, depth_station_keeping)` — in water a machine must go forward or
+hold a position, and sinking is neither. A gate got 66% of what the subtraction
+got for none of its cost.
+
 And: a quantity that means "I could not measure this" must not share a value with
 a quantity that means "I measured zero". `thrust_margin` returned 0.0 for both and
 the rung above it sat at `>= 0.0`; eight of eighty re-scored elites cleared it

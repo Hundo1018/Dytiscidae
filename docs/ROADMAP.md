@@ -2031,6 +2031,99 @@ small-amplitude high-frequency flapping, which is real thrust. **Do not add it.*
 
 ---
 
+## What 2026-09-21 changed: the passive twin is gone, and water is gated
+
+The first arch40 launch was stopped by the user at generation 54 (2.31 h), and
+its data is in `runs/arch40_stopped_passive_twin`. Two reasons, both the
+user's:
+
+1. **Cost.** Every segment ran twice. Measured: an 8 s water segment costs
+   2.084 s with the twin against 1.047 s without, x1.99, and a whole generation
+   ran at 117 s against arch39's 85 and arch38's 90 at the same generations
+   (gen 7-60 median). `85 + 32 = 117` puts segment rollout at ~38% of a
+   generation.
+2. **It scored the wrong thing.** Netting forward distance against a twin says
+   passive forward motion is worth nothing. The user's decision: a glide, or a
+   hull that carries itself through water, *is* a capability and the learner
+   should be free to find it. **Sinking is the thing that must be chosen** —
+   "in water a machine must at least go forward or hold a position".
+
+### What the run measured before it was stopped
+
+Over its 985 evaluations, scored through the real path with the policy driving
+and a twin of the same design held still beside it:
+
+| medium | passive competence, median | what it means |
+|---|---|---|
+| water | **0.422** | the defect |
+| air | 0.002 | already gated |
+| land | 0.006 | already gated |
+
+**Water was the only medium paying for doing nothing**, and two fifths of that
+0.422 was the constant `0.2 * submerged + 0.2 * upright` in the additive water
+formula — paid for being *released* four metres under and for being a stable
+hull. That is the §W leak seen from the other side: water was the cheapest
+medium in the run, so 96.4% of the air island's elites were better in water
+than in air.
+
+Also measured, and it refuted the first fix that was tried: over 56 elites and
+seed plans, driven against actuators-still, **depth station keeping alone does
+not separate them** (0.506 against 0.414), nor does horizontal speed (0.160
+against 0.153 m/s), nor depth error (5.171 against 5.349 m). The twin is the
+only instrument that ever separated driven from still in water. What a gate can
+do instead is stop the *state* from paying and require the motion to be chosen.
+
+### The change
+
+- **The passive twin is removed** from both evaluators, with `passive_control`,
+  `_net_of_passive`, `competence_gross` and every `*_net` measurement.
+- **Water competence is `gate * active * motion`**, where `gate` is
+  `served * submerged * (0.5 + 0.5 * upright)` — state multiplies now, it does
+  not add — `motion` is `0.6 * headway + 0.4 * (0.35 reached + 0.25 hold)/0.6`,
+  and **`active = max(headway, depth_station_keeping)`** is the user's rule: a
+  machine that neither makes headway nor holds a depth scores zero however deep
+  it gets.
+- **`depth_station_keeping` and `depth_excursion_ratio`** are published, the
+  same measurement the air branch makes on height, for the same reason: a
+  machine sinking straight through the target scores well on `depth_error` and
+  a brick earns `depth_gain` by being dense.
+- **`FORWARD_REF_SPEED["water"]` is 0.79 m/s**, the 0.993 quantile of the gross
+  water speed distribution over the stopped run's 985 segments (median 0.112,
+  p90 0.291, p99 0.700). The old 0.45 was that quantile of the *net*
+  distribution and would have paid the median 0.25 for drifting.
+- **Curriculum stage 1** reads `station_keeping / 0.17` (air), `water_headway`
+  (water) and `land_speed / 0.4` (land) — gross quantities that are each gated
+  or shaped, rather than the net forms that went with the twin. The scales are
+  each quantity's own 0.999 quantile over the stopped run, which is where
+  land's 0.4 m/s already sat.
+
+### What it is worth, measured
+
+50 designs from the stopped run's archives plus 8 seed plans, 8 s segments,
+base gait against actuators held still:
+
+| medium | driven | actuators still | still ÷ driven |
+|---|---|---|---|
+| air | 0.0032 | 0.0031 | 97% |
+| water | **0.0944** | **0.0628** | **66%** |
+| land | 0.0366 | 0.0049 | 13% |
+
+Water's still score falls **7.2x** (0.451 -> 0.063 on the 56-design set) and the
+water-to-land gap closes from 11.6x to 2.6x. It does **not** fall to zero, and
+nothing without a twin makes it: 66% is what a gate can do, and the honest
+statement is that in this population a still machine in water is still worth
+two thirds of a driven one. Air is untouched by this and remains ~0 for nearly
+everything, which is the older "nothing flies" problem and not this one.
+
+Four mutations hold it: `water-scores-being-underwater`,
+`sinking-opens-the-water-gate`, `water-station-keeping-cannot-fail` and
+`stage-one-reads-gross-measurements`. All four are caught; the last one survived
+its first version because the test fixture happened to make the mutant produce
+the same number, which is the mutation harness earning its keep.
+
+**Nothing before 2026-09-21 is comparable with anything after it**, including
+the 54 generations of the stopped launch.
+
 ## arch40 — the work list
 
 Written 2026-09-20, after the day's fixes and before any run on them.
@@ -2040,9 +2133,19 @@ medium was redefined, the curriculum's two lowest stages changed, the operator
 bandit gained a floor, and the GPU physics moved five weeks forward. Nothing
 from arch34–arch39 can be compared with what comes out. So arch40 is **one run
 that changes nothing further**, and its only job is to say what the new
-distributions are: net forward speed per medium, net depth gain, the share of
-children each operator makes, and how far the archives get. Read at generation
-200, which is where distributions settle.
+distributions are: forward speed per medium, the water gate's two terms, the
+share of children each operator makes, and how far the archives get. Read at
+generation 200, which is where distributions settle.
+
+*Amended 2026-09-21.* The first launch was stopped at generation 54 and the
+scoring changed again — the passive twin is gone and water is gated instead;
+see the section above. The baseline is re-run from scratch on the new code, at
+600 generations rather than 900 at the user's instruction. The quantities to
+read at generation 200 are `water_headway` and `depth_station_keeping` (the two
+the water gate is built from), `station_keeping` in air, `land_speed`, the
+operator shares, and the §W table — the share of each island's elites that are
+better in another medium than in their own, which is the number this change was
+aimed at.
 
 What it costs to skip this: every number in the next list would be read against
 arch39's, and arch38 already showed what that produces -- a replication failure

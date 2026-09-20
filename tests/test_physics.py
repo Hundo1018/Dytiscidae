@@ -2690,34 +2690,46 @@ def test_depth_is_a_gain_not_a_spawn() -> None:
           abs(m_held["max_depth"] - 4.0) < 1e-6, f"{m_held['max_depth']:.2f} m")
 
 
-def test_a_machine_that_does_nothing_scores_nothing() -> None:
-    """Every medium's competence is what the machine did beyond a passive twin.
+def test_sinking_is_not_a_capability() -> None:
+    """Water scores motion that was chosen, not a machine that is underwater.
 
-    Measured with every actuator held still, before this: water competence 0.533
-    against 0.510 moving, air 0.032 against 0.029, land 0.010 against 0.048. A
-    still machine sinks -- the eel gains +4.45 m of depth held still against
-    +4.52 m flapping -- and depth gained, depth held, being submerged and being
-    upright all paid for it. That is the seventh time a score here has paid for
-    absent motion.
+    The passive twin that used to enforce this -- every segment run a second
+    time with the actuators held still, and the difference scored -- was
+    removed 2026-09-21 on the user's decision: it doubled the cost of every
+    segment (2.084 s against 1.047 s on an 8 s water segment) and it also
+    refused to score passive forward motion, which is a capability when it is a
+    glide or a hull that carries itself.
 
-    So each segment now also runs a twin from the same state with every joint
-    held at the angle it starts at, and the competence is the difference. Three
-    things have to hold: the twin leaves no trace on the scored run, a machine
-    that does nothing scores zero, and *state* is not netted -- only motion is.
+    What replaces it is gates, and this is where they are asserted. Measured
+    over the 985 segments of `runs/arch40_stopped_passive_twin`, the additive
+    water formula paid a machine with its actuators held still **0.422**,
+    against 0.002 in air and 0.006 on land, and two fifths of that was the
+    constant ``0.2 * submerged + 0.2 * upright`` -- paid for being released
+    underwater and for being a stable hull. So:
+
+      1. state multiplies the motion terms instead of adding to them, and
+      2. the motion terms are gated on ``active`` -- headway or depth station
+         keeping -- because the user's rule is that in water a machine must at
+         least go forward or hold a position, and sinking is neither.
     """
-    print("\ncompetence: a machine that does nothing scores nothing")
+    print("\ncompetence: sinking is not a capability")
+    import inspect
+
     from dytiscidae.control.cpg import CPGParams
     from dytiscidae.core.bodyplans import BODY_PLANS
     from dytiscidae.core.phenotype import build
     from dytiscidae.envs.triphibian import Domain, SegmentResult, TriphibianEnv
 
-    NEW = {"forward_net_m", "passive_distance", "control_net",
-           "passive_competence", "passive_unstable"}
+    # The cost the twin used to add cannot come back by accident.
+    sig = inspect.signature(TriphibianEnv.rollout)
+    check("rollout runs one segment, not two",
+          "passive_control" not in sig.parameters,
+          f"parameters: {list(sig.parameters)}")
 
-    def rolled(plan, dom, twin, inert=False):
+    def rolled(plan, dom, inert=False, seed=11):
         env = TriphibianEnv(build(BODY_PLANS[plan]()), seed=3)
         env.reset(dom)
-        env.scatter(np.random.default_rng(11))
+        env.scatter(np.random.default_rng(seed))
         params = None
         if inert:
             b = env.cpg.base
@@ -2725,56 +2737,69 @@ def test_a_machine_that_does_nothing_scores_nothing() -> None:
                 amplitude=np.zeros(env.cpg.n), phase=np.asarray(b.phase, float),
                 offset=np.asarray(env.data.qpos[env._act_qadr], float),
                 frequency=float(b.frequency))
-        return env.rollout(8.0, params=params, domain=dom, passive_control=twin)
+        return env.rollout(8.0, params=params, domain=dom)
 
     for plan in ("beetle", "eel"):
-        for dom in (Domain.AIR, Domain.WATER, Domain.LAND):
-            plain, netted = rolled(plan, dom, False), rolled(plan, dom, True)
-            same = (plain.distance == netted.distance
-                    and plain.competence == netted.competence_gross
-                    and all(plain.measurements.get(k) == netted.measurements.get(k)
-                            for k in plain.measurements if k not in NEW))
-            check(f"{plan} {dom.value}: the twin leaves the scored run untouched",
-                  same, f"distance {plain.distance:.6f}/{netted.distance:.6f}, "
-                        f"gross {plain.competence:.6f}/{netted.competence_gross:.6f}")
-            still = rolled(plan, dom, True, inert=True)
-            check(f"{plan} {dom.value}: held still it scores zero",
-                  still.competence == 0.0,
-                  f"{still.competence:.6f} (gross {still.competence_gross:.4f})")
+        still = rolled(plan, Domain.WATER, inert=True)
+        m = still.measurements
+        check(f"{plan}: water publishes what the gate is made of",
+              {"water_headway", "water_active", "depth_station_keeping",
+               "depth_excursion_ratio"} <= set(m),
+              f"published: {sorted(m)}")
+        # 0.422 is what the additive formula paid a still machine. The bar here
+        # is deliberately loose -- this test owns the *structure*, and the
+        # distribution is owned by the run -- but a still machine must no
+        # longer be able to earn what being submerged and upright used to pay.
+        check(f"{plan}: held still in water it no longer scores the old 0.4",
+              still.competence < 0.30, f"{still.competence:.4f}")
 
-    # The blend, on fabricated parts, so the weights are asserted and not
-    # inferred from a rollout.
-    env = TriphibianEnv(build(BODY_PLANS["beetle"]()), seed=0)
-    def netted(gate, ctrl_a, ctrl_p, d_a, d_p, dom=Domain.WATER, alive=True):
-        a = SegmentResult(domain=dom, duration=8.0, distance=d_a, survived=True)
-        a.parts = {"gate": gate, "control": ctrl_a}
-        a.competence = 0.0
-        p = SegmentResult(domain=dom, duration=8.0, distance=d_p, survived=alive)
-        p.parts = {"gate": gate, "control": ctrl_p}
-        env._net_of_passive(a, p, 8.0, dom)
-        return a
-    v = env.FORWARD_REF_SPEED["water"] * 8.0
-    r = netted(1.0, 0.5, 0.2, v, 0.0)
-    check("forward distance carries 0.6 of it and the motion terms 0.4",
-          abs(r.competence - (0.6 * 1.0 + 0.4 * 0.3)) < 1e-12, f"{r.competence:.6f}")
-    check("and the gate multiplies the whole of it",
-          abs(netted(0.5, 0.5, 0.2, v, 0.0).competence - 0.5 * r.competence) < 1e-12)
-    check("a twin that went as far leaves no forward credit",
-          netted(1.0, 0.2, 0.2, v, v).competence == 0.0)
-    check("and one that went further does not score negative",
-          netted(1.0, 0.2, 0.2, v, 2 * v).competence == 0.0)
-    check("a twin that did not survive leaves no baseline, so the segment is zero",
-          netted(1.0, 0.9, 0.0, v, 0.0, alive=False).competence == 0.0
-          and netted(1.0, 0.9, 0.0, v, 0.0, alive=False)
-              .measurements.get("passive_unstable") == 1.0)
+    # The gate itself, on fabricated numbers, so the rule is asserted rather
+    # than inferred from a rollout that might have been active by accident.
+    env = TriphibianEnv(build(BODY_PLANS["eel"]()), seed=0)
+    ref = env.FORWARD_REF_SPEED["water"]
 
-    # State is a gate, not a net term: two machines with identical motion and
-    # different posture differ by their gate, and neither is rewarded for being
-    # passively worse.
-    good, bad = netted(1.0, 0.4, 0.1, v, 0.0), netted(0.25, 0.4, 0.1, v, 0.0)
-    check("posture scales the score rather than being netted against the twin",
-          abs(bad.competence - 0.25 * good.competence) < 1e-12,
-          f"{good.competence:.4f} vs {bad.competence:.4f}")
+    # Headway alone opens the gate, station keeping alone opens the gate, and
+    # a machine doing neither is left with nothing however deep it goes.  The
+    # traces are full length -- `_score_segment` divides every time fraction by
+    # the length the segment was *asked* for, so a short array scores the
+    # truncation and not the behaviour.
+    def water_score(speed, depths):
+        n = len(depths)
+        res = SegmentResult(domain=Domain.WATER, duration=8.0, survived=True)
+        res.distance, res.mean_speed = speed * 8.0, speed
+        res.max_depth = float(np.max(depths))
+        return env._score_segment(
+            Domain.WATER, res, np.asarray(depths, float), np.zeros(n),
+            np.ones(n), np.zeros(n), np.zeros(n), spins=np.zeros(n),
+            vzs=np.zeros(n), xys=np.zeros((n, 2)))
+
+    n = int(8.0 / env.timestep)
+    holds = np.full(n, 6.0)                     # sits at six metres
+    sinks = np.linspace(4.0, 40.0, n)           # falls straight through
+    dives = np.linspace(4.0, 10.0, n // 2)      # reaches the target and holds
+    dives = np.concatenate([dives, np.full(n - len(dives), 10.0)])
+
+    sinking = water_score(0.0, sinks)
+    holding = water_score(0.0, holds)
+    # Not zero: `active` is graded, so the stretch a sinker spends inside the
+    # band before it falls out of it is worth something, on the same reasoning
+    # that keeps every other gate here graded -- a step nothing can climb is
+    # the "0.1 m/s left 61.6% of the population with nowhere to stand" mistake.
+    # The claim is that sinking is worth an order of magnitude less than
+    # holding, which is what the user's rule says it should be.
+    check("a machine that only sinks scores an order less than one that holds",
+          sinking < 0.1 * holding,
+          f"sink {sinking:.6f} at {sinks.max():.0f} m deep, hold {holding:.6f}")
+    check("holding a depth opens the gate on its own", holding > 0.0,
+          f"{holding:.6f}")
+    swimming = water_score(ref, sinks)
+    check("and so does headway on its own", swimming > 0.0, f"{swimming:.6f}")
+    check("headway at the reference speed outscores sitting still",
+          swimming > holding, f"{swimming:.4f} vs {holding:.4f}")
+    diving = water_score(0.0, dives)
+    check("reaching the target and holding it outscores both",
+          diving > holding and diving > sinking,
+          f"dive {diving:.4f}, hold {holding:.4f}, sink {sinking:.4f}")
 
 
 def main() -> int:
@@ -2782,7 +2807,7 @@ def main() -> int:
     print("Dytiscidae physics verification")
     print("=" * 68)
     run_all([
-        test_a_machine_that_does_nothing_scores_nothing,
+        test_sinking_is_not_a_capability,
         test_lift_sign_and_magnitude,
         test_buoyancy,
         test_bluff_drag_is_orientation_dependent,

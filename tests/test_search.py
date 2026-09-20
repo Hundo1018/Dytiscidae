@@ -1879,9 +1879,9 @@ def test_a_specialist_islands_curriculum_reads_only_its_own_medium() -> None:
         return NS(competence=c, measurements=m)
     # Good at sitting underwater, poor in the air: the measured shape.
     res = NS(mission_fraction=0.01, segments={
-        "air": seg(0.03, sink_rate=2.4, sink_reduction=1.24),
-        "water": seg(0.90, depth_error=0.5, depth_error_reduction=0.54),
-        "land": seg(0.05, land_speed=0.02, land_speed_net=0.01)})
+        "air": seg(0.03, sink_rate=2.4, station_keeping=0.051),
+        "water": seg(0.90, depth_error=0.5, water_headway=1.0),
+        "land": seg(0.05, land_speed=0.02)})
 
     class TS:
         def __init__(self, results):
@@ -1901,9 +1901,18 @@ def test_a_specialist_islands_curriculum_reads_only_its_own_medium() -> None:
     check("restricted, stage 0 reads air and nothing else",
           stage_score(0, res, **air) == 0.03, f"{stage_score(0, res, **air)}")
     check("stage 1 reads only the island's own directed measure",
-          abs(stage_score(1, res, **air) - 1.24 / 6.2) < 1e-12
-          and stage_score(1, res) == 1.0,          # water's reduction is full marks
+          abs(stage_score(1, res, **air) - 0.051 / 0.17) < 1e-12
+          and stage_score(1, res) == 1.0,          # water's headway is full marks
           f"{stage_score(1, res, **air):.3f} (unrestricted {stage_score(1, res):.3f})")
+    # The air island's stage 1 must read *holding a height*, not *losing it
+    # slowly*: a machine falling from the 30 m launch has a sink rate a glide
+    # would be proud of and holds nothing, and paying it here is the defect
+    # `sink_reduction` was introduced to close and the twin's removal reopened.
+    falling = NS(mission_fraction=0.0, segments={
+        "air": seg(0.0, sink_rate=1.2, station_keeping=0.0)})
+    check("a machine that only falls opens nothing at stage 1",
+          stage_score(1, falling, **air) == 0.0,
+          f"{stage_score(1, falling, **air):.3f} on sink_rate 1.2, station 0.0")
     check("stage 2 reads only the island's own crossings",
           stage_score(2, res, ts, **air) == 0.0 and stage_score(2, res, ts) > 0.0,
           f"own {stage_score(2, res, ts, **air)}, all {stage_score(2, res, ts):.3f}")
@@ -2116,12 +2125,12 @@ def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> 
             self.mission_fraction = mf
 
     # A water specialist and a uniform failure both score ~0 on the mission.
-    # The net measurements are what stage 1 reads: what this machine did beyond
-    # a twin of itself with the actuators held still.
+    # Stage 1 reads `water_headway`, so a water specialist states what it does
+    # in water as headway rather than as depth reached -- sinking is not a
+    # capability and does not open the stage.
     specialist = Res(0.02, 0.85, 0.03, 0.001,
                      {"water": {"depth_error": 0.8, "max_depth": 10.0,
-                                "depth_gain": 6.0, "depth_gain_net": 2.4,
-                                "depth_error_reduction": 1.6}})
+                                "depth_gain": 6.0, "water_headway": 1.0}})
     useless = Res(0.02, 0.03, 0.03, 0.001)
     t = Trans(0.34, 0.4)
 
@@ -2325,14 +2334,16 @@ def test_promotion_needs_a_nonzero_answer_to_the_next_question() -> None:
     from dytiscidae.evolution.curriculum import Curriculum
 
     def result_water_specialist():
-        # Stage 1 reads the *net* measurements -- what this machine did beyond
-        # a twin of itself with the actuators held still -- so the specialist
-        # has to state its depth-holding in those terms to pass the bar at all.
+        # Stage 1 asks whether the machine is going somewhere, and in water
+        # that is `water_headway` -- so the specialist has to state what it
+        # does as headway to pass the bar at all.  Depth reached does not open
+        # the stage, because a machine denser than water reaches depth without
+        # choosing to.
         seg = SimpleNamespace(
             competence=0.9,
             measurements={"depth_error": 0.5, "max_depth": 9.0,
                           "depth_gain": 5.0, "water_speed": 0.5,
-                          "depth_error_reduction": 0.54, "depth_gain_net": 2.0},
+                          "water_headway": 1.0},
         )
         return SimpleNamespace(segments={"water": seg}, mission_fraction=0.0)
 
@@ -2761,8 +2772,7 @@ def test_the_batched_path_tells_the_policy_it_is_wet() -> None:
         e.scatter(np.random.default_rng(11))
     bf = BatchedFluid(envs)
     bf.reset_slam()
-    rollout_batch(envs, bf, 2.0, [e.cpg.base for e in envs], Domain.WATER,
-                  passive_control=False)
+    rollout_batch(envs, bf, 2.0, [e.cpg.base for e in envs], Domain.WATER)
     for name, e in zip(plans, envs):
         d = e.solver.diag
         check(f"{name}: submerged in water reads submerged, not 0.0",
@@ -2777,53 +2787,10 @@ def test_the_batched_path_tells_the_policy_it_is_wet() -> None:
     envs[0].reset(Domain.AIR)
     bf = BatchedFluid(envs)
     bf.reset_slam()
-    rollout_batch(envs, bf, 2.0, [envs[0].cpg.base], Domain.AIR,
-                  passive_control=False)
+    rollout_batch(envs, bf, 2.0, [envs[0].cpg.base], Domain.AIR)
     check("and in the air it reads dry",
           envs[0].solver.diag.mean_submerged < 0.05,
           f"mean_submerged {envs[0].solver.diag.mean_submerged:.3f}")
-
-
-def test_the_batched_passive_twin_leaves_no_trace() -> None:
-    """The batched evaluator's twin must be as invisible as the single one's.
-
-    It restores every environment's whole MuJoCo state and the batched fluid's
-    own history -- the added mass and time it differences against, and whether
-    each machine is primed.  If any of that leaked, the scored run would differ
-    from the same run without a twin, and the search would be scoring something
-    nobody measured.
-    """
-    print("\nbatched: the passive twin leaves no trace")
-    if needs_batched_evaluator("test_the_batched_passive_twin_leaves_no_trace"):
-        return
-    from dytiscidae.core.bodyplans import BODY_PLANS
-    from dytiscidae.core.phenotype import build
-    from dytiscidae.envs.batchroll import BatchedFluid, rollout_batch
-    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
-
-    NEW = {"forward_net_m", "passive_distance", "control_net",
-           "passive_competence", "passive_unstable"}
-    plans = ("gannet", "beetle", "eel")
-
-    def batch(dom, twin):
-        envs = [TriphibianEnv(build(BODY_PLANS[n]()), seed=3) for n in plans]
-        for e in envs:
-            e.reset(dom)
-            e.scatter(np.random.default_rng(11))
-        bf = BatchedFluid(envs)
-        bf.reset_slam()
-        return rollout_batch(envs, bf, 8.0, [e.cpg.base for e in envs], dom,
-                             passive_control=twin)
-
-    for dom in (Domain.AIR, Domain.WATER, Domain.LAND):
-        plain, netted = batch(dom, False), batch(dom, True)
-        for name, a, b in zip(plans, plain, netted):
-            same = (a.distance == b.distance
-                    and a.competence == b.competence_gross
-                    and all(a.measurements.get(k) == b.measurements.get(k)
-                            for k in a.measurements if k not in NEW))
-            check(f"{dom.value} {name}: scored run identical with and without the twin",
-                  same, f"distance {a.distance:.6f}/{b.distance:.6f}")
 
 
 def test_a_kernel_older_than_its_source_is_not_usable() -> None:
@@ -3956,7 +3923,6 @@ def main() -> int:
         test_every_path_agrees_on_the_control_law,
         test_the_shared_policy_survives_a_resume,
         test_the_batched_path_tells_the_policy_it_is_wet,
-        test_the_batched_passive_twin_leaves_no_trace,
         test_a_kernel_older_than_its_source_is_not_usable,
         test_a_checkpoint_names_the_commit_the_process_started_from,
         test_a_finished_run_is_a_checkpoint,
