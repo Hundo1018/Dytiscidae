@@ -2124,6 +2124,35 @@ the same number, which is the mutation harness earning its keep.
 **Nothing before 2026-09-21 is comparable with anything after it**, including
 the 54 generations of the stopped launch.
 
+## What arch40 measured
+
+600 generations in 16.44 h (9,433 evaluations, 85 s/generation), seed
+20260921, on the gated water score of 2026-09-21 morning. Report
+`runs/arch40/report.html`; notes `runs/arch40_notes.md`.
+
+1. **The water leak closed, most of the way.** Median competence water/land was
+   22.8x in arch39 at matched evaluations and 2.7x here. The §W share of the
+   land island's elites better in another medium went 96.4% → 50.0%; the air
+   island's 96.4% → 82.9%, which is mostly scale — air competence is 0.003 at
+   the median for the whole population, so "better elsewhere" is nearly
+   automatic.
+2. **The operator floor works, and continuity was the thing to measure.**
+   `gait` was 5.6% of children against arch39's 4.2% — indistinguishable — but
+   arch39 ran eight consecutive 20-generation blocks with none (gens 60–199)
+   and arch40 ran none in 600 generations.
+3. **The population flattened in the second half.** Competence medians over
+   gens 150–249 and 500–599: air 0.003/0.003, water 0.090/0.100, land
+   0.035/0.037. The curator called 47% of gens 300–399 `stagnant`. Archive
+   elites kept improving; the population did not.
+4. **The mission did not move.** Filmed by mission, driven as evaluated: 0/2
+   transitions, 0% of the water leg on task. Water `holds_depth` cleared by 0%
+   of the last 1,500 evaluations.
+
+What it licenses: the gate fixed the cross-medium leak it was built for, and
+nothing about the reward's structure below that — the controller was still told
+where it was and never what to do. Item X is the next change, and arch41 its
+baseline.
+
 ## arch40 — the work list
 
 Written 2026-09-20, after the day's fixes and before any run on them.
