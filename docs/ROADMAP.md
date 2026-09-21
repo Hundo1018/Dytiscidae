@@ -2178,6 +2178,53 @@ Then, in this order:
 
 ---
 
+### X. The reward has no task — raised by the user 2026-09-21, **measured, not acted on**
+
+The user's objection: "if the operation's purpose is to go forward, forward should
+score; if it is to hover in a medium, it should hover then, and movement should be
+penalised — not one reward applied everywhere." Read against the code, it is
+right, and the cause is one level below the reward:
+
+**The policy is never told what to do, only where it is.** Its command channel is
+a three-way one-hot of the medium (`TriphibianEnv.observation`), plus the depth
+error to a fixed 10 m. So each medium's score has to blend every goal that medium
+might have, and the policy — rewarded once per segment with that blend
+(`collector.finish(buffer, [s.competence ...])`) — can only learn one compromise:
+
+| medium | told | scored on | the conflict |
+|---|---|---|---|
+| air | "air" | `0.55 flight + 0.25 glide + 0.20 station`, all vertical | no forward term at all, yet a flapping wing holds height only by flying forward: it is asked to hover and not given the means |
+| water | "water", depth error to 10 m | `gate * max(headway, station) * (0.6 headway + 0.4 depth)` | move, hold and dive in the same 8 s. **corr(headway, depth_station_keeping) = −0.264** over arch40's 6,288 water segments; the top quartile of both holds 151 segments against 393 if independent. The formula pays a perfect hover 0.20 and a perfect mover 0.80 — "or hold" is a gate, and the goal it actually states is *move* |
+| land | "land" | `posture * (0.65 progress + 0.35 climb)` | the most coherent of the three |
+
+And "forward" is `norm((end - start)[:2])` everywhere: displacement in *any*
+horizontal direction. Drifting sideways is progress.
+
+**The proposed fix is a task, not a better blend.** The standard in legged
+locomotion RL is command tracking: the policy observes a commanded velocity and
+is rewarded for matching it, and a command of zero *is* standing still, with
+motion penalised. Here:
+
+1. Each segment becomes a short script of commanded phases at the same total
+   length and cost — e.g. water: hold at 6 m, then cruise at `v` on a heading at
+   that depth; land: walk at `v`, then stop.
+2. The policy observes the command: task one-hot, commanded speed, heading error,
+   depth/altitude error to the *commanded* target.
+3. Each phase is scored on its own objective only: tracking error on the heading
+   for cruise, with lateral drift and depth/altitude excursion penalised;
+   position error including vertical for hold; reaching the commanded depth for
+   dive — where sinking is the chosen operation and may score.
+
+It also retires the passive twin's job for free: **a passive machine does the
+same thing whatever it is commanded**, so it cannot score on a hold phase and a
+cruise phase in the same segment. The command switch is the "are the actuators
+doing anything" test, at no extra rollout.
+
+Cost: `OBS_DIM` changes, so the shared policy, every checkpoint and every
+comparison start over — a new baseline. Open, for the user: what "hold" means in
+air for machines that cannot hover; how many phases per segment; whether the
+ladder rungs are re-cut as task success.
+
 ### W. The specialist islands were selecting for water — curriculum **fixed, unrun**; water score **measured, not fixed**
 
 Raised 2026-09-20 during arch39: a pure-habitat island's elites should not be
