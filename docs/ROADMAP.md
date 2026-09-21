@@ -2306,6 +2306,16 @@ Six mutations hold it: `cruise-pays-for-speed-in-any-direction`,
 `hold-ignores-motion`, `hold-scale-is-absolute`, `land-stop-adds-to-the-walk`,
 `controller-is-not-told-the-task`, `evaluators-ask-different-tasks`.
 
+**arch41 ran it for 52 generations and was stopped** (`runs/arch41_stopped_gen50_walls`).
+The pre-registered gen-50 bar failed: task-score medians 0 in every medium.
+Tracking had gradient (water `cruise_tracking` p90 0.34 → 0.50); the
+multipliers were walls — water machines mostly never descend (max depth p50
+4.71 m against a 4 m release) and drift 0.41 m while told to hold (band 0.30),
+86% of air segments fall out of the sky in 2.65 s, land barely moves against a
+0.08 m/s command. Re-derived values (hold depth 5.0–6.5 m, stillness band
+0.64 m/s, land command 0.04 m/s) are in the run's notes, **measured and not
+applied**: the user decided not to relaunch.
+
 ### Y. The filmed arch40 machine never leaves the beach — raised by the user 2026-09-21, **measured, not acted on**
 
 The user, watching `runs/showcase_arch40/mission.mp4`: "it is only trembling in
