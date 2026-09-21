@@ -2178,7 +2178,7 @@ Then, in this order:
 
 ---
 
-### X. The reward has no task — raised by the user 2026-09-21, **measured, not acted on**
+### X. The reward has no task — raised by the user 2026-09-21, **implemented the same day, unrun**
 
 The user's objection: "if the operation's purpose is to go forward, forward should
 score; if it is to hover in a medium, it should hover then, and movement should be
@@ -2224,6 +2224,58 @@ Cost: `OBS_DIM` changes, so the shared policy, every checkpoint and every
 comparison start over — a new baseline. Open, for the user: what "hold" means in
 air for machines that cannot hover; how many phases per segment; whether the
 ladder rungs are re-cut as task success.
+
+**Decided by the user ("照建議做"), and built** (`dytiscidae/envs/tasks.py`,
+`TriphibianEnv._task_scores`, `TriphibianEnv.task_channels`):
+
+| medium | phase A | phase B | combined |
+|---|---|---|---|
+| water | hold at a commanded depth 5.5–8 m (released at 4) | cruise at 0.30 m/s on a drawn heading at that depth | mean; order drawn |
+| air | cruise on the launch heading at the machine's own trim speed, holding height | the same after a commanded 45–90° turn | mean |
+| land | walk at 0.08 m/s on a drawn heading | stop and stay stopped | `walk * (0.5 + 0.5 stop)` — a rock stops perfectly, so stopping qualifies the walk instead of adding to it; order drawn |
+
+Each phase is measured over its late half. Cruise is `1 - |v - v_cmd| / |v_cmd|`
+on the mean horizontal velocity, times holding the vertical (water: the
+commanded depth, against the descent it asked for; air: graded from level
+through a glide to ballistic, as `flight` and `glide` have been since arch37).
+Hold is *at the commanded depth* times *not moving*, both required. The task is
+drawn per generation from the evaluation seed, the same for every candidate, in
+both evaluators through one helper; the controller observes it in six new
+channels (purpose, commanded speed, heading error, height lost), so `OBS_DIM` is
+33. The command speeds are ~p80 of arch40's gross speeds (water p75 0.271 / p90
+0.446, land p75 0.060 / p90 0.116 m/s over 6,383 segments each). The ladder's
+task rungs read the phases — `holds_depth` = `hold_error` ≤ 1 m (distance from
+the commanded depth plus distance moved), water `manoeuvres` = `cruise_score` ≥
+0.5, air `manoeuvres` = `turn_tracking` ≥ 0.5, `walks` = `walk_tracking` ≥ 0.5 —
+and curriculum stage 1 reads the cruise phase's tracking in every medium. The
+three 0.5 bars are set on their physical meaning (error under half the command)
+because nothing has yet been trained to follow a command; **re-derive them from
+arch41's own distribution.**
+
+Measured before the run, on the real rollout path:
+
+- **A machine with its actuators held still**, averaged over eight task draws:
+  water 0.011 (beetle) and 0.008 (eel), land 0.003 and 0.001. The additive
+  water formula paid it 0.422; the gate that replaced it that morning, ~0.063.
+  No passive twin runs.
+- The first version was a wall: with a flat 1 m depth band, **97% of 64 designs
+  scored exactly zero in water**, driven or still, and air lost the glide
+  gradient arch37 added for exactly this reason. Errors are now measured
+  against the displacement the command asked for, so sitting where you were put
+  is exactly 0 and halfway is a half; water non-zero rose to 29%.
+- The default heading was 0, the spawn's own nose direction, and a still beetle
+  gliding forward as it sank scored 0.45 on tracking it. It is now 90°: a
+  default should not line a passive glide up with the command by construction.
+- Command-blind machines — open-loop gait or held still — score near zero in
+  every medium (water p90 0.014 against 0.007, land 0.106 against 0.003, air
+  ~0.03 for both). **Only a controller that follows the command can score**,
+  which is the point, and also the risk: if water and air task scores have not
+  risen by generation 50 there is too little gradient, and the command speeds
+  and bands are the first things to re-derive.
+
+Six mutations hold it: `cruise-pays-for-speed-in-any-direction`,
+`hold-ignores-motion`, `hold-scale-is-absolute`, `land-stop-adds-to-the-walk`,
+`controller-is-not-told-the-task`, `evaluators-ask-different-tasks`.
 
 ### W. The specialist islands were selecting for water — curriculum **fixed, unrun**; water score **measured, not fixed**
 

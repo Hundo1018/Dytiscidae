@@ -215,7 +215,8 @@ def sample_states(n: int, rng: np.random.Generator) -> np.ndarray:
     produces: body rates already divided by their scales and clipped to
     [-3, 3], a unit gravity direction in the body frame, bounded depth and
     wetness, a one-hot for the commanded domain, and the four sensed scalars
-    added later (depth error, contact, battery, stroke phase and rate).
+    added later (depth error, contact, battery, stroke phase and rate), and the
+    six task channels added 2026-09-21.
     """
     x = np.zeros((n, STATE_DIM))
     x[:, 0:3] = np.clip(rng.normal(0.0, 0.8, (n, 3)), -3, 3)   # linear twist / 5
@@ -231,6 +232,18 @@ def sample_states(n: int, rng: np.random.Generator) -> np.ndarray:
     x[:, 16] = rng.uniform(0.0, 1.0, n)      # battery fraction
     x[:, 17] = rng.uniform(-1.0, 1.0, n)     # stroke phase
     x[:, 18] = np.clip(rng.normal(0.0, 1.0, n), -3, 3)  # stroke rate
+    # The task channels (``TriphibianEnv.task_channels``): purpose one-hot,
+    # commanded speed, heading error as a unit vector, height lost.  A tenth of
+    # draws carry no task, as a transition does.
+    moving = rng.random(n) < 0.5
+    idle = rng.random(n) < 0.1
+    x[:, 19] = (moving & ~idle).astype(float)
+    x[:, 20] = (~moving & ~idle).astype(float)
+    x[:, 21] = np.where(moving & ~idle, 1.0, 0.0)
+    err = rng.uniform(-np.pi, np.pi, n)
+    x[:, 22] = np.where(moving & ~idle, np.cos(err), 0.0)
+    x[:, 23] = np.where(moving & ~idle, np.sin(err), 0.0)
+    x[:, 24] = np.where(idle, 0.0, rng.uniform(-1.0, 1.0, n) * (rng.random(n) < 0.33))
     return x
 
 

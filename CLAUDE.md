@@ -285,10 +285,14 @@ first fix, 2026-09-20, was a subtraction: run every segment a second time with
 the actuators held still and score the difference. It worked and it cost 38% of
 every generation, and it also refused to score a glide. On 2026-09-21 the user
 replaced it with a gate, which is what the paragraph above says to reach for:
-state multiplies instead of adding, and the motion terms are gated on
-`max(headway, depth_station_keeping)` — in water a machine must go forward or
-hold a position, and sinking is neither. A gate got 66% of what the subtraction
-got for none of its cost.
+state multiplies instead of adding, and the motion terms were gated on
+`max(headway, depth_station_keeping)`. That still blended two purposes that
+fight (`corr = -0.264`), so the same day the reward became **task-conditioned**:
+each segment is two commanded phases the controller can see, each scored on its
+own purpose (`envs/tasks.py`). A still machine now scores ~0.01 in water, with no
+twin — a passive body does the same thing whatever it is commanded, so it cannot
+score on both phases. **When a score pays for doing nothing, first ask whether
+the machine was ever told what to do.**
 
 And: a quantity that means "I could not measure this" must not share a value with
 a quantity that means "I measured zero". `thrust_margin` returned 0.0 for both and

@@ -168,6 +168,31 @@ Not fixable here. Named so it is not mistaken for covered.
 
 ---
 
+## 7. The mutation harness never ran a batched test, then counted a timeout as a catch
+
+Found 2026-09-21 while adding the task mutations. Two defects in
+`tools/mutate.py`, one hiding the other.
+
+**The mutant tree had no GPU kernel.** `copy_tree` copies `git ls-files`, and
+`mojo/build/*.so` is untracked, so in every mutant copy the batched evaluator
+was unavailable and every test that drives it *skipped*. A skip exits 0, which
+the harness reads as "no suite failed". So no mutation in the batched path was
+ever tested by a batched test: its verdict came from whatever unbatched checks
+happened to notice. `copy_tree` now links the kernel in; its freshness is still
+checked against the copy's own `mojo/src`.
+
+**A timeout was a catch.** `evaluate` treated any non-zero exit as `caught`, and
+a timeout returned 124. With the kernel present `test_search` runs ~25 min
+against a flat 900 s limit, so the first three batched-path mutations run after
+the fix came back `caught` at 900.2 s, 900.1 s and 900.2 s with no failing check
+between them. A timeout is now its own status, counted as a broken measurement
+(non-zero exit), and `test_search` gets 3600 s.
+
+What it invalidates: any past `caught` for a mutation whose only catching suite
+is `test_search` is evidence only if its failing check was named and it ran
+under 900 s *without* the batched tests -- i.e. a catch by an unbatched check.
+Re-run them.
+
 # The checklist, item by item
 
 ## A. Completeness

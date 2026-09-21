@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from dataclasses import replace as _replace
 from enum import Enum
 
 import numpy as np
@@ -58,6 +59,7 @@ from ..physics.energy import (
 from ..physics.fluid import FluidSolver
 from ..physics.medium import GRAVITY, MediumField, SeaState
 from ..physics.structure import ballast_pump_power
+from .tasks import CRUISE, HOLD, STOP, TASK_SPEED, TaskSchedule, schedule_for
 
 
 class Domain(str, Enum):
@@ -490,6 +492,27 @@ class TriphibianEnv:
         Domain.LAND: (15.0, 0.0, 0.9),
     }
 
+    #: What the next segment will ask, set by the evaluator after ``scatter``
+    #: from a draw every machine in the generation shares (``tasks.task_seed``).
+    #: ``None`` means "whatever ``tasks.schedule_for`` gives by default", which
+    #: is what probes and tests that call ``rollout`` directly get.
+    task: "TaskSchedule | None" = None
+    #: The schedule in force while a segment is running, and the clock it runs
+    #: on.  ``None`` outside a segment -- during a transition, or the continuous
+    #: mission's own loop -- so the controller is told no task there, which is
+    #: what it was trained with in those places.
+    _active_task: "TaskSchedule | None" = None
+    _seg_t0: float = 0.0
+    _seg_T: float = 1.0
+    #: Height above the surface when the segment began: the air hold's
+    #: reference, and what the controller's height-error channel reads against.
+    _height_ref: float = 0.0
+
+    #: Tolerance for holding a commanded depth, in metres: the water ladder's
+    #: ``holds_depth`` rung has always meant "within 1 m of the target", and the
+    #: hold phase is that rung's task.
+    DEPTH_BAND = 1.0
+
 
     def __init__(
         self,
@@ -598,6 +621,8 @@ class TriphibianEnv:
 
     def reset(self, domain: Domain, *, randomise: bool = True) -> None:
         self._mj.mj_resetData(self.model, self.data)
+        self.task = None
+        self._active_task = None
         x, y, z = self.SPAWN[domain]
         if randomise:
             x += float(self.rng.normal(0, 0.4))
@@ -1261,11 +1286,20 @@ class TriphibianEnv:
         * stroke phase: the mean normalised actuated-joint position and its
           rate (joint encoders).  Resonant drive is a phase relationship; a
           controller that cannot sense its own stroke cannot seek resonance.
+
+        And, since 2026-09-21, **what it is being asked to do in the medium**
+        (``task_channels``): the domain one-hot said where, and nothing said
+        what, so each medium's score had to blend every goal and the policy
+        could only learn one compromise.  The depth-error channel reads the
+        *commanded* depth while a water task is in force.
         """
         tw = self.body_twist()
         R = self.data.xmat[self.root_body].reshape(3, 3)
         gravity_body = R.T @ np.array([0.0, 0.0, -1.0])
         d = self.depth()
+        ph = self._phase_now()
+        depth_target = (ph.depth if ph is not None and ph.depth is not None
+                        else self.TARGET_DEPTH)
         cmd = np.zeros(3)
         if target is not None:
             cmd[DOMAIN_CYCLE.index(target)] = 1.0
@@ -1290,48 +1324,73 @@ class TriphibianEnv:
                 [np.tanh(d / 5.0), self.solver.diag.mean_submerged],
                 cmd,
                 [
-                    np.tanh((d - self.TARGET_DEPTH) / 3.0),
+                    np.tanh((d - depth_target) / 3.0),
                     1.0 if self._touching_ground() else 0.0,
                     float(b.energy_j / max(b.capacity_j, 1e-9)),
                     stroke,
                     stroke_rate,
                 ],
+                self.task_channels(R, ph),
                 self.morphology_context,
             ]
         )
 
+    def _phase_now(self):
+        """The task phase in force at this instant, or None outside a segment."""
+        t = self._active_task
+        if t is None:
+            return None
+        return t.at((float(self.data.time) - self._seg_t0) / self._seg_T)
+
+    def task_channels(self, R=None, ph=None) -> np.ndarray:
+        """Six channels saying what the current phase asks for.
+
+        ``[cruise, hold, speed, cos(heading error), sin(heading error),
+        height lost]``:
+
+        * a one-hot of the phase's purpose -- move, or hold (``stop`` on land
+          is a hold);
+        * the commanded speed over the medium's own command scale, so 1 while
+          cruising and 0 while holding;
+        * the heading error in the horizontal plane, as a unit vector, between
+          the command and where the body's +x axis points -- a compass, which a
+          real hull has.  Zero while holding, where there is no heading to
+          keep;
+        * in air, the height lost since the segment began, ``tanh(m / 3)`` --
+          a barometer, and the thing the air phases are scored on keeping.
+
+        All six are zero outside a segment, which is what the controller sees
+        during a transition and was trained with there.
+        """
+        out = np.zeros(6)
+        if ph is None:
+            ph = self._phase_now()
+        if ph is None:
+            return out
+        if R is None:
+            R = self.data.xmat[self.root_body].reshape(3, 3)
+        if ph.kind == CRUISE:
+            out[0] = 1.0
+            ref = TASK_SPEED.get(self._active_task.domain) or max(self.launch_speed, 1e-6)
+            out[2] = float(np.clip(ph.speed / max(ref, 1e-6), 0.0, 3.0))
+            yaw = math.atan2(float(R[1, 0]), float(R[0, 0]))
+            err = ph.heading - yaw
+            out[3], out[4] = math.cos(err), math.sin(err)
+        else:
+            out[1] = 1.0
+        if self._active_task.domain == "air":
+            out[5] = math.tanh((self._height_ref - float(self.clearance())) / 3.0)
+        return out
+
     #: 3 linear + 3 angular + 3 gravity + depth + wetness + 3 commanded domain
-    #: + depth error + contact + battery + stroke phase and rate + 8 morphology.
-    OBS_DIM = 19 + MORPHOLOGY_DIM
+    #: + depth error + contact + battery + stroke phase and rate, + 6 task
+    #: channels (``task_channels``), + 8 morphology.
+    OBS_DIM = 25 + MORPHOLOGY_DIM
 
     #: The scorer's depth target, shared with the observation's error channel
     #: so the sensed error and the scored error cannot drift apart.
     TARGET_DEPTH = 10.0
 
-    #: Share of the water competence that is headway; the rest is the depth
-    #: terms.  Decided with the user 2026-09-20: forward distance matters more.
-    #: Air and land score their own motion terms and do not read this -- the
-    #: uniform "net forward distance in every medium" form it was written for
-    #: was removed with the passive twin on 2026-09-21.
-    FORWARD_WEIGHT = 0.6
-    #: Water speed that earns full marks, on the **gross** horizontal speed the
-    #: water branch now reads, set at the same 0.993 quantile of its own
-    #: measured distribution that land's 0.6 m/s sits at in its.
-    #:
-    #: Measured over the 985 water segments of
-    #: `runs/arch40_stopped_passive_twin`, scored through the real path:
-    #:
-    #:     median 0.112   p90 0.291   p99 0.700   q0.993 0.788   max 1.002 m/s
-    #:
-    #: So full marks is what about one segment in a hundred currently reaches,
-    #: and nothing saturates.  The previous 0.45 was the same quantile of the
-    #: *net* distribution, which no longer exists; on the gross numbers it
-    #: would have handed the median 0.25 for drifting.  A machine released
-    #: without its actuators still drifts at a median 0.106 m/s, which is 0.13
-    #: here, so drift is cheap rather than free -- the release cannot be made
-    #: to give nothing without a twin to subtract, and this is the price of not
-    #: running one.
-    FORWARD_REF_SPEED = {"water": 0.79}
 
     # ------------------------------------------------------------------ stepping
 
@@ -1373,6 +1432,7 @@ class TriphibianEnv:
         """
         p = params or self.cpg.base
         res = SegmentResult(domain=domain, duration=duration)
+        self._arm_task(domain, duration)
         n_steps = int(duration / self.timestep)
         control_every = max(1, int(1.0 / (control_hz * self.timestep)))
 
@@ -1435,7 +1495,176 @@ class TriphibianEnv:
             spins=np.array(spins), commands=commands, responses=responses,
             vzs=np.array(vzs), xys=np.array(xys),
         )
+        self._active_task = None
         return res
+
+    def _arm_task(self, domain: Domain, duration: float) -> None:
+        """Put this segment's task in force and start its clock.
+
+        The evaluators set ``self.task`` from a draw the whole generation
+        shares; anything that calls ``rollout`` directly gets the default
+        schedule.  The air command's speed is the machine's own trim speed,
+        filled in here because the shared draw cannot know it.  Both rollout
+        paths call this, so they cannot disagree about what was asked.
+        """
+        t = self.task
+        if t is None or t.domain != domain.value:
+            t = schedule_for(domain)
+        if domain is Domain.AIR:
+            v = float(self.launch_speed)
+            t = TaskSchedule(t.domain, tuple(_replace(ph, speed=v) for ph in t.phases))
+        self._active_task = t
+        self._seg_t0 = float(self.data.time)
+        self._seg_T = max(float(duration), 1e-6)
+        self._height_ref = float(self.clearance())
+
+    def _task_scores(self, domain: Domain, depths, clearances, xys,
+                     n_want: int) -> dict:
+        """Score each phase of the segment on its own purpose, and combine them.
+
+        Every phase is measured over its **late half** -- the first half is
+        the machine's to turn, descend or brake in -- and over the samples the
+        segment was *asked* for, so a phase the episode never reached scores
+        nothing and a truncated one scores only the part it served.
+
+        * **cruise**: the mean horizontal velocity over the late half against
+          the commanded one, ``1 - |v - v_cmd| / |v_cmd|``.  A machine standing
+          still scores 0, one drifting across the heading scores 0, and one
+          going twice as fast as asked scores 0.  Multiplied by holding the
+          vertical: in water the commanded depth, against how far the command
+          asked it to descend; in air height above the surface, graded from
+          level (1) through a glide to ballistic (0) as ``flight`` and ``glide``
+          have been since arch37.
+        * **hold** (water): at the commanded depth *and* not moving, both
+          required.  Distance from the commanded depth is measured against how
+          far the command asked the machine to descend, so a hull that sits
+          where it was released scores 0; movement over the window is measured
+          against the distance the cruise command would have covered, so one
+          sinking through the target scores 0.
+        * **stop** (land): the same, horizontally, against the distance the
+          walk command would have covered -- walking on at the commanded speed
+          scores 0.
+
+        Combined: water and air are the mean of their two phases, because
+        neither phase is free for a machine that does nothing.  On land a
+        machine that does nothing stops perfectly, so stopping *qualifies* the
+        walk instead of adding to it -- ``walk * (0.5 + 0.5 * stop)`` -- and a
+        rock scores zero.
+        """
+        t = self._active_task
+        if t is None or t.domain != domain.value:
+            t = schedule_for(domain, trim_speed=float(self.launch_speed))
+        xy = np.asarray(xys if xys is not None else np.zeros((0, 2)), float).reshape(-1, 2)
+        dep = np.asarray(depths, float)
+        clr = (np.asarray(clearances, float) if clearances is not None else -dep)
+        n_got = min(len(xy), len(dep), len(clr))
+        dt = float(self.timestep)
+        # Where the machine was released, for the water phases' scale: an
+        # error is measured against how far the command asked it to move, so a
+        # hull that sits where it was put scores exactly zero and one that gets
+        # halfway scores a half.  A flat 1 m band was measured first and gave
+        # 97% of 64 designs exactly zero in water -- a wall, with no gradient
+        # for selection or the policy to climb.
+        d_start = float(dep[0]) if len(dep) else 0.0
+        phases = []
+        for (lo, hi), ph in zip(t.bounds(n_want), t.phases):
+            mid = lo + (hi - lo) // 2
+            top = min(hi, n_got)
+            rec = {"kind": ph.kind, "score": 0.0, "measured": False}
+            if top - mid >= 2:
+                span = (top - 1 - mid) * dt
+                served = (top - mid) / max(hi - mid, 1)
+                rec["measured"] = True
+                if ph.kind == CRUISE:
+                    v = (xy[top - 1] - xy[mid]) / max(span, 1e-6)
+                    want = ph.speed * np.array([math.cos(ph.heading), math.sin(ph.heading)])
+                    track = float(np.clip(
+                        1.0 - np.linalg.norm(v - want) / max(ph.speed, 1e-6), 0.0, 1.0))
+                    if domain is Domain.WATER:
+                        err = float(np.mean(np.abs(dep[mid:top] - ph.depth)))
+                        scale = max(abs(float(ph.depth) - d_start), self.DEPTH_BAND)
+                        vert = float(np.clip(1.0 - err / scale, 0.0, 1.0))
+                    elif domain is Domain.AIR:
+                        # Graded over the whole range between holding height and
+                        # falling, as the air score has been since arch37:
+                        # ``flight`` alone is zero for everything not very nearly
+                        # level, and a 4 s phase of it measured zero for 131 of
+                        # 132 open-loop segments.
+                        sink = float((clr[mid] - clr[top - 1]) / max(span, 1e-6))
+                        flight = float(np.clip(1.0 - sink / 1.5, 0.0, 1.0))
+                        glide = float(np.clip(1.0 - sink / SINK_BALLISTIC, 0.0, 1.0))
+                        vert = (0.55 * flight + 0.25 * glide) / 0.80
+                    else:
+                        vert = 1.0
+                    rec.update(tracking=track, vertical=vert, score=track * vert * served)
+                elif ph.kind == HOLD:
+                    # Two things, both required: be at the commanded depth,
+                    # and do not move.  Depth alone is satisfied by a hull
+                    # sinking *through* the target during the window -- the
+                    # still eel, released at 4 m and sinking 0.55 m/s, crosses
+                    # 6.5 m right on time -- so the motion over the window is
+                    # scored separately, against the distance the cruise
+                    # command would cover in it: holding still scores 1,
+                    # moving at cruise speed scores 0.
+                    e_d = float(np.mean(np.abs(dep[mid:top] - float(ph.depth))))
+                    p3 = np.column_stack([xy[mid:top], dep[mid:top]])
+                    e_m = float(np.mean(np.linalg.norm(p3 - p3[0], axis=1)))
+                    scale = max(abs(float(ph.depth) - d_start), self.DEPTH_BAND)
+                    band_m = max(TASK_SPEED["water"] * span / 2.0, 1e-3)
+                    at = float(np.clip(1.0 - e_d / scale, 0.0, 1.0))
+                    still = float(np.clip(1.0 - e_m / band_m, 0.0, 1.0))
+                    rec.update(error=e_d + e_m, depth_error=e_d, drift=e_m,
+                               score=at * still * served)
+                else:
+                    drift = float(np.mean(np.linalg.norm(xy[mid:top] - xy[mid], axis=1)))
+                    band = max(TASK_SPEED["land"] * span / 2.0, 1e-3)
+                    rec.update(drift=drift, score=float(
+                        np.clip(1.0 - drift / band, 0.0, 1.0)) * served)
+            phases.append(rec)
+
+        m: dict = {}
+        if domain is Domain.LAND:
+            walk = next(r for r in phases if r["kind"] == CRUISE)
+            stop = next(r for r in phases if r["kind"] == STOP)
+            task = walk["score"] * (0.5 + 0.5 * stop["score"])
+            if walk["measured"]:
+                m["walk_tracking"] = walk["tracking"]
+            if stop["measured"]:
+                m["stop_score"] = stop["score"]
+                m["stop_drift"] = stop["drift"]
+            m["cmd_heading"] = next(ph.heading for ph in t.phases if ph.kind == CRUISE)
+            m["task_walk_first"] = float(t.phases[0].kind == CRUISE)
+        else:
+            task = 0.5 * phases[0]["score"] + 0.5 * phases[1]["score"]
+            if domain is Domain.WATER:
+                cr = next(r for r in phases if r["kind"] == CRUISE)
+                ho = next(r for r in phases if r["kind"] == HOLD)
+                if cr["measured"]:
+                    m["cruise_tracking"] = cr["tracking"]
+                    m["cruise_depth_hold"] = cr["vertical"]
+                    m["cruise_score"] = cr["score"]
+                if ho["measured"]:
+                    # Metres from where it was told to be, *plus* metres it
+                    # moved: the ladder's `holds_depth` reads this at 1 m.
+                    m["hold_error"] = ho["error"]
+                    m["hold_depth_error"] = ho["depth_error"]
+                    m["hold_drift"] = ho["drift"]
+                    m["hold_score"] = ho["score"]
+                m["cmd_depth"] = float(t.phases[0].depth)
+                m["cmd_heading"] = next(ph.heading for ph in t.phases if ph.kind == CRUISE)
+                m["task_hold_first"] = float(t.phases[0].kind == HOLD)
+            else:
+                a, b = phases
+                if a["measured"]:
+                    m["cruise_tracking"] = a["tracking"]
+                    m["cruise_height_hold"] = a["vertical"]
+                if b["measured"]:
+                    m["turn_tracking"] = b["tracking"]
+                    m["turn_height_hold"] = b["vertical"]
+                m["cmd_turn"] = float(t.phases[1].heading)
+                m["cmd_speed"] = float(t.phases[0].speed)
+        m["task_score"] = float(task)
+        return {"task": float(task), "phases": phases, "measurements": m}
 
     def _score_segment(self, domain, res, depths, alts, ups, contacts,
                        clearances=None, *, spins=None, commands=None,
@@ -1806,11 +2035,26 @@ class TriphibianEnv:
             # machine on speed it did not produce is what made the launch a
             # gift worth having.  Every term that remains is a property of the
             # trajectory the machine flew.
-            res.parts = {"gate": float(credit * frac),
-                         "control": float(0.55 * flight + 0.25 * glide + 0.20 * station)}
-            return float(
-                credit * frac * (0.55 * flight + 0.25 * glide + 0.20 * station)
-            )
+            # What the machine is *scored* on is the task it was given: cruise
+            # on the launch heading holding height, then turn on command and
+            # hold height on the new heading (``_task_scores``).  ``flight``,
+            # ``glide`` and ``station`` stay above as the ladder's measurements;
+            # they used to be the score, and all three were vertical -- the air
+            # competence had no forward term at all, so it asked a flapping wing
+            # to hold height without giving it the one thing that holds a
+            # flapping wing up.  A glider launched from 30 m sinks and cannot
+            # turn when told, so it scores on neither phase.
+            ts = self._task_scores(domain, depths, clearances, xys, n_want)
+            tm = ts["measurements"]
+            if gates:
+                # Gated designs publish zeros on the rungs, as every other air
+                # ladder metric above does.
+                tm = {k: (0.0 if k in ("cruise_tracking", "cruise_height_hold",
+                                       "turn_tracking", "turn_height_hold")
+                          else v) for k, v in tm.items()}
+            res.measurements.update(tm)
+            res.parts = {"gate": float(credit * frac), "control": ts["task"]}
+            return float(credit * frac * ts["task"])
 
         if domain is Domain.WATER:
             target = self.TARGET_DEPTH
@@ -1828,15 +2072,12 @@ class TriphibianEnv:
             # split this file has been bitten by before.
             start_depth = float(depths[0]) if len(depths) else 0.0
             gain = float(res.max_depth - start_depth)
-            reached = float(np.clip(gain / max(target - start_depth, 1e-6),
-                                    0.0, 1.0))
             submerged = float(np.sum(depths > 0.2) / n_want)
             # Holding depth matters as much as reaching it: a machine that
             # plummets to 10 m has not demonstrated depth control.
             settled = depths[len(depths) // 2 :]
             err = float(np.mean(np.abs(settled - target))) if len(settled) else target
             res.depth_error = err
-            hold = float(np.clip(1.0 - err / target, 0.0, 1.0))
             # Station keeping in depth, the same measurement the air branch
             # makes on height and for the same reason.  `depth_error` is the
             # mean distance from the target over the late half, so a machine
@@ -1900,36 +2141,25 @@ class TriphibianEnv:
             # thing it was asked to do.
             #
             # Being underwater and being upright are *state*, so they gate the
-            # motion terms rather than adding to them.  Measured over the 985
-            # segments of `runs/arch40_stopped_passive_twin`, with the policy
-            # driving and against a twin of the same design with every actuator
-            # held still: the additive form paid a still machine **0.422** in
-            # water, against 0.002 in air and 0.006 on land, which are already
-            # gated.  Two fifths of that 0.422 was the constant
-            # ``0.2 * submerged + 0.2 * upright`` -- the machine is *released*
-            # four metres under and a hull is passively stable, so the score was
-            # paid for existing.  That is the leak behind §W: 96.4% of the air
-            # island's elites were better in water than in air, because water
-            # was the cheapest medium in the run.
+            # task rather than adding to it.  Measured over the 985 segments of
+            # `runs/arch40_stopped_passive_twin`: the additive form paid a
+            # machine with its actuators held still **0.422** in water, two
+            # fifths of it the constant ``0.2 * submerged + 0.2 * upright``.
             #
-            # What is left is motion, and motion has to be chosen.  Decided with
-            # the user 2026-09-21: **sinking is not a capability on its own; in
-            # water a machine must at least make headway or hold a depth.**  So
-            # the depth terms are multiplied by ``active``, which is the better
-            # of the two.  A machine that neither moves nor holds -- one falling
-            # through the target -- scores zero however deep it gets.
-            headway = float(np.clip(res.mean_speed / self.FORWARD_REF_SPEED["water"],
-                                    0.0, 1.0))
-            active = float(max(headway, station))
+            # The task (``_task_scores``) is two phases with one purpose each:
+            # hold at a commanded depth below the release, and cruise on a
+            # commanded heading at that depth, in an order drawn per generation.
+            # Until 2026-09-21 this was one blend of moving, holding and
+            # diving, and the blend fought itself -- ``corr(headway,
+            # depth_station_keeping)`` was -0.264 over arch40's 6,288 water
+            # segments, and it paid a perfect hover 0.20 against a perfect mover
+            # 0.80.  Sinking scores only as far as it reaches the commanded
+            # depth and stops there, which is what makes it a chosen operation.
+            ts = self._task_scores(domain, depths, clearances, xys, n_want)
+            res.measurements.update(ts["measurements"])
             gate = float(served * submerged * (0.5 + 0.5 * upright))
-            depth_control = float(np.clip((0.35 * reached + 0.25 * hold) / 0.60,
-                                          0.0, 1.0))
-            w = float(self.FORWARD_WEIGHT)
-            motion = float(w * headway + (1.0 - w) * depth_control)
-            res.measurements["water_headway"] = headway
-            res.measurements["water_active"] = active
-            res.parts = {"gate": gate * active, "control": motion}
-            return float(gate * active * motion)
+            res.parts = {"gate": gate, "control": ts["task"]}
+            return float(gate * ts["task"])
 
         # LAND
         #
@@ -1950,7 +2180,6 @@ class TriphibianEnv:
         _n = min(len(_c), len(_u))
         contact = float(
             np.sum((_c[:_n] > 0.5) & (_u[:_n] > 0.5)) / n_want) if _n else 0.0
-        progress = float(np.clip(res.mean_speed / 0.6, 0.0, 1.0))
         # Height gained against the beach's own slope: walking uphill is the
         # capability, not merely moving.
         from ..core.mjcf import beach_surface_z
@@ -2136,9 +2365,16 @@ class TriphibianEnv:
         # gradient is what matters and it improves by more than an order of
         # magnitude: the spread across these six plans goes from 1.1x to 36x.
         posture = 0.5 * contact + 0.5 * upright
-        climb = float(np.clip(max(climbed, 0.0) / 0.5, 0.0, 1.0))
-        res.parts = {"gate": float(served * posture), "control": float(climb)}
-        return served * posture * float(0.65 * progress + 0.35 * climb)
+        # The task: walk on a commanded heading at the commanded speed, and
+        # stop when told to (``_task_scores``).  It replaces ``0.65 * progress
+        # + 0.35 * climb``, where progress was displacement in *any* direction
+        # -- drifting sideways was progress -- and the climb was the only
+        # direction anything asked for.  ``slope_climbed`` is still measured
+        # above, for the ladder.
+        ts = self._task_scores(domain, depths, clearances, xys, n_want)
+        res.measurements.update(ts["measurements"])
+        res.parts = {"gate": float(served * posture), "control": ts["task"]}
+        return float(served * posture * ts["task"])
 
     # ------------------------------------------------------------- mobility ID
 

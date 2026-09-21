@@ -545,6 +545,11 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
 
     k = len(envs)
     res = [SegmentResult(domain=domain, duration=duration) for _ in envs]
+    # The same call the single-machine rollout makes, so the two paths put the
+    # same task in force on the same clock and cannot disagree about what a
+    # machine was asked to do.
+    for e in envs:
+        e._arm_task(domain, duration)
     n_steps = int(duration / envs[0].timestep)
     control_every = max(1, int(1.0 / (control_hz * envs[0].timestep)))
 
@@ -672,6 +677,8 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
             spins=np.array(r["spins"]), commands=r["cmds"],
             responses=r["resp"], vzs=np.array(r["vzs"]),
             xys=np.array(r["xys"]))
+    for e in envs:
+        e._active_task = None
     return res
 
 
@@ -782,10 +789,15 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         # score depend on which interpreter ran it.  See TriphibianEnv.scatter
         # for why the canonical pose alone was not a training set.
         from .evaluate import _scatter_seed
+        from .tasks import schedule_for, task_seed
         scatter_seed = _scatter_seed(seed, dom)
+        # The task, drawn the same way and shared the same way: every machine
+        # in the generation is asked the same thing.
+        task = schedule_for(dom, np.random.default_rng(task_seed(scatter_seed)))
         for i in live:
             envs[i].reset(dom)
             envs[i].scatter(np.random.default_rng(scatter_seed))
+            envs[i].task = task
         bf.reset_slam()
         collector = None
         if shared is not None and buffer is not None:

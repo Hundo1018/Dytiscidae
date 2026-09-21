@@ -146,7 +146,15 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         # asks the machine to still be at the height it settled at.
         ("holds_station", "station_keeping", 0.6),
         ("climbs", "sink_rate", -0.5),         # net climb
-        ("manoeuvres", "turn_rate_held", 0.2),  # turns while holding height
+        # Turns *when told to*: the air segment's second phase commands a new
+        # heading 45-90 degrees off the launch, and this reads how closely the
+        # mean velocity over its late half matches it.  It used to read
+        # `turn_rate_held`, a turn the machine chose to make, which a policy
+        # that turns all the time clears as well as one that steers.  0.5 is
+        # "the velocity error is under half the command": set on its physical
+        # meaning because nothing has yet been trained to follow a command, and
+        # to be re-derived from arch41's own distribution.
+        ("manoeuvres", "turn_tracking", 0.5),
     ],
     "water": [
         # Depth as a gain over where the machine was released, not as an
@@ -169,8 +177,17 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         ("dives", "depth_gain", 2.0),           # 51.9%
         ("reaches_depth", "depth_gain", 5.0),   # 28.8%
         ("goes_deep", "depth_gain", 8.0),       # 10.4%
-        ("holds_depth", "depth_error", 1.0),   # within 1 m of target
-        ("manoeuvres", "water_speed", 0.5),    # makes way while holding depth
+        # The task rungs.  ``holds_depth`` reads the hold phase: metres from
+        # the depth it was *told* to hold plus metres it moved while holding,
+        # under the 1 m the rung has always meant.  It used to read
+        # `depth_error` to a fixed 10 m over the late half of a segment that
+        # never asked the machine to hold anything, which a hull sinking
+        # through 10 m cleared on the way past.
+        ("holds_depth", "hold_error", 1.0),
+        # Makes way on a commanded heading at the commanded depth: tracking
+        # times depth held, from the cruise phase.  Was `water_speed` >= 0.5,
+        # speed in any direction.  0.5 set on its meaning; re-derive at arch41.
+        ("manoeuvres", "cruise_score", 0.5),
     ],
     "land": [
         ("stays_upright", "upright", 0.7),
@@ -209,7 +226,10 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         ("stirs", "land_peak_speed", 0.08),      # 48.8%
         ("moves", "land_speed", 0.02),           # 35.0%
         ("climbs_slope", "slope_climbed", 0.05),  # 31.2%
-        ("walks", "land_speed", 0.05),           # 15.0%
+        # Walks where it is told to: the walk phase's tracking of a commanded
+        # heading and speed.  Was `land_speed` >= 0.05, displacement in any
+        # direction.  0.5 set on its meaning; re-derive at arch41.
+        ("walks", "walk_tracking", 0.5),
     ],
     # Take-off, and it is deliberately a ladder of its own rather than rungs
     # appended to ``land``.  ``rung_reached`` stops at the first unmet rung, and
@@ -267,7 +287,7 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
 
 #: Metrics where *lower* is better, so the rung is reached by going below the
 #: threshold rather than above it.
-LOWER_IS_BETTER = {"sink_rate", "depth_error"}
+LOWER_IS_BETTER = {"sink_rate", "depth_error", "hold_error"}
 
 
 def rung_reached(domain: str, measurements: dict[str, float]) -> int:

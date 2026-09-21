@@ -350,38 +350,62 @@ MUTATIONS: tuple = (
                "the search and every verification run different physics",
         suites=("test_search",), item="kernel freshness"),
 
+    # --- the task: each phase scored on its own purpose (2026-09-21) --------
     Mutation(
-        id="water-scores-being-underwater",
+        id="cruise-pays-for-speed-in-any-direction",
         path="dytiscidae/envs/triphibian.py",
-        find="            res.parts = {\"gate\": gate * active, \"control\": motion}\n"
-             "            return float(gate * active * motion)",
-        replace="            res.parts = {\"gate\": gate, \"control\": motion}\n"
-                "            return served * float(\n"
-                "                0.35 * reached + 0.25 * hold + 0.2 * submerged"
-                " + 0.2 * upright\n            )",
-        defect="water pays 0.2 for being submerged and 0.2 for being upright "
-               "again -- the machine is released four metres under and a hull "
-               "is passively stable, so two fifths of the score is paid for "
-               "existing, which is what made water every island's cheapest "
-               "medium",
-        suites=("test_physics",), item="sinking is not a capability"),
+        find="                    track = float(np.clip(\n"
+             "                        1.0 - np.linalg.norm(v - want) / max(ph.speed, 1e-6), 0.0, 1.0))",
+        replace="                    track = float(np.clip(\n"
+                "                        np.linalg.norm(v) / max(ph.speed, 1e-6), 0.0, 1.0))",
+        defect="a cruise phase pays for speed whatever its direction, so drifting "
+               "across the commanded heading is progress again",
+        suites=("test_physics",), item="task tracking"),
     Mutation(
-        id="sinking-opens-the-water-gate",
+        id="hold-ignores-motion",
         path="dytiscidae/envs/triphibian.py",
-        find="            active = float(max(headway, station))",
-        replace="            active = 1.0",
-        defect="the water score stops requiring headway or station keeping, so "
-               "a machine falling through the target depth scores for the "
-               "depth it fell to",
-        suites=("test_physics",), item="sinking is not a capability"),
+        find="                    still = float(np.clip(1.0 - e_m / band_m, 0.0, 1.0))",
+        replace="                    still = 1.0",
+        defect="a hold phase stops penalising movement, so a hull sinking through "
+               "the commanded depth on the way past is holding it",
+        suites=("test_physics",), item="task hold"),
     Mutation(
-        id="water-station-keeping-cannot-fail",
+        id="hold-scale-is-absolute",
         path="dytiscidae/envs/triphibian.py",
-        find="                station = float(np.mean(s_dev < s_band))",
-        replace="                station = 1.0",
-        defect="depth station keeping reads full marks for every trace, so a "
-               "steady sink is indistinguishable from holding a depth",
-        suites=("test_physics",), item="sinking is not a capability"),
+        find="                    scale = max(abs(float(ph.depth) - d_start), self.DEPTH_BAND)\n"
+             "                    band_m",
+        replace="                    scale = 10.0\n"
+                "                    band_m",
+        defect="the hold's depth error is judged against a fixed band instead of "
+               "the descent the command asked for, so a hull that sits where it "
+               "was released earns most of it",
+        suites=("test_physics",), item="task hold"),
+    Mutation(
+        id="land-stop-adds-to-the-walk",
+        path="dytiscidae/envs/triphibian.py",
+        find="            task = walk[\"score\"] * (0.5 + 0.5 * stop[\"score\"])",
+        replace="            task = 0.5 * walk[\"score\"] + 0.5 * stop[\"score\"]",
+        defect="stopping on land adds to the walk instead of qualifying it, and a "
+               "rock -- which stops perfectly -- scores half",
+        suites=("test_physics",), item="task land"),
+    Mutation(
+        id="controller-is-not-told-the-task",
+        path="dytiscidae/envs/triphibian.py",
+        find="                self.task_channels(R, ph),",
+        replace="                np.zeros(6),",
+        defect="the observation stops carrying the command, so the controller is "
+               "scored on a purpose it cannot see -- the defect this whole change "
+               "exists to remove",
+        suites=("test_physics",), item="task observed"),
+    Mutation(
+        id="evaluators-ask-different-tasks",
+        path="dytiscidae/envs/batchroll.py",
+        find="        task = schedule_for(dom, np.random.default_rng(task_seed(scatter_seed)))",
+        replace="        task = schedule_for(dom)",
+        defect="the batched path asks every machine the default task while the "
+               "single path asks the drawn one, so the search scores one experiment "
+               "and every verification runs another",
+        suites=("test_search",), item="path agreement"),
 
     Mutation(
         id="batched-fluid-diagnostics-stay-default",
@@ -395,8 +419,9 @@ MUTATIONS: tuple = (
     Mutation(
         id="stage-one-reads-gross-measurements",
         path="dytiscidae/evolution/curriculum.py",
-        find='            air.get("station_keeping", 0.0) / 0.17, 0.0, 1.0)))',
-        replace='            1.0 - air.get("sink_rate", 9.9) / 3.0, 0.0, 1.0)))',
+        find='        for dom, key in (("air", "cruise_tracking"), ("water", "cruise_tracking"),',
+        replace='        best = float(np.clip(1.0 - meas.get("air", {}).get("sink_rate", 9.9) / 3.0, 0.0, 1.0))\n'
+                '        for dom, key in (("water", "cruise_tracking"),',
         defect="the curriculum's directed stage pays for gliding from the 30 m "
                "launch again, which a machine with its actuators off also does",
         suites=("test_search",), item="sinking is not a capability"),
@@ -440,6 +465,16 @@ def copy_tree(dest: Path) -> None:
     untar.communicate()
     if untar.returncode:                                     # pragma: no cover
         raise RuntimeError("copying the tree failed")
+    # The compiled GPU kernel is untracked, so the copy above leaves it behind,
+    # and without it every test that drives the batched evaluator *skips* --
+    # which exits 0, which this harness reads as "no suite failed".  A mutant
+    # in the batched path therefore survived every run for a reason that had
+    # nothing to do with the tests: they never ran.  Link it in, read-only use.
+    # Its freshness is still checked against the copy's own `mojo/src`.
+    build = ROOT / "mojo" / "build"
+    if build.exists() and not (dest / "mojo" / "build").exists():
+        (dest / "mojo").mkdir(parents=True, exist_ok=True)
+        os.symlink(os.path.realpath(build), dest / "mojo" / "build")
 
 
 def apply_mutation(tree: Path, m: Mutation) -> str:
@@ -482,7 +517,13 @@ raise SystemExit(0)
 """
 
 
-def run_suite(tree: Path, suite: str, timeout: int = 900) -> tuple:
+#: Per-suite wall-clock limits.  `test_search` takes ~25 min with the GPU
+#: kernel present, so a flat 900 s ended every run of it early -- see
+#: ``evaluate`` for why that used to be reported as a catch.
+SUITE_TIMEOUT = {"test_search": 3600}
+
+
+def run_suite(tree: Path, suite: str, timeout: int | None = None) -> tuple:
     """(returncode, stdout+stderr).  Same invocation a contributor uses.
 
     ``module::function`` runs one test function instead of the whole file.
@@ -501,10 +542,10 @@ def run_suite(tree: Path, suite: str, timeout: int = 900) -> tuple:
         cmd = [PYTHON, str(tree / "tests" / f"{suite}.py")]
     try:
         out = subprocess.run(cmd, cwd=str(tree), env=env, capture_output=True,
-                             text=True, timeout=timeout)
+                             text=True, timeout=timeout or SUITE_TIMEOUT.get(suite, 900))
         return out.returncode, (out.stdout or "") + (out.stderr or "")
     except subprocess.TimeoutExpired:
-        return 124, f"timed out after {timeout}s"
+        return 124, f"timed out after {timeout or SUITE_TIMEOUT.get(suite, 900)}s"
 
 
 def failing_checks(output: str) -> list:
@@ -522,6 +563,14 @@ def evaluate(m: Mutation, workdir: Path) -> Result:
 
     for suite in m.suites:
         rc, out = run_suite(tree, suite)
+        # A suite that ran out of time failed nothing: it is evidence of
+        # neither outcome.  It used to fall through to "caught", and with the
+        # kernel linked in, `test_search` outlasted the old 900 s limit on
+        # every mutant -- three batched-path mutations were reported caught at
+        # 900.2 s, 900.1 s and 900.2 s with no failing check between them.
+        if rc == 124 and out.startswith("timed out"):
+            return Result(m, "TIMEOUT", by=suite, detail=out,
+                          seconds=time.time() - t0)
         if rc != 0:
             fails = failing_checks(out)
             detail = fails[0] if fails else out.strip().splitlines()[-1][:160]
@@ -556,7 +605,8 @@ def main(argv=None) -> int:
             r = evaluate(m, workdir)
             results.append(r)
             mark = {"caught": "caught  ", "SURVIVED": "SURVIVED",
-                    "MISAPPLIED": "MISAPPLD", "ERROR": "ERROR   "}[r.status]
+                    "MISAPPLIED": "MISAPPLD", "ERROR": "ERROR   ",
+                    "TIMEOUT": "TIMEOUT "}[r.status]
             where = f" by {r.by}" if r.by else ""
             print(f"  [{mark}] {m.id:42} {r.seconds:5.1f}s{where}")
             if r.status == "caught":
@@ -570,7 +620,7 @@ def main(argv=None) -> int:
 
     caught = sum(1 for r in results if r.status == "caught")
     survived = [r for r in results if r.status == "SURVIVED"]
-    bad = [r for r in results if r.status in ("MISAPPLIED", "ERROR")]
+    bad = [r for r in results if r.status in ("MISAPPLIED", "ERROR", "TIMEOUT")]
 
     print("\n" + "=" * 70)
     print(f"caught {caught}/{len(results)}"
@@ -590,8 +640,8 @@ def main(argv=None) -> int:
             indent=2) + "\n")
         print(f"\nwrote {args.json}")
 
-    # A survivor is a reportable hole, not a crash; a misapplied mutation is a
-    # broken harness and must be loud.
+    # A survivor is a reportable hole, not a crash; a misapplied mutation, or a
+    # suite that ran out of time, is a broken measurement and must be loud.
     return 1 if bad else 0
 
 

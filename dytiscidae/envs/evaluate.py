@@ -26,6 +26,7 @@ import numpy as np
 from ..control.cpg import CPGParams, MobilityBasis, Policy
 from ..core.phenotype import Phenotype
 from ..physics.energy import transition_energy
+from .tasks import schedule_for, task_seed
 from .transitions import TransitionSet, run_transition
 from .triphibian import (
     DOMAIN_CYCLE,
@@ -308,6 +309,10 @@ def evaluate_tier1(
         # batched path and 0.008 m/s through this one: a factor of sixty, on the
         # same body with the same controller.
         env.scatter(np.random.default_rng(_scatter_seed(seed, dom)))
+        # What the segment asks, drawn from the same seed the batched path
+        # uses -- see `batchroll.evaluate_tier1_batch`.
+        env.task = schedule_for(
+            dom, np.random.default_rng(task_seed(_scatter_seed(seed, dom))))
         seg = env.rollout(
             segment_seconds,
             params=ctrl.params,

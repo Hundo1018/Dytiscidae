@@ -144,36 +144,23 @@ def stage_score(stage: int, result, transitions=None, *,
         # ladder measurements rather than competence, because "held depth" and
         # "scored well in water" are not the same claim.
         #
-        # Each one is a *gross* measurement that is nevertheless not paid for
-        # doing nothing, because each is gated or shaped rather than netted.
-        # The passive twin these three used to be measured against was removed
-        # 2026-09-21: it doubled the cost of every segment, and the user's
-        # decision is that passive forward motion -- a glide, or a hull that
-        # carries itself through water -- is a capability and should score.
+        # Each one is the cruise phase's tracking of its command
+        # (``TriphibianEnv._task_scores``): the mean velocity over the phase's
+        # late half against the commanded heading and speed, in [0, 1], with
+        # the same definition in every medium -- so the three are comparable,
+        # which three differently-scaled gross quantities never were.  A
+        # machine standing still scores 0, one drifting across the heading
+        # scores 0, and one falling from the 30 m launch has a heading to hold
+        # after it is told to turn.
         #
-        #   air    `station_keeping`, the fraction of the late airborne window
-        #          spent within a band of the height the machine settled at.
-        #          A machine falling from the 30 m launch scores ~0 on it,
-        #          which is what `sink_reduction` was there to ensure.
-        #   water  `water_headway`, the gross horizontal speed over
-        #          `FORWARD_REF_SPEED`.  The other half of the user's rule --
-        #          holding station instead of moving -- is in the water
-        #          competence's `active` gate rather than here, because stage 1
-        #          asks whether the machine is *going somewhere*.
-        #   land   `land_speed`, which is already gated on posture.
-        #
-        # The scales are each quantity's own 0.999 quantile over the 985
-        # segments of `runs/arch40_stopped_passive_twin`, which is where land's
-        # 0.4 m/s already sat, so land does not move under this change:
-        # air 0.167, land 0.384.  `water_headway` arrives normalised.
+        # Until 2026-09-21 this read `station_keeping / 0.17`, `water_headway`
+        # and `land_speed / 0.4`: "going somewhere" measured three ways, none
+        # of them relative to where the machine was asked to go.
         best = 0.0
-        air = meas.get("air", {})
-        best = max(best, float(np.clip(
-            air.get("station_keeping", 0.0) / 0.17, 0.0, 1.0)))
-        water = meas.get("water", {})
-        best = max(best, float(np.clip(water.get("water_headway", 0.0), 0.0, 1.0)))
-        land = meas.get("land", {})
-        best = max(best, float(np.clip(land.get("land_speed", 0.0) / 0.4, 0.0, 1.0)))
+        for dom, key in (("air", "cruise_tracking"), ("water", "cruise_tracking"),
+                         ("land", "walk_tracking")):
+            best = max(best, float(np.clip(
+                meas.get(dom, {}).get(key, 0.0), 0.0, 1.0)))
         return best
 
     if stage == 2:

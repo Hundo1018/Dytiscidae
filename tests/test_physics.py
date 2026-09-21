@@ -125,6 +125,29 @@ def report(label: str) -> int:
 # --------------------------------------------------------------------------
 
 
+
+def on_task_xy(env, domain, n: int, dur: float = 8.0) -> np.ndarray:
+    """A horizontal trace that does exactly what the default task asks.
+
+    Since 2026-09-21 every medium is scored on following a commanded phase
+    script (``dytiscidae.envs.tasks``), and horizontal motion comes from the
+    recorded positions.  A test that fabricates altitude or depth traces to
+    probe a *gate* has to supply the motion too, or the task scores zero and
+    the gate under test is never reached.  ``n`` samples of a segment asked to
+    last ``dur`` seconds, so a truncated trace stops where the episode did.
+    """
+    from dytiscidae.envs.tasks import schedule_for
+
+    t = schedule_for(domain, trim_speed=float(env.launch_speed))
+    n_want = max(int(round(dur / env.timestep)), 1)
+    xy = np.zeros((n, 2))
+    for k, ((lo, hi), ph) in enumerate(zip(t.bounds(n_want), t.phases)):
+        v = (ph.speed * np.array([np.cos(ph.heading), np.sin(ph.heading)])
+             if ph.moving else np.zeros(2))
+        for i in range(lo, min(hi, n)):
+            xy[i] = (xy[i - 1] if i else 0.0) + v * env.timestep
+    return xy
+
 def _single_panel_model(density: float = 200.0):
     """A single free body carrying one wing strip, used for force probes."""
     xml = f"""
@@ -844,6 +867,7 @@ def test_truncated_episodes_cannot_score() -> None:
         return env._score_segment(
             Domain.AIR, r, -clear, clear,
             np.ones(n_samples), np.zeros(n_samples), clear,
+            xys=on_task_xy(env, Domain.AIR, n_samples, dur),
         )
 
     dead = air(3, 0.0)
@@ -860,7 +884,8 @@ def test_truncated_episodes_cannot_score() -> None:
         r.mean_speed = 0.6
         k = max(int(frac * n), 2)
         return env._score_segment(
-            Domain.LAND, r, np.full(k, -0.1), np.full(k, 0.5), np.ones(k), np.ones(k)
+            Domain.LAND, r, np.full(k, -0.1), np.full(k, 0.5), np.ones(k), np.ones(k),
+            xys=on_task_xy(env, Domain.LAND, k, dur),
         )
 
     check("the same hole is closed on land", land(0.02) < 0.05 < land(1.0),
@@ -1434,7 +1459,8 @@ def test_flight_is_measured_against_the_ground_not_the_waterline() -> None:
         r = SegmentResult(domain=Domain.AIR, duration=dur)
         r.mean_speed = env.launch_speed
         return env._score_segment(
-            Domain.AIR, r, depth, np.zeros(n), np.ones(n), np.zeros(n), clear
+            Domain.AIR, r, depth, np.zeros(n), np.ones(n), np.zeros(n), clear,
+            xys=on_task_xy(env, Domain.AIR, n, dur),
         )
 
     t = np.arange(n) * dt
@@ -2026,8 +2052,8 @@ def test_flap_frequency_is_commandable_in_the_loop() -> None:
           abs(moved.frequency - base.frequency) > 1e-6,
           f"{base.frequency:.4f} -> {moved.frequency:.4f} Hz")
     check("and the observation carries the stroke phase to time it against",
-          TriphibianEnv.OBS_DIM == 19 + MORPHOLOGY_DIM,
-          f"19 sensed + {MORPHOLOGY_DIM} morphology = {TriphibianEnv.OBS_DIM}")
+          TriphibianEnv.OBS_DIM == 25 + MORPHOLOGY_DIM,
+          f"19 sensed + 6 task + {MORPHOLOGY_DIM} morphology = {TriphibianEnv.OBS_DIM}")
     del CPGParams
 
 
@@ -2119,7 +2145,8 @@ def test_the_air_score_measures_flight() -> None:
         try:
             s = env._score_segment(
                 Domain.AIR, r, -clear, clear, np.ones(m), np.zeros(m), clear,
-                spins=spins, commands=commands, responses=responses)
+                spins=spins, commands=commands, responses=responses,
+                xys=on_task_xy(env, Domain.AIR, m, secs))
         finally:
             env.air_gates = []
         return s, r.measurements
@@ -2652,15 +2679,21 @@ def test_depth_is_a_gain_not_a_spawn() -> None:
         r.max_depth = float(np.max(depths))
         c = env._score_segment(
             Domain.WATER, r, np.asarray(depths, float), -np.asarray(depths, float),
-            np.ones(n), np.zeros(n), np.zeros(n), vzs=np.zeros(n))
+            np.ones(n), np.zeros(n), np.zeros(n), vzs=np.zeros(n),
+            xys=on_task_xy(env, Domain.WATER, n, dur))
         return c, r.measurements
 
+    from dytiscidae.envs.tasks import schedule_for
+    target = float(schedule_for(Domain.WATER).phases[0].depth)
+    ramp = np.clip(np.arange(n) / (n / 8), 0, 1)
     held = 4.0 * np.ones(n)                                  # released and idle
-    dove = 4.0 + 9.0 * np.clip(np.arange(n) / (n / 2), 0, 1)  # 4 m -> 13 m
+    dove = 4.0 + (target - 4.0) * ramp                       # to the commanded depth
+    plunged = 4.0 + 9.0 * np.clip(np.arange(n) / (n / 2), 0, 1)  # 4 m -> 13 m
     rose = 4.0 - 0.6 * np.clip(np.arange(n) / (n / 2), 0, 1)  # floats up
 
     c_held, m_held = water(held)
     c_dove, m_dove = water(dove)
+    c_plunged, m_plunged = water(plunged)
     c_rose, m_rose = water(rose)
 
     check("a machine that stays where it was dropped gained nothing",
@@ -2678,11 +2711,16 @@ def test_depth_is_a_gain_not_a_spawn() -> None:
           f"gain {m_rose['depth_gain']:+.3f} m, competence {c_rose:.4f} "
           f"against {c_dove:.4f}")
     check("while a real dive is measured from the release depth",
-          abs(m_dove["depth_gain"] - 9.0) < 1e-6,
-          f"4 m -> 13 m reads {m_dove['depth_gain']:+.2f} m, not "
-          f"{m_dove['max_depth']:.2f}")
+          abs(m_plunged["depth_gain"] - 9.0) < 1e-6,
+          f"4 m -> 13 m reads {m_plunged['depth_gain']:+.2f} m, not "
+          f"{m_plunged['max_depth']:.2f}")
     check("the competence no longer pays for the spawn",
           c_dove > c_held, f"idle {c_held:.4f} against diving {c_dove:.4f}")
+    # Depth is a command now, not a thing to maximise: going to the depth
+    # asked for and staying is the task, and plunging past it is not.
+    check("and reaching the commanded depth beats plunging past it",
+          c_dove > c_plunged,
+          f"to {target:.1f} m {c_dove:.4f} against to 13 m {c_plunged:.4f}")
 
     # `max_depth` stays published unchanged, so every number measured before
     # this change is still re-derivable from the record.
@@ -2690,124 +2728,184 @@ def test_depth_is_a_gain_not_a_spawn() -> None:
           abs(m_held["max_depth"] - 4.0) < 1e-6, f"{m_held['max_depth']:.2f} m")
 
 
-def test_sinking_is_not_a_capability() -> None:
-    """Water scores motion that was chosen, not a machine that is underwater.
+def test_each_phase_is_scored_on_its_own_purpose() -> None:
+    """A segment asks one thing at a time, and is scored on what it asked.
 
-    The passive twin that used to enforce this -- every segment run a second
-    time with the actuators held still, and the difference scored -- was
-    removed 2026-09-21 on the user's decision: it doubled the cost of every
-    segment (2.084 s against 1.047 s on an 8 s water segment) and it also
-    refused to score passive forward motion, which is a capability when it is a
-    glide or a hull that carries itself.
+    Raised by the user 2026-09-21: "if the purpose is to go forward, forward
+    should score; if it is to hover, it should hover then, and moving should be
+    penalised -- not one reward applied everywhere."  Until then the controller
+    was told which medium it was in and never what to do there, and each
+    medium's score blended goals that fought: ``corr(headway,
+    depth_station_keeping)`` was -0.264 over arch40's 6,288 water segments, and
+    the water formula paid a perfect hover 0.20 against a perfect mover 0.80.
 
-    What replaces it is gates, and this is where they are asserted. Measured
-    over the 985 segments of `runs/arch40_stopped_passive_twin`, the additive
-    water formula paid a machine with its actuators held still **0.422**,
-    against 0.002 in air and 0.006 on land, and two fifths of that was the
-    constant ``0.2 * submerged + 0.2 * upright`` -- paid for being released
-    underwater and for being a stable hull. So:
+    So each segment is two phases with one purpose each (``envs/tasks.py``),
+    the controller observes the purpose, and each phase is scored on its own
+    objective.  This asserts the four properties that make that true:
 
-      1. state multiplies the motion terms instead of adding to them, and
-      2. the motion terms are gated on ``active`` -- headway or depth station
-         keeping -- because the user's rule is that in water a machine must at
-         least go forward or hold a position, and sinking is neither.
+      1. the observation carries the command, and it switches at the phase
+         boundary;
+      2. a cruise phase pays for the commanded velocity and nothing else --
+         not standing still, not drifting across the heading, not overshooting;
+      3. a hold phase pays for being at the commanded depth *and* not moving --
+         not for sitting where the machine was released, not for sinking
+         through the target on the way past;
+      4. a machine with its actuators held still scores ~nothing in any medium,
+         on the real rollout path, with no passive twin to subtract.
     """
-    print("\ncompetence: sinking is not a capability")
+    print("\ncompetence: each phase is scored on its own purpose")
     import inspect
 
     from dytiscidae.control.cpg import CPGParams
     from dytiscidae.core.bodyplans import BODY_PLANS
     from dytiscidae.core.phenotype import build
-    from dytiscidae.envs.triphibian import Domain, SegmentResult, TriphibianEnv
+    from dytiscidae.envs.tasks import (CRUISE, HOLD, STOP, TASK_SPEED, Phase,
+                                       TaskSchedule, schedule_for)
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
 
-    # The cost the twin used to add cannot come back by accident.
-    sig = inspect.signature(TriphibianEnv.rollout)
     check("rollout runs one segment, not two",
-          "passive_control" not in sig.parameters,
-          f"parameters: {list(sig.parameters)}")
+          "passive_control" not in inspect.signature(TriphibianEnv.rollout).parameters)
 
-    def rolled(plan, dom, inert=False, seed=11):
-        env = TriphibianEnv(build(BODY_PLANS[plan]()), seed=3)
-        env.reset(dom)
-        env.scatter(np.random.default_rng(seed))
-        params = None
-        if inert:
-            b = env.cpg.base
-            params = CPGParams(
-                amplitude=np.zeros(env.cpg.n), phase=np.asarray(b.phase, float),
-                offset=np.asarray(env.data.qpos[env._act_qadr], float),
-                frequency=float(b.frequency))
-        return env.rollout(8.0, params=params, domain=dom)
-
-    for plan in ("beetle", "eel"):
-        still = rolled(plan, Domain.WATER, inert=True)
-        m = still.measurements
-        check(f"{plan}: water publishes what the gate is made of",
-              {"water_headway", "water_active", "depth_station_keeping",
-               "depth_excursion_ratio"} <= set(m),
-              f"published: {sorted(m)}")
-        # 0.422 is what the additive formula paid a still machine. The bar here
-        # is deliberately loose -- this test owns the *structure*, and the
-        # distribution is owned by the run -- but a still machine must no
-        # longer be able to earn what being submerged and upright used to pay.
-        check(f"{plan}: held still in water it no longer scores the old 0.4",
-              still.competence < 0.30, f"{still.competence:.4f}")
-
-    # The gate itself, on fabricated numbers, so the rule is asserted rather
-    # than inferred from a rollout that might have been active by accident.
     env = TriphibianEnv(build(BODY_PLANS["eel"]()), seed=0)
-    ref = env.FORWARD_REF_SPEED["water"]
+    dt = env.timestep
+    n = int(8.0 / dt)
 
-    # Headway alone opens the gate, station keeping alone opens the gate, and
-    # a machine doing neither is left with nothing however deep it goes.  The
-    # traces are full length -- `_score_segment` divides every time fraction by
-    # the length the segment was *asked* for, so a short array scores the
-    # truncation and not the behaviour.
-    def water_score(speed, depths):
-        n = len(depths)
-        res = SegmentResult(domain=Domain.WATER, duration=8.0, survived=True)
-        res.distance, res.mean_speed = speed * 8.0, speed
-        res.max_depth = float(np.max(depths))
-        return env._score_segment(
-            Domain.WATER, res, np.asarray(depths, float), np.zeros(n),
-            np.ones(n), np.zeros(n), np.zeros(n), spins=np.zeros(n),
-            vzs=np.zeros(n), xys=np.zeros((n, 2)))
+    # --- 1. the command is observed, and it switches ------------------------
+    env.reset(Domain.WATER)
+    check("outside a segment the task channels are silent, as in a transition",
+          not np.any(env.task_channels()), f"{env.task_channels()}")
+    env._arm_task(Domain.WATER, 8.0)
+    first = env.task_channels().copy()
+    obs_first = env.observation(Domain.WATER).copy()
+    env.data.time = env._seg_t0 + 5.0          # into the second phase
+    second = env.task_channels().copy()
+    obs_second = env.observation(Domain.WATER).copy()
+    env._active_task = None
+    # What the *controller* receives, not what a helper can compute: the
+    # channels have to be in the observation vector, in the state block ahead
+    # of the morphology, and they have to change when the command does.  A
+    # first version of this test checked `task_channels()` alone, and the
+    # mutation that dropped them from the observation survived it.
+    from dytiscidae.envs.triphibian import MORPHOLOGY_DIM
+    lo = TriphibianEnv.OBS_DIM - MORPHOLOGY_DIM - 6
+    check("the controller's observation carries the command",
+          np.allclose(obs_first[lo:lo + 6], first) and np.allclose(obs_second[lo:lo + 6], second),
+          f"obs {obs_first[lo:lo + 6]} vs channels {first}")
+    check("and what it observes changes when the command changes",
+          not np.allclose(obs_first[lo:lo + 6], obs_second[lo:lo + 6]))
+    check("the default water task holds first, then cruises",
+          first[1] == 1.0 and first[0] == 0.0 and second[0] == 1.0 and second[1] == 0.0,
+          f"first {first[:2]}, second {second[:2]}")
+    check("and the commanded speed appears only while cruising",
+          first[2] == 0.0 and abs(second[2] - 1.0) < 1e-9, f"{first[2]} / {second[2]}")
+    obs = env.observation(Domain.WATER)
+    check("the observation is as wide as it says", obs.shape == (TriphibianEnv.OBS_DIM,),
+          f"{obs.shape} vs {TriphibianEnv.OBS_DIM}")
 
-    n = int(8.0 / env.timestep)
-    holds = np.full(n, 6.0)                     # sits at six metres
-    sinks = np.linspace(4.0, 40.0, n)           # falls straight through
-    dives = np.linspace(4.0, 10.0, n // 2)      # reaches the target and holds
-    dives = np.concatenate([dives, np.full(n - len(dives), 10.0)])
+    # --- 2 & 3. each phase on fabricated traces --------------------------------
+    depth = 6.5
+    sched = TaskSchedule("water", (Phase(HOLD, 0.0, depth=depth),
+                                   Phase(CRUISE, 0.5, heading=0.0,
+                                         speed=TASK_SPEED["water"], depth=depth)))
 
-    sinking = water_score(0.0, sinks)
-    holding = water_score(0.0, holds)
-    # Not zero: `active` is graded, so the stretch a sinker spends inside the
-    # band before it falls out of it is worth something, on the same reasoning
-    # that keeps every other gate here graded -- a step nothing can climb is
-    # the "0.1 m/s left 61.6% of the population with nowhere to stand" mistake.
-    # The claim is that sinking is worth an order of magnitude less than
-    # holding, which is what the user's rule says it should be.
-    check("a machine that only sinks scores an order less than one that holds",
-          sinking < 0.1 * holding,
-          f"sink {sinking:.6f} at {sinks.max():.0f} m deep, hold {holding:.6f}")
-    check("holding a depth opens the gate on its own", holding > 0.0,
-          f"{holding:.6f}")
-    swimming = water_score(ref, sinks)
-    check("and so does headway on its own", swimming > 0.0, f"{swimming:.6f}")
-    check("headway at the reference speed outscores sitting still",
-          swimming > holding, f"{swimming:.4f} vs {holding:.4f}")
-    diving = water_score(0.0, dives)
-    check("reaching the target and holding it outscores both",
-          diving > holding and diving > sinking,
-          f"dive {diving:.4f}, hold {holding:.4f}, sink {sinking:.4f}")
+    def water(depths, vel2):
+        """Score a water segment whose second half moves at ``vel2``."""
+        xy = np.zeros((n, 2))
+        for i in range(1, n):
+            xy[i] = xy[i - 1] + (vel2 if i >= n // 2 else 0.0) * dt
+        env._active_task = sched
+        try:
+            return env._task_scores(Domain.WATER, np.asarray(depths, float),
+                                    -np.asarray(depths, float), xy, n)
+        finally:
+            env._active_task = None
 
+    at_depth = np.concatenate([np.linspace(4.0, depth, n // 8), np.full(n - n // 8, depth)])
+    v = TASK_SPEED["water"]
+    good = water(at_depth, np.array([v, 0.0]))
+    ph = {r["kind"]: r["score"] for r in good["phases"]}
+    check("going to the commanded depth, holding it, then cruising as told scores full",
+          ph[HOLD] > 0.99 and ph[CRUISE] > 0.99, f"{ph}")
+    idle = water(np.full(n, 4.0), np.zeros(2))
+    check("a hull that sits where it was released scores nothing on either phase",
+          idle["task"] == 0.0, f"{[r['score'] for r in idle['phases']]}")
+    sinking = np.linspace(4.0, 8.4, n)          # the still eel's 0.55 m/s
+    through = water(sinking, np.array([v, 0.0]))
+    hold_through = next(r for r in through["phases"] if r["kind"] == HOLD)
+    check("sinking through the target on the way past does not count as holding it",
+          hold_through["score"] < 0.1,
+          f"hold {hold_through['score']:.3f}, depth error {hold_through['depth_error']:.2f} m, "
+          f"moved {hold_through['drift']:.2f} m")
+    across = water(at_depth, np.array([0.0, v]))
+    check("cruising across the commanded heading scores nothing for cruise",
+          next(r for r in across["phases"] if r["kind"] == CRUISE)["score"] == 0.0)
+    double = water(at_depth, np.array([2 * v, 0.0]))
+    check("and neither does going twice as fast as asked",
+          next(r for r in double["phases"] if r["kind"] == CRUISE)["score"] == 0.0)
+    drifting = water(at_depth, np.array([0.1, 0.0]))
+    hold_drift = water(np.concatenate([at_depth[: n // 4], np.linspace(depth, depth + 0.6, n - n // 4)]),
+                       np.array([v, 0.0]))
+    check("moving while told to hold is the penalty",
+          next(r for r in hold_drift["phases"] if r["kind"] == HOLD)["score"]
+          < next(r for r in good["phases"] if r["kind"] == HOLD)["score"] - 0.3,
+          f"{next(r for r in hold_drift['phases'] if r['kind'] == HOLD)['score']:.3f}")
+    check("and a slow cruise earns part of it, so there is a gradient to climb",
+          0.0 < next(r for r in drifting["phases"] if r["kind"] == CRUISE)["score"] < 0.5)
+
+    # Land: stopping is free for a rock, so it qualifies the walk instead of
+    # adding to it.
+    lsched = TaskSchedule("land", (Phase(CRUISE, 0.0, heading=0.0, speed=TASK_SPEED["land"]),
+                                   Phase(STOP, 0.5)))
+
+    def land(v1, v2):
+        xy = np.zeros((n, 2))
+        for i in range(1, n):
+            xy[i] = xy[i - 1] + (v1 if i < n // 2 else v2) * dt
+        env._active_task = lsched
+        try:
+            return env._task_scores(Domain.LAND, np.zeros(n), np.full(n, 0.3), xy, n)["task"]
+        finally:
+            env._active_task = None
+
+    w = np.array([TASK_SPEED["land"], 0.0])
+    rock, walker, runs_on = land(np.zeros(2), np.zeros(2)), land(w, np.zeros(2)), land(w, w)
+    check("on land a rock scores nothing, though it stops perfectly", rock == 0.0, f"{rock}")
+    check("walking as told and stopping as told scores full", walker > 0.99, f"{walker:.3f}")
+    check("walking on when told to stop scores half", abs(runs_on - 0.5) < 0.05,
+          f"{runs_on:.3f}")
+
+    # --- 4. held still, on the real rollout path ---------------------------------
+    # Averaged over task draws, as a run draws them: a passive body that glides
+    # along its own nose scores when the drawn heading happens to lie along it,
+    # which is the user's "passive forward motion can score" -- and it cannot
+    # choose to, so on average it scores little.
+    from dytiscidae.envs.tasks import task_seed
+    for plan in ("beetle", "eel"):
+        for dom in (Domain.WATER, Domain.LAND):
+            e = TriphibianEnv(build(BODY_PLANS[plan]()), seed=3)
+            comps = []
+            for draw in range(8):
+                e.reset(dom)
+                e.scatter(np.random.default_rng(11 + draw))
+                e.task = schedule_for(dom, np.random.default_rng(task_seed(11 + draw)))
+                b = e.cpg.base
+                still = CPGParams(amplitude=np.zeros(e.cpg.n), phase=np.asarray(b.phase, float),
+                                  offset=np.asarray(e.data.qpos[e._act_qadr], float),
+                                  frequency=float(b.frequency))
+                comps.append(e.rollout(8.0, params=still, domain=dom).competence)
+            check(f"{plan} held still in {dom.value} scores ~nothing, over 8 task draws",
+                  float(np.mean(comps)) < 0.05,
+                  f"mean {np.mean(comps):.4f}, max {np.max(comps):.4f}")
+    check("and the task is re-drawn per generation, not fixed",
+          schedule_for(Domain.WATER, np.random.default_rng(1))
+          != schedule_for(Domain.WATER, np.random.default_rng(2)))
 
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
     print("=" * 68)
     run_all([
-        test_sinking_is_not_a_capability,
+        test_each_phase_is_scored_on_its_own_purpose,
         test_lift_sign_and_magnitude,
         test_buoyancy,
         test_bluff_drag_is_orientation_dependent,

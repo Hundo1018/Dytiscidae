@@ -1434,7 +1434,7 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
         ({**pushes, "airborne_fraction": 0.9, "sink_rate": 0.2,
           "station_keeping": 0.8}, LIFT + THR + 5),
         ({**pushes, "airborne_fraction": 0.95, "sink_rate": -1.0,
-          "station_keeping": 0.8, "turn_rate_held": 0.0}, LIFT + THR + 6),
+          "station_keeping": 0.8, "turn_tracking": 0.0}, LIFT + THR + 6),
     ]
     ok = all(rung_reached("air", m) == k for m, k in seq)
     check("the ladder orders capability", ok,
@@ -1448,7 +1448,7 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # being dropped from 30 m, and had no gradient between "makes no lift" and
     # "flies".
     perfect = {"airborne_fraction": 1.0, "sink_rate": -2.0, "thrust_margin": 2.0,
-               "station_keeping": 0.9, "turn_rate_held": 0.5}
+               "station_keeping": 0.9, "turn_tracking": 0.9}
     check("a body that makes no lift scores nothing in air",
           rung_reached("air", {**perfect, "lift_margin": 0.0}) == 0,
           "a whole segment airborne, climbing, and it still cannot fly")
@@ -1463,7 +1463,7 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # seed at zero or negative, and `holds_station` reached once in 14,092
     # evaluations.
     glider = {"lift_margin": 3.0, "airborne_fraction": 1.0, "sink_rate": 0.2,
-              "station_keeping": 0.9, "turn_rate_held": 0.5}
+              "station_keeping": 0.9, "turn_tracking": 0.9}
     check("a glider stops where gliding stops, however well it held station",
           rung_reached("air", {**glider, "thrust_margin": -0.2}) == LIFT + 4,
           f"rung {rung_reached('air', {**glider, 'thrust_margin': -0.2})} -- "
@@ -1545,7 +1545,7 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # by being dropped.  The ladder now reads the gain over the release depth,
     # the way `takeoff_height` reads a gain over resting clearance.
     GAIN = sum(1 for _n, m, _t in LADDER["water"] if m == "depth_gain")
-    deep_enough = {"depth_error": 0.5, "water_speed": 1.0}
+    deep_enough = {"hold_error": 0.5, "cruise_score": 1.0}
     check("a machine that stays where it was dropped scores nothing in water",
           rung_reached("water", {**deep_enough, "max_depth": 4.0,
                                  "depth_gain": 0.0}) == 0,
@@ -1569,9 +1569,9 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # `pushes`, not `flies`: without a thrust margin both of these stop at the
     # same rung and the check ties itself, which is not a test of anything.
     below = j.score("air", {**pushes, "airborne_fraction": 0.95, "sink_rate": -1.0,
-                            "station_keeping": 0.8, "turn_rate_held": 0.0})
+                            "station_keeping": 0.8, "turn_tracking": 0.0})
     top = j.score("air", {**pushes, "airborne_fraction": 0.95, "sink_rate": -1.0,
-                          "station_keeping": 0.8, "turn_rate_held": 0.5})
+                          "station_keeping": 0.8, "turn_tracking": 0.9})
     check("clearing six rungs never ties with clearing seven",
           below["total"] < top["total"], f"{below['total']:.3f} < {top['total']:.3f}")
 
@@ -1879,8 +1879,8 @@ def test_a_specialist_islands_curriculum_reads_only_its_own_medium() -> None:
         return NS(competence=c, measurements=m)
     # Good at sitting underwater, poor in the air: the measured shape.
     res = NS(mission_fraction=0.01, segments={
-        "air": seg(0.03, sink_rate=2.4, station_keeping=0.051),
-        "water": seg(0.90, depth_error=0.5, water_headway=1.0),
+        "air": seg(0.03, sink_rate=2.4, cruise_tracking=0.3),
+        "water": seg(0.90, depth_error=0.5, cruise_tracking=1.0),
         "land": seg(0.05, land_speed=0.02)})
 
     class TS:
@@ -1901,18 +1901,18 @@ def test_a_specialist_islands_curriculum_reads_only_its_own_medium() -> None:
     check("restricted, stage 0 reads air and nothing else",
           stage_score(0, res, **air) == 0.03, f"{stage_score(0, res, **air)}")
     check("stage 1 reads only the island's own directed measure",
-          abs(stage_score(1, res, **air) - 0.051 / 0.17) < 1e-12
-          and stage_score(1, res) == 1.0,          # water's headway is full marks
+          abs(stage_score(1, res, **air) - 0.3) < 1e-12
+          and stage_score(1, res) == 1.0,          # water's tracking is full marks
           f"{stage_score(1, res, **air):.3f} (unrestricted {stage_score(1, res):.3f})")
-    # The air island's stage 1 must read *holding a height*, not *losing it
-    # slowly*: a machine falling from the 30 m launch has a sink rate a glide
-    # would be proud of and holds nothing, and paying it here is the defect
-    # `sink_reduction` was introduced to close and the twin's removal reopened.
+    # The air island's stage 1 must read *going where it was told*, not
+    # *losing height slowly*: a machine falling from the 30 m launch has a sink
+    # rate a glide would be proud of and no heading it chose, and paying it
+    # here is the defect `sink_reduction` was introduced to close.
     falling = NS(mission_fraction=0.0, segments={
-        "air": seg(0.0, sink_rate=1.2, station_keeping=0.0)})
+        "air": seg(0.0, sink_rate=1.2, station_keeping=0.0, cruise_tracking=0.0)})
     check("a machine that only falls opens nothing at stage 1",
           stage_score(1, falling, **air) == 0.0,
-          f"{stage_score(1, falling, **air):.3f} on sink_rate 1.2, station 0.0")
+          f"{stage_score(1, falling, **air):.3f} on sink_rate 1.2, tracking 0.0")
     check("stage 2 reads only the island's own crossings",
           stage_score(2, res, ts, **air) == 0.0 and stage_score(2, res, ts) > 0.0,
           f"own {stage_score(2, res, ts, **air)}, all {stage_score(2, res, ts):.3f}")
@@ -2125,12 +2125,12 @@ def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> 
             self.mission_fraction = mf
 
     # A water specialist and a uniform failure both score ~0 on the mission.
-    # Stage 1 reads `water_headway`, so a water specialist states what it does
-    # in water as headway rather than as depth reached -- sinking is not a
-    # capability and does not open the stage.
+    # Stage 1 reads the cruise phase's tracking, so a water specialist states
+    # what it does in water as going where it was told rather than as depth
+    # reached -- sinking is not a capability and does not open the stage.
     specialist = Res(0.02, 0.85, 0.03, 0.001,
                      {"water": {"depth_error": 0.8, "max_depth": 10.0,
-                                "depth_gain": 6.0, "water_headway": 1.0}})
+                                "depth_gain": 6.0, "cruise_tracking": 1.0}})
     useless = Res(0.02, 0.03, 0.03, 0.001)
     t = Trans(0.34, 0.4)
 
@@ -2334,16 +2334,16 @@ def test_promotion_needs_a_nonzero_answer_to_the_next_question() -> None:
     from dytiscidae.evolution.curriculum import Curriculum
 
     def result_water_specialist():
-        # Stage 1 asks whether the machine is going somewhere, and in water
-        # that is `water_headway` -- so the specialist has to state what it
-        # does as headway to pass the bar at all.  Depth reached does not open
+        # Stage 1 asks whether the machine is going where it was told, and in
+        # water that is the cruise phase's tracking -- so the specialist has to
+        # state what it does in those terms to pass the bar at all.  Depth reached does not open
         # the stage, because a machine denser than water reaches depth without
         # choosing to.
         seg = SimpleNamespace(
             competence=0.9,
             measurements={"depth_error": 0.5, "max_depth": 9.0,
                           "depth_gain": 5.0, "water_speed": 0.5,
-                          "water_headway": 1.0},
+                          "cruise_tracking": 1.0},
         )
         return SimpleNamespace(segments={"water": seg}, mission_fraction=0.0)
 

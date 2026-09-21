@@ -695,10 +695,10 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `BatchedFluid` | class | 209 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 678 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `evaluate_tier1_batch` | function | 685 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
 | `identify_batch` | function | 454 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
 | `rollout_batch` | function | 530 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 854 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 866 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
 | `step_batch` | function | 418 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 90 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
 | `BatchedFluid.__init__` | method | 220 | `(self, envs)` | — |
@@ -711,21 +711,21 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `behaviour_descriptor` | function | 569 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | — |
-| `Controller` | class | 42 | — | Everything needed to drive one machine: rhythm, axes, and intent. |
-| `dominates` | function | 612 | `(a: np.ndarray, b: np.ndarray) -> bool` | True when ``a`` is at least as good everywhere and better somewhere. |
-| `evaluate_tier1` | function | 235 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, n_modes: int=6) -> MissionResult` | Short dynamic episodes in each domain, plus transitions. |
-| `evaluate_tier1_5` | function | 367 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seconds: float=60.0, seed: int=0, domain: Domain \| None=None, competences: dict \| None=None, sea_state=None) -> SegmentResult` | One long leg, run only on designs the search has decided to promote. |
-| `evaluate_tier2` | function | 427 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seed: int=0, time_compression: float=12.0, sea_state=None, tier1: MissionResult \| None=None) -> MissionResult` | The real mission schedule, with disturbances and a random start domain. |
-| `finalise_tier1` | function | 140 | `(r: MissionResult, clamped_any: bool) -> None` | Turn measured segments and transitions into mission_fraction, and flag |
-| `fitness` | function | 618 | `(p: Phenotype, r: MissionResult, spec: MissionSpec \| None=None) -> float` | Scalar quality within a behaviour cell. |
-| `objectives` | function | 595 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | The objective vector used to decide who occupies a cell. |
-| `SharedController` | class | 102 | `(Controller)` | A controller carrying a `SummedPolicy`, kept pointed at the right basis. |
-| `SummedPolicy` | class | 60 | — | The per-candidate policy plus the shared one, as a single policy. |
-| `weakest_domain` | function | 352 | `(competences: dict) -> Domain` | The domain a design is worst at, which is the one the mission turns on. |
-| `Controller.basis_for` | method | 49 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
-| `SharedController.basis_for` | method | 112 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
-| `SummedPolicy.act` | method | 82 | `(self, obs) -> np.ndarray` | — |
+| `behaviour_descriptor` | function | 574 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | — |
+| `Controller` | class | 43 | — | Everything needed to drive one machine: rhythm, axes, and intent. |
+| `dominates` | function | 617 | `(a: np.ndarray, b: np.ndarray) -> bool` | True when ``a`` is at least as good everywhere and better somewhere. |
+| `evaluate_tier1` | function | 236 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, n_modes: int=6) -> MissionResult` | Short dynamic episodes in each domain, plus transitions. |
+| `evaluate_tier1_5` | function | 372 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seconds: float=60.0, seed: int=0, domain: Domain \| None=None, competences: dict \| None=None, sea_state=None) -> SegmentResult` | One long leg, run only on designs the search has decided to promote. |
+| `evaluate_tier2` | function | 432 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seed: int=0, time_compression: float=12.0, sea_state=None, tier1: MissionResult \| None=None) -> MissionResult` | The real mission schedule, with disturbances and a random start domain. |
+| `finalise_tier1` | function | 141 | `(r: MissionResult, clamped_any: bool) -> None` | Turn measured segments and transitions into mission_fraction, and flag |
+| `fitness` | function | 623 | `(p: Phenotype, r: MissionResult, spec: MissionSpec \| None=None) -> float` | Scalar quality within a behaviour cell. |
+| `objectives` | function | 600 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | The objective vector used to decide who occupies a cell. |
+| `SharedController` | class | 103 | `(Controller)` | A controller carrying a `SummedPolicy`, kept pointed at the right basis. |
+| `SummedPolicy` | class | 61 | — | The per-candidate policy plus the shared one, as a single policy. |
+| `weakest_domain` | function | 357 | `(competences: dict) -> Domain` | The domain a design is worst at, which is the one the mission turns on. |
+| `Controller.basis_for` | method | 50 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
+| `SharedController.basis_for` | method | 113 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
+| `SummedPolicy.act` | method | 83 | `(self, obs) -> np.ndarray` | — |
 
 ## `envs.kernel` — `dytiscidae/envs/kernel.py`
 
@@ -793,6 +793,21 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `ThermalThrust.run` | method | 385 | `(self, policy, rng) -> SkillResult` | — |
 | `VibratorTrack.run` | method | 471 | `(self, policy, rng) -> SkillResult` | — |
 
+## `envs.tasks` — `dytiscidae/envs/tasks.py`
+
+> What a segment asks the machine to do, phase by phase.
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `Phase` | class | 93 | — | One purpose, over one stretch of a segment. |
+| `schedule_for` | function | 146 | `(domain, rng=None, *, trim_speed: float=0.0) -> TaskSchedule` | The two-phase script for one segment in ``domain``. |
+| `task_seed` | function | 199 | `(scatter_seed: int) -> int` | The task draw for one segment, derived from its scatter draw. |
+| `TaskSchedule` | class | 113 | — | The phases one segment is made of, in order. |
+| `Phase.moving` | property | 108 | `(self) -> bool` | — |
+| `TaskSchedule.at` | method | 127 | `(self, frac: float) -> Phase` | — |
+| `TaskSchedule.bounds` | method | 130 | `(self, n: int) -> list` | Sample index ranges ``[(lo, hi), ...]`` for a segment of ``n`` samples. |
+| `TaskSchedule.index_at` | method | 119 | `(self, frac: float) -> int` | The phase in force at ``frac`` of the way through the segment. |
+
 ## `envs.transitions` — `dytiscidae/envs/transitions.py`
 
 > Crossing between media, scored rather than merely survived.
@@ -812,39 +827,40 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `airworthiness` | function | 264 | `(p: Phenotype) -> list[str]` | Which flight gates a design fails, as reasons.  Empty means none. |
-| `Domain` | class | 63 | `(str, Enum)` | — |
-| `evaluate_tier0` | function | 329 | `(p: Phenotype, spec: MissionSpec \| None=None) -> MissionResult` | Closed-form feasibility and energy budget.  No simulation. |
-| `MissionResult` | class | 145 | — | Aggregate of a whole evaluation, at whatever fidelity produced it. |
-| `MissionSpec` | class | 76 | — | The mission the user specified, with every number left adjustable. |
-| `morphology_channels` | function | 407 | `(*, mass: float, density_ratio: float, wing_area: float, span: float, aspect_ratio: float, wing_loading: float, n_actuated: int, battery_wh: float) -> np.ndarray` | The eight body-identity channels, from scalars rather than a phenotype. |
-| `SegmentResult` | class | 101 | — | What one stretch of operating in one domain produced. |
-| `TriphibianEnv` | class | 437 | — | A compiled machine in the triphibian world, steppable by a controller. |
-| `MissionResult.energy_margin` | property | 182 | `(self) -> float` | — |
-| `MissionSpec.total_seconds` | property | 92 | `(self) -> float` | — |
-| `MissionSpec.transitions` | property | 96 | `(self) -> list[str]` | — |
-| `SegmentResult.cost_of_transport` | property | 137 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
-| `TriphibianEnv.__init__` | method | 494 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
-| `TriphibianEnv.body_twist` | method | 1080 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
-| `TriphibianEnv.clearance` | method | 1149 | `(self) -> float` | Height of the machine above the ground beneath it, metres. |
-| `TriphibianEnv.depth` | method | 1108 | `(self) -> float` | — |
-| `TriphibianEnv.flap_travel` | method | 782 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
-| `TriphibianEnv.ground_height` | method | 1119 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
-| `TriphibianEnv.ground_heights` | method | 1128 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
-| `TriphibianEnv.identify` | method | 2145 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
-| `TriphibianEnv.launch_pitch` | property | 752 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
-| `TriphibianEnv.launch_speed` | property | 720 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
-| `TriphibianEnv.lift_margin` | property | 768 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
-| `TriphibianEnv.morphology_context` | property | 1196 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
-| `TriphibianEnv.observation` | method | 1235 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
-| `TriphibianEnv.reset` | method | 599 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
-| `TriphibianEnv.restore` | method | 1071 | `(self, snap: tuple) -> None` | — |
-| `TriphibianEnv.rollout` | method | 1353 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0) -> SegmentResult` | Run one segment and measure what happened. |
-| `TriphibianEnv.root_pos` | method | 1105 | `(self) -> np.ndarray` | — |
-| `TriphibianEnv.scatter` | method | 628 | `(self, rng, *, strength: float=1.0) -> None` | Widen the initial condition, from a caller-supplied generator. |
-| `TriphibianEnv.snapshot` | method | 1068 | `(self) -> tuple` | — |
-| `TriphibianEnv.step` | method | 1338 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
-| `TriphibianEnv.thrust_margin` | method | 810 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
+| `airworthiness` | function | 266 | `(p: Phenotype) -> list[str]` | Which flight gates a design fails, as reasons.  Empty means none. |
+| `Domain` | class | 65 | `(str, Enum)` | — |
+| `evaluate_tier0` | function | 331 | `(p: Phenotype, spec: MissionSpec \| None=None) -> MissionResult` | Closed-form feasibility and energy budget.  No simulation. |
+| `MissionResult` | class | 147 | — | Aggregate of a whole evaluation, at whatever fidelity produced it. |
+| `MissionSpec` | class | 78 | — | The mission the user specified, with every number left adjustable. |
+| `morphology_channels` | function | 409 | `(*, mass: float, density_ratio: float, wing_area: float, span: float, aspect_ratio: float, wing_loading: float, n_actuated: int, battery_wh: float) -> np.ndarray` | The eight body-identity channels, from scalars rather than a phenotype. |
+| `SegmentResult` | class | 103 | — | What one stretch of operating in one domain produced. |
+| `TriphibianEnv` | class | 439 | — | A compiled machine in the triphibian world, steppable by a controller. |
+| `MissionResult.energy_margin` | property | 184 | `(self) -> float` | — |
+| `MissionSpec.total_seconds` | property | 94 | `(self) -> float` | — |
+| `MissionSpec.transitions` | property | 98 | `(self) -> list[str]` | — |
+| `SegmentResult.cost_of_transport` | property | 139 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
+| `TriphibianEnv.__init__` | method | 517 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
+| `TriphibianEnv.body_twist` | method | 1105 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
+| `TriphibianEnv.clearance` | method | 1174 | `(self) -> float` | Height of the machine above the ground beneath it, metres. |
+| `TriphibianEnv.depth` | method | 1133 | `(self) -> float` | — |
+| `TriphibianEnv.flap_travel` | method | 807 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
+| `TriphibianEnv.ground_height` | method | 1144 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
+| `TriphibianEnv.ground_heights` | method | 1153 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
+| `TriphibianEnv.identify` | method | 2381 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.launch_pitch` | property | 777 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
+| `TriphibianEnv.launch_speed` | property | 745 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
+| `TriphibianEnv.lift_margin` | property | 793 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
+| `TriphibianEnv.morphology_context` | property | 1221 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
+| `TriphibianEnv.observation` | method | 1260 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
+| `TriphibianEnv.reset` | method | 622 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
+| `TriphibianEnv.restore` | method | 1096 | `(self, snap: tuple) -> None` | — |
+| `TriphibianEnv.rollout` | method | 1412 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0) -> SegmentResult` | Run one segment and measure what happened. |
+| `TriphibianEnv.root_pos` | method | 1130 | `(self) -> np.ndarray` | — |
+| `TriphibianEnv.scatter` | method | 653 | `(self, rng, *, strength: float=1.0) -> None` | Widen the initial condition, from a caller-supplied generator. |
+| `TriphibianEnv.snapshot` | method | 1093 | `(self) -> tuple` | — |
+| `TriphibianEnv.step` | method | 1397 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
+| `TriphibianEnv.task_channels` | method | 1345 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
+| `TriphibianEnv.thrust_margin` | method | 835 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
 
 ## `evolution.archive` — `dytiscidae/evolution/archive.py`
 
@@ -964,20 +980,20 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Curriculum` | class | 214 | — | Tracks what each lineage is ready to be asked. |
+| `Curriculum` | class | 201 | — | Tracks what each lineage is ready to be asked. |
 | `stage_score` | function | 100 | `(stage: int, result, transitions=None, *, domains=None, transition_names=None) -> float` | How well a result answers the question *this* stage asks. |
 | `StageResult` | class | 77 | — | — |
-| `Curriculum.evaluate` | method | 409 | `(self, cell, result, transitions=None) -> StageResult` | Score a design at its cell's stage, and at the next one up. |
-| `Curriculum.forget` | method | 483 | `(self, cell) -> None` | Drop a cell's stage when the cell itself is gone. |
-| `Curriculum.handover` | method | 296 | `(self, stage: int) -> float` | How much weight the island's own objective has earned, in [0, 1]. |
-| `Curriculum.mission_standing` | method | 384 | `(self, mission: float, stage: int=0) -> float` | ``mission_fraction`` as a population quantile, on the same scale. |
-| `Curriculum.observe_blend` | method | 284 | `(self, island_score: float, curriculum_score: float, stage: int=0, mission: float=0.0) -> None` | Record what each half of the blend said about one design. |
-| `Curriculum.rebuild_from` | method | 456 | `(self, archive) -> dict` | Re-key the stage record after the descriptor axes have moved. |
-| `Curriculum.report` | method | 492 | `(self) -> dict` | — |
-| `Curriculum.seed_stage` | method | 263 | `(self, cell, stage: int) -> int` | Give an unvisited cell the stage its parent had earned. |
-| `Curriculum.stage_of` | method | 260 | `(self, cell) -> int` | — |
-| `Curriculum.standing` | method | 343 | `(self, island_score: float, curriculum_score: float, stage: int=0)` | Both halves of the blend as population quantiles in [0, 1]. |
-| `Curriculum.update` | method | 427 | `(self, cell, sr: StageResult) -> str` | Promote or demote the cell.  Returns what happened. |
+| `Curriculum.evaluate` | method | 396 | `(self, cell, result, transitions=None) -> StageResult` | Score a design at its cell's stage, and at the next one up. |
+| `Curriculum.forget` | method | 470 | `(self, cell) -> None` | Drop a cell's stage when the cell itself is gone. |
+| `Curriculum.handover` | method | 283 | `(self, stage: int) -> float` | How much weight the island's own objective has earned, in [0, 1]. |
+| `Curriculum.mission_standing` | method | 371 | `(self, mission: float, stage: int=0) -> float` | ``mission_fraction`` as a population quantile, on the same scale. |
+| `Curriculum.observe_blend` | method | 271 | `(self, island_score: float, curriculum_score: float, stage: int=0, mission: float=0.0) -> None` | Record what each half of the blend said about one design. |
+| `Curriculum.rebuild_from` | method | 443 | `(self, archive) -> dict` | Re-key the stage record after the descriptor axes have moved. |
+| `Curriculum.report` | method | 479 | `(self) -> dict` | — |
+| `Curriculum.seed_stage` | method | 250 | `(self, cell, stage: int) -> int` | Give an unvisited cell the stage its parent had earned. |
+| `Curriculum.stage_of` | method | 247 | `(self, cell) -> int` | — |
+| `Curriculum.standing` | method | 330 | `(self, island_score: float, curriculum_score: float, stage: int=0)` | Both halves of the blend as population quantiles in [0, 1]. |
+| `Curriculum.update` | method | 414 | `(self, cell, sr: StageResult) -> str` | Promote or demote the cell.  Returns what happened. |
 
 ## `evolution.descriptors` — `dytiscidae/evolution/descriptors.py`
 
@@ -1019,17 +1035,17 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Judge` | class | 401 | — | Scores a design against a fixed ladder and a ratcheting bar. |
-| `Ratchet` | class | 299 | — | A bar that tracks the population and never moves back down. |
-| `rung_reached` | function | 273 | `(domain: str, measurements: dict[str, float]) -> int` | How many rungs of ``domain``'s ladder these measurements clear. |
-| `Judge.maybe_tighten` | method | 428 | `(self, generation: int) -> list[dict]` | Tighten any bar that the population has outgrown. |
-| `Judge.observe` | method | 421 | `(self, measurements: dict[str, dict[str, float]]) -> None` | Record one design's raw measurements, keyed by domain. |
-| `Judge.report` | method | 469 | `(self) -> dict` | — |
-| `Judge.score` | method | 441 | `(self, domain: str, measurements: dict[str, float]) -> dict` | Score one domain.  Returns rung, within-rung fraction, and total. |
-| `Ratchet.observe` | method | 326 | `(self, value: float) -> None` | — |
-| `Ratchet.rollback` | method | 349 | `(self) -> bool` | Undo the most recent tightening. |
-| `Ratchet.score` | method | 364 | `(self, value: float) -> float` | Fraction of the current bar this value achieves, in [0, 1]. |
-| `Ratchet.update` | method | 332 | `(self, generation: int) -> bool` | Recompute the bar.  Returns True if it tightened. |
+| `Judge` | class | 421 | — | Scores a design against a fixed ladder and a ratcheting bar. |
+| `Ratchet` | class | 319 | — | A bar that tracks the population and never moves back down. |
+| `rung_reached` | function | 293 | `(domain: str, measurements: dict[str, float]) -> int` | How many rungs of ``domain``'s ladder these measurements clear. |
+| `Judge.maybe_tighten` | method | 448 | `(self, generation: int) -> list[dict]` | Tighten any bar that the population has outgrown. |
+| `Judge.observe` | method | 441 | `(self, measurements: dict[str, dict[str, float]]) -> None` | Record one design's raw measurements, keyed by domain. |
+| `Judge.report` | method | 489 | `(self) -> dict` | — |
+| `Judge.score` | method | 461 | `(self, domain: str, measurements: dict[str, float]) -> dict` | Score one domain.  Returns rung, within-rung fraction, and total. |
+| `Ratchet.observe` | method | 346 | `(self, value: float) -> None` | — |
+| `Ratchet.rollback` | method | 369 | `(self) -> bool` | Undo the most recent tightening. |
+| `Ratchet.score` | method | 384 | `(self, value: float) -> float` | Fraction of the current bar this value achieves, in [0, 1]. |
+| `Ratchet.update` | method | 352 | `(self, generation: int) -> bool` | Recompute the bar.  Returns True if it tightened. |
 
 ## `evolution.loop` — `dytiscidae/evolution/loop.py`
 
@@ -1082,14 +1098,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `distil` | function | 288 | `(run_dir, *, n_states: int=256, hidden: int=128, epochs: int=400, lr: float=0.003, held_out: float=0.3, seed: int=0, min_mission: float=0.0, refined_only: bool=False) -> DistillResult` | Fit a conditioned student to the stored per-body teachers. |
-| `DistillResult` | class | 260 | — | — |
+| `distil` | function | 301 | `(run_dir, *, n_states: int=256, hidden: int=128, epochs: int=400, lr: float=0.003, held_out: float=0.3, seed: int=0, min_mission: float=0.0, refined_only: bool=False) -> DistillResult` | Fit a conditioned student to the stored per-body teachers. |
+| `DistillResult` | class | 273 | — | — |
 | `load_teachers` | function | 136 | `(run_dir, *, min_mission: float=0.0, refined_only: bool=False) -> tuple` | Every archive elite in ``run_dir`` that carries fitted policy weights. |
 | `refined_cells` | function | 106 | `(run_dir) -> set` | ``(island, cell)`` pairs whose policy was actually fitted to that body. |
 | `sample_states` | function | 211 | `(n: int, rng: np.random.Generator) -> np.ndarray` | ``n`` draws from the observation envelope, state channels only. |
 | `Teacher` | class | 86 | — | One body's fitted policy, plus who that body is. |
-| `teacher_targets` | function | 237 | `(teachers, states: np.ndarray, n_modes: int) -> np.ndarray` | ``(n_teachers, n_states, n_modes)`` of what each teacher commands. |
-| `DistillResult.lines` | method | 270 | `(self) -> list` | — |
+| `teacher_targets` | function | 250 | `(teachers, states: np.ndarray, n_modes: int) -> np.ndarray` | ``(n_teachers, n_states, n_modes)`` of what each teacher commands. |
+| `DistillResult.lines` | method | 283 | `(self) -> list` | — |
 | `Teacher.policy` | method | 101 | `(self, n_modes: int) -> Policy` | — |
 
 ## `learning.ppo` — `dytiscidae/learning/ppo.py`
