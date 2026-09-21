@@ -2306,6 +2306,57 @@ Six mutations hold it: `cruise-pays-for-speed-in-any-direction`,
 `hold-ignores-motion`, `hold-scale-is-absolute`, `land-stop-adds-to-the-walk`,
 `controller-is-not-told-the-task`, `evaluators-ask-different-tasks`.
 
+### Y. The filmed arch40 machine never leaves the beach — raised by the user 2026-09-21, **measured, not acted on**
+
+The user, watching `runs/showcase_arch40/mission.mp4`: "it is only trembling in
+place." It is. Reproduced on arch40's own code (`2bb8d32`), the continuous
+mission gives the film's numbers exactly — on-task 35%, 0/2 transitions, 0.0 m
+depth — and the body's net displacement over the three 8 s legs is 0.10, 0.16
+and 0.02 m. Two causes, one under the other.
+
+**It has nowhere it can go from the beach.** The filmed elite (aerial_diver
+island, beetle plan, 3 parts, **2 DOF — the two wings**, 4.71 kg, 1.92x the
+density of water) is worth something in exactly one medium, and its Tier-1
+record reproduces: air 0.033 (from the 30 m launch it stays up 2.7 s), land
+0.028, **water 0.767**. From its evaluated water initial condition:
+
+| 8 s in water | horizontal | depth gained | competence |
+|---|---|---|---|
+| its own controller | 6.96 m | 2.39 m | 0.763 |
+| open-loop gait | 1.98 m | 9.15 m | 0.090 |
+| **actuators held still** | **5.24 m** | 1.51 m | **0.519** |
+
+A dense hull whose wings, held at their starting angle, turn sinking into
+forward glide: two thirds of its water score needs no actuation. On land the
+wings give no traction — 8 s moves it 0.21 m driven, 0.16 m held still. It
+cannot take off. Every medium in evaluation starts from a placed spawn (air
+launched at 30 m and trim speed, water released 4 m under, land on the beach),
+so nothing in selection asked it to get from one medium to another under its own
+power; the continuous mission starts it on the beach, and the one thing it can
+do is in the water it cannot reach. This is item O's distortion reaching the
+film, and the fifth run whose film shows 0/2 transitions.
+
+**Why it trembles rather than flaps.** In the air and water legs the controller
+drives the wings through bases identified in fluid, while the body sits on sand.
+The wings strike the ground, the ground-contact channel flips on a third of
+control steps, the yaw-rate channel jumps by 0.62 of its range per step, and the
+controller answers the jolt: its command reverses direction on **72%** of 40 ms
+control steps (smooth control is well under 50%). The loop runs through the
+body rates — freezing those six channels halves the step size (0.165 → 0.074)
+and reversals fall to 57%; freezing the stroke channels changes nothing (70%).
+The policy is the deterministic mean, so this is the closed loop, not
+exploration noise. It has essentially never seen ground contact in the legs
+whose bases it is using.
+
+What arch41 changes and does not: its task reward removes the passive glide's
+pay (a still machine scores ~0.01 in water), and does nothing about the spawns
+or about getting between media, so its film can show the same beach. Candidate
+fixes, none attempted: evaluate a leg from where the previous one ended (item O
+generalised); an action-rate penalty or command low-pass, standard in legged RL,
+for the chatter; and film each medium from its evaluated spawn beside the
+continuous mission (`render --top` already writes those clips), so a score and
+the footage of it are the same experiment.
+
 ### W. The specialist islands were selecting for water — curriculum **fixed, unrun**; water score **measured, not fixed**
 
 Raised 2026-09-20 during arch39: a pure-habitat island's elites should not be
