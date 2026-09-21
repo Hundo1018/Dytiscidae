@@ -181,6 +181,22 @@ Vectorisation:
     - tests.test_search::test_sharding_a_generation_does_not_change_a_score
   note: process pool and shard shape, decoupled from what is being evaluated
 
+FilmIsTheEvaluation:
+  implementation:
+    - viz.film.film_run
+    - viz.film.evaluate_on_film
+    - viz.film.control_laws
+    - viz.film.pick_elite
+    - ops.run.launch_postrun
+    - ops.run.cmd_postrun
+    - ops.run.cmd_film
+  tests:
+    - tests.test_physics::test_a_film_is_the_evaluation
+    - tests.test_physics::test_the_first_air_reset_is_like_every_other
+    - tests.test_search::test_a_film_reproduces_the_scored_experiment
+    - tests.test_search::test_sharding_a_generation_does_not_change_a_score
+  note: a finished run films its best elite by re-running the Tier-1 evaluation with a camera attached, stamps the recorded and reproduced score on every clip, and puts each continuous-mission leg beside the evaluated clip of its medium; runs itself at the end of every search
+
 Transitions:
   implementation:
     - envs.transitions.run_transition

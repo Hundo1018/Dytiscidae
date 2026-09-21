@@ -232,6 +232,8 @@ def cmd_search(args) -> int:
     state = run_search(cfg, spec, on_generation=report)
     out = build_dashboard(cfg.run_dir)
     print(f"\ndashboard: {out}")
+    if getattr(args, "postrun", True):
+        launch_postrun(cfg.run_dir)
 
     best = state.archive.best
     if best is not None:
@@ -245,6 +247,72 @@ def cmd_search(args) -> int:
             for ln in lines:
                 print(f"      {ln}")
     return 0
+
+
+def launch_postrun(run_dir, *, timeout: float = 3600.0) -> int:
+    """Run ``postrun`` for a finished run, in its own process.
+
+    Its own process so that a renderer that cannot get a GL context, or a
+    report that throws, cannot take the search's exit status with it -- the
+    run is finished and checkpointed by the time this is called.  Blocking, so
+    that "the search process has exited" means "the report and the films
+    exist", which is what the watcher reads.
+    """
+    import subprocess
+    import sys
+
+    log = Path(run_dir) / "postrun.log"
+    print(f"\npost-run: report and films -> {log}", flush=True)
+    try:
+        with open(log, "w") as f:
+            rc = subprocess.run([sys.executable, "-m", "dytiscidae.ops.run", "postrun",
+                                 "--run", str(run_dir)], stdout=f, stderr=subprocess.STDOUT,
+                                timeout=timeout).returncode
+    except Exception as exc:                                  # noqa: BLE001
+        print(f"  post-run failed to start: {exc}", flush=True)
+        return 1
+    print(f"  post-run exited {rc}", flush=True)
+    return rc
+
+
+def cmd_postrun(args) -> int:
+    """Everything a finished run should leave behind, in one call.
+
+    1. The chart report (`.claude/skills/training-report/report.py`).
+    2. The films (`viz/film.py`): each medium filmed *as it was evaluated*,
+       stamped with the recorded and the reproduced score, beside the
+       continuous mission -- which is never shown alone, because on
+       2026-09-21 it was, and every judgement drawn from it was wrong.
+
+    ``ops.run search`` calls this when a run finishes, and so does the job
+    layer's search trainer, so nobody has to remember to.
+    """
+    import subprocess
+    import sys
+
+    run_dir = Path(args.run)
+    report = Path(__file__).resolve().parents[2] / ".claude" / "skills" / "training-report" / "report.py"
+    rc = 0
+    if report.exists():
+        print("== report ==", flush=True)
+        rc |= subprocess.run([sys.executable, str(report), str(run_dir)]).returncode
+    print("== films ==", flush=True)
+    from ..viz.film import film_run
+
+    manifest = film_run(run_dir, by=args.by)
+    if manifest:
+        # Once more, now that the manifest exists, so the report embeds it.
+        if report.exists():
+            subprocess.run([sys.executable, str(report), str(run_dir)],
+                           stdout=subprocess.DEVNULL)
+    return rc if manifest else 1
+
+
+def cmd_film(args) -> int:
+    from ..viz.film import film_run
+
+    m = film_run(args.run, by=args.by, island=args.island)
+    return 0 if m else 1
 
 
 def cmd_skills(args) -> int:
@@ -561,6 +629,14 @@ def cmd_showcase(args) -> int:
     # video this project exists to produce could not show a design the search
     # found.  ``--design`` names a run whose archive to take the best elite
     # from, optionally restricted to one island.
+    if args.design and not args.controller and not args.train:
+        # A design from a run is filmed as it was scored, beside the continuous
+        # mission -- never the mission alone (ROADMAP item Y; `viz/film.py`).
+        from ..viz.film import film_run
+
+        m = film_run(args.design, by=args.by, island=args.island,
+                     out_dir=Path(args.run))
+        return 0 if m else 1
     if args.design:
         archive, islands = load_run_archive(args.design, island=args.island)
         if archive is None:
@@ -684,20 +760,33 @@ def cmd_dashboard(args) -> int:
 
 
 def cmd_render(args) -> int:
-    from ..viz.render import render_elites
+    """The top elites, each filmed as it was evaluated.
+
+    This used to drive every elite open-loop -- no policy, no basis -- at seed
+    0, without the evaluation's scatter, for 10 s, and print no score, so its
+    clips were a different experiment from the numbers beside them and nothing
+    on screen said so.  Now each is ``viz/film.py``'s evaluated film, with the
+    recorded and reproduced score on every clip.
+    """
+    from ..viz.film import MEDIA, evaluate_on_film, _banner, _verdict, _write
 
     archive, islands = load_run_archive(args.run)
     if archive is None:
         print(f"no archive in {args.run}")
         return 1
-    print(f"{len(archive.cells)} elites from {len(islands)} island(s): "
-          f"{', '.join(islands)}")
-    made = render_elites(archive, args.run, top=args.top, duration=args.duration)
-    if not made:
-        print("nothing rendered (no GL context and no matplotlib?)")
-        return 1
-    for m in made:
-        print(m)
+    elites = sorted(archive.cells.values(),
+                    key=lambda e: -((e.meta or {}).get("mission_fraction") or 0.0))[:args.top]
+    out = Path(args.run) / "media"
+    for rank, e in enumerate(elites):
+        ev = evaluate_on_film(e, args.run)
+        for m in MEDIA:
+            r = ev["media"][m]
+            text, colour = _verdict(r)
+            frames = [_banner(f, [f"SCORED -- elite {rank}, {m}, as evaluated", text,
+                                  f"control: {ev['control_law']}"], colour, 640)
+                      for f in r["frames"]]
+            path = _write(frames, out / f"elite{rank}_{m}.mp4", 25)
+            print(f"  elite{rank} {m:5s} {text}  {path or '(no footage)'}")
     return 0
 
 
@@ -836,7 +925,10 @@ def main(argv=None) -> int:
     p.add_argument("--n-modes", type=int, default=6,
                    help="mobility modes identified per body per domain, and "
                         "the width the shared policy commands through")
-    p.set_defaults(fn=cmd_search)
+    p.add_argument("--no-postrun", dest="postrun", action="store_false",
+                   help="skip the report and films a finished run makes of "
+                        "itself (see `postrun`)")
+    p.set_defaults(fn=cmd_search, postrun=True)
 
     p = sub.add_parser("skills", help="train the actuator skill library")
     p.add_argument("--tasks", default=None, help="comma-separated subset")
@@ -883,7 +975,7 @@ def main(argv=None) -> int:
                    help="restrict --design to one island's archive")
     p.add_argument("--plan", default=None,
                    help="film a named body plan instead (beetle, gannet, ...)")
-    p.add_argument("--by", choices=("fitness", "mission", "island"), default="fitness",
+    p.add_argument("--by", choices=("fitness", "mission", "island"), default="mission",
                    help="which elite counts as best: the curator's fitness "
                         "ranking, the mission fraction the machine achieved, or "
                         "competence at the island's own domains (use with "
@@ -900,6 +992,19 @@ def main(argv=None) -> int:
     p.add_argument("--no-wake", dest="wake", action="store_false")
     p.add_argument("--no-stress", dest="stress", action="store_false")
     p.set_defaults(fn=cmd_showcase, wake=True, stress=True)
+
+    p = sub.add_parser("film", help="film a run's best elite as it was scored, "
+                                    "beside the continuous mission")
+    p.add_argument("--run", required=True)
+    p.add_argument("--by", choices=("fitness", "mission", "island"), default="mission")
+    p.add_argument("--island", default=None)
+    p.set_defaults(fn=cmd_film)
+
+    p = sub.add_parser("postrun", help="the report and films a finished run "
+                                       "leaves behind (run automatically)")
+    p.add_argument("--run", required=True)
+    p.add_argument("--by", choices=("fitness", "mission", "island"), default="mission")
+    p.set_defaults(fn=cmd_postrun)
 
     p = sub.add_parser("dashboard", help="regenerate the dashboard for a run")
     p.add_argument("--run", default="runs/latest")

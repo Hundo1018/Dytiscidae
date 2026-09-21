@@ -553,6 +553,58 @@ def _previous_run(run: Path):
     return max(cands, key=lambda p: p.stat().st_mtime).parent
 
 
+def film_section(run: Path) -> str:
+    """The film, first: what the score was earned on, beside the mission.
+
+    Written by `ops.run postrun` (`dytiscidae/viz/film.py`), which every
+    finished run calls.  Placed above every chart because it is what a reader
+    looks at first and judges by, and on 2026-09-21 what they looked at was
+    the continuous mission alone -- a water glider sitting on a beach it could
+    not leave, read as a machine that does nothing.  Absent when the run has
+    not been filmed, and then it says so rather than showing nothing.
+    """
+    import html as _h
+
+    mf = run / "media" / "film_manifest.json"
+    if not mf.exists():
+        return ('<section class="film"><h2>0 · The film</h2><p class="sub">Not filmed '
+                'yet -- run <code>python -m dytiscidae.ops.run postrun --run '
+                f'{_h.escape(str(run))}</code>.</p></section>')
+    m = json.loads(mf.read_text())
+    rows = []
+    for med, r in (m.get("media") or {}).items():
+        rec, got = r.get("recorded"), r.get("reproduced")
+        ok = r.get("match")
+        verdict = ("the scored experiment" if ok else
+                   "<b style='color:#d6402f'>NOT the scored experiment</b>")
+        rows.append(f"<tr><td>{_h.escape(med)}</td>"
+                    f"<td>{'' if rec is None else f'{rec:.3f}'}</td>"
+                    f"<td>{'' if got is None else f'{got:.3f}'}</td><td>{verdict}</td></tr>")
+    mis = m.get("mission") or {}
+    legs = ", ".join(f"{l['medium']} {100 * l['on_task']:.0f}%" for l in mis.get("legs", []))
+    comp = (m.get("paths") or {}).get("composite")
+    video = (f'<video controls muted loop playsinline style="width:100%;max-width:1280px" '
+             f'src="media/{Path(comp).name}"></video>' if comp else
+             f"<p class='sub'>No footage: {_h.escape(str(m.get('film_error') or 'unknown'))}. "
+             "The numbers below were still measured.</p>")
+    d = m.get("design") or {}
+    return f"""<section class="film"><h2>0 · The film -- what was scored, beside the mission</h2>
+<p class="sub">Left of each pair: the medium <b>as it was evaluated</b> -- the Tier-1 evaluation
+itself, re-run with the camera on, same seed, scatter, task and control law. Right: the
+continuous mission, which starts on the beach and is never re-placed, so it shows whether the
+machine can get <i>between</i> media -- which no score reads. The best elite by
+{_h.escape(str(m.get('by')))}: {_h.escape(str(m.get('island')))} island,
+{d.get('body_plan')}, {d.get('dof')} DOF, {d.get('mass')} kg, mission {d.get('mission_fraction')}.
+Control law: {_h.escape(str(m.get('control_law')))}.</p>
+{video}
+<table class="data"><tr><th>medium</th><th>recorded</th><th>this film</th><th></th></tr>
+{''.join(rows)}</table>
+<p class="sub">Continuous mission: on-task {100 * float(mis.get('on_task') or 0):.0f}%,
+transitions {_h.escape(str(mis.get('transitions')))}, max depth {mis.get('max_depth')} m
+({_h.escape(legs)}). Tolerance {m.get('tolerance')}; a clip outside it is marked on the
+footage and must not be read as evidence for that medium.</p></section>"""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("run")
@@ -582,7 +634,8 @@ def main() -> int:
     tpl = (Path(__file__).parent / "template.html").read_text()
     html = (tpl.replace("__PAYLOAD__", json.dumps(data))
                .replace("__TITLE__", title)
-               .replace("__SUBTITLE__", sub))
+               .replace("__SUBTITLE__", sub)
+               .replace("__FILM__", film_section(run)))
     out = Path(a.out) if a.out else run / "report.html"
     out.write_text(html)
     print(f"{out}  ({out.stat().st_size // 1024} KB)")

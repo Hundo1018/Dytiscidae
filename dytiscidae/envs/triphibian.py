@@ -992,7 +992,17 @@ class TriphibianEnv:
         against an evaluation that costs seconds.
         """
         mj = self._mj
-        m, d = self.model, self.data
+        # A scratch MjData, never the one being simulated.  This runs the first
+        # time anything reads ``launch_speed`` -- which is inside ``reset``, for
+        # the air, *after* the spawn pose and its random offset have been
+        # written -- and it used to probe on ``self.data`` itself.  So the first
+        # air reset of every phenotype object came out at the exact spawn with
+        # the last probe's velocities in it, and every later one did not: an
+        # air segment's initial condition depended on whether that phenotype's
+        # trim had been computed before, i.e. on the history of the process.
+        # Found 2026-09-21 when two evaluations of the same body in the same
+        # process disagreed in air and nowhere else.
+        m, d = self.model, mj.MjData(self.model)
         weight = self.p.mass * GRAVITY
         pitches = np.radians(np.linspace(-4.0, 44.0, n_pitch))
 
@@ -1135,9 +1145,22 @@ class TriphibianEnv:
 
     @property
     def _machine_geoms(self) -> np.ndarray:
+        """The machine's *physical* geometry: every geom on its bodies that collides.
+
+        Render-only geometry is excluded -- the tapered, twisted strips
+        ``detail=True`` draws beside each wing's collision box, which carry no
+        mass and no contact.  They were included, and they reach further than
+        the box when a wing flaps, so ``clearance`` -- and through it the air
+        segment's sink rate and the controller's height-lost channel -- read a
+        different number on a model built for the camera.  Found 2026-09-21:
+        the filmed evaluation of a body diverged from the unfilmed one at the
+        eleventh control decision, on that channel and no other.
+        """
         g = getattr(self, "_mgeoms", None)
         if g is None:
-            g = np.nonzero(self.model.geom_bodyid != 0)[0]
+            m = self.model
+            g = np.nonzero((m.geom_bodyid != 0)
+                           & ((m.geom_contype != 0) | (m.geom_conaffinity != 0)))[0]
             self._mgeoms = g
         return g
 
@@ -1418,8 +1441,15 @@ class TriphibianEnv:
         basis: MobilityBasis | None = None,
         domain: Domain = Domain.AIR,
         control_hz: float = 25.0,
+        on_step=None,
     ) -> SegmentResult:
         """Run one segment and measure what happened.
+
+        ``on_step(env, i)``, if given, is called after every physics step and
+        must not touch the simulation.  It exists so a film can be taken *of
+        the evaluation* rather than of a second rollout that is meant to
+        resemble it -- see ``viz/film.py``, and ROADMAP item Y for what the
+        second kind of film showed.
 
         One rollout, and nothing else: the passive twin this used to run first
         -- the same segment with every actuator held still, subtracted from the
@@ -1473,6 +1503,8 @@ class TriphibianEnv:
             vzs.append(float(self.body_twist()[2]))
             xys.append(pos[:2].copy())
             peak_slam = max(peak_slam, self.solver.diag.slam)
+            if on_step is not None:
+                on_step(self, i)
 
         end = self.root_pos().copy()
         res.bad_qacc = int(self.data.warning[

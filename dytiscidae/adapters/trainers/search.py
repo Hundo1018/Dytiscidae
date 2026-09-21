@@ -34,6 +34,8 @@ six.  That is why ``TrainerCapabilities.step_unit`` exists.
 
 from __future__ import annotations
 
+import os
+
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -275,6 +277,17 @@ class SearchTrainer:
         }
         if getattr(state, "stop_reason", None):
             summary["loop_stop_reason"] = state.stop_reason
+        # A completed run films itself as it was scored, beside the continuous
+        # mission, and writes its report -- the same chain `ops.run search`
+        # runs, so a run started as a job leaves the same things behind.
+        # Paused, cancelled and memory-stopped runs have generations left and
+        # are filmed when they finish.
+        if (reason == StopReason.COMPLETED
+                and bool(context.plan.hyperparameter("postrun", True))
+                and not os.environ.get("DYTISCIDAE_NO_POSTRUN")):
+            from ...ops.run import launch_postrun
+
+            summary["postrun_exit"] = launch_postrun(workspace)
         return TrainingOutcome(
             state=context.state, stop_reason=reason,
             final_checkpoint=record.checkpoint_id if record else None,

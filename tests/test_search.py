@@ -2793,6 +2793,80 @@ def test_the_batched_path_tells_the_policy_it_is_wet() -> None:
           f"mean_submerged {envs[0].solver.diag.mean_submerged:.3f}")
 
 
+def test_a_film_reproduces_the_scored_experiment() -> None:
+    """A film of an elite is the evaluation that scored it -- checked end to end.
+
+    Found 2026-09-21: arch41's mission-best elite, filmed with the showcase's
+    control law, scored land 0.002 against a recorded 0.283, and reproduced its
+    record to the last digit only with the shared policy removed -- because the
+    actor pool had dropped the shared policy from every re-score.  So this runs
+    a real, sharded search with a shared policy and refinement, films its best
+    elite without a camera, and asserts that the film chose the *recorded*
+    control law and reproduced every raw measurement the record kept.
+    """
+    if needs_batched_evaluator("test_a_film_reproduces_the_scored_experiment"):
+        return
+    print("\nfilm: a run's best elite is filmed as it was scored")
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.envs.triphibian import Domain, MissionSpec
+    from dytiscidae.viz.film import MEDIA, evaluate_on_film, pick_elite
+
+    tmp = tempfile.mkdtemp(prefix="dyt-film-")
+    try:
+        cfg = SearchConfig(generations=3, batch=4, workers=2, min_shard=2, seed=5,
+                           segment_seconds=2.0, n_reference_seeds=4, n_random_seeds=0,
+                           islands=("generalist",), tier2_every=999, audit_every=999,
+                           migrate_every=999, checkpoint_every=1, run_dir=tmp,
+                           use_shared_policy=True, promotion_refine_steps=0,
+                           controller_refine_steps=1)
+        run_search(cfg, MissionSpec())
+        e = pick_elite(tmp, by="fitness")
+        meta = e.meta or {}
+        check("the elite records that the shared policy scored it",
+              meta.get("scored_with_shared_policy") is True,
+              f"{meta.get('scored_with_shared_policy')!r}")
+        net = Path(tmp) / "scoring_networks" / f"gen{int(meta.get('gen', -1)):05d}.npz"
+        check("and the network that scored its generation was kept", net.exists(), str(net))
+        ev = evaluate_on_film(e, tmp, film=False, log=lambda *a, **k: None)
+        check("the film drives it with the recorded control law, not a fallback",
+              ev["control_law"].startswith("own + shared policy, the network that scored"),
+              ev["control_law"])
+        # Competences alone can match vacuously -- zero against zero -- so the
+        # raw measurements the record kept are compared too, and at least one
+        # of them has to be non-zero for the check to mean anything.
+        compared, nonzero, worst = 0, 0, (0.0, "")
+        for m in MEDIA:
+            check(f"{m}: the film reproduces the recorded competence",
+                  ev["media"][m]["match"],
+                  f"recorded {ev['media'][m]['recorded']} film {ev['media'][m]['reproduced']}")
+            rec_m = (meta.get("ladder_measurements") or {}).get(m) or {}
+            seg = ev["result"].segments.get(Domain(m))
+            for k, v in rec_m.items():
+                got = (seg.measurements or {}).get(k) if seg is not None else None
+                if not isinstance(v, (int, float)) or not isinstance(got, (int, float)):
+                    continue
+                compared += 1
+                nonzero += abs(v) > 1e-9
+                d = abs(float(v) - float(got)) / max(1.0, abs(float(v)))
+                if d > worst[0]:
+                    worst = (d, f"{m}.{k} {v:.6g}/{got:.6g}")
+        # 2%, not bitwise: the record came through the batched path -- the GPU
+        # fluid kernel, and the shared policy evaluated for a whole shard in one
+        # matmul -- and the film through the single path, one row at a time.
+        # Those differ at 1e-7 (see the sharding test), and a contact-rich land
+        # segment amplifies that over 8 s: measured worst 0.5%, on
+        # `land.stop_score`.  A different control law or a different start
+        # shows as tens of percent.
+        check("and every raw measurement the record kept, none of them vacuously",
+              compared >= 10 and nonzero >= 3 and worst[0] < 0.02,
+              f"{compared} compared, {nonzero} non-zero, worst {worst[1] or '-'}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_a_kernel_older_than_its_source_is_not_usable() -> None:
     """The GPU kernel is a compiled mirror of the numpy solver; nothing compared them.
 
@@ -3705,6 +3779,61 @@ def test_sharding_a_generation_does_not_change_a_score() -> None:
           one[1] == many[1] and one[2] == many[2],
           f"air ranks {one[2]}")
 
+    # The shared policy has to cross the process boundary too, and until
+    # 2026-09-21 it only did when a rollout *buffer* came with it -- i.e. on the
+    # generation's learning rollout.  The noise-free re-score and every
+    # refinement trial pass no buffer, so on any generation split into more
+    # than one shard the workers scored without the shared policy, and those
+    # are the numbers the archive keeps: arch41's mission-best elite reproduces
+    # its recorded air/water/land 0.034/0.090/0.283 exactly with the shared
+    # policy removed, and 0.033/0.113/0.002 with it.  The film, Tier-2 and the
+    # showcase all drove it *with* it.  Checked here with the fixture that makes
+    # the difference visible: bases identified, then a re-score with a shared
+    # network and no buffer, in one shard and in three.
+    import torch
+
+    from dytiscidae.envs.triphibian import TriphibianEnv
+    from dytiscidae.learning.ppo import SharedPolicy
+
+    torch.manual_seed(0)
+    net = SharedPolicy(TriphibianEnv.OBS_DIM, 6, hidden=16)
+    with torch.no_grad():
+        for prm in net.parameters():
+            if prm.ndim == 2:
+                prm.mul_(4.0)          # a policy that commands something
+    net.eval()
+    ctrls0 = [Controller(params=None, policy=None) for _ in phenos]
+    ActorPool(1).evaluate_tier1(phenos, controllers=ctrls0, **kw)   # bases
+    rescore = dict(kw, identify_axes=False)
+
+    def score(workers, shared):
+        pool = ActorPool(workers, min_shard=2)
+        ctrls = [Controller(params=None, policy=None, bases=dict(c.bases or {}))
+                 for c in ctrls0]
+        try:
+            res = pool.evaluate_tier1(phenos, controllers=ctrls, shared=shared,
+                                      **rescore)
+        finally:
+            pool.close()
+        # Where each machine went, not what it scored: at a 1 s segment the
+        # seed plans score zero with or without a controller, and a check that
+        # compares zeros with zeros passes whatever the pool does.
+        return [round(float(seg.distance), 9) for r in res
+                for _d, seg in sorted(r.segments.items(), key=lambda kv: str(kv[0]))]
+
+    alone, sharded, without = score(1, net), score(3, net), score(1, None)
+    check("the shared policy changes the fixture's scores, so this can fail",
+          alone != without, f"with {alone[:3]} without {without[:3]}")
+    # To 1e-5, not bitwise: the shared network's forward pass runs at a batch
+    # width of six in one shard and two in three, and a matmul at a different
+    # width is not bitwise the same sum -- measured 1.6e-7 after a 1 s segment.
+    # The defect this guards against shows as 0.226.
+    check("a re-score in three shards drives the shared policy as one shard does",
+          max(abs(a - b) for a, b in zip(alone, sharded)) < 1e-5,
+          f"max difference {max(abs(a - b) for a, b in zip(alone, sharded)):.3g}"
+          f"; without the shared policy it would be "
+          f"{max(abs(a - b) for a, b in zip(without, sharded)):.3g}")
+
 
 def test_structure_can_be_recombined_and_duplicated() -> None:
     """Structure was asexual: every graph descended from one seed by mutation.
@@ -3923,6 +4052,7 @@ def main() -> int:
         test_every_path_agrees_on_the_control_law,
         test_the_shared_policy_survives_a_resume,
         test_the_batched_path_tells_the_policy_it_is_wet,
+        test_a_film_reproduces_the_scored_experiment,
         test_a_kernel_older_than_its_source_is_not_usable,
         test_a_checkpoint_names_the_commit_the_process_started_from,
         test_a_finished_run_is_a_checkpoint,

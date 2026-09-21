@@ -200,15 +200,15 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Progress` | class | 284 | — | Turns the loop's per-generation callback into job state. |
-| `SearchTrainer` | class | 80 | — | ``ports.Trainer`` over ``evolution.loop.run_search``. |
-| `_Progress.__init__` | method | 292 | `(self, context: TrainingContext, workspace: Path, *, publish_every: int, checkpoint_every: int) -> None` | — |
-| `_Progress.on_generation` | method | 313 | `(self, state, report: Mapping[str, Any]) -> None` | Progress only.  Called *before* the loop writes its checkpoint. |
-| `_Progress.publish` | method | 352 | `(self, step: int, kind: CheckpointKind, *, force: bool=False)` | Copy the run directory's portable checkpoint into the store. |
-| `_Progress.should_stop` | method | 330 | `(self, generation: int, report: Mapping[str, Any])` | Publish if the loop has just checkpointed, then poll the stop flag. |
-| `SearchTrainer.capabilities` | method | 85 | `(self) -> TrainerCapabilities` | — |
-| `SearchTrainer.export` | method | 130 | `(self, record: CheckpointRecord, payload: CheckpointPayload, *, destination: str, fmt: str) -> dict` | Write the portable checkpoint out as files. |
-| `SearchTrainer.train` | method | 104 | `(self, context: TrainingContext) -> TrainingOutcome` | — |
+| `_Progress` | class | 297 | — | Turns the loop's per-generation callback into job state. |
+| `SearchTrainer` | class | 82 | — | ``ports.Trainer`` over ``evolution.loop.run_search``. |
+| `_Progress.__init__` | method | 305 | `(self, context: TrainingContext, workspace: Path, *, publish_every: int, checkpoint_every: int) -> None` | — |
+| `_Progress.on_generation` | method | 326 | `(self, state, report: Mapping[str, Any]) -> None` | Progress only.  Called *before* the loop writes its checkpoint. |
+| `_Progress.publish` | method | 365 | `(self, step: int, kind: CheckpointKind, *, force: bool=False)` | Copy the run directory's portable checkpoint into the store. |
+| `_Progress.should_stop` | method | 343 | `(self, generation: int, report: Mapping[str, Any])` | Publish if the loop has just checkpointed, then poll the stop flag. |
+| `SearchTrainer.capabilities` | method | 87 | `(self) -> TrainerCapabilities` | — |
+| `SearchTrainer.export` | method | 132 | `(self, record: CheckpointRecord, payload: CheckpointPayload, *, destination: str, fmt: str) -> dict` | Write the portable checkpoint out as files. |
+| `SearchTrainer.train` | method | 106 | `(self, context: TrainingContext) -> TrainingOutcome` | — |
 
 ## `adapters.trainers.synthetic` — `dytiscidae/adapters/trainers/synthetic.py`
 
@@ -682,11 +682,11 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `ActorPool` | class | 154 | — | A persistent pool of worker processes, each with its own batched evaluator. |
-| `split` | function | 127 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
-| `ActorPool.__init__` | method | 166 | `(self, workers: int=1, *, min_shard: int=4) -> None` | — |
-| `ActorPool.close` | method | 274 | `(self) -> None` | — |
-| `ActorPool.evaluate_tier1` | method | 184 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
+| `ActorPool` | class | 159 | — | A persistent pool of worker processes, each with its own batched evaluator. |
+| `split` | function | 132 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
+| `ActorPool.__init__` | method | 171 | `(self, workers: int=1, *, min_shard: int=4) -> None` | — |
+| `ActorPool.close` | method | 294 | `(self) -> None` | — |
+| `ActorPool.evaluate_tier1` | method | 189 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
 
 ## `envs.batchroll` — `dytiscidae/envs/batchroll.py`
 
@@ -711,18 +711,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `behaviour_descriptor` | function | 574 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | — |
+| `behaviour_descriptor` | function | 583 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | — |
 | `Controller` | class | 43 | — | Everything needed to drive one machine: rhythm, axes, and intent. |
-| `dominates` | function | 617 | `(a: np.ndarray, b: np.ndarray) -> bool` | True when ``a`` is at least as good everywhere and better somewhere. |
-| `evaluate_tier1` | function | 236 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, n_modes: int=6) -> MissionResult` | Short dynamic episodes in each domain, plus transitions. |
-| `evaluate_tier1_5` | function | 372 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seconds: float=60.0, seed: int=0, domain: Domain \| None=None, competences: dict \| None=None, sea_state=None) -> SegmentResult` | One long leg, run only on designs the search has decided to promote. |
-| `evaluate_tier2` | function | 432 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seed: int=0, time_compression: float=12.0, sea_state=None, tier1: MissionResult \| None=None) -> MissionResult` | The real mission schedule, with disturbances and a random start domain. |
+| `dominates` | function | 626 | `(a: np.ndarray, b: np.ndarray) -> bool` | True when ``a`` is at least as good everywhere and better somewhere. |
+| `evaluate_tier1` | function | 236 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, n_modes: int=6, detail: bool=False, on_step=None) -> MissionResult` | Short dynamic episodes in each domain, plus transitions. |
+| `evaluate_tier1_5` | function | 381 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seconds: float=60.0, seed: int=0, domain: Domain \| None=None, competences: dict \| None=None, sea_state=None) -> SegmentResult` | One long leg, run only on designs the search has decided to promote. |
+| `evaluate_tier2` | function | 441 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seed: int=0, time_compression: float=12.0, sea_state=None, tier1: MissionResult \| None=None) -> MissionResult` | The real mission schedule, with disturbances and a random start domain. |
 | `finalise_tier1` | function | 141 | `(r: MissionResult, clamped_any: bool) -> None` | Turn measured segments and transitions into mission_fraction, and flag |
-| `fitness` | function | 623 | `(p: Phenotype, r: MissionResult, spec: MissionSpec \| None=None) -> float` | Scalar quality within a behaviour cell. |
-| `objectives` | function | 600 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | The objective vector used to decide who occupies a cell. |
+| `fitness` | function | 632 | `(p: Phenotype, r: MissionResult, spec: MissionSpec \| None=None) -> float` | Scalar quality within a behaviour cell. |
+| `objectives` | function | 609 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | The objective vector used to decide who occupies a cell. |
 | `SharedController` | class | 103 | `(Controller)` | A controller carrying a `SummedPolicy`, kept pointed at the right basis. |
 | `SummedPolicy` | class | 61 | — | The per-candidate policy plus the shared one, as a single policy. |
-| `weakest_domain` | function | 357 | `(competences: dict) -> Domain` | The domain a design is worst at, which is the one the mission turns on. |
+| `weakest_domain` | function | 366 | `(competences: dict) -> Domain` | The domain a design is worst at, which is the one the mission turns on. |
 | `Controller.basis_for` | method | 50 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
 | `SharedController.basis_for` | method | 113 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
 | `SummedPolicy.act` | method | 83 | `(self, obs) -> np.ndarray` | — |
@@ -840,26 +840,26 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `MissionSpec.transitions` | property | 98 | `(self) -> list[str]` | — |
 | `SegmentResult.cost_of_transport` | property | 139 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
 | `TriphibianEnv.__init__` | method | 517 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
-| `TriphibianEnv.body_twist` | method | 1105 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
-| `TriphibianEnv.clearance` | method | 1174 | `(self) -> float` | Height of the machine above the ground beneath it, metres. |
-| `TriphibianEnv.depth` | method | 1133 | `(self) -> float` | — |
+| `TriphibianEnv.body_twist` | method | 1115 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
+| `TriphibianEnv.clearance` | method | 1197 | `(self) -> float` | Height of the machine above the ground beneath it, metres. |
+| `TriphibianEnv.depth` | method | 1143 | `(self) -> float` | — |
 | `TriphibianEnv.flap_travel` | method | 807 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
-| `TriphibianEnv.ground_height` | method | 1144 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
-| `TriphibianEnv.ground_heights` | method | 1153 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
-| `TriphibianEnv.identify` | method | 2381 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.ground_height` | method | 1167 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
+| `TriphibianEnv.ground_heights` | method | 1176 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
+| `TriphibianEnv.identify` | method | 2413 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
 | `TriphibianEnv.launch_pitch` | property | 777 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
 | `TriphibianEnv.launch_speed` | property | 745 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
 | `TriphibianEnv.lift_margin` | property | 793 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
-| `TriphibianEnv.morphology_context` | property | 1221 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
-| `TriphibianEnv.observation` | method | 1260 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
+| `TriphibianEnv.morphology_context` | property | 1244 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
+| `TriphibianEnv.observation` | method | 1283 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
 | `TriphibianEnv.reset` | method | 622 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
-| `TriphibianEnv.restore` | method | 1096 | `(self, snap: tuple) -> None` | — |
-| `TriphibianEnv.rollout` | method | 1412 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0) -> SegmentResult` | Run one segment and measure what happened. |
-| `TriphibianEnv.root_pos` | method | 1130 | `(self) -> np.ndarray` | — |
+| `TriphibianEnv.restore` | method | 1106 | `(self, snap: tuple) -> None` | — |
+| `TriphibianEnv.rollout` | method | 1435 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
+| `TriphibianEnv.root_pos` | method | 1140 | `(self) -> np.ndarray` | — |
 | `TriphibianEnv.scatter` | method | 653 | `(self, rng, *, strength: float=1.0) -> None` | Widen the initial condition, from a caller-supplied generator. |
-| `TriphibianEnv.snapshot` | method | 1093 | `(self) -> tuple` | — |
-| `TriphibianEnv.step` | method | 1397 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
-| `TriphibianEnv.task_channels` | method | 1345 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
+| `TriphibianEnv.snapshot` | method | 1103 | `(self) -> tuple` | — |
+| `TriphibianEnv.step` | method | 1420 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
+| `TriphibianEnv.task_channels` | method | 1368 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
 | `TriphibianEnv.thrust_margin` | method | 835 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
 
 ## `evolution.archive` — `dytiscidae/evolution/archive.py`
@@ -1056,12 +1056,12 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `batchroll_eval` | function | 560 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
 | `evaluate_candidate` | function | 325 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
 | `evaluate_candidates` | function | 378 | `(genomes, cfg: SearchConfig, *, inherited=None, identify: bool=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `load_state` | function | 1508 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 898 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 1407 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `load_state` | function | 1536 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 905 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 1416 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 63 | — | Everything adjustable about a run. |
 | `SearchState` | class | 238 | — | — |
-| `seed_archipelago` | function | 1767 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `seed_archipelago` | function | 1795 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
 | `SearchState.archive` | property | 295 | `(self) -> Archive` | — |
 | `SearchState.curator` | property | 299 | `(self) -> Curator` | — |
 | `SearchState.curriculum` | property | 303 | `(self) -> Curriculum` | — |
@@ -1098,14 +1098,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `distil` | function | 301 | `(run_dir, *, n_states: int=256, hidden: int=128, epochs: int=400, lr: float=0.003, held_out: float=0.3, seed: int=0, min_mission: float=0.0, refined_only: bool=False) -> DistillResult` | Fit a conditioned student to the stored per-body teachers. |
-| `DistillResult` | class | 273 | — | — |
+| `distil` | function | 303 | `(run_dir, *, n_states: int=256, hidden: int=128, epochs: int=400, lr: float=0.003, held_out: float=0.3, seed: int=0, min_mission: float=0.0, refined_only: bool=False) -> DistillResult` | Fit a conditioned student to the stored per-body teachers. |
+| `DistillResult` | class | 275 | — | — |
 | `load_teachers` | function | 136 | `(run_dir, *, min_mission: float=0.0, refined_only: bool=False) -> tuple` | Every archive elite in ``run_dir`` that carries fitted policy weights. |
 | `refined_cells` | function | 106 | `(run_dir) -> set` | ``(island, cell)`` pairs whose policy was actually fitted to that body. |
-| `sample_states` | function | 211 | `(n: int, rng: np.random.Generator) -> np.ndarray` | ``n`` draws from the observation envelope, state channels only. |
+| `sample_states` | function | 213 | `(n: int, rng: np.random.Generator) -> np.ndarray` | ``n`` draws from the observation envelope, state channels only. |
 | `Teacher` | class | 86 | — | One body's fitted policy, plus who that body is. |
-| `teacher_targets` | function | 250 | `(teachers, states: np.ndarray, n_modes: int) -> np.ndarray` | ``(n_teachers, n_states, n_modes)`` of what each teacher commands. |
-| `DistillResult.lines` | method | 283 | `(self) -> list` | — |
+| `teacher_targets` | function | 252 | `(teachers, states: np.ndarray, n_modes: int) -> np.ndarray` | ``(n_teachers, n_states, n_modes)`` of what each teacher commands. |
+| `DistillResult.lines` | method | 285 | `(self) -> list` | — |
 | `Teacher.policy` | method | 101 | `(self, n_modes: int) -> Policy` | — |
 
 ## `learning.ppo` — `dytiscidae/learning/ppo.py`
@@ -1164,20 +1164,23 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 414 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `cmd_cohort` | function | 355 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_dashboard` | function | 679 | `(args) -> int` | — |
-| `cmd_distill` | function | 704 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `_Cached` | class | 482 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `cmd_cohort` | function | 423 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_dashboard` | function | 755 | `(args) -> int` | — |
+| `cmd_distill` | function | 793 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 311 | `(args) -> int` | — |
+| `cmd_postrun` | function | 278 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 123 | `(args) -> int` | — |
-| `cmd_render` | function | 686 | `(args) -> int` | — |
+| `cmd_render` | function | 762 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
 | `cmd_search` | function | 158 | `(args) -> int` | — |
-| `cmd_showcase` | function | 545 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 250 | `(args) -> int` | — |
-| `cmd_train` | function | 284 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_showcase` | function | 613 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 318 | `(args) -> int` | — |
+| `cmd_train` | function | 352 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 116 | `(args) -> int` | — |
-| `controller_for_elite` | function | 424 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `controller_for_elite` | function | 492 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 252 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 31 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 721 | `(argv=None) -> int` | — |
+| `main` | function | 810 | `(argv=None) -> int` | — |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`
 
@@ -1495,6 +1498,23 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `build_dashboard` | function | 185 | `(run_dir: str \| Path, out_path: str \| Path \| None=None) -> str` | Read a run directory and write ``dashboard.html``.  Returns its path. |
+
+## `viz.film` — `dytiscidae/viz/film.py`
+
+> Film what was scored, beside what the mission does.
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `_Camera` | class | 126 | — | A follow camera attached to whichever env the evaluation builds. |
+| `code_changed_since` | function | 81 | `(commit: str \| None) -> list[str] \| None` | Source files under ``dytiscidae/`` that differ from ``commit``. |
+| `control_laws` | function | 201 | `(elite, run_dir, shared)` | The control laws the elite's score may have been earned under, best-known first. |
+| `current_commit` | function | 73 | `() -> str` | — |
+| `evaluate_on_film` | function | 236 | `(elite, run_dir, *, film: bool=True, width: int=640, height: int=400, fps: int=25, log=print) -> dict` | Re-run the elite's Tier-1 evaluation, filming it, and compare the scores. |
+| `film_run` | function | 365 | `(run_dir, *, by: str='mission', island: str \| None=None, out_dir=None, fps: int=25, panel: int=640, log=print) -> dict` | Film a finished run: evaluated clips, the continuous mission, and both side by side. |
+| `pick_elite` | function | 100 | `(run_dir, *, by: str='mission', island: str \| None=None)` | The elite the film is of, chosen the way ``showcase`` chooses. |
+| `run_provenance` | function | 61 | `(run_dir: Path) -> dict` | The commit and configuration a run's checkpoint recorded, if any. |
+| `_Camera.__init__` | method | 129 | `(self, width: int, height: int, fps: int)` | — |
+| `_Camera.close` | method | 179 | `(self)` | — |
 
 ## `viz.render` — `dytiscidae/viz/render.py`
 

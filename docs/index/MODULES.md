@@ -2,7 +2,7 @@
 
 # Modules
 
-100 modules, 31,482 lines, 960 indexed symbols.
+101 modules, 32,192 lines, 973 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -46,7 +46,7 @@ is what makes a violation visible while reading.
 | `adapters.sqlite` | The SQLite DB adapter from the architecture diagram. | 20 | — | — | `adapters.sqlite.store` |
 | `adapters.sqlite.store` | SQLite adapters for ``ExperimentStore`` and ``JobStore``. | 338 | — | — | `domain.errors`, `domain.experiment`, `domain.ids`, `domain.job`, `domain.state` |
 | `adapters.trainers` | The trainer registry: names in, ``Trainer`` implementations out. | 142 | — | — | `adapters.trainers.search`, `adapters.trainers.synthetic`, `ports.trainer` |
-| `adapters.trainers.search` | The real trainer: this project's MAP-Elites design search, behind the port. | 421 | — | `torch` | `domain.checkpoint`, `domain.job`, `envs.triphibian`, `evolution.loop`, `ops`, `ops.checkpoint`, `ports.trainer` |
+| `adapters.trainers.search` | The real trainer: this project's MAP-Elites design search, behind the port. | 434 | — | `torch` | `domain.checkpoint`, `domain.job`, `envs.triphibian`, `evolution.loop`, `ops`, `ops.checkpoint`, `ops.run`, `ports.trainer` |
 | `adapters.trainers.synthetic` | A trainer that implements the whole contract and computes nothing real. | 209 | — | — | `domain.checkpoint`, `domain.job`, `ports.trainer` |
 
 ## `application`  (inner)
@@ -97,15 +97,15 @@ is what makes a violation visible while reading.
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
-| `envs.actors` | Several generations' worth of machines, stepped in several processes. | 283 | — | `torch` | `envs`, `envs.batchroll`, `learning.ppo` |
+| `envs.actors` | Several generations' worth of machines, stepped in several processes. | 303 | — | `torch` | `envs`, `envs.batchroll`, `learning.ppo` |
 | `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1012 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.medium` |
-| `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 650 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |
+| `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 659 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 68 | — | — | — |
 | `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 335 | — | `numpy` | `envs.triphibian` |
 | `envs.skills` | The actuator skill bench: learning to operate components, not vehicles. | 655 | — | `numpy` | `evolution.cmaes`, `physics.energy`, `physics.materials`, `physics.medium`, `physics.structure` |
 | `envs.tasks` | What a segment asks the machine to do, phase by phase. | 205 | — | — | — |
 | `envs.transitions` | Crossing between media, scored rather than merely survived. | 455 | — | `numpy` | `envs.triphibian` |
-| `envs.triphibian` | The triphibian mission environment. | 2418 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.structure` |
+| `envs.triphibian` | The triphibian mission environment. | 2450 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.structure` |
 
 ## `evolution`
 
@@ -120,14 +120,14 @@ is what makes a violation visible while reading.
 | `evolution.descriptors` | Learned behaviour descriptors, so the archive axes stop being my guesses. | 228 | — | `numpy` | — |
 | `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 319 | — | `numpy` | `evolution.curriculum` |
 | `evolution.judge` | The judge: a scoring standard that gets stricter as the population improves. | 498 | — | `numpy` | — |
-| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 2038 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
+| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 2072 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
 | `evolution.scout` | The scout: a network that predicts a lineage's potential, not its score. | 493 | — | `numpy` | — |
 
 ## `learning`
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
-| `learning.distill` | Can one morphology-conditioned network represent the per-body optima? | 435 | — | `numpy`, `torch` | `control.cpg`, `envs.triphibian` |
+| `learning.distill` | Can one morphology-conditioned network represent the per-body optima? | 437 | — | `numpy`, `torch` | `control.cpg`, `envs.triphibian` |
 | `learning.ppo` | PPO over a policy shared by every morphology in the search. | 670 | — | `numpy`, `torch` | — |
 
 ## `ops`
@@ -135,7 +135,7 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `ops.checkpoint` | A run's finished state as one portable artefact. | 398 | — | `numpy`, `torch` | `envs.kernel`, `evolution.judge`, `learning`, `learning.ppo` |
-| `ops.run` | Command-line entry point. | 950 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.islands`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `viz.dashboard`, `viz.render`, `viz.showcase` |
+| `ops.run` | Command-line entry point. | 1055 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.islands`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `viz.dashboard`, `viz.film`, `viz.render`, `viz.showcase` |
 | `ops.telemetry` | Structured telemetry. | 111 | — | `numpy` | — |
 
 ## `physics`
@@ -170,6 +170,7 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `viz.dashboard` | Generates a self-contained HTML dashboard for a run. | 316 | — | `numpy` | `ops.telemetry` |
+| `viz.film` | Film what was scored, beside what the mission does. | 495 | — | `PIL`, `imageio`, `mujoco`, `numpy`, `torch` | `core.phenotype`, `envs.evaluate`, `envs.triphibian`, `evolution.islands`, `ops.run`, `viz.render`, `viz.showcase` |
 | `viz.render` | Watching the machine: turntables and episode video in each medium. | 547 | — | `PIL`, `imageio`, `matplotlib`, `mujoco`, `numpy` | `core.phenotype`, `envs.triphibian` |
 | `viz.showcase` | The showcase render: one continuous mission, with the flow and the loads on screen. | 335 | — | `PIL`, `imageio`, `mujoco`, `numpy` | `core.phenotype`, `envs.mission`, `envs.triphibian`, `physics.fluid`, `physics.structure`, `physics.wake`, `viz.render` |
 

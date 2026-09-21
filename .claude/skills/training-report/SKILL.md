@@ -64,24 +64,32 @@ with a section naming what this telemetry does not contain — Q/V value traces,
 gradient norm, per-step action distributions, cross-seed curves — because a
 report that quietly omits them reads as if they were fine.
 
-## 2 · The video
+## 2 · The video — made by the run, not by you
+
+A finished search runs `ops.run postrun`, which writes the report and then the
+films, and embeds them at the top of the page. If they are missing:
 
 ```bash
-# continuous mission, wake and stress overlays -- what it does end to end
-.venv/bin/python -m dytiscidae.ops.run showcase --design runs/<run> \
-    --island <island> --run runs/showcase_<run> --leg-seconds 8 --cycles 1
-
-# per-segment clips and a turntable for the top archive elites
-.venv/bin/python -m dytiscidae.ops.run render --run runs/<run> --top 3 --duration 8
+.venv/bin/python -m dytiscidae.ops.run postrun --run runs/<run>   # report + films
+.venv/bin/python -m dytiscidae.ops.run film --run runs/<run>      # films only
 ```
 
-`showcase` picks the highest **fitness** elite in the island, which is not
-always the highest `mission_fraction` — read the best-design block in the report
-and film the island that owns it. `render` writes
-`runs/<run>/media/elite{N}_{air,water,land,turntable}.mp4`.
+`runs/<run>/media/`:
 
-Both are minutes of compute. Launch them detached and keep the process count
-low if anything else is running.
+- `evaluated_vs_mission.mp4` — **the one to show.** Each continuous-mission leg
+  beside the same medium *as it was evaluated*.
+- `evaluated_{air,water,land}.mp4` — the Tier-1 evaluation re-run with a
+  camera: same seed, scatter, task and control law, with the recorded and the
+  reproduced competence stamped on every frame. Green = the scored experiment;
+  red = it did not reproduce, and the clip is not evidence for that medium.
+- `mission.mp4` — the continuous mission. Starts on the beach and is never
+  re-placed; it answers "can it get between media", which no score reads.
+  **Never show it alone.**
+- `film_manifest.json` — every number on the clips, the control law that
+  reproduced them, and whether the package changed since the run's commit.
+
+`showcase --design` and `render --top` now produce the same evaluated films.
+Before 2026-09-21 neither filmed the scored experiment (ROADMAP item Z).
 
 ## 3 · Reading it honestly
 

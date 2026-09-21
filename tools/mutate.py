@@ -407,6 +407,42 @@ MUTATIONS: tuple = (
                "and every verification runs another",
         suites=("test_search",), item="path agreement"),
 
+    # --- the film is the evaluation (2026-09-21) --------------------------
+    Mutation(
+        id="pool-drops-the-shared-policy-from-rescores",
+        path="dytiscidae/envs/actors.py",
+        find="        spec = None\n        if shared is not None:\n",
+        replace="        spec = None\n        if shared is not None and buffer is not None:\n",
+        defect="the actor pool ships the shared policy to its workers only with a "
+               "rollout buffer, so every re-score and refinement trial -- the "
+               "numbers the archive keeps -- is scored without it",
+        suites=("test_search",), item="film = evaluation"),
+    Mutation(
+        id="trim-probes-the-live-state",
+        path="dytiscidae/envs/triphibian.py",
+        find="        m, d = self.model, mj.MjData(self.model)",
+        replace="        m, d = self.model, self.data",
+        defect="measuring trim resets the simulation being run, so the first air "
+               "reset of each body loses its spawn offset and later ones do not",
+        suites=("test_physics",), item="film = evaluation"),
+    Mutation(
+        id="clearance-reads-render-geometry",
+        path="dytiscidae/envs/triphibian.py",
+        find="            g = np.nonzero((m.geom_bodyid != 0)\n"
+             "                           & ((m.geom_contype != 0) | (m.geom_conaffinity != 0)))[0]",
+        replace="            g = np.nonzero(m.geom_bodyid != 0)[0]",
+        defect="clearance counts the camera's wing strips as the machine's lowest "
+               "point, so a model built for filming flies a different air segment",
+        suites=("test_physics",), item="film = evaluation"),
+    Mutation(
+        id="film-ignores-the-evaluation-seed",
+        path="dytiscidae/viz/film.py",
+        find='    seed = int(meta.get("eval_seed") or 0)',
+        replace="    seed = 0",
+        defect="the film re-runs the evaluation from a different initial condition "
+               "and stamps it with the recorded score anyway",
+        suites=("test_search",), item="film = evaluation"),
+
     Mutation(
         id="batched-fluid-diagnostics-stay-default",
         path="dytiscidae/envs/batchroll.py",

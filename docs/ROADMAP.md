@@ -2153,6 +2153,32 @@ nothing about the reward's structure below that — the controller was still tol
 where it was and never what to do. Item X is the next change, and arch41 its
 baseline.
 
+## 2026-09-22 — every open item, started
+
+The user: "Roadmap事項全部開始." Every item below is started today. What keeps
+that from repeating arch38 — a bundle whose result nobody could attribute — is
+that **anything that changes selection lands behind a flag, default off**, so
+the next run (arch42) is a clean baseline for the code as it now stands, and
+each flag is an arm of its own afterwards. Status is verified against the code,
+not taken from the headings below (two of which were stale).
+
+| item | what "started" means | status |
+|---|---|---|
+| Z film = evaluation | pool fix, trim fix, clearance fix, promotion record, `viz/film.py`, automatic `postrun` | **done** |
+| U `min_shard` defaults | already 4 in all three places (`loop.py:95`, `actors.py:171`, CLI) | **done** — heading was stale |
+| S `mut_gait` | implemented (`genome.py:549`) with the operator floor; needs only its measurement, which arch42 carries | in arch42 |
+| X task reward | apply the parameters re-derived from arch41's stop (hold depth 5.0–6.5 m, stillness band 0.64 m/s, land command 0.04 m/s) | today |
+| Y chatter | an action-rate penalty on the controller's commands, flag | today |
+| Y / O continuity | a leg starts where the previous one ended instead of at a placed spawn, flag — the structural fix under the air spawn | today, design first |
+| M complexity | measure the complexity/part-count confound on arch40 before charging anything | measuring |
+| L aspect ratio | measure what AR buys in air and costs in water, conditional on area and mass | measuring |
+| P refit | measure merge loss per refit on arch40 and the staleness a slower schedule costs | measuring |
+| R `shared_ent_coef` | a short sweep, after arch42 (it needs the machine) | queued |
+| N GRPO | the partial form, flag | after X/Y |
+| W, T, V | superseded by X / closed / subsumed | closed |
+| Q triphibian conflict | a written decision for the user: what "a chain of pairs" would change | memo |
+| TEST_AUDIT 7 | re-run every mutation whose only catching suite is `test_search`, on the fixed harness | queued |
+
 ## arch40 — the work list
 
 Written 2026-09-20, after the day's fixes and before any run on them.
@@ -2316,6 +2342,69 @@ multipliers were walls — water machines mostly never descend (max depth p50
 0.64 m/s, land command 0.04 m/s) are in the run's notes, **measured and not
 applied**: the user decided not to relaunch.
 
+### Z. No film was of the scored experiment — and the search's own scores were not what it meant them to be — **fixed 2026-09-22**
+
+The user, after item Y: film each medium from where it was evaluated, beside
+the continuous mission, "and make it happen every session, automatically, or I
+keep judging from the wrong video." Building that meant checking that a film
+reproduces its score, and on the first run it did not: arch41's mission-best
+elite, filmed as the showcase drove it, scored land 0.002 against a recorded
+0.283. Four defects, found in that order, each by a measurement that ruled out
+the one before it:
+
+1. **The actor pool dropped the shared policy from every re-score.** It shipped
+   the shared network to its workers only when a rollout buffer came with it —
+   the generation's learning rollout — so the noise-free re-score and every
+   refinement trial, whose numbers are what the archive keeps, ran without it on
+   any generation split into more than one shard. On `--workers 4 --min-shard 4`
+   that is nearly every generation of every run since the pool was written
+   (2026-09-03, arch35–arch41). The elite reproduces 0.034 / 0.090 / 0.283
+   exactly with the shared policy removed; batch composition and the shared
+   network's generation were each measured and ruled out first. **The shared
+   policy trained on rollouts it took no part in scoring, and refinement tuned
+   each design's own policy against a sum whose other half was zero** — the
+   failure `_refine_controllers`' docstring names. It may be part of why the
+   shared policy "failed" four times. Fixed in `envs/actors.py`; the sharding
+   test now drives a shared network through three shards (it passed with none
+   before, so it could not see this).
+2. **Measuring trim reset the simulation being run.** `launch_speed` is computed
+   the first time it is read — inside `reset`, for the air, after the spawn and
+   its random offset are written — and it probed on the live `MjData`. So the
+   first air reset of every phenotype object started at the bare spawn with the
+   last probe's velocities, and later ones did not: process history in the
+   score. Fixed with a scratch `MjData`.
+3. **`clearance` counted the camera's wing strips.** `detail=True` models (for
+   filming) put render-only geoms on the wings; the lowest-point search included
+   them, so the air sink rate and the controller's height channel read
+   differently on a filmed model — diverging at the eleventh control decision.
+   Now physical (colliding) geometry only; plain models are unchanged (0 of 19).
+4. **Promotion overwrote the scored policy.** Tier-2 stored its refined weights
+   over `meta["policy"]`, leaving Tier-1 scores paired with weights never scored
+   at Tier-1. Now `policy_promoted`, beside it; inheritance reads it first, so
+   the search behaves as before.
+
+And the films themselves: `showcase` filmed only the continuous mission;
+`render --top` drove elites open-loop, at seed 0, without the evaluation's
+scatter, for 10 s, printing no score.
+
+**What exists now.** `viz/film.py` re-runs `evaluate_tier1` — the scoring
+function — with a camera on `on_step`; stamps recorded and reproduced
+competence on every clip; puts each continuous-mission leg beside its medium;
+writes `film_manifest.json`. Each scored elite records
+`scored_with_shared_policy`, and `scoring_networks/gen*.npz` keeps the exact
+network that scored each generation, so a film can drive it exactly; a legacy
+record is filmed with whichever candidate control law reproduces it, and says
+which. `ops.run search` and the job trainer run `postrun` (report + films) on
+completion. Tests: `test_a_film_is_the_evaluation`,
+`test_the_first_air_reset_is_like_every_other`,
+`test_a_film_reproduces_the_scored_experiment` (a real sharded search with a
+shared policy, every raw measurement compared); mutations
+`pool-drops-the-shared-policy-from-rescores`, `trim-probes-the-live-state`,
+`clearance-reads-render-geometry`, `film-ignores-the-evaluation-seed`.
+
+**Not comparable across this commit:** re-scores now include the shared policy,
+and the first air reset of each body carries its spawn offset.
+
 ### Y. The filmed arch40 machine never leaves the beach — raised by the user 2026-09-21, **measured, not acted on**
 
 The user, watching `runs/showcase_arch40/mission.mp4`: "it is only trembling in
@@ -2364,8 +2453,8 @@ or about getting between media, so its film can show the same beach. Candidate
 fixes, none attempted: evaluate a leg from where the previous one ended (item O
 generalised); an action-rate penalty or command low-pass, standard in legged RL,
 for the chatter; and film each medium from its evaluated spawn beside the
-continuous mission (`render --top` already writes those clips), so a score and
-the footage of it are the same experiment.
+continuous mission — **done, item Z** (`render --top` turned out to film a
+different experiment, open-loop at seed 0).
 
 ### W. The specialist islands were selecting for water — curriculum **fixed, unrun**; water score **measured, not fixed**
 

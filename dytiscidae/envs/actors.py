@@ -108,7 +108,7 @@ def _run_shard(payload):
 
         from ..learning.ppo import RolloutBuffer, SharedPolicy
 
-        n_obs, n_modes, hidden, state, shaping, seed = shared_spec
+        n_obs, n_modes, hidden, state, shaping, seed, want_buffer = shared_spec
         policy = _WORKER.get("shared")
         if policy is None or (policy.n_obs, policy.n_modes) != (n_obs, n_modes):
             policy = SharedPolicy(n_obs, n_modes, hidden=hidden)
@@ -117,7 +117,12 @@ def _run_shard(payload):
             {k: torch.as_tensor(v) for k, v in state.items()}, strict=False)
         # Reproducible per worker count; see the module docstring.
         torch.manual_seed(int(seed) + 7919 * int(shard_index))
-        shared, buffer = policy, RolloutBuffer(shaping=shaping)
+        shared = policy
+        # A buffer only when the caller is collecting: the noise-free re-score
+        # and the refinement trials drive the shared policy at its mean and
+        # bank nothing, and a buffer here would switch the batched path to
+        # sampling.
+        buffer = RolloutBuffer(shaping=shaping) if want_buffer else None
 
     results = batchroll.evaluate_tier1_batch(
         phenos, controllers=ctrls, shared=shared, buffer=buffer, **kwargs)
@@ -199,15 +204,30 @@ class ActorPool:
                 phenos, controllers=ctrls, shared=shared, buffer=buffer,
                 **kwargs)
 
+        # The shared policy crosses the process boundary whenever there is one,
+        # not only when a buffer comes with it.  Until 2026-09-21 the condition
+        # was `shared is not None and buffer is not None`, so only the
+        # generation's *learning* rollout carried it; the noise-free re-score
+        # and every refinement trial -- which pass no buffer, and whose numbers
+        # are the ones the archive keeps -- were scored by the workers without
+        # it on every generation split into more than one shard.  That was every
+        # run on `--workers 4 --min-shard 4` since the pool was written
+        # (2026-09-03, arch35 onward): the shared policy trained on rollouts it
+        # then took no part in scoring, and the refinement tuned each design's
+        # own policy against a sum whose other half was zero -- the exact
+        # failure `_refine_controllers`' docstring names.  Found because a film
+        # of arch41's mission-best elite could not reproduce its score, and it
+        # does reproduce, to the last digit, with the shared policy removed.
         spec = None
-        if shared is not None and buffer is not None:
+        if shared is not None:
             spec = (
                 shared.n_obs, shared.n_modes,
                 int(shared.actor[0].out_features),
                 {k: v.detach().cpu().numpy()
                  for k, v in shared.state_dict().items()},
-                float(getattr(buffer, "shaping", 0.0)),
+                float(getattr(buffer, "shaping", 0.0)) if buffer is not None else 0.0,
                 int(kwargs.get("seed", 0)),
+                buffer is not None,
             )
 
         futures = []

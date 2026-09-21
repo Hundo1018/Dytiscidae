@@ -158,7 +158,9 @@ def load_teachers(run_dir, *, min_mission: float = 0.0,
             continue
         for e in data.get("elites", []):
             meta = e.get("meta") or {}
-            w = meta.get("policy")
+            # The fitted weights, where a promotion produced them: they sit
+            # beside the scored policy since 2026-09-21 rather than over it.
+            w = meta.get("policy_promoted") or meta.get("policy")
             if not w:
                 continue
             w = np.asarray(w, float)

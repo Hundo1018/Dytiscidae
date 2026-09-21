@@ -244,6 +244,8 @@ def evaluate_tier1(
     sea_state=None,
     perturb: dict | None = None,
     n_modes: int = 6,
+    detail: bool = False,
+    on_step=None,
 ) -> MissionResult:
     """Short dynamic episodes in each domain, plus transitions.
 
@@ -265,7 +267,12 @@ def evaluate_tier1(
         return r
 
     try:
-        env = TriphibianEnv(p, seed=seed, sea_state=sea_state, perturb=perturb)
+        # ``detail`` draws the lifting surfaces for a camera: massless,
+        # collisionless strips beside the box that collides, so the physics is
+        # the same -- which `test_a_film_is_the_evaluation` asserts rather than
+        # assumes.
+        env = TriphibianEnv(p, seed=seed, sea_state=sea_state, perturb=perturb,
+                            detail=detail)
     except Exception as exc:  # a genome that will not compile is simply dead
         r.notes.append(f"compile failed: {type(exc).__name__}: {exc}")
         r.wall_time = time.time() - t0
@@ -319,6 +326,8 @@ def evaluate_tier1(
             policy=ctrl.policy,
             basis=ctrl.basis_for(dom),
             domain=dom,
+            on_step=(None if on_step is None
+                     else (lambda e, i, _d=dom: on_step(_d, e, i))),
         )
         clamped_any |= env.solver.diag.clamped
         r.segments[dom.value] = seg

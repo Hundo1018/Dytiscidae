@@ -2900,12 +2900,89 @@ def test_each_phase_is_scored_on_its_own_purpose() -> None:
           schedule_for(Domain.WATER, np.random.default_rng(1))
           != schedule_for(Domain.WATER, np.random.default_rng(2)))
 
+def test_the_first_air_reset_is_like_every_other() -> None:
+    """Measuring a body's trim must not disturb the simulation it is measured for.
+
+    ``launch_speed`` is computed the first time it is read -- inside ``reset``,
+    for the air, after the spawn pose and its random offset are written -- and
+    until 2026-09-21 it probed on the live ``MjData``.  So the first air reset
+    of every phenotype object came out at the exact spawn, with the last
+    probe's velocities, and every later one did not: an air segment's start
+    depended on whether that phenotype's trim had been computed before.
+    """
+    print("\nreset: the first air reset of a body is like every other")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    cold = TriphibianEnv(build(BODY_PLANS["beetle"]()), seed=17)
+    warm = TriphibianEnv(build(BODY_PLANS["beetle"]()), seed=17)
+    _ = warm.launch_speed                       # trim computed before any reset
+    cold.reset(Domain.AIR)
+    warm.reset(Domain.AIR)
+    check("a body whose trim is computed inside reset starts where a warmed one does",
+          np.array_equal(cold.data.qpos, warm.data.qpos)
+          and np.array_equal(cold.data.qvel, warm.data.qvel),
+          f"cold {np.round(cold.data.qpos[:3], 4)} warm {np.round(warm.data.qpos[:3], 4)}")
+    check("and it carries the spawn's random offset, not the bare spawn point",
+          not np.allclose(cold.data.qpos[:3], TriphibianEnv.SPAWN[Domain.AIR]),
+          f"{np.round(cold.data.qpos[:3], 4)}")
+
+
+def test_a_film_is_the_evaluation() -> None:
+    """Attaching a camera to the Tier-1 evaluation must not change what it measures.
+
+    `viz/film.py` films an elite by re-running ``evaluate_tier1`` -- the function
+    that produces a score -- with ``detail=True`` (the lifting surfaces drawn as
+    the shape the fluid solver reads) and a per-step ``on_step`` hook.  Both are
+    meant to be invisible to the physics: the detail strips are massless and
+    collisionless, and the hook only reads.  If either leaked, every film would
+    be a slightly different experiment from the score printed on it, which is
+    the failure the film module exists to end.
+    """
+    print("\nfilm: a camera on the evaluation changes nothing it measures")
+    from dytiscidae.control.cpg import Policy
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import Controller, evaluate_tier1
+    from dytiscidae.envs.triphibian import TriphibianEnv
+
+    p = build(BODY_PLANS["beetle"]())
+    rng = np.random.default_rng(3)
+    pol = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=6, hidden=0)
+    pol.weights = rng.normal(0.0, 0.5, pol.n_weights)
+    base = evaluate_tier1(p, controller=Controller(params=None, policy=pol),
+                          segment_seconds=2.0, seed=17, identify_axes=True)
+    bases = {k.value if hasattr(k, "value") else k: v for k, v in base.mobility.items()}
+
+    def run(detail, hook):
+        seen = []
+        r = evaluate_tier1(p, controller=Controller(params=None, policy=pol, bases=dict(bases)),
+                           segment_seconds=2.0, seed=17, identify_axes=False, detail=detail,
+                           on_step=(lambda d, e, i: seen.append(i)) if hook else None)
+        return r, len(seen)
+
+    plain, _ = run(False, False)
+    filmed, calls = run(True, True)
+    same = all(
+        plain.segments[d].competence == filmed.segments[d].competence
+        and plain.segments[d].distance == filmed.segments[d].distance
+        for d in plain.segments)
+    check("detail geometry and a per-step hook leave every segment bit-identical",
+          same, " ".join(f"{getattr(d, 'value', d)} {plain.segments[d].distance:.6f}/"
+                         f"{filmed.segments[d].distance:.6f}" for d in plain.segments))
+    check("and the hook was actually called on every step of every segment",
+          calls == 3 * int(2.0 / TriphibianEnv(p).timestep), f"{calls} calls")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
     print("=" * 68)
     run_all([
         test_each_phase_is_scored_on_its_own_purpose,
+        test_the_first_air_reset_is_like_every_other,
+        test_a_film_is_the_evaluation,
         test_lift_sign_and_magnitude,
         test_buoyancy,
         test_bluff_drag_is_orientation_dependent,

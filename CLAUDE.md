@@ -194,10 +194,12 @@ steady state is ~74 s. Not a regression.
   seed was shared, and they still differ in water when identification is on.
   `tests/test_search.py` now asserts the agreement — read it before trusting an
   offline re-measurement.
-- **`on-task` in a showcase, and the film itself, are not evidence about a
-  design unless the control law is the one that earned the score.** The showcase
-  prints `driving as evaluated: ...` and says whether the mobility basis was
-  stored or re-identified; re-identified is a different experiment.
+- **A film is evidence only if it reproduces the score printed on it.** Until
+  2026-09-21 none did: `render --top` drove elites open-loop at seed 0, the
+  showcase added a shared policy the scores were earned without (the actor pool
+  had dropped it from every re-score), and the first air reset of every body
+  lost its spawn offset. `film_manifest.json` records, per medium, the recorded
+  and reproduced competence and which control law reproduced it.
 
 ## Before adding anything: look for it first
 
@@ -258,10 +260,20 @@ needs no third-party package and runs in about a second.
 | `.claude/skills/training-report/` | regenerates the report for any run |
 | `.claude/agents/` | six roles: explorer, mutator, assumption-breaker, adversary, judge, historian |
 
-Post-run: `.venv/bin/python .claude/skills/training-report/report.py runs/<run>`
-then film with `showcase --design runs/<run> --by mission` — `--by fitness` is
-the default and picks a different machine (corr was +0.70, close and not close
-enough).
+**Post-run happens by itself.** A search that finishes — direct or as a job —
+runs `ops.run postrun`: the chart report, then the films (`dytiscidae/viz/film.py`)
+into `runs/<run>/media/`, embedded at the top of `report.html`. By hand:
+`python -m dytiscidae.ops.run postrun --run runs/<run>`.
+
+**Judge a design only from `media/evaluated_vs_mission.mp4` and
+`film_manifest.json`, never from a continuous-mission film alone.** Each pair
+puts the medium *as it was evaluated* — the Tier-1 evaluation itself, re-run with
+a camera, same seed, scatter, task and control law — beside the continuous
+mission, which starts on the beach and shows only whether the machine can get
+between media. Every evaluated clip is stamped with the recorded and the
+reproduced score; a red one did not reproduce and is not evidence for that
+medium. On 2026-09-21 the continuous mission was shown alone and a water glider
+that could not leave the beach was read as "a machine that only trembles".
 
 ## The lesson this project keeps re-learning
 

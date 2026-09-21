@@ -814,6 +814,13 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     previous = state.archive.cells[cell].fitness if cell in state.archive.cells else 0.0
     meta = _meta(pheno, result, ctrl)
     meta["gen"] = int(state.archive.generation)
+    # What drove the scored rollout, so it can be driven again: whether the
+    # shared policy was summed in, and -- by `gen` -- which network it was
+    # (`scoring_networks/gen{gen}.npz`).  Before 2026-09-21 the actor pool
+    # silently dropped the shared policy from these rollouts on any generation
+    # split into more than one shard; a record without this key may have been
+    # scored either way.
+    meta["scored_with_shared_policy"] = bool(state.shared is not None)
     # The raw feature vector travels with the elite.  A learned projection moves,
     # and re-binning has to re-project from the features rather than from a
     # latent coordinate that no longer means the same thing.
@@ -1087,7 +1094,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 else:
                     child, operators = mutate(parent.genome, rng, operators=operators,
                                               n_ops=regime.n_mutations)
-                    inherited = parent.meta.get("policy")
+                    inherited = (parent.meta.get("policy_promoted")
+                                 or parent.meta.get("policy"))
                     if rng.random() < 0.15:
                         other = curator.select_parent()
                         if other is not None and other is not parent:
@@ -1106,6 +1114,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             if state.shared is not None:
                 from ..learning.ppo import RolloutBuffer
                 buffer = RolloutBuffer(shaping=cfg.reward_shaping)
+                _save_scoring_network(state, gen)
             evaluated = evaluate_candidates(
                 [b[0] for b in built], cfg,
                 inherited=[b[1] for b in built],
@@ -1505,6 +1514,25 @@ def save_state(state: SearchState, gen: int) -> None:
               f"{type(exc).__name__}: {exc})", flush=True)
 
 
+def _save_scoring_network(state: "SearchState", gen: int) -> None:
+    """The shared network exactly as it scores generation ``gen``.
+
+    ``policy_snapshots/`` is written with the checkpoint, every
+    ``checkpoint_every`` generations and *after* that generation's update, so
+    no snapshot is the network any elite was scored with -- a film re-driving
+    an elite scored at generation 25 had the choice of generation 20's
+    post-update network or 40's.  This is the one that scored ``gen``: written
+    before its evaluation, a few tens of kilobytes each.
+    """
+    try:
+        d = Path(state.config.run_dir) / "scoring_networks"
+        d.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(d / f"gen{gen:05d}.npz", **{
+            k: v.detach().cpu().numpy() for k, v in state.shared.state_dict().items()})
+    except Exception as exc:                                      # noqa: BLE001
+        print(f"  (scoring network for gen {gen} not saved: {exc})", flush=True)
+
+
 def load_state(state: SearchState) -> int:
     """Restore a previous run into ``state``.  Returns the generation to start at.
 
@@ -1851,7 +1879,8 @@ def _refined_controller_for(state: SearchState, elite, pheno, spec, rng):
 
     from ..envs import batchroll
 
-    policy = _controller_for(pheno, elite.genome, cfg, elite.meta.get("policy"))
+    policy = _controller_for(pheno, elite.genome, cfg,
+                             elite.meta.get("policy_promoted") or elite.meta.get("policy"))
     if policy is None or policy.weights.size == 0:
         return None
     ctrl = Controller(params=None, policy=policy)
@@ -1947,7 +1976,12 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
                 # place the search pays for a design twice, and discarding the
                 # better controller it just bought would make the second
                 # payment worthless to everyone except the critic.
-                elite.meta["policy"] = ctrl2.policy.weights.tolist()
+                # Beside the policy that earned the elite's recorded scores,
+                # not over it.  Overwriting "policy" left six of arch41's
+                # archive entries pairing Tier-1 numbers with weights that were
+                # never scored at Tier-1 -- a record nothing could reproduce.
+                # Inheritance and re-promotion read this first.
+                elite.meta["policy_promoted"] = ctrl2.policy.weights.tolist()
                 # And say that these weights were *fitted to this body*, rather
                 # than inherited from a parent.  Most archive entries carry a
                 # policy; only these were optimised.  The distillation study
