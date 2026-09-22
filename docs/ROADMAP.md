@@ -2166,7 +2166,7 @@ not taken from the headings below (two of which were stale).
 |---|---|---|
 | Z film = evaluation | pool fix, trim fix, clearance fix, promotion record, `viz/film.py`, automatic `postrun` | **done** |
 | U `min_shard` defaults | already 4 in all three places (`loop.py:95`, `actors.py:171`, CLI) | **done** — heading was stale |
-| S `mut_gait` | implemented (`genome.py:549`) with the operator floor; needs only its measurement, which arch42 carries | in arch42 |
+| S `mut_gait` | implemented (`genome.py:549`) with the operator floor; needs only its measurement, which arch42 carries | **in arch42**, running |
 | X task reward | hold depth 5.0–6.5 m and land command 0.04 m/s, from arch41's stop; the stillness band **stays 0.30 m/s** — at arch41's p75 (0.64) it paid a held-still beetle 0.093 in water, because that population's drift *is* passive sinking | **done** |
 | Y chatter | `command_rate`, `command_reversal` published on every segment; `action_rate_penalty` (default 0) charges the rate | **done**, flag off |
 | Y / O continuity | measured first (below): a continuous start would be a wall today | **designed**, not built |
@@ -2174,10 +2174,10 @@ not taken from the headings below (two of which were stale).
 | L aspect ratio | `runs/analysis_L_aspect_ratio.md`: no cost — AR buys static lift (+0.153) that never becomes flight | **closed** |
 | P refit | `runs/analysis_P_refit.md`: each refit erases more than islands grow between refits; subspace overlap now recorded, `descriptor_keep_if_overlap` (default 0) keeps unchanged axes | **done**, flag off |
 | R `shared_ent_coef` | a short sweep, after arch42 (it needs the machine) | queued |
-| N GRPO | the partial form, flag | after X/Y |
+| N GRPO | held on purpose: arch42 is the first run in which the shared policy is scored at all (item Z), and whether it helps decides whether a better estimator for it is worth building | after arch42's read |
 | W, T, V | superseded by X / closed / subsumed | closed |
 | Q triphibian conflict | a written decision for the user: what "a chain of pairs" would change | memo |
-| TEST_AUDIT 7 | re-run every mutation whose only catching suite is `test_search`, on the fixed harness | queued |
+| TEST_AUDIT 7 | 15 mutations are caught only by `test_search`. The 5 for this commit's code are caught by named checks — two of them against their own test function after the full-suite run timed out under four-way contention. The 10 older ones wait for the machine, after arch42 | 5 of 15 |
 
 ### Y / O — what a continuous start would do, measured before building it
 
