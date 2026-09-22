@@ -2808,11 +2808,11 @@ def test_each_phase_is_scored_on_its_own_purpose() -> None:
                                    Phase(CRUISE, 0.5, heading=0.0,
                                          speed=TASK_SPEED["water"], depth=depth)))
 
-    def water(depths, vel2):
-        """Score a water segment whose second half moves at ``vel2``."""
+    def water(depths, vel2, vel1=0.0):
+        """Score a water segment whose halves move at ``vel1`` and ``vel2``."""
         xy = np.zeros((n, 2))
         for i in range(1, n):
-            xy[i] = xy[i - 1] + (vel2 if i >= n // 2 else 0.0) * dt
+            xy[i] = xy[i - 1] + (vel2 if i >= n // 2 else vel1) * dt
         env._active_task = sched
         try:
             return env._task_scores(Domain.WATER, np.asarray(depths, float),
@@ -2836,12 +2836,31 @@ def test_each_phase_is_scored_on_its_own_purpose() -> None:
           hold_through["score"] < 0.1,
           f"hold {hold_through['score']:.3f}, depth error {hold_through['depth_error']:.2f} m, "
           f"moved {hold_through['drift']:.2f} m")
+    # arch42's held-still eel: 0.094 m/s, a third of the old band, reaching the
+    # commanded depth in the middle of the hold window.  It scored 0.63.
+    t_s = np.arange(n) * dt
+    slow = water(depth + 0.1 * (t_s - 0.375 * n * dt), np.array([v, 0.0]))
+    hold_slow = next(r for r in slow["phases"] if r["kind"] == HOLD)
+    check("sinking through it slowly does not count either",
+          hold_slow["score"] < 0.05,
+          f"hold {hold_slow['score']:.3f}, net {hold_slow['sink']:.3f} m/s")
+    # At the depth and level, but drifting across it: the vertical term cannot
+    # see this, so the stillness term has to.
+    sideways = water(at_depth, np.array([v, 0.0]), vel1=np.array([0.0, v]))
+    check("drifting sideways at the commanded depth is not holding it",
+          next(r for r in sideways["phases"] if r["kind"] == HOLD)["score"] < 0.05,
+          f"{next(r for r in sideways['phases'] if r['kind'] == HOLD)['score']:.3f}")
     across = water(at_depth, np.array([0.0, v]))
-    check("cruising across the commanded heading scores nothing for cruise",
-          next(r for r in across["phases"] if r["kind"] == CRUISE)["score"] == 0.0)
+    check("cruising across the commanded heading makes no progress",
+          next(r for r in across["phases"] if r["kind"] == CRUISE)["progress"] < 0.01,
+          f"{next(r for r in across['phases'] if r['kind'] == CRUISE)['progress']:.4f}")
     double = water(at_depth, np.array([2 * v, 0.0]))
-    check("and neither does going twice as fast as asked",
-          next(r for r in double["phases"] if r["kind"] == CRUISE)["score"] == 0.0)
+    # Forward is forward: the user's rule scores progress, so overshooting the
+    # commanded speed is not a penalty -- the command sets what full marks is.
+    check("going faster than asked is still full progress",
+          next(r for r in double["phases"] if r["kind"] == CRUISE)["progress"] > 0.99)
+    check("and a segment that holds, then cruises as told, scores full",
+          good["task"] > 0.99, f"{good['task']:.4f}")
     drifting = water(at_depth, np.array([0.1, 0.0]))
     # Drifting at 0.4 m/s while told to hold: most of ``HOLD_DRIFT_SPEED``.
     hold_drift = water(np.concatenate([at_depth[: n // 4], np.linspace(depth, depth + 2.4, n - n // 4)]),
@@ -2875,16 +2894,58 @@ def test_each_phase_is_scored_on_its_own_purpose() -> None:
     check("walking on when told to stop scores half", abs(runs_on - 0.5) < 0.05,
           f"{runs_on:.3f}")
 
+    # Air: a turn is scored as a response to the command -- the change in
+    # velocity across the old heading, toward the new one.  A body slowing
+    # down on its launch heading used to project onto a wide turn and score.
+    asched = TaskSchedule("air", (Phase(CRUISE, 0.0, heading=0.0, speed=10.0),
+                                  Phase(CRUISE, 0.5, heading=np.radians(120.0), speed=10.0)))
+
+    def air(v1, v2, airborne=None):
+        xy = np.zeros((n, 2))
+        for i in range(1, n):
+            xy[i] = xy[i - 1] + (v1 if i < n // 2 else v2) * dt
+        env._active_task = asched
+        try:
+            return env._task_scores(Domain.AIR, -np.full(n, 20.0), np.full(n, 20.0), xy, n,
+                                    airborne=airborne)
+        finally:
+            env._active_task = None
+
+    slowing = air(np.array([10.0, 0.0]), np.array([4.0, 0.0]))
+    turned = air(np.array([10.0, 0.0]), 10.0 * np.array([np.cos(np.radians(120)), np.sin(np.radians(120))]))
+    check("slowing down on the launch heading is not a turn",
+          slowing["measurements"]["turn_response"] == 0.0,
+          f"{slowing['measurements']['turn_response']:.3f}")
+    check("turning as commanded is", turned["measurements"]["turn_response"] > 0.8,
+          f"{turned['measurements']['turn_response']:.3f}")
+    # arch42's held-still gannets: down in the sea, sliding away from the
+    # commanded side, then stopped.  Stopping is a velocity change toward it.
+    stopped = air(np.array([10.0, -3.0]), np.zeros(2))
+    check("stopping after a slide away from the new heading is not a turn",
+          stopped["measurements"]["turn_response"] == 0.0,
+          f"{stopped['measurements']['turn_response']:.3f}")
+    # Reversing along the launch line changes velocity toward *every* turn more
+    # than 90 degrees off; only the normal to the old heading says it is none.
+    reversed_ = air(np.array([10.0, 0.0]), np.array([-10.0, 0.0]))
+    check("reversing along the launch line is not a turn either",
+          reversed_["measurements"]["turn_response"] == 0.0,
+          f"{reversed_['measurements']['turn_response']:.3f}")
+    wet = air(np.array([10.0, 0.0]), 10.0 * np.array([np.cos(np.radians(120)), np.sin(np.radians(120))]),
+              airborne=np.arange(n) < n // 2)
+    check("and a turn made on the water is not a turn in the air",
+          wet["measurements"]["turn_response"] == 0.0,
+          f"{wet['measurements']['turn_response']:.3f}")
+
     # --- 4. held still, on the real rollout path ---------------------------------
-    # Averaged over task draws, as a run draws them: a passive body that glides
-    # along its own nose scores when the drawn heading happens to lie along it,
-    # which is the user's "passive forward motion can score" -- and it cannot
-    # choose to, so on average it scores little.
+    # Averaged over task draws, as a run draws them.  Progress may be passive --
+    # a hull that glides forward is the user's "passive forward motion can
+    # score" -- so it is reported, not barred.  What must be chosen may not be:
+    # holding at a commanded depth, and responding to a stop.
     from dytiscidae.envs.tasks import task_seed
     for plan in ("beetle", "eel"):
         for dom in (Domain.WATER, Domain.LAND):
             e = TriphibianEnv(build(BODY_PLANS[plan]()), seed=3)
-            comps = []
+            chosen, prog = [], []
             for draw in range(8):
                 e.reset(dom)
                 e.scatter(np.random.default_rng(11 + draw))
@@ -2893,10 +2954,18 @@ def test_each_phase_is_scored_on_its_own_purpose() -> None:
                 still = CPGParams(amplitude=np.zeros(e.cpg.n), phase=np.asarray(b.phase, float),
                                   offset=np.asarray(e.data.qpos[e._act_qadr], float),
                                   frequency=float(b.frequency))
-                comps.append(e.rollout(8.0, params=still, domain=dom).competence)
-            check(f"{plan} held still in {dom.value} scores ~nothing, over 8 task draws",
-                  float(np.mean(comps)) < 0.05,
-                  f"mean {np.mean(comps):.4f}, max {np.max(comps):.4f}")
+                m = e.rollout(8.0, params=still, domain=dom).measurements
+                pr = float(m.get("cruise_progress" if dom is Domain.WATER else "walk_progress", 0.0))
+                prog.append(pr)
+                # Water: the hold must be chosen.  Land: stopping only qualifies
+                # the walk, so a still body can score no more than its own
+                # passive progress.
+                chosen.append(float(m.get("hold_score", 0.0)) if dom is Domain.WATER
+                              else max(0.0, float(m.get("task_score", 0.0)) - pr))
+            check(f"{plan} held still in {dom.value}: what must be chosen scores ~nothing",
+                  float(np.mean(chosen)) < 0.02,
+                  f"{'hold' if dom is Domain.WATER else 'beyond passive progress'} mean "
+                  f"{np.mean(chosen):.4f}, passive progress mean {np.mean(prog):.3f} (allowed)")
     check("and the task is re-drawn per generation, not fixed",
           schedule_for(Domain.WATER, np.random.default_rng(1))
           != schedule_for(Domain.WATER, np.random.default_rng(2)))

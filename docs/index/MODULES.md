@@ -2,7 +2,7 @@
 
 # Modules
 
-101 modules, 32,310 lines, 974 indexed symbols.
+101 modules, 32,461 lines, 974 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -103,24 +103,24 @@ is what makes a violation visible while reading.
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 68 | — | — | — |
 | `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 335 | — | `numpy` | `envs.triphibian` |
 | `envs.skills` | The actuator skill bench: learning to operate components, not vehicles. | 655 | — | `numpy` | `evolution.cmaes`, `physics.energy`, `physics.materials`, `physics.medium`, `physics.structure` |
-| `envs.tasks` | What a segment asks the machine to do, phase by phase. | 226 | — | — | — |
+| `envs.tasks` | What a segment asks the machine to do, phase by phase. | 248 | — | — | — |
 | `envs.transitions` | Crossing between media, scored rather than merely survived. | 455 | — | `numpy` | `envs.triphibian` |
-| `envs.triphibian` | The triphibian mission environment. | 2491 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.structure` |
+| `envs.triphibian` | The triphibian mission environment. | 2606 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.structure` |
 
 ## `evolution`
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `evolution.archive` | The MAP-Elites archive: a map of what is achievable, not a single winner. | 442 | — | `numpy` | — |
-| `evolution.auditor` | The third party: a check on both the designs and the judge. | 358 | — | `numpy` | — |
+| `evolution.auditor` | The third party: a check on both the designs and the judge. | 361 | — | `numpy` | — |
 | `evolution.cmaes` | CMA-ES for controller weights. | 231 | — | `numpy` | — |
 | `evolution.critic` | The critic: a learned adversary trained to catch what cheap evaluation misses. | 281 | — | `numpy` | — |
 | `evolution.curator` | The curator: active management of the search, not just survival of the fittest. | 784 | — | `numpy` | `core.genome`, `evolution.archive` |
-| `evolution.curriculum` | Staged evaluation: learn one medium, then a crossing, then the chain. | 510 | — | `numpy` | — |
+| `evolution.curriculum` | Staged evaluation: learn one medium, then a crossing, then the chain. | 509 | — | `numpy` | — |
 | `evolution.descriptors` | Learned behaviour descriptors, so the archive axes stop being my guesses. | 253 | — | `numpy` | — |
 | `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 319 | — | `numpy` | `evolution.curriculum` |
 | `evolution.judge` | The judge: a scoring standard that gets stricter as the population improves. | 498 | — | `numpy` | — |
-| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 2094 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
+| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 2106 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
 | `evolution.scout` | The scout: a network that predicts a lineage's potential, not its score. | 493 | — | `numpy` | — |
 
 ## `learning`

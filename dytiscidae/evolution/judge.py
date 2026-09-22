@@ -154,7 +154,7 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         # "the velocity error is under half the command": set on its physical
         # meaning because nothing has yet been trained to follow a command, and
         # to be re-derived from arch41's own distribution.
-        ("manoeuvres", "turn_tracking", 0.5),
+        ("manoeuvres", "turn_response", 0.5),
     ],
     "water": [
         # Depth as a gain over where the machine was released, not as an
@@ -229,7 +229,7 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         # Walks where it is told to: the walk phase's tracking of a commanded
         # heading and speed.  Was `land_speed` >= 0.05, displacement in any
         # direction.  0.5 set on its meaning; re-derive at arch41.
-        ("walks", "walk_tracking", 0.5),
+        ("walks", "walk_progress", 0.5),
     ],
     # Take-off, and it is deliberately a ladder of its own rather than rungs
     # appended to ``land``.  ``rung_reached`` stops at the first unmet rung, and

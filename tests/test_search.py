@@ -1434,7 +1434,7 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
         ({**pushes, "airborne_fraction": 0.9, "sink_rate": 0.2,
           "station_keeping": 0.8}, LIFT + THR + 5),
         ({**pushes, "airborne_fraction": 0.95, "sink_rate": -1.0,
-          "station_keeping": 0.8, "turn_tracking": 0.0}, LIFT + THR + 6),
+          "station_keeping": 0.8, "turn_response": 0.0}, LIFT + THR + 6),
     ]
     ok = all(rung_reached("air", m) == k for m, k in seq)
     check("the ladder orders capability", ok,
@@ -1448,7 +1448,7 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # being dropped from 30 m, and had no gradient between "makes no lift" and
     # "flies".
     perfect = {"airborne_fraction": 1.0, "sink_rate": -2.0, "thrust_margin": 2.0,
-               "station_keeping": 0.9, "turn_tracking": 0.9}
+               "station_keeping": 0.9, "turn_response": 0.9}
     check("a body that makes no lift scores nothing in air",
           rung_reached("air", {**perfect, "lift_margin": 0.0}) == 0,
           "a whole segment airborne, climbing, and it still cannot fly")
@@ -1463,7 +1463,7 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # seed at zero or negative, and `holds_station` reached once in 14,092
     # evaluations.
     glider = {"lift_margin": 3.0, "airborne_fraction": 1.0, "sink_rate": 0.2,
-              "station_keeping": 0.9, "turn_tracking": 0.9}
+              "station_keeping": 0.9, "turn_response": 0.9}
     check("a glider stops where gliding stops, however well it held station",
           rung_reached("air", {**glider, "thrust_margin": -0.2}) == LIFT + 4,
           f"rung {rung_reached('air', {**glider, 'thrust_margin': -0.2})} -- "
@@ -1569,9 +1569,9 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # `pushes`, not `flies`: without a thrust margin both of these stop at the
     # same rung and the check ties itself, which is not a test of anything.
     below = j.score("air", {**pushes, "airborne_fraction": 0.95, "sink_rate": -1.0,
-                            "station_keeping": 0.8, "turn_tracking": 0.0})
+                            "station_keeping": 0.8, "turn_response": 0.0})
     top = j.score("air", {**pushes, "airborne_fraction": 0.95, "sink_rate": -1.0,
-                          "station_keeping": 0.8, "turn_tracking": 0.9})
+                          "station_keeping": 0.8, "turn_response": 0.9})
     check("clearing six rungs never ties with clearing seven",
           below["total"] < top["total"], f"{below['total']:.3f} < {top['total']:.3f}")
 
@@ -1879,8 +1879,8 @@ def test_a_specialist_islands_curriculum_reads_only_its_own_medium() -> None:
         return NS(competence=c, measurements=m)
     # Good at sitting underwater, poor in the air: the measured shape.
     res = NS(mission_fraction=0.01, segments={
-        "air": seg(0.03, sink_rate=2.4, cruise_tracking=0.3),
-        "water": seg(0.90, depth_error=0.5, cruise_tracking=1.0),
+        "air": seg(0.03, sink_rate=2.4, cruise_progress=0.3),
+        "water": seg(0.90, depth_error=0.5, cruise_progress=1.0),
         "land": seg(0.05, land_speed=0.02)})
 
     class TS:
@@ -1909,7 +1909,7 @@ def test_a_specialist_islands_curriculum_reads_only_its_own_medium() -> None:
     # rate a glide would be proud of and no heading it chose, and paying it
     # here is the defect `sink_reduction` was introduced to close.
     falling = NS(mission_fraction=0.0, segments={
-        "air": seg(0.0, sink_rate=1.2, station_keeping=0.0, cruise_tracking=0.0)})
+        "air": seg(0.0, sink_rate=1.2, station_keeping=0.0, cruise_progress=0.0)})
     check("a machine that only falls opens nothing at stage 1",
           stage_score(1, falling, **air) == 0.0,
           f"{stage_score(1, falling, **air):.3f} on sink_rate 1.2, tracking 0.0")
@@ -2130,7 +2130,7 @@ def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> 
     # reached -- sinking is not a capability and does not open the stage.
     specialist = Res(0.02, 0.85, 0.03, 0.001,
                      {"water": {"depth_error": 0.8, "max_depth": 10.0,
-                                "depth_gain": 6.0, "cruise_tracking": 1.0}})
+                                "depth_gain": 6.0, "cruise_progress": 1.0}})
     useless = Res(0.02, 0.03, 0.03, 0.001)
     t = Trans(0.34, 0.4)
 
@@ -2343,7 +2343,7 @@ def test_promotion_needs_a_nonzero_answer_to_the_next_question() -> None:
             competence=0.9,
             measurements={"depth_error": 0.5, "max_depth": 9.0,
                           "depth_gain": 5.0, "water_speed": 0.5,
-                          "cruise_tracking": 1.0},
+                          "cruise_progress": 1.0},
         )
         return SimpleNamespace(segments={"water": seg}, mission_fraction=0.0)
 
@@ -2399,6 +2399,48 @@ def test_the_headline_is_the_mission() -> None:
               f"{len(gen_rows)} rows carry it")
         check("and it is a fraction, not a fitness",
               all(0.0 <= r["mission_best"] <= 1.0 for r in gen_rows))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_an_audit_perturbs_the_scored_experiment_and_nothing_else() -> None:
+    """The audit's ratio is the perturbation's, not a second experiment's.
+
+    It re-ran every design with no controller at seed 0 and divided that by a
+    score earned with the design's own policy plus the shared one at its own
+    seed -- and since the task is drawn from the seed, under another task.
+    arch40 invalidated 25 of 42 audits that way, held-out ratios up to 4.5.
+    A perturbation of x1.0 changes nothing, so it must retain exactly 1.
+    """
+    print("\naudit: the perturbation is the only thing that differs")
+    import shutil
+    import tempfile
+
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution import loop as loop_mod
+    from dytiscidae.evolution.auditor import Auditor
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+
+    tmp = tempfile.mkdtemp(prefix="dyt-audit-")
+    try:
+        state = run_search(SearchConfig(
+            generations=1, batch=1, seed=11, segment_seconds=1.0,
+            n_reference_seeds=1, n_random_seeds=0, islands=("generalist",),
+            tier2_every=999, audit_every=999, migrate_every=999,
+            checkpoint_every=999, run_dir=tmp, identify_axes_every=999,
+        ), MissionSpec())
+        check("the fixture leaves an elite to audit", bool(state.archive.cells))
+        if not state.archive.cells:
+            return
+        state.auditor = Auditor(held_out_seeds=0, perturbations=(("cd_scale", 1.0),))
+        loop_mod._audit(state, 1, MissionSpec(), np.random.default_rng(0))
+        rep = state.auditor.reports[-1]
+        # Two checks need only the result; the third is the perturbation, which
+        # runs only on a base above zero -- without it the 1.0 is a default.
+        check("the perturbation check ran", rep.checks_run == 3, f"{rep.checks_run} checks")
+        check("and a perturbation of x1.0 retains exactly what the scored experiment scored",
+              abs(rep.retained_fraction - 1.0) < 1e-9 and not rep.invalid,
+              f"retained {rep.retained_fraction:.4f}, invalid {rep.invalid}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -4082,6 +4124,7 @@ def main() -> int:
         test_a_run_can_be_picked_up_where_it_stopped,
         test_promotion_needs_a_nonzero_answer_to_the_next_question,
         test_the_headline_is_the_mission,
+        test_an_audit_perturbs_the_scored_experiment_and_nothing_else,
         test_promotion_spends_refinement_and_keeps_what_it_buys,
         test_a_shared_command_means_the_same_thing_on_every_body,
         test_the_identification_width_reaches_the_policy,

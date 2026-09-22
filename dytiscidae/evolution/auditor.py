@@ -215,11 +215,14 @@ class Auditor:
 
     # ---------------------------------------------------------------- audit
 
-    def audit(self, phenotype, result, *, reevaluate=None, name: str = "") -> AuditReport:
+    def audit(self, phenotype, result, *, reevaluate=None, name: str = "",
+              seed: int = 0) -> AuditReport:
         """Run every check that the available information supports.
 
         ``reevaluate(seed=..., perturb=...)`` should return a fresh
-        MissionResult.  When it is not supplied the audit still runs the checks
+        MissionResult, and ``result`` should be the same experiment with nothing
+        perturbed -- same control law, same ``seed`` -- so that a perturbation
+        is the only thing that differs between the two.  When it is not supplied the audit still runs the checks
         that need only the existing result, so an audit is never skipped
         entirely for want of a budget.
         """
@@ -258,7 +261,7 @@ class Auditor:
             for key, factor in self.perturbations:
                 rep.checks_run += 1
                 try:
-                    alt = reevaluate(seed=0, perturb={key: factor})
+                    alt = reevaluate(seed=seed, perturb={key: factor})
                 except Exception as exc:
                     rep.findings.append(Finding(
                         check="perturbation", severity="note",

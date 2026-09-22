@@ -2069,17 +2069,29 @@ def _audit(state: SearchState, gen: int, spec, rng) -> list:
         except Exception:
             continue
 
-        def reevaluate(seed=0, perturb=None, _p=pheno):
+        # The audit re-runs the experiment that was scored, perturbed, and
+        # nothing else.  It used to run with no controller at seed 0 and
+        # compare that against a score earned by the elite's own policy plus
+        # the shared one at its own seed -- and since the task is drawn from
+        # the seed, against a different task too.  arch40 invalidated 25 of
+        # its 42 audits on that comparison, with held-out ratios of 2.1 and
+        # 4.5: the base was not the thing being perturbed.  The base is now
+        # re-measured under the same law, so the ratio is the perturbation's.
+        own = _controller_for(pheno, elite.genome, cfg, elite.meta.get("policy"))
+        law = _with_shared(state, Controller(params=None, policy=own))
+        seed0 = int(elite.meta.get("eval_seed") or 0)
+
+        def reevaluate(seed=seed0, perturb=None, _p=pheno, _c=law):
             return evaluate_tier1(
-                _p, spec=spec, segment_seconds=cfg.segment_seconds,
-                identify_axes=False, seed=seed, perturb=perturb,
+                _p, spec=spec, controller=_c, segment_seconds=cfg.segment_seconds,
+                identify_axes=True, seed=seed, perturb=perturb,
             )
 
         class _Cheap:
-            mission_fraction = float(elite.meta.get("mission_fraction", 0.0))
+            mission_fraction = float(reevaluate().mission_fraction)
             segments: dict = {}
 
-        rep = state.auditor.audit(pheno, _Cheap(), reevaluate=reevaluate,
+        rep = state.auditor.audit(pheno, _Cheap(), reevaluate=reevaluate, seed=seed0,
                                   name=str(elite.meta.get("body_plan", "?")))
         state.telemetry.event({"kind": "audit", "gen": gen, "island": state.island,
                                "cell": list(elite.cell), **rep.summary()})

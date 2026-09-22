@@ -354,13 +354,71 @@ MUTATIONS: tuple = (
     Mutation(
         id="cruise-pays-for-speed-in-any-direction",
         path="dytiscidae/envs/triphibian.py",
-        find="                    track = float(np.clip(\n"
-             "                        1.0 - np.linalg.norm(v - want) / max(ph.speed, 1e-6), 0.0, 1.0))",
-        replace="                    track = float(np.clip(\n"
-                "                        np.linalg.norm(v) / max(ph.speed, 1e-6), 0.0, 1.0))",
+        find="                    along = float(v @ h)",
+        replace="                    along = float(np.linalg.norm(v))",
         defect="a cruise phase pays for speed whatever its direction, so drifting "
                "across the commanded heading is progress again",
         suites=("test_physics",), item="task tracking"),
+    Mutation(
+        id="turn-counts-slowing-down",
+        path="dytiscidae/envs/triphibian.py",
+        find="                n = np.array([-ha[1], ha[0]])\n"
+             "                if float(hb @ n) < 0.0:\n"
+             "                    n = -n",
+        replace="                n = (hb - ha) / max(float(np.linalg.norm(hb - ha)), 1e-9)",
+        defect="a turn is read along the difference of the two headings, so a "
+               "body slowing down on its launch heading scores as turning",
+        suites=("test_physics",), item="task response"),
+    Mutation(
+        id="audit-perturbs-another-seed",
+        path="dytiscidae/evolution/auditor.py",
+        find="                    alt = reevaluate(seed=seed, perturb={key: factor})",
+        replace="                    alt = reevaluate(seed=0, perturb={key: factor})",
+        defect="the perturbed re-run uses seed 0 -- another scatter and another task "
+               "-- so the audit's ratio measures the draw, not the perturbation",
+        suites=("test_search::test_an_audit_perturbs_the_scored_experiment_and_nothing_else",),
+        item="audit"),
+    Mutation(
+        id="audit-base-is-the-record",
+        path="dytiscidae/evolution/loop.py",
+        find="            mission_fraction = float(reevaluate().mission_fraction)",
+        replace="            mission_fraction = float(elite.meta.get(\"mission_fraction\", 0.0))",
+        defect="the audit divides a re-run by the recorded score, which another path "
+               "and another network earned, so the ratio is not the perturbation's",
+        suites=("test_search::test_an_audit_perturbs_the_scored_experiment_and_nothing_else",),
+        item="audit"),
+    Mutation(
+        id="air-height-counts-floating",
+        path="dytiscidae/envs/triphibian.py",
+        find="                        ab = (np.ones(top - lo, bool) if airborne is None\n"
+             "                              else np.asarray(airborne, bool)[lo:top])",
+        replace="                        ab = np.ones(top - lo, bool)",
+        defect="holding height no longer asks whether the machine is in the air, "
+               "so a body that fell into the sea floats to full marks",
+        suites=("test_physics",), item="task response"),
+    Mutation(
+        id="hold-ignores-sinking",
+        path="dytiscidae/envs/triphibian.py",
+        find="                               score=at * still * level * served)",
+        replace="                               score=at * still * served)",
+        defect="a hold stops asking whether the machine is still sinking, so a hull "
+               "passing through the commanded depth at 0.1 m/s scores for holding it",
+        suites=("test_physics",), item="task response"),
+    Mutation(
+        id="turn-counts-stopping",
+        path="dytiscidae/envs/triphibian.py",
+        find="                gain = min(float(b[\"v\"] @ n), float((b[\"v\"] - a[\"v\"]) @ n))",
+        replace="                gain = float((b[\"v\"] - a[\"v\"]) @ n)",
+        defect="a machine that slid away from the commanded side and stopped scores "
+               "the stop as a turn toward it",
+        suites=("test_physics",), item="task response"),
+    Mutation(
+        id="turn-ignores-airborne",
+        path="dytiscidae/envs/triphibian.py",
+        find="                        * min(a.get(\"airborne\", 1.0), b.get(\"airborne\", 1.0)))",
+        replace="                        * 1.0)",
+        defect="a turn is scored whether or not the machine is still in the air",
+        suites=("test_physics",), item="task response"),
     Mutation(
         id="hold-ignores-motion",
         path="dytiscidae/envs/triphibian.py",
@@ -383,8 +441,8 @@ MUTATIONS: tuple = (
     Mutation(
         id="land-stop-adds-to-the-walk",
         path="dytiscidae/envs/triphibian.py",
-        find="            task = walk[\"score\"] * (0.5 + 0.5 * stop[\"score\"])",
-        replace="            task = 0.5 * walk[\"score\"] + 0.5 * stop[\"score\"]",
+        find="            task = progress * (0.5 + 0.5 * stop[\"score\"])",
+        replace="            task = 0.5 * progress + 0.5 * stop[\"score\"]",
         defect="stopping on land adds to the walk instead of qualifying it, and a "
                "rock -- which stops perfectly -- scores half",
         suites=("test_physics",), item="task land"),
@@ -481,9 +539,9 @@ MUTATIONS: tuple = (
     Mutation(
         id="stage-one-reads-gross-measurements",
         path="dytiscidae/evolution/curriculum.py",
-        find='        for dom, key in (("air", "cruise_tracking"), ("water", "cruise_tracking"),',
+        find='        for dom, key in (("air", "cruise_progress"), ("water", "cruise_progress"),',
         replace='        best = float(np.clip(1.0 - meas.get("air", {}).get("sink_rate", 9.9) / 3.0, 0.0, 1.0))\n'
-                '        for dom, key in (("water", "cruise_tracking"),',
+                '        for dom, key in (("water", "cruise_progress"),',
         defect="the curriculum's directed stage pays for gliding from the 30 m "
                "launch again, which a machine with its actuators off also does",
         suites=("test_search",), item="sinking is not a capability"),

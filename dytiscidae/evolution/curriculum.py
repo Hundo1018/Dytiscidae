@@ -144,21 +144,20 @@ def stage_score(stage: int, result, transitions=None, *,
         # ladder measurements rather than competence, because "held depth" and
         # "scored well in water" are not the same claim.
         #
-        # Each one is the cruise phase's tracking of its command
-        # (``TriphibianEnv._task_scores``): the mean velocity over the phase's
-        # late half against the commanded heading and speed, in [0, 1], with
-        # the same definition in every medium -- so the three are comparable,
-        # which three differently-scaled gross quantities never were.  A
-        # machine standing still scores 0, one drifting across the heading
-        # scores 0, and one falling from the 30 m launch has a heading to hold
-        # after it is told to turn.
+        # Each one is the cruise phase's *progress* along its commanded heading
+        # (``TriphibianEnv._task_scores``): speed along the heading over the
+        # command, capped at 1, with a soft penalty on speed across it -- the
+        # same definition in every medium, so the three are comparable.  A
+        # machine standing still scores 0 and one drifting across the heading
+        # scores 0; progress may be passive (a glide), which is the user's rule.
         #
         # Until 2026-09-21 this read `station_keeping / 0.17`, `water_headway`
-        # and `land_speed / 0.4`: "going somewhere" measured three ways, none
-        # of them relative to where the machine was asked to go.
+        # and `land_speed / 0.4`; until 2026-09-22 the cruise phase's tracking,
+        # which gave a population that could not yet follow commands a median
+        # of exactly zero for 102 generations.
         best = 0.0
-        for dom, key in (("air", "cruise_tracking"), ("water", "cruise_tracking"),
-                         ("land", "walk_tracking")):
+        for dom, key in (("air", "cruise_progress"), ("water", "cruise_progress"),
+                         ("land", "walk_progress")):
             best = max(best, float(np.clip(
                 meas.get(dom, {}).get(key, 0.0), 0.0, 1.0)))
         return best

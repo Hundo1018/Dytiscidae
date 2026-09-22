@@ -799,14 +799,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Phase` | class | 114 | — | One purpose, over one stretch of a segment. |
-| `schedule_for` | function | 167 | `(domain, rng=None, *, trim_speed: float=0.0) -> TaskSchedule` | The two-phase script for one segment in ``domain``. |
-| `task_seed` | function | 220 | `(scatter_seed: int) -> int` | The task draw for one segment, derived from its scatter draw. |
-| `TaskSchedule` | class | 134 | — | The phases one segment is made of, in order. |
-| `Phase.moving` | property | 129 | `(self) -> bool` | — |
-| `TaskSchedule.at` | method | 148 | `(self, frac: float) -> Phase` | — |
-| `TaskSchedule.bounds` | method | 151 | `(self, n: int) -> list` | Sample index ranges ``[(lo, hi), ...]`` for a segment of ``n`` samples. |
-| `TaskSchedule.index_at` | method | 140 | `(self, frac: float) -> int` | The phase in force at ``frac`` of the way through the segment. |
+| `Phase` | class | 136 | — | One purpose, over one stretch of a segment. |
+| `schedule_for` | function | 189 | `(domain, rng=None, *, trim_speed: float=0.0) -> TaskSchedule` | The two-phase script for one segment in ``domain``. |
+| `task_seed` | function | 242 | `(scatter_seed: int) -> int` | The task draw for one segment, derived from its scatter draw. |
+| `TaskSchedule` | class | 156 | — | The phases one segment is made of, in order. |
+| `Phase.moving` | property | 151 | `(self) -> bool` | — |
+| `TaskSchedule.at` | method | 170 | `(self, frac: float) -> Phase` | — |
+| `TaskSchedule.bounds` | method | 173 | `(self, n: int) -> list` | Sample index ranges ``[(lo, hi), ...]`` for a segment of ``n`` samples. |
+| `TaskSchedule.index_at` | method | 162 | `(self, frac: float) -> int` | The phase in force at ``frac`` of the way through the segment. |
 
 ## `envs.transitions` — `dytiscidae/envs/transitions.py`
 
@@ -847,7 +847,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `TriphibianEnv.flap_travel` | method | 839 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
 | `TriphibianEnv.ground_height` | method | 1199 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
 | `TriphibianEnv.ground_heights` | method | 1208 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
-| `TriphibianEnv.identify` | method | 2454 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.identify` | method | 2569 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
 | `TriphibianEnv.launch_pitch` | property | 809 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
 | `TriphibianEnv.launch_speed` | property | 777 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
 | `TriphibianEnv.lift_margin` | property | 825 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
@@ -901,9 +901,9 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `check_energy_conservation` | function | 113 | `(result) -> Finding \| None` | The fluid must not be a power source. |
 | `check_scaling` | function | 144 | `(phenotype) -> Finding \| None` | Wing loading against mass, compared with the real world. |
 | `Finding` | class | 74 | — | One thing the auditor objected to. |
-| `Auditor.audit` | method | 218 | `(self, phenotype, result, *, reevaluate=None, name: str='') -> AuditReport` | Run every check that the available information supports. |
-| `Auditor.report` | method | 346 | `(self) -> dict` | — |
-| `Auditor.review_tightening` | method | 292 | `(self, judge, moves: list, invalid_designs) -> list` | Veto a bar that was moved by evidence that did not hold up. |
+| `Auditor.audit` | method | 218 | `(self, phenotype, result, *, reevaluate=None, name: str='', seed: int=0) -> AuditReport` | Run every check that the available information supports. |
+| `Auditor.report` | method | 349 | `(self) -> dict` | — |
+| `Auditor.review_tightening` | method | 295 | `(self, judge, moves: list, invalid_designs) -> list` | Veto a bar that was moved by evidence that did not hold up. |
 | `AuditReport.invalid` | property | 92 | `(self) -> bool` | — |
 | `AuditReport.summary` | method | 95 | `(self) -> dict` | — |
 
@@ -981,20 +981,20 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Curriculum` | class | 201 | — | Tracks what each lineage is ready to be asked. |
+| `Curriculum` | class | 200 | — | Tracks what each lineage is ready to be asked. |
 | `stage_score` | function | 100 | `(stage: int, result, transitions=None, *, domains=None, transition_names=None) -> float` | How well a result answers the question *this* stage asks. |
 | `StageResult` | class | 77 | — | — |
-| `Curriculum.evaluate` | method | 396 | `(self, cell, result, transitions=None) -> StageResult` | Score a design at its cell's stage, and at the next one up. |
-| `Curriculum.forget` | method | 470 | `(self, cell) -> None` | Drop a cell's stage when the cell itself is gone. |
-| `Curriculum.handover` | method | 283 | `(self, stage: int) -> float` | How much weight the island's own objective has earned, in [0, 1]. |
-| `Curriculum.mission_standing` | method | 371 | `(self, mission: float, stage: int=0) -> float` | ``mission_fraction`` as a population quantile, on the same scale. |
-| `Curriculum.observe_blend` | method | 271 | `(self, island_score: float, curriculum_score: float, stage: int=0, mission: float=0.0) -> None` | Record what each half of the blend said about one design. |
-| `Curriculum.rebuild_from` | method | 443 | `(self, archive) -> dict` | Re-key the stage record after the descriptor axes have moved. |
-| `Curriculum.report` | method | 479 | `(self) -> dict` | — |
-| `Curriculum.seed_stage` | method | 250 | `(self, cell, stage: int) -> int` | Give an unvisited cell the stage its parent had earned. |
-| `Curriculum.stage_of` | method | 247 | `(self, cell) -> int` | — |
-| `Curriculum.standing` | method | 330 | `(self, island_score: float, curriculum_score: float, stage: int=0)` | Both halves of the blend as population quantiles in [0, 1]. |
-| `Curriculum.update` | method | 414 | `(self, cell, sr: StageResult) -> str` | Promote or demote the cell.  Returns what happened. |
+| `Curriculum.evaluate` | method | 395 | `(self, cell, result, transitions=None) -> StageResult` | Score a design at its cell's stage, and at the next one up. |
+| `Curriculum.forget` | method | 469 | `(self, cell) -> None` | Drop a cell's stage when the cell itself is gone. |
+| `Curriculum.handover` | method | 282 | `(self, stage: int) -> float` | How much weight the island's own objective has earned, in [0, 1]. |
+| `Curriculum.mission_standing` | method | 370 | `(self, mission: float, stage: int=0) -> float` | ``mission_fraction`` as a population quantile, on the same scale. |
+| `Curriculum.observe_blend` | method | 270 | `(self, island_score: float, curriculum_score: float, stage: int=0, mission: float=0.0) -> None` | Record what each half of the blend said about one design. |
+| `Curriculum.rebuild_from` | method | 442 | `(self, archive) -> dict` | Re-key the stage record after the descriptor axes have moved. |
+| `Curriculum.report` | method | 478 | `(self) -> dict` | — |
+| `Curriculum.seed_stage` | method | 249 | `(self, cell, stage: int) -> int` | Give an unvisited cell the stage its parent had earned. |
+| `Curriculum.stage_of` | method | 246 | `(self, cell) -> int` | — |
+| `Curriculum.standing` | method | 329 | `(self, island_score: float, curriculum_score: float, stage: int=0)` | Both halves of the blend as population quantiles in [0, 1]. |
+| `Curriculum.update` | method | 413 | `(self, cell, sr: StageResult) -> str` | Promote or demote the cell.  Returns what happened. |
 
 ## `evolution.descriptors` — `dytiscidae/evolution/descriptors.py`
 

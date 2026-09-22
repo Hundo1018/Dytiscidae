@@ -59,7 +59,7 @@ from ..physics.energy import (
 from ..physics.fluid import FluidSolver
 from ..physics.medium import GRAVITY, MediumField, SeaState
 from ..physics.structure import ballast_pump_power
-from .tasks import (CRUISE, HOLD, HOLD_DRIFT_SPEED, STOP, TASK_SPEED, TaskSchedule,
+from .tasks import (CRUISE, HOLD, HOLD_DRIFT_SPEED, HOLD_SINK_SPEED, STOP, TASK_SPEED, TaskSchedule,
                     schedule_for)
 
 
@@ -1583,7 +1583,7 @@ class TriphibianEnv:
         self._height_ref = float(self.clearance())
 
     def _task_scores(self, domain: Domain, depths, clearances, xys,
-                     n_want: int) -> dict:
+                     n_want: int, airborne=None) -> dict:
         """Score each phase of the segment on its own purpose, and combine them.
 
         Every phase is measured over its **late half** -- the first half is
@@ -1638,10 +1638,22 @@ class TriphibianEnv:
             if top - mid >= 2:
                 span = (top - 1 - mid) * dt
                 served = (top - mid) / max(hi - mid, 1)
-                rec["measured"] = True
+                v = (xy[top - 1] - xy[mid]) / max(span, 1e-6)
+                rec.update(measured=True, v=v, served=served)
                 if ph.kind == CRUISE:
-                    v = (xy[top - 1] - xy[mid]) / max(span, 1e-6)
-                    want = ph.speed * np.array([math.cos(ph.heading), math.sin(ph.heading)])
+                    h = np.array([math.cos(ph.heading), math.sin(ph.heading)])
+                    want = ph.speed * h
+                    # Progress along the commanded heading, the part of the
+                    # score that may be passive (a glide, a hull that carries
+                    # itself -- the user's rule, 2026-09-21): the speed along
+                    # the heading over the command, capped at 1, times a soft
+                    # penalty on the speed across it.  Standing still and
+                    # drifting across the heading both score 0; going faster
+                    # than asked is still forward.
+                    along = float(v @ h)
+                    across = float(abs(v[0] * h[1] - v[1] * h[0]))
+                    rec["progress"] = float(np.clip(along / max(ph.speed, 1e-6), 0.0, 1.0)
+                                            * math.exp(-(across / max(ph.speed, 1e-6)) ** 2))
                     track = float(np.clip(
                         1.0 - np.linalg.norm(v - want) / max(ph.speed, 1e-6), 0.0, 1.0))
                     if domain is Domain.WATER:
@@ -1654,10 +1666,38 @@ class TriphibianEnv:
                         # ``flight`` alone is zero for everything not very nearly
                         # level, and a 4 s phase of it measured zero for 131 of
                         # 132 open-loop segments.
-                        sink = float((clr[mid] - clr[top - 1]) / max(span, 1e-6))
-                        flight = float(np.clip(1.0 - sink / 1.5, 0.0, 1.0))
-                        glide = float(np.clip(1.0 - sink / SINK_BALLISTIC, 0.0, 1.0))
-                        vert = (0.55 * flight + 0.25 * glide) / 0.80
+                        #
+                        # Holding height is only holding height in the air, so
+                        # it is measured from the start of the phase for as long
+                        # as the machine *stays* in the air, and weighted by
+                        # the share of the phase that is: a body that fell into
+                        # the sea floats at a sink rate of zero, and scored full
+                        # marks for it (the seed flappers, 0.141, against the
+                        # gannet's 0.187).  From the start, not over the late
+                        # half the other terms use -- that half is time to turn
+                        # or descend, and height needs none: the machine is
+                        # launched level at its own trim speed.  Measured on
+                        # arch42's top 40 at gen 102: 86% of air segments are
+                        # in the sea by 2.65 s, so a late-half window read zero
+                        # for every driven design (median 0.000, mean 0.004)
+                        # and air had no gradient at all.  A rock launched from
+                        # 30 m falls at ~12 m/s averaged over its flight and
+                        # still scores 0; a glide scores, as it may.
+                        ab = (np.ones(top - lo, bool) if airborne is None
+                              else np.asarray(airborne, bool)[lo:top])
+                        stay = int(np.argmin(ab)) if not ab.all() else len(ab)
+                        if stay >= 2:
+                            sink = float((clr[lo] - clr[lo + stay - 1])
+                                         / max((stay - 1) * dt, 1e-6))
+                            flight = float(np.clip(1.0 - sink / 1.5, 0.0, 1.0))
+                            glide = float(np.clip(1.0 - sink / SINK_BALLISTIC, 0.0, 1.0))
+                            vert = ((0.55 * flight + 0.25 * glide) / 0.80
+                                    * stay / max(hi - lo, 1))
+                        else:
+                            vert = 0.0
+                        late = (np.asarray(airborne, bool)[mid:top] if airborne is not None
+                                else np.ones(top - mid, bool))
+                        rec["airborne"] = float(np.mean(late)) if len(late) else 0.0
                     else:
                         vert = 1.0
                     rec.update(tracking=track, vertical=vert, score=track * vert * served)
@@ -1669,7 +1709,11 @@ class TriphibianEnv:
                     # 6.5 m right on time -- so the motion over the window is
                     # scored separately, against the distance
                     # ``HOLD_DRIFT_SPEED`` would cover in it: holding still
-                    # scores 1, drifting at that speed scores 0.
+                    # scores 1, drifting at that speed scores 0.  And the net
+                    # vertical rate on its own, against ``HOLD_SINK_SPEED``:
+                    # that band is the cruise speed, and arch42's held-still
+                    # eel passed through its target at 0.094 m/s and scored
+                    # 0.63 for holding it.
                     e_d = float(np.mean(np.abs(dep[mid:top] - float(ph.depth))))
                     p3 = np.column_stack([xy[mid:top], dep[mid:top]])
                     e_m = float(np.mean(np.linalg.norm(p3 - p3[0], axis=1)))
@@ -1677,8 +1721,10 @@ class TriphibianEnv:
                     band_m = max(HOLD_DRIFT_SPEED * span / 2.0, 1e-3)
                     at = float(np.clip(1.0 - e_d / scale, 0.0, 1.0))
                     still = float(np.clip(1.0 - e_m / band_m, 0.0, 1.0))
-                    rec.update(error=e_d + e_m, depth_error=e_d, drift=e_m,
-                               score=at * still * served)
+                    sink = float(abs(dep[top - 1] - dep[mid]) / max(span, 1e-6))
+                    level = float(np.clip(1.0 - sink / HOLD_SINK_SPEED, 0.0, 1.0))
+                    rec.update(error=e_d + e_m, depth_error=e_d, drift=e_m, sink=sink,
+                               score=at * still * level * served)
                 else:
                     drift = float(np.mean(np.linalg.norm(xy[mid:top] - xy[mid], axis=1)))
                     band = max(TASK_SPEED["land"] * span / 2.0, 1e-3)
@@ -1686,47 +1732,115 @@ class TriphibianEnv:
                         np.clip(1.0 - drift / band, 0.0, 1.0)) * served)
             phases.append(rec)
 
+        # The combination, as measured on arch42's elites against the same
+        # bodies held still (`runs/_logs/probe_shapes_score.py`, 2026-09-22).
+        # The linear, multiplied form before this left the whole population's
+        # median at exactly zero in every medium for 102 generations, so
+        # selection was choosing among ties.  The rule it follows is the
+        # user's: **progress may be passive, what must be chosen may not.**
+        #
+        # * progress along a commanded heading -- a glide, a hull carrying
+        #   itself -- scores however it is made;
+        # * turning on command is scored as a *response*: the change in
+        #   velocity across the old heading toward the new one, which a body
+        #   gliding on is not doing;
+        # * holding is scored as being at the commanded depth *and* still, and
+        #   stopping as a factor on the walk -- neither can pay a still body
+        #   more than its own passive progress;
+        # * sinking never scores by itself: the hold is at a commanded depth
+        #   below the release, and it must also be still.
+        #
+        # Measured means, driven / held still: land progress 0.240 / 0.009;
+        # water hold 0.056 / 0.048; air turn 0.061 / 0.040.  Water progress
+        # 0.313 / 0.220 and air height 0.336 / 0.352 are mostly passive, which
+        # the rule allows.  A stop *response* term on land was tried and
+        # dropped: a still eel that slid to rest scored 0.097 on it.
         m: dict = {}
+        def _served(*rs):
+            return min((r.get("served", 0.0) for r in rs), default=0.0)
+
         if domain is Domain.LAND:
             walk = next(r for r in phases if r["kind"] == CRUISE)
             stop = next(r for r in phases if r["kind"] == STOP)
-            task = walk["score"] * (0.5 + 0.5 * stop["score"])
+            wph = next(ph for ph in t.phases if ph.kind == CRUISE)
+            # Progress, qualified by stopping when told: a *product*, not the
+            # sum with a stop "response" that was tried first.  The response
+            # was measured as the walk-phase velocity minus the stop-phase
+            # velocity along the heading, and a body held still that slid and
+            # came to rest on its own read as having stopped on command -- the
+            # eel, 0.097 averaged over eight draws.  As a product, a still body
+            # can never score more than its own passive progress, which the
+            # user's rule allows; a rock scores zero.
+            progress = walk.get("progress", 0.0) * walk.get("served", 0.0)
+            task = progress * (0.5 + 0.5 * stop["score"])
             if walk["measured"]:
                 m["walk_tracking"] = walk["tracking"]
+                m["walk_progress"] = walk["progress"]
             if stop["measured"]:
                 m["stop_score"] = stop["score"]
                 m["stop_drift"] = stop["drift"]
-            m["cmd_heading"] = next(ph.heading for ph in t.phases if ph.kind == CRUISE)
+            m["cmd_heading"] = wph.heading
             m["task_walk_first"] = float(t.phases[0].kind == CRUISE)
+        elif domain is Domain.WATER:
+            cr = next(r for r in phases if r["kind"] == CRUISE)
+            ho = next(r for r in phases if r["kind"] == HOLD)
+            task = (0.5 * cr.get("progress", 0.0) * cr.get("served", 0.0)
+                    + 0.5 * ho["score"])
+            if cr["measured"]:
+                m["cruise_tracking"] = cr["tracking"]
+                m["cruise_progress"] = cr["progress"]
+                m["cruise_depth_hold"] = cr["vertical"]
+                m["cruise_score"] = cr["score"]
+            if ho["measured"]:
+                # Metres from where it was told to be, *plus* metres it
+                # moved: the ladder's `holds_depth` reads this at 1 m.
+                m["hold_error"] = ho["error"]
+                m["hold_depth_error"] = ho["depth_error"]
+                m["hold_drift"] = ho["drift"]
+                m["hold_sink_rate"] = ho["sink"]
+                m["hold_score"] = ho["score"]
+            m["cmd_depth"] = float(t.phases[0].depth)
+            m["cmd_heading"] = next(ph.heading for ph in t.phases if ph.kind == CRUISE)
+            m["task_hold_first"] = float(t.phases[0].kind == HOLD)
         else:
-            task = 0.5 * phases[0]["score"] + 0.5 * phases[1]["score"]
-            if domain is Domain.WATER:
-                cr = next(r for r in phases if r["kind"] == CRUISE)
-                ho = next(r for r in phases if r["kind"] == HOLD)
-                if cr["measured"]:
-                    m["cruise_tracking"] = cr["tracking"]
-                    m["cruise_depth_hold"] = cr["vertical"]
-                    m["cruise_score"] = cr["score"]
-                if ho["measured"]:
-                    # Metres from where it was told to be, *plus* metres it
-                    # moved: the ladder's `holds_depth` reads this at 1 m.
-                    m["hold_error"] = ho["error"]
-                    m["hold_depth_error"] = ho["depth_error"]
-                    m["hold_drift"] = ho["drift"]
-                    m["hold_score"] = ho["score"]
-                m["cmd_depth"] = float(t.phases[0].depth)
-                m["cmd_heading"] = next(ph.heading for ph in t.phases if ph.kind == CRUISE)
-                m["task_hold_first"] = float(t.phases[0].kind == HOLD)
-            else:
-                a, b = phases
-                if a["measured"]:
-                    m["cruise_tracking"] = a["tracking"]
-                    m["cruise_height_hold"] = a["vertical"]
-                if b["measured"]:
-                    m["turn_tracking"] = b["tracking"]
-                    m["turn_height_hold"] = b["vertical"]
-                m["cmd_turn"] = float(t.phases[1].heading)
-                m["cmd_speed"] = float(t.phases[0].speed)
+            a, b = phases
+            pa, pb = t.phases
+            turn = 0.0
+            if a["measured"] and b["measured"]:
+                # Toward the new heading *across* the old one only: a body
+                # slowing down on its launch heading has a velocity change
+                # with a component along any turn that is more than 90
+                # degrees from straight ahead, and was scored as turning.
+                ha = np.array([math.cos(pa.heading), math.sin(pa.heading)])
+                hb = np.array([math.cos(pb.heading), math.sin(pb.heading)])
+                n = np.array([-ha[1], ha[0]])
+                if float(hb @ n) < 0.0:
+                    n = -n
+                # Against what a perfect turn to the commanded heading would add
+                # across the old one, ``speed * sin(turn)``, so turning exactly
+                # as told scores 1 at any commanded angle.
+                want = max(pb.speed * float(hb @ n), 1e-6)
+                # And the second phase's own velocity must point to the new
+                # side, in the air.  arch42's held-still gannets fell 30 m,
+                # slid sideways away from the commanded side on the water and
+                # stopped: stopping is a velocity change *toward* it, and
+                # scored 0.28 and 0.34 as turning.
+                gain = min(float(b["v"] @ n), float((b["v"] - a["v"]) @ n))
+                turn = (float(np.clip(gain / want, 0.0, 1.0)) * _served(a, b)
+                        * min(a.get("airborne", 1.0), b.get("airborne", 1.0)))
+                m["turn_response"] = turn
+            height = float(np.mean([r.get("vertical", 0.0) * r.get("served", 0.0) for r in (a, b)]))
+            task = 0.5 * turn + 0.5 * height
+            if a["measured"]:
+                m["cruise_tracking"] = a["tracking"]
+                m["cruise_progress"] = a["progress"]
+                m["cruise_height_hold"] = a["vertical"]
+            if b["measured"]:
+                m["turn_tracking"] = b["tracking"]
+                m["turn_height_hold"] = b["vertical"]
+            m["height_hold"] = height
+            m["cmd_turn"] = float(pb.heading)
+            m["cmd_speed"] = float(pa.speed)
         m["task_score"] = float(task)
         return {"task": float(task), "phases": phases, "measurements": m}
 
@@ -2117,7 +2231,8 @@ class TriphibianEnv:
             # to hold height without giving it the one thing that holds a
             # flapping wing up.  A glider launched from 30 m sinks and cannot
             # turn when told, so it scores on neither phase.
-            ts = self._task_scores(domain, depths, clearances, xys, n_want)
+            ts = self._task_scores(domain, depths, clearances, xys, n_want,
+                                   airborne=airborne)
             tm = ts["measurements"]
             if gates:
                 # Gated designs publish zeros on the rungs, as every other air

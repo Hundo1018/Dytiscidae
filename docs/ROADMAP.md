@@ -2165,9 +2165,10 @@ not taken from the headings below (two of which were stale).
 | item | what "started" means | status |
 |---|---|---|
 | Z film = evaluation | pool fix, trim fix, clearance fix, promotion record, `viz/film.py`, automatic `postrun` | **done** |
+| Z2 audit = evaluation | the audit re-runs the scored experiment (own + shared policy, own seed), perturbed and nothing else | **done**, in arch42 |
 | U `min_shard` defaults | already 4 in all three places (`loop.py:95`, `actors.py:171`, CLI) | **done** — heading was stale |
 | S `mut_gait` | implemented (`genome.py:549`) with the operator floor; needs only its measurement, which arch42 carries | **in arch42**, running |
-| X task reward | hold depth 5.0–6.5 m and land command 0.04 m/s, from arch41's stop; the stillness band **stays 0.30 m/s** — at arch41's p75 (0.64) it paid a held-still beetle 0.093 in water, because that population's drift *is* passive sinking | **done** |
+| X task reward | **reshaped as S3 after arch42's first launch ran flat to gen 102 (see X)**; hold depth 5.0–6.5 m and land command 0.04 m/s, from arch41's stop; the stillness band **stays 0.30 m/s** — at arch41's p75 (0.64) it paid a held-still beetle 0.093 in water, because that population's drift *is* passive sinking | **done** |
 | Y chatter | `command_rate`, `command_reversal` published on every segment; `action_rate_penalty` (default 0) charges the rate | **done**, flag off |
 | Y / O continuity | measured first (below): a continuous start would be a wall today | **designed**, not built |
 | M complexity | `runs/analysis_M_complexity.md`: do not charge — it is the air/water conflict (+0.139 air, −0.280 water), not bloat | **closed** |
@@ -2268,7 +2269,7 @@ Then, in this order:
 
 ---
 
-### X. The reward has no task — raised by the user 2026-09-21, **implemented the same day, unrun**
+### X. The reward has no task — raised by the user 2026-09-21; **reshaped twice, S3 running in arch42**
 
 The user's objection: "if the operation's purpose is to go forward, forward should
 score; if it is to hover in a medium, it should hover then, and movement should be
@@ -2377,6 +2378,73 @@ multipliers were walls — water machines mostly never descend (max depth p50
 0.64 m/s, land command 0.04 m/s) are in the run's notes, **measured and not
 applied**: the user decided not to relaunch.
 
+**arch42 applied them and was stopped flat at generation 102**
+(`runs/arch42_stopped_gen102_flat`; the user: "停掉，改任務計分的形狀"). Task
+score over the archive's 163 elites: water median 0.000 (29% non-zero), land
+0.001 (52%), air 0.000. Tracking was the wall: `1 - |v - v_cmd| / |v_cmd|` is
+zero for standing still, for drifting across the heading *and* for going twice
+as fast, and it was multiplied by vertical terms most machines failed.
+
+#### S3 — the shape arch42 relaunched on (2026-09-22)
+
+Relaunch bar, set before the work: on arch42's own top 40 elites, driven as
+scored, the task-score median must be above zero, and the same bodies with
+every actuator held still must score ~0 on what has to be chosen. Progress may
+be passive — the user's rule allows a glide, and forward motion in water
+through the mechanism — so it is reported, not barred.
+
+| medium | score |
+|---|---|
+| water | `0.5 progress + 0.5 hold`; hold = at the depth × not moving × **not sinking** |
+| land | `progress * (0.5 + 0.5 stop)` — a rock stops perfectly, so stopping qualifies the walk |
+| air | `0.5 turn + 0.5 height`; turn = the velocity change across the launch heading toward the new one, over `speed * sin(turn)` |
+
+Progress is `clip(v·h / v_cmd, 0, 1) * exp(-(v_across / v_cmd)^2)`: forward is
+forward, and overshooting the command is not a penalty.
+
+**Four leaks found only on the real path** — the fabricated traces and the two
+seed plans held still passed every one of them. Each now has a check and a
+mutation that the check catches:
+
+| leak | who, held still | paid | fix | mutation |
+|---|---|---|---|---|
+| air height while floating | seed flappers, fallen into the sea | 0.141 (gannet 0.187) | height counts only time in the air | `air-height-counts-floating` |
+| hold = passing through the target | an eel at 0.094 m/s, a gannet at an oscillation's turning point | 0.63, 0.51 | net vertical rate against `HOLD_SINK_SPEED` 0.05 m/s | `hold-ignores-sinking` |
+| turn = stopping after a slide | two gannets, slid away from the commanded side on the water | 0.28, 0.34 | the second phase's own velocity must point to the new side | `turn-counts-stopping` |
+| turn on the water | the same | — | the turn is gated on being airborne | `turn-ignores-airborne` |
+
+`HOLD_SINK_SPEED` is set *below* the passive distribution on purpose: the held
+holders crossed their target at 0.048–0.233 m/s, and the 7 *driven* holders at
+0.026–0.172. **No controller in arch42 held depth better than a body doing
+nothing**, so hold was paying coincidence. Two checks were added for mutants
+the new gates made redundant: sideways drift at depth (`hold-ignores-motion`)
+and reversing along the launch line (`turn-counts-slowing-down`).
+
+Air height is measured from the start of each phase, for as long as the
+machine stays up, weighted by the share of the phase it does — not over the
+late half, which is time to turn or descend. 86% of air segments are in the sea
+by 2.65 s, and a late-half window read zero for every driven design.
+
+Validation, `runs/_logs/validate_shape_real_path.py`, 288 segments through
+`rollout()` (driven / held still):
+
+| | median | mean | on what must be chosen |
+|---|---|---|---|
+| water | **0.133** / 0.018 | 0.161 / 0.110 | hold 0.008 / **0.001** |
+| land | **0.058** / 0.000 | 0.166 / 0.009 | beyond progress 0 / **0** |
+| air | **0.000** / 0.000 | 0.015 / 0.009 | turn 0.010 / **0.000** |
+
+Water and land pass. **Air does not, and not because of the shape.** With the
+leaks closed, 84% of driven air segments fall at a ballistic average over their
+whole flight. Grading below that would pay drag and tumbling — the defect the
+air ladder's first two rungs had ("Why nothing has ever flown" §2). Air's honest
+gradient is a glide, which 16% of driven segments have (mean 0.015). The rest
+has to come from the design side: the lift rungs, not the controller. arch42's
+gen-50 bar was always water and land for this reason.
+
+And hold is now a capability nobody has: 2% of driven water segments score on
+it, one real holder at 0.333 against a held-still maximum of 0.037.
+
 ### Z. No film was of the scored experiment — and the search's own scores were not what it meant them to be — **fixed 2026-09-22**
 
 The user, after item Y: film each medium from where it was evaluated, beside
@@ -2439,6 +2507,36 @@ shared policy, every raw measurement compared); mutations
 
 **Not comparable across this commit:** re-scores now include the shared policy,
 and the first air reset of each body carries its spawn offset.
+
+### Z, part two. The audit was not the scored experiment either — **fixed 2026-09-22**
+
+Found when S3 made a one-generation test fixture lose its only elite. The
+auditor's `reevaluate` ran the design **with no controller, at seed 0**, and
+divided that by the `mission_fraction` the design had earned with its own policy
+plus the shared one, on the batched path, at its own seed. Since the task is
+drawn from the seed, the audit also changed the task. So the "perturbation"
+ratio compared two different experiments, and an audit that removes a design
+from the archive, labels it 0 for the critic and can veto the judge was acting
+on that comparison.
+
+- arch40 invalidated **25 of its 42 audits**, with held-out ratios of 2.1 and
+  4.5 beside collapses to 0–3%: noise in the base, read as model dependence.
+- arch42's first launch invalidated none, only because every audited base was
+  exactly zero and the check skips a zero base. S3's graded scores would have
+  switched it on.
+- Measured on the fixture's elite, a **×1.0** perturbation read **2.2152**
+  against the recorded score. After the fix it reads 1.0000.
+
+Now the audit rebuilds the elite's control law (its own policy plus the shared
+one), re-measures the base under that law at the elite's eval seed, and
+perturbs that same experiment. The held-out seeds still change the seed, and
+with it the task, which is what a held-out seed is for. Held by
+`test_an_audit_perturbs_the_scored_experiment_and_nothing_else` and two
+mutations (`audit-perturbs-another-seed`, `audit-base-is-the-record`).
+
+Not done: a floor on the base. A design at 0.0004 of the mission has nothing to
+collapse, and whether a same-experiment collapse at that level still means "the
+design depends on the model" is a question for arch42's audit events.
 
 ### Y. The filmed arch40 machine never leaves the beach — raised by the user 2026-09-21, **measured, not acted on**
 

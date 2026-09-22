@@ -32,9 +32,15 @@ Two phases per segment, each half of it:
     land    walk on a heading  |  stop and stay stopped
             (order drawn per generation)
 
-A passive machine does the same thing whatever it is commanded, so it cannot
-score on both halves of one segment.  That is the job the passive twin did,
-done by the command switch at no extra rollout.
+What is scored in each phase (``TriphibianEnv._task_scores``, reshaped
+2026-09-22 after 102 generations of arch42 at a median of exactly zero): progress
+along a commanded heading, which may be passive -- a glide is a capability --
+and the things that must be chosen, which may not: holding at a commanded depth
+and staying still, stopping when told, turning when told.  A passive body does
+the same thing whatever it is commanded, so it cannot score on those, and no
+passive twin has to run to know it.  Holding height counts only the samples
+spent in the air: a body that fell into the sea floats at a sink rate of zero,
+and without that gate it scored full marks for it.
 
 Everything here is plain data and arithmetic: no MuJoCo, no numpy state.  The
 scoring that reads it is ``TriphibianEnv._task_scores``.
@@ -104,6 +110,22 @@ DEFAULT_HEADING = math.pi / 2
 #: still paid it 0.056.  At 0.30 m/s the held-still beetle scores 0.018 and a
 #: hull sinking at 0.55 m/s scores exactly 0 on stillness.
 HOLD_DRIFT_SPEED = 0.30
+
+#: How fast a machine may still be sinking or rising, net over the window, and
+#: be holding its depth, m/s.  Scored separately from ``HOLD_DRIFT_SPEED``
+#: because that band is the cruise command itself, and a hull passing *through*
+#: the commanded depth at a third of it held it well enough to score.
+#:
+#: **Set below the passive distribution, on purpose.**  Measured 2026-09-22 on
+#: arch42's top 40 elites (gen 102): with every actuator held still, 5 of 40
+#: water segments scored over 0.1 on hold, up to 0.63 -- an eel of density
+#: 1.008 sinking at 0.094 m/s that reached its commanded 5.72 m inside the
+#: window, a gannet at the turning point of a passive oscillation at 0.048 m/s --
+#: and they crossed at 0.048 to 0.233 m/s.  The 7 *driven* holders crossed at
+#: 0.026 to 0.172 m/s: no controller in that population held depth better than
+#: a body doing nothing, so hold was paying coincidence.  At 0.05 m/s passing
+#: through scores nothing and a controller that slows at the target earns it.
+HOLD_SINK_SPEED = 0.05
 
 #: Kinds of phase.  ``stop`` is ``hold`` on land, where there is no depth or
 #: height to hold and the only thing to hold is position.
