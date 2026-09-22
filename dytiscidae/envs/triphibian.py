@@ -1506,13 +1506,16 @@ class TriphibianEnv:
         # ``responses`` are per control decision, and exist so the air score can
         # tell a commanded turn from a tumble -- see ``_turn_authority``.
         spins, commands, responses, vzs, xys = [], [], [], [], []
+        # The commanded gait gain at each recorded step; stays empty for a
+        # controller without the channel.
+        gains, cur_gain = [], None
         peak_slam = 0.0
         cur = p
 
         for i in range(n_steps):
             if policy is not None and basis is not None and i % control_every == 0:
-                coeffs = policy.act(self.observation(domain))
-                cur = basis.command_params(p, coeffs, self.cpg.n)
+                cur, coeffs, cur_gain = basis.command_policy(
+                    p, policy.act(self.observation(domain)), self.cpg.n, policy)
                 commands.append(np.asarray(basis.twist_of(coeffs), float)[3:])
                 responses.append(self.body_twist()[3:])
             angles = self.cpg.command(cur, self.data.time)
@@ -1534,6 +1537,8 @@ class TriphibianEnv:
             spins.append(float(np.linalg.norm(self.body_twist()[3:])))
             vzs.append(float(self.body_twist()[2]))
             xys.append(pos[:2].copy())
+            if cur_gain is not None:
+                gains.append(cur_gain)
             peak_slam = max(peak_slam, self.solver.diag.slam)
             if on_step is not None:
                 on_step(self, i)
@@ -1557,7 +1562,7 @@ class TriphibianEnv:
             domain, res, np.array(depths), np.array(alts),
             np.array(ups), np.array(contacts), np.array(clearances),
             spins=np.array(spins), commands=commands, responses=responses,
-            vzs=np.array(vzs), xys=np.array(xys),
+            vzs=np.array(vzs), xys=np.array(xys), gains=gains,
         )
         self._active_task = None
         return res
@@ -1581,6 +1586,28 @@ class TriphibianEnv:
         self._seg_t0 = float(self.data.time)
         self._seg_T = max(float(duration), 1e-6)
         self._height_ref = float(self.clearance())
+
+    def _publish_gains(self, res, gains) -> None:
+        """The mean commanded gait gain over each kind of phase.
+
+        ``gain_cruise``, ``gain_hold``, ``gain_stop``: whether the controller
+        uses the channel the way the task asks -- down when told to stop or
+        hold, up or level when told to go.  Published only when the controller
+        has the channel; a run without it has no gain to report, and a 1.0 in
+        its place would read as "commanded the design's own gait".
+        """
+        g = np.asarray(gains if gains is not None else [], float)
+        t = self._active_task
+        if not len(g) or t is None:
+            return
+        n = max(int(round(self._seg_T / self.timestep)), 1)
+        by_kind: dict = {}
+        for (lo, hi), ph in zip(t.bounds(n), t.phases):
+            seg = g[lo:min(hi, len(g))]
+            if len(seg):
+                by_kind.setdefault(ph.kind, []).append(seg)
+        for kind, parts in by_kind.items():
+            res.measurements[f"gain_{kind}"] = float(np.mean(np.concatenate(parts)))
 
     def _task_scores(self, domain: Domain, depths, clearances, xys,
                      n_want: int, airborne=None) -> dict:
@@ -1846,7 +1873,7 @@ class TriphibianEnv:
 
     def _score_segment(self, domain, res, depths, alts, ups, contacts,
                        clearances=None, *, spins=None, commands=None,
-                       responses=None, vzs=None, xys=None) -> float:
+                       responses=None, vzs=None, xys=None, gains=None) -> float:
         """Domain competence in [0, 1].
 
         ``spins`` is the body angular rate magnitude at each recorded step, and
@@ -1909,6 +1936,7 @@ class TriphibianEnv:
         # had a controller -- a diagnostic no rung reads, so a run can measure
         # its distribution before anyone sets the penalty's weight from it.
         stats = command_statistics(commands)
+        self._publish_gains(res, gains)
         chatter = 1.0
         if stats is not None:
             res.measurements["command_rate"], res.measurements["command_reversal"] = stats

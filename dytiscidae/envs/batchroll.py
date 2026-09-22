@@ -44,6 +44,7 @@ import os as _os
 import numpy as np
 
 from ..physics.medium import GRAVITY
+from ..control.cpg import TWIST_DIM, gait_gain
 from .triphibian import Domain
 
 #: ``mojo/build``, as an absolute path.  Used both to put the extension on
@@ -560,7 +561,7 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
     # ``clears``; ``cmds``/``resp`` are per control decision.  All three feed
     # the air branch's tumble-versus-commanded-turn test.
     rec = [dict(depths=[], alts=[], ups=[], contacts=[], clears=[], slam=0.0,
-                spins=[], cmds=[], resp=[], vzs=[], xys=[])
+                spins=[], cmds=[], resp=[], vzs=[], xys=[], gains=[], gain=None)
            for _ in envs]
     cur = list(params_list)
     active = np.ones(k, dtype=bool)
@@ -593,10 +594,17 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                     obs = (shared_out[m][0] if m in shared_out
                            else e.observation(domain))
                     coeffs = np.zeros(bases[m].modes.shape[0])
+                    # The gait-gain intents of both halves, summed like the
+                    # modes (``control.cpg.GAIN_RANGE``); None when neither has
+                    # the channel, so a legacy controller drives as it did.
+                    gain = None
                     if policies is not None and policies[m] is not None:
                         own = np.asarray(policies[m].act(obs), float)
-                        w = min(len(own), len(coeffs))
+                        n_own = int(getattr(policies[m], "n_modes", len(own)))
+                        w = min(len(own), len(coeffs), n_own)
                         coeffs[:w] += own[:w]
+                        if len(own) > n_own:
+                            gain = float(own[n_own])
                     if shared is not None:
                         # Sample only when this rollout is feeding the learner.
                         # The exploration noise exists to generate on-policy
@@ -609,14 +617,19 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                         # index: mode k means something different on every body
                         # (see MobilityBasis), so a shared action indexed by
                         # mode averaged to nothing.
-                        coeffs = coeffs + bases[m].coeffs_for_twist(a)
+                        a_np = np.asarray(a, float)
+                        if len(a_np) > TWIST_DIM:
+                            gain = (gain or 0.0) + float(a_np[TWIST_DIM])
+                        coeffs = coeffs + bases[m].coeffs_for_twist(a_np[:TWIST_DIM])
                         if collector is not None:
                             from ..learning.ppo import potential_of
                             collector.record(
                                 m, obs, a, logp, val,
                                 potential_of(obs, getattr(domain, "value", str(domain))))
                     cur[m] = bases[m].command_params(
-                        params_list[m], coeffs, e.cpg.n)
+                        params_list[m], coeffs, e.cpg.n,
+                        gain=1.0 if gain is None else gait_gain(gain))
+                    rec[m]["gain"] = None if gain is None else gait_gain(gain)
                     rec[m]["cmds"].append(
                         np.asarray(bases[m].twist_of(coeffs), float)[3:])
                     rec[m]["resp"].append(e.body_twist()[3:])
@@ -648,6 +661,8 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
             r["contacts"].append(1.0 if e._touching_ground() else 0.0)
             r["spins"].append(float(np.linalg.norm(e.body_twist()[3:])))
             r["vzs"].append(float(e.body_twist()[2]))
+            if r["gain"] is not None:
+                r["gains"].append(r["gain"])
             r["xys"].append(pos[:2].copy())
             r["slam"] = max(r["slam"], e.solver.diag.slam)
 
@@ -676,7 +691,7 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
             np.array(r["ups"]), np.array(r["contacts"]), np.array(r["clears"]),
             spins=np.array(r["spins"]), commands=r["cmds"],
             responses=r["resp"], vzs=np.array(r["vzs"]),
-            xys=np.array(r["xys"]))
+            xys=np.array(r["xys"]), gains=r["gains"])
     for e in envs:
         e._active_task = None
     return res
@@ -933,20 +948,29 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
                     and (c.policy is not None or shared is not None)):
                 obs = e.observation(target)
                 coeffs = _np.zeros(bases[m].modes.shape[0])
+                gain = None
                 if c.policy is not None:
                     own = _np.asarray(c.policy.act(obs), float)
-                    w = min(len(own), len(coeffs))
+                    n_own = int(getattr(c.policy, "n_modes", len(own)))
+                    w = min(len(own), len(coeffs), n_own)
                     coeffs[:w] += own[:w]
+                    if len(own) > n_own:
+                        gain = float(own[n_own])
                 if shared is not None:
                     a, logp, val = shared.act(
                         obs, deterministic=collector is None)
-                    coeffs = coeffs + bases[m].coeffs_for_twist(a)
+                    a_np = _np.asarray(a, float)
+                    if len(a_np) > TWIST_DIM:
+                        gain = (gain or 0.0) + float(a_np[TWIST_DIM])
+                    coeffs = coeffs + bases[m].coeffs_for_twist(a_np[:TWIST_DIM])
                     if collector is not None:
                         from ..learning.ppo import potential_of
                         collector.record(
                             m, obs, a, logp, val,
                             potential_of(obs, getattr(target, "value", "transition")))
-                cur[m] = bases[m].command_params(c.params, coeffs, e.cpg.n)
+                cur[m] = bases[m].command_params(
+                    c.params, coeffs, e.cpg.n,
+                    gain=1.0 if gain is None else gait_gain(gain))
             angles.append(e.cpg.command(cur[m], e.data.time))
 
         was = active.copy()

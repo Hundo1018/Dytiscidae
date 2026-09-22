@@ -168,6 +168,7 @@ def cmd_search(args) -> int:
         min_shard=args.min_shard,
         action_rate_penalty=args.action_rate_penalty,
         descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
+        gait_gain=bool(args.gait_gain),
         segment_seconds=args.segment_seconds,
         controller_refine_steps=args.refine_steps,
         controller_refine_sigma=args.refine_sigma,
@@ -517,10 +518,13 @@ def controller_for_elite(design_dir, elite, p, seed: int, *, log=print):
     env0 = TriphibianEnv(p, seed=seed)
     own = None
     w = (elite.meta or {}).get("policy")
-    pol = _Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=6, hidden=0)
-    if w is not None and len(w) == pol.n_weights:
-        pol.weights = _np.asarray(w, float).copy()
-        own = pol
+    # Either width: a run with the gait-gain channel stores one more output.
+    for _gain in (False, True):
+        pol = _Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=6, hidden=0, gain=_gain)
+        if w is not None and len(w) == pol.n_weights:
+            pol.weights = _np.asarray(w, float).copy()
+            own = pol
+            break
 
     # The basis the score was earned against, if the run recorded it.
     #
@@ -931,6 +935,10 @@ def main(argv=None) -> int:
                    help="keep the learned axes when a refit would reproduce "
                         "them (subspace overlap at or above this); 0 = off "
                         "(ROADMAP item P)")
+    p.add_argument("--gait-gain", action="store_true",
+                   help="give both policies a gait-gain output, a factor on the "
+                        "commanded amplitude, so stopping and throttling are "
+                        "reachable (control.cpg.GAIN_RANGE); off by default")
     p.add_argument("--action-rate-penalty", type=float, default=0.0,
                    help="weight of the command-rate penalty on competence "
                         "(ROADMAP item Y); 0 = off")

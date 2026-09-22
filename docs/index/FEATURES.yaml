@@ -118,6 +118,17 @@ MobilityIdentification:
     - tests.test_mobility_cache
   note: the measured map from command to body twist; what makes one policy drive every body
 
+GaitGain:
+  implementation:
+    - control.cpg.gait_gain
+    - control.cpg.split_command
+    - control.cpg.MobilityBasis.command_policy
+    - envs.evaluate.SummedPolicy
+  tests:
+    - tests.test_physics::test_the_gait_gain_can_stop_a_machine
+    - tests.test_search::test_the_gait_gain_drives_the_same_on_every_path
+  note: a factor on the commanded amplitude, so stopping and throttling are in the action space (--gait-gain)
+
 ControllerSearch:
   implementation:
     - control.train.train_controller

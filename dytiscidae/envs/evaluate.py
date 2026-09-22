@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..control.cpg import CPGParams, MobilityBasis, Policy
+from ..control.cpg import TWIST_DIM, CPGParams, MobilityBasis, Policy
 from ..core.phenotype import Phenotype
 from ..physics.energy import transition_energy
 from .tasks import schedule_for, task_seed
@@ -81,12 +81,21 @@ class SummedPolicy:
     basis: object = None
 
     def act(self, obs) -> np.ndarray:
+        # Mode coefficients, then -- when either half has the gain channel --
+        # the summed gain intent after them (``split_command`` reads it).
         c = np.zeros(self.n_modes)
+        gain, has_gain = 0.0, False
         if self.own is not None:
             a = np.asarray(self.own.act(obs), float)
             c[: min(len(a), self.n_modes)] += a[: self.n_modes]
+            if len(a) > self.n_modes:
+                gain, has_gain = gain + float(a[self.n_modes]), True
         if self.shared is not None:
             a, _logp, _v = self.shared.act(obs, deterministic=True)
+            a = np.asarray(a, float)
+            if len(a) > TWIST_DIM:
+                gain, has_gain = gain + float(a[TWIST_DIM]), True
+                a = a[:TWIST_DIM]
             if self.basis is not None:
                 a = np.asarray(self.basis.coeffs_for_twist(a), float)
             else:
@@ -96,7 +105,7 @@ class SummedPolicy:
                 # conservative reading.
                 a = np.zeros(0)
             c[: min(len(a), self.n_modes)] += a[: self.n_modes]
-        return c
+        return np.append(c, gain) if has_gain else c
 
 
 @dataclass(eq=False)

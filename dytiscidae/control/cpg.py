@@ -131,6 +131,42 @@ class CPG:
 #: it is a property of space rather than of a body, which is the whole point.
 TWIST_DIM = 6
 
+#: The range of the gait gain: the factor on the commanded amplitude that the
+#: controller may choose, as ``1 + intent`` with the intent in [-1, 1].  Zero is
+#: "hold the posture and do not oscillate", one is the design's own gait, two
+#: is twice it.  An intent of zero -- a policy with zero weights, or one that
+#: was built without the channel -- leaves the gait exactly as it was.
+#:
+#: Why it exists, measured 2026-09-22 on arch42's top 8 elites at gen 208: the
+#: policy commands ``base + modes^T c`` with ``c`` bounded to [-1, 1], and the
+#: best such ``c`` still left a median 74% of the base amplitude on land and 50%
+#: in water, while moving phase and offset by up to 1.5 rad.  Stopping and
+#: hovering were outside the action space, so no reward could teach them:
+#: walkers that walked did not stop (2.0% did both, 5.5% expected if
+#: independent).  An oracle that set the gain to zero on the stop phase lifted
+#: arch42's land task score from 0.362 to 0.501 and its stop from 0.356 to
+#: 0.902 (`runs/_logs/probe_gain_headroom.py`).
+GAIN_RANGE = (0.0, 2.0)
+
+
+def gait_gain(intent: float) -> float:
+    """The amplitude factor a gain intent asks for."""
+    return float(np.clip(1.0 + float(intent), *GAIN_RANGE))
+
+
+def split_command(raw, n_modes: int):
+    """``(mode coefficients, gain)`` from what a policy returned.
+
+    A policy with the gain channel returns ``n_modes + 1`` values and the last
+    is the gain intent; one without returns ``n_modes`` and the gain is 1, so
+    every controller written before the channel existed drives exactly as it
+    did.
+    """
+    a = np.asarray(raw, float)
+    if len(a) > n_modes:
+        return a[:n_modes], gait_gain(a[n_modes])
+    return a, 1.0
+
 #: What a saturated intent asks for, as a fraction of a body's own reach.
 #:
 #: A policy's output is a tanh, so it saturates constantly, and reading
@@ -296,12 +332,34 @@ class MobilityBasis:
             out.append(f"mode{i}[{desc}] sigma={self.authority[i]:.3g}")
         return out
 
-    def command_params(self, base: CPGParams, coeffs: np.ndarray, n: int) -> CPGParams:
-        """Turn intent coefficients into concrete CPG parameters."""
+    def command_params(self, base: CPGParams, coeffs: np.ndarray, n: int,
+                       gain: float = 1.0) -> CPGParams:
+        """Turn intent coefficients into concrete CPG parameters.
+
+        ``gain`` scales the commanded amplitude after the modes are applied
+        (see ``GAIN_RANGE``); at 1 the result is exactly what it always was.
+        """
         c = np.asarray(coeffs, float)
         r = min(len(c), self.modes.shape[0])
         delta = self.modes[:r].T @ c[:r] if r > 0 else np.zeros(base.flat().shape)
-        return CPGParams.from_flat(base.flat() + delta, n)
+        out = CPGParams.from_flat(base.flat() + delta, n)
+        if gain != 1.0:
+            out.amplitude = out.amplitude * float(gain)
+        return out
+
+    def command_policy(self, base: CPGParams, raw, n: int, policy):
+        """``(params, mode coefficients, gain or None)`` for what ``policy`` returned.
+
+        The one place a policy's output becomes a gait on the single-machine
+        paths, so the gain channel cannot be honoured on one and dropped on
+        another.  The batched paths sum two policies and split them there.
+        The gain is None when the policy has no channel, so telemetry can say
+        "not commanded" rather than "commanded one".
+        """
+        k = getattr(policy, "n_modes", len(raw))
+        coeffs, g = split_command(raw, k)
+        return (self.command_params(base, coeffs, n, gain=g), coeffs,
+                g if len(np.asarray(raw)) > k else None)
 
     # ------------------------------------------------------- the inverse model
     #
@@ -529,20 +587,29 @@ class Policy:
     n_modes: int
     hidden: int = 0
     weights: np.ndarray = field(default=None)  # type: ignore[assignment]
+    #: One more output after the mode coefficients: the gait-gain intent (see
+    #: ``GAIN_RANGE`` and ``split_command``).
+    gain: bool = False
 
     def __post_init__(self) -> None:
         if self.weights is None:
             self.weights = np.zeros(self.n_weights)
 
     @property
+    def n_out(self) -> int:
+        # ``getattr``: a Policy pickled before the channel existed has no field.
+        return self.n_modes + (1 if getattr(self, "gain", False) else 0)
+
+    @property
     def n_weights(self) -> int:
+        k = self.n_out
         if self.hidden <= 0:
-            return self.n_obs * self.n_modes + self.n_modes
-        return self.n_obs * self.hidden + self.hidden + self.hidden * self.n_modes + self.n_modes
+            return self.n_obs * k + k
+        return self.n_obs * self.hidden + self.hidden + self.hidden * k + k
 
     def act(self, obs: np.ndarray) -> np.ndarray:
         w = self.weights
-        n_in, h, n_out = self.n_obs, self.hidden, self.n_modes
+        n_in, h, n_out = self.n_obs, self.hidden, self.n_out
         x = np.asarray(obs, float)
         if h <= 0:
             W = w[: n_in * n_out].reshape(n_in, n_out)

@@ -338,13 +338,15 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `basis_from_probes` | function | 461 | `(deltas, responses, *, medium: str='air', max_modes: int=6) -> MobilityBasis` | Fit the mobility basis from probe deltas and their measured responses. |
+| `basis_from_probes` | function | 519 | `(deltas, responses, *, medium: str='air', max_modes: int=6) -> MobilityBasis` | Fit the mobility basis from probe deltas and their measured responses. |
 | `CPG` | class | 81 | — | A bank of phase-coupled oscillators, one per actuated joint. |
 | `CPGParams` | class | 44 | — | Open parameters of the pattern generator. |
-| `identify_mobility` | function | 415 | `(step_fn, reset_fn, n_params: int, *, n_probes: int=24, probe_scale: float=0.35, medium: str='air', rng: np.random.Generator \| None=None, max_modes: int=6) -> MobilityBasis` | Empirically identify a body's control axes. |
-| `MobilityBasis` | class | 156 | — | The control axes a particular body actually has, in a particular medium. |
-| `Policy` | class | 508 | — | Maps observations to intent coefficients in the mobility basis. |
-| `required_probes` | function | 399 | `(n_params: int, *, margin: float=1.5) -> int` | Probes needed for the mobility fit to be determined, with headroom. |
+| `gait_gain` | function | 152 | `(intent: float) -> float` | The amplitude factor a gain intent asks for. |
+| `identify_mobility` | function | 473 | `(step_fn, reset_fn, n_params: int, *, n_probes: int=24, probe_scale: float=0.35, medium: str='air', rng: np.random.Generator \| None=None, max_modes: int=6) -> MobilityBasis` | Empirically identify a body's control axes. |
+| `MobilityBasis` | class | 192 | — | The control axes a particular body actually has, in a particular medium. |
+| `Policy` | class | 566 | — | Maps observations to intent coefficients in the mobility basis. |
+| `required_probes` | function | 457 | `(n_params: int, *, margin: float=1.5) -> int` | Probes needed for the mobility fit to be determined, with headroom. |
+| `split_command` | function | 157 | `(raw, n_modes: int)` | ``(mode coefficients, gain)`` from what a policy returned. |
 | `CPG.__init__` | method | 91 | `(self, n_joints: int, base_frequency: float=2.0, joint_range: np.ndarray \| None=None) -> None` | — |
 | `CPG.command` | method | 118 | `(self, params: CPGParams, t: float) -> np.ndarray` | Target joint angles at time ``t``. |
 | `CPG.n_params` | property | 125 | `(self) -> int` | — |
@@ -353,17 +355,19 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `CPGParams.flat` | method | 59 | `(self) -> np.ndarray` | — |
 | `CPGParams.from_flat` | method | 63 | `(v: np.ndarray, n: int) -> 'CPGParams'` | — |
 | `CPGParams.n` | property | 56 | `(self) -> int` | — |
-| `MobilityBasis.coeffs_for_twist` | method | 364 | `(self, intent: np.ndarray) -> np.ndarray` | Coefficients that best deliver a commanded body twist. |
-| `MobilityBasis.command_params` | method | 299 | `(self, base: CPGParams, coeffs: np.ndarray, n: int) -> CPGParams` | Turn intent coefficients into concrete CPG parameters. |
-| `MobilityBasis.condition` | property | 238 | `(self) -> float` | `sigma_0 / sigma_r` over the retained modes.  Infinite if any is 0. |
-| `MobilityBasis.control_rank` | property | 213 | `(self) -> int` | How many axes are worth commanding.  An engineering threshold. |
-| `MobilityBasis.describe` | method | 282 | `(self) -> list[str]` | Human-readable names for the discovered axes. |
-| `MobilityBasis.diagnostics` | method | 267 | `(self) -> dict` | Everything a consumer needs to judge this basis, in one call. |
-| `MobilityBasis.numerical_rank` | property | 196 | `(self) -> int` | Rank in the linear-algebra sense: singular values above the level |
-| `MobilityBasis.twist_of` | method | 389 | `(self, coeffs: np.ndarray) -> np.ndarray` | The twist a coefficient vector produces.  The forward model. |
-| `MobilityBasis.underdetermined` | property | 251 | `(self) -> bool` | Whether the fit behind this basis had fewer probes than parameters. |
-| `Policy.act` | method | 543 | `(self, obs: np.ndarray) -> np.ndarray` | — |
-| `Policy.n_weights` | property | 538 | `(self) -> int` | — |
+| `MobilityBasis.coeffs_for_twist` | method | 422 | `(self, intent: np.ndarray) -> np.ndarray` | Coefficients that best deliver a commanded body twist. |
+| `MobilityBasis.command_params` | method | 335 | `(self, base: CPGParams, coeffs: np.ndarray, n: int, gain: float=1.0) -> CPGParams` | Turn intent coefficients into concrete CPG parameters. |
+| `MobilityBasis.command_policy` | method | 350 | `(self, base: CPGParams, raw, n: int, policy)` | ``(params, mode coefficients, gain or None)`` for what ``policy`` returned. |
+| `MobilityBasis.condition` | property | 274 | `(self) -> float` | `sigma_0 / sigma_r` over the retained modes.  Infinite if any is 0. |
+| `MobilityBasis.control_rank` | property | 249 | `(self) -> int` | How many axes are worth commanding.  An engineering threshold. |
+| `MobilityBasis.describe` | method | 318 | `(self) -> list[str]` | Human-readable names for the discovered axes. |
+| `MobilityBasis.diagnostics` | method | 303 | `(self) -> dict` | Everything a consumer needs to judge this basis, in one call. |
+| `MobilityBasis.numerical_rank` | property | 232 | `(self) -> int` | Rank in the linear-algebra sense: singular values above the level |
+| `MobilityBasis.twist_of` | method | 447 | `(self, coeffs: np.ndarray) -> np.ndarray` | The twist a coefficient vector produces.  The forward model. |
+| `MobilityBasis.underdetermined` | property | 287 | `(self) -> bool` | Whether the fit behind this basis had fewer probes than parameters. |
+| `Policy.act` | method | 610 | `(self, obs: np.ndarray) -> np.ndarray` | — |
+| `Policy.n_out` | property | 599 | `(self) -> int` | — |
+| `Policy.n_weights` | property | 604 | `(self) -> int` | — |
 
 ## `control.train` — `dytiscidae/control/train.py`
 
@@ -694,16 +698,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `BatchedFluid` | class | 209 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 685 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `identify_batch` | function | 454 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `rollout_batch` | function | 530 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 866 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 418 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
-| `usable` | function | 90 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
-| `BatchedFluid.__init__` | method | 220 | `(self, envs)` | — |
-| `BatchedFluid.apply` | method | 307 | `(self, t: float, active=None) -> None` | Run the fluid for every environment and write their xfrc_applied. |
-| `BatchedFluid.reset_slam` | method | 294 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
+| `BatchedFluid` | class | 210 | — | One GPU pipeline serving N environments stepped in lockstep. |
+| `evaluate_tier1_batch` | function | 700 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `identify_batch` | function | 455 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `rollout_batch` | function | 531 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 881 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 419 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `usable` | function | 91 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
+| `BatchedFluid.__init__` | method | 221 | `(self, envs)` | — |
+| `BatchedFluid.apply` | method | 308 | `(self, t: float, active=None) -> None` | Run the fluid for every environment and write their xfrc_applied. |
+| `BatchedFluid.reset_slam` | method | 295 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
@@ -711,20 +715,20 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `behaviour_descriptor` | function | 583 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | — |
+| `behaviour_descriptor` | function | 592 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | — |
 | `Controller` | class | 43 | — | Everything needed to drive one machine: rhythm, axes, and intent. |
-| `dominates` | function | 626 | `(a: np.ndarray, b: np.ndarray) -> bool` | True when ``a`` is at least as good everywhere and better somewhere. |
-| `evaluate_tier1` | function | 236 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, n_modes: int=6, detail: bool=False, on_step=None) -> MissionResult` | Short dynamic episodes in each domain, plus transitions. |
-| `evaluate_tier1_5` | function | 381 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seconds: float=60.0, seed: int=0, domain: Domain \| None=None, competences: dict \| None=None, sea_state=None) -> SegmentResult` | One long leg, run only on designs the search has decided to promote. |
-| `evaluate_tier2` | function | 441 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seed: int=0, time_compression: float=12.0, sea_state=None, tier1: MissionResult \| None=None) -> MissionResult` | The real mission schedule, with disturbances and a random start domain. |
-| `finalise_tier1` | function | 141 | `(r: MissionResult, clamped_any: bool) -> None` | Turn measured segments and transitions into mission_fraction, and flag |
-| `fitness` | function | 632 | `(p: Phenotype, r: MissionResult, spec: MissionSpec \| None=None) -> float` | Scalar quality within a behaviour cell. |
-| `objectives` | function | 609 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | The objective vector used to decide who occupies a cell. |
-| `SharedController` | class | 103 | `(Controller)` | A controller carrying a `SummedPolicy`, kept pointed at the right basis. |
+| `dominates` | function | 635 | `(a: np.ndarray, b: np.ndarray) -> bool` | True when ``a`` is at least as good everywhere and better somewhere. |
+| `evaluate_tier1` | function | 245 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, n_modes: int=6, detail: bool=False, on_step=None) -> MissionResult` | Short dynamic episodes in each domain, plus transitions. |
+| `evaluate_tier1_5` | function | 390 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seconds: float=60.0, seed: int=0, domain: Domain \| None=None, competences: dict \| None=None, sea_state=None) -> SegmentResult` | One long leg, run only on designs the search has decided to promote. |
+| `evaluate_tier2` | function | 450 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seed: int=0, time_compression: float=12.0, sea_state=None, tier1: MissionResult \| None=None) -> MissionResult` | The real mission schedule, with disturbances and a random start domain. |
+| `finalise_tier1` | function | 150 | `(r: MissionResult, clamped_any: bool) -> None` | Turn measured segments and transitions into mission_fraction, and flag |
+| `fitness` | function | 641 | `(p: Phenotype, r: MissionResult, spec: MissionSpec \| None=None) -> float` | Scalar quality within a behaviour cell. |
+| `objectives` | function | 618 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | The objective vector used to decide who occupies a cell. |
+| `SharedController` | class | 112 | `(Controller)` | A controller carrying a `SummedPolicy`, kept pointed at the right basis. |
 | `SummedPolicy` | class | 61 | — | The per-candidate policy plus the shared one, as a single policy. |
-| `weakest_domain` | function | 366 | `(competences: dict) -> Domain` | The domain a design is worst at, which is the one the mission turns on. |
+| `weakest_domain` | function | 375 | `(competences: dict) -> Domain` | The domain a design is worst at, which is the one the mission turns on. |
 | `Controller.basis_for` | method | 50 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
-| `SharedController.basis_for` | method | 113 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
+| `SharedController.basis_for` | method | 122 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
 | `SummedPolicy.act` | method | 83 | `(self, obs) -> np.ndarray` | — |
 
 ## `envs.kernel` — `dytiscidae/envs/kernel.py`
@@ -744,7 +748,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `build_schedule` | function | 167 | `(spec: MissionSpec, rng: np.random.Generator, leg_seconds: float \| None=None) -> list[tuple[Domain, float]]` | Random starting domain, then cycle, as specified. |
-| `continuous_score` | function | 308 | `(result: ContinuousResult, spec: MissionSpec) -> float` | A single number for the continuous mission, in [0, 1]. |
+| `continuous_score` | function | 309 | `(result: ContinuousResult, spec: MissionSpec) -> float` | A single number for the continuous mission, in [0, 1]. |
 | `ContinuousResult` | class | 59 | — | What one unbroken mission produced. |
 | `current_domain` | function | 156 | `(env: TriphibianEnv) -> Domain` | Which domain the machine is physically in right now. |
 | `LegRecord` | class | 39 | — | One commanded stretch of the mission. |
@@ -816,10 +820,10 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 |---|---|---:|---|---|
 | `run_transition` | function | 224 | `(env: TriphibianEnv, kind: str, controller, *, duration: float=6.0) -> TransitionResult` | Simulate one crossing and measure it. |
 | `TransitionResult` | class | 121 | — | One crossing, measured.  Every field is a raw physical quantity or a |
-| `TransitionSet` | class | 431 | — | All crossings attempted in one evaluation. |
+| `TransitionSet` | class | 432 | — | All crossings attempted in one evaluation. |
 | `TransitionResult.components` | property | 180 | `(self) -> dict[str, float]` | The scored parts, for the judge to weight. |
-| `TransitionSet.component_means` | method | 442 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
-| `TransitionSet.crossed_fraction` | property | 437 | `(self) -> float` | — |
+| `TransitionSet.component_means` | method | 443 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
+| `TransitionSet.crossed_fraction` | property | 438 | `(self) -> float` | — |
 
 ## `envs.triphibian` — `dytiscidae/envs/triphibian.py`
 
@@ -847,7 +851,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `TriphibianEnv.flap_travel` | method | 839 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
 | `TriphibianEnv.ground_height` | method | 1199 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
 | `TriphibianEnv.ground_heights` | method | 1208 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
-| `TriphibianEnv.identify` | method | 2569 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.identify` | method | 2597 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
 | `TriphibianEnv.launch_pitch` | property | 809 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
 | `TriphibianEnv.launch_speed` | property | 777 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
 | `TriphibianEnv.lift_margin` | property | 825 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
@@ -1054,18 +1058,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 570 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `evaluate_candidate` | function | 335 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 388 | `(genomes, cfg: SearchConfig, *, inherited=None, identify: bool=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `load_state` | function | 1558 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 915 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 1438 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 578 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `evaluate_candidate` | function | 342 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 395 | `(genomes, cfg: SearchConfig, *, inherited=None, identify: bool=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `load_state` | function | 1568 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 923 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 1448 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 63 | — | Everything adjustable about a run. |
-| `SearchState` | class | 248 | — | — |
-| `seed_archipelago` | function | 1817 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `SearchState.archive` | property | 305 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 309 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 313 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 254 | — | — |
+| `seed_archipelago` | function | 1828 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `SearchState.archive` | property | 311 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 315 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 319 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1165,23 +1169,23 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 484 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `cmd_cohort` | function | 425 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_dashboard` | function | 757 | `(args) -> int` | — |
-| `cmd_distill` | function | 795 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 313 | `(args) -> int` | — |
-| `cmd_postrun` | function | 280 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 485 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `cmd_cohort` | function | 426 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_dashboard` | function | 761 | `(args) -> int` | — |
+| `cmd_distill` | function | 799 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 314 | `(args) -> int` | — |
+| `cmd_postrun` | function | 281 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 123 | `(args) -> int` | — |
-| `cmd_render` | function | 764 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_render` | function | 768 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
 | `cmd_search` | function | 158 | `(args) -> int` | — |
-| `cmd_showcase` | function | 615 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 320 | `(args) -> int` | — |
-| `cmd_train` | function | 354 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_showcase` | function | 619 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 321 | `(args) -> int` | — |
+| `cmd_train` | function | 355 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 116 | `(args) -> int` | — |
-| `controller_for_elite` | function | 494 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 254 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 495 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 255 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 31 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 812 | `(argv=None) -> int` | — |
+| `main` | function | 816 | `(argv=None) -> int` | — |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`
 
@@ -1526,10 +1530,10 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `_near_plane` | class | 106 | — | Temporarily move the near clip plane in to suit a close-up. |
 | `capture_episode` | function | 241 | `(env, duration: float, *, domain, controller=None, fps: int=25, width: int=720, height: int=480, label: str='', follow: bool=True) -> list[np.ndarray]` | Roll out an episode and return the HUD-annotated frames. |
 | `gl_available` | function | 36 | `() -> str \| None` | Return the working MuJoCo GL backend name, or None. |
-| `render_design` | function | 498 | `(phenotype, out_dir: str \| Path, *, stem: str='design', duration: float=10.0, controller=None, turntable: bool=True, width: int=720, height: int=480) -> list[str]` | Turntable plus one episode per domain for a single design. |
-| `render_elites` | function | 534 | `(archive, run_dir: str \| Path, *, top: int=3, duration: float=10.0) -> list[str]` | Render the archive's best few designs. |
-| `render_episode` | function | 332 | `(env, duration: float, *, domain, controller=None, out_path: str \| Path='episode.mp4', fps: int=25, width: int=720, height: int=480, label: str='', follow: bool=True) -> str \| None` | Roll out an episode and write video with the waterline in frame. |
-| `render_learning_comparison` | function | 401 | `(phenotype, controller, out_dir: str \| Path, *, stem: str='learned', duration: float=10.0, domains=None, width: int=560, height: int=400, fps: int=25) -> list[str]` | Render open-loop against learned control, side by side, per domain. |
+| `render_design` | function | 499 | `(phenotype, out_dir: str \| Path, *, stem: str='design', duration: float=10.0, controller=None, turntable: bool=True, width: int=720, height: int=480) -> list[str]` | Turntable plus one episode per domain for a single design. |
+| `render_elites` | function | 535 | `(archive, run_dir: str \| Path, *, top: int=3, duration: float=10.0) -> list[str]` | Render the archive's best few designs. |
+| `render_episode` | function | 333 | `(env, duration: float, *, domain, controller=None, out_path: str \| Path='episode.mp4', fps: int=25, width: int=720, height: int=480, label: str='', follow: bool=True) -> str \| None` | Roll out an episode and write video with the waterline in frame. |
+| `render_learning_comparison` | function | 402 | `(phenotype, controller, out_dir: str \| Path, *, stem: str='learned', duration: float=10.0, domains=None, width: int=560, height: int=400, fps: int=25) -> list[str]` | Render open-loop against learned control, side by side, per domain. |
 | `render_turntable` | function | 172 | `(env, *, out_path: str \| Path, frames: int=96, width: int=720, height: int=480, fps: int=24, elevation: float=-14.0, label: str='', focus: str \| None=None, margin: float=1.35) -> str \| None` | Rotate the camera once around the machine held in a neutral pose. |
 | `_near_plane.__init__` | method | 122 | `(self, model, subject_extent: float, fraction: float=0.02)` | — |
 

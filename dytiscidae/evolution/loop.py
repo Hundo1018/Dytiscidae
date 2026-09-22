@@ -194,6 +194,12 @@ class SearchConfig:
     #: loses nothing.  0 = off, the baseline; the overlap is recorded on every
     #: refit event either way.
     descriptor_keep_if_overlap: float = 0.0
+    #: The gait-gain channel (``control.cpg.GAIN_RANGE``): one more output on
+    #: every per-candidate policy and one more action on the shared one, a
+    #: factor on the commanded amplitude, so stopping and throttling are in the
+    #: action space.  Changes both policies' shapes, so nothing trained without
+    #: it transfers.  Off by default: every stored run was scored without it.
+    gait_gain: bool = False
     event_sample: int = 1
 
     # --- the archipelago ---------------------------------------------------
@@ -326,7 +332,8 @@ def _controller_for(pheno, genome: Genome, cfg: SearchConfig, inherited=None):
     "command nothing", i.e. fall back to the raw pattern generator rather than to
     random flailing.
     """
-    policy = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=cfg.n_modes, hidden=cfg.policy_hidden)
+    policy = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=cfg.n_modes, hidden=cfg.policy_hidden,
+                    gain=bool(getattr(cfg, "gait_gain", False)))
     if inherited is not None and len(inherited) == policy.n_weights:
         policy.weights = np.asarray(inherited, float).copy()
     return policy
@@ -562,7 +569,8 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
 
 def _copy_policy(policy, weights):
     """A policy with the same shape and different weights."""
-    twin = Policy(n_obs=policy.n_obs, n_modes=policy.n_modes, hidden=policy.hidden)
+    twin = Policy(n_obs=policy.n_obs, n_modes=policy.n_modes, hidden=policy.hidden,
+                  gain=bool(getattr(policy, "gain", False)))
     twin.weights = np.asarray(weights, float)
     return twin
 
@@ -1037,8 +1045,10 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         # TWIST_DIM, not n_modes: the shared policy commands a body twist,
         # which is the same six axes on every machine, where a mode index is a
         # private coordinate that means something different on each.
+        # Plus one action for the gait gain when the channel is on.
         state.shared = _ppo.SharedPolicy(
-            TriphibianEnv.OBS_DIM, TWIST_DIM, hidden=cfg.shared_hidden)
+            TriphibianEnv.OBS_DIM, TWIST_DIM + (1 if cfg.gait_gain else 0),
+            hidden=cfg.shared_hidden)
         # eps 1e-5 rather than torch's 1e-8; see ``ppo_update``.
         state.shared_opt = _torch.optim.Adam(
             state.shared.parameters(), lr=cfg.shared_lr, eps=1e-5)
@@ -1776,7 +1786,8 @@ def load_state(state: SearchState) -> int:
     # untransferable, and 240 discarded controllers should not look like a
     # normal resume.
     want = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=state.config.n_modes,
-                  hidden=state.config.policy_hidden).n_weights
+                  hidden=state.config.policy_hidden,
+                  gain=bool(getattr(state.config, "gait_gain", False))).n_weights
     stored, mismatched = 0, 0
     for a in state.archipelago.archives.values():
         for e in a.cells.values():

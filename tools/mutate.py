@@ -370,6 +370,50 @@ MUTATIONS: tuple = (
                "body slowing down on its launch heading scores as turning",
         suites=("test_physics",), item="task response"),
     Mutation(
+        id="gain-is-ignored",
+        path="dytiscidae/control/cpg.py",
+        find="        if gain != 1.0:\n            out.amplitude = out.amplitude * float(gain)",
+        replace="        if False:\n            out.amplitude = out.amplitude * float(gain)",
+        defect="the gain channel is read and never applied, so stopping is still "
+               "outside the action space",
+        suites=("test_physics::test_the_gait_gain_can_stop_a_machine",),
+        item="gait gain"),
+    Mutation(
+        id="single-path-drops-the-gain",
+        path="dytiscidae/control/cpg.py",
+        find="        return a[:n_modes], gait_gain(a[n_modes])",
+        replace="        return a[:n_modes], 1.0",
+        defect="the single-machine paths -- Tier-2, the mission, every film -- drive "
+               "at gain one while the batched pool honours it",
+        suites=("test_search::test_the_gait_gain_drives_the_same_on_every_path",),
+        item="gait gain"),
+    Mutation(
+        id="batched-drops-the-shared-gain",
+        path="dytiscidae/envs/batchroll.py",
+        find="                            gain = (gain or 0.0) + float(a_np[TWIST_DIM])",
+        replace="                            pass",
+        defect="the pool that scores the archive ignores the shared policy's gain "
+               "action while the single path applies it",
+        suites=("test_search::test_the_gait_gain_drives_the_same_on_every_path",),
+        item="gait gain"),
+    Mutation(
+        id="summed-policy-drops-the-own-gain",
+        path="dytiscidae/envs/evaluate.py",
+        find="                gain, has_gain = gain + float(a[self.n_modes]), True",
+        replace="                pass",
+        defect="the single path drops the per-candidate policy's gain intent",
+        suites=("test_search::test_the_gait_gain_drives_the_same_on_every_path",),
+        item="gait gain"),
+    Mutation(
+        id="batched-never-records-the-gain",
+        path="dytiscidae/envs/batchroll.py",
+        find="            if r[\"gain\"] is not None:\n                r[\"gains\"].append(r[\"gain\"])",
+        replace="            pass",
+        defect="the path that scores the archive publishes no gain, so a run cannot "
+               "see whether its controllers throttle when told to stop",
+        suites=("test_search::test_the_gait_gain_drives_the_same_on_every_path",),
+        item="gait gain"),
+    Mutation(
         id="audit-perturbs-another-seed",
         path="dytiscidae/evolution/auditor.py",
         find="                    alt = reevaluate(seed=seed, perturb={key: factor})",

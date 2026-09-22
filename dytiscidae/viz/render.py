@@ -297,8 +297,9 @@ def capture_episode(
             # one did not, so the per-elite clips have always filmed a machine
             # driven blind while the numbers beside them came from one that was
             # told the mission.
-            cur = basis.command_params(
-                params, controller.policy.act(env.observation(domain)), env.cpg.n)
+            cur, _, _g = basis.command_policy(
+                params, controller.policy.act(env.observation(domain)), env.cpg.n,
+                controller.policy)
         alive = env.step(env.cpg.command(cur, env.data.time))
         pos = env.root_pos()
         if not np.all(np.isfinite(pos)) or np.abs(pos).max() > 300:

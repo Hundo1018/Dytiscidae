@@ -2165,6 +2165,7 @@ not taken from the headings below (two of which were stale).
 | item | what "started" means | status |
 |---|---|---|
 | Z film = evaluation | pool fix, trim fix, clearance fix, promotion record, `viz/film.py`, automatic `postrun` | **done** |
+| AA gait gain | the policy could not stop a machine (74% of amplitude left at best); a gain channel on both policies, `--gait-gain` | **done**, in arch42 |
 | Z2 audit = evaluation | the audit re-runs the scored experiment (own + shared policy, own seed), perturbed and nothing else | **done**, in arch42 |
 | U `min_shard` defaults | already 4 in all three places (`loop.py:95`, `actors.py:171`, CLI) | **done** — heading was stale |
 | S `mut_gait` | implemented (`genome.py:549`) with the operator floor; needs only its measurement, which arch42 carries | **in arch42**, running |
@@ -2537,6 +2538,51 @@ mutations (`audit-perturbs-another-seed`, `audit-base-is-the-record`).
 Not done: a floor on the base. A design at 0.0004 of the mission has nothing to
 collapse, and whether a same-experiment collapse at that level still means "the
 design depends on the model" is a question for arch42's audit events.
+
+### AA. The policy could not stop a machine — **gait gain, built 2026-09-22, in arch42**
+
+arch42 on S3 (`runs/arch42_s3_stopped_gen208_no_stop_authority`) climbed on
+progress and never learned a command. At gen 200 the archive's task medians
+were water 0.092 and land 0.033, and rising. Hold was 0% above 0.1. Land machines that
+walked did not stop when told: 2.0% of evaluations did both, against 5.5% if
+the two were independent (corr −0.20), unchanged since gens 6–50. Stopped at
+gen 208 by the user ("現在停，立刻做步態增益").
+
+**The cause was the action space, not the reward.** The policy commands
+`base + modes^T c` with `c` bounded to [−1, 1] by tanh, and the modes come from
+small probes around the design's own gait. Per actuator the modes could reach
+zero amplitude, but a stop needs *one* `c` that zeroes every actuator at once.
+Measured on the top 8 elites (`runs/_logs/probe_stop_authority.py`), the best
+bounded `c` left a median **74%** of the base amplitude on land and **50%** in
+water, and moved phase and offset by up to 1.5 rad doing it. For most designs
+stopping and hovering were not in reach, so no task shape could teach them.
+
+**The headroom, before building** (`runs/_logs/probe_gain_headroom.py`, 24
+elites, same law, seed and task): an oracle that sets the amplitude to zero on
+stop and hold phases lifts the land task score from **0.362 to 0.501** and stop
+from 0.356 to 0.902, at a cost in progress of 0.567 → 0.535. Water does not
+move (0.231 → 0.225, hold 0.000 → 0.000): zeroing the gait lets a body sink or
+float, and holding depth needs depth feedback. So the gain is necessary for
+hold and not sufficient.
+
+**Built** (`--gait-gain`, `SearchConfig.gait_gain`, off by default):
+
+- The per-candidate policy gets one more output and the shared policy one more
+  action. The two intents are summed, like the mode coefficients, into
+  `g = clip(1 + intent, 0, 2)`, which multiplies the commanded amplitude
+  (`control.cpg.GAIN_RANGE`, `gait_gain`, `split_command`).
+- An intent of zero leaves the gait bit-identical. A policy without the
+  channel, which covers every stored run, drives at gain 1, so old films still
+  reproduce.
+- The single-machine paths go through one method, `MobilityBasis.command_policy`.
+  The batched pool sums the two halves itself, and a test holds the two paths
+  to the same distances.
+- Published per segment: `gain_cruise`, `gain_hold`, `gain_stop`, the mean
+  commanded gain over each kind of phase. Absent without the channel.
+
+Held by `test_the_gait_gain_can_stop_a_machine`, where the walker's stop goes
+from 0.000 to 0.994 when its gain output saturates low, and by
+`test_the_gait_gain_drives_the_same_on_every_path`. Five mutations are caught.
 
 ### Y. The filmed arch40 machine never leaves the beach — raised by the user 2026-09-21, **measured, not acted on**
 

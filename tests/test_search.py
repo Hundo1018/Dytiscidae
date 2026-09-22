@@ -3914,6 +3914,94 @@ def test_sharding_a_generation_does_not_change_a_score() -> None:
           f"{max(abs(a - b) for a, b in zip(without, sharded)):.3g}")
 
 
+def test_the_gait_gain_drives_the_same_on_every_path() -> None:
+    """The gain channel is honoured by the batched pool and the single path alike.
+
+    Both policies carry it -- one more output on the per-candidate policy, one
+    more action on the shared one -- and the two paths sum them in different
+    code (``batchroll`` sums in place, ``SummedPolicy`` for everything else).
+    A path that dropped either half's gain would score, and film, a different
+    machine from the one the archive recorded.
+    """
+    print("\ncontrol: the gait gain on every path")
+    import torch
+
+    from dytiscidae.control.cpg import TWIST_DIM, Policy
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.actors import ActorPool
+    from dytiscidae.envs.evaluate import Controller, SharedController, SummedPolicy, evaluate_tier1
+    from dytiscidae.envs.triphibian import MissionSpec, TriphibianEnv
+    from dytiscidae.learning.ppo import SharedPolicy
+
+    pheno = build(BODY_PLANS["beetle"]())
+    kw = dict(spec=MissionSpec(), segment_seconds=1.0, seed=5)
+    torch.manual_seed(0)
+    net = SharedPolicy(TriphibianEnv.OBS_DIM, TWIST_DIM + 1, hidden=16)
+    with torch.no_grad():
+        for prm in net.parameters():
+            if prm.ndim == 2:
+                prm.mul_(4.0)
+    net.eval()
+    own = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=6, hidden=0, gain=True)
+    own.weights = np.random.default_rng(1).normal(0.0, 0.3, own.n_weights)
+
+    base = Controller(params=None, policy=None)
+    ActorPool(1).evaluate_tier1([pheno], controllers=[base], identify_axes=True, **kw)
+
+    def batched(policy, shared):
+        pool = ActorPool(1)
+        try:
+            r = pool.evaluate_tier1(
+                [pheno], controllers=[Controller(params=None, policy=policy,
+                                                 bases=dict(base.bases))],
+                shared=shared, identify_axes=False, **kw)[0]
+        finally:
+            pool.close()
+        GAINS.append({str(d): {k: v for k, v in seg.measurements.items() if k.startswith("gain_")}
+                      for d, seg in r.segments.items()})
+        return [round(float(seg.distance), 9) for _d, seg in sorted(r.segments.items(), key=lambda kv: str(kv[0]))]
+
+    GAINS: list = []
+
+    def single(policy, shared):
+        law = SharedController(params=None, bases=dict(base.bases),
+                               policy=SummedPolicy(own=policy, shared=shared, n_modes=6))
+        r = evaluate_tier1(pheno, controller=law, identify_axes=False, **kw)
+        GAINS.append({str(d): {k: v for k, v in seg.measurements.items() if k.startswith("gain_")}
+                      for d, seg in r.segments.items()})
+        return [round(float(seg.distance), 9) for _d, seg in sorted(r.segments.items(), key=lambda kv: str(kv[0]))]
+
+    # The same weights with the gain output removed, so the gain is the only
+    # difference: the fixture must move when it is on, or nothing here can fail.
+    blind = Policy(n_obs=own.n_obs, n_modes=6, hidden=0, gain=False)
+    k = own.n_obs * 7
+    blind.weights = np.concatenate([own.weights[:k].reshape(own.n_obs, 7)[:, :6].ravel(),
+                                    own.weights[k:k + 6]])
+    # And the shared network without its gain action: every tensor whose
+    # leading axis is the action width loses its last row.
+    net6 = SharedPolicy(TriphibianEnv.OBS_DIM, TWIST_DIM, hidden=16)
+    sd6 = net6.state_dict()
+    net6.load_state_dict({key: (v[:TWIST_DIM] if v.shape != sd6[key].shape else v)
+                          for key, v in net.state_dict().items()})
+    net6.eval()
+    with_gain, without = batched(own, net), batched(blind, net6)
+    check("the gain alone changes where the fixture goes, so this can fail",
+          with_gain != without, f"with {with_gain} without {without}")
+    s_gain = single(own, net)
+    check("the single path drives both halves' gain as the batched pool does",
+          max(abs(a - b) for a, b in zip(with_gain, s_gain)) < 1e-5,
+          f"batched {with_gain} single {s_gain}")
+    # GAINS: [batched with gain, batched without, single with gain].
+    g_b, g_none, g_s = GAINS
+    check("both paths publish the gain they commanded, and the same gain",
+          all(g_b[d] and set(g_b[d]) == set(g_s[d]) and
+              all(abs(g_b[d][k] - g_s[d][k]) < 1e-6 for k in g_b[d]) for d in g_b),
+          f"batched {g_b} single {g_s}")
+    check("and a controller without the channel publishes none",
+          not any(g_none.values()), f"{g_none}")
+
+
 def test_structure_can_be_recombined_and_duplicated() -> None:
     """Structure was asexual: every graph descended from one seed by mutation.
 
@@ -4147,6 +4235,7 @@ def main() -> int:
         test_a_long_leg_runs_on_promotion_candidates_only,
         test_the_shared_controller_question_is_answered_with_a_number,
         test_sharding_a_generation_does_not_change_a_score,
+        test_the_gait_gain_drives_the_same_on_every_path,
         test_structure_can_be_recombined_and_duplicated,
     ])
     return report("all search-machinery checks passed")

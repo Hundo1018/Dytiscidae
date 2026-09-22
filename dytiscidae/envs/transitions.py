@@ -255,10 +255,11 @@ def run_transition(
 
     for i in range(n):
         if controller.policy is not None and basis is not None and i % control_every == 0:
-            cur = basis.command_params(
+            cur, _, _g = basis.command_policy(
                 controller.params,
                 controller.policy.act(env.observation(target)),
                 env.cpg.n,
+                controller.policy,
             )
         if not env.step(env.cpg.command(cur, env.data.time)):
             r.failure = "battery exhausted mid-transition"

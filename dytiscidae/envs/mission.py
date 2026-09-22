@@ -237,8 +237,9 @@ def run_continuous(
         for _ in range(n):
             if controller is not None and controller.policy is not None \
                     and basis is not None and step_i % ctrl_every == 0:
-                coeffs = controller.policy.act(env.observation(commanded))
-                cur = basis.command_params(params, coeffs, env.cpg.n)
+                cur, coeffs, _g = basis.command_policy(
+                    params, controller.policy.act(env.observation(commanded)),
+                    env.cpg.n, controller.policy)
 
             alive = env.step(env.cpg.command(cur, env.data.time))
             if int(env.data.warning[_bad].number) > bad0:

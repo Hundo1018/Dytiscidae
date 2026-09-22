@@ -2999,6 +2999,63 @@ def test_the_first_air_reset_is_like_every_other() -> None:
           f"{np.round(cold.data.qpos[:3], 4)}")
 
 
+def test_the_gait_gain_can_stop_a_machine() -> None:
+    """Stopping has to be in the action space before any reward can teach it.
+
+    The policy commands ``base + modes^T c`` with ``c`` in [-1, 1]; measured on
+    arch42's top elites the best such ``c`` left 74% of the base amplitude on
+    land, so a walker told to stop could not.  The gain channel scales the
+    commanded amplitude, and at 1 must change nothing at all.
+    """
+    print("\ncontrol: the gait gain")
+    from dytiscidae.control.cpg import Policy, split_command
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.tasks import CRUISE, STOP, Phase, TaskSchedule
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    p = build(BODY_PLANS["beetle"]())
+    env = TriphibianEnv(p, seed=3)
+    b = env.identify(Domain.LAND, seed=3)
+    base = env.cpg.base
+    c = np.linspace(-0.5, 0.5, b.modes.shape[0])
+    check("a gain of one is exactly the gait it always was",
+          np.array_equal(b.command_params(base, c, env.cpg.n).flat(),
+                         b.command_params(base, c, env.cpg.n, gain=1.0).flat()))
+    check("a gain of zero holds the posture: no amplitude left",
+          float(np.abs(b.command_params(base, c, env.cpg.n, gain=0.0).amplitude).max()) == 0.0)
+    raw6, raw7 = np.zeros(6), np.append(np.zeros(6), -1.0)
+    check("a policy without the channel drives at gain one; with it, it reads the last output",
+          split_command(raw6, 6)[1] == 1.0 and split_command(raw7, 6)[1] == 0.0)
+
+    # On the real rollout: told to stop, with the gain output saturated low.
+    def stop_score(bias):
+        pol = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=6, hidden=0, gain=True)
+        pol.weights[-1] = bias
+        e = TriphibianEnv(p, seed=3)
+        e.reset(Domain.LAND)
+        e.task = TaskSchedule("land", (Phase(CRUISE, 0.0, heading=0.0, speed=0.04),
+                                       Phase(STOP, 0.5)))
+        r = e.rollout(4.0, domain=Domain.LAND, params=e.cpg.base, policy=pol, basis=b)
+        return r.measurements
+
+    flapping, held = stop_score(0.0), stop_score(-10.0)
+    check("a walker whose gain stays at one does not stop",
+          flapping.get("stop_score", 0.0) < 0.5, f"stop {flapping.get('stop_score', 0.0):.3f}")
+    check("and one that turns its gain down does", held.get("stop_score", 0.0) > 0.9,
+          f"stop {held.get('stop_score', 0.0):.3f}")
+    # And the run can see which it was, per phase.
+    check("the commanded gain is published per phase",
+          abs(flapping.get("gain_stop", -1) - 1.0) < 1e-9 and held.get("gain_stop", 1) < 0.01,
+          f"gain_stop {flapping.get('gain_stop')} / {held.get('gain_stop')}")
+    e = TriphibianEnv(p, seed=3)
+    e.reset(Domain.LAND)
+    blind = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=6, hidden=0)
+    m = e.rollout(1.0, domain=Domain.LAND, params=e.cpg.base, policy=blind, basis=b).measurements
+    check("and not at all for a controller without the channel",
+          not any(k.startswith("gain_") for k in m), f"{sorted(k for k in m if k.startswith('gain_'))}")
+
+
 def test_chattering_commands_are_measured() -> None:
     """A controller's command rate and reversals are published, and can be charged.
 
@@ -3109,6 +3166,7 @@ def main() -> int:
         test_each_phase_is_scored_on_its_own_purpose,
         test_the_first_air_reset_is_like_every_other,
         test_chattering_commands_are_measured,
+        test_the_gait_gain_can_stop_a_machine,
         test_a_film_is_the_evaluation,
         test_lift_sign_and_magnitude,
         test_buoyancy,
