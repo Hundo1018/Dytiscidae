@@ -2167,17 +2167,52 @@ not taken from the headings below (two of which were stale).
 | Z film = evaluation | pool fix, trim fix, clearance fix, promotion record, `viz/film.py`, automatic `postrun` | **done** |
 | U `min_shard` defaults | already 4 in all three places (`loop.py:95`, `actors.py:171`, CLI) | **done** — heading was stale |
 | S `mut_gait` | implemented (`genome.py:549`) with the operator floor; needs only its measurement, which arch42 carries | in arch42 |
-| X task reward | apply the parameters re-derived from arch41's stop (hold depth 5.0–6.5 m, stillness band 0.64 m/s, land command 0.04 m/s) | today |
-| Y chatter | an action-rate penalty on the controller's commands, flag | today |
-| Y / O continuity | a leg starts where the previous one ended instead of at a placed spawn, flag — the structural fix under the air spawn | today, design first |
-| M complexity | measure the complexity/part-count confound on arch40 before charging anything | measuring |
-| L aspect ratio | measure what AR buys in air and costs in water, conditional on area and mass | measuring |
-| P refit | measure merge loss per refit on arch40 and the staleness a slower schedule costs | measuring |
+| X task reward | hold depth 5.0–6.5 m and land command 0.04 m/s, from arch41's stop; the stillness band **stays 0.30 m/s** — at arch41's p75 (0.64) it paid a held-still beetle 0.093 in water, because that population's drift *is* passive sinking | **done** |
+| Y chatter | `command_rate`, `command_reversal` published on every segment; `action_rate_penalty` (default 0) charges the rate | **done**, flag off |
+| Y / O continuity | measured first (below): a continuous start would be a wall today | **designed**, not built |
+| M complexity | `runs/analysis_M_complexity.md`: do not charge — it is the air/water conflict (+0.139 air, −0.280 water), not bloat | **closed** |
+| L aspect ratio | `runs/analysis_L_aspect_ratio.md`: no cost — AR buys static lift (+0.153) that never becomes flight | **closed** |
+| P refit | `runs/analysis_P_refit.md`: each refit erases more than islands grow between refits; subspace overlap now recorded, `descriptor_keep_if_overlap` (default 0) keeps unchanged axes | **done**, flag off |
 | R `shared_ent_coef` | a short sweep, after arch42 (it needs the machine) | queued |
 | N GRPO | the partial form, flag | after X/Y |
 | W, T, V | superseded by X / closed / subsumed | closed |
 | Q triphibian conflict | a written decision for the user: what "a chain of pairs" would change | memo |
 | TEST_AUDIT 7 | re-run every mutation whose only catching suite is `test_search`, on the fixed harness | queued |
+
+### Y / O — what a continuous start would do, measured before building it
+
+`runs/_logs/probe_continuity.py`: arch41's top 30 elites, each in three leg
+orders, 8 s legs, driven as scored, never re-placed. **Of 90 continuous
+missions none completed both transitions and 25 (28%) completed one — nearly all
+of them air → water, the 30 m launch falling into the sea.** No machine got from
+land into water or into air under its own power. Making the evaluation
+continuous today would zero every leg after the first for almost everyone: the
+"moves at 0.1 m/s" wall again, at the scale of the whole mission.
+
+The design that has a gradient: **move the start of each transition probe back
+from the interface as the population learns to cross it.** The four transition
+probes already start at the interface and score the crossing. Give each a start
+distance — 0 at the waterline, the shore or the launch height — that steps
+further back (up the beach, deeper, lower) whenever a set share of evaluations
+cross from the current distance, and publish the distance. At its limit the
+probe *is* the continuous mission; at its start it is today's probe; in between
+it is a curriculum on the thing no score has ever read. The air spawn (O) is the
+same curriculum run the other way: launch height steps down from 30 m.
+Not built: it changes what every transition score means, and the step rule
+needs its own measurement of crossing rates by distance first.
+
+### Q — the decision memo
+
+Measured three ways now: `corr(air, water)` −0.17 by arch37's end; a wing
+costing 2.5x in water what it buys in air; and today, CPPN complexity buying
+air (+0.139) and costing water (−0.280) with part count held fixed. The
+`land_air` island produced arch37's mission-best, and every transition any
+machine makes in a continuous mission is one gravity makes for it. The option
+the project has not tried is to make the mission **a chain of pairs** — separate
+lineages for land↔air and water↔air, each selected on its pair and its
+crossing, with the triphibian as a hand-off between them rather than one body
+asked to be good at three media at once. It changes what the project is for,
+so it stays the user's decision; nothing here acts on it.
 
 ## arch40 — the work list
 

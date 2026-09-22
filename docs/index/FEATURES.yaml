@@ -187,6 +187,7 @@ FilmIsTheEvaluation:
     - viz.film.evaluate_on_film
     - viz.film.control_laws
     - viz.film.pick_elite
+    - envs.triphibian.command_statistics
     - ops.run.launch_postrun
     - ops.run.cmd_postrun
     - ops.run.cmd_film
@@ -195,6 +196,7 @@ FilmIsTheEvaluation:
     - tests.test_physics::test_the_first_air_reset_is_like_every_other
     - tests.test_search::test_a_film_reproduces_the_scored_experiment
     - tests.test_search::test_sharding_a_generation_does_not_change_a_score
+    - tests.test_physics::test_chattering_commands_are_measured
   note: a finished run films its best elite by re-running the Tier-1 evaluation with a camera attached, stamps the recorded and reproduced score on every clip, and puts each continuous-mission leg beside the evaluated clip of its medium; runs itself at the end of every search
 
 Transitions:

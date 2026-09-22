@@ -799,14 +799,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Phase` | class | 93 | — | One purpose, over one stretch of a segment. |
-| `schedule_for` | function | 146 | `(domain, rng=None, *, trim_speed: float=0.0) -> TaskSchedule` | The two-phase script for one segment in ``domain``. |
-| `task_seed` | function | 199 | `(scatter_seed: int) -> int` | The task draw for one segment, derived from its scatter draw. |
-| `TaskSchedule` | class | 113 | — | The phases one segment is made of, in order. |
-| `Phase.moving` | property | 108 | `(self) -> bool` | — |
-| `TaskSchedule.at` | method | 127 | `(self, frac: float) -> Phase` | — |
-| `TaskSchedule.bounds` | method | 130 | `(self, n: int) -> list` | Sample index ranges ``[(lo, hi), ...]`` for a segment of ``n`` samples. |
-| `TaskSchedule.index_at` | method | 119 | `(self, frac: float) -> int` | The phase in force at ``frac`` of the way through the segment. |
+| `Phase` | class | 114 | — | One purpose, over one stretch of a segment. |
+| `schedule_for` | function | 167 | `(domain, rng=None, *, trim_speed: float=0.0) -> TaskSchedule` | The two-phase script for one segment in ``domain``. |
+| `task_seed` | function | 220 | `(scatter_seed: int) -> int` | The task draw for one segment, derived from its scatter draw. |
+| `TaskSchedule` | class | 134 | — | The phases one segment is made of, in order. |
+| `Phase.moving` | property | 129 | `(self) -> bool` | — |
+| `TaskSchedule.at` | method | 148 | `(self, frac: float) -> Phase` | — |
+| `TaskSchedule.bounds` | method | 151 | `(self, n: int) -> list` | Sample index ranges ``[(lo, hi), ...]`` for a segment of ``n`` samples. |
+| `TaskSchedule.index_at` | method | 140 | `(self, frac: float) -> int` | The phase in force at ``frac`` of the way through the segment. |
 
 ## `envs.transitions` — `dytiscidae/envs/transitions.py`
 
@@ -827,40 +827,41 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `airworthiness` | function | 266 | `(p: Phenotype) -> list[str]` | Which flight gates a design fails, as reasons.  Empty means none. |
-| `Domain` | class | 65 | `(str, Enum)` | — |
-| `evaluate_tier0` | function | 331 | `(p: Phenotype, spec: MissionSpec \| None=None) -> MissionResult` | Closed-form feasibility and energy budget.  No simulation. |
-| `MissionResult` | class | 147 | — | Aggregate of a whole evaluation, at whatever fidelity produced it. |
-| `MissionSpec` | class | 78 | — | The mission the user specified, with every number left adjustable. |
-| `morphology_channels` | function | 409 | `(*, mass: float, density_ratio: float, wing_area: float, span: float, aspect_ratio: float, wing_loading: float, n_actuated: int, battery_wh: float) -> np.ndarray` | The eight body-identity channels, from scalars rather than a phenotype. |
-| `SegmentResult` | class | 103 | — | What one stretch of operating in one domain produced. |
-| `TriphibianEnv` | class | 439 | — | A compiled machine in the triphibian world, steppable by a controller. |
-| `MissionResult.energy_margin` | property | 184 | `(self) -> float` | — |
-| `MissionSpec.total_seconds` | property | 94 | `(self) -> float` | — |
-| `MissionSpec.transitions` | property | 98 | `(self) -> list[str]` | — |
-| `SegmentResult.cost_of_transport` | property | 139 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
-| `TriphibianEnv.__init__` | method | 517 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
-| `TriphibianEnv.body_twist` | method | 1115 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
-| `TriphibianEnv.clearance` | method | 1197 | `(self) -> float` | Height of the machine above the ground beneath it, metres. |
-| `TriphibianEnv.depth` | method | 1143 | `(self) -> float` | — |
-| `TriphibianEnv.flap_travel` | method | 807 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
-| `TriphibianEnv.ground_height` | method | 1167 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
-| `TriphibianEnv.ground_heights` | method | 1176 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
-| `TriphibianEnv.identify` | method | 2413 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
-| `TriphibianEnv.launch_pitch` | property | 777 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
-| `TriphibianEnv.launch_speed` | property | 745 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
-| `TriphibianEnv.lift_margin` | property | 793 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
-| `TriphibianEnv.morphology_context` | property | 1244 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
-| `TriphibianEnv.observation` | method | 1283 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
-| `TriphibianEnv.reset` | method | 622 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
-| `TriphibianEnv.restore` | method | 1106 | `(self, snap: tuple) -> None` | — |
-| `TriphibianEnv.rollout` | method | 1435 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
-| `TriphibianEnv.root_pos` | method | 1140 | `(self) -> np.ndarray` | — |
-| `TriphibianEnv.scatter` | method | 653 | `(self, rng, *, strength: float=1.0) -> None` | Widen the initial condition, from a caller-supplied generator. |
-| `TriphibianEnv.snapshot` | method | 1103 | `(self) -> tuple` | — |
-| `TriphibianEnv.step` | method | 1420 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
-| `TriphibianEnv.task_channels` | method | 1368 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
-| `TriphibianEnv.thrust_margin` | method | 835 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
+| `airworthiness` | function | 291 | `(p: Phenotype) -> list[str]` | Which flight gates a design fails, as reasons.  Empty means none. |
+| `command_statistics` | function | 103 | `(commands) -> tuple[float, float] \| None` | How much, and how erratically, a controller's commands move. |
+| `Domain` | class | 66 | `(str, Enum)` | — |
+| `evaluate_tier0` | function | 356 | `(p: Phenotype, spec: MissionSpec \| None=None) -> MissionResult` | Closed-form feasibility and energy budget.  No simulation. |
+| `MissionResult` | class | 172 | — | Aggregate of a whole evaluation, at whatever fidelity produced it. |
+| `MissionSpec` | class | 79 | — | The mission the user specified, with every number left adjustable. |
+| `morphology_channels` | function | 434 | `(*, mass: float, density_ratio: float, wing_area: float, span: float, aspect_ratio: float, wing_loading: float, n_actuated: int, battery_wh: float) -> np.ndarray` | The eight body-identity channels, from scalars rather than a phenotype. |
+| `SegmentResult` | class | 128 | — | What one stretch of operating in one domain produced. |
+| `TriphibianEnv` | class | 464 | — | A compiled machine in the triphibian world, steppable by a controller. |
+| `MissionResult.energy_margin` | property | 209 | `(self) -> float` | — |
+| `MissionSpec.total_seconds` | property | 95 | `(self) -> float` | — |
+| `MissionSpec.transitions` | property | 99 | `(self) -> list[str]` | — |
+| `SegmentResult.cost_of_transport` | property | 164 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
+| `TriphibianEnv.__init__` | method | 542 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
+| `TriphibianEnv.body_twist` | method | 1147 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
+| `TriphibianEnv.clearance` | method | 1229 | `(self) -> float` | Height of the machine above the ground beneath it, metres. |
+| `TriphibianEnv.depth` | method | 1175 | `(self) -> float` | — |
+| `TriphibianEnv.flap_travel` | method | 839 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
+| `TriphibianEnv.ground_height` | method | 1199 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
+| `TriphibianEnv.ground_heights` | method | 1208 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
+| `TriphibianEnv.identify` | method | 2454 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.launch_pitch` | property | 809 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
+| `TriphibianEnv.launch_speed` | property | 777 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
+| `TriphibianEnv.lift_margin` | property | 825 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
+| `TriphibianEnv.morphology_context` | property | 1276 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
+| `TriphibianEnv.observation` | method | 1315 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
+| `TriphibianEnv.reset` | method | 654 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
+| `TriphibianEnv.restore` | method | 1138 | `(self, snap: tuple) -> None` | — |
+| `TriphibianEnv.rollout` | method | 1467 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
+| `TriphibianEnv.root_pos` | method | 1172 | `(self) -> np.ndarray` | — |
+| `TriphibianEnv.scatter` | method | 685 | `(self, rng, *, strength: float=1.0) -> None` | Widen the initial condition, from a caller-supplied generator. |
+| `TriphibianEnv.snapshot` | method | 1135 | `(self) -> tuple` | — |
+| `TriphibianEnv.step` | method | 1452 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
+| `TriphibianEnv.task_channels` | method | 1400 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
+| `TriphibianEnv.thrust_margin` | method | 867 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
 
 ## `evolution.archive` — `dytiscidae/evolution/archive.py`
 
@@ -1003,14 +1004,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 |---|---|---:|---|---|
 | `episode_features` | function | 59 | `(result, phenotype) -> np.ndarray` | Extract the raw behaviour vector from a mission result. |
 | `LearnedDescriptors` | class | 95 | — | Projects raw behaviour features onto a learned low-dimensional space. |
-| `LearnedDescriptors.axis_meaning` | method | 207 | `(self, i: int, top: int=3) -> str` | Which raw features a learned axis is mostly made of. |
-| `LearnedDescriptors.bounds` | method | 193 | `(self) -> np.ndarray` | Empirical range of each latent axis, for binning the archive. |
-| `LearnedDescriptors.due_for_refit` | method | 133 | `(self) -> bool` | Whether enough new episodes have arrived to justify a refit. |
-| `LearnedDescriptors.fit` | method | 150 | `(self) -> bool` | Refit the projection.  Returns True if it changed. |
-| `LearnedDescriptors.fitted` | property | 176 | `(self) -> bool` | — |
-| `LearnedDescriptors.observe` | method | 125 | `(self, features: np.ndarray) -> None` | — |
-| `LearnedDescriptors.project` | method | 181 | `(self, features: np.ndarray) -> np.ndarray` | Map a behaviour vector to archive coordinates. |
-| `LearnedDescriptors.report` | method | 222 | `(self) -> dict` | — |
+| `LearnedDescriptors.axis_meaning` | method | 230 | `(self, i: int, top: int=3) -> str` | Which raw features a learned axis is mostly made of. |
+| `LearnedDescriptors.bounds` | method | 216 | `(self) -> np.ndarray` | Empirical range of each latent axis, for binning the archive. |
+| `LearnedDescriptors.due_for_refit` | method | 144 | `(self) -> bool` | Whether enough new episodes have arrived to justify a refit. |
+| `LearnedDescriptors.fit` | method | 161 | `(self) -> bool` | Refit the projection.  Returns True if it changed. |
+| `LearnedDescriptors.fitted` | property | 199 | `(self) -> bool` | — |
+| `LearnedDescriptors.observe` | method | 136 | `(self, features: np.ndarray) -> None` | — |
+| `LearnedDescriptors.project` | method | 204 | `(self, features: np.ndarray) -> np.ndarray` | Map a behaviour vector to archive coordinates. |
+| `LearnedDescriptors.report` | method | 245 | `(self) -> dict` | — |
 
 ## `evolution.islands` — `dytiscidae/evolution/islands.py`
 
@@ -1053,18 +1054,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 560 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `evaluate_candidate` | function | 325 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 378 | `(genomes, cfg: SearchConfig, *, inherited=None, identify: bool=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `load_state` | function | 1536 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 905 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 1416 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 570 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `evaluate_candidate` | function | 335 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 388 | `(genomes, cfg: SearchConfig, *, inherited=None, identify: bool=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `load_state` | function | 1558 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 915 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 1438 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 63 | — | Everything adjustable about a run. |
-| `SearchState` | class | 238 | — | — |
-| `seed_archipelago` | function | 1795 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `SearchState.archive` | property | 295 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 299 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 303 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 248 | — | — |
+| `seed_archipelago` | function | 1817 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `SearchState.archive` | property | 305 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 309 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 313 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1164,23 +1165,23 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 482 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `cmd_cohort` | function | 423 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_dashboard` | function | 755 | `(args) -> int` | — |
-| `cmd_distill` | function | 793 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 311 | `(args) -> int` | — |
-| `cmd_postrun` | function | 278 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 484 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `cmd_cohort` | function | 425 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_dashboard` | function | 757 | `(args) -> int` | — |
+| `cmd_distill` | function | 795 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 313 | `(args) -> int` | — |
+| `cmd_postrun` | function | 280 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 123 | `(args) -> int` | — |
-| `cmd_render` | function | 762 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_render` | function | 764 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
 | `cmd_search` | function | 158 | `(args) -> int` | — |
-| `cmd_showcase` | function | 613 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 318 | `(args) -> int` | — |
-| `cmd_train` | function | 352 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_showcase` | function | 615 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 320 | `(args) -> int` | — |
+| `cmd_train` | function | 354 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 116 | `(args) -> int` | — |
-| `controller_for_elite` | function | 492 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 252 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 494 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 254 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 31 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 810 | `(argv=None) -> int` | — |
+| `main` | function | 812 | `(argv=None) -> int` | — |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`
 

@@ -444,6 +444,32 @@ MUTATIONS: tuple = (
         suites=("test_search",), item="film = evaluation"),
 
     Mutation(
+        id="reversal-counts-agreement",
+        path="dytiscidae/envs/triphibian.py",
+        find="    return rate, float(np.mean(dots < 0.0))",
+        replace="    return rate, float(np.mean(dots > 0.0))",
+        defect="command_reversal counts steps that continue in the same direction, "
+               "so a smooth controller reads as chattering and a chattering one as "
+               "smooth",
+        suites=("test_physics",), item="Y chatter"),
+    Mutation(
+        id="action-rate-penalty-ignored",
+        path="dytiscidae/envs/triphibian.py",
+        find="                chatter = 1.0 / (1.0 + self.action_rate_penalty * stats[0])",
+        replace="                chatter = 1.0",
+        defect="the command-rate penalty is configured and never applied",
+        suites=("test_physics",), item="Y chatter"),
+
+    Mutation(
+        id="refit-gate-never-keeps",
+        path="dytiscidae/evolution/descriptors.py",
+        find="            if self.keep_if_overlap > 0.0 and self.last_overlap >= self.keep_if_overlap:",
+        replace="            if False:",
+        defect="the refit gate is configured and never keeps the axes, so every "
+               "refit re-bins and merges the archive as before",
+        suites=("test_search",), item="P refit"),
+
+    Mutation(
         id="batched-fluid-diagnostics-stay-default",
         path="dytiscidae/envs/batchroll.py",
         find='                e.solver.diag.mean_submerged = float(o["subf"][pa:pb].mean())',

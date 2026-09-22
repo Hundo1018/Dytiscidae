@@ -93,6 +93,11 @@ class SearchConfig:
     #: found.  4 is the swept optimum, not a guess: 4 shards of 4 take 31.7 s
     #: where 1x16 takes 72.2, 2x8 47.6, 8x2 51.8 and 16x1 93.3.
     min_shard: int = 4
+    #: Weight of the command-rate penalty on every competence (ROADMAP item Y:
+    #: a controller chattering at the control rate).  0 = off, which is the
+    #: baseline; `command_rate` and `command_reversal` are published either
+    #: way, so the weight can be set from a measured distribution.
+    action_rate_penalty: float = 0.0
 
     # Fidelity
     segment_seconds: float = 8.0
@@ -184,6 +189,11 @@ class SearchConfig:
     #: means, and the definition moves as the population moves.
     learned_axes: bool = True
     descriptor_refit_every: int = 400
+    #: ROADMAP item P: keep the learned axes when a refit would reproduce them
+    #: (subspace overlap at or above this), so the archive is not re-binned and
+    #: loses nothing.  0 = off, the baseline; the overlap is recorded on every
+    #: refit event either way.
+    descriptor_keep_if_overlap: float = 0.0
     event_sample: int = 1
 
     # --- the archipelago ---------------------------------------------------
@@ -966,6 +976,9 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
     # per-worker cost rather than a per-generation one.
     from ..envs.actors import ActorPool
 
+    # Before the pool: its worker processes build their own environments and
+    # read this from the environment they inherit.
+    os.environ["DYTISCIDAE_ACTION_RATE_PENALTY"] = str(float(cfg.action_rate_penalty))
     pool = ActorPool(cfg.workers, min_shard=cfg.min_shard)
 
     archipelago = Archipelago(migrate_every=cfg.migrate_every, n_migrants=cfg.n_migrants)
@@ -997,7 +1010,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         pool=pool,
         descriptors=(
             LearnedDescriptors(n_dims=len(BD_AXES),
-                               refit_every=cfg.descriptor_refit_every)
+                               refit_every=cfg.descriptor_refit_every,
+                               keep_if_overlap=cfg.descriptor_keep_if_overlap)
             if cfg.learned_axes else None),
         spec=spec,
     )
@@ -1217,7 +1231,15 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         # restored object and checked the empty one for refits, forever (arch24:
         # seen 3049 against a last refit at 1204, zero refits after resume).
         learned = state.descriptors
-        if learned is not None and learned.due_for_refit() and learned.fit():
+        refit_due = learned is not None and learned.due_for_refit()
+        skipped_before = learned.skipped if learned is not None else 0
+        refitted = refit_due and learned.fit()
+        if refit_due and not refitted and learned.skipped > skipped_before:
+            # Kept the axes it already had (item P): nothing re-binned, nothing
+            # lost -- and the overlap that decided it is on the record.
+            telemetry.event({"kind": "descriptor_refit_skipped", "gen": gen,
+                             **learned.report()})
+        if refitted:
             def _reproject(e, _d=learned):
                 f = e.meta.get("features")
                 return _d.project(np.asarray(f, float)) if f else None

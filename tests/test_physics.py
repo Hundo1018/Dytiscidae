@@ -2843,7 +2843,8 @@ def test_each_phase_is_scored_on_its_own_purpose() -> None:
     check("and neither does going twice as fast as asked",
           next(r for r in double["phases"] if r["kind"] == CRUISE)["score"] == 0.0)
     drifting = water(at_depth, np.array([0.1, 0.0]))
-    hold_drift = water(np.concatenate([at_depth[: n // 4], np.linspace(depth, depth + 0.6, n - n // 4)]),
+    # Drifting at 0.4 m/s while told to hold: most of ``HOLD_DRIFT_SPEED``.
+    hold_drift = water(np.concatenate([at_depth[: n // 4], np.linspace(depth, depth + 2.4, n - n // 4)]),
                        np.array([v, 0.0]))
     check("moving while told to hold is the penalty",
           next(r for r in hold_drift["phases"] if r["kind"] == HOLD)["score"]
@@ -2929,6 +2930,62 @@ def test_the_first_air_reset_is_like_every_other() -> None:
           f"{np.round(cold.data.qpos[:3], 4)}")
 
 
+def test_chattering_commands_are_measured() -> None:
+    """A controller's command rate and reversals are published, and can be charged.
+
+    ROADMAP item Y: the filmed arch40 machine, sitting on sand, reversed its
+    command direction on 72% of 40 ms control steps -- a loop through its
+    body-rate channels.  `command_rate` and `command_reversal` are published on
+    every segment with a controller so a run can measure their distribution;
+    `action_rate_penalty` (default 0) charges the rate once a weight is set
+    from it.
+    """
+    print("\ncommands: chatter is measured, and chargeable")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.tasks import TASK_SPEED
+    from dytiscidae.envs.triphibian import (Domain, SegmentResult, TriphibianEnv,
+                                            command_statistics)
+
+    smooth = [np.array([0.01 * k, 0.0, 0.0]) for k in range(50)]
+    chatter = [np.array([0.3 * (-1) ** k, 0.0, 0.0]) for k in range(50)]
+    s_rate, s_rev = command_statistics(smooth)
+    c_rate, c_rev = command_statistics(chatter)
+    check("a steadily ramping command never reverses", s_rev == 0.0, f"{s_rev}")
+    check("an alternating one reverses on every step", c_rev == 1.0, f"{c_rev}")
+    check("and its rate is the size of the step", abs(c_rate - 0.6) < 1e-12, f"{c_rate}")
+    check("too few decisions to say is None, not zero", command_statistics(smooth[:2]) is None)
+
+    env = TriphibianEnv(build(BODY_PLANS["eel"]()), seed=0)
+    n = int(8.0 / env.timestep)
+    depths = np.concatenate([np.linspace(4.0, 5.75, n // 8), np.full(n - n // 8, 5.75)])
+    xy = np.zeros((n, 2))
+    for i in range(1, n):
+        xy[i] = xy[i - 1] + (np.array([0.0, TASK_SPEED["water"]]) if i >= n // 2 else 0.0) * env.timestep
+
+    def score(commands, weight):
+        env.action_rate_penalty = weight
+        res = SegmentResult(domain=Domain.WATER, duration=8.0, survived=True)
+        res.distance = float(np.linalg.norm(xy[-1]))
+        res.mean_speed = res.distance / 8.0
+        c = env._score_segment(Domain.WATER, res, depths, -depths, np.ones(n), np.zeros(n),
+                               -depths, commands=commands, spins=np.zeros(n),
+                               vzs=np.zeros(n), xys=xy)
+        return c, res.measurements
+
+    base, m = score(chatter, 0.0)
+    check("the statistics are published on the segment",
+          m.get("command_reversal") == 1.0 and abs(m.get("command_rate", 0) - 0.6) < 1e-12,
+          f"{m.get('command_rate')} / {m.get('command_reversal')}")
+    check("at the default weight they change nothing", base == score(smooth, 0.0)[0] and base > 0.0,
+          f"{base:.4f}")
+    charged = score(chatter, 1.0)[0]
+    check("with a weight, chattering costs and smooth commands do not",
+          charged < base and score(smooth, 1.0)[0] > charged,
+          f"chatter {charged:.4f} smooth {score(smooth, 1.0)[0]:.4f} unweighted {base:.4f}")
+    env.action_rate_penalty = 0.0
+
+
 def test_a_film_is_the_evaluation() -> None:
     """Attaching a camera to the Tier-1 evaluation must not change what it measures.
 
@@ -2982,6 +3039,7 @@ def main() -> int:
     run_all([
         test_each_phase_is_scored_on_its_own_purpose,
         test_the_first_air_reset_is_like_every_other,
+        test_chattering_commands_are_measured,
         test_a_film_is_the_evaluation,
         test_lift_sign_and_magnitude,
         test_buoyancy,

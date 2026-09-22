@@ -3163,6 +3163,43 @@ def test_a_resume_says_when_controllers_cannot_be_inherited() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_a_refit_that_changes_nothing_can_be_skipped() -> None:
+    """A refit that reproduces the axes need not re-bin, and must say so.
+
+    ROADMAP item P, measured on arch40: each refit erased 12-16 cells per island
+    while islands grew 9.5-11.5 between refits, and the axes' leading features
+    stayed the same refit to refit (mean Jaccard 0.71).  So the subspace
+    overlap between the old and new projection is recorded on every refit, and
+    ``keep_if_overlap`` (0 = off) keeps the old axes above it.
+    """
+    print("\ndescriptors: a refit that changes nothing can be skipped")
+    from dytiscidae.evolution.descriptors import LearnedDescriptors
+
+    rng = np.random.default_rng(0)
+    base = rng.normal(size=(300, 16)) * np.linspace(3.0, 0.2, 16)
+    turned = base @ (np.eye(16) + 0.8 * rng.normal(size=(16, 16)))
+
+    def refit_twice(threshold, second):
+        d = LearnedDescriptors(refit_every=1, keep_if_overlap=threshold)
+        for f in base:
+            d.observe(f)
+        d.fit()
+        d._buffer = list(second)
+        return d, d.fit()
+
+    d, replaced = refit_twice(0.0, base)
+    check("the overlap is recorded on a refit, and identical data overlaps fully",
+          d.last_overlap is not None and abs(d.last_overlap - 1.0) < 1e-9,
+          f"{d.last_overlap}")
+    check("with the gate off, a due refit still replaces the axes", replaced and d.skipped == 0)
+    d, replaced = refit_twice(0.95, base)
+    check("with it on, identical axes are kept and nothing is re-binned",
+          not replaced and d.skipped == 1 and d.report()["skipped"] == 1)
+    d, replaced = refit_twice(0.95, turned)
+    check("and axes that really moved are still replaced",
+          replaced and d.last_overlap < 0.95, f"overlap {d.last_overlap:.3f}")
+
+
 def test_learned_axes_survive_resume() -> None:
     """A refit that moved the archive onto latent axes must survive ``--resume``.
 
@@ -4058,6 +4095,7 @@ def main() -> int:
         test_a_finished_run_is_a_checkpoint,
         test_the_two_evaluation_paths_score_the_same_machine_the_same,
         test_a_resume_says_when_controllers_cannot_be_inherited,
+        test_a_refit_that_changes_nothing_can_be_skipped,
         test_learned_axes_survive_resume,
         test_the_loop_wires_every_layer_together,
         test_the_body_plan_outlives_the_lineage_window,

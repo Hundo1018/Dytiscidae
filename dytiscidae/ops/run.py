@@ -166,6 +166,8 @@ def cmd_search(args) -> int:
         seed=args.seed,
         workers=args.workers,
         min_shard=args.min_shard,
+        action_rate_penalty=args.action_rate_penalty,
+        descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
         segment_seconds=args.segment_seconds,
         controller_refine_steps=args.refine_steps,
         controller_refine_sigma=args.refine_sigma,
@@ -925,6 +927,13 @@ def main(argv=None) -> int:
     p.add_argument("--n-modes", type=int, default=6,
                    help="mobility modes identified per body per domain, and "
                         "the width the shared policy commands through")
+    p.add_argument("--descriptor-keep-if-overlap", type=float, default=0.0,
+                   help="keep the learned axes when a refit would reproduce "
+                        "them (subspace overlap at or above this); 0 = off "
+                        "(ROADMAP item P)")
+    p.add_argument("--action-rate-penalty", type=float, default=0.0,
+                   help="weight of the command-rate penalty on competence "
+                        "(ROADMAP item Y); 0 = off")
     p.add_argument("--no-postrun", dest="postrun", action="store_false",
                    help="skip the report and films a finished run makes of "
                         "itself (see `postrun`)")

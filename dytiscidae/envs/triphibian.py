@@ -59,7 +59,8 @@ from ..physics.energy import (
 from ..physics.fluid import FluidSolver
 from ..physics.medium import GRAVITY, MediumField, SeaState
 from ..physics.structure import ballast_pump_power
-from .tasks import CRUISE, HOLD, STOP, TASK_SPEED, TaskSchedule, schedule_for
+from .tasks import (CRUISE, HOLD, HOLD_DRIFT_SPEED, STOP, TASK_SPEED, TaskSchedule,
+                    schedule_for)
 
 
 class Domain(str, Enum):
@@ -97,6 +98,30 @@ class MissionSpec:
     @property
     def transitions(self) -> list[str]:
         return CYCLE_TRANSITIONS * self.cycles
+
+
+def command_statistics(commands) -> tuple[float, float] | None:
+    """How much, and how erratically, a controller's commands move.
+
+    ``commands`` is the commanded body rate at each control decision.  Returns
+    ``(rate, reversal)``: the mean size of a step between consecutive commands,
+    and the fraction of consecutive steps that reverse direction.  A smooth
+    controller reverses well under half the time; one chattering at the
+    control rate reverses on most steps.  ROADMAP item Y measured the filmed
+    arch40 machine at 72% on the beach, a loop through its body-rate channels.
+    None when there are too few decisions to say.
+    """
+    c = np.asarray([np.asarray(x, float).ravel() for x in (commands or [])])
+    if c.ndim != 2 or len(c) < 3:
+        return None
+    d = np.diff(c, axis=0)
+    size = np.linalg.norm(d, axis=1)
+    rate = float(size.mean())
+    live = (size[:-1] > 1e-9) & (size[1:] > 1e-9)
+    if not np.any(live):
+        return rate, 0.0
+    dots = np.einsum("ij,ij->i", d[:-1], d[1:])[live]
+    return rate, float(np.mean(dots < 0.0))
 
 
 @dataclass
@@ -534,6 +559,13 @@ class TriphibianEnv:
         self.air_gates = airworthiness(phenotype)
         self._morph_ctx = None
         self.rng = np.random.default_rng(seed)
+        #: Weight of the command-rate penalty (ROADMAP item Y), 0 = off.  Read
+        #: from the environment because the search's worker processes build
+        #: their own envs and inherit the parent's environment, not its
+        #: objects; `run_search` sets it from `SearchConfig.action_rate_penalty`.
+        import os as _os
+        self.action_rate_penalty = float(
+            _os.environ.get("DYTISCIDAE_ACTION_RATE_PENALTY", "0") or 0.0)
         self.medium = MediumField(sea_state=sea_state, current=current, wind=wind)
         self.timestep = timestep
 
@@ -1635,14 +1667,14 @@ class TriphibianEnv:
                     # sinking *through* the target during the window -- the
                     # still eel, released at 4 m and sinking 0.55 m/s, crosses
                     # 6.5 m right on time -- so the motion over the window is
-                    # scored separately, against the distance the cruise
-                    # command would cover in it: holding still scores 1,
-                    # moving at cruise speed scores 0.
+                    # scored separately, against the distance
+                    # ``HOLD_DRIFT_SPEED`` would cover in it: holding still
+                    # scores 1, drifting at that speed scores 0.
                     e_d = float(np.mean(np.abs(dep[mid:top] - float(ph.depth))))
                     p3 = np.column_stack([xy[mid:top], dep[mid:top]])
                     e_m = float(np.mean(np.linalg.norm(p3 - p3[0], axis=1)))
                     scale = max(abs(float(ph.depth) - d_start), self.DEPTH_BAND)
-                    band_m = max(TASK_SPEED["water"] * span / 2.0, 1e-3)
+                    band_m = max(HOLD_DRIFT_SPEED * span / 2.0, 1e-3)
                     at = float(np.clip(1.0 - e_d / scale, 0.0, 1.0))
                     still = float(np.clip(1.0 - e_m / band_m, 0.0, 1.0))
                     rec.update(error=e_d + e_m, depth_error=e_d, drift=e_m,
@@ -1759,6 +1791,15 @@ class TriphibianEnv:
         n_got = len(alts)
         # Anything that ended early is measured against what it was asked to do.
         served = min(n_got / n_want, 1.0)
+        # How the controller's commands moved, published on every segment that
+        # had a controller -- a diagnostic no rung reads, so a run can measure
+        # its distribution before anyone sets the penalty's weight from it.
+        stats = command_statistics(commands)
+        chatter = 1.0
+        if stats is not None:
+            res.measurements["command_rate"], res.measurements["command_reversal"] = stats
+            if self.action_rate_penalty > 0.0:
+                chatter = 1.0 / (1.0 + self.action_rate_penalty * stats[0])
 
         if domain is Domain.AIR:
             # Flight, not slow descent.
@@ -2085,8 +2126,8 @@ class TriphibianEnv:
                                        "turn_tracking", "turn_height_hold")
                           else v) for k, v in tm.items()}
             res.measurements.update(tm)
-            res.parts = {"gate": float(credit * frac), "control": ts["task"]}
-            return float(credit * frac * ts["task"])
+            res.parts = {"gate": float(credit * frac), "control": ts["task"] * chatter}
+            return float(credit * frac * ts["task"] * chatter)
 
         if domain is Domain.WATER:
             target = self.TARGET_DEPTH
@@ -2190,8 +2231,8 @@ class TriphibianEnv:
             ts = self._task_scores(domain, depths, clearances, xys, n_want)
             res.measurements.update(ts["measurements"])
             gate = float(served * submerged * (0.5 + 0.5 * upright))
-            res.parts = {"gate": gate, "control": ts["task"]}
-            return float(gate * ts["task"])
+            res.parts = {"gate": gate, "control": ts["task"] * chatter}
+            return float(gate * ts["task"] * chatter)
 
         # LAND
         #
@@ -2405,8 +2446,8 @@ class TriphibianEnv:
         # above, for the ladder.
         ts = self._task_scores(domain, depths, clearances, xys, n_want)
         res.measurements.update(ts["measurements"])
-        res.parts = {"gate": float(served * posture), "control": ts["task"]}
-        return float(served * posture * ts["task"])
+        res.parts = {"gate": float(served * posture), "control": ts["task"] * chatter}
+        return float(served * posture * ts["task"] * chatter)
 
     # ------------------------------------------------------------- mobility ID
 

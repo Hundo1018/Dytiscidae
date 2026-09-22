@@ -51,24 +51,31 @@ from dataclasses import dataclass
 #: filled in by the environment.
 #:
 #: Set from the measured distribution of gross speed over arch40's first 400
-#: generations (6,383 segments each), at about the 80th percentile -- a command
-#: most of the population undershoots but that the upper fifth already makes:
+#: generations (6,383 segments each):
 #:
 #:     water `water_speed`  p50 0.151  p75 0.271  p90 0.446  m/s
 #:     land  `land_speed`   p50 0.020  p75 0.060  p90 0.116  m/s
 #:
+#: Water sits at about the 80th percentile.  Land was there too, at 0.08, and
+#: arch41 stopped at generation 52 with `walk_tracking` p50 0 and p75 0.04: a
+#: command the population could not approach is a wall, not a gradient.  It
+#: is now 0.04, between land's p50 and p75.
+#:
 #: A tracking command is not a full-marks reference: overshooting it scores
 #: less, so it has to be a speed the population can reach rather than the 0.993
 #: quantile ``FORWARD_REF_SPEED`` used.
-TASK_SPEED = {"water": 0.30, "land": 0.08}
+TASK_SPEED = {"water": 0.30, "land": 0.04}
 
 #: Commanded hold depth in water, drawn uniformly per generation.  The machine
 #: is released four metres under (``TriphibianEnv.SPAWN``), so every draw asks
-#: it to *descend* at least 1.5 m and stop: a hull that sits where it was put
-#: fails the hold, and one that sinks through the target fails it too.  The top
-#: of the range stays short of the mission's 10 m because a 4 s phase has to
-#: leave time to settle.
-HOLD_DEPTH_RANGE = (5.5, 8.0)
+#: it to *descend* at least a metre and stop: a hull that sits where it was put
+#: fails the hold, and one that sinks through the target fails it too.
+#:
+#: Was 5.5-8.0 m.  arch41 stopped at generation 52 with the population's
+#: maximum depth at p50 4.71 m and p75 6.93 m -- most machines never got near a
+#: 1.5-4 m descent, and 89% scored zero on the hold.  5.0-6.5 m sits inside what
+#: the population already reaches.
+HOLD_DEPTH_RANGE = (5.0, 6.5)
 
 #: The heading change the air segment's second phase commands, in radians,
 #: drawn with a random sign.  Between 45 and 90 degrees: enough that holding the
@@ -83,6 +90,20 @@ TURN_RANGE = (math.radians(45.0), math.radians(90.0))
 #: per generation and a passive glide lines up with it only by chance; the
 #: default should not line it up by construction.
 DEFAULT_HEADING = math.pi / 2
+
+#: How fast a machine may drift while told to hold and still score, m/s.  The
+#: stillness term is scored against the distance this would cover over the
+#: window, so drifting at it scores zero.
+#:
+#: **Set by the gate, not by the population.**  arch41's first 52 generations
+#: measured hold-phase drift at p50 0.41 m and p75 0.64 m over the ~2 s window,
+#: and a band at that p75 was tried: with the shallower depth range below, it
+#: paid a beetle with its actuators held still 0.093 in water (max 0.240), up
+#: from 0.011 -- because that population's drift *is* passive sinking, and a
+#: threshold set from passive behaviour rewards passive behaviour.  0.45 m/s
+#: still paid it 0.056.  At 0.30 m/s the held-still beetle scores 0.018 and a
+#: hull sinking at 0.55 m/s scores exactly 0 on stillness.
+HOLD_DRIFT_SPEED = 0.30
 
 #: Kinds of phase.  ``stop`` is ``hold`` on land, where there is no depth or
 #: height to hold and the only thing to hold is position.
@@ -157,7 +178,7 @@ def schedule_for(domain, rng=None, *, trim_speed: float = 0.0) -> TaskSchedule:
     key = _key(domain)
     if key == "water":
         if rng is None:
-            hold_first, heading, depth = True, DEFAULT_HEADING, 6.5
+            hold_first, heading, depth = True, DEFAULT_HEADING, 5.75
         else:
             hold_first = bool(rng.random() < 0.5)
             heading = float(rng.uniform(-math.pi, math.pi))

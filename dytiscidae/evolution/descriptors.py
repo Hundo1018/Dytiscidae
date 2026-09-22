@@ -111,6 +111,17 @@ class LearnedDescriptors:
     n_dims: int = 4
     refit_every: int = 400
     min_samples: int = 60
+    #: Keep the current axes when a refit would describe the same ones: the
+    #: mean squared cosine of the principal angles between the old and new
+    #: projections at or above this, and nothing is re-binned.  0 = off (every
+    #: due refit replaces the axes, as always).  ROADMAP item P measured on
+    #: arch40 that each refit erased 12-16 cells per island against 9.5-11.5
+    #: grown between refits, while the axes' leading features stayed the same
+    #: (mean Jaccard 0.71 refit to refit).  ``last_overlap`` is recorded either
+    #: way, so the threshold can be set from its distribution.
+    keep_if_overlap: float = 0.0
+    last_overlap: float | None = None
+    skipped: int = 0
 
     _buffer: list = field(default_factory=list)
     _mean: np.ndarray | None = None
@@ -167,7 +178,19 @@ class LearnedDescriptors:
             _, _, Vt = np.linalg.svd(Z, full_matrices=False)
         except np.linalg.LinAlgError:
             return False
-        self._components = Vt[: self.n_dims]
+        new = Vt[: self.n_dims]
+        if self._components is not None and self._components.shape == new.shape:
+            # Principal angles between the two subspaces, in the space each was
+            # fitted in -- a sign flip or a reordering of axes is not a change.
+            sv = np.linalg.svd(self._components @ new.T, compute_uv=False)
+            self.last_overlap = float(np.mean(np.clip(sv, 0.0, 1.0) ** 2))
+            if self.keep_if_overlap > 0.0 and self.last_overlap >= self.keep_if_overlap:
+                self.skipped += 1
+                self._last_refit_at = self.seen
+                return False
+        else:
+            self.last_overlap = None
+        self._components = new
         self.refits += 1
         self._last_refit_at = self.seen
         return True
@@ -225,4 +248,6 @@ class LearnedDescriptors:
             "samples": len(self._buffer),
             "refits": self.refits,
             "axes": [self.axis_meaning(i) for i in range(self.n_dims)] if self.fitted else [],
+            "overlap": self.last_overlap,
+            "skipped": self.skipped,
         }
