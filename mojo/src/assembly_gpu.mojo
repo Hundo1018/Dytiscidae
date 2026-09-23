@@ -4,7 +4,7 @@ Ports three pieces of `fluid.apply` that between them finish the force vector:
 
     fluid.py:494-496   L = q*area*cl*lift_scale ; D = q*area*cd*cd_scale
                        F += L*lift_axis + D*d_hat
-    fluid.py:582-588   f_rot = where(is_wing, c_rot*rho*U*omega_s*chord^2*dr, 0)
+    fluid.py   f_rot = where(is_wing, -c_rot*rho*U*omega_s*chord^2*dr, 0)
                        F += f_rot*lift_axis
     fluid.py:676-677   f_buoy = water.rho*GRAVITY*volume_buoyant*subf
                        F[:,2] += f_buoy
@@ -116,7 +116,9 @@ def assembly_kernel(
             + omega[unsafe_offset=j + 2] * s_hat[unsafe_offset=j + 2]
         )
         var ch = chord[unsafe_offset=i]
-        var f_rot = (
+        # d(alpha)/dt = -omega_s, so nose-up pitching is -ws (fixed 2026-09-23,
+        # see fluid.py).
+        var f_rot = -(
             c_rot[unsafe_offset=i] * rho[unsafe_offset=i] * u[unsafe_offset=i]
             * ws * ch * ch * dr[unsafe_offset=i]
         )

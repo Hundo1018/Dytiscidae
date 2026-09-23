@@ -429,7 +429,7 @@ def step_batch(envs, angles_list, bf: BatchedFluid, active=None):
         if not active[i]:
             continue
         if len(e.act_names):
-            e.data.ctrl[: len(angles_list[i])] = angles_list[i]
+            e.data.ctrl[: len(angles_list[i])] = e.servo_command(angles_list[i])
         e.data.xfrc_applied[:] = 0.0
 
     # The wave phase is a function of time, and every *active* machine is in

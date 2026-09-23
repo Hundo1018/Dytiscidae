@@ -37,6 +37,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import math
+
 import numpy as np
 
 
@@ -111,15 +113,44 @@ class CPG:
         #: reports was the same number at the same moment of every episode the
         #: policy ever saw.
         self.phase_offset = 0.0
+        self._continuity_reset()
+
+    def _continuity_reset(self) -> None:
+        #: Keeps the stroke phase continuous when the frequency changes.  The
+        #: phase is ``2 pi f t + psi``; with ``f`` constant ``psi`` stays 0 and
+        #: the command is bit-identical to the old closed form.  Without it the
+        #: phase was ``2 pi f t`` on the absolute clock, so a policy moving the
+        #: frequency by 0.1 Hz at t = 4 s jumped the stroke by 2.5 rad in one
+        #: control step -- and every identified basis carries frequency, so the
+        #: policy did that constantly (ROADMAP "measured a third time").
+        self._psi = 0.0
+        self._f_last: float | None = None
+        self._t_last = -math.inf
+        #: d(command)/dt of the last ``command`` call, for the servo's velocity
+        #: feed-forward; ``pop_rate`` hands it over once.
+        self._rate: np.ndarray | None = None
 
     def reset(self) -> None:
         self.t = 0.0
+        self._continuity_reset()
 
     def command(self, params: CPGParams, t: float) -> np.ndarray:
         """Target joint angles at time ``t``."""
         p = params.clipped(self.lo, self.hi)
-        return p.offset + p.amplitude * np.sin(
-            2.0 * np.pi * p.frequency * t + p.phase + self.phase_offset)
+        f = float(p.frequency)
+        if self._f_last is None or t < self._t_last:
+            self._psi = 0.0                  # a new timeline starts at the closed form
+        elif f != self._f_last:
+            self._psi += 2.0 * np.pi * (self._f_last - f) * t
+        self._f_last, self._t_last = f, t
+        arg = 2.0 * np.pi * f * t + self._psi + p.phase + self.phase_offset
+        self._rate = p.amplitude * (2.0 * np.pi * f) * np.cos(arg)
+        return p.offset + p.amplitude * np.sin(arg)
+
+    def pop_rate(self) -> np.ndarray | None:
+        """The rate of the last command, once; None if it was already taken."""
+        r, self._rate = self._rate, None
+        return r
 
     @property
     def n_params(self) -> int:

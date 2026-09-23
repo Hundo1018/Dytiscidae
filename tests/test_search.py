@@ -2424,7 +2424,7 @@ def test_an_audit_perturbs_the_scored_experiment_and_nothing_else() -> None:
     tmp = tempfile.mkdtemp(prefix="dyt-audit-")
     try:
         state = run_search(SearchConfig(
-            generations=1, batch=1, seed=11, segment_seconds=1.0,
+            generations=1, batch=1, seed=11, segment_seconds=4.0,
             n_reference_seeds=1, n_random_seeds=0, islands=("generalist",),
             tier2_every=999, audit_every=999, migrate_every=999,
             checkpoint_every=999, run_dir=tmp, identify_axes_every=999,
@@ -2432,6 +2432,16 @@ def test_an_audit_perturbs_the_scored_experiment_and_nothing_else() -> None:
         check("the fixture leaves an elite to audit", bool(state.archive.cells))
         if not state.archive.cells:
             return
+        # The perturbation only runs on a nonzero mission base, and a mission
+        # is a needle: the drawn beetle's 0.0009 went to 0.0 when the fluid
+        # model was corrected on 2026-09-23 (MATH_AUDIT F-09..F-11).  So the
+        # audited elite is a gannet, whose base is nonzero at seed 0, and that
+        # precondition is what the next check reads.
+        from dytiscidae.core.bodyplans import BODY_PLANS
+        for e in state.archive.cells.values():
+            e.genome = BODY_PLANS["gannet"]()
+            e.meta["policy"] = None
+            e.meta["eval_seed"] = 0
         state.auditor = Auditor(held_out_seeds=0, perturbations=(("cd_scale", 1.0),))
         loop_mod._audit(state, 1, MissionSpec(), np.random.default_rng(0))
         rep = state.auditor.reports[-1]

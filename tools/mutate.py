@@ -590,6 +590,55 @@ MUTATIONS: tuple = (
                "launch again, which a machine with its actuators off also does",
         suites=("test_search",), item="sinking is not a capability"),
 
+    # --- why nothing flew, 2026-09-23 -------------------------------------
+    Mutation(
+        id="strip-arm-from-frame-origin",
+        path="dytiscidae/physics/fluid.py",
+        find="        v_elem = v_org + _cross3(omega, pos - xipos[p.body_id])",
+        replace="        v_elem = v_org + _cross3(omega, pos - xpos[p.body_id])",
+        defect="the strip lever arm starts at the body frame while the velocity "
+               "is at the centre of mass: flapping strips move 1.8-3.6x too fast",
+        suites=("test_physics",), item="fluid kinematics"),
+    Mutation(
+        id="reversed-flow-mirrors-incidence",
+        path="dytiscidae/physics/fluid.py",
+        find="        alpha = np.where(rev, -alpha, alpha)\n",
+        replace="",
+        defect="flow over the trailing edge is folded by a mirror, so a plate "
+               "swept backwards lifts the same way as forwards",
+        suites=("test_physics",), item="fluid incidence"),
+    Mutation(
+        id="kramer-opposes-pitch-up",
+        path="dytiscidae/physics/fluid.py",
+        find="            -self.c_rot * rho * U * omega_s * p.chord**2 * p.dr,",
+        replace="            self.c_rot * rho * U * omega_s * p.chord**2 * p.dr,",
+        defect="rotational lift has the wrong sign and opposes nose-up pitching",
+        suites=("test_physics",), item="fluid rotation"),
+    Mutation(
+        id="servo-without-feed-forward",
+        path="dytiscidae/envs/triphibian.py",
+        find="        return tgt + self.servo_lead[: len(tgt)] * rate",
+        replace="        return tgt",
+        defect="the position servo lags 75 ms and a 7.3 Hz stroke reaches 27%",
+        suites=("test_physics",), item="actuation"),
+    Mutation(
+        id="cpg-phase-on-absolute-clock",
+        path="dytiscidae/control/cpg.py",
+        find="            self._psi += 2.0 * np.pi * (self._f_last - f) * t",
+        replace="            pass",
+        defect="a frequency change jumps the stroke phase by 2 pi df t",
+        suites=("test_physics",), item="control continuity"),
+    Mutation(
+        id="a-fall-pays-for-flight",
+        path="dytiscidae/envs/triphibian.py",
+        find='                res.parts = {"gate": float(credit * frac), "control": 0.0}\n'
+             '                return 0.0',
+        replace='                res.parts = {"gate": float(credit * frac), "control": 0.10}\n'
+                '                return float(credit * frac * 0.10)',
+        defect="a body that reaches the sea from the launch in under 2.8 s is "
+               "paid for flight, more than one that stayed up longer",
+        suites=("test_physics",), item="sinking is not a capability"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

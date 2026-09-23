@@ -2,7 +2,7 @@
 
 # Modules
 
-101 modules, 32,611 lines, 978 indexed symbols.
+101 modules, 32,707 lines, 980 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -64,7 +64,7 @@ is what makes a violation visible while reading.
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
-| `control.cpg` | Central pattern generator, and the *discovered* control basis. | 624 | — | `numpy` | — |
+| `control.cpg` | Central pattern generator, and the *discovered* control basis. | 655 | — | `numpy` | — |
 | `control.train` | Learning a controller for one morphology. | 257 | — | `numpy` | `control.cpg`, `envs.evaluate`, `envs.mission`, `envs.triphibian`, `evolution.cmaes`, `physics.wake`, `viz.showcase` |
 
 ## `core`
@@ -105,7 +105,7 @@ is what makes a violation visible while reading.
 | `envs.skills` | The actuator skill bench: learning to operate components, not vehicles. | 655 | — | `numpy` | `evolution.cmaes`, `physics.energy`, `physics.materials`, `physics.medium`, `physics.structure` |
 | `envs.tasks` | What a segment asks the machine to do, phase by phase. | 248 | — | — | — |
 | `envs.transitions` | Crossing between media, scored rather than merely survived. | 456 | — | `numpy` | `envs.triphibian` |
-| `envs.triphibian` | The triphibian mission environment. | 2634 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.structure` |
+| `envs.triphibian` | The triphibian mission environment. | 2669 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.structure` |
 
 ## `evolution`
 
@@ -143,7 +143,7 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `physics.energy` | Electrical power train: actuators, battery, and the mission energy budget. | 369 | — | `numpy` | `physics.materials`, `physics.medium` |
-| `physics.fluid` | Quasi-steady blade-element fluid loads for flapping surfaces and bluff bodies. | 938 | — | `mujoco`, `numpy` | `physics.medium` |
+| `physics.fluid` | Quasi-steady blade-element fluid loads for flapping surfaces and bluff bodies. | 968 | — | `mujoco`, `numpy` | `physics.medium` |
 | `physics.jet` | Pulsed-jet propulsion: medusa bells and squid mantles. | 266 | — | `numpy` | `physics.medium` |
 | `physics.materials` | Material and component property database. | 257 | — | — | — |
 | `physics.medium` | Medium field: air above the free surface, water below, and the blended | 191 | — | `numpy` | — |

@@ -469,8 +469,16 @@ def strip_kernel(
     # removed rather than absorbed into a tolerance.
     var hyp = sqrt(sin_a * sin_a + cos_a * cos_a)
     var hyp_safe = hyp if hyp > 1e-300 else 1e-300
-    var alpha = atan2d(sin_a / hyp_safe, abs(cos_a) / hyp_safe + 1e-12)
-    alpha_out[unsafe_offset=i] = alpha + 2.0 * camber[unsafe_offset=i]
+    # 2026-09-23: a shift of pi, not a mirror -- see fluid.py.  Reversed flow
+    # negates the folded angle and the camber term.
+    var rev = cos_a < 0.0
+    var cpos = -cos_a if rev else cos_a
+    var alpha = atan2d(sin_a / hyp_safe, cpos / hyp_safe + 1e-12)
+    var cam = camber[unsafe_offset=i]
+    if rev:
+        alpha = -alpha
+        cam = -cam
+    alpha_out[unsafe_offset=i] = alpha + 2.0 * cam
 
     var ws = (
         omega[unsafe_offset=j + 0] * sx
@@ -806,7 +814,9 @@ def velocity_kernel(
     """Panel relative flow, the block marked `--- kinematics` in `fluid.py`.
 
     `vel6` is one 6-vector per body from mj_objectVelocity -- angular in 0..2,
-    linear in 3..5, both world frame at the body frame origin.  That call is a
+    linear in 3..5, world frame, the linear part at the body's centre of mass.
+    `xpos` is therefore the caller's *xipos* buffer: the lever arm has to start
+    where the velocity was measured (fixed 2026-09-23).  That call is a
     per-body CPU loop and stays on the host; everything downstream of it is
     per-panel and lands here.
 
@@ -831,7 +841,7 @@ def velocity_kernel(
     omega_out[unsafe_offset=j + 1] = wy
     omega_out[unsafe_offset=j + 2] = wz
 
-    # r = element centroid minus the body frame origin
+    # r = element centroid minus the point vel6 is measured at (xipos)
     var rx = pos_w[unsafe_offset=j + 0] - xpos[unsafe_offset=b * 3 + 0]
     var ry = pos_w[unsafe_offset=j + 1] - xpos[unsafe_offset=b * 3 + 1]
     var rz = pos_w[unsafe_offset=j + 2] - xpos[unsafe_offset=b * 3 + 2]

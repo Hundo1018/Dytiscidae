@@ -575,6 +575,20 @@ class TriphibianEnv:
         self.model, self.data, self.act_names, self.panels = compile_phenotype(
             phenotype, scene=scene, detail=detail
         )
+        # The servo's own lag, kv/kp per actuator (biasprm = [0, -kp, -kv]).
+        # A position actuator damps the joint's *absolute* velocity, so on its
+        # own it is a first-order lag of kv/kp = 75 ms -- a 2.1 Hz corner
+        # whatever the motor, and measured on the gannet it reached 27% of a
+        # 7.3 Hz stroke with its torque never saturating.  A servo tracking a
+        # trajectory feeds the reference rate forward; commanding
+        # ``q_ref + (kv/kp) dq_ref/dt`` is exactly that, since
+        # kp(q_ref + tau dq_ref - q) - kv dq = kp(q_ref - q) + kv(dq_ref - dq).
+        # The torque limit is untouched, so what the motor cannot do it still
+        # cannot: the same gannet reaches 98% at 7.3 Hz and saturates 21% of the
+        # time (experiments/flight_audit/servo_probe.py).
+        bp = np.asarray(self.model.actuator_biasprm, float)
+        self.servo_lead = (np.where(bp[:, 1] < 0, bp[:, 2] / np.minimum(bp[:, 1], -1e-12), 0.0)
+                           if self.model.nu else np.zeros(0))
         # ``perturb`` moves the model's own coefficients.  It exists for the
         # auditor: the only way to find out whether a design depends on the
         # model being exactly right is to make the model wrong on purpose.
@@ -1449,10 +1463,19 @@ class TriphibianEnv:
 
     # ------------------------------------------------------------------ stepping
 
+    def servo_command(self, target_angles) -> np.ndarray:
+        """``ctrl`` for these target angles: the target plus the servo's
+        velocity feed-forward, when the CPG that produced them left a rate."""
+        tgt = np.asarray(target_angles, float)
+        rate = self.cpg.pop_rate()
+        if rate is None or len(rate) != len(tgt):
+            return tgt
+        return tgt + self.servo_lead[: len(tgt)] * rate
+
     def step(self, target_angles: np.ndarray) -> bool:
         """Advance one timestep.  Returns False when the battery is flat."""
         if len(self.act_names):
-            self.data.ctrl[: len(target_angles)] = target_angles
+            self.data.ctrl[: len(target_angles)] = self.servo_command(target_angles)
         self.data.xfrc_applied[:] = 0.0
         self.solver.apply(self.data, self.data.time)
         if self.jets.n:
@@ -2049,8 +2072,20 @@ class TriphibianEnv:
                 _tm = self.thrust_margin()
                 if _tm is not None:
                     res.measurements["thrust_margin"] = float(_tm)
-                res.parts = {"gate": float(credit * frac), "control": 0.10}
-                return float(credit * frac * 0.10)
+                # And no score.  This paid ``credit * frac * 0.10`` until
+                # 2026-09-23, and every body that takes this branch reached the
+                # sea from the 30 m launch in under 2.8 s -- faster than free
+                # fall's 2.47 s allows anything that flew.  It paid 0.033 for
+                # that, while a body that stayed up longer and came down faster
+                # than 6 m/s took the long branch and scored 0: across arch42,
+                # 1,069 fallers had median 0.030-0.033 and 1,786 long exits
+                # median 0.000, and air competence correlated -0.44 with time
+                # aloft.  The score paid falling over staying up, and the famine
+                # regime -- air starved in 113 of 178 generations -- selected
+                # on it.  A fall is not flight, so it scores what flight it
+                # showed: none.
+                res.parts = {"gate": float(credit * frac), "control": 0.0}
+                return 0.0
 
             # Sink rate measured only over the airborne stretch, and only its
             # later half, by which time a real flyer has settled.  Zero sink is

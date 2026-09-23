@@ -129,6 +129,16 @@ GaitGain:
     - tests.test_search::test_the_gait_gain_drives_the_same_on_every_path
   note: a factor on the commanded amplitude, so stopping and throttling are in the action space (--gait-gain)
 
+ServoFeedForward:
+  implementation:
+    - control.cpg.CPG.pop_rate
+    - envs.triphibian.TriphibianEnv.servo_command
+    - envs.batchroll.step_batch
+  tests:
+    - tests.test_physics::test_the_servo_reaches_a_fast_stroke
+    - tests.test_physics::test_a_frequency_change_does_not_jump_the_stroke
+  note: the position servo is fed the reference rate, so a stroke is reached where the motor has the torque (MATH_AUDIT A-01, C-11)
+
 ControllerSearch:
   implementation:
     - control.train.train_controller
@@ -375,6 +385,9 @@ FluidSolver:
     - physics.fluid.skin_friction_cd
   tests:
     - tests.test_physics
+    - tests.test_physics::test_a_strip_moves_with_its_hinge
+    - tests.test_physics::test_reversed_flow_reverses_the_force
+    - tests.test_physics::test_pitching_nose_up_adds_lift
     - tests.test_stall_blend
     - tests.test_reduced_frequency
 

@@ -11,6 +11,14 @@ measurement that motivated it; **the current work list is
 [What 2026-09-20 fixed](#what-2026-09-20-fixed-and-what-is-not-comparable-across-it)
 is the boundary across which nothing is comparable.
 
+**Revised 2026-09-23. Read
+[Why nothing flies, measured a third time](#why-nothing-flies-measured-a-third-time--2026-09-23)
+first.** Five model defects were fixed and the air score's fall credit was
+gated. With the physics corrected, no seed plan's heave-only flapping reaches
+the thrust level flight needs, at any of 300 random gaits (best: gannet +0.65).
+Its work list, AB-AF, comes before arch40's. The paragraph below on thrust
+being reachable was measured on the bugged physics and is superseded.
+
 Two things to read before proposing anything.
 
 [What arch38 measured](#what-arch38-measured) §3 and §6: rewarding thrust moved
@@ -2215,6 +2223,211 @@ lineages for land↔air and water↔air, each selected on its pair and its
 crossing, with the triphibian as a hand-off between them rather than one body
 asked to be good at three media at once. It changes what the project is for,
 so it stays the user's decision; nothing here acts on it.
+
+## Why nothing flies, measured a third time — 2026-09-23
+
+Asked by the user: why can nothing fly, is the reward reasonable, and how
+rigorous is the fluid model. Three read-only audits were run and every claim
+below was then re-checked with its own probe before anything was changed. The
+probes are in `experiments/flight_audit/`; notes in `runs/_logs/flight_audit_0923.md`.
+Every figure in a table here was re-measured. The audit-only figures, not
+re-measured, are marked (audit): some correlations in §4, the joint shares and
+the spar check in §5, and the tumbler, curriculum and robofly figures in §6-7.
+
+**The short answer.** The model had five defects between the airframe and the
+force, in both evaluation paths. Some made flapping look easier and some made it
+harder. The air score paid a fall more than a slower descent. **With all of them
+fixed, no seed plan can make the thrust level flight needs, at any of 300 random
+gaits.** The earlier finding that thrust is reachable came from the bugs. What
+stops flight is the flapping kinematics this genome can express, not the reward
+and not the search.
+
+### 1. Three fluid bugs, one of them in both paths — all fixed
+
+| id | defect | direction | fix, measured |
+|---|---|---|---|
+| F-09 | strip lever arm from `xpos` while `mj_objectVelocity(mjOBJ_BODY)` is at `xipos` (probe: hinge body, CoM at 1 m, reported lin vel 2.0 at 2 rad/s) | flapping **too easy**: strip speed 1.8-3.6x in `U^2 S`; in `fluid.py` *and* `fluid_gpu.mojo` | arm from the CoM; 1 m from a 4 rad/s hinge now 4.000 m/s, was 6.0 |
+| F-10 | reversed flow folded by a mirror, `atan2(sin, \|cos\|)` | **too easy**: a plate swept back and forth at one pitch lifted the same way both strokes (-3.770 N both) | shift by pi, camber negated; +8.050 / -8.050 N |
+| F-11 | Kramer rotational force sign: `d(alpha)/dt = -omega_s`, term used `+omega_s` | **too hard**: it opposed lift during pitch-up | nose-up 12.38 N, nose-down 4.68 N; difference 7.70 N = the analytic term |
+
+`tests/test_gpu_mirror.py` could not see F-09, because it compares the two
+*sources* and both carried the bug. The kernel was rebuilt (`pixi run build-all`).
+
+### 2. The actuator could not flap — fixed (item H's evidence, supplied)
+
+Item H said to change the actuator model only on evidence. Here it is. Each
+position servo had `kp = 2 tau g`, `kv = 0.15 tau g`, and `kv` damps the
+joint's **absolute** velocity. That is a fixed 75 ms lag with a 2.1 Hz corner,
+whatever the motor. Hull held, joints driven at `0.5 sin(2 pi f t)`
+(`experiments/flight_audit/servo_probe.py`):
+
+| | 2.2 Hz | 4 Hz | 7.3 Hz | 11 Hz |
+|---|---|---|---|---|
+| gannet, as it was | 0.69 (sat 0%) | 0.47 (0%) | **0.27 (0%)** | 0.19 (0%) |
+| gannet, feed-forward | 0.97 (0%) | 0.98 (6%) | 0.98 (21%) | 0.98 (32%) |
+| beetle, as it was | 0.72 | 0.48 | 0.27 | 0.17 (3%) |
+| beetle, feed-forward | 1.04 (33%) | 0.98 (23%) | 0.99 (33%) | **0.65 (58%)** |
+
+The first row is the finding. At 7.3 Hz the stroke reached 27% while the torque
+**never saturated**. The motor had the authority and the control law threw it
+away. A trajectory-tracking servo feeds the reference rate forward, and
+`ctrl = q_ref + (kv/kp) dq_ref/dt` is exactly `kp(q_ref - q) + kv(dq_ref - dq)`.
+Now the torque limit binds where it should: the beetle at 11 Hz reaches 65%
+because its motor saturates 58% of the time, not because of a lag. Implemented
+as `TriphibianEnv.servo_command`, used by `step` and `batchroll.step_batch`.
+The rate comes from the CPG (`CPG.pop_rate`), so a command that is not a CPG's
+gets no lead.
+
+It costs the gannet's glide at some initial conditions. That glider's gait flaps
+at 0.6 Hz, and it now flaps as commanded. Six scatter seeds through
+`evaluate_tier1`:
+
+- **unchanged:** seeds 1-4, competence within 0.012 (seed 3 falls either way)
+- **worse:** seed 0 from 0.213 to 0.022, and seed 5 from 0.012 to 0.001
+- **better:** none
+
+Seed 0 was the only draw `test_the_seeds_include_something_that_flies` used. It
+now takes medians over seeds 0-2 (gannet: airborne 1.00, sink 2.50 m/s, 0.074
+against a next best of 0.000). A glider that wants to glide needs its gait held
+still, which the gait gain (AA) can do and an open-loop gait cannot.
+
+### 3. The controller jumped the stroke whenever it touched frequency — fixed
+
+The CPG phase was `2 pi f t` on the absolute clock, and every identified basis
+spans frequency (arch42 air bases: median frequency weight 0.43, audit). A 0.1 Hz
+change at t = 4 s moved the stroke by 2.5 rad in one 40 ms control step. So any
+policy that used the frequency mode was scrambling the stroke. A continuity term
+now moves only when `f` changes, and constant-frequency commands are
+bit-identical to the closed form.
+
+### 4. The air score paid a fall more than staying up — gated
+
+Air-segment exits in arch42, by time spent airborne:
+
+| | n | median air competence |
+|---|---|---|
+| in the sea in < 2.6 s | 393 | 0.030 |
+| 2.6-2.8 s | 676 | 0.033 |
+| longer (the scored branch) | 1,786 | **0.000** |
+
+The short branch paid `credit * frac * 0.10`. Every body in it reached the sea
+from the 30 m launch in under 2.8 s, and free fall takes 2.47 s. A body that
+stayed up longer but sank faster than `SINK_BALLISTIC` = 6 m/s scored 0. Air
+competence correlated **-0.44** with time aloft and **-0.20** with
+`lift_margin` (audit). The famine regime starved air in 113 of 178
+generations and selected on exactly this. The short branch now scores 0, which
+is the flight it showed. It is gated, not re-weighted.
+
+### 5. With all of it fixed, thrust for level flight is out of reach
+
+Best `thrust_margin` over 300 random gaits per seed plan: amplitude, phase,
+offset, and frequency 1.5-12 Hz, quasi-static at trim
+(`experiments/flight_audit/gait_search.py`, same rng on both trees):
+
+| plan | old tree: best (p90) | fixed tree: best (p90) | share > 0, fixed |
+|---|---|---|---|
+| gannet | +1.289 (+0.569) | **+0.651** (+0.287) at 11.8 Hz | 0.98 |
+| teal | +0.819 (+0.361) | **+0.287** (+0.108) at 10.8 Hz | 0.56 |
+| beetle | +0.369 (+0.243) | **+0.208** (+0.138) at 11.4 Hz | 1.00 |
+| bat | +0.097 (+0.049) | **+0.057** (+0.016) at 3.0 Hz | 0.24 |
+
+Three things follow:
+
+- **"Thrust is reachable in the model" was the bugs.** The old tree put the
+  gannet over 1.0. The fixed one halves every figure, and nothing reaches the
+  1.0 that level flight at trim needs.
+- **Every best gait sits at 10.8-11.8 Hz.** `mut_gait` redraws frequency from
+  1.5-8 Hz (`genome.py`), so the search cannot even visit them. The spar check
+  fails the gannet at 10.95 Hz (1.99x allowable, audit).
+- **Open loop, nothing flies on either tree**
+  (`experiments/flight_audit/fly_probe.py`). The gannet glides at 1.7 m/s sink
+  and scores 0.072; every other plan falls at 6-14 m/s.
+
+The binding constraint is the flapping stroke itself. Every joint is one hinge
+(`mjcf.py`). The `"universal"` joint kind in `genome.py` is built as a plain
+hinge. 54% of arch42's powered wing joints only pitch, 33% only flap (audit), and no
+wing can flap and feather with a controlled phase between the two, which is how
+every animal flapper makes thrust. A heave-only wing gets its thrust from lift
+tilt alone, and the table above is what that buys.
+
+### 6. The reward, reflected on — what it still gets wrong
+
+§4 was the defect that inverted the gradient. The rest are real and not fixed
+here, because each is a reshaping that needs its own validation:
+
+- **Thrust is in no term of fitness.** The ladder (`judge.py`) is metadata and
+  scout features only (`loop.py`), so `flaps_forward`, `makes_thrust` and
+  `pushes_itself` apply no selection pressure. And they sit above
+  `holds_height`, which 0.1% of evaluations reach.
+- **No gradient between 6 and 14 m/s of sink.** Median measured sink is 9.9 and
+  p90 14.1, and all of it scores the same 0.
+- **The height term reads endpoints.** Designs spinning at 4.4-5.9 rad/s (just
+  under `MAX_SPIN_RATE`), with a wobble ratio of 27-72, scored 0.16-0.25: the
+  best air scores after gen 120 in arch42. This is `sink_rate` against
+  `station_keeping` again (arch37).
+- **Curriculum stage 1 reads air `cruise_progress`**, which is not gated on
+  being airborne. Bodies in the sea by 3.5 s read 0.23 at the median.
+- **The PPO reward for air is terminal.** The shaping potential
+  `-tanh(d/5)` saturates above ~10 m, which is the whole air segment.
+- `thrust_margin` is cached per phenotype at the first gait it sees, so a gait
+  the policy modulates is never re-measured. It also reads *commanded*
+  kinematics. After §2 those match what is reached, except under saturation.
+
+### 7. The fluid model, reflected on — what it is and is not
+
+Strip theory with a quasi-steady CL/CD, an LEV term, Kramer rotation and scalar
+wing added mass. It is carefully labelled and **has never been checked against
+flapping data**. `tests/test_physics.py` checks signs and orders of magnitude.
+Open, and recorded in `docs/MATH_AUDIT.md`:
+
+- F-12: the aspect ratio is taken per part, which roughly doubles induced drag,
+  and there is no leading-edge suction.
+- F-13: no inflow, Wagner or Theodorsen model. This is fine in cruise
+  (`k ~ 0.15`) and outside the model's range in hover and swimming (`k ~ 1`,
+  induced velocity about equal to tip speed).
+- F-14: the weight cancellation for added mass is applied at the strips.
+- F-02: the LEV is keyed on pitch rate, so a heave-only wing never gets it
+  (robofly at 45 deg: CL 1.8, model 1.1).
+- F-08: there is no post-stall lift loss.
+
+**None of them is the reason nothing flies.** §5 is a kinematic ceiling, and F-12
+and F-02 each lower thrust further for the wings this genome builds. The
+validation that would settle the model's standing is Dickinson's robofly
+(Dickinson, Lehmann & Sane 1999) and Sane & Dickinson (2001) as a fixed-rig
+fixture: prescribed stroke and pitch, force time histories, compared.
+
+### Comparability
+
+**Nothing air- or water-force related, and nothing actuated, is comparable
+across 2026-09-23.** Flapping strip speeds, reversed-flow forces, rotational
+lift, the reach of every stroke above ~2 Hz, and the air score's short branch
+all changed. arch42 (stopped at gen 177) stands as a record under the old model.
+Two test fixtures moved with it, each with its measurement in the test:
+`test_the_seeds_include_something_that_flies` takes medians over three scatter
+seeds (§2). The audit fixture audits a gannet, because the drawn beetle's
+mission of 0.0009 is 0.0 under the corrected fluid model.
+
+### The work list this sets, in order
+
+- **AB. A flapping wing that can feather.** Build the `"universal"` joint the
+  genome already names, or a stroke hinge with a pitch hinge in series, and give
+  the CPG a pitch-heave phase. **Probe first.** Put a pitch joint on the gannet
+  wing and re-run `gait_search.py` with the phase lead free. If best
+  `thrust_margin` does not clear 1.0, the ceiling is elsewhere and nothing
+  should be built.
+- **AC. `mut_gait`'s frequency range** runs 1.5-8 Hz, and every best gait above
+  is 10.8-11.8 Hz. Widen it only together with the spar check that forbids
+  those frequencies, so the search is not handed designs that break.
+- **AD. Thrust into selection,** as a gate on the air task and not as another
+  rung, once AB says there is thrust to select for. Doing it first would repeat
+  arch38 (§3 there): a term with nothing reachable above its floor moves the
+  distribution down.
+- **AE. The endpoint height term, and stage-1 coast** (§6), each validated on
+  the population held still before it is used.
+- **AF. A robofly fixture** for the fluid model (§7). Until it exists, "the
+  model says" means "the model says".
+
+---
 
 ## arch40 — the work list
 

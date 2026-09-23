@@ -318,8 +318,11 @@ struct FullPipeline(Movable, Writable):
             Float64(py=scalars[14]), Float64(py=scalars[15]),
             Int32(n), grid_dim=g, block_dim=BLOCK)
 
+        # The lever arm is from the centre of mass: vel6's linear part is the
+        # velocity *at xipos* (mj_objectVelocity, mjOBJ_BODY).  It was xpos
+        # until 2026-09-23 -- the same bug as fluid.py's, see there.
         ctx.enqueue_function[velocity_kernel](
-            s.vel6.unsafe_ptr(), s.xpos.unsafe_ptr(), s.pos_w.unsafe_ptr(),
+            s.vel6.unsafe_ptr(), s.xipos.unsafe_ptr(), s.pos_w.unsafe_ptr(),
             s.u_flow.unsafe_ptr(), s.body_id.unsafe_ptr(),
             s.omega.unsafe_ptr(), s.v_rel.unsafe_ptr(),
             Int32(n), grid_dim=g, block_dim=BLOCK)
