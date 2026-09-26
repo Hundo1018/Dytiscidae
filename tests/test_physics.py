@@ -3703,6 +3703,30 @@ def test_the_search_can_build_rotorcraft() -> None:
           f"rotor count ranged {min(counts)}-{max(counts)}")
 
 
+def test_a_propeller_can_go_under_water() -> None:
+    """arch43 was stopped at gen 3: 5.1% of rollouts diverged, rotor designs
+    crossing into water.  A rotor spinning at 550 rad/s put under water reached
+    |qvel| 787,158 -- its drag torque, ~1000x in water, meets a tiny inertia.
+    Backward Euler on the drag and an implicit split keep it finite."""
+    print("\nrotor: a spinning propeller put under water")
+    from dytiscidae.core.bodyplans import REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(REFERENCE_PLANS["quad"]()), seed=0)
+    env.reset(Domain.WATER, randomise=False)
+    for k in env.rotors.dof:
+        env.data.qvel[k] = 550.0
+    w0 = int(env.data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number)
+    worst = 0.0
+    for _ in range(int(1.0 / env.timestep)):
+        env.step(env.cpg.command(env.cpg.base, env.data.time))
+        worst = max(worst, float(np.abs(env.data.qvel).max()))
+    bad = int(env.data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number) - w0
+    check("no divergence, and nothing faster than the spin it started with",
+          bad == 0 and worst < 600.0, f"{bad} bad-qacc, largest |qvel| {worst:.1f}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -3726,6 +3750,7 @@ def main() -> int:
         test_the_level_margin_measures_what_the_actuators_deliver,
         test_the_rotor_table_is_the_rotor_model,
         test_the_search_can_build_rotorcraft,
+        test_a_propeller_can_go_under_water,
         test_each_phase_is_scored_on_its_own_purpose,
         test_the_first_air_reset_is_like_every_other,
         test_chattering_commands_are_measured,

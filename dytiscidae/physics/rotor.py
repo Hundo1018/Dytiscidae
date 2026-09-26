@@ -35,6 +35,7 @@ spin, on the rotor body.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -212,6 +213,7 @@ class RotorSet:
         import mujoco
 
         self.body = []
+        self.inertia = []
         self.dof = []
         self.spec = []
         self.axis_local = []
@@ -222,11 +224,39 @@ class RotorSet:
             j = int(model.body_jntadr[b])
             self.body.append(b)
             self.dof.append(int(model.jnt_dofadr[j]))
-            self.axis_local.append(np.asarray(model.jnt_axis[j], float))
+            ax = np.asarray(model.jnt_axis[j], float)
+            self.axis_local.append(ax)
             self.spec.append(spec)
+            # Inertia about the spin axis: the body's principal inertia, turned
+            # into the body frame by `body_iquat`, projected on the axis, plus
+            # the joint's armature.  Constant, so computed once.
+            Rq = np.zeros(9)
+            mujoco.mju_quat2Mat(Rq, model.body_iquat[b])
+            Rq = Rq.reshape(3, 3)
+            I_body = Rq @ np.diag(model.body_inertia[b]) @ Rq.T
+            self.inertia.append(float(ax @ I_body @ ax) + float(model.dof_armature[model.jnt_dofadr[j]]))
         self.n = len(self.body)
         self.last_thrust = np.zeros(self.n)
         self.last_torque = np.zeros(self.n)
+
+    def _end_of_step(self, model, data, k: int, omega: float, Q: float) -> float:
+        dof = self.dof[k]
+        w = abs(float(omega))
+        if w < 1e-6:
+            return omega
+        inertia = self.inertia[k]                          # rotor + armature
+        dt = float(model.opt.timestep)
+        # The drag alone: it is the stiff part.  The motor's torque is left to
+        # MuJoCo's own implicit velocity servo -- predicting it from last step's
+        # actuator force led the servo by a step and cost the reference
+        # quadrotor's controller 0.1 of its air score (0.96 -> 0.86).
+        s = 1.0 if omega >= 0.0 else -1.0
+        c = abs(Q) / (w * w)
+        a = inertia / dt
+        if c < 1e-12:
+            return omega
+        w2 = (-a + math.sqrt(a * a + 4.0 * c * a * w)) / (2.0 * c)
+        return s * w2
 
     def apply(self, model, data, medium, t: float) -> float:
         """Add rotor thrust and aerodynamic torque to ``data.xfrc_applied``.
@@ -254,10 +284,40 @@ class RotorSet:
             thrust_dir = self.spec[k].handed * sgn * ax
             v_ax = float(rel @ thrust_dir)
             v_ip = float(np.linalg.norm(rel - v_ax * thrust_dir))
-            T, Q = rotor_forces(self.spec[k], omega, v_ax, v_ip, float(subf[0]),
-                                medium.air, medium.water)
+            T0, Q0 = rotor_forces(self.spec[k], omega, v_ax, v_ip, float(subf[0]),
+                                  medium.air, medium.water)
+            # Backward Euler for the spin: in water a rotor brakes in about a
+            # millisecond, far inside a 4 ms step, and thrust taken at the
+            # start-of-step speed gave a plunging quadrotor ~40 N s of impulse
+            # per rotor where momentum theory and its 13 J of stored energy
+            # allow ~3 -- the machine was fired out of the water.  Solve the
+            # rotor's own drag equation for the end-of-step speed,
+            #     I (w' - w) / dt = - c w'|w'|,   c = |Q| / w^2,
+            # and take thrust and torque there.  In air at hover that is ~1%
+            # below w; in water it is the braking.
+            omega_e = self._end_of_step(model, data, k, omega, Q0)
+            if omega_e != omega:
+                T, Q = rotor_forces(self.spec[k], omega_e, v_ax, v_ip, float(subf[0]),
+                                    medium.air, medium.water)
+            else:
+                T, Q = T0, Q0
             data.xfrc_applied[b, :3] += T * thrust_dir
             data.xfrc_applied[b, 3:] += -Q * sgn * ax
+            # The drag torque grows as Omega^2 and meets a rotor's tiny inertia:
+            # a propeller spinning at 550 rad/s put under water, where the torque
+            # is ~1000x, reached |qvel| 787,158 and a bad-qacc reset
+            # (2026-09-26, arch43 stopped at gen 3).  The F-03 cure: split its
+            # damping dQ/dOmega = 2Q/|Omega| into MuJoCo's implicit
+            # `dof_damping` and add it back explicitly, so the torque at this
+            # state is unchanged and the stiff part is integrated implicitly.
+            # Added to what the fluid solver wrote this step, as jets add.
+            # |Q|, not Q: a rotor slower than the flow through it windmills,
+            # Q turns negative, and a negative dof_damping is an instability of
+            # its own (the first version of this oscillated +-100 rad/s).
+            dq = 2.0 * abs(Q) / max(abs(omega_e), 1e-6)
+            dof = self.dof[k]
+            model.dof_damping[dof] += dq
+            data.qfrc_applied[dof] += dq * omega
             self.last_thrust[k] = T
             self.last_torque[k] = Q
             total += T

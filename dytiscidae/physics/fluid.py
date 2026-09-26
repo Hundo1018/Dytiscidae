@@ -52,6 +52,7 @@ under a second of wall clock.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -479,13 +480,27 @@ class InducedFlow:
     MATH_AUDIT.
     """
 
+    #: Steps between updates.  The inflow's own time constant is one disc
+    #: radius of travel, 100 ms or more, and the lag is integrated exactly over
+    #: the interval, so updating every step (4 ms) bought nothing and cost
+    #: 12 s of a 73 s batched evaluation with `machine_flow` (2026-09-26).
+    UPDATE_EVERY = 4
+
     def __init__(self, span: float) -> None:
         self.span = float(max(span, 0.0))
         self.area = np.pi * self.span**2 / 4.0
         self.w = np.zeros(3)
+        self._count = 0
+
+    def due(self) -> bool:
+        return self._count % self.UPDATE_EVERY == 0
+
+    def tick(self) -> None:
+        self._count += 1
 
     def reset(self) -> None:
         self.w[:] = 0.0
+        self._count = 0
 
     def update(self, F: np.ndarray, V: np.ndarray, rho: float, dt: float) -> np.ndarray:
         T = float(np.linalg.norm(F))
@@ -496,19 +511,29 @@ class InducedFlow:
             k = T / (2.0 * rho * self.area)
             v_par = float(V @ f)
             v_perp2 = float(V @ V) - v_par * v_par
-            # w * sqrt(v_perp^2 + (v_par - w)^2) = k: the smallest root, by
-            # bisection -- fixed-point iteration oscillates in hover.
-            g = lambda x: x * np.sqrt(max(v_perp2, 0.0) + (v_par - x) ** 2) - k
-            lo, hi = 0.0, max(1.0, np.sqrt(k)) * 4.0 + abs(v_par) + np.sqrt(max(v_perp2, 0.0))
-            while g(hi) < 0.0:
+            # w * sqrt(v_perp^2 + (v_par - w)^2) = k, by Newton inside a
+            # bisection bracket (fixed-point iteration oscillates in hover; a
+            # pure 48-step bisection in Python was 10 s of an 82 s evaluation).
+            vp2 = max(v_perp2, 0.0)
+
+            def g(x):
+                sq = math.sqrt(vp2 + (v_par - x) ** 2)
+                return x * sq - k, sq + x * (x - v_par) / max(sq, 1e-12)
+            lo, hi = 0.0, max(1.0, math.sqrt(k)) * 4.0 + abs(v_par) + math.sqrt(vp2)
+            while g(hi)[0] < 0.0:
                 hi *= 2.0
-            for _ in range(48):
-                mid = 0.5 * (lo + hi)
-                if g(mid) < 0.0:
-                    lo = mid
+            x = min(max(float(np.linalg.norm(self.w)), lo), hi) or 0.5 * hi
+            for _ in range(60):
+                gx, dg = g(x)
+                if gx < 0.0:
+                    lo = x
                 else:
-                    hi = mid
-            target = -f * 0.5 * (lo + hi)
+                    hi = x
+                if hi - lo < 1e-12 * max(hi, 1.0):
+                    break
+                xn = x - gx / dg if dg > 0.0 else 0.5 * (lo + hi)
+                x = xn if lo < xn < hi else 0.5 * (lo + hi)
+            target = -f * x
         through = float(np.linalg.norm(V + target))
         tau = 0.5 * self.span / max(through, 0.05)
         self.w += (target - self.w) * (1.0 - np.exp(-dt / max(tau, 1e-6)))
@@ -595,10 +620,23 @@ class ImplicitAeroDamping:
         anc[:, free] = False
         self.anc = anc
         self.last_b = np.zeros(nv)
+        self._count = 0
+
+    #: Steps between refreshes of B.  B is a stability bound, not a force: the
+    #: explicit compensation uses this step's velocity, so the force at the
+    #: current state is exact whatever B is.  Refreshing every step was 12 s of
+    #: a 73 s batched evaluation (2026-09-26); every 4 steps (16 ms) is five or
+    #: six refreshes per stroke of an 11 Hz gait.
+    REFRESH_EVERY = 4
+
+    def due(self) -> bool:
+        """Whether this step recomputes B (callers skip forming ``b`` if not)."""
+        return self._count % self.REFRESH_EVERY == 0
 
     def reset(self) -> None:
         self.model.dof_damping[:] = self.base
         self.last_b[:] = 0.0
+        self._count = 0
 
     def clear(self, data) -> None:
         """The step's damping with the split off: the dry model's own.  Called
@@ -607,25 +645,66 @@ class ImplicitAeroDamping:
         self.model.dof_damping[:] = self.base
         data.qfrc_applied[:] = 0.0
 
-    def apply(self, data, pos: np.ndarray, body_id: np.ndarray, b: np.ndarray) -> None:
-        """``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip."""
+    def projected(self, data, pos, body_id, b) -> np.ndarray:
+        """``B_k = sum_i b_i |lin_k + rot_k x r_i|^2`` over strips on bodies dof
+        ``k`` moves, formed per body from the strips' moments,
+
+            sum_i b_i |v + w x r_i|^2 = B0 |v|^2 + 2 B1 . (v x w) + w . B2 w,
+            B0 = sum b,  B1 = sum b r,  B2 = sum b (|r|^2 I - r r^T),
+
+        so the cost is bodies x dofs instead of strips x dofs.  The per-strip
+        form with ``np.cross`` was 15 s of an 82 s batched evaluation
+        (2026-09-26); this is the same number to rounding (`_projected_strips`).
+        """
+        m = self.model
+        key = (id(body_id), len(body_id))
+        if getattr(self, "_onehot_key", None) != key:
+            # strips -> bodies, as a matrix: np.add.at was most of the cost
+            S = np.zeros((m.nbody, len(body_id)))
+            S[body_id, np.arange(len(body_id))] = 1.0
+            self._onehot, self._onehot_key = S, key
+            self._roots = m.body_rootid[body_id]
+        S = self._onehot
+        r = pos - data.subtree_com[self._roots]                  # (n, 3)
+        rr = np.einsum("ni,ni->n", r, r)
+        # b (|r|^2 I - r r^T), flattened to 9
+        m9 = -(r[:, :, None] * r[:, None, :]).reshape(-1, 9)
+        m9[:, [0, 4, 8]] += rr[:, None]
+        agg = S @ np.concatenate([b[:, None], b[:, None] * r, b[:, None] * m9], axis=1)
+        B0, B1, B2 = agg[:, 0], agg[:, 1:4], agg[:, 4:]
+        rot = data.cdof[:, :3]                                    # (nv, 3)
+        lin = data.cdof[:, 3:]
+        lxw = np.stack([lin[:, 1] * rot[:, 2] - lin[:, 2] * rot[:, 1],
+                        lin[:, 2] * rot[:, 0] - lin[:, 0] * rot[:, 2],
+                        lin[:, 0] * rot[:, 1] - lin[:, 1] * rot[:, 0]], axis=1)
+        ww = (rot[:, :, None] * rot[:, None, :]).reshape(-1, 9)  # (nv, 9)
+        val = (B0[:, None] * (lin * lin).sum(1)[None, :]
+               + 2.0 * (B1 @ lxw.T) + B2 @ ww.T)
+        return (val * self.anc).sum(0)
+
+    def _projected_strips(self, data, pos, body_id, b) -> np.ndarray:
+        """The per-strip form `projected` replaces; kept as its reference."""
+        root = self.model.body_rootid[body_id]
+        r = pos - data.subtree_com[root]
+        rot, lin = data.cdof[:, :3], data.cdof[:, 3:]
+        u = lin[None, :, :] + np.cross(rot[None, :, :], r[:, None, :])
+        return b @ (np.einsum("nkd,nkd->nk", u, u) * self.anc[body_id])
+
+    def apply(self, data, pos: np.ndarray, body_id: np.ndarray, b) -> None:
+        """``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip --
+        or None on a step that is not `due`, which reuses the last B."""
         m = self.model
         if m.nv == 0:
             return
-        root = m.body_rootid[body_id]
-        r = pos - data.subtree_com[root]                         # (n, 3)
-        rot = data.cdof[:, :3]                                    # (nv, 3)
-        lin = data.cdof[:, 3:]
-        # velocity of each strip per unit rate of each dof: lin + rot x r
-        u = lin[None, :, :] + np.cross(rot[None, :, :], r[:, None, :])
-        u2 = np.einsum("nkd,nkd->nk", u, u) * self.anc[body_id]
-        B = b @ u2                                                # (nv,)
+        if b is not None:
+            self.last_b = self.projected(data, pos, body_id, b)
+        self._count += 1
+        B = self.last_b
         m.dof_damping[:] = self.base + B
-        # It owns ``qfrc_applied`` outright -- nothing else in the project writes
-        # it -- and rewrites all of it every step, so a snapshot restore or a
-        # reset between steps cannot leave a stale compensation behind.
+        # It rewrites all of ``qfrc_applied`` every step, so a snapshot restore
+        # or a reset between steps cannot leave a stale compensation behind;
+        # jets and rotors, stepped after it, add to what it wrote.
         data.qfrc_applied[:] = B * data.qvel
-        self.last_b = B
 
 
 def strip_damping(q, area, lift, drag, rho, aspect_ratio, is_wing,
@@ -1096,13 +1175,16 @@ class FluidSolver:
         )
         F += f_rot[:, None] * lift_axis
         if live_inflow:
-            # For the next step: the lifting system's force and the flow it
-            # sees.  A one-step lag, well inside the inflow's own time constant.
-            wing_any = bool(is_wing.any())
-            self._inflow.update(
-                F[is_wing].sum(axis=0) if wing_any else np.zeros(3),
-                machine_flow(self.model, data, self.medium, t),
-                float(rho[is_wing].mean()) if wing_any else 0.0, dt)
+            # For the steps ahead: the lifting system's force and the flow it
+            # sees, every `InducedFlow.UPDATE_EVERY` steps, integrated over them.
+            if self._inflow.due():
+                wing_any = bool(is_wing.any())
+                self._inflow.update(
+                    F[is_wing].sum(axis=0) if wing_any else np.zeros(3),
+                    machine_flow(self.model, data, self.medium, t),
+                    float(rho[is_wing].mean()) if wing_any else 0.0,
+                    dt * InducedFlow.UPDATE_EVERY)
+            self._inflow.tick()
 
         # --- added mass ----------------------------------------------------
         # For a flat strip the 2D added mass for normal acceleration is
@@ -1242,7 +1324,8 @@ class FluidSolver:
         fmag = np.linalg.norm(F, axis=1)
         if self.implicit_damping:
             self._damping.apply(data, pos, p.body_id, strip_damping(
-                q, p.area, L, D, rho, ar_eff, is_wing, self.lift_scale))
+                q, p.area, L, D, rho, ar_eff, is_wing, self.lift_scale)
+                if self._damping.due() else None)
         else:
             self._damping.clear(data)
         nb = self._nbody

@@ -702,11 +702,11 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `BatchedFluid` | class | 212 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 758 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `identify_batch` | function | 513 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `rollout_batch` | function | 589 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 939 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 477 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `evaluate_tier1_batch` | function | 762 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `identify_batch` | function | 517 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `rollout_batch` | function | 593 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 943 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 481 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 93 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
 | `BatchedFluid.__init__` | method | 223 | `(self, envs)` | — |
 | `BatchedFluid.apply` | method | 324 | `(self, t: float, active=None) -> None` | Run the fluid for every environment and write their xfrc_applied. |
@@ -1243,39 +1243,43 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `drag_coefficient` | function | 326 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, cl: np.ndarray, lev: np.ndarray \| float=0.0) -> np.ndarray` | Skin friction, plus induced drag, plus separated pressure drag. |
-| `finish_bodies` | function | 669 | `(fb: np.ndarray, fsum_b: np.ndarray, m_body: np.ndarray, limit: float) -> bool` | Per-machine limiter and weight cancellation, in place on ``fb`` (nb, 6). |
-| `FluidDiagnostics` | class | 360 | — | Per-step aggregates, recorded for observability and for scoring. |
-| `FluidSolver` | class | 693 | — | Applies blade-element fluid loads to a MuJoCo model each step. |
-| `ImplicitAeroDamping` | class | 547 | — | Lift and drag made implicit by splitting their damping off. |
-| `InducedFlow` | class | 459 | — | Momentum-theory downwash of a machine's lifting system, one vector. |
-| `lift_coefficient` | function | 292 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, lev: np.ndarray, alpha_e: np.ndarray \| None=None) -> np.ndarray` | Lift coefficient: attached below stall, separated normal force above. |
-| `machine_flow` | function | 538 | `(model, data, medium, t: float) -> np.ndarray` | The flow the machine's root body sees: medium velocity minus its own. |
-| `PanelSet` | class | 93 | — | The fluid-facing discretisation of a machine. |
-| `rossby_lev` | function | 404 | `(U, chord, omega, s_hat)` | LEV strength from the strip's own Rossby number, ``U / (\|w_perp\| c)``. |
-| `skin_friction_cd` | function | 241 | `(re: np.ndarray) -> np.ndarray` | Two-sided skin friction coefficient of a flat plate. |
-| `slam_mass` | function | 655 | `(m_add, rho, chord, dr, is_wing, scale: float=1.0) -> np.ndarray` | The entrained mass the slam diagnostic differences: a wing's *normal* |
-| `strip_damping` | function | 631 | `(q, area, lift, drag, rho, aspect_ratio, is_wing, lift_scale: float=1.0) -> np.ndarray` | Per-strip damping bound ``b_i`` for `ImplicitAeroDamping`, N s/m. |
-| `UnsteadyState` | class | 419 | — | Per-strip history: Wagner lag and chords travelled since reversal. |
-| `FluidSolver.__init__` | method | 704 | `(self, model, panels: PanelSet, medium: MediumField, *, c_rot: float \| None=None, added_mass_scale: float=1.0, cd_scale: float=1.0, lift_scale: float=1.0, disc_span: float \| None=None) -> None` | — |
-| `FluidSolver.apply` | method | 875 | `(self, data, t: float) -> FluidDiagnostics` | Compute and accumulate fluid loads into ``data.xfrc_applied``. |
-| `FluidSolver.instantaneous_power` | method | 1323 | `(self, data) -> float` | Mechanical power the machine is currently putting into the fluid, W. |
-| `FluidSolver.reset` | method | 860 | `(self) -> None` | — |
-| `FluidSolver.steady` | method | 837 | `(self)` | Context for quasi-static probes (trim, lift and thrust margins). |
-| `ImplicitAeroDamping.__init__` | method | 573 | `(self, model) -> None` | — |
-| `ImplicitAeroDamping.apply` | method | 610 | `(self, data, pos: np.ndarray, body_id: np.ndarray, b: np.ndarray) -> None` | ``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip. |
-| `ImplicitAeroDamping.clear` | method | 603 | `(self, data) -> None` | The step's damping with the split off: the dry model's own.  Called |
-| `ImplicitAeroDamping.reset` | method | 599 | `(self) -> None` | — |
-| `InducedFlow.__init__` | method | 482 | `(self, span: float) -> None` | — |
-| `InducedFlow.reset` | method | 487 | `(self) -> None` | — |
-| `InducedFlow.update` | method | 490 | `(self, F: np.ndarray, V: np.ndarray, rho: float, dt: float) -> np.ndarray` | — |
-| `PanelSet.concat` | method | 212 | `(sets: list['PanelSet']) -> 'PanelSet'` | — |
-| `PanelSet.empty` | method | 190 | `() -> 'PanelSet'` | — |
-| `PanelSet.total_area` | property | 182 | `(self) -> float` | — |
-| `PanelSet.total_volume` | property | 186 | `(self) -> float` | — |
-| `UnsteadyState.__init__` | method | 427 | `(self, n: int) -> None` | — |
-| `UnsteadyState.reset` | method | 433 | `(self) -> None` | — |
-| `UnsteadyState.update` | method | 439 | `(self, alpha, rev, U, chord, omega, s_hat, dt)` | — |
+| `drag_coefficient` | function | 327 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, cl: np.ndarray, lev: np.ndarray \| float=0.0) -> np.ndarray` | Skin friction, plus induced drag, plus separated pressure drag. |
+| `finish_bodies` | function | 748 | `(fb: np.ndarray, fsum_b: np.ndarray, m_body: np.ndarray, limit: float) -> bool` | Per-machine limiter and weight cancellation, in place on ``fb`` (nb, 6). |
+| `FluidDiagnostics` | class | 361 | — | Per-step aggregates, recorded for observability and for scoring. |
+| `FluidSolver` | class | 772 | — | Applies blade-element fluid loads to a MuJoCo model each step. |
+| `ImplicitAeroDamping` | class | 572 | — | Lift and drag made implicit by splitting their damping off. |
+| `InducedFlow` | class | 460 | — | Momentum-theory downwash of a machine's lifting system, one vector. |
+| `lift_coefficient` | function | 293 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, lev: np.ndarray, alpha_e: np.ndarray \| None=None) -> np.ndarray` | Lift coefficient: attached below stall, separated normal force above. |
+| `machine_flow` | function | 563 | `(model, data, medium, t: float) -> np.ndarray` | The flow the machine's root body sees: medium velocity minus its own. |
+| `PanelSet` | class | 94 | — | The fluid-facing discretisation of a machine. |
+| `rossby_lev` | function | 405 | `(U, chord, omega, s_hat)` | LEV strength from the strip's own Rossby number, ``U / (\|w_perp\| c)``. |
+| `skin_friction_cd` | function | 242 | `(re: np.ndarray) -> np.ndarray` | Two-sided skin friction coefficient of a flat plate. |
+| `slam_mass` | function | 734 | `(m_add, rho, chord, dr, is_wing, scale: float=1.0) -> np.ndarray` | The entrained mass the slam diagnostic differences: a wing's *normal* |
+| `strip_damping` | function | 710 | `(q, area, lift, drag, rho, aspect_ratio, is_wing, lift_scale: float=1.0) -> np.ndarray` | Per-strip damping bound ``b_i`` for `ImplicitAeroDamping`, N s/m. |
+| `UnsteadyState` | class | 420 | — | Per-strip history: Wagner lag and chords travelled since reversal. |
+| `FluidSolver.__init__` | method | 783 | `(self, model, panels: PanelSet, medium: MediumField, *, c_rot: float \| None=None, added_mass_scale: float=1.0, cd_scale: float=1.0, lift_scale: float=1.0, disc_span: float \| None=None) -> None` | — |
+| `FluidSolver.apply` | method | 954 | `(self, data, t: float) -> FluidDiagnostics` | Compute and accumulate fluid loads into ``data.xfrc_applied``. |
+| `FluidSolver.instantaneous_power` | method | 1406 | `(self, data) -> float` | Mechanical power the machine is currently putting into the fluid, W. |
+| `FluidSolver.reset` | method | 939 | `(self) -> None` | — |
+| `FluidSolver.steady` | method | 916 | `(self)` | Context for quasi-static probes (trim, lift and thrust margins). |
+| `ImplicitAeroDamping.__init__` | method | 598 | `(self, model) -> None` | — |
+| `ImplicitAeroDamping.apply` | method | 693 | `(self, data, pos: np.ndarray, body_id: np.ndarray, b) -> None` | ``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip -- |
+| `ImplicitAeroDamping.clear` | method | 641 | `(self, data) -> None` | The step's damping with the split off: the dry model's own.  Called |
+| `ImplicitAeroDamping.due` | method | 632 | `(self) -> bool` | Whether this step recomputes B (callers skip forming ``b`` if not). |
+| `ImplicitAeroDamping.projected` | method | 648 | `(self, data, pos, body_id, b) -> np.ndarray` | ``B_k = sum_i b_i \|lin_k + rot_k x r_i\|^2`` over strips on bodies dof |
+| `ImplicitAeroDamping.reset` | method | 636 | `(self) -> None` | — |
+| `InducedFlow.__init__` | method | 489 | `(self, span: float) -> None` | — |
+| `InducedFlow.due` | method | 495 | `(self) -> bool` | — |
+| `InducedFlow.reset` | method | 501 | `(self) -> None` | — |
+| `InducedFlow.tick` | method | 498 | `(self) -> None` | — |
+| `InducedFlow.update` | method | 505 | `(self, F: np.ndarray, V: np.ndarray, rho: float, dt: float) -> np.ndarray` | — |
+| `PanelSet.concat` | method | 213 | `(sets: list['PanelSet']) -> 'PanelSet'` | — |
+| `PanelSet.empty` | method | 191 | `() -> 'PanelSet'` | — |
+| `PanelSet.total_area` | property | 183 | `(self) -> float` | — |
+| `PanelSet.total_volume` | property | 187 | `(self) -> float` | — |
+| `UnsteadyState.__init__` | method | 428 | `(self, n: int) -> None` | — |
+| `UnsteadyState.reset` | method | 434 | `(self) -> None` | — |
+| `UnsteadyState.update` | method | 440 | `(self, alpha, rev, U, chord, omega, s_hat, dt)` | — |
 
 ## `physics.jet` — `dytiscidae/physics/jet.py`
 
@@ -1328,14 +1332,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `bemt` | function | 79 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, rho: float, mu: float) -> tuple[float, float]` | Thrust (N, along the spin axis) and aerodynamic torque (N m, resisting |
-| `rotor_forces` | function | 182 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, medium_frac: float, air, water) -> tuple[float, float]` | Thrust and torque from the tables, blended across the free surface by |
-| `rotor_table` | function | 142 | `(spec: RotorSpec, rho: float, mu_visc: float)` | ``(CT, CQ)`` over ``TABLE_J x TABLE_MU``, with ``T = rho Om^2 R^4 CT`` |
-| `RotorSet` | class | 207 | — | Every rotor of one machine, applied each step like `JetSet`. |
-| `RotorSpec` | class | 50 | — | Geometry of one fixed-pitch rotor. |
-| `RotorSet.__init__` | method | 210 | `(self, model, specs: dict) -> None` | ``specs`` maps a rotor body name to its `RotorSpec`. |
-| `RotorSet.apply` | method | 231 | `(self, model, data, medium, t: float) -> float` | Add rotor thrust and aerodynamic torque to ``data.xfrc_applied``. |
-| `RotorSpec.stations` | method | 70 | `(self)` | — |
+| `bemt` | function | 80 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, rho: float, mu: float) -> tuple[float, float]` | Thrust (N, along the spin axis) and aerodynamic torque (N m, resisting |
+| `rotor_forces` | function | 183 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, medium_frac: float, air, water) -> tuple[float, float]` | Thrust and torque from the tables, blended across the free surface by |
+| `rotor_table` | function | 143 | `(spec: RotorSpec, rho: float, mu_visc: float)` | ``(CT, CQ)`` over ``TABLE_J x TABLE_MU``, with ``T = rho Om^2 R^4 CT`` |
+| `RotorSet` | class | 208 | — | Every rotor of one machine, applied each step like `JetSet`. |
+| `RotorSpec` | class | 51 | — | Geometry of one fixed-pitch rotor. |
+| `RotorSet.__init__` | method | 211 | `(self, model, specs: dict) -> None` | ``specs`` maps a rotor body name to its `RotorSpec`. |
+| `RotorSet.apply` | method | 261 | `(self, model, data, medium, t: float) -> float` | Add rotor thrust and aerodynamic torque to ``data.xfrc_applied``. |
+| `RotorSpec.stations` | method | 71 | `(self)` | — |
 
 ## `physics.structure` — `dytiscidae/physics/structure.py`
 

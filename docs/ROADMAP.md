@@ -18,7 +18,7 @@ nothing, AD waits on arch43's gen-200 read — see
 **Revised 2026-09-26. Read
 [AB-AF executed](#2026-09-2326--ab-af-executed-every-open-fluid-item-closed-and-a-rotor-control)
 first:** every open fluid item is closed, a quadrotor control flies the real air
-segment (0.963-0.987), and level flapping flight exists only with feathering
+segment (0.963-0.987; 0.86-0.93 under the later AE height term), and level flapping flight exists only with feathering
 and is lost to actuator torque at 7-12 Hz. Its work list, AG-AK, comes first.
 
 Revised 2026-09-23. Read
@@ -2291,6 +2291,53 @@ be allowed to evolve rotorcraft (AI), and then for a new training run.
   - Actuator order was checked over 40 random designs with rotors and feathering
     joints: 281 actuators, none misordered.
 
+### arch43's first launch — stopped at gen 3, and why
+
+At gen 2, 5.1% of rollouts diverged, against the 1% pre-registered. Four of the
+five diverging designs came from `mut_rotor`, and all five were "unstable" on
+air -> water.
+
+**The cause.** Reproduced offline, a rotor spinning at 550 rad/s put under water
+reached |qvel| 787,158. Two faults compounded. The drag torque (Omega^2, about
+1000x in water) was explicit on a tiny inertia. And thrust was taken at the
+start-of-step spin while the rotor braked in about 1 ms. That gave about
+40 N s of impulse per rotor, where momentum theory with the rotor's 13 J allows
+about 3, so the machine was fired out of the water.
+
+**The fixes:**
+
+- Backward Euler on the drag for the end-of-step spin, with thrust and torque
+  taken there. The motor's torque is left to MuJoCo's servo; predicting it too
+  put the controller a step behind.
+- An implicit split of 2|Q|/|Omega| on the rotor's hinge. It uses |Q|, because a
+  windmilling rotor has Q < 0 and negative damping oscillated.
+
+The plunge now has 0 bad-qacc (`test_a_propeller_can_go_under_water`; mutation
+`rotor-thrust-at-start-of-step`).
+
+**A correction to §3 above.** The reference quad scores **0.86-0.93**, not
+0.963-0.987, under AE's worst-second height term: its controller sags about a
+metre in turns. The committed tree before these fixes gives the same, so the
+rotor fix moves air flight by at most 0.006.
+
+**Cost.** The launch read 620-700 s/gen in the burst, about 2x. Profiled on four
+designs, one batched evaluation:
+
+| tree | seconds |
+|---|---|
+| before the fluid rewrite (`54d2f45`) | 37.3 |
+| after it, as launched | 73 |
+| after the fixes below | **51** (1.37x) |
+
+The extra time was host-side Python per step and per machine, and three changes
+remove most of it:
+
+- The damping sum per body instead of per strip, the same to 2e-10.
+- The damping bound refreshed every 4 steps. The explicit compensation still
+  uses this step's velocity, so the force is exact.
+- The inflow updated every 4 steps. Its time constant is 100 ms or more, and the
+  lag is integrated exactly.
+
 ### arch43 — what it is
 
 The first run under the corrected physics, and the first in which rotorcraft
@@ -2312,7 +2359,8 @@ fluid model. Every number below came from a script in `experiments/robofly`,
 **The short answer.**
 
 - **Physics and score can see flight.** A quadrotor built through the same
-  pipeline scores **0.963-0.987** on the real air segment. The best flapper ever
+  pipeline scores **0.963-0.987** on the real air segment (0.86-0.93 once AE's
+  worst-second height term is in -- see "arch43's first launch"). The best flapper ever
   scored 0.378.
 - **Level flapping flight exists only with feathering.** It is rare: one teal
   gait in about 300, at margin 1.26, with ideal kinematics. No heave-only gait
@@ -2378,7 +2426,8 @@ shape across incidence, and CL through the inflow, are. It is gated in
   level.
 - **`REFERENCE_PLANS["quad"]`, never seeded.** A textbook cascade controller
   flies it through the real segment (`experiments/rotor/fly.py`): **0.963,
-  0.974, 0.987**, sink about 0, height 0.975, turn 0.95-1.0.
+  0.974, 0.987**, sink about 0, height 0.975, turn 0.95-1.0. Under AE's worst-second height term it is 0.86-0.93
+  ("arch43's first launch").
 
 ### 4. AB — the feathering wing: built, probed, and where it stops
 
@@ -2486,6 +2535,10 @@ This is the second boundary in a week. Nothing has been run since the first.
   - **Both bars** are now max(old bar, 2x the path's own floor under the
     matching noise) (`_nudged` in `test_search.py`). A real path defect shows as
     tens of percent.
+  - **The eel's floor is the largest of three dithered runs.** One draw is a
+    weak estimate of a chaotic spread: six seeds gave 1.0e-4 to 7.2e-4, one
+    draw read 2.6e-4, and the paths differed by 7.8e-4 once the damping and
+    inflow ran on their 4-step cadence.
   - **A latent mismatch, fixed along the way.** The GPU ran the unsteady history
     even with `FluidSolver.unsteady` off. It now honours the flag.
 - **AK. The ray's entry under the corrected added mass.** Its membranes

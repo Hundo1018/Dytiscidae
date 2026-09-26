@@ -748,6 +748,14 @@ MUTATIONS: tuple = (
         defect='the search can never put a propeller on a design',
         suites=('test_physics',), item='AI'),
 
+    Mutation(
+        id="rotor-thrust-at-start-of-step",
+        path="dytiscidae/physics/rotor.py",
+        find="            omega_e = self._end_of_step(model, data, k, omega, Q0)",
+        replace="            omega_e = omega",
+        defect="rotor thrust is taken at the start-of-step spin, and a propeller entering water is fired out of it",
+        suites=("test_physics",), item="rotor in water"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

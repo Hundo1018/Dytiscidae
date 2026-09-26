@@ -44,8 +44,8 @@ import os as _os
 import numpy as np
 
 from ..physics.medium import GRAVITY
-from ..physics.fluid import (INFLOW_AR, finish_bodies, machine_flow, slam_mass,
-                             strip_damping)
+from ..physics.fluid import (INFLOW_AR, InducedFlow, finish_bodies, machine_flow,
+                             slam_mass, strip_damping)
 from ..control.cpg import TWIST_DIM, gait_gain
 from .triphibian import Domain
 
@@ -408,18 +408,22 @@ class BatchedFluid:
                                                    o["drag"][pa:pb] + o["d_bluff"][pa:pb],
                                                    o["rho"][pa:pb],
                                                    self.ar[pa:pb], self.is_wing[pa:pb] == 1,
-                                                   sol_i.lift_scale))
+                                                   sol_i.lift_scale)
+                                     if sol_i._damping.due() else None)
             else:
                 sol_i._damping.clear(e.data)
             if sol_i.inflow:
-                wing = self.is_wing[pa:pb] == 1
-                if wing.any():
-                    fw = o["force"][pa:pb][wing].sum(axis=0)
-                    fw[2] -= o["buoy"][pa:pb][wing].sum()
-                    sol_i._inflow.update(fw, machine_flow(e.model, e.data, sol_i.medium, t),
-                                         float(o["rho"][pa:pb][wing].mean()), dt_u)
-                else:
-                    sol_i._inflow.update(np.zeros(3), np.zeros(3), 0.0, dt_u)
+                if sol_i._inflow.due():
+                    wing = self.is_wing[pa:pb] == 1
+                    k_up = InducedFlow.UPDATE_EVERY
+                    if wing.any():
+                        fw = o["force"][pa:pb][wing].sum(axis=0)
+                        fw[2] -= o["buoy"][pa:pb][wing].sum()
+                        sol_i._inflow.update(fw, machine_flow(e.model, e.data, sol_i.medium, t),
+                                             float(o["rho"][pa:pb][wing].mean()), dt_u * k_up)
+                    else:
+                        sol_i._inflow.update(np.zeros(3), np.zeros(3), 0.0, dt_u * k_up)
+                sol_i._inflow.tick()
             fb = o["xfrc"][a:b].copy()
             self.clamped[i] = int(finish_bodies(fb, o["fsum_b"][a:b], mb, float(self.limit[i])))
             e.data.xfrc_applied[:] = fb
