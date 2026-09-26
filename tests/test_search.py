@@ -4106,6 +4106,72 @@ def test_the_gait_gain_drives_the_same_on_every_path() -> None:
           not any(g_none.values()), f"{g_none}")
 
 
+def test_a_nan_observation_fails_the_rollout_not_the_batch() -> None:
+    """arch43 ran single-process from generation 0 (2026-09-26): one machine's
+    observation went NaN after MuJoCo's auto-reset, the shared policy raised
+    inside ``torch.distributions.Normal`` in a worker, and the pool degraded for
+    the rest of the run at four times the cost.  A non-finite observation now
+    fails that rollout as diverged; the batch, and the other machine, go on."""
+    print("\ncontrol: a NaN observation fails its own rollout")
+    import torch
+
+    from dytiscidae.control.cpg import TWIST_DIM
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.actors import ActorPool
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import MissionSpec, TriphibianEnv
+    from dytiscidae.learning.ppo import SharedPolicy
+
+    phenos = [build(BODY_PLANS["beetle"]()), build(BODY_PLANS["beetle"]())]
+    kw = dict(spec=MissionSpec(), segment_seconds=1.0, seed=5)
+    torch.manual_seed(0)
+    net = SharedPolicy(TriphibianEnv.OBS_DIM, TWIST_DIM + 1, hidden=16)
+    net.eval()
+    bases = Controller(params=None, policy=None)
+    ActorPool(1).evaluate_tier1(phenos[:1], controllers=[bases], identify_axes=True, **kw)
+
+    real = TriphibianEnv.observation
+    order: list = []
+    calls: dict = {}
+
+    def poisoned(self, *a, **k):
+        if id(self) not in calls:
+            order.append(id(self))
+            calls[id(self)] = 0
+        calls[id(self)] += 1
+        obs = real(self, *a, **k)
+        # every other environment is the first machine's (two per batch)
+        if order.index(id(self)) % 2 == 0 and calls[id(self)] > 3:
+            obs = np.full_like(np.asarray(obs, float), np.nan)
+        return obs
+
+    TriphibianEnv.observation = poisoned
+    raised = None
+    try:
+        res = ActorPool(1).evaluate_tier1(
+            phenos, controllers=[Controller(params=None, policy=None, bases=dict(bases.bases))
+                                 for _ in phenos],
+            shared=net, identify_axes=False, **kw)
+    except Exception as exc:          # noqa: BLE001 -- the failure under test
+        raised, res = exc, None
+    finally:
+        TriphibianEnv.observation = real
+    check("a NaN observation does not raise out of the batch",
+          raised is None, f"{type(raised).__name__}: {raised}")
+    if res is None:
+        return
+    bad = [str(d) for d, seg in res[0].segments.items() if seg.failure == "diverged"]
+    check("the poisoned machine's rollouts fail as diverged and score nothing",
+          bad and all(res[0].segments[d].competence == 0.0
+                      for d in res[0].segments if str(d) in bad),
+          f"diverged {bad} of {[str(d) for d in res[0].segments]}")
+    good = res[1].segments.values()
+    check("the other machine is scored as usual",
+          all(not seg.failure == "diverged" and np.isfinite(seg.competence) for seg in good),
+          f"{[(seg.failure, seg.competence) for seg in good]}")
+
+
 def test_structure_can_be_recombined_and_duplicated() -> None:
     """Structure was asexual: every graph descended from one seed by mutation.
 
@@ -4340,6 +4406,7 @@ def main() -> int:
         test_the_shared_controller_question_is_answered_with_a_number,
         test_sharding_a_generation_does_not_change_a_score,
         test_the_gait_gain_drives_the_same_on_every_path,
+        test_a_nan_observation_fails_the_rollout_not_the_batch,
         test_structure_can_be_recombined_and_duplicated,
     ])
     return report("all search-machinery checks passed")

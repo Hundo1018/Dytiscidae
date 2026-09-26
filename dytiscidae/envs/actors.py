@@ -156,6 +156,15 @@ def split(n: int, workers: int, min_shard: int) -> list:
     return out
 
 
+def _pool_is_broken(exc: Exception) -> bool:
+    """Whether the pool itself failed -- a dead worker, or a worker that could
+    not start (the unguarded-main case) -- as opposed to one evaluation
+    raising inside a healthy worker."""
+    from concurrent.futures.process import BrokenProcessPool
+
+    return isinstance(exc, (BrokenProcessPool, OSError, EOFError))
+
+
 class ActorPool:
     """A persistent pool of worker processes, each with its own batched evaluator.
 
@@ -167,6 +176,9 @@ class ActorPool:
     so the single-process path stays exactly what it was and is what the tests
     compare against.
     """
+
+    #: Consecutive batches a worker may raise on before the pool is dropped.
+    RETRY_STREAK = 3
 
     def __init__(self, workers: int = 1, *, min_shard: int = 4) -> None:
         self.workers = max(int(workers), 1)
@@ -242,11 +254,18 @@ class ActorPool:
         try:
             collected = [f.result() for f in futures]
         except Exception as exc:
-            self._degrade(exc)
+            self._streak = getattr(self, "_streak", 0) + 1
+            # Three in a row is not one bad batch: every batch is paying for
+            # the pool and then for the parent, so stop paying for the pool.
+            if _pool_is_broken(exc) or self._streak >= self.RETRY_STREAK:
+                self._degrade(exc)
+            else:
+                self._retry_here(exc)
             return batchroll.evaluate_tier1_batch(
                 phenos, controllers=ctrls, shared=shared, buffer=buffer,
                 **kwargs)
 
+        self._streak = 0
         results = [None] * n
         for (a, b), (res, back, trajectories) in zip(shards, collected):
             results[a:b] = res
@@ -265,6 +284,24 @@ class ActorPool:
         return results
 
     # ---------------------------------------------------------------- failure
+
+    def _retry_here(self, exc: Exception) -> None:
+        """One batch raised inside a worker: re-run it here, keep the pool.
+
+        An exception from the evaluation itself says something about one batch,
+        not about the pool, and the workers are still alive.  Until 2026-09-26
+        every exception degraded the pool for good, and arch43 lost its
+        parallelism at generation 0 to one NaN observation (``batchroll.
+        observation_finite``), running at four times the cost.  Said every time,
+        so a batch that keeps failing is visible in the log.
+        """
+        import sys
+
+        self.retried = getattr(self, "retried", 0) + 1
+        print(f"*** actor pool: a worker raised, batch re-run in the parent "
+              f"(pool kept; {self.retried} so far): "
+              f"{type(exc).__name__}: {str(exc)[:200]}",
+              file=sys.stderr, flush=True)
 
     def _degrade(self, exc: Exception) -> None:
         """Fall back to one process, and say so.

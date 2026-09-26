@@ -478,6 +478,21 @@ class BatchedFluid:
         self._prev_ma[:] = m_slam
 
 
+def observation_finite(obs) -> bool:
+    """Whether a machine's observation can be handed to a policy.
+
+    The root-position check after each step cannot see every divergence:
+    MuJoCo auto-resets a bad ``qacc`` to the default pose, so the position is
+    finite again, while state that outlives the reset -- the power budget, the
+    fluid's memory -- can still hold a NaN.  Handed to the shared policy, a NaN
+    row raised inside ``torch.distributions.Normal``; in a worker that killed
+    the actor pool, and arch43 ran single-process from generation 0 at four
+    times the cost (2026-09-26).  A non-finite observation fails the rollout
+    as diverged, the way a non-finite position does.
+    """
+    return bool(np.all(np.isfinite(obs)))
+
+
 def step_batch(envs, angles_list, bf: BatchedFluid, active=None):
     """One timestep for the whole batch.  Returns the updated active mask.
 
@@ -638,8 +653,16 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
         shared_out = {}
         if shared is not None and bases is not None and i % control_every == 0:
             rows = [m for m in range(k) if active[m] and bases[m] is not None]
+            obs_rows = [envs[m].observation(domain) for m in rows]
+            keep = [j for j, o in enumerate(obs_rows) if observation_finite(o)]
+            for j in set(range(len(rows))) - set(keep):
+                m = rows[j]
+                res[m].survived = False
+                res[m].failure = "diverged"
+                active[m] = False
+            rows = [rows[j] for j in keep]
+            obs_rows = [obs_rows[j] for j in keep]
             if rows:
-                obs_rows = [envs[m].observation(domain) for m in rows]
                 acts, logps, vals = shared.act_many(
                     np.asarray(obs_rows, np.float32),
                     deterministic=collector is None)
@@ -655,6 +678,12 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                              or shared is not None)):
                     obs = (shared_out[m][0] if m in shared_out
                            else e.observation(domain))
+                    if not observation_finite(obs):
+                        res[m].survived = False
+                        res[m].failure = "diverged"
+                        active[m] = False
+                        angles.append(None)
+                        continue
                     coeffs = np.zeros(bases[m].modes.shape[0])
                     # The gait-gain intents of both halves, summed like the
                     # modes (``control.cpg.GAIN_RANGE``); None when neither has
@@ -1009,6 +1038,11 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
             if (bases[m] is not None and i % control_every == 0
                     and (c.policy is not None or shared is not None)):
                 obs = e.observation(target)
+                if not observation_finite(obs):
+                    res[m].failure = "diverged"
+                    active[m] = False
+                    angles.append(None)
+                    continue
                 coeffs = _np.zeros(bases[m].modes.shape[0])
                 gain = None
                 if c.policy is not None:

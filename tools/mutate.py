@@ -725,6 +725,14 @@ MUTATIONS: tuple = (
         defect="curriculum stage 1 pays the launch's coast after the machine is in the sea",
         suites=('test_physics',), item='AE'),
 
+    # --- arch43's pool, 2026-09-26 --------------------------------------------
+    Mutation(
+        id='nan-observation-reaches-policy',
+        path='dytiscidae/envs/batchroll.py',
+        find='    return bool(np.all(np.isfinite(obs)))\n',
+        replace='    return True\n',
+        defect='a NaN observation reaches the shared policy and raises out of the batch',
+        suites=('test_search',), item='arch43'),
     # --- AG and AI, 2026-09-26 ---------------------------------------------
     Mutation(
         id='level-rig-spends-battery',

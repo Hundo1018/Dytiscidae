@@ -689,11 +689,11 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `ActorPool` | class | 159 | — | A persistent pool of worker processes, each with its own batched evaluator. |
+| `ActorPool` | class | 168 | — | A persistent pool of worker processes, each with its own batched evaluator. |
 | `split` | function | 132 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
-| `ActorPool.__init__` | method | 171 | `(self, workers: int=1, *, min_shard: int=4) -> None` | — |
-| `ActorPool.close` | method | 294 | `(self) -> None` | — |
-| `ActorPool.evaluate_tier1` | method | 189 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
+| `ActorPool.__init__` | method | 183 | `(self, workers: int=1, *, min_shard: int=4) -> None` | — |
+| `ActorPool.close` | method | 331 | `(self) -> None` | — |
+| `ActorPool.evaluate_tier1` | method | 201 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
 
 ## `envs.batchroll` — `dytiscidae/envs/batchroll.py`
 
@@ -702,11 +702,12 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `BatchedFluid` | class | 212 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 762 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `identify_batch` | function | 517 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `rollout_batch` | function | 593 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 943 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 481 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `evaluate_tier1_batch` | function | 791 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `identify_batch` | function | 532 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `observation_finite` | function | 481 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
+| `rollout_batch` | function | 608 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 972 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 496 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 93 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
 | `BatchedFluid.__init__` | method | 223 | `(self, envs)` | — |
 | `BatchedFluid.apply` | method | 324 | `(self, t: float, active=None) -> None` | Run the fluid for every environment and write their xfrc_applied. |
