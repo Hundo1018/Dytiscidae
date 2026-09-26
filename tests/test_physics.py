@@ -3637,6 +3637,72 @@ def test_a_drop_and_recovery_is_not_holding_height() -> None:
           fell == 0.0 and abs(flew - 0.8) < 1e-12, f"fell {fell}, flew {flew}")
 
 
+def test_the_level_margin_measures_what_the_actuators_deliver() -> None:
+    """ROADMAP AG: min(<Fz>/W, 1 + <Fx>/W) on a rig, with the real actuators."""
+    print("\nair: the level-flight margin")
+    from dytiscidae.core.bodyplans import BODY_PLANS, REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import TriphibianEnv
+
+    quad = TriphibianEnv(build(REFERENCE_PLANS["quad"]()), seed=0)
+    j0 = quad.budget.actuator_j
+    lq = quad.level_margin()
+    check("measuring it does not spend the battery",
+          quad.budget.actuator_j == j0, f"{j0} -> {quad.budget.actuator_j}")
+    eel = TriphibianEnv(build(BODY_PLANS["eel"]()), seed=0).level_margin()
+    gannet = TriphibianEnv(build(BODY_PLANS["gannet"]()), seed=0).level_margin()
+    check("a multirotor at its rest throttle nearly holds itself up; a wingless eel does not",
+          lq is not None and eel is not None and lq > 0.7 and eel < 0.2,
+          f"quad {lq:.3f}, eel {eel:.3f}")
+    check("and a glider reads short of 1: it has lift and no thrust",
+          gannet is not None and 0.5 < gannet < 1.0, f"gannet {gannet:.3f}")
+
+
+def test_the_rotor_table_is_the_rotor_model() -> None:
+    """The lookup table `RotorSet` uses against `bemt` it is built from."""
+    print("\nrotor: the lookup table")
+    from dytiscidae.physics.medium import AIR, SEAWATER
+    from dytiscidae.physics.rotor import RotorSpec, bemt, rotor_forces
+    s = RotorSpec(radius=0.127, pitch=4.7 * 0.0254)
+    et, eq = 0.0, 0.0
+    for om in (250.0, 450.0, 700.0, 1100.0):
+        T0, Q0 = bemt(s, om, 0.0, 0.0, AIR.rho, AIR.mu)
+        for vax in (0.0, 1.5, 4.0, 7.0, 12.0):
+            for vip in (0.0, 2.0, 5.0, 10.0):
+                a = bemt(s, om, vax, vip, AIR.rho, AIR.mu)
+                b = rotor_forces(s, om, vax, vip, 0.0, AIR, SEAWATER)
+                et = max(et, abs(a[0] - b[0]) / T0)
+                eq = max(eq, abs(a[1] - b[1]) / Q0)
+    check("thrust within 5% of static thrust, torque within 15% of static torque, off-grid",
+          et < 0.05 and eq < 0.15, f"worst {et:.3f} thrust, {eq:.3f} torque")
+
+
+def test_the_search_can_build_rotorcraft() -> None:
+    """ROADMAP AI: `mut_rotor` adds, removes and retunes, and what it makes builds."""
+    print("\nsearch: rotorcraft are reachable")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.genome import MUTATION_OPERATORS, mut_rotor
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import TriphibianEnv
+
+    rng = np.random.default_rng(3)
+    g = BODY_PLANS["beetle"]()
+    check("the operator is registered", MUTATION_OPERATORS.get("rotor") is mut_rotor)
+    fired = mut_rotor(g, rng)
+    n1 = sum(p.rotor_radius > 1e-3 for p in g.parts)
+    check("on a design with no propeller it adds one", fired and n1 == 1, f"{n1}")
+    env = TriphibianEnv(build(g), seed=0)
+    check("and the design builds with a spinning rotor on a speed servo",
+          env.rotors.n >= 1 and any(a.endswith("_r") for a in env.act_names),
+          f"{env.rotors.n} rotors, actuators {env.act_names[-2:]}")
+    counts = []
+    for _ in range(60):
+        mut_rotor(g, rng)
+        counts.append(sum(p.rotor_radius > 1e-3 for p in g.parts))
+    check("repeated, it both adds and removes", max(counts) > 1 and min(counts) < max(counts),
+          f"rotor count ranged {min(counts)}-{max(counts)}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -3657,6 +3723,9 @@ def main() -> int:
         test_the_circulation_has_a_history,
         test_the_model_reproduces_the_robofly,
         test_a_drop_and_recovery_is_not_holding_height,
+        test_the_level_margin_measures_what_the_actuators_deliver,
+        test_the_rotor_table_is_the_rotor_model,
+        test_the_search_can_build_rotorcraft,
         test_each_phase_is_scored_on_its_own_purpose,
         test_the_first_air_reset_is_like_every_other,
         test_chattering_commands_are_measured,

@@ -2,7 +2,7 @@
 
 # Modules
 
-102 modules, 33,606 lines, 1,007 indexed symbols.
+102 modules, 33,813 lines, 1,011 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -73,7 +73,7 @@ is what makes a violation visible while reading.
 |---|---|---:|---|---|---|
 | `core.bodyplans` | Body-plan archetypes: the seeds the search starts from. | 731 | — | `numpy` | `core.cppn`, `core.genome`, `core.sdf` |
 | `core.cppn` | Compositional Pattern Producing Networks -- the implicit shape representation. | 435 | — | `numpy` | — |
-| `core.genome` | The morphology genome: a recursive module graph plus implicit surface fields. | 1196 | — | `numpy` | `core.cppn`, `core.sdf` |
+| `core.genome` | The morphology genome: a recursive module graph plus implicit surface fields. | 1236 | — | `numpy` | `core.cppn`, `core.sdf` |
 | `core.mjcf` | Phenotype -> MJCF.  Builds the MuJoCo model and the triphibian scene. | 745 | — | `mujoco`, `numpy` | `core.genome`, `core.phenotype`, `physics.medium` |
 | `core.phenotype` | Genome -> phenotype: expand the module graph, size everything, weigh it. | 1245 | — | `mujoco`, `numpy` | `core.cppn`, `core.genome`, `core.sdf`, `physics`, `physics.energy`, `physics.fluid`, `physics.jet`, `physics.materials`, `physics.medium`, `physics.rotor`, `physics.structure` |
 | `core.reference` | A hand-designed reference machine. | 208 | — | `numpy` | `core.cppn`, `core.genome` |
@@ -105,7 +105,7 @@ is what makes a violation visible while reading.
 | `envs.skills` | The actuator skill bench: learning to operate components, not vehicles. | 655 | — | `numpy` | `evolution.cmaes`, `physics.energy`, `physics.materials`, `physics.medium`, `physics.structure` |
 | `envs.tasks` | What a segment asks the machine to do, phase by phase. | 248 | — | — | — |
 | `envs.transitions` | Crossing between media, scored rather than merely survived. | 456 | — | `numpy` | `envs.triphibian` |
-| `envs.triphibian` | The triphibian mission environment. | 2731 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
+| `envs.triphibian` | The triphibian mission environment. | 2819 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
 
 ## `evolution`
 
@@ -147,7 +147,7 @@ is what makes a violation visible while reading.
 | `physics.jet` | Pulsed-jet propulsion: medusa bells and squid mantles. | 280 | — | `numpy` | `physics.medium` |
 | `physics.materials` | Material and component property database. | 257 | — | — | — |
 | `physics.medium` | Medium field: air above the free surface, water below, and the blended | 191 | — | `numpy` | — |
-| `physics.rotor` | Propellers: blade-element momentum theory, the comparison to flapping. | 185 | — | `mujoco`, `numpy` | `physics.fluid` |
+| `physics.rotor` | Propellers: blade-element momentum theory, the comparison to flapping. | 264 | — | `mujoco`, `numpy` | `physics.fluid` |
 | `physics.structure` | Structural feasibility: spars, hulls, seals, and the loads that break them. | 623 | — | `numpy` | `physics.materials`, `physics.medium` |
 | `physics.wake` | Vortex-particle wake, for seeing the flow the solver is actually computing. | 183 | — | `numpy` | `physics.fluid` |
 

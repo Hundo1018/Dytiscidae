@@ -431,35 +431,36 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `crossover` | function | 1162 | `(a: Genome, b: Genome, rng: np.random.Generator) -> Genome` | Blend two designs. |
-| `descendants` | function | 703 | `(g: Genome, start: int) -> list[int]` | Part indices reachable from ``start``, itself included, each once. |
+| `crossover` | function | 1202 | `(a: Genome, b: Genome, rng: np.random.Generator) -> Genome` | Blend two designs. |
+| `descendants` | function | 706 | `(g: Genome, start: int) -> list[int]` | Part indices reachable from ``start``, itself included, each once. |
 | `Edge` | class | 202 | — | An attachment of ``child`` onto ``parent``. |
-| `estimated_bodies` | function | 721 | `(g: Genome, *, cap: int=4096, max_depth: int=8) -> int` | How many rigid bodies this graph expands to, near enough to budget with. |
+| `estimated_bodies` | function | 724 | `(g: Genome, *, cap: int=4096, max_depth: int=8) -> int` | How many rigid bodies this graph expands to, near enough to budget with. |
 | `Genome` | class | 224 | — | A complete design. |
-| `graft_subtree` | function | 898 | `(child: Genome, donor: Genome, rng: np.random.Generator) -> bool` | Move a subtree of ``donor`` onto ``child``.  Graph-level recombination. |
-| `mut_actuator` | function | 463 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_add_part` | function | 756 | `(g: Genome, rng: np.random.Generator) -> bool` | Grow a new module and attach it somewhere. |
-| `mut_body_field` | function | 1011 | `(g: Genome, rng: np.random.Generator) -> bool` | Reshape a part's implicit volume. |
-| `mut_cppn_structure` | function | 1049 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_cppn_weights` | function | 1042 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_drivetrain` | function | 420 | `(g: Genome, rng: np.random.Generator) -> bool` | Move a joint's series spring and its drive compliance together. |
-| `mut_duplicate_part` | function | 836 | `(g: Genome, rng: np.random.Generator) -> bool` | Copy a module, attach the copy beside the original, and let it diverge. |
-| `mut_edge_placement` | function | 484 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_edge_topology` | function | 648 | `(g: Genome, rng: np.random.Generator) -> bool` | Rewire, reflect, or change the recursion depth of an attachment. |
-| `mut_gait` | function | 566 | `(g: Genome, rng: np.random.Generator) -> bool` | Resample the whole gait at once: frequency, amplitude, phase and rest. |
-| `mut_global_buoyancy` | function | 1074 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_global_energy` | function | 1063 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_jet` | function | 628 | `(g: Genome, rng: np.random.Generator) -> bool` | Tune a bell's nozzle and stroke. |
-| `mut_joint` | function | 448 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_material` | function | 1003 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_part_dimensions` | function | 407 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_part_kind` | function | 983 | `(g: Genome, rng: np.random.Generator) -> bool` | Reinterpret a module as a different kind. |
-| `mut_phase_gradient` | function | 516 | `(g: Genome, rng: np.random.Generator) -> bool` | Shift the oscillator phases, which is what turns flapping into swimming. |
-| `mut_radial_symmetry` | function | 496 | `(g: Genome, rng: np.random.Generator) -> bool` | Change how many times an attachment is replicated around its parent. |
-| `mut_remove_part` | function | 961 | `(g: Genome, rng: np.random.Generator) -> bool` | Delete a module and everything attached below it. |
-| `mut_scale` | function | 1085 | `(g: Genome, rng: np.random.Generator) -> bool` | Scale the whole machine. |
-| `mut_stroke` | function | 538 | `(g: Genome, rng: np.random.Generator) -> bool` | Change how far a part strokes, and where it sits at rest. |
-| `mutate` | function | 1130 | `(g: Genome, rng: np.random.Generator, *, operators: list[str] \| None=None, n_ops: int=1) -> tuple[Genome, list[str]]` | Apply the named operators.  Returns the child and what was applied. |
+| `graft_subtree` | function | 901 | `(child: Genome, donor: Genome, rng: np.random.Generator) -> bool` | Move a subtree of ``donor`` onto ``child``.  Graph-level recombination. |
+| `mut_actuator` | function | 466 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_add_part` | function | 759 | `(g: Genome, rng: np.random.Generator) -> bool` | Grow a new module and attach it somewhere. |
+| `mut_body_field` | function | 1014 | `(g: Genome, rng: np.random.Generator) -> bool` | Reshape a part's implicit volume. |
+| `mut_cppn_structure` | function | 1052 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_cppn_weights` | function | 1045 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_drivetrain` | function | 423 | `(g: Genome, rng: np.random.Generator) -> bool` | Move a joint's series spring and its drive compliance together. |
+| `mut_duplicate_part` | function | 839 | `(g: Genome, rng: np.random.Generator) -> bool` | Copy a module, attach the copy beside the original, and let it diverge. |
+| `mut_edge_placement` | function | 487 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_edge_topology` | function | 651 | `(g: Genome, rng: np.random.Generator) -> bool` | Rewire, reflect, or change the recursion depth of an attachment. |
+| `mut_gait` | function | 569 | `(g: Genome, rng: np.random.Generator) -> bool` | Resample the whole gait at once: frequency, amplitude, phase and rest. |
+| `mut_global_buoyancy` | function | 1077 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_global_energy` | function | 1066 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_jet` | function | 631 | `(g: Genome, rng: np.random.Generator) -> bool` | Tune a bell's nozzle and stroke. |
+| `mut_joint` | function | 451 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_material` | function | 1006 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_part_dimensions` | function | 410 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_part_kind` | function | 986 | `(g: Genome, rng: np.random.Generator) -> bool` | Reinterpret a module as a different kind. |
+| `mut_phase_gradient` | function | 519 | `(g: Genome, rng: np.random.Generator) -> bool` | Shift the oscillator phases, which is what turns flapping into swimming. |
+| `mut_radial_symmetry` | function | 499 | `(g: Genome, rng: np.random.Generator) -> bool` | Change how many times an attachment is replicated around its parent. |
+| `mut_remove_part` | function | 964 | `(g: Genome, rng: np.random.Generator) -> bool` | Delete a module and everything attached below it. |
+| `mut_rotor` | function | 1105 | `(g: Genome, rng: np.random.Generator) -> bool` | Add, remove or retune a propeller on a part (`physics.rotor`). |
+| `mut_scale` | function | 1088 | `(g: Genome, rng: np.random.Generator) -> bool` | Scale the whole machine. |
+| `mut_stroke` | function | 541 | `(g: Genome, rng: np.random.Generator) -> bool` | Change how far a part strokes, and where it sits at rest. |
+| `mutate` | function | 1170 | `(g: Genome, rng: np.random.Generator, *, operators: list[str] \| None=None, n_ops: int=1) -> tuple[Genome, list[str]]` | Apply the named operators.  Returns the child and what was applied. |
 | `Part` | class | 67 | — | One module type.  May be instantiated many times by the expansion. |
 | `random_genome` | function | 307 | `(rng: np.random.Generator, *, target_scale: float=1.0) -> Genome` | A random but structurally sensible starting design. |
 | `Edge.copy` | method | 219 | `(self) -> 'Edge'` | — |
@@ -848,27 +849,28 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `MissionSpec.transitions` | property | 99 | `(self) -> list[str]` | — |
 | `SegmentResult.cost_of_transport` | property | 164 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
 | `TriphibianEnv.__init__` | method | 566 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
-| `TriphibianEnv.body_twist` | method | 1210 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
-| `TriphibianEnv.clearance` | method | 1292 | `(self) -> float` | Height of the machine above the ground beneath it, metres. |
-| `TriphibianEnv.depth` | method | 1238 | `(self) -> float` | — |
+| `TriphibianEnv.body_twist` | method | 1286 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
+| `TriphibianEnv.clearance` | method | 1368 | `(self) -> float` | Height of the machine above the ground beneath it, metres. |
+| `TriphibianEnv.depth` | method | 1314 | `(self) -> float` | — |
 | `TriphibianEnv.flap_travel` | method | 894 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
-| `TriphibianEnv.ground_height` | method | 1262 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
-| `TriphibianEnv.ground_heights` | method | 1271 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
-| `TriphibianEnv.identify` | method | 2694 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.ground_height` | method | 1338 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
+| `TriphibianEnv.ground_heights` | method | 1347 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
+| `TriphibianEnv.identify` | method | 2782 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
 | `TriphibianEnv.launch_pitch` | property | 864 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
 | `TriphibianEnv.launch_speed` | property | 832 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
+| `TriphibianEnv.level_margin` | method | 1043 | `(self)` | Can this machine hold height *and* speed, with its own actuators? |
 | `TriphibianEnv.lift_margin` | property | 880 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
-| `TriphibianEnv.morphology_context` | property | 1339 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
-| `TriphibianEnv.observation` | method | 1378 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
+| `TriphibianEnv.morphology_context` | property | 1415 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
+| `TriphibianEnv.observation` | method | 1454 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
 | `TriphibianEnv.reset` | method | 709 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
-| `TriphibianEnv.restore` | method | 1201 | `(self, snap: tuple) -> None` | — |
-| `TriphibianEnv.rollout` | method | 1541 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
-| `TriphibianEnv.root_pos` | method | 1235 | `(self) -> np.ndarray` | — |
+| `TriphibianEnv.restore` | method | 1277 | `(self, snap: tuple) -> None` | — |
+| `TriphibianEnv.rollout` | method | 1617 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
+| `TriphibianEnv.root_pos` | method | 1311 | `(self) -> np.ndarray` | — |
 | `TriphibianEnv.scatter` | method | 740 | `(self, rng, *, strength: float=1.0) -> None` | Widen the initial condition, from a caller-supplied generator. |
-| `TriphibianEnv.servo_command` | method | 1515 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
-| `TriphibianEnv.snapshot` | method | 1198 | `(self) -> tuple` | — |
-| `TriphibianEnv.step` | method | 1524 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
-| `TriphibianEnv.task_channels` | method | 1463 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
+| `TriphibianEnv.servo_command` | method | 1591 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
+| `TriphibianEnv.snapshot` | method | 1274 | `(self) -> tuple` | — |
+| `TriphibianEnv.step` | method | 1600 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
+| `TriphibianEnv.task_channels` | method | 1539 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
 | `TriphibianEnv.thrust_margin` | method | 922 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
 
 ## `evolution.archive` — `dytiscidae/evolution/archive.py`
@@ -1327,10 +1329,12 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `bemt` | function | 79 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, rho: float, mu: float) -> tuple[float, float]` | Thrust (N, along the spin axis) and aerodynamic torque (N m, resisting |
-| `RotorSet` | class | 129 | — | Every rotor of one machine, applied each step like `JetSet`. |
+| `rotor_forces` | function | 182 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, medium_frac: float, air, water) -> tuple[float, float]` | Thrust and torque from the tables, blended across the free surface by |
+| `rotor_table` | function | 142 | `(spec: RotorSpec, rho: float, mu_visc: float)` | ``(CT, CQ)`` over ``TABLE_J x TABLE_MU``, with ``T = rho Om^2 R^4 CT`` |
+| `RotorSet` | class | 207 | — | Every rotor of one machine, applied each step like `JetSet`. |
 | `RotorSpec` | class | 50 | — | Geometry of one fixed-pitch rotor. |
-| `RotorSet.__init__` | method | 132 | `(self, model, specs: dict) -> None` | ``specs`` maps a rotor body name to its `RotorSpec`. |
-| `RotorSet.apply` | method | 153 | `(self, model, data, medium, t: float) -> float` | Add rotor thrust and aerodynamic torque to ``data.xfrc_applied``. |
+| `RotorSet.__init__` | method | 210 | `(self, model, specs: dict) -> None` | ``specs`` maps a rotor body name to its `RotorSpec`. |
+| `RotorSet.apply` | method | 231 | `(self, model, data, medium, t: float) -> float` | Add rotor thrust and aerodynamic torque to ``data.xfrc_applied``. |
 | `RotorSpec.stations` | method | 70 | `(self)` | — |
 
 ## `physics.structure` — `dytiscidae/physics/structure.py`

@@ -1036,6 +1036,82 @@ class TriphibianEnv:
             pass
         return out
 
+    #: Rig timing for `level_margin`, seconds: settle, then average.  Long
+    #: enough for a 1.5 Hz gait's full cycle in the averaging window.
+    RIG_SETTLE, RIG_AVERAGE = 0.5, 0.7
+
+    def level_margin(self):
+        """Can this machine hold height *and* speed, with its own actuators?
+
+        ``min(<Fz>/W, 1 + <Fx>/W)`` -- 1 or more is level flight -- measured on
+        a fixed rig: the airframe held at its own trim speed and attitude (the
+        air segment's launch), the joints driven through its own gait by the
+        real servos and motors, the fluid with its full history, and the forces
+        averaged after a settle.  ROADMAP AG.
+
+        Why not `thrust_margin`: that is quasi-static, prescribed kinematics,
+        and blind to lift.  Measured 2026-09-26, the gannet's best feathering
+        gait read +2.50 there and pulled the machine *down* with 0.39 of its
+        weight; the teal's level-flight gait read 1.28 with its kinematics
+        prescribed and 0.42 with its joints free, the motors at their torque
+        limit 60% of the time (MATH_AUDIT C-12, A-02).  This measures what the
+        actuators deliver.  Rotor thrust is in it, so a multirotor reads its
+        hover margin.  Cached per phenotype like `thrust_margin`; ``None`` when
+        it cannot be measured.
+        """
+        if hasattr(self.p, "_measured_level"):
+            v = self.p._measured_level
+            return None if v is None else float(v)
+        out = None
+        import copy
+        budget = copy.deepcopy(self.budget)      # the rig must not spend the battery
+        try:
+            mj, m, d = self._mj, self.model, self.data
+            if m.nq >= 7:
+                v, pitch = self._trim()[:2]
+                mj.mj_resetData(m, d)
+                x0, y0, z0 = self.SPAWN[Domain.AIR]
+                q0 = np.array([x0, y0, z0, math.cos(-pitch / 2), 0.0,
+                               math.sin(-pitch / 2), 0.0])
+                d.qpos[:7] = q0
+                self.solver.reset()
+                self.cpg.reset()
+                self.cpg.phase_offset = 0.0
+                for k in range(len(self.rotors.dof)):
+                    d.qvel[self.rotors.dof[k]] = 0.0
+                mj.mj_forward(m, d)
+                weight = float(self.solver._dry_mass.sum()) * GRAVITY
+                n_set = int(self.RIG_SETTLE / self.timestep)
+                n_avg = int(self.RIG_AVERAGE / self.timestep)
+                F = np.zeros(3)
+                t0 = float(d.time)
+                for k in range(n_set + n_avg):
+                    d.qpos[:7] = q0
+                    d.qpos[0] = x0 + v * (float(d.time) - t0)
+                    d.qvel[:6] = 0.0
+                    d.qvel[0] = v
+                    if not self.step(self.cpg.command(self.cpg.base, d.time)):
+                        break
+                    if k >= n_set:
+                        f = d.xfrc_applied[:, :3].sum(0)
+                        f[2] -= (m.body_mass.sum() - self.solver._dry_mass.sum()) * GRAVITY
+                        F += f / n_avg
+                else:
+                    if weight > 1e-9 and np.all(np.isfinite(F)):
+                        out = float(min(F[2] / weight, 1.0 + F[0] / weight))
+                self.solver.reset()
+                self.cpg.reset()
+        except Exception:
+            out = None
+        finally:
+            self.budget = budget
+        out = float(np.clip(out, -10.0, 10.0)) if out is not None else None
+        try:
+            self.p._measured_level = out
+        except Exception:
+            pass
+        return out
+
     def _trim(self) -> tuple:
         cached = getattr(self.p, "_measured_trim", None)
         if cached is not None:
@@ -2008,6 +2084,9 @@ class TriphibianEnv:
                 _tm = self.thrust_margin()
                 if _tm is not None:
                     res.measurements["thrust_margin"] = float(_tm)
+                _lm = self.level_margin()
+                if _lm is not None:
+                    res.measurements["level_margin"] = float(_lm)
             return 0.0
         upright = float(np.clip(np.mean(ups), 0.0, 1.0))
         # Samples the segment should have produced had it run to term.
@@ -2077,6 +2156,9 @@ class TriphibianEnv:
                 _tm = self.thrust_margin()
                 if _tm is not None:
                     res.measurements["thrust_margin"] = float(_tm)
+                _lm = self.level_margin()
+                if _lm is not None:
+                    res.measurements["level_margin"] = float(_lm)
                 return 0.0  # never left the surface: no flight to score
             idx = np.flatnonzero(airborne)
 
@@ -2134,6 +2216,9 @@ class TriphibianEnv:
                 _tm = self.thrust_margin()
                 if _tm is not None:
                     res.measurements["thrust_margin"] = float(_tm)
+                _lm = self.level_margin()
+                if _lm is not None:
+                    res.measurements["level_margin"] = float(_lm)
                 # And no score.  This paid ``credit * frac * 0.10`` until
                 # 2026-09-23, and every body that takes this branch reached the
                 # sea from the 30 m launch in under 2.8 s -- faster than free
@@ -2340,6 +2425,9 @@ class TriphibianEnv:
             _tm = self.thrust_margin()
             if _tm is not None:
                 res.measurements["thrust_margin"] = float(_tm)
+            _lm = self.level_margin()
+            if _lm is not None:
+                res.measurements["level_margin"] = float(_lm)
             # Both of the terms that paid for something other than flying are
             # gone.  The flat 0.25 for being off the ground at all is now the
             # graded glide term, and the 0.2 for the launch velocity the

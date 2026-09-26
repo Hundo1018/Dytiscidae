@@ -11,6 +11,10 @@ measurement that motivated it; **the current work list is
 [What 2026-09-20 fixed](#what-2026-09-20-fixed-and-what-is-not-comparable-across-it)
 is the boundary across which nothing is comparable.
 
+**Revised 2026-09-26, later: AG and AI are done, AH was probed and built
+nothing, AD waits on arch43's gen-200 read — see
+[AG, AH and AI, and arch43](#2026-09-26-later--ag-ah-and-ai-and-arch43).**
+
 **Revised 2026-09-26. Read
 [AB-AF executed](#2026-09-2326--ab-af-executed-every-open-fluid-item-closed-and-a-rotor-control)
 first:** every open fluid item is closed, a quadrotor control flies the real air
@@ -2229,6 +2233,73 @@ lineages for land↔air and water↔air, each selected on its pair and its
 crossing, with the triphibian as a hand-off between them rather than one body
 asked to be good at three media at once. It changes what the project is for,
 so it stays the user's decision; nothing here acts on it.
+
+## 2026-09-26, later — AG, AH and AI, and arch43
+
+The user asked for the recommended next steps (AG, then AH), for the search to
+be allowed to evolve rotorcraft (AI), and then for a new training run.
+
+- **AG — done.** `TriphibianEnv.level_margin` is `min(<Fz>/W, 1 + <Fx>/W)` on a
+  rig. The airframe is held at its trim speed and attitude, its own gait runs on
+  its real servos and motors, the fluid keeps its full history, and the force is
+  averaged over 0.7 s after a 0.5 s settle. It costs about 0.3 s a design,
+  cached per phenotype. It is published beside `thrust_margin` on every air
+  exit, and the rig does not spend the battery.
+
+  | plan | level_margin |
+  |---|---|
+  | beetle | 0.939 |
+  | gannet | 0.913 |
+  | teal | 0.826 |
+  | medusa | 0.005 |
+  | eel | -0.07 |
+  | ray | -0.08 |
+  | bat | -1.03 |
+  | quad | 0.85 |
+
+  For a glider it reads about `1 - 1/(L/D)`, and it reaches 1 only with thrust,
+  so it is a gradient toward flight rather than a step.
+- **AH — probed; nothing built, as pre-registered.** The teal's level-flight gait
+  on the rig with free joints (`experiments/flight_audit/probe_actuation.py`):
+
+  | condition | margin | torque-limited |
+  |---|---|---|
+  | own motors | 0.365 | 61% |
+  | motors 2x | 0.543 | 67% |
+  | motors 3x | 0.494 | 65% |
+  | spring at the gait's own offset | 0.143 | — |
+  | spring, compliant drive | 0.153 | 14% |
+
+  Nothing clears 1. Heavier motors stay just as saturated, so this is not simply
+  a torque-size problem. The search already has the genes in question (motor
+  mass, series spring, compliance, feathering), and with AG it has a measure of
+  what they deliver.
+- **AD — deferred to arch43's gen-200 read.** Thresholds are set from a measured
+  distribution, and there is none yet under the corrected physics.
+  `level_margin` is published from gen 0.
+- **AI — done.**
+  - `mut_rotor` adds, removes and retunes a propeller on any part (radius,
+    pitch/diameter, rest throttle), and one fresh random genome in ten carries
+    one. The rotor spins about the part's own +Z, so the placement genes decide
+    where it points.
+  - A rotor's CPG channel is a steady throttle the policy moves through the
+    offset.
+  - Rotor forces come from a nondimensional CT/CQ table per rotor and medium,
+    with Reynolds number as an axis. It is within 4% of static thrust and 11% of
+    static torque of direct BEMT, and 190x faster (3.5 ms -> 19 us a call); a
+    quadrotor's segment had cost 28 s.
+  - Actuator order was checked over 40 random designs with rotors and feathering
+    joints: 281 actuators, none misordered.
+
+### arch43 — what it is
+
+The first run under the corrected physics, and the first in which rotorcraft
+are reachable. Its configuration and pre-registered reads are in
+`runs/arch43_notes.md`. **Nothing before it is comparable** on air or water
+forces, actuated motion, the air score's short exit and height term, or
+curriculum stage 1.
+
+---
 
 ## 2026-09-23..26 — AB-AF executed, every open fluid item closed, and a rotor control
 

@@ -382,6 +382,9 @@ def random_genome(rng: np.random.Generator, *, target_scale: float = 1.0) -> Gen
     g.battery_wh = float(rng.uniform(60.0, 400.0))
     g.battery_chem = str(rng.choice(["liion", "lipo"]))
     g.flap_frequency = float(rng.uniform(1.5, 12.0))   # as mut_gait, ROADMAP AC
+    # One fresh design in ten carries a propeller (ROADMAP AI).
+    if g.parts and rng.random() < 0.1:
+        _new_rotor(g.parts[int(rng.integers(len(g.parts)))], rng)
     g.gas_volume = float(rng.uniform(0.0, 0.02))
     g.ballast_fraction = float(rng.uniform(0.1, 0.9))
     g.deadrise_deg = float(rng.uniform(5.0, 50.0))
@@ -1093,6 +1096,42 @@ def mut_scale(g: Genome, rng: np.random.Generator) -> bool:
     return True
 
 
+def _new_rotor(part: Part, rng: np.random.Generator) -> None:
+    part.rotor_radius = float(rng.uniform(0.06, 0.2))
+    part.rotor_pitch_ratio = float(rng.uniform(0.35, 0.9))
+    part.rotor_throttle = float(rng.uniform(0.3, 0.7))
+
+
+def mut_rotor(g: Genome, rng: np.random.Generator) -> bool:
+    """Add, remove or retune a propeller on a part (`physics.rotor`).
+
+    Added 2026-09-26 at the user's decision that the search may evolve
+    rotorcraft (ROADMAP AI).  A rotor is a gene on a part -- radius, pitch over
+    diameter, rest throttle -- spinning about the part's own +Z, so where it
+    points is decided by the placement genes the part already has.  With no
+    rotor anywhere this adds one; otherwise it adds another (1/4), removes one
+    (1/5) or retunes one.
+    """
+    if not g.parts:
+        return False
+    rotored = [p for p in g.parts if getattr(p, "rotor_radius", 0.0) > 1e-3]
+    roll = rng.random()
+    if not rotored or roll < 0.25:
+        bare = [p for p in g.parts if getattr(p, "rotor_radius", 0.0) <= 1e-3]
+        if not bare:
+            return False
+        _new_rotor(bare[int(rng.integers(len(bare)))], rng)
+        return True
+    part = rotored[int(rng.integers(len(rotored)))]
+    if roll < 0.45:
+        part.rotor_radius = 0.0
+        return True
+    part.rotor_radius = float(np.clip(part.rotor_radius * math.exp(rng.normal(0, 0.15)), 0.03, 0.35))
+    part.rotor_pitch_ratio = float(np.clip(part.rotor_pitch_ratio + rng.normal(0, 0.08), 0.2, 1.2))
+    part.rotor_throttle = float(np.clip(part.rotor_throttle + rng.normal(0, 0.08), 0.05, 1.0))
+    return True
+
+
 MUTATION_OPERATORS: dict[str, callable] = {
     "radial_symmetry": mut_radial_symmetry,
     "phase_gradient": mut_phase_gradient,
@@ -1116,6 +1155,7 @@ MUTATION_OPERATORS: dict[str, callable] = {
     "global_energy": mut_global_energy,
     "global_buoyancy": mut_global_buoyancy,
     "scale": mut_scale,
+    "rotor": mut_rotor,
 }
 
 #: Operators that change the graph rather than a value.  The curator throttles

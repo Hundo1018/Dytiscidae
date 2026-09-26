@@ -725,6 +725,29 @@ MUTATIONS: tuple = (
         defect="curriculum stage 1 pays the launch's coast after the machine is in the sea",
         suites=('test_physics',), item='AE'),
 
+    # --- AG and AI, 2026-09-26 ---------------------------------------------
+    Mutation(
+        id='level-rig-spends-battery',
+        path='dytiscidae/envs/triphibian.py',
+        find='            self.budget = budget\n',
+        replace='            pass\n',
+        defect='measuring the level margin drains the battery the segments then fly on',
+        suites=('test_physics',), item='AG'),
+    Mutation(
+        id='rotor-torque-off-by-radius',
+        path='dytiscidae/physics/rotor.py',
+        find='        out += frac * np.array([n * c_t, n * R * c_q])',
+        replace='        out += frac * np.array([n * c_t, n * c_q])',
+        defect="the rotor table's torque loses a factor of the radius",
+        suites=('test_physics',), item='AI'),
+    Mutation(
+        id='mut-rotor-never-adds',
+        path='dytiscidae/core/genome.py',
+        find='        _new_rotor(bare[int(rng.integers(len(bare)))], rng)\n        return True',
+        replace='        return False',
+        defect='the search can never put a propeller on a design',
+        suites=('test_physics',), item='AI'),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

@@ -425,12 +425,24 @@ Rotor:
   implementation:
     - physics.rotor.RotorSpec
     - physics.rotor.bemt
+    - physics.rotor.rotor_table
+    - physics.rotor.rotor_forces
     - physics.rotor.RotorSet
     - envs.triphibian.rotor_lift_ratio
     - core.bodyplans.quad
+    - core.genome.mut_rotor
   tests:
     - tests.test_physics::test_the_rotor_model_matches_a_measured_propeller
-  note: blade-element momentum propellers, the comparison to flapping; checked against UIUC APC 10x4.7 (experiments/rotor); the reference quad flies the real air segment (experiments/rotor/fly.py)
+    - tests.test_physics::test_the_rotor_table_is_the_rotor_model
+    - tests.test_physics::test_the_search_can_build_rotorcraft
+  note: blade-element momentum propellers, the comparison to flapping, evolvable since 2026-09-26 (mut_rotor, ROADMAP AI); checked against UIUC APC 10x4.7 (experiments/rotor); the reference quad flies the real air segment (experiments/rotor/fly.py)
+
+LevelMargin:
+  implementation:
+    - envs.triphibian.TriphibianEnv.level_margin
+  tests:
+    - tests.test_physics::test_the_level_margin_measures_what_the_actuators_deliver
+  note: min(<Fz>/W, 1 + <Fx>/W) on a rig with the real actuators, published beside thrust_margin (ROADMAP AG)
 
 Medium:
   implementation:

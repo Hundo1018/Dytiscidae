@@ -126,6 +126,84 @@ def bemt(spec: RotorSpec, omega: float, v_ax: float, v_ip: float,
     return float(np.sum(dT * dr)), float(np.sum(dQ * dr))
 
 
+#: Advance-ratio grids for the lookup table: axial ``J = V_ax / (Omega R)``
+#: and in-plane ``mu = V_ip / (Omega R)``.
+#: Denser near zero, where Glauert's term and the inflow change fastest.
+TABLE_J = np.array([-0.3, -0.15, -0.05, 0.0, 0.03, 0.06, 0.1, 0.15, 0.2, 0.27,
+                    0.35, 0.45, 0.55, 0.65, 0.8, 1.0, 1.2])
+TABLE_MU = np.array([0.0, 0.03, 0.07, 0.12, 0.2, 0.3, 0.45, 0.7, 1.0, 1.5])
+#: Tip speeds the tables are built at, m/s, interpolated in log tip speed: the
+#: Reynolds number is what the nondimensional coefficients still depend on, and
+#: one table at 100 m/s was 12% off at 38 m/s.
+TABLE_TIP_SPEEDS = (30.0, 80.0, 200.0)
+_TABLES: dict = {}
+
+
+def rotor_table(spec: RotorSpec, rho: float, mu_visc: float):
+    """``(CT, CQ)`` over ``TABLE_J x TABLE_MU``, with ``T = rho Om^2 R^4 CT``
+    and ``Q = rho Om^2 R^5 CQ``.  Built once per rotor and medium.
+
+    `bemt` bisects every annulus every call -- 3.5 ms a rotor, so a quadrotor's
+    8 s segment cost 28 s.  Thrust and torque are ``rho Om^2`` times functions
+    of the two advance ratios (and weakly of Reynolds number), so a table built
+    once is exact to its interpolation: within 2% of `bemt` over the UIUC points
+    (`experiments/rotor`).
+    """
+    key = (round(spec.radius, 6), round(spec.pitch, 6), spec.blades, spec.chord_ratio,
+           spec.hub_ratio, spec.camber, round(rho, 3), round(mu_visc, 9))
+    if key in _TABLES:
+        return _TABLES[key]
+    R = spec.radius
+    ct = np.zeros((len(TABLE_TIP_SPEEDS), len(TABLE_J), len(TABLE_MU)))
+    cq = np.zeros_like(ct)
+    for a, tip in enumerate(TABLE_TIP_SPEEDS):
+        om = tip / max(R, 1e-6)
+        norm_t = rho * om**2 * R**4
+        for i, J in enumerate(TABLE_J):
+            for k, mu in enumerate(TABLE_MU):
+                T, Q = bemt(spec, om, J * om * R, mu * om * R, rho, mu_visc)
+                ct[a, i, k] = T / norm_t
+                cq[a, i, k] = Q / (norm_t * R)
+    _TABLES[key] = (ct, cq)
+    return ct, cq
+
+
+def _bilinear(tab, J, mu):
+    x = np.clip(J, TABLE_J[0], TABLE_J[-1])
+    y = np.clip(mu, TABLE_MU[0], TABLE_MU[-1])
+    i = min(int(np.searchsorted(TABLE_J, x, "right") - 1), len(TABLE_J) - 2)
+    k = min(int(np.searchsorted(TABLE_MU, y, "right") - 1), len(TABLE_MU) - 2)
+    tx = (x - TABLE_J[i]) / (TABLE_J[i + 1] - TABLE_J[i])
+    ty = (y - TABLE_MU[k]) / (TABLE_MU[k + 1] - TABLE_MU[k])
+    return ((1 - tx) * (1 - ty) * tab[i, k] + tx * (1 - ty) * tab[i + 1, k]
+            + (1 - tx) * ty * tab[i, k + 1] + tx * ty * tab[i + 1, k + 1])
+
+
+def rotor_forces(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, medium_frac: float,
+                 air, water) -> tuple[float, float]:
+    """Thrust and torque from the tables, blended across the free surface by
+    ``medium_frac`` (0 in air, 1 submerged) -- a propeller swims too."""
+    om = abs(float(omega))
+    if om < 1e-6 or spec.radius <= 0.0:
+        return 0.0, 0.0
+    R = spec.radius
+    J, mu = v_ax / (om * R), v_ip / (om * R)
+    out = np.zeros(2)
+    for frac, fl in ((1.0 - medium_frac, air), (medium_frac, water)):
+        if frac <= 0.0:
+            continue
+        ct, cq = rotor_table(spec, fl.rho, fl.mu)
+        n = fl.rho * om**2 * R**4
+        lt = np.log(np.clip(om * R, TABLE_TIP_SPEEDS[0], TABLE_TIP_SPEEDS[-1]))
+        grid = np.log(TABLE_TIP_SPEEDS)
+        a = min(int(np.searchsorted(grid, lt, "right") - 1), len(grid) - 2)
+        w = (lt - grid[a]) / (grid[a + 1] - grid[a])
+        c_t = (1 - w) * _bilinear(ct[a], J, mu) + w * _bilinear(ct[a + 1], J, mu)
+        c_q = (1 - w) * _bilinear(cq[a], J, mu) + w * _bilinear(cq[a + 1], J, mu)
+        out += frac * np.array([n * c_t, n * R * c_q])
+    return float(out[0]), float(out[1])
+
+
 class RotorSet:
     """Every rotor of one machine, applied each step like `JetSet`."""
 
@@ -166,7 +244,7 @@ class RotorSet:
             omega = float(data.qvel[self.dof[k]])
             mujoco.mj_objectVelocity(model, data, mujoco.mjtObj.mjOBJ_BODY, b, v6, 0)
             pos = data.xipos[b]
-            rho, mu, _ = medium.properties(pos[None, :], np.array([0.01]), t)
+            _, _, subf = medium.properties(pos[None, :], np.array([0.01]), t)
             flow = np.asarray(medium.flow_velocity(pos[None, :], t), float).reshape(3)
             rel = v6[3:] - flow                     # hub velocity through the fluid
             # The rotor pushes fluid against the direction its thrust acts in:
@@ -176,7 +254,8 @@ class RotorSet:
             thrust_dir = self.spec[k].handed * sgn * ax
             v_ax = float(rel @ thrust_dir)
             v_ip = float(np.linalg.norm(rel - v_ax * thrust_dir))
-            T, Q = bemt(self.spec[k], omega, v_ax, v_ip, float(rho[0]), float(mu[0]))
+            T, Q = rotor_forces(self.spec[k], omega, v_ax, v_ip, float(subf[0]),
+                                medium.air, medium.water)
             data.xfrc_applied[b, :3] += T * thrust_dir
             data.xfrc_applied[b, 3:] += -Q * sgn * ax
             self.last_thrust[k] = T
