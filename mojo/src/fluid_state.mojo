@@ -115,6 +115,7 @@ struct GpuFluid(Movable, Writable):
             self_ptr[].ar.unsafe_ptr(), self_ptr[].rf.unsafe_ptr(),
             self_ptr[].wing.unsafe_ptr(),
             self_ptr[].cl.unsafe_ptr(), self_ptr[].cd.unsafe_ptr(),
+            self_ptr[].alpha.unsafe_ptr(),
             Int32(n),
             grid_dim=ceildiv(n, BLOCK),
             block_dim=BLOCK,

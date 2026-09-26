@@ -253,111 +253,101 @@ def skin_friction_cd(re: np.ndarray) -> np.ndarray:
     return 2.0 * ((1.0 - w) * lam + w * turb)
 
 
-#: How far past the stall angle the flow is taken to be fully separated: the
-#: handover reaches the separated branch here and carries none of the attached
-#: one beyond it.
+#: How far past the stall angle the attached flow takes to separate completely:
+#: the handover starts *at* the stall angle and is finished this far beyond it.
 #:
-#: Measured, not chosen.  `experiments/stall_blend` sweeps it against the
-#: 3.3 million strip-steps the seven seed plans actually visit, and 16 degrees
-#: is an interior minimum of how much the change perturbs the lift in use --
-#: 3.8%, against 4.4% at 13 degrees and 4.5% at 20 -- among the widths that
-#: both deliver the attached slope at zero incidence and never reach the
-#: `1.2 * CL_max` clip.  That is a conservatism criterion and not a physical
-#: one: the purpose of the change is to remove F-05, not to re-tune the lift
-#: model, so among the widths that remove it the one that moves the model
-#: least is the one that does it.
-SEPARATION_COMPLETE = np.radians(16.0)
+#: 2026-09-23 (MATH_AUDIT F-08): the handover used to run from zero incidence to
+#: ``alpha_stall + 16 deg``, so CL rose monotonically all the way to 45 deg and
+#: the model had no stall at all.  Thin plates at Re 1e4-1e5 lose attached flow
+#: within a few degrees of stall; 6 degrees is a modelling choice, recorded as
+#: such in `docs/MATH_AUDIT.md`, not a measurement.
+SEPARATION_COMPLETE = np.radians(6.0)
+
+#: Normal-force coefficient of the separated branch, ``CL = CN sin a cos a``,
+#: ``CD = CN sin^2 a``.  1.98 is a flat plate broadside (the pressure-drag
+#: constant this module always used); 3.4 is a wing carrying a stable
+#: leading-edge vortex -- Dickinson, Lehmann & Sane 1999's robofly fit gives
+#: CD(90) = 3.46 and CL(45) = 1.80, i.e. CN ~ 3.4-3.6.  One CN for both
+#: coefficients, because a separated plate is loaded normal to itself.
+CN_PLATE = 1.98
+CN_LEV = 3.4
+
+
+def _stall(alpha, re):
+    """Static stall angle and the attached-to-separated weight ``w``.
+
+    ``w`` is 0 up to the stall angle and reaches 1 ``SEPARATION_COMPLETE``
+    beyond it, a smoothstep, so ``w`` and ``w'`` are exactly zero at zero
+    incidence (F-05) and the attached lift peaks at stall and falls to the plate
+    curve after it (F-08).
+    """
+    alpha_stall = np.radians(11.0)
+    # Very low Reynolds number wings stall early and softly.
+    alpha_stall = alpha_stall * np.clip(
+        0.55 + 0.45 * np.log10(np.maximum(re, 10.0)) / 5.0, 0.5, 1.0)
+    t = np.clip((np.abs(alpha) - alpha_stall) / SEPARATION_COMPLETE, 0.0, 1.0)
+    return alpha_stall, t * t * (3.0 - 2.0 * t)
 
 
 def lift_coefficient(
     alpha: np.ndarray, re: np.ndarray, ar: np.ndarray,
-    reduced_pitch_rate: np.ndarray
+    lev: np.ndarray, alpha_e: np.ndarray | None = None,
 ) -> np.ndarray:
-    """Lift coefficient spanning attached, LEV-augmented and post-stall regimes.
+    """Lift coefficient: attached below stall, separated normal force above.
 
-    Below stall the strip behaves like a finite wing with the Helmholtz
-    lift-slope correction ``2*pi / (1 + 2/AR)``.  Above stall it behaves like a
-    flat plate, ``CL_max * sin(2*alpha)``.
+    Attached: the Helmholtz slope ``2 pi / (1 + 2/AR)`` on the *effective*
+    incidence ``alpha_e`` -- the Wagner-lagged angle the circulation has had
+    time to build to (``alpha`` itself when none is given).  With the solver's
+    inflow on, ``AR`` is passed as effectively infinite, because the downwash
+    that the Helmholtz factor stands in for is then in the flow itself.
 
-    Both statements are exact, which they were not: the handover between the
-    two is compactly supported, so at zero incidence the attached branch stands
-    alone and past ``alpha_stall + SEPARATION_COMPLETE`` the separated one
-    does.  A logistic, which is what this was, reaches neither end and so
-    evaluated each branch outside its own domain.  MATH_AUDIT F-05.
-
-    ``CL_max`` and the stall angle are both raised by the **reduced pitch
-    rate**
-
-        kappa = |alpha_dot| * c / (2 * U)
-
-    This is the leading-edge-vortex term: a wing that is pitching fast relative
-    to its own translation carries a stable LEV and keeps generating lift far
-    past the static stall angle, which is the whole reason flapping flight is
-    competitive at this scale.  A gliding wing (kappa -> 0) gets the
-    conventional static behaviour.
-
-    **`kappa` is not the reduced frequency, and this used to say it was.**
-    The reduced frequency `k = Omega c / (2U)` is a constant of an oscillation;
-    `kappa` is instantaneous.  For `alpha(t) = alpha_0 sin(Omega t)` they are
-    related by `kappa = alpha_0 |cos(Omega t)| k`, so `kappa` carries a pitch
-    amplitude that `k` does not and falls to zero at both stroke extremes --
-    where a vortex that grew over the preceding half-stroke is largest.
-    Measured over one stroke at `k = 0.1728`, `kappa` runs 0 to 0.121, a spread
-    of 157% of its own mean.
-
-    Both are legitimate dimensionless groups and `kappa` is the standard
-    variable in dynamic-stall correlations, so this is a naming correction, not
-    a model change: nothing here computes a different number than it did.
-    Whether the LEV should key on a history variable instead is
-    `docs/MATH_AUDIT.md` F-02, and `tests/test_reduced_frequency.py` measures
-    the difference.
+    Separated: ``CN sin(alpha) cos(alpha)`` with ``CN`` raised from a flat
+    plate's 1.98 to 3.4 by the leading-edge vortex strength ``lev`` in [0, 1].
+    ``lev`` used to be the reduced *pitch rate* (F-02), which is zero on a wing
+    that revolves at fixed incidence -- the robofly -- and read CL 1.10 where
+    the robofly measures 1.80.  The solver now forms ``lev`` from the strip's
+    Rossby number and its travel since the flow last reversed.
     """
-    lev = np.clip(reduced_pitch_rate / 0.30, 0.0, 1.0)
-
-    cl_max = 1.10 + 0.80 * lev  # 1.1 static flat plate -> 1.9 with a strong LEV
-    alpha_stall = np.radians(11.0 + 26.0 * lev)  # 11 deg static -> 37 deg flapping
-    # Very low Reynolds number wings stall early and softly.
-    alpha_stall *= np.clip(0.55 + 0.45 * np.log10(np.maximum(re, 10.0)) / 5.0, 0.5, 1.0)
-
+    lev = np.clip(lev, 0.0, 1.0)
+    ae = alpha if alpha_e is None else alpha_e
     cl_alpha = 2.0 * np.pi / (1.0 + 2.0 / np.maximum(ar, 0.5))
-    cl_linear = cl_alpha * alpha
-
-    cl_plate = cl_max * np.sin(2.0 * alpha)
-
-    # Handover.  Smooth, so the optimiser never sees a kink to exploit, and
-    # **compactly supported**, so neither branch is evaluated where it does not
-    # apply.
-    #
-    # This was a logistic of width 6 degrees.  A logistic is never 0 and never
-    # 1, so each branch leaked into the other's domain: `w(0) = 0.138` at the
-    # static stall angle, which put 13.8% of the separated branch at zero
-    # incidence and cost a gliding wing up to 9.6% of the attached lift slope
-    # the docstring names, while 10 degrees past stall an unbounded linear
-    # branch still carried 16% of the weight.  MATH_AUDIT F-05.
-    #
-    # The smoothstep is the lowest-order polynomial that is C1 at both ends, so
-    # `w` and `w'` are both exactly zero at zero incidence: the separated
-    # branch contributes neither lift nor slope there, which is the property a
-    # logistic cannot have at any width.
-    t = np.clip(np.abs(alpha) / (alpha_stall + SEPARATION_COMPLETE), 0.0, 1.0)
-    w = t * t * (3.0 - 2.0 * t)
-    cl = (1.0 - w) * cl_linear + w * cl_plate
-    # Never exceed the plate envelope; the linear branch is unbounded.
-    return np.clip(cl, -1.2 * cl_max, 1.2 * cl_max)
+    cl_att = cl_alpha * ae
+    cn = CN_PLATE + (CN_LEV - CN_PLATE) * lev
+    cl_sep = cn * np.sin(alpha) * np.cos(alpha)
+    _, w = _stall(alpha, re)
+    # A strong LEV is separated flow from the leading edge on: the robofly's
+    # CL is CN sin a cos a from a few degrees up (0.55 at 9 deg; CN 3.5 gives
+    # 0.54).  So the LEV strength also moves the handover toward the separated
+    # branch, all the way at lev = 1.
+    w = w + (1.0 - w) * lev
+    return (1.0 - w) * cl_att + w * cl_sep
 
 
 def drag_coefficient(
-    alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, cl: np.ndarray
+    alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, cl: np.ndarray,
+    lev: np.ndarray | float = 0.0,
 ) -> np.ndarray:
-    """Profile + induced + separated pressure drag."""
+    """Skin friction, plus induced drag, plus separated pressure drag.
+
+    The pressure term ``CN sin^2 a`` belongs to separated flow only.  It was
+    applied at every incidence, so attached flow paid a flat plate's pressure
+    drag and had no leading-edge suction; a cambered section lost L/D for being
+    cambered (12.2 against 15.2 flat at AR 6.6, F-12).  Weighted by the same
+    handover as the lift now.  Induced drag ``CL^2 / (pi e AR)`` vanishes when
+    the solver passes an effectively infinite AR because its inflow model is
+    producing the downwash itself.
+    """
+    lev = np.clip(lev, 0.0, 1.0)
     cd_f = skin_friction_cd(re)
     # Oswald efficiency: low for the stubby, highly twisted surfaces this
     # pipeline tends to generate.
     oswald = 0.75
-    cd_i = cl**2 / (np.pi * oswald * np.maximum(ar, 0.5))
-    # Flat plate normal to the flow is ~1.98; this term dominates at high alpha
-    # and is what makes a wing a paddle when it is in water.
-    cd_p = 1.98 * (1.0 - np.cos(2.0 * alpha)) * 0.5
+    cd_i = cl * cl / (np.pi * oswald * np.maximum(ar, 0.5))
+    _, w = _stall(alpha, re)
+    w = w + (1.0 - w) * lev
+    cn = CN_PLATE + (CN_LEV - CN_PLATE) * lev
+    sa = np.sin(alpha)
+    cd_p = w * cn * sa * sa
     return cd_f + cd_i + cd_p
 
 
@@ -386,6 +376,320 @@ class FluidDiagnostics:
     clamped: bool = False
 
 
+#: R.T. Jones's two-term approximation to Wagner's function,
+#: ``phi(s) = 1 - A1 exp(-b1 s) - A2 exp(-b2 s)``, ``s`` in semichords of
+#: travel (Jones 1940, NACA Report 681; constants as quoted by
+#: arXiv:2104.15122).  An impulsively started plate carries half its
+#: steady-state circulation at once and builds the rest over a few chords.
+WAGNER_A = (0.165, 0.335)
+WAGNER_B = (0.0455, 0.3)
+#: The leading-edge vortex of a translating wing persists for about two chords
+#: of travel after an impulsive start and is gone by about four (Dickinson &
+#: Goetz 1993, J Exp Biol 174:45, as summarised in runs/_logs/
+#: aero_literature_0923.md item 3: "~2 chords").  Reset at every reversal of
+#: the chordwise flow, which is every half-stroke of a flapping wing.
+LEV_TRAVEL = (2.0, 4.0)
+#: A revolving wing keeps its LEV attached below a Rossby number of about 3
+#: (Lentink & Dickinson 2009, J Exp Biol 212:2705: fly wings, Ro ~ 2.9, stable;
+#: translating, Ro = infinity, not).  Where it is gone is not a published
+#: threshold; 8 is a modelling choice recorded in MATH_AUDIT.
+LEV_ROSSBY = (3.0, 8.0)
+
+
+def _smoothstep(t):
+    t = np.clip(t, 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def rossby_lev(U, chord, omega, s_hat):
+    """LEV strength from the strip's own Rossby number, ``U / (|w_perp| c)``.
+
+    ``w_perp`` is the strip's angular velocity less its pitch about the span:
+    a strip revolving about a hinge at radius ``r`` has ``U = w r`` and so
+    ``Ro = r / c``, the revolving-wing Rossby number; a translating strip has
+    ``Ro`` infinite.
+    """
+    c = np.maximum(chord, 1e-6)
+    w_perp = omega - np.einsum("ni,ni->n", omega, s_hat)[:, None] * s_hat
+    ro = U / np.maximum(np.linalg.norm(w_perp, axis=1) * c, 1e-9)
+    rlo, rhi = LEV_ROSSBY
+    return 1.0 - _smoothstep((ro - rlo) / (rhi - rlo))
+
+
+class UnsteadyState:
+    """Per-strip history: Wagner lag and chords travelled since reversal.
+
+    ``update`` returns ``(alpha_e, lev)``: the circulation-lagged incidence the
+    attached branch uses, and the leading-edge-vortex strength -- the larger of
+    the rotational (Rossby) and the delayed-stall (travel) mechanisms.
+    """
+
+    def __init__(self, n: int) -> None:
+        self.x = np.zeros((2, n))
+        self.s = np.zeros(n)
+        self.rev = np.zeros(n, bool)
+        self.primed = False
+
+    def reset(self) -> None:
+        self.x[:] = 0.0
+        self.s[:] = 0.0
+        self.rev[:] = False
+        self.primed = False
+
+    def update(self, alpha, rev, U, chord, omega, s_hat, dt):
+        c = np.maximum(chord, 1e-6)
+        if self.primed:
+            flip = rev != self.rev
+            self.x[:, flip] = 0.0
+            self.s[flip] = 0.0
+        self.rev = rev.copy()
+        self.primed = True
+        ds = U * dt / c                         # chords this step
+        self.s += ds
+        a1, a2 = WAGNER_A
+        for i, b in enumerate(WAGNER_B):
+            # exact for a step held constant over dt; semichords = 2 * chords
+            self.x[i] += (alpha - self.x[i]) * (1.0 - np.exp(-b * 2.0 * ds))
+        alpha_e = alpha * (1.0 - a1 - a2) + a1 * self.x[0] + a2 * self.x[1]
+        lo, hi = LEV_TRAVEL
+        lev_travel = 1.0 - _smoothstep((self.s - lo) / (hi - lo))
+        return alpha_e, np.maximum(rossby_lev(U, chord, omega, s_hat), lev_travel)
+
+
+class InducedFlow:
+    """Momentum-theory downwash of a machine's lifting system, one vector.
+
+    Glauert's actuator disc: the fluid through a disc of area ``A`` that
+    carries force ``F`` is accelerated by ``w`` along ``-F`` with
+
+        w |V + w| = |F| / (2 rho A)
+
+    where ``V`` is the flow the disc sees.  In hover that is Rankine-Froude,
+    ``w = sqrt(T / 2 rho A)``; in forward flight with ``A = pi b^2 / 4`` it is
+    exactly lifting-line theory's induced angle ``CL / (pi AR)`` -- so one
+    model covers both, and the strips then use the 2D lift slope and no
+    separate induced drag (they would count it twice).  The disc spans the
+    machine's tip-to-tip span, so a bilateral pair is one wing of the full
+    aspect ratio (F-12) and not two halves.  MATH_AUDIT F-13.
+
+    ``w`` follows its target with a first-order lag of one disc radius of
+    travel, ``tau = (b/2) / |V + w|`` -- the wake has to convect away before
+    the inflow it induces is established.  A modelling choice (Pitt-Peters is
+    the rotorcraft form and its constant could not be confirmed), recorded in
+    MATH_AUDIT.
+    """
+
+    def __init__(self, span: float) -> None:
+        self.span = float(max(span, 0.0))
+        self.area = np.pi * self.span**2 / 4.0
+        self.w = np.zeros(3)
+
+    def reset(self) -> None:
+        self.w[:] = 0.0
+
+    def update(self, F: np.ndarray, V: np.ndarray, rho: float, dt: float) -> np.ndarray:
+        T = float(np.linalg.norm(F))
+        if self.area <= 1e-9 or T < 1e-9 or rho <= 0.0:
+            target = np.zeros(3)
+        else:
+            f = F / T
+            k = T / (2.0 * rho * self.area)
+            v_par = float(V @ f)
+            v_perp2 = float(V @ V) - v_par * v_par
+            # w * sqrt(v_perp^2 + (v_par - w)^2) = k: the smallest root, by
+            # bisection -- fixed-point iteration oscillates in hover.
+            g = lambda x: x * np.sqrt(max(v_perp2, 0.0) + (v_par - x) ** 2) - k
+            lo, hi = 0.0, max(1.0, np.sqrt(k)) * 4.0 + abs(v_par) + np.sqrt(max(v_perp2, 0.0))
+            while g(hi) < 0.0:
+                hi *= 2.0
+            for _ in range(48):
+                mid = 0.5 * (lo + hi)
+                if g(mid) < 0.0:
+                    lo = mid
+                else:
+                    hi = mid
+            target = -f * 0.5 * (lo + hi)
+        through = float(np.linalg.norm(V + target))
+        tau = 0.5 * self.span / max(through, 0.05)
+        self.w += (target - self.w) * (1.0 - np.exp(-dt / max(tau, 1e-6)))
+        return self.w
+
+
+#: The aspect ratio the strips are given when the inflow model is on: large
+#: enough that ``2 pi / (1 + 2/AR)`` is the 2D slope and ``CL^2/(pi e AR)``
+#: vanishes, because the downwash both stand in for is then in the flow.
+INFLOW_AR = 1.0e6
+
+
+def _wing_span(model, panels) -> float:
+    """Tip-to-tip extent of the lifting strips at the model's rest pose."""
+    import mujoco
+    sel = panels.kind == WING
+    if not np.any(sel):
+        return 0.0
+    d = mujoco.MjData(model)
+    mujoco.mj_kinematics(model, d)
+    R = d.xmat.reshape(-1, 3, 3)[panels.body_id[sel]]
+    pos = d.xpos[panels.body_id[sel]] + np.einsum("nij,nj->ni", R, panels.pos_local[sel])
+    diff = pos[:, None, :] - pos[None, :, :]
+    return float(np.sqrt((diff ** 2).sum(-1)).max())
+
+
+def machine_flow(model, data, medium, t: float) -> np.ndarray:
+    """The flow the machine's root body sees: medium velocity minus its own."""
+    import mujoco
+    v = np.zeros(6)
+    mujoco.mj_objectVelocity(model, data, mujoco.mjtObj.mjOBJ_BODY, 1, v, 0)
+    u = medium.flow_velocity(data.xipos[1:2], t)
+    return np.asarray(u, float).reshape(-1, 3)[0] - v[3:]
+
+
+class ImplicitAeroDamping:
+    """Lift and drag made implicit by splitting their damping off.
+
+    Lift and drag go into ``xfrc_applied`` and are integrated explicitly; added
+    mass goes into the mass matrix and is implicit.  An explicit damping force
+    ``-b v`` on a body of inertia ``m`` is stable only while ``b dt / m`` stays
+    below about two, and a wing strip in water has ``b`` of hundreds of N s/m on
+    a few grams of spar.  What kept it stable was the isotropic added mass,
+    about 2.8x too large (MATH_AUDIT F-03): correct it and eel and ray run away
+    at dt = 0.004 (2026-09-23: 11,110 and 27,341 rad).
+
+    The split: each step, project each strip's linearised damping onto the
+    joints, ``B_kk = sum_i b_i |J_i e_k|^2``, put ``B_kk`` into MuJoCo's own
+    ``dof_damping`` -- which ``implicitfast`` integrates implicitly -- and add
+    ``+B_kk qdot_k`` back to ``qfrc_applied``.  At the current state the two
+    cancel exactly, so the force the machine feels is unchanged; what changes is
+    that the stiff part is integrated implicitly.  The price is an O(dt) lag in
+    the damping force, the same order as the explicit scheme's own error.
+
+    ``b_i`` bounds the strip's force derivative with respect to its own
+    velocity.  For ``F = q S (CL l + CD d)``, a streamwise perturbation gives
+    ``rho S U sqrt(CL^2 + CD^2) = 2|F|/U`` and a normal one adds the lift slope,
+    ``q S CL_alpha / U``; the diagonal only, because MuJoCo's ``dof_damping`` is
+    diagonal.
+    """
+
+    def __init__(self, model) -> None:
+        self.model = model
+        self.base = model.dof_damping.copy()
+        nb, nv = model.nbody, model.nv
+        # anc[j, k]: dof k moves body j (k's body is j or one of j's ancestors).
+        anc = np.zeros((nb, nv), bool)
+        for j in range(nb):
+            b = j
+            while b > 0:
+                anc[j, model.dof_bodyid == b] = True
+                b = int(model.body_parentid[b])
+        # Articulated joints only.  The split adds dt*B of effective inertia
+        # to first order, and on the free root that is 20-50% more pitch
+        # inertia for a glider -- it broke the gannet's glide under the launch
+        # scatter (sink 1.5 -> 10.5 m/s, 2026-09-26).  The instability the
+        # split exists for is in light spars (b dt >> their mass), never in the
+        # root, which is heavy and stable explicitly.
+        free = np.zeros(nv, bool)
+        for j in range(model.njnt):
+            if model.jnt_type[j] == 0:                       # mjJNT_FREE
+                a = model.jnt_dofadr[j]
+                free[a:a + 6] = True
+        anc[:, free] = False
+        self.anc = anc
+        self.last_b = np.zeros(nv)
+
+    def reset(self) -> None:
+        self.model.dof_damping[:] = self.base
+        self.last_b[:] = 0.0
+
+    def clear(self, data) -> None:
+        """The step's damping with the split off: the dry model's own.  Called
+        every step either way, because `dof_damping` has one owner that
+        rewrites it and everyone else (jets) adds to what it wrote."""
+        self.model.dof_damping[:] = self.base
+        data.qfrc_applied[:] = 0.0
+
+    def apply(self, data, pos: np.ndarray, body_id: np.ndarray, b: np.ndarray) -> None:
+        """``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip."""
+        m = self.model
+        if m.nv == 0:
+            return
+        root = m.body_rootid[body_id]
+        r = pos - data.subtree_com[root]                         # (n, 3)
+        rot = data.cdof[:, :3]                                    # (nv, 3)
+        lin = data.cdof[:, 3:]
+        # velocity of each strip per unit rate of each dof: lin + rot x r
+        u = lin[None, :, :] + np.cross(rot[None, :, :], r[:, None, :])
+        u2 = np.einsum("nkd,nkd->nk", u, u) * self.anc[body_id]
+        B = b @ u2                                                # (nv,)
+        m.dof_damping[:] = self.base + B
+        # It owns ``qfrc_applied`` outright -- nothing else in the project writes
+        # it -- and rewrites all of it every step, so a snapshot restore or a
+        # reset between steps cannot leave a stale compensation behind.
+        data.qfrc_applied[:] = B * data.qvel
+        self.last_b = B
+
+
+def strip_damping(q, area, lift, drag, rho, aspect_ratio, is_wing,
+                  lift_scale: float = 1.0) -> np.ndarray:
+    """Per-strip damping bound ``b_i`` for `ImplicitAeroDamping`, N s/m.
+
+    ``2|F_aero|/U + q S CL_alpha / U``, with ``|F_aero| = sqrt(L^2 + D^2)`` --
+    the *velocity-dependent* force only (circulatory lift and drag, and a bluff
+    body's drag).  Buoyancy does not depend on velocity and must not be in it:
+    the first version used the whole strip force, and a floored ``U`` turned a
+    resting medusa's buoyancy into 1e5 N s/m and ran it away (2026-09-23).  The
+    lift slope is the attached-flow ``2 pi / (1 + 2/AR)`` on lifting strips.
+    ``U`` is recovered from ``q`` and ``rho`` so both evaluation paths form it
+    from what they already hold.  Every term scales as ``U``, so it goes to zero
+    with the flow rather than blowing up.
+    """
+    U = np.sqrt(2.0 * np.maximum(q, 0.0) / np.maximum(rho, 1e-9))
+    Us = np.maximum(U, 1e-3)
+    # The slope term carries the same `lift_scale` the lift does: a bound on a
+    # force the auditor has scaled to zero must be zero too.
+    slope = np.where(is_wing, 2.0 * np.pi / (1.0 + 2.0 / np.maximum(aspect_ratio, 0.1)),
+                     0.0) * lift_scale
+    fa = np.sqrt(lift * lift + drag * drag)
+    return np.where(U > 1e-3, (2.0 * fa + q * area * slope) / Us, 0.0)
+
+
+def slam_mass(m_add, rho, chord, dr, is_wing, scale: float = 1.0) -> np.ndarray:
+    """The entrained mass the slam diagnostic differences: a wing's *normal*
+    value, ``rho pi c^2 / 4 dr``, whatever direction the flow comes from.
+
+    Slam is a normal impact -- the load of a surface being wetted -- and the
+    direction-dependent tensor (F-03) changes a wing's entrained mass every
+    time the flow turns relative to it, i.e. every flap.  Differencing that
+    read flapping in water as slamming: the ray's nose-first entry swung between
+    19 and 730 kPa with configuration (2026-09-26).  Bluff elements keep their
+    own value.
+    """
+    return np.where(is_wing, rho * np.pi * chord**2 * 0.25 * dr * scale, m_add)
+
+
+def finish_bodies(fb: np.ndarray, fsum_b: np.ndarray, m_body: np.ndarray,
+                  limit: float) -> bool:
+    """Per-machine limiter and weight cancellation, in place on ``fb`` (nb, 6).
+
+    The limiter is a last resort: the quasi-steady model is only valid for
+    states a real machine could be in, and once a candidate is tumbling at
+    50 m/s the forces can be arbitrarily large.  It bounds the machine's total
+    fluid load, ``sum |F_i|``, by ``limit`` (60x its dry weight) and scales
+    every strip by the same factor, so the distribution of load -- and hence
+    the moments -- is kept.  It was a bound *per strip* until 2026-09-23, so a
+    200-strip machine could carry 200x the stated bound and a clamped machine
+    had its load redistributed toward its weakest strips (MATH_AUDIT F-04).
+
+    Then the weight MuJoCo applies to the entrained fluid is cancelled at each
+    body's centre of mass (F-14).  Returns whether the limiter bound.
+    """
+    total = float(fsum_b.sum())
+    clamped = total > limit
+    if clamped:
+        fb *= limit / total
+    fb[:, 2] += m_body * GRAVITY
+    return clamped
+
+
 class FluidSolver:
     """Applies blade-element fluid loads to a MuJoCo model each step.
 
@@ -407,6 +711,7 @@ class FluidSolver:
         added_mass_scale: float = 1.0,
         cd_scale: float = 1.0,
         lift_scale: float = 1.0,
+        disc_span: float | None = None,
     ) -> None:
         self.model = model
         self.panels = panels
@@ -478,7 +783,35 @@ class FluidSolver:
         #: normal entry in every direction.  **Off**: it is correct and the
         #: solver does not survive it at this timestep.  See MATH_AUDIT F-03
         #: and `experiments/wing_added_mass`.
-        self.wing_added_mass_tensor = False
+        #: **On since 2026-09-23**, with `implicit_damping`: the pair closes
+        #: F-03.  Measured at dt = 0.004, largest joint angle over 5 s, driven:
+        #: tensor with explicit lift/drag ran ray to 7,282 rad (27,341 before
+        #: the lever-arm fix); with the split every plan stays under 2.8 rad in
+        #: air and 2.3 in water (`experiments/flight_audit/stability_probe.py`).
+        self.wing_added_mass_tensor = True
+        #: Lift and drag damping integrated implicitly (`ImplicitAeroDamping`).
+        self.implicit_damping = True
+        self._damping = ImplicitAeroDamping(model)
+        #: Wagner lag and the LEV's travel/Rossby history (F-02, F-13).
+        self.unsteady = True
+        self._unsteady = UnsteadyState(panels.n)
+        #: Momentum-theory inflow over the machine's span (F-12, F-13).  With
+        #: it on, strips use the 2D lift slope and no separate induced drag.
+        self.inflow = True
+        if disc_span is None:
+            disc_span = _wing_span(model, panels)
+        self._inflow = InducedFlow(disc_span)
+        # The machine's own aspect ratio, tip-to-tip span squared over its
+        # lifting area -- what a steady, lifting-line reading of the same
+        # inflow gives, and what `steady()` measurements use.
+        s_wing = float(panels.area[panels.kind == WING].sum()) if panels.n else 0.0
+        self._machine_ar = (disc_span**2 / s_wing) if (disc_span > 0 and s_wing > 0) else None
+        #: Quasi-static evaluation: see `steady`.
+        self.quasi_static = False
+        if self._inflow.area <= 1e-9:
+            # A lifting system with no span -- a single strip, or none -- has
+            # no disc to put momentum through; it keeps the finite-wing model.
+            self.inflow = False
         self.record_state = False
         self.last_state: dict | None = None
         # Scratch buffers reused every step.
@@ -501,6 +834,29 @@ class FluidSolver:
                 self._const_scratch = mujoco.MjData(self.model)
             mujoco.mj_setConst(self.model, self._const_scratch)
 
+    def steady(self):
+        """Context for quasi-static probes (trim, lift and thrust margins).
+
+        They pose the machine, reset the solver and read one step's forces, so
+        a history means nothing to them: the Wagner lag would restart at half
+        circulation and every pose would be "just reversed" with a fresh LEV.
+        Inside it the incidence is not lagged, the LEV comes from the steady
+        (Rossby) mechanism alone, and the downwash is the steady lifting-line
+        one -- the machine's tip-to-tip aspect ratio -- instead of the lagged
+        inflow.
+        """
+        import contextlib
+
+        @contextlib.contextmanager
+        def _cm():
+            was = self.quasi_static
+            self.quasi_static = True
+            try:
+                yield self
+            finally:
+                self.quasi_static = was
+        return _cm()
+
     def reset(self) -> None:
         self._prev_vn[:] = 0.0
         self._prev_ma[:] = 0.0
@@ -509,6 +865,9 @@ class FluidSolver:
         # Restore dry inertia: leaving a previous episode's entrained water in
         # the mass matrix would silently make the next episode heavier.
         self._publish_inertia(self._dry_mass, self._dry_inertia)
+        self._damping.reset()
+        self._unsteady.reset()
+        self._inflow.reset()
         self.diag = FluidDiagnostics()
 
     # ------------------------------------------------------------------ step
@@ -564,6 +923,10 @@ class FluidSolver:
         # --- medium -------------------------------------------------------
         rho, mu, subf = self.medium.properties(pos, p.half_height, t)
         u_flow = self.medium.flow_velocity(pos, t)
+        is_wing = p.kind == WING
+        live_inflow = self.inflow and not self.quasi_static
+        if live_inflow:
+            u_flow = u_flow + np.where(is_wing[:, None], self._inflow.w[None, :], 0.0)
         v_rel = u_flow - v_elem
 
         # --- strip theory -------------------------------------------------
@@ -600,15 +963,21 @@ class FluidSolver:
         # the flipped lift axis.
         alpha = alpha + 2.0 * np.where(rev, -p.camber, p.camber)
 
-        # Angular rate about the span axis.  This is the strip's *pitch* rate,
-        # and it drives two different things below: the reduced pitch rate that
-        # indexes the leading-edge vortex, and the Kramer rotational force,
-        # which wants the pitch rate and is the one of the two this variable
-        # was always right for.
+        # Angular rate about the span axis: the strip's *pitch* rate, which the
+        # Kramer rotational force below wants.  It used to index the LEV as
+        # well (F-02); the LEV now comes from `UnsteadyState`.
         omega_s = np.einsum("ni,ni->n", omega, s_hat)
-        reduced_pitch_rate = np.abs(omega_s) * p.chord / (2.0 * U_safe)
+        if self.unsteady and not self.quasi_static:
+            alpha_e, lev = self._unsteady.update(alpha, rev, U, p.chord, omega, s_hat, dt)
+        else:
+            alpha_e, lev = alpha, rossby_lev(U, p.chord, omega, s_hat)
+        if live_inflow:
+            ar_eff = np.full(p.n, INFLOW_AR)
+        elif self._machine_ar is not None:
+            ar_eff = np.full(p.n, self._machine_ar)
+        else:
+            ar_eff = p.aspect_ratio
 
-        is_wing = p.kind == WING
         lift_axis = _cross3(s_hat, d_hat)
         lift_axis /= np.maximum(np.linalg.norm(lift_axis, axis=1, keepdims=True), 1e-12)
 
@@ -617,9 +986,9 @@ class FluidSolver:
         # Circulatory lift and drag, on the lifting strips only.
         cl = np.where(
             is_wing,
-            lift_coefficient(alpha, re, p.aspect_ratio, reduced_pitch_rate),
+            lift_coefficient(alpha, re, ar_eff, lev, alpha_e),
             0.0)
-        cd = np.where(is_wing, drag_coefficient(alpha, re, p.aspect_ratio, cl), 0.0)
+        cd = np.where(is_wing, drag_coefficient(alpha, re, ar_eff, cl, lev), 0.0)
         L = q * p.area * cl * self.lift_scale
         D = q * p.area * cd * self.cd_scale
         F += L[:, None] * lift_axis + D[:, None] * d_hat
@@ -726,6 +1095,14 @@ class FluidSolver:
             0.0,
         )
         F += f_rot[:, None] * lift_axis
+        if live_inflow:
+            # For the next step: the lifting system's force and the flow it
+            # sees.  A one-step lag, well inside the inflow's own time constant.
+            wing_any = bool(is_wing.any())
+            self._inflow.update(
+                F[is_wing].sum(axis=0) if wing_any else np.zeros(3),
+                machine_flow(self.model, data, self.medium, t),
+                float(rho[is_wing].mean()) if wing_any else 0.0, dt)
 
         # --- added mass ----------------------------------------------------
         # For a flat strip the 2D added mass for normal acceleration is
@@ -796,22 +1173,13 @@ class FluidSolver:
         # `benchmarks/layers.py` layer 2 with no simulation in the chain.
         # `docs/MATH_AUDIT.md` **F-03**.
         #
-        # The tensor is here, behind `wing_added_mass_tensor`, and it is **off**.
-        # `experiments/wing_added_mass` says why: switching it on makes layer 2
-        # hold (0.729 -> 8.3e-06) and takes a gannet's wing added mass from
-        # 70.2 kg to 25.1 kg, and then four of the seven seed plans run away at
-        # this project's dt = 0.004 -- three of them with the actuators held
-        # completely still.  Every plan is stable at dt = 0.001.
-        #
-        # So the surplus inertia the scalar carries is what keeps the
-        # *explicit* lift and drag stable at the current timestep.  The comment
-        # above explains why added mass goes into the mass matrix rather than
-        # into `xfrc_applied`; lift and drag do not, and they are only stable
-        # because the wings are carrying about three times the entrained mass
-        # they should.  Closing F-03 needs a smaller timestep or an implicit
-        # treatment of those forces, which is a larger change than a
-        # coefficient -- so the switch exists, defaults off, and the experiment
-        # is what turns it on.
+        # The tensor is behind `wing_added_mass_tensor`, **on** since 2026-09-23.
+        # Switching it on makes layer 2 hold (0.729 -> 8.3e-06) and takes a
+        # gannet's wing added mass from 70.2 kg to 25.1 kg -- and the surplus
+        # inertia the scalar carried had been what kept the *explicit* lift and
+        # drag stable at dt = 0.004 (`experiments/wing_added_mass`).  That
+        # needed an implicit treatment of those forces, not a coefficient, and
+        # `ImplicitAeroDamping` is it.
         if self.wing_added_mass_tensor:
             t_wing = np.maximum(p.ext_local[:, 2], 1e-5)
             # `rho` is per element -- one straddling the free surface carries a
@@ -842,19 +1210,23 @@ class FluidSolver:
             self._dry_mass + m_body,
             self._dry_inertia + (m_body * self._lever2)[:, None],
         )
-        # Cancel the weight MuJoCo will apply to the entrained fluid.
-        F[:, 2] += m_add * GRAVITY
+        # The weight MuJoCo will apply to the entrained fluid is cancelled at
+        # each body's *centre of mass*, where MuJoCo applies it -- see
+        # `finish_bodies`.  It was added at every strip until 2026-09-23, which
+        # also put a couple ``sum (r_i - com) x m_i g`` on every body: 22.8 N m
+        # about the beetle's wing axis in water (MATH_AUDIT F-14).
 
         # The slamming rate term is still computed, but only as a *diagnostic*:
         # the structural check needs to know the peak entry load, while the
         # dynamics get the same physics through the varying mass matrix.
+        m_s = slam_mass(m_add, rho, p.chord, p.dr, is_wing, self.added_mass_scale)
         if self._primed:
-            slam = float(np.abs((m_add - self._prev_ma) / dt * vn).max())
+            slam = float(np.abs((m_s - self._prev_ma) / dt * vn).max())
         else:
             slam = 0.0
             self._primed = True
         self._prev_vn = vn.copy()
-        self._prev_ma = m_add.copy()
+        self._prev_ma = m_s.copy()
         dmv = np.zeros(p.n)
 
         # Buoyancy: only the genuinely submerged portion, at true water density,
@@ -862,27 +1234,29 @@ class FluidSolver:
         f_buoy = self.medium.water.rho * GRAVITY * p.volume_buoyant * subf
         F[:, 2] += f_buoy
 
-        # A last-resort limiter.  The quasi-steady model is only valid for
-        # states a real machine could be in; once a candidate is tumbling at
-        # 50 m/s the coefficients are extrapolation and the forces can be
-        # arbitrarily large.  Clamping to a multiple of the vehicle's weight
-        # keeps the integrator alive long enough to record the failure, and
-        # raises the flag that tells the scorer this run left the valid domain
-        # rather than discovering free thrust.
-        weight = float(self._dry_mass.sum()) * GRAVITY + 1.0
-        fmag = np.linalg.norm(F, axis=1)
-        limit = 60.0 * weight
-        if np.any(fmag > limit):
-            scale_f = np.minimum(1.0, limit / np.maximum(fmag, 1e-9))
-            F *= scale_f[:, None]
-            self.diag.clamped = True
-
         # --- accumulate to bodies -----------------------------------------
         # xfrc_applied takes a world-frame force at the body CoM plus a torque.
+        # Summed per body first, unscaled, in panel order -- the batched path's
+        # deterministic gather does exactly this -- and then `finish_bodies`
+        # applies the machine's limiter and the weight cancellation.
+        fmag = np.linalg.norm(F, axis=1)
+        if self.implicit_damping:
+            self._damping.apply(data, pos, p.body_id, strip_damping(
+                q, p.area, L, D, rho, ar_eff, is_wing, self.lift_scale))
+        else:
+            self._damping.clear(data)
+        nb = self._nbody
+        fb = np.zeros((nb, 6))
         arm = pos - xipos[p.body_id]
-        T = _cross3(arm, F)
-        np.add.at(data.xfrc_applied[:, :3], p.body_id, F)
-        np.add.at(data.xfrc_applied[:, 3:], p.body_id, T)
+        np.add.at(fb[:, :3], p.body_id, F)
+        np.add.at(fb[:, 3:], p.body_id, _cross3(arm, F))
+        fsum_b = np.zeros(nb)
+        np.add.at(fsum_b, p.body_id, fmag)
+        weight = float(self._dry_mass.sum()) * GRAVITY + 1.0
+        clamped = finish_bodies(fb, fsum_b, m_body, 60.0 * weight)
+        if clamped:
+            self.diag.clamped = True
+        data.xfrc_applied[:] += fb
 
         # --- diagnostics ---------------------------------------------------
         d = self.diag

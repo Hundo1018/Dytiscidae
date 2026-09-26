@@ -126,9 +126,11 @@ def assembly_kernel(
         fy += f_rot * lift_axis[unsafe_offset=j + 1]
         fz += f_rot * lift_axis[unsafe_offset=j + 2]
 
-    # --- added-mass gravity compensation, then buoyancy -------------------
-    # Both are vertical only, and both come after Kramer in the source.
-    fz += fz_added[unsafe_offset=i]
+    # --- buoyancy ----------------------------------------------------------
+    # The added-mass weight cancellation is no longer a panel force: it is
+    # applied per body at the centre of mass, on the host (fluid.finish_bodies,
+    # MATH_AUDIT F-14).  `fz_added` stays in the signature, unread.
+    _ = fz_added
     var fb = water_rho * GRAVITY * vol_buoy[unsafe_offset=i] * subf[unsafe_offset=i]
     buoy_out[unsafe_offset=i] = fb
     fz += fb

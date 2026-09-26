@@ -183,15 +183,21 @@ def test_what_it_is_worth_in_lift() -> None:
     a = np.radians(np.array([10.0, 25.0, 40.0]))
     re = np.full(3, 2e5)
     ar = np.full(3, 5.0)
+    # Since 2026-09-23 the fourth argument is the LEV strength in [0, 1], formed
+    # by the solver from the strip's Rossby number and its travel since the
+    # flow reversed -- not from kappa, which this file shows is zero at both
+    # stroke extremes (F-02, closed).
+    from dytiscidae.physics.fluid import CN_LEV, CN_PLATE
     lo = lift_coefficient(a, re, ar, np.zeros(3))
-    hi = lift_coefficient(a, re, ar, np.full(3, 0.30))
+    hi = lift_coefficient(a, re, ar, np.ones(3))
     for i, deg in enumerate((10.0, 25.0, 40.0)):
-        print(f"         alpha {deg:4.0f} deg:  CL {lo[i]:.3f} at k=0 "
-              f"-> {hi[i]:.3f} at k=0.30   ({hi[i]/max(lo[i],1e-9):.2f}x)")
-    check("the LEV term is worth a factor of two at post-stall angles",
-          hi[1] / lo[1] > 1.8,
-          f"{lo[1]:.3f} -> {hi[1]:.3f} at 25 degrees; whatever drives this "
-          f"term decides half the lift of a flapping wing")
+        print(f"         alpha {deg:4.0f} deg:  CL {lo[i]:.3f} without an LEV "
+              f"-> {hi[i]:.3f} with one   ({hi[i]/max(lo[i],1e-9):.2f}x)")
+    check("the LEV is worth CN_LEV / CN_PLATE at post-stall angles",
+          abs(hi[1] / lo[1] - CN_LEV / CN_PLATE) < 1e-9,
+          f"{lo[1]:.3f} -> {hi[1]:.3f} at 25 degrees ({CN_LEV / CN_PLATE:.2f}x); "
+          f"whatever drives this term decides a large share of a flapping "
+          f"wing's lift")
 
 
 def main() -> int:

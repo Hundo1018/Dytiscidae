@@ -471,6 +471,16 @@ def _add_geoms(
         )
 
 
+#: Travel of a universal joint's feathering hinge, radians either way.  Insect
+#: and bird wings pitch through roughly +-45-60 degrees about the span over a
+#: stroke; one radian is inside that and is a modelling choice.
+FEATHER_RANGE = 1.0
+
+#: A propeller's top speed is set by its tip speed, m/s: small propellers are
+#: run to about Mach 0.4-0.5 at most, and 150 m/s is inside that.
+ROTOR_TIP_SPEED = 150.0
+
+
 def build_model_xml(
     p: Phenotype,
     *,
@@ -583,6 +593,64 @@ def build_model_xml(
                     aname, jname, s.actuator.stall_torque,
                     float(getattr(s.part, "drive_compliance", 1.0)),
                 ))
+            if s.part.joint == "universal":
+                # The feathering hinge: pitch about the part's own span, which
+                # is local +X for every lifting surface (`build_panels`).  It
+                # was listed as a joint kind and built as a plain hinge, so no
+                # wing in this project could flap and pitch with a phase between
+                # the two -- the kinematics every animal flapper makes thrust
+                # with (ROADMAP AB).  Mirrored like any other hinge axis.
+                fax = np.array([1.0, 0.0, 0.0])
+                if s.mirrored:
+                    fax = fax * np.array([-1.0, -1.0, 1.0])
+                fname = f"{s.name}_jf"
+                ET.SubElement(body, "joint", {
+                    "name": fname,
+                    "type": "hinge",
+                    "axis": _fmt(fax),
+                    "range": f"{_fmt(-FEATHER_RANGE)} {_fmt(FEATHER_RANGE)}",
+                    "damping": _fmt(0.02 + 0.5 * s.mass),
+                    "armature": _fmt(max(1e-4, 0.01 * s.mass)),
+                })
+                fa = getattr(s, "feather_actuator", None)
+                if fa is not None:
+                    aname = f"{s.name}_f"
+                    actuator_names.append(aname)
+                    act_specs.append((
+                        aname, fname, fa.stall_torque,
+                        float(getattr(s.part, "drive_compliance", 1.0)),
+                    ))
+        rot = getattr(s, "rotor", None)
+        if rot is not None:
+            # A propeller at the tip, spinning about the part's local +Z, on a
+            # velocity servo (`physics.rotor`).  Its blades are a thin disc that
+            # collides with nothing -- a spinning disc is not a solid -- and its
+            # motor's stator is in the segment above.
+            R = float(rot.radius)
+            om_max = ROTOR_TIP_SPEED / max(R, 1e-3)
+            rb = ET.SubElement(body, "body", {
+                "name": f"{s.name}_rot",
+                "pos": _fmt(np.array([max(s.axis_length, 0.01), 0.0, 0.0])),
+            })
+            rj = f"{s.name}_jr"
+            # Always about local +Z.  A mirrored segment's rotor is the mirror
+            # image of its twin's -- the opposite hand (`RotorSpec.handed`) --
+            # so it spins the other way in the world and pushes the same way,
+            # and the pair's reaction torques cancel as a multirotor's do.
+            ET.SubElement(rb, "joint", {
+                "name": rj, "type": "hinge", "axis": "0 0 1", "limited": "false",
+                "range": f"0 {_fmt(om_max)}", "damping": "1e-5", "armature": "1e-5",
+            })
+            ET.SubElement(rb, "geom", {
+                "type": "cylinder", "size": f"{_fmt(R)} 0.002",
+                "mass": _fmt(0.011 * (R / 0.127) ** 3),
+                "contype": "0", "conaffinity": "0", "group": "3",
+            })
+            ra = getattr(s, "rotor_actuator", None)
+            if ra is not None:
+                aname = f"{s.name}_r"
+                actuator_names.append(aname)
+                act_specs.append((aname, rj, ra.stall_torque, ("velocity", om_max)))
 
         # Every motor in the machine was weightless.  ``Segment.mass`` is spar,
         # skin and hull structure; the actuator mass went into the budget --
@@ -599,6 +667,10 @@ def build_model_xml(
         m_extra = extra_root if s.parent < 0 else 0.0
         if s.actuator is not None:
             m_extra += float(s.actuator.mass)
+        if getattr(s, "feather_actuator", None) is not None:
+            m_extra += float(s.feather_actuator.mass)
+        if getattr(s, "rotor_actuator", None) is not None:
+            m_extra += float(s.rotor_actuator.mass)     # the stator stays put
         if not _add_field_geoms(root, body, s, max(s.mass + m_extra, 1e-4)):
             _add_geoms(body, s, m_extra, detail=detail)
 
@@ -612,6 +684,18 @@ def build_model_xml(
         act = ET.SubElement(root, "actuator")
         for name, joint, frange, compliance in act_specs:
             fr = float(np.clip(frange, 0.02, 400.0))
+            if isinstance(compliance, tuple) and compliance[0] == "velocity":
+                # A rotor's speed servo: torque = kv (omega_cmd - omega), up to
+                # the motor's torque, saturating at a tenth of top speed of
+                # error.  Forward only.
+                om_max = float(compliance[1])
+                ET.SubElement(act, "velocity", {
+                    "name": name, "joint": joint,
+                    "kv": _fmt(max(fr / (0.1 * om_max), 1e-6)),
+                    "forcerange": f"{_fmt(-fr)} {_fmt(fr)}",
+                    "ctrlrange": f"0 {_fmt(om_max)}",
+                })
+                continue
             # Position servo: the controller commands angles, MuJoCo produces the
             # torque, and the energy model reads that torque back.  kp is scaled
             # to the actuator's own authority so a small motor cannot fake a

@@ -155,6 +155,23 @@ class Part:
     #: the upper.  0.5 is the midpoint, which is what was hard-wired.  A folding
     #: shoulder needs its neutral at the *extended* end, not halfway folded.
     neutral: float = 0.5
+    #: For a ``"universal"`` joint, how far the feathering (pitch about the
+    #: span) leads the stroke, radians.  pi/2 is the classical choice -- pitch
+    #: reverses at stroke reversal, so the wing meets each half-stroke at
+    #: positive incidence -- and the one a heaving-and-pitching foil makes its
+    #: thrust with.  A gene because the best lead depends on the body.
+    feather_lead: float = math.pi / 2
+    #: A propeller at this part's tip, spinning about the part's local +Z:
+    #: radius in metres, 0 for none (`physics.rotor`).  Added 2026-09-23 as the
+    #: comparison to flapping; see ROADMAP "Why nothing flies, measured a third
+    #: time".
+    rotor_radius: float = 0.0
+    #: Geometric pitch over diameter.  0.47 is the APC 10x4.7 the model is
+    #: checked against.
+    rotor_pitch_ratio: float = 0.47
+    #: Rest speed as a fraction of the rotor's top speed -- the throttle the
+    #: CPG's offset starts from.
+    rotor_throttle: float = 0.5
     #: For BELL: orifice area as a fraction of the bell's frontal area.  Jet
     #: thrust goes as 1/A, so a small orifice trades flow rate for velocity.
     jet_area_ratio: float = 0.18
@@ -364,7 +381,7 @@ def random_genome(rng: np.random.Generator, *, target_scale: float = 1.0) -> Gen
 
     g.battery_wh = float(rng.uniform(60.0, 400.0))
     g.battery_chem = str(rng.choice(["liion", "lipo"]))
-    g.flap_frequency = float(rng.uniform(1.5, 8.0))
+    g.flap_frequency = float(rng.uniform(1.5, 12.0))   # as mut_gait, ROADMAP AC
     g.gas_volume = float(rng.uniform(0.0, 0.02))
     g.ballast_fraction = float(rng.uniform(0.1, 0.9))
     g.deadrise_deg = float(rng.uniform(5.0, 50.0))
@@ -592,12 +609,19 @@ def mut_gait(g: Genome, rng: np.random.Generator) -> bool:
         return False
     # The same draws as ``random_genome``, deliberately: the distribution a
     # fresh design's gait comes from is the one the sweep above sampled.
-    g.flap_frequency = float(rng.uniform(1.5, 8.0))
+    # 1.5-12 Hz since 2026-09-23 (ROADMAP AC): every gait that makes thrust, on
+    # every plan, sat at 7-12 Hz and this draw stopped at 8.  The spar check
+    # (`structure.flapping_inertial_check`, Tier 0) rejects a design whose wing
+    # breaks at the frequency drawn, so the band is open and the physics closes
+    # it.
+    g.flap_frequency = float(rng.uniform(1.5, 12.0))
     for part in movable:
         part.stroke_amplitude = (
             0.0 if rng.random() < 0.2 else float(rng.uniform(0.15, 0.9)))
         part.phase_offset = float(rng.uniform(0.0, 2 * math.pi))
         part.neutral = float(rng.uniform(0.2, 0.8))
+        if part.joint == "universal":
+            part.feather_lead = float(rng.uniform(0.0, 2 * math.pi))
     return True
 
 

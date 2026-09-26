@@ -30,6 +30,7 @@ from std.python.bindings import PythonModuleBuilder
 from fluid_gpu import (
     added_mass_kernel, bluff_kernel, coeff_kernel, kin_kernel, strip_kernel,
     velocity_kernel,
+    unsteady_kernel,
 )
 from medium_gpu import medium_kernel
 from assembly_gpu import assembly_kernel
@@ -138,6 +139,16 @@ struct FullPipeline(Movable, Writable):
     var buoy: DeviceBuffer[F64]
     var fmag: DeviceBuffer[F64]
     var fmax: DeviceBuffer[F64]
+    var fsum_b: DeviceBuffer[F64]
+    # 2026-09-23: unsteady history (Wagner, LEV travel) and the inflow.
+    var ae: DeviceBuffer[F64]
+    var lev: DeviceBuffer[F64]
+    var st_x0: DeviceBuffer[F64]
+    var st_x1: DeviceBuffer[F64]
+    var st_s: DeviceBuffer[F64]
+    var st_rev: DeviceBuffer[F64]
+    var st_primed: DeviceBuffer[F64]
+    var v_ind: DeviceBuffer[F64]
 
     # outputs
     var xfrc: DeviceBuffer[F64]
@@ -205,6 +216,16 @@ struct FullPipeline(Movable, Writable):
         self.buoy = c.enqueue_create_buffer[F64](cap_p)
         self.fmag = c.enqueue_create_buffer[F64](cap_p)
         self.fmax = c.enqueue_create_buffer[F64](cap_m)
+        self.fsum_b = c.enqueue_create_buffer[F64](cap_b)
+        self.ae = c.enqueue_create_buffer[F64](cap_p)
+        self.lev = c.enqueue_create_buffer[F64](cap_p)
+        self.st_x0 = c.enqueue_create_buffer[F64](cap_p)
+        self.st_x1 = c.enqueue_create_buffer[F64](cap_p)
+        self.st_s = c.enqueue_create_buffer[F64](cap_p)
+        self.st_rev = c.enqueue_create_buffer[F64](cap_p)
+        self.st_primed = c.enqueue_create_buffer[F64](cap_p)
+        self.v_ind = c.enqueue_create_buffer[F64](cap_m * 3)
+        self.st_primed.enqueue_fill(0.0)
         self.xfrc = c.enqueue_create_buffer[F64](cap_b * 6)
         self.m_body = c.enqueue_create_buffer[F64](cap_b)
         self.clamped = c.enqueue_create_buffer[I32](cap_m)
@@ -269,11 +290,13 @@ struct FullPipeline(Movable, Writable):
         out: xfrc, m_body, clamped, m_add, subf, alpha, q, lift, drag, buoy,
              vn
         then n, nbody, nmachine, has_bluff
+        then out: fsum_b, fmag, rho, pos_w, d_bluff, force; in: v_ind
 
         scalars (19): 0 amplitude, 1 wavelength, 2 period, 3 khat_x,
         4 khat_y, 5 t, 6 air_rho, 7 air_mu, 8 water_rho, 9 water_mu,
         10-12 current xyz, 13-15 wind xyz, 16 cd_scale, 17 am_scale,
-        18 lift_scale
+        18 lift_scale, 19 wing added-mass tensor (0/1), 20 dt,
+        21 reset the unsteady history (0/1), 22 unsteady history on (0/1)
         """
         var d = UnsafePointer[Int64, MutAnyOrigin](
             unsafe_from_address=Int(py=desc.ctypes.data))
@@ -290,6 +313,7 @@ struct FullPipeline(Movable, Writable):
         _up_f64(ctx, s.xmat, Int(d[unsafe_offset=1]), nb * 9)
         _up_f64(ctx, s.xipos, Int(d[unsafe_offset=2]), nb * 3)
         _up_f64(ctx, s.vel6, Int(d[unsafe_offset=3]), nb * 6)
+        _up_f64(ctx, s.v_ind, Int(d[unsafe_offset=25]), nm * 3)
         s.m_body.create_sub_buffer[F64](0, nb).enqueue_fill(0.0)
         s.xfrc.create_sub_buffer[F64](0, nb * 6).enqueue_fill(0.0)
         s.clamped.create_sub_buffer[I32](0, nm).enqueue_fill(0)
@@ -325,6 +349,7 @@ struct FullPipeline(Movable, Writable):
             s.vel6.unsafe_ptr(), s.xipos.unsafe_ptr(), s.pos_w.unsafe_ptr(),
             s.u_flow.unsafe_ptr(), s.body_id.unsafe_ptr(),
             s.omega.unsafe_ptr(), s.v_rel.unsafe_ptr(),
+            s.machine.unsafe_ptr(), s.is_wing.unsafe_ptr(), s.v_ind.unsafe_ptr(),
             Int32(n), grid_dim=g, block_dim=BLOCK)
 
         ctx.enqueue_function[strip_kernel](
@@ -335,10 +360,20 @@ struct FullPipeline(Movable, Writable):
             s.re.unsafe_ptr(), s.alpha.unsafe_ptr(), s.rf.unsafe_ptr(),
             s.lift_axis.unsafe_ptr(), Int32(n), grid_dim=g, block_dim=BLOCK)
 
+        ctx.enqueue_function[unsteady_kernel](
+            s.alpha.unsafe_ptr(), s.rf.unsafe_ptr(), s.u.unsafe_ptr(),
+            s.chord.unsafe_ptr(), s.omega.unsafe_ptr(), s.s_hat.unsafe_ptr(),
+            s.st_x0.unsafe_ptr(), s.st_x1.unsafe_ptr(), s.st_s.unsafe_ptr(),
+            s.st_rev.unsafe_ptr(), s.st_primed.unsafe_ptr(),
+            s.ae.unsafe_ptr(), s.lev.unsafe_ptr(),
+            Float64(py=scalars[20]), Int32(Int(py=scalars[21])),
+            Int32(Int(py=scalars[22])), Int32(n), grid_dim=g, block_dim=BLOCK)
+
         ctx.enqueue_function[coeff_kernel](
             s.alpha.unsafe_ptr(), s.re.unsafe_ptr(), s.ar.unsafe_ptr(),
-            s.rf.unsafe_ptr(), s.is_wing.unsafe_ptr(), s.cl.unsafe_ptr(),
-            s.cd.unsafe_ptr(), Int32(n), grid_dim=g, block_dim=BLOCK)
+            s.lev.unsafe_ptr(), s.is_wing.unsafe_ptr(), s.cl.unsafe_ptr(),
+            s.cd.unsafe_ptr(), s.ae.unsafe_ptr(), Int32(n),
+            grid_dim=g, block_dim=BLOCK)
 
         ctx.enqueue_function[bluff_kernel](
             s.v_rel.unsafe_ptr(), s.s_hat.unsafe_ptr(), s.c_hat.unsafe_ptr(),
@@ -356,7 +391,7 @@ struct FullPipeline(Movable, Writable):
             s.body_id.unsafe_ptr(), s.m_add.unsafe_ptr(), s.vn.unsafe_ptr(),
             s.m_body.unsafe_ptr(), s.fz.unsafe_ptr(),
             Float64(py=scalars[17]), Int32(has_bluff),
-            Int32(n), grid_dim=g, block_dim=BLOCK)
+            Int32(Int(py=scalars[19])), Int32(n), grid_dim=g, block_dim=BLOCK)
 
         ctx.enqueue_function[assembly_kernel](
             s.q.unsafe_ptr(), s.area.unsafe_ptr(), s.cl.unsafe_ptr(),
@@ -381,7 +416,8 @@ struct FullPipeline(Movable, Writable):
             s.machine.unsafe_ptr(), s.limit.unsafe_ptr(), s.fmax.unsafe_ptr(),
             s.pos_w.unsafe_ptr(), s.xipos.unsafe_ptr(),
             s.body_start.unsafe_ptr(), s.m_body.unsafe_ptr(),
-            s.xfrc.unsafe_ptr(), s.clamped.unsafe_ptr(), Int32(nb),
+            s.xfrc.unsafe_ptr(), s.clamped.unsafe_ptr(),
+            s.fsum_b.unsafe_ptr(), Int32(nb),
             grid_dim=ceildiv(nb, BLOCK), block_dim=BLOCK)
 
         _dn_f64(ctx, s.xfrc, Int(d[unsafe_offset=4]), nb * 6)
@@ -399,6 +435,14 @@ struct FullPipeline(Movable, Writable):
         # transition score reads slam as the entry load, so omitting it zeroes
         # every crossing's shock term without any error being raised.
         _dn_f64(ctx, s.vn, Int(d[unsafe_offset=14]), n)
+        # 2026-09-23: what the host needs for the per-machine limiter and the
+        # implicit damping split (fluid.finish_bodies, ImplicitAeroDamping).
+        _dn_f64(ctx, s.fsum_b, Int(d[unsafe_offset=19]), nb)
+        _dn_f64(ctx, s.fmag, Int(d[unsafe_offset=20]), n)
+        _dn_f64(ctx, s.rho, Int(d[unsafe_offset=21]), n)
+        _dn_f64(ctx, s.pos_w, Int(d[unsafe_offset=22]), n * 3)
+        _dn_f64(ctx, s.d_bluff, Int(d[unsafe_offset=23]), n)
+        _dn_f64(ctx, s.force, Int(d[unsafe_offset=24]), n * 3)
         ctx.synchronize()
         return PythonObject(n)
 

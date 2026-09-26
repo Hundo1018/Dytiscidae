@@ -216,7 +216,7 @@ struct Pipeline(Movable, Writable):
         ctx.enqueue_function[coeff_kernel](
             s.alpha.unsafe_ptr(), s.re.unsafe_ptr(), s.ar.unsafe_ptr(),
             s.rf.unsafe_ptr(), s.is_wing.unsafe_ptr(),
-            s.cl.unsafe_ptr(), s.cd.unsafe_ptr(), Int32(n),
+            s.cl.unsafe_ptr(), s.cd.unsafe_ptr(), s.alpha.unsafe_ptr(), Int32(n),
             grid_dim=g, block_dim=BLOCK)
         ctx.enqueue_function[bluff_kernel](
             s.v_rel.unsafe_ptr(), s.s_hat.unsafe_ptr(), s.c_hat.unsafe_ptr(),
@@ -231,7 +231,7 @@ struct Pipeline(Movable, Writable):
             s.volume.unsafe_ptr(), s.is_wing.unsafe_ptr(), s.body_id.unsafe_ptr(),
             s.m_add.unsafe_ptr(), s.vn.unsafe_ptr(), s.m_body.unsafe_ptr(),
             s.fz.unsafe_ptr(),
-            Float64(py=scales[1]), Int32(Int(py=scales[2])), Int32(n),
+            Float64(py=scales[1]), Int32(Int(py=scales[2])), Int32(0), Int32(n),
             grid_dim=g, block_dim=BLOCK)
 
         _dn_f64(ctx, s.cl, Int(d[unsafe_offset=6]), n)

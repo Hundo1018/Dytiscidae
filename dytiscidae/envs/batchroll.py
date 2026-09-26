@@ -44,6 +44,8 @@ import os as _os
 import numpy as np
 
 from ..physics.medium import GRAVITY
+from ..physics.fluid import (INFLOW_AR, finish_bodies, machine_flow, slam_mass,
+                             strip_damping)
 from ..control.cpg import TWIST_DIM, gait_gain
 from .triphibian import Domain
 
@@ -249,7 +251,13 @@ class BatchedFluid:
         self.ext, self.chord, self.camber = g("ext_local"), g("chord"), g("camber")
         self.dr, self.area, self.volume = g("dr"), g("area"), g("volume")
         self.vol_buoy, self.half_height = g("volume_buoyant"), g("half_height")
-        self.cd_bluff, self.ar = g("cd_bluff"), g("aspect_ratio")
+        self.cd_bluff = g("cd_bluff")
+        # With the inflow model on, the strips get the aspect ratio that makes
+        # their slope 2D and their induced drag zero, exactly as
+        # `FluidSolver.apply` passes them (`INFLOW_AR`).
+        self.ar = C(np.concatenate([
+            np.full(len(p.aspect_ratio), INFLOW_AR) if e.solver.inflow
+            else np.asarray(p.aspect_ratio, float) for e, p in zip(self.envs, P)]))
         self.c_rot = C(np.concatenate(
             [np.asarray(e.solver.c_rot, float) for e in self.envs]))
         self.limit = C(np.array([
@@ -279,7 +287,11 @@ class BatchedFluid:
         self.out = {k: np.zeros(s) for k, s in (
             ("xfrc", (nb, 6)), ("m_body", nb), ("m_add", n), ("subf", n),
             ("alpha", n), ("q", n), ("lift", n), ("drag", n), ("buoy", n),
-            ("vn", n))}
+            ("vn", n), ("fsum_b", nb), ("fmag", n), ("rho", n), ("pos_w", (n, 3)),
+            ("d_bluff", n), ("force", (n, 3)))}
+        self.v_ind = np.zeros((nm, 3))
+        self._prev_t_u = None
+        self._reset_u = True
         self.clamped = np.zeros(nm, dtype=np.int32)
         self._has_bluff = int((self.is_wing == 0).any())
         self._v6 = np.zeros(6)
@@ -304,6 +316,10 @@ class BatchedFluid:
         self._prev_ma[:] = 0.0
         self._prev_t = [None] * self.nm
         self._primed = [False] * self.nm
+        # The unsteady history (Wagner, LEV travel) restarts with the segment,
+        # as `FluidSolver.reset` restarts it on the single-machine path.
+        self._prev_t_u = None
+        self._reset_u = True
 
     def apply(self, t: float, active=None) -> None:
         """Run the fluid for every environment and write their xfrc_applied.
@@ -341,6 +357,11 @@ class BatchedFluid:
             self.vel6[a:b, 0:3] = ang
             self.vel6[a:b, 3:6] = e.data.cvel[:, 3:6] - np.cross(off, ang)
 
+        for i, e in enumerate(self.envs):
+            self.v_ind[i] = e.solver._inflow.w if e.solver.inflow else 0.0
+        dt_u = (self.envs[0].model.opt.timestep if self._prev_t_u is None
+                else max(t - self._prev_t_u, 1e-6))
+        self._prev_t_u = t
         o = self.out
         e0 = self.envs[0]
         med, sol, s = e0.solver.medium, e0.solver, e0.solver.medium.sea_state
@@ -350,22 +371,58 @@ class BatchedFluid:
                self.clamped.ctypes.data]
             + [o[k].ctypes.data for k in
                ("m_add", "subf", "alpha", "q", "lift", "drag", "buoy", "vn")]
-            + [self.n, self.nb, self.nm, self._has_bluff], dtype=np.int64)
+            + [self.n, self.nb, self.nm, self._has_bluff]
+            + [o[k].ctypes.data for k in ("fsum_b", "fmag", "rho", "pos_w", "d_bluff", "force")]
+            + [self.v_ind.ctypes.data],
+            dtype=np.int64)
         self.pipe.step(desc, (
             s.amplitude, s.wavelength, s.period,
             float(np.cos(s.direction)), float(np.sin(s.direction)), t,
             med.air.rho, med.air.mu, med.water.rho, med.water.mu,
             *[float(x) for x in med.current], *[float(x) for x in med.wind],
-            sol.cd_scale, sol.added_mass_scale, sol.lift_scale))
+            sol.cd_scale, sol.added_mass_scale, sol.lift_scale,
+            int(bool(sol.wing_added_mass_tensor)), float(dt_u), int(self._reset_u),
+            int(bool(sol.unsteady))))
+        self._reset_u = False
 
         # Scatter back into each machine, and fold the added mass into its mass
         # matrix.  That write stays here rather than in a kernel because these
         # are MuJoCo model arrays and mj_step reads them on the next line.
+        # As `FluidSolver.apply` differences it: a wing's normal entrained mass.
+        m_slam = slam_mass(o["m_add"], o["rho"], self.chord, self.dr,
+                           self.is_wing == 1, sol.added_mass_scale)
         for i, e in enumerate(self.envs):
             if active is not None and not active[i]:
                 continue
             a, b = self.boff[i], self.boff[i + 1]
-            e.data.xfrc_applied[:] = o["xfrc"][a:b]
+            pa, pb = self.poff[i], self.poff[i + 1]
+            mb = o["m_body"][a:b]
+            # The machine's limiter and the weight cancellation, and the
+            # implicit damping split -- the same numpy the single-machine
+            # solver runs, on the same numbers, so the paths cannot drift.
+            sol_i = e.solver
+            if sol_i.implicit_damping:
+                sol_i._damping.apply(e.data, o["pos_w"][pa:pb], sol_i.panels.body_id,
+                                     strip_damping(o["q"][pa:pb], self.area[pa:pb],
+                                                   o["lift"][pa:pb],
+                                                   o["drag"][pa:pb] + o["d_bluff"][pa:pb],
+                                                   o["rho"][pa:pb],
+                                                   self.ar[pa:pb], self.is_wing[pa:pb] == 1,
+                                                   sol_i.lift_scale))
+            else:
+                sol_i._damping.clear(e.data)
+            if sol_i.inflow:
+                wing = self.is_wing[pa:pb] == 1
+                if wing.any():
+                    fw = o["force"][pa:pb][wing].sum(axis=0)
+                    fw[2] -= o["buoy"][pa:pb][wing].sum()
+                    sol_i._inflow.update(fw, machine_flow(e.model, e.data, sol_i.medium, t),
+                                         float(o["rho"][pa:pb][wing].mean()), dt_u)
+                else:
+                    sol_i._inflow.update(np.zeros(3), np.zeros(3), 0.0, dt_u)
+            fb = o["xfrc"][a:b].copy()
+            self.clamped[i] = int(finish_bodies(fb, o["fsum_b"][a:b], mb, float(self.limit[i])))
+            e.data.xfrc_applied[:] = fb
             # Jet thrust is CPU-side in both paths: a handful of bells per
             # machine against thousands of panels, so it stays out of the
             # kernel, but it must come after the xfrc overwrite above or the
@@ -373,12 +430,12 @@ class BatchedFluid:
             if e.jets.n:
                 e.jets.apply(e.model, e.data, e.solver.medium, t,
                              e.model.opt.timestep)
-            mb = o["m_body"][a:b]
+            if e.rotors.n:
+                e.rotors.apply(e.model, e.data, e.solver.medium, t)
             e.model.body_mass[:] = self.dry_mass[i] + mb
             e.model.body_inertia[:] = (
                 self.dry_inertia[i] + (mb * self.lever2[i])[:, None])
             e.solver.diag.clamped = bool(self.clamped[i])
-            pa, pb = self.poff[i], self.poff[i + 1]
             # `FluidSolver.apply` (the single-machine path) refreshes every
             # field of `diag` each call.  This path only ever wrote `.clamped`
             # and `.slam`, so the rest -- most importantly `.mean_submerged`,
@@ -401,19 +458,20 @@ class BatchedFluid:
                 e.solver.diag.max_alpha = 0.0
                 e.solver.diag.max_dynamic_pressure = 0.0
             e.solver.diag.lift = float(np.abs(o["lift"][pa:pb]).sum())
-            e.solver.diag.drag = float(np.abs(o["drag"][pa:pb]).sum())
+            # Bluff drag included, as the single-machine solver's `D` is.
+            e.solver.diag.drag = float(np.abs(o["drag"][pa:pb] + o["d_bluff"][pa:pb]).sum())
             e.solver.diag.buoyancy = float(o["buoy"][pa:pb].sum())
             e.solver.diag.added_mass = float(mb.sum())
             if self._primed[i] and self._prev_t[i] is not None:
                 dt = max(t - self._prev_t[i], 1e-6)
                 e.solver.diag.slam = float(np.abs(
-                    (o["m_add"][pa:pb] - self._prev_ma[pa:pb]) / dt
+                    (m_slam[pa:pb] - self._prev_ma[pa:pb]) / dt
                     * o["vn"][pa:pb]).max()) if pb > pa else 0.0
             else:
                 e.solver.diag.slam = 0.0
                 self._primed[i] = True
             self._prev_t[i] = t
-        self._prev_ma[:] = o["m_add"]
+        self._prev_ma[:] = m_slam
 
 
 def step_batch(envs, angles_list, bf: BatchedFluid, active=None):

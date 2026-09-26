@@ -123,7 +123,6 @@ class JetSet:
         #: rebuilt from scratch each step rather than accumulating, and
         #: restored on reset.  `FluidSolver` keeps `_dry_mass` for the same
         #: reason and learned it the same way.
-        self._dry_damping: np.ndarray | None = None
         #: Mechanical power the bell muscles spent last step, W.  Recorded so
         #: the energy budget and the telemetry can see it separately from the
         #: work of swinging the bell's own inertia.
@@ -146,8 +145,15 @@ class JetSet:
         self.last_pump_power = 0.0
         # Leaving a previous episode's pumping load in the model would quietly
         # make the next episode's bells stiffer.
-        if model is not None and self._dry_damping is not None:
-            model.dof_damping[:] = self._dry_damping
+        self._unapply(model)
+
+    def _unapply(self, model) -> None:
+        """Take back last step's load if nothing has rewritten the array since."""
+        left = getattr(self, "_left", None)
+        if model is not None and left is not None and np.array_equal(model.dof_damping, left):
+            model.dof_damping[:] -= self._added
+        self._left = None
+        self._added = None
 
     def apply(self, model, data, medium: MediumField, t: float, dt: float) -> float:
         """Add jet thrust to ``data.xfrc_applied``.  Returns total thrust, N."""
@@ -227,14 +233,22 @@ class JetSet:
             self._dofadr = np.array(
                 [model.jnt_dofadr[j] if j >= 0 else -1 for j in self.joint_id],
                 dtype=int)
-        if self._dry_damping is None:
-            self._dry_damping = model.dof_damping.copy()
         driven = self._dofadr >= 0
         if np.any(driven):
             adr = self._dofadr[driven]
-            # Rebuilt from the dry value every step, never accumulated.
-            model.dof_damping[adr] = self._dry_damping[adr]
-            np.add.at(model.dof_damping, adr, c_pump[driven])
+            # Added on top of what is there, never accumulated.  The fluid
+            # solver rewrites ``dof_damping`` every step (dry value plus its
+            # implicit aerodynamic damping, `ImplicitAeroDamping`); when it has
+            # not -- a bell driven on its own -- this step's load replaces last
+            # step's.  It used to overwrite these dofs with a dry snapshot,
+            # which erased the solver's damping while the solver's explicit
+            # compensation stayed in ``qfrc_applied``: net anti-damping, and
+            # medusa ran away (2026-09-23).
+            self._unapply(model)
+            add = np.zeros(model.nv)
+            np.add.at(add, adr, c_pump[driven])
+            model.dof_damping[:] += add
+            self._added, self._left = add, model.dof_damping.copy()
             self.last_pump_power = float(
                 np.sum(c_pump[driven] * omega[driven] ** 2))
         else:

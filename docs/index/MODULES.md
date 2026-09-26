@@ -2,7 +2,7 @@
 
 # Modules
 
-101 modules, 32,707 lines, 980 indexed symbols.
+102 modules, 33,606 lines, 1,007 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -71,11 +71,11 @@ is what makes a violation visible while reading.
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
-| `core.bodyplans` | Body-plan archetypes: the seeds the search starts from. | 692 | — | `numpy` | `core.cppn`, `core.genome`, `core.sdf` |
+| `core.bodyplans` | Body-plan archetypes: the seeds the search starts from. | 731 | — | `numpy` | `core.cppn`, `core.genome`, `core.sdf` |
 | `core.cppn` | Compositional Pattern Producing Networks -- the implicit shape representation. | 435 | — | `numpy` | — |
-| `core.genome` | The morphology genome: a recursive module graph plus implicit surface fields. | 1172 | — | `numpy` | `core.cppn`, `core.sdf` |
-| `core.mjcf` | Phenotype -> MJCF.  Builds the MuJoCo model and the triphibian scene. | 661 | — | `mujoco`, `numpy` | `core.genome`, `core.phenotype`, `physics.medium` |
-| `core.phenotype` | Genome -> phenotype: expand the module graph, size everything, weigh it. | 1199 | — | `mujoco`, `numpy` | `core.cppn`, `core.genome`, `core.sdf`, `physics`, `physics.energy`, `physics.fluid`, `physics.jet`, `physics.materials`, `physics.medium`, `physics.structure` |
+| `core.genome` | The morphology genome: a recursive module graph plus implicit surface fields. | 1196 | — | `numpy` | `core.cppn`, `core.sdf` |
+| `core.mjcf` | Phenotype -> MJCF.  Builds the MuJoCo model and the triphibian scene. | 745 | — | `mujoco`, `numpy` | `core.genome`, `core.phenotype`, `physics.medium` |
+| `core.phenotype` | Genome -> phenotype: expand the module graph, size everything, weigh it. | 1245 | — | `mujoco`, `numpy` | `core.cppn`, `core.genome`, `core.sdf`, `physics`, `physics.energy`, `physics.fluid`, `physics.jet`, `physics.materials`, `physics.medium`, `physics.rotor`, `physics.structure` |
 | `core.reference` | A hand-designed reference machine. | 208 | — | `numpy` | `core.cppn`, `core.genome` |
 | `core.sdf` | Free-form body volumes from an implicit occupancy field. | 324 | — | `numpy`, `scipy` | `core.cppn` |
 
@@ -98,14 +98,14 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `envs.actors` | Several generations' worth of machines, stepped in several processes. | 303 | — | `torch` | `envs`, `envs.batchroll`, `learning.ppo` |
-| `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1036 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.medium` |
+| `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1094 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.fluid`, `physics.medium` |
 | `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 668 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 68 | — | — | — |
 | `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 336 | — | `numpy` | `envs.triphibian` |
 | `envs.skills` | The actuator skill bench: learning to operate components, not vehicles. | 655 | — | `numpy` | `evolution.cmaes`, `physics.energy`, `physics.materials`, `physics.medium`, `physics.structure` |
 | `envs.tasks` | What a segment asks the machine to do, phase by phase. | 248 | — | — | — |
 | `envs.transitions` | Crossing between media, scored rather than merely survived. | 456 | — | `numpy` | `envs.triphibian` |
-| `envs.triphibian` | The triphibian mission environment. | 2669 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.structure` |
+| `envs.triphibian` | The triphibian mission environment. | 2731 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
 
 ## `evolution`
 
@@ -116,7 +116,7 @@ is what makes a violation visible while reading.
 | `evolution.cmaes` | CMA-ES for controller weights. | 231 | — | `numpy` | — |
 | `evolution.critic` | The critic: a learned adversary trained to catch what cheap evaluation misses. | 281 | — | `numpy` | — |
 | `evolution.curator` | The curator: active management of the search, not just survival of the fittest. | 784 | — | `numpy` | `core.genome`, `evolution.archive` |
-| `evolution.curriculum` | Staged evaluation: learn one medium, then a crossing, then the chain. | 509 | — | `numpy` | — |
+| `evolution.curriculum` | Staged evaluation: learn one medium, then a crossing, then the chain. | 516 | — | `numpy` | — |
 | `evolution.descriptors` | Learned behaviour descriptors, so the archive axes stop being my guesses. | 253 | — | `numpy` | — |
 | `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 319 | — | `numpy` | `evolution.curriculum` |
 | `evolution.judge` | The judge: a scoring standard that gets stricter as the population improves. | 498 | — | `numpy` | — |
@@ -143,11 +143,12 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `physics.energy` | Electrical power train: actuators, battery, and the mission energy budget. | 369 | — | `numpy` | `physics.materials`, `physics.medium` |
-| `physics.fluid` | Quasi-steady blade-element fluid loads for flapping surfaces and bluff bodies. | 968 | — | `mujoco`, `numpy` | `physics.medium` |
-| `physics.jet` | Pulsed-jet propulsion: medusa bells and squid mantles. | 266 | — | `numpy` | `physics.medium` |
+| `physics.fluid` | Quasi-steady blade-element fluid loads for flapping surfaces and bluff bodies. | 1342 | — | `mujoco`, `numpy` | `physics.medium` |
+| `physics.jet` | Pulsed-jet propulsion: medusa bells and squid mantles. | 280 | — | `numpy` | `physics.medium` |
 | `physics.materials` | Material and component property database. | 257 | — | — | — |
 | `physics.medium` | Medium field: air above the free surface, water below, and the blended | 191 | — | `numpy` | — |
-| `physics.structure` | Structural feasibility: spars, hulls, seals, and the loads that break them. | 617 | — | `numpy` | `physics.materials`, `physics.medium` |
+| `physics.rotor` | Propellers: blade-element momentum theory, the comparison to flapping. | 185 | — | `mujoco`, `numpy` | `physics.fluid` |
+| `physics.structure` | Structural feasibility: spars, hulls, seals, and the loads that break them. | 623 | — | `numpy` | `physics.materials`, `physics.medium` |
 | `physics.wake` | Vortex-particle wake, for seeing the flow the solver is actually computing. | 183 | — | `numpy` | `physics.fluid` |
 
 ## `ports`  (inner)

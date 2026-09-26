@@ -113,37 +113,137 @@ def _skin_friction_cd(re_in: Float64) -> Float64:
 
 
 @always_inline
-def _lift_coefficient(
-    alpha: Float64, re: Float64, ar: Float64, reduced_freq: Float64
-) -> Float64:
-    """Mirrors `fluid.lift_coefficient`.  Attached, LEV-augmented, post-stall."""
-    var lev = clampd(reduced_freq / 0.30, 0.0, 1.0)
-    var cl_max = 1.10 + 0.80 * lev
+def _stall_weight(alpha: Float64, re: Float64, lev: Float64) -> Float64:
+    """Mirrors `fluid._stall` plus the LEV's pull toward separation."""
     var re_c = re if re > 10.0 else 10.0
-    var stall = (11.0 + 26.0 * lev) * DEG
+    var stall = 11.0 * DEG
     stall = stall * clampd(0.55 + 0.45 * log10d(re_c) / 5.0, 0.5, 1.0)
-
-    var ar_c = ar if ar > 0.5 else 0.5
-    var cl_linear = (2.0 * PI_D / (1.0 + 2.0 / ar_c)) * alpha
-    var cl_plate = cl_max * sind(2.0 * alpha)
-
-    # Compactly supported handover; see `fluid.SEPARATION_COMPLETE`.
-    var sep = 16.0 * DEG
-    var t = clampd(abs(alpha) / (stall + sep), 0.0, 1.0)
+    var t = clampd((abs(alpha) - stall) / (6.0 * DEG), 0.0, 1.0)
     var w = t * t * (3.0 - 2.0 * t)
-    var cl = (1.0 - w) * cl_linear + w * cl_plate
-    return clampd(cl, -1.2 * cl_max, 1.2 * cl_max)
+    return w + (1.0 - w) * lev
+
+
+@always_inline
+def _lift_coefficient(
+    alpha: Float64, re: Float64, ar: Float64, lev_in: Float64, alpha_e: Float64
+) -> Float64:
+    """Mirrors `fluid.lift_coefficient`: attached below stall on the Wagner-
+    lagged incidence, separated normal force above, LEV raising CN."""
+    var lev = clampd(lev_in, 0.0, 1.0)
+    var ar_c = ar if ar > 0.5 else 0.5
+    var cl_att = (2.0 * PI_D / (1.0 + 2.0 / ar_c)) * alpha_e
+    var cn = 1.98 + (3.4 - 1.98) * lev
+    var cl_sep = cn * sind(alpha) * cosd(alpha)
+    var w = _stall_weight(alpha, re, lev)
+    return (1.0 - w) * cl_att + w * cl_sep
 
 
 @always_inline
 def _drag_coefficient(
-    alpha: Float64, re: Float64, ar: Float64, cl: Float64
+    alpha: Float64, re: Float64, ar: Float64, cl: Float64, lev_in: Float64
 ) -> Float64:
-    """Mirrors `fluid.drag_coefficient`.  Profile, induced and separated."""
+    """Mirrors `fluid.drag_coefficient`: friction, induced, separated pressure."""
+    var lev = clampd(lev_in, 0.0, 1.0)
     var ar_c = ar if ar > 0.5 else 0.5
     var cd_i = cl * cl / (PI_D * 0.75 * ar_c)
-    var cd_p = 1.98 * (1.0 - cosd(2.0 * alpha)) * 0.5
-    return _skin_friction_cd(re) + cd_i + cd_p
+    var w = _stall_weight(alpha, re, lev)
+    var cn = 1.98 + (3.4 - 1.98) * lev
+    var sa = sind(alpha)
+    return _skin_friction_cd(re) + cd_i + w * cn * sa * sa
+
+
+def unsteady_kernel(
+    alpha: UnsafePointer[Float64, MutAnyOrigin],
+    rev: UnsafePointer[Float64, MutAnyOrigin],
+    u: UnsafePointer[Float64, MutAnyOrigin],
+    chord: UnsafePointer[Float64, MutAnyOrigin],
+    omega: UnsafePointer[Float64, MutAnyOrigin],
+    s_hat: UnsafePointer[Float64, MutAnyOrigin],
+    x0: UnsafePointer[Float64, MutAnyOrigin],
+    x1: UnsafePointer[Float64, MutAnyOrigin],
+    trav: UnsafePointer[Float64, MutAnyOrigin],
+    rev_prev: UnsafePointer[Float64, MutAnyOrigin],
+    primed: UnsafePointer[Float64, MutAnyOrigin],
+    ae_out: UnsafePointer[Float64, MutAnyOrigin],
+    lev_out: UnsafePointer[Float64, MutAnyOrigin],
+    dt: Float64,
+    reset: Int32,
+    enabled: Int32,
+    n: Int32,
+):
+    """Mirrors `fluid.UnsteadyState.update`: Wagner lag (Jones's two terms) and
+    the LEV's travel-since-reversal and Rossby mechanisms, one strip a thread,
+    with the history in persistent buffers."""
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    var j = i * 3
+    if enabled == 0:
+        # `FluidSolver.unsteady` off: no lag, and the LEV from the Rossby
+        # number alone (`rossby_lev`), exactly as the Python's else-branch.
+        var c0 = chord[unsafe_offset=i]
+        c0 = c0 if c0 > 1e-6 else 1e-6
+        var u0 = u[unsafe_offset=i]
+        var qx = omega[unsafe_offset=j + 0]
+        var qy = omega[unsafe_offset=j + 1]
+        var qz = omega[unsafe_offset=j + 2]
+        var hx = s_hat[unsafe_offset=j + 0]
+        var hy = s_hat[unsafe_offset=j + 1]
+        var hz = s_hat[unsafe_offset=j + 2]
+        var q_s = qx * hx + qy * hy + qz * hz
+        var rx = qx - q_s * hx
+        var ry = qy - q_s * hy
+        var rz = qz - q_s * hz
+        var wp0 = sqrt(rx * rx + ry * ry + rz * rz) * c0
+        var ro0 = u0 / (wp0 if wp0 > 1e-9 else 1e-9)
+        var t0 = clampd((ro0 - 3.0) / (8.0 - 3.0), 0.0, 1.0)
+        ae_out[unsafe_offset=i] = alpha[unsafe_offset=i]
+        lev_out[unsafe_offset=i] = 1.0 - t0 * t0 * (3.0 - 2.0 * t0)
+        return
+    if reset != 0:
+        x0[unsafe_offset=i] = 0.0
+        x1[unsafe_offset=i] = 0.0
+        trav[unsafe_offset=i] = 0.0
+        rev_prev[unsafe_offset=i] = 0.0
+        primed[unsafe_offset=i] = 0.0
+    var r = rev[unsafe_offset=i]
+    if primed[unsafe_offset=i] != 0.0 and r != rev_prev[unsafe_offset=i]:
+        x0[unsafe_offset=i] = 0.0
+        x1[unsafe_offset=i] = 0.0
+        trav[unsafe_offset=i] = 0.0
+    rev_prev[unsafe_offset=i] = r
+    primed[unsafe_offset=i] = 1.0
+    var c = chord[unsafe_offset=i]
+    c = c if c > 1e-6 else 1e-6
+    var uu = u[unsafe_offset=i]
+    var ds = uu * dt / c
+    var s = trav[unsafe_offset=i] + ds
+    trav[unsafe_offset=i] = s
+    var a = alpha[unsafe_offset=i]
+    var y0 = x0[unsafe_offset=i]
+    var y1 = x1[unsafe_offset=i]
+    y0 = y0 + (a - y0) * (1.0 - expd(-0.0455 * 2.0 * ds))
+    y1 = y1 + (a - y1) * (1.0 - expd(-0.3 * 2.0 * ds))
+    x0[unsafe_offset=i] = y0
+    x1[unsafe_offset=i] = y1
+    ae_out[unsafe_offset=i] = a * (1.0 - 0.165 - 0.335) + 0.165 * y0 + 0.335 * y1
+    var tt = clampd((s - 2.0) / (4.0 - 2.0), 0.0, 1.0)
+    var lev_t = 1.0 - tt * tt * (3.0 - 2.0 * tt)
+    var wx = omega[unsafe_offset=j + 0]
+    var wy = omega[unsafe_offset=j + 1]
+    var wz = omega[unsafe_offset=j + 2]
+    var sx = s_hat[unsafe_offset=j + 0]
+    var sy = s_hat[unsafe_offset=j + 1]
+    var sz = s_hat[unsafe_offset=j + 2]
+    var ws = wx * sx + wy * sy + wz * sz
+    var px = wx - ws * sx
+    var py = wy - ws * sy
+    var pz = wz - ws * sz
+    var wp = sqrt(px * px + py * py + pz * pz) * c
+    var ro = uu / (wp if wp > 1e-9 else 1e-9)
+    var tr = clampd((ro - 3.0) / (8.0 - 3.0), 0.0, 1.0)
+    var lev_r = 1.0 - tr * tr * (3.0 - 2.0 * tr)
+    lev_out[unsafe_offset=i] = lev_r if lev_r > lev_t else lev_t
 
 
 comptime CD_CROSSFLOW: Float64 = 1.1
@@ -267,6 +367,7 @@ def added_mass_kernel(
     fz: UnsafePointer[Float64, MutAnyOrigin],
     scale: Float64,
     has_bluff: Int32,
+    wing_tensor: Int32,
     n: Int32,
 ):
     """Anisotropic added mass and its scatter.
@@ -332,7 +433,29 @@ def added_mass_kernel(
     var ma: Float64
     if is_wing[unsafe_offset=i] != 0:
         var ch = chord[unsafe_offset=i]
-        ma = r * PI_D * ch * ch * 0.25 * dr[unsafe_offset=i]
+        if wing_tensor != 0:
+            # The plate's tensor projected on the flow direction, as fluid.py:
+            # span 0, chord rho pi t^2/4, normal rho pi c^2/4 per unit span.
+            var tw = ext[unsafe_offset=j + 2]
+            tw = tw if tw > 1e-5 else 1e-5
+            var k = r * dr[unsafe_offset=i] * (PI_D * 0.25)
+            var m1 = k * (tw * tw)
+            var m2 = k * (ch * ch)
+            var wx = d_full[unsafe_offset=j + 0]
+            var wy = d_full[unsafe_offset=j + 1]
+            var wz = d_full[unsafe_offset=j + 2]
+            var ws = wx * s_hat[unsafe_offset=j + 0] + wy * s_hat[unsafe_offset=j + 1] + wz * s_hat[unsafe_offset=j + 2]
+            var wc = wx * c_hat[unsafe_offset=j + 0] + wy * c_hat[unsafe_offset=j + 1] + wz * c_hat[unsafe_offset=j + 2]
+            var wn = wx * nx + wy * ny + wz * nz
+            var p0 = ws * ws
+            var p1 = wc * wc
+            var p2 = wn * wn
+            if p0 + p1 + p2 > 1e-6:
+                ma = p0 * 0.0 + p1 * m1 + p2 * m2
+            else:
+                ma = (0.0 + m1 + m2) / 3.0
+        else:
+            ma = r * PI_D * ch * ch * 0.25 * dr[unsafe_offset=i]
     else:
         ma = ca_eff * r * volume[unsafe_offset=i]
     ma = ma * scale
@@ -353,10 +476,11 @@ def coeff_kernel(
     alpha: UnsafePointer[Float64, MutAnyOrigin],
     re: UnsafePointer[Float64, MutAnyOrigin],
     ar: UnsafePointer[Float64, MutAnyOrigin],
-    rf: UnsafePointer[Float64, MutAnyOrigin],
+    lev: UnsafePointer[Float64, MutAnyOrigin],
     is_wing: UnsafePointer[Int32, MutAnyOrigin],
     cl_out: UnsafePointer[Float64, MutAnyOrigin],
     cd_out: UnsafePointer[Float64, MutAnyOrigin],
+    alpha_e: UnsafePointer[Float64, MutAnyOrigin],
     n: Int32,
 ):
     var i = Int(global_idx.x)
@@ -371,9 +495,10 @@ def coeff_kernel(
     var a = alpha[unsafe_offset=i]
     var r = re[unsafe_offset=i]
     var arv = ar[unsafe_offset=i]
-    var cl = _lift_coefficient(a, r, arv, rf[unsafe_offset=i])
+    var lv = lev[unsafe_offset=i]
+    var cl = _lift_coefficient(a, r, arv, lv, alpha_e[unsafe_offset=i])
     cl_out[unsafe_offset=i] = cl
-    cd_out[unsafe_offset=i] = _drag_coefficient(a, r, arv, cl)
+    cd_out[unsafe_offset=i] = _drag_coefficient(a, r, arv, cl, lv)
 
 
 @always_inline
@@ -485,7 +610,13 @@ def strip_kernel(
         + omega[unsafe_offset=j + 1] * sy
         + omega[unsafe_offset=j + 2] * sz
     )
-    rf_out[unsafe_offset=i] = abs(ws) * ch / (2.0 * u_safe)
+    # `rf_out` carries the reversal flag now (1 when the flow arrives over the
+    # trailing edge): the LEV and the Wagner lag reset on its changes
+    # (`unsteady_kernel`).  The reduced pitch rate it used to carry keyed the
+    # LEV wrongly, MATH_AUDIT F-02.
+    _ = ws
+    _ = ch
+    rf_out[unsafe_offset=i] = 1.0 if rev else 0.0
 
     # lift acts normal to both the span and the flow
     var lx = sy * dz - sz * dy
@@ -653,6 +784,9 @@ def coefficients(desc: PythonObject) raises -> PythonObject:
     var re = _f64(ctx, Int(d[unsafe_offset=1]), n)
     var ar = _f64(ctx, Int(d[unsafe_offset=2]), n)
     var rf = _f64(ctx, Int(d[unsafe_offset=3]), n)
+    # The standalone call has no history: alpha_e is alpha, as a separate
+    # buffer because one may not be passed mutably twice.
+    var ae = _f64(ctx, Int(d[unsafe_offset=0]), n)
 
     var wing = ctx.enqueue_create_buffer[DType.int32](n)
     ctx.enqueue_copy(
@@ -667,7 +801,7 @@ def coefficients(desc: PythonObject) raises -> PythonObject:
 
     ctx.enqueue_function[coeff_kernel](
         alpha.unsafe_ptr(), re.unsafe_ptr(), ar.unsafe_ptr(), rf.unsafe_ptr(),
-        wing.unsafe_ptr(), cl.unsafe_ptr(), cd.unsafe_ptr(),
+        wing.unsafe_ptr(), cl.unsafe_ptr(), cd.unsafe_ptr(), ae.unsafe_ptr(),
         Int32(n),
         grid_dim=ceildiv(n, BLOCK),
         block_dim=BLOCK,
@@ -775,7 +909,7 @@ def added_mass(desc: PythonObject, scale: PythonObject,
         vol.unsafe_ptr(), wing.unsafe_ptr(), bid.unsafe_ptr(),
         ma_o.unsafe_ptr(), vn_o.unsafe_ptr(), mb_o.unsafe_ptr(),
         fz_o.unsafe_ptr(),
-        Float64(py=scale), Int32(Int(py=has_bluff)), Int32(n),
+        Float64(py=scale), Int32(Int(py=has_bluff)), Int32(0), Int32(n),
         grid_dim=ceildiv(n, BLOCK),
         block_dim=BLOCK,
     )
@@ -809,9 +943,17 @@ def velocity_kernel(
     body_id: UnsafePointer[Int32, MutAnyOrigin],
     omega_out: UnsafePointer[Float64, MutAnyOrigin],
     vrel_out: UnsafePointer[Float64, MutAnyOrigin],
+    machine: UnsafePointer[Int32, MutAnyOrigin],
+    is_wing: UnsafePointer[Int32, MutAnyOrigin],
+    v_ind: UnsafePointer[Float64, MutAnyOrigin],
     n: Int32,
 ):
     """Panel relative flow, the block marked `--- kinematics` in `fluid.py`.
+
+    Lifting strips also see their machine's momentum-theory downwash `v_ind`
+    (`fluid.InducedFlow`, MATH_AUDIT F-13), added to the ambient flow first as
+    the Python does.
+
 
     `vel6` is one 6-vector per body from mj_objectVelocity -- angular in 0..2,
     linear in 3..5, world frame, the linear part at the body's centre of mass.
@@ -852,6 +994,14 @@ def velocity_kernel(
     var ez = vel6[unsafe_offset=v6 + 5] + (wx * ry - wy * rx)
 
     # v_rel is the fluid seen from the element, so the sign is flow minus body.
-    vrel_out[unsafe_offset=j + 0] = u_flow[unsafe_offset=j + 0] - ex
-    vrel_out[unsafe_offset=j + 1] = u_flow[unsafe_offset=j + 1] - ey
-    vrel_out[unsafe_offset=j + 2] = u_flow[unsafe_offset=j + 2] - ez
+    var ux = u_flow[unsafe_offset=j + 0]
+    var uy = u_flow[unsafe_offset=j + 1]
+    var uz = u_flow[unsafe_offset=j + 2]
+    if is_wing[unsafe_offset=i] != 0:
+        var m3 = Int(machine[unsafe_offset=i]) * 3
+        ux = ux + v_ind[unsafe_offset=m3 + 0]
+        uy = uy + v_ind[unsafe_offset=m3 + 1]
+        uz = uz + v_ind[unsafe_offset=m3 + 2]
+    vrel_out[unsafe_offset=j + 0] = ux - ex
+    vrel_out[unsafe_offset=j + 1] = uy - ey
+    vrel_out[unsafe_offset=j + 2] = uz - ez

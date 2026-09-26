@@ -91,10 +91,10 @@ def test_coefficients_are_well_behaved_everywhere() -> None:
     alpha = rng.uniform(-np.pi / 2, np.pi / 2, n)
     re = 10.0 ** rng.uniform(1.0, 7.0, n)
     ar = rng.uniform(0.5, 30.0, n)
-    k = rng.uniform(0.0, 2.0, n)
+    k = rng.uniform(0.0, 1.0, n)          # leading-edge-vortex strength
 
     cl = lift_coefficient(alpha, re, ar, k)
-    cd = drag_coefficient(alpha, re, ar, cl)
+    cd = drag_coefficient(alpha, re, ar, cl, k)
     cf = skin_friction_cd(re)
 
     check("CL is finite everywhere", bool(np.all(np.isfinite(cl))))
@@ -122,11 +122,12 @@ def test_coefficients_are_well_behaved_everywhere() -> None:
     check("CL is odd in alpha", float(np.max(np.abs(cl + cl_m))) < 1e-12,
           f"max |CL(a)+CL(-a)| = {float(np.max(np.abs(cl + cl_m))):.3g}")
 
-    # Lift is bounded by the plate envelope the model declares.
-    cl_max = 1.10 + 0.80 * np.clip(k / 0.30, 0.0, 1.0)
-    check("CL stays inside its declared 1.2*CL_max envelope",
-          bool(np.all(np.abs(cl) <= 1.2 * cl_max + 1e-12)),
-          f"max |CL| / (1.2 CL_max) = {float(np.max(np.abs(cl) / (1.2*cl_max))):.4f}")
+    # Lift is bounded by the separated branch's peak with a full LEV,
+    # CN_LEV / 2 -- the attached branch stops at stall, below it.
+    from dytiscidae.physics.fluid import CN_LEV
+    check("CL stays inside the CN_LEV / 2 envelope the model declares",
+          bool(np.all(np.abs(cl) <= CN_LEV / 2 + 1e-12)),
+          f"max |CL| = {float(np.max(np.abs(cl))):.4f} against {CN_LEV / 2:.2f}")
 
     # More reduced frequency never reduces the stall angle or the peak CL.
     lo = lift_coefficient(np.full(200, np.radians(25.0)), np.full(200, 2e5),
@@ -556,9 +557,15 @@ def test_the_cpg_command_is_the_function_it_claims() -> None:
           float(np.max(np.abs(amp - base.amplitude))) < 5e-3)
     # Doubling the frequency must halve the period, exactly.
     fast = CPGParams(base.amplitude, base.phase, base.offset, 2 * base.frequency)
+    # Each on a fresh timeline: the CPG keeps the stroke continuous when the
+    # frequency changes *within* one (MATH_AUDIT C-11), so two calls in a row
+    # at different frequencies are a frequency change, not two closed forms.
+    cpg.reset()
+    a_fast = cpg.command(fast, 0.37)
+    cpg.reset()
+    a_base = cpg.command(base, 0.74)
     check("doubling the frequency halves the period",
-          float(np.max(np.abs(cpg.command(fast, 0.37)
-                              - cpg.command(base, 0.74)))) < 1e-12)
+          float(np.max(np.abs(a_fast - a_base))) < 1e-12)
     flat = CPGParams.from_flat(base.flat(), cpg.n)
     check("flat() and from_flat() round-trip",
           float(np.max(np.abs(flat.flat() - base.flat()))) == 0.0)

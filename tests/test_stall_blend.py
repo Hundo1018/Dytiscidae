@@ -2,21 +2,24 @@
 
 The model writes CL as a partition of unity:
 
-    CL = (1 - w) * CL_alpha * alpha  +  w * CL_max * sin(2 alpha)
+    CL = (1 - w) * CL_alpha * alpha_e  +  w * CN(lev) * sin(alpha) cos(alpha)
 
-A partition of unity is a statement about *where each branch is valid*.  The
-attached branch is valid below stall and the separated one above it, so `w` has
-to be exactly 0 below some angle and exactly 1 above another.
+with ``w`` zero up to the static stall angle and one ``SEPARATION_COMPLETE``
+past it, raised toward one by the leading-edge-vortex strength ``lev``.
 
-It was a logistic, which is never either.  At the static stall angle its tail
-reached zero incidence with weight 0.138, so a gliding wing lost up to 9.6% of
-the attached lift slope the docstring names; and 10 degrees past stall an
-unbounded linear extrapolation still carried 16% of the weight.  `MATH_AUDIT`
-F-05, measured in `experiments/stall_blend`.
+Two defects this file has pinned, in order:
 
-These tests pin the properties the replacement has to have, and the two it
-must not quietly acquire: a kink for the optimiser to exploit, and a different
-model above stall than the one that was there.
+* F-05 (closed 2026-09-18): the weight was a logistic, never 0 and never 1, so
+  each branch leaked into the other's domain -- 13.8% of the separated branch at
+  zero incidence.  ``w`` and ``w'`` are exactly zero there, on a wing with no
+  leading-edge vortex.
+* F-08 (closed 2026-09-23): the handover ran from zero incidence to
+  ``alpha_stall + 16 deg``, so CL rose monotonically to 45 degrees and the model
+  had no stall.  It now starts at the stall angle, and lift falls after it.
+
+And the separated branch is a normal-force plate, ``CN sin a cos a``, with
+``CN`` from 1.98 (plate) to 3.4 (robofly, full LEV) -- the same ``CN`` the
+drag's pressure term uses.
 
 Run:  PYTHONPATH=. python tests/test_stall_blend.py
 """
@@ -34,13 +37,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.setdefault("MUJOCO_GL", "disable")
 
 from dytiscidae.physics.fluid import (  # noqa: E402
-    SEPARATION_COMPLETE, lift_coefficient)
+    CN_LEV, CN_PLATE, SEPARATION_COMPLETE, lift_coefficient)
 
 FAILURES: list[str] = []
 
 AR = (2.0, 4.0, 8.0, 16.0)
 RE = (1.0e4, 1.0e5, 1.0e6)
-KAPPA = (0.0, 0.05, 0.15, 0.30)
+LEV = (0.0, 0.25, 0.6, 1.0)
 
 
 def check(name: str, cond: bool, detail: str = "") -> None:
@@ -50,154 +53,145 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         FAILURES.append(name)
 
 
-def cl(alpha_rad, ar: float, re: float, kappa: float) -> np.ndarray:
+def cl(alpha_rad, ar: float, re: float, lev: float) -> np.ndarray:
     a = np.atleast_1d(np.asarray(alpha_rad, float))
     return lift_coefficient(a, np.full(a.shape, re), np.full(a.shape, ar),
-                            np.full(a.shape, kappa))
+                            np.full(a.shape, lev))
 
 
 def attached_slope(ar: float) -> float:
     return 2.0 * np.pi / (1.0 + 2.0 / max(ar, 0.5))
 
 
-def stall_angle(re: float, kappa: float) -> float:
-    lev = min(kappa / 0.30, 1.0)
-    a = np.radians(11.0 + 26.0 * lev)
-    return a * float(np.clip(0.55 + 0.45 * np.log10(max(re, 10.0)) / 5.0,
-                             0.5, 1.0))
+def cn(lev: float) -> float:
+    return CN_PLATE + (CN_LEV - CN_PLATE) * lev
 
 
-def test_the_attached_slope_is_delivered_at_zero() -> None:
-    """The defect F-05 names, over the whole regime."""
+def stall_angle(re: float) -> float:
+    return np.radians(11.0) * float(np.clip(
+        0.55 + 0.45 * np.log10(max(re, 10.0)) / 5.0, 0.5, 1.0))
+
+
+def test_the_slope_at_zero() -> None:
+    """F-05, over the whole regime: attached slope alone without an LEV, and
+    exactly the declared mixture with one."""
     print("\nstall blend: the lift slope at zero incidence")
     worst, where = 0.0, None
-    for ar, re, k in itertools.product(AR, RE, KAPPA):
-        h = 1e-5
-        c = cl([-h, h], ar, re, k)
+    h = 1e-5
+    for ar, re, lev in itertools.product(AR, RE, LEV):
+        c = cl([-h, h], ar, re, lev)
         got = float((c[1] - c[0]) / (2 * h))
-        d = got / attached_slope(ar) - 1.0
+        want = (1.0 - lev) * attached_slope(ar) + lev * cn(lev)
+        d = got / want - 1.0
         if abs(d) > abs(worst):
-            worst, where = d, (ar, re, k)
-    check("the realised slope is the attached slope everywhere",
-          abs(worst) < 1e-9,
+            worst, where = d, (ar, re, lev)
+    check("the realised slope is (1-lev) CL_alpha + lev CN everywhere, and so "
+          "the attached slope alone without an LEV", abs(worst) < 1e-6,
           f"worst deviation {100*worst:+.3e}% over "
-          f"{len(AR)*len(RE)*len(KAPPA)} points"
-          + (f" at AR={where[0]} Re={where[1]:.0e} kappa={where[2]}"
-             if abs(worst) >= 1e-9 else ""))
+          f"{len(AR)*len(RE)*len(LEV)} points"
+          + (f" at AR={where[0]} Re={where[1]:.0e} lev={where[2]}"
+             if abs(worst) >= 1e-6 else ""))
 
 
 def test_the_weight_is_compactly_supported() -> None:
-    """Exactly zero at zero incidence, exactly one past the separation width."""
+    """Exactly the attached branch up to stall, exactly the separated one past
+    the separation width."""
     print("\nstall blend: where each branch is weighted")
-    # At alpha = 0 both branches give 0, so the weight is read off the slope:
-    # the separated branch contributes 2*CL_max of slope, and the attached one
-    # CL_alpha.  Recovering exactly CL_alpha is w(0) = 0 and w'(0) = 0 at once.
-    ar, re, k = 16.0, 1.0e4, 0.0  # the worst case in the audit's measurement
-    h = 1e-5
-    c = cl([-h, h], ar, re, k)
-    got = float((c[1] - c[0]) / (2 * h))
-    check("w(0) = 0 and w'(0) = 0, so neither lift nor slope leaks to zero "
-          "incidence", abs(got / attached_slope(ar) - 1.0) < 1e-9,
-          f"slope {got:.6f} against {attached_slope(ar):.6f}")
+    worst_a, worst_s, n = 0.0, 0.0, 0
+    for ar, re in itertools.product(AR, RE):
+        a_s = stall_angle(re)
+        below = np.linspace(-a_s, a_s, 50)
+        worst_a = max(worst_a, float(np.max(np.abs(
+            cl(below, ar, re, 0.0) - attached_slope(ar) * below))))
+        for lev in LEV:
+            past = np.linspace(a_s + SEPARATION_COMPLETE, np.radians(90.0), 60)
+            want = cn(lev) * np.sin(past) * np.cos(past)
+            worst_s = max(worst_s, float(np.max(np.abs(cl(past, ar, re, lev) - want))))
+            n += 1
+    check("below stall, without an LEV, it is the attached branch alone",
+          worst_a < 1e-12, f"worst residual {worst_a:.2e}")
+    check("past the separation width it is CN(lev) sin a cos a alone",
+          n > 0 and worst_s < 1e-12,
+          f"{n} regime points, worst residual {worst_s:.2e}")
 
-    # One check carrying the worst point, rather than an early return and a
-    # trailing `check(..., True)` that could not fail even on an empty loop.
-    worst, where, n = 0.0, "", 0
-    for ar, re, k in itertools.product((4.0,), RE, KAPPA):
-        a_s = stall_angle(re, k)
-        past = a_s + SEPARATION_COMPLETE + np.radians(0.5)
-        lev = min(k / 0.30, 1.0)
-        cmax = 1.10 + 0.80 * lev
-        want = cmax * np.sin(2.0 * past)
-        got = float(cl([past], ar, re, k)[0])
-        n += 1
-        if abs(got - want) > worst:
-            worst, where = abs(got - want), f"Re={re:.0e} kappa={k}"
-    check("past the separation width it is the separated branch alone",
-          n > 0 and worst <= 1e-9,
-          f"{n} points beyond alpha_stall + "
-          f"{np.degrees(SEPARATION_COMPLETE):.0f} deg, worst residual "
-          f"{worst:.2e}" + (f" at {where}" if where else ""))
+
+def test_it_stalls() -> None:
+    """F-08: without an LEV, lift peaks at stall and is lower after it."""
+    print("\nstall blend: a wing without a vortex stalls")
+    rows = []
+    for ar, re in itertools.product((4.0, 8.0, 16.0), (1.0e5, 1.0e6)):
+        # Up to the end of the handover: a flat plate's *global* maximum is its
+        # second peak near 45 degrees, CN sin a cos a, which a low-AR wing's
+        # attached peak can be below -- as on real plates.  F-08 is the local
+        # maximum at stall and the loss after it.
+        a = np.linspace(0.0, stall_angle(re) + SEPARATION_COMPLETE, 3001)
+        c = cl(a, ar, re, 0.0)
+        a_pk = float(np.degrees(a[np.argmax(c)]))
+        a_s = float(np.degrees(stall_angle(re)))
+        after = float(cl([stall_angle(re) + SEPARATION_COMPLETE], ar, re, 0.0)[0])
+        rows.append((ar, re, a_pk, a_s, float(c.max()), after))
+    # The peak sits just past the stall angle, not on it: the handover is C1,
+    # so w' = 0 at stall and the attached branch keeps rising for a moment.
+    # "Just past" is the first third of the handover.
+    third = np.degrees(SEPARATION_COMPLETE) / 3.0
+    ok = all(s <= pk <= s + third and after < 0.9 * peak
+             for _, _, pk, s, peak, after in rows)
+    ar, re, pk, s, peak, after = rows[0]
+    check("CL peaks within the first third of the handover and has lost >10% by its end",
+          ok, f"AR {ar:g} Re {re:.0e}: peak {peak:.3f} at {pk:.2f} deg "
+              f"(stall {s:.2f}), {after:.3f} {np.degrees(SEPARATION_COMPLETE):.0f} deg "
+              f"later; {len(rows)} regimes")
+    lev_rows = [float(cl([np.radians(25.0)], ar, 1e5, 1.0)[0]) for ar in AR]
+    check("with a full LEV there is no drop: 25 deg is CN_LEV sin a cos a",
+          all(abs(v - CN_LEV * np.sin(np.radians(25)) * np.cos(np.radians(25))) < 1e-12
+              for v in lev_rows), f"{lev_rows[0]:.3f}")
 
 
 def test_it_has_no_kink() -> None:
-    """The property the logistic was chosen for, which must survive.
-
-    A corner in CL' is a discontinuity: the largest step in a numerical first
-    derivative does not shrink when the grid is refined.  A C1 curve's does,
-    roughly in proportion to the step.
-    """
+    """A corner in CL' is a discontinuity: the largest step in a numerical first
+    derivative does not shrink when the grid is refined.  A C1 curve's does."""
     print("\nstall blend: whether the optimiser can find a corner")
     worst = 0.0
-    for ar, re, k in itertools.product(AR, (1.0e5,), KAPPA):
-        lev = min(k / 0.30, 1.0)
-        clip = 1.2 * (1.10 + 0.80 * lev)
+    for ar, re, lev in itertools.product(AR, (1.0e5,), LEV):
         jumps = []
         for n in (4001, 8001):
             a = np.radians(np.linspace(-90.0, 90.0, n))
-            c = cl(a, ar, re, k)
-            d1 = np.gradient(c, a)
-            clipped = np.abs(np.abs(c) - clip) <= 1e-9
-            free = ~clipped
-            for shift in (1, 2):
-                free &= ~np.roll(clipped, shift) & ~np.roll(clipped, -shift)
-            steps = np.abs(np.diff(d1))
-            keep = free[:-1] & free[1:]
-            jumps.append(float(steps[keep].max()) if keep.any() else 0.0)
+            d1 = np.gradient(cl(a, ar, re, lev), a)
+            jumps.append(float(np.abs(np.diff(d1)).max()))
         worst = max(worst, jumps[1] / max(jumps[0], 1e-30))
     check("halving the grid halves the largest step in CL', so CL' is "
           "continuous", worst < 0.75, f"worst ratio {worst:.3f}, against 0.5 "
                                       f"for a smooth curve and 1 for a corner")
 
 
-def test_the_clip_is_no_longer_reached() -> None:
-    """`np.clip(cl, -1.2 CL_max, 1.2 CL_max)` is a corner wherever it binds."""
-    print("\nstall blend: the envelope clip")
+def test_the_envelope() -> None:
+    """No clip any more: the model is bounded by construction."""
+    print("\nstall blend: the envelope")
     worst = 0.0
     a = np.radians(np.linspace(-90.0, 90.0, 3601))
-    for ar, re, k in itertools.product(AR, RE, KAPPA):
-        lev = min(k / 0.30, 1.0)
-        clip = 1.2 * (1.10 + 0.80 * lev)
-        worst = max(worst, float(np.max(np.abs(cl(a, ar, re, k)))) / clip)
-    check("CL stays strictly inside the envelope, so the clip never binds",
-          worst < 1.0 - 1e-6,
-          f"max |CL| reaches {100*worst:.2f}% of 1.2 CL_max; the logistic "
-          f"reached 100.00%")
+    for ar, re, lev in itertools.product(AR, RE, LEV):
+        worst = max(worst, float(np.max(np.abs(cl(a, ar, re, lev)))))
+    check("|CL| never exceeds CN_LEV / 2", worst <= CN_LEV / 2 + 1e-12,
+          f"max |CL| {worst:.4f} against {CN_LEV / 2:.2f}")
 
 
-def test_the_separated_branch_is_untouched() -> None:
-    """Above the separation width nothing has changed, by construction."""
-    print("\nstall blend: what happens well past stall")
-    worst = 0.0
-    for ar, re, k in itertools.product(AR, RE, KAPPA):
-        lev = min(k / 0.30, 1.0)
-        cmax = 1.10 + 0.80 * lev
-        a_s = stall_angle(re, k)
-        a = np.linspace(a_s + SEPARATION_COMPLETE, np.radians(90.0), 400)
-        want = cmax * np.sin(2.0 * a)
-        worst = max(worst, float(np.max(np.abs(cl(a, ar, re, k) - want))))
-    check("it is CL_max sin(2 alpha), the same separated branch as before",
-          worst < 1e-9, f"worst absolute difference {worst:.2e} over "
-                        f"{len(AR)*len(RE)*len(KAPPA)} regime points")
-
-
-def test_the_separation_width_is_the_measured_one() -> None:
-    print("\nstall blend: the one constant this introduces")
+def test_the_separation_width() -> None:
+    print("\nstall blend: the one angle this introduces")
     deg = float(np.degrees(SEPARATION_COMPLETE))
-    check("SEPARATION_COMPLETE is 16 degrees, as experiments/stall_blend "
-          "measured", abs(deg - 16.0) < 1e-9, f"{deg:.4f} deg")
+    check("SEPARATION_COMPLETE is 6 degrees (a modelling choice, MATH_AUDIT F-08)",
+          abs(deg - 6.0) < 1e-9, f"{deg:.4f} deg")
     check("and it is declared as an angle, not as a bare number",
           0.0 < SEPARATION_COMPLETE < np.pi / 2,
           f"{SEPARATION_COMPLETE:.6f} rad")
 
 
 def main() -> int:
-    test_the_attached_slope_is_delivered_at_zero()
+    test_the_slope_at_zero()
     test_the_weight_is_compactly_supported()
+    test_it_stalls()
     test_it_has_no_kink()
-    test_the_clip_is_no_longer_reached()
-    test_the_separated_branch_is_untouched()
-    test_the_separation_width_is_the_measured_one()
+    test_the_envelope()
+    test_the_separation_width()
     print()
     if FAILURES:
         print(f"{len(FAILURES)} checks failed:")

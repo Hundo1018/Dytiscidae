@@ -50,7 +50,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         FAILURES.append(name)
 
 
-def _plate(jointed: bool, *, scale: float = 1.0):
+def _plate(jointed: bool, *, scale: float = 1.0, tensor: bool = False):
     """One free body carrying one wing strip, optionally with a joint on it."""
     child = ('<body name="d" pos="0 0 0.05">'
              '<joint type="hinge" axis="0 1 0"/>'
@@ -81,6 +81,11 @@ def _plate(jointed: bool, *, scale: float = 1.0):
         ext_local=np.array([[SPAN, CHORD, THICK]]))
     solver = FluidSolver(model, panels, MediumField(water=SEAWATER),
                          added_mass_scale=scale)
+    # These tests pin the *mechanism* -- added mass reaching the mass matrix,
+    # F-01 -- with one number to compare against, the plate's normal value.
+    # The solver's default since 2026-09-23 is the direction-dependent tensor
+    # (F-03), which `test_the_tensor_follows_the_direction_of_motion` pins.
+    solver.wing_added_mass_tensor = tensor
     return model, data, panels, solver
 
 
@@ -265,6 +270,29 @@ def test_the_scratch_data_protects_the_simulation_state() -> None:
           "which is the trap this arrangement exists to avoid")
 
 
+def test_the_tensor_follows_the_direction_of_motion() -> None:
+    """F-03: moving along its normal a plate carries rho pi c^2/4 per span,
+    edgewise rho pi t^2/4 -- (c/t)^2 = 10,000 times less -- and spanwise none."""
+    print("\nadded mass: the wing tensor follows the direction of motion")
+    normal = SEAWATER.rho * math.pi * CHORD**2 / 4 * SPAN
+    edge = SEAWATER.rho * math.pi * THICK**2 / 4 * SPAN
+    got = {}
+    for name, dof in (("normal", 2), ("chord", 0), ("span", 1)):
+        model, data, panels, solver = _plate(False, tensor=True)
+        data.qvel[dof] = 0.5
+        mujoco.mj_forward(model, data)
+        solver.apply(data, 0.0)
+        got[name] = solver.diag.added_mass
+    check("along the normal it is the plate's normal value",
+          abs(got["normal"] / normal - 1.0) < 1e-9,
+          f"{got['normal']:.4f} kg against {normal:.4f}")
+    check("edgewise it is the thickness value",
+          abs(got["chord"] / edge - 1.0) < 1e-9,
+          f"{got['chord']:.6f} kg against {edge:.6f}")
+    check("and spanwise a flat plate entrains nothing",
+          abs(got["span"]) < 1e-12, f"{got['span']:.3e} kg")
+
+
 def main() -> int:
     test_the_mass_matrix_itself_carries_the_added_mass()
     test_changing_the_added_mass_changes_the_trajectory()
@@ -272,6 +300,7 @@ def main() -> int:
     test_the_model_constants_are_restored_on_reset()
     test_the_rebuild_only_runs_where_it_is_needed()
     test_the_scratch_data_protects_the_simulation_state()
+    test_the_tensor_follows_the_direction_of_motion()
     print()
     if FAILURES:
         print(f"{len(FAILURES)} added-mass checks failed:")

@@ -155,11 +155,18 @@ def stage_score(stage: int, result, transitions=None, *,
         # and `land_speed / 0.4`; until 2026-09-22 the cruise phase's tracking,
         # which gave a population that could not yet follow commands a median
         # of exactly zero for 102 generations.
+        #
+        # Air progress counts only while airborne (ROADMAP AE, 2026-09-23): it
+        # was read raw, and a body that had fallen into the sea by 3.5 s still
+        # read 0.23 at the median -- the launch coasting it along the heading.
+        # Air supplied this stage's maximum in 105 of 223 arch42 evaluations.
         best = 0.0
         for dom, key in (("air", "cruise_progress"), ("water", "cruise_progress"),
                          ("land", "walk_progress")):
-            best = max(best, float(np.clip(
-                meas.get(dom, {}).get(key, 0.0), 0.0, 1.0)))
+            v = float(np.clip(meas.get(dom, {}).get(key, 0.0), 0.0, 1.0))
+            if dom == "air":
+                v *= float(np.clip(meas.get("air", {}).get("airborne_fraction", 0.0), 0.0, 1.0))
+            best = max(best, v)
         return best
 
     if stage == 2:

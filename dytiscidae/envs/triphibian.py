@@ -56,7 +56,7 @@ from ..physics.energy import (
     cruise_power_water,
     transition_energy,
 )
-from ..physics.fluid import FluidSolver
+from ..physics.fluid import CN_LEV, FluidSolver
 from ..physics.medium import GRAVITY, MediumField, SeaState
 from ..physics.structure import ballast_pump_power
 from .tasks import (CRUISE, HOLD, HOLD_DRIFT_SPEED, HOLD_SINK_SPEED, STOP, TASK_SPEED, TaskSchedule,
@@ -221,11 +221,13 @@ class MissionResult:
 #: about anyway.
 LAUNCH_SPEED_RANGE = (6.0, 30.0)
 
-#: The largest lift coefficient the strip model will produce (``lift_coefficient``
-#: caps at ``1.2 * cl_max`` with ``cl_max`` reaching 1.9 under a strong leading-
-#: edge vortex).  1.8 is the figure Tier 0's stall-speed estimate already used;
-#: naming it here keeps the gate below and that estimate from drifting apart.
-CL_MAX = 1.8
+#: The largest lift coefficient the strip model will produce: the separated
+#: branch ``CN sin a cos a`` at 45 degrees with a full leading-edge vortex,
+#: ``CN_LEV / 2`` = 1.7 (the attached branch peaks lower, ``2 pi`` times the
+#: 11 degree stall angle, 1.21).  It was 1.8 against a model that capped at
+#: ``1.2 * 1.9``; derived from the model since 2026-09-23 so the two cannot
+#: drift apart.
+CL_MAX = CN_LEV / 2.0
 
 #: A lifting surface smaller than this is not a lifting surface.  The same
 #: figure ``Phenotype.is_plausible_flyer`` uses to decide whether flight load
@@ -288,6 +290,24 @@ SINK_BALLISTIC = LAUNCH_SPEED_RANGE[0]  # m/s
 GATED_AIR_CREDIT = 0.05
 
 
+#: The window the air score's height term looks for a drop in, s.  One second:
+#: long enough that a stroke's own heave (a few Hz) averages out, short enough
+#: that a tumble's fall does not.
+HEIGHT_WINDOW = 1.0
+
+
+def rotor_lift_ratio(p: Phenotype) -> float:
+    """Static thrust of every propeller at top speed, in air, over the weight."""
+    from ..core.mjcf import ROTOR_TIP_SPEED
+    from ..physics.medium import AIR
+    from ..physics.rotor import bemt
+    specs = [s.rotor for s in getattr(p, "segments", []) if getattr(s, "rotor", None) is not None]
+    if not specs:
+        return 0.0
+    thrust = sum(bemt(r, ROTOR_TIP_SPEED / r.radius, 0.0, 0.0, AIR.rho, AIR.mu)[0] for r in specs)
+    return float(thrust / max(p.mass * GRAVITY, 1e-9))
+
+
 def airworthiness(p: Phenotype) -> list[str]:
     """Which flight gates a design fails, as reasons.  Empty means none.
 
@@ -310,6 +330,10 @@ def airworthiness(p: Phenotype) -> list[str]:
     simply cannot be credited with flight.
     """
     out: list[str] = []
+    # A machine whose propellers can hold its weight up is airworthy without a
+    # wing: that is what a multirotor is.  Static thrust at top speed, in air.
+    if rotor_lift_ratio(p) >= 1.0:
+        return out
     if p.wing_area < WING_AREA_FLOOR:
         out.append("no lifting surface")
     elif p.wing_loading > MAX_WING_LOADING:
@@ -601,6 +625,10 @@ class TriphibianEnv:
         )
         from ..core.phenotype import build_jets
         self.jets = build_jets(phenotype, self.model)
+        from ..physics.rotor import RotorSet
+        self.rotors = RotorSet(self.model, {
+            f"{s.name}_rot": s.rotor for s in phenotype.segments
+            if getattr(s, "rotor", None) is not None})
 
         import mujoco
 
@@ -654,7 +682,20 @@ class TriphibianEnv:
             # chain beat in unison -- which is not a travelling wave, it is a
             # very long paddle.  Accumulating it down the chain is what makes
             # the wave travel, and the wave is where the thrust comes from.
-            phases.append(seg.part.phase_offset * max(seg.depth, 1) if seg is not None else 0.0)
+            ph = seg.part.phase_offset * max(seg.depth, 1) if seg is not None else 0.0
+            if name.endswith("_r") and seg is not None:
+                # A rotor's channel is a speed: steady at the part's throttle,
+                # no stroke.  The policy moves it through the offset.
+                amps[-1] = 0.0
+                offs[-1] = lo[k] + float(np.clip(getattr(seg.part, "rotor_throttle", 0.5),
+                                                 0.0, 1.0)) * (hi[k] - lo[k])
+            if name.endswith("_f") and seg is not None:
+                # A universal joint's feathering channel: centred (the hinge is
+                # symmetric about the span) and leading the stroke by the part's
+                # ``feather_lead``.
+                ph += float(getattr(seg.part, "feather_lead", math.pi / 2))
+                offs[-1] = 0.5 * (lo[k] + hi[k])
+            phases.append(ph)
         if phases:
             self.cpg.base.phase = np.array(phases, float)
             self.cpg.base.amplitude = np.array(amps, float)
@@ -964,7 +1005,8 @@ class TriphibianEnv:
                     self.solver.reset()
                     mj.mj_forward(m, d)
                     d.xfrc_applied[:] = 0.0
-                    self.solver.apply(d, 0.0)
+                    with self.solver.steady():
+                        self.solver.apply(d, 0.0)
                     return float(d.xfrc_applied[:, 0].sum())
 
                 cmds = [np.asarray(self.cpg.command(base, k * dt), float)
@@ -1000,6 +1042,12 @@ class TriphibianEnv:
             return cached
         lo, hi = LAUNCH_SPEED_RANGE
         out = self._measure_trim_speed(lo, hi)
+        if rotor_lift_ratio(self.p) >= 1.0:
+            # Held up by its propellers, not its airframe: it trims level, at
+            # the bottom of the launch band, whatever the wing sweep said -- a
+            # wingless machine's sweep falls back to its steepest attitude,
+            # which for a multirotor is a 44 degree dive it did not choose.
+            out = (lo, 0.0, out[2] if len(out) > 2 else 0.0)
         try:
             self.p._measured_trim = out
         except Exception:
@@ -1065,7 +1113,8 @@ class TriphibianEnv:
             self.solver.reset()
             mj.mj_forward(m, d)
             d.xfrc_applied[:] = 0.0
-            self.solver.apply(d, 0.0)
+            with self.solver.steady():
+                self.solver.apply(d, 0.0)
             # Remove the added-mass gravity compensation: it is not lift.
             return float(d.xfrc_applied[:, 2].sum()) - self.solver.diag.added_mass * GRAVITY
 
@@ -1481,6 +1530,8 @@ class TriphibianEnv:
         if self.jets.n:
             self.jets.apply(self.model, self.data, self.medium,
                             self.data.time, self.timestep)
+        if self.rotors.n:
+            self.rotors.apply(self.model, self.data, self.medium, self.data.time)
         self._mj.mj_step(self.model, self.data)
         alive = self.budget.step(
             np.abs(self.data.actuator_force), np.abs(self.data.actuator_velocity), self.timestep
@@ -1739,6 +1790,17 @@ class TriphibianEnv:
                         if stay >= 2:
                             sink = float((clr[lo] - clr[lo + stay - 1])
                                          / max((stay - 1) * dt, 1e-6))
+                            # And the worst second inside it (ROADMAP AE): the
+                            # endpoints read zero for a body that drops and
+                            # comes back, and arch42's best air scores after
+                            # gen 120 were tumblers doing exactly that (wobble
+                            # ratio 27-72).  `sink_rate` against
+                            # `station_keeping` again, arch37.
+                            win = int(round(HEIGHT_WINDOW / dt))
+                            if stay > win:
+                                seg_clr = np.asarray(clr[lo:lo + stay], float)
+                                drops = (seg_clr[:-win] - seg_clr[win:]) / (win * dt)
+                                sink = max(sink, float(drops.max()))
                             flight = float(np.clip(1.0 - sink / 1.5, 0.0, 1.0))
                             glide = float(np.clip(1.0 - sink / SINK_BALLISTIC, 0.0, 1.0))
                             vert = ((0.55 * flight + 0.25 * glide) / 0.80

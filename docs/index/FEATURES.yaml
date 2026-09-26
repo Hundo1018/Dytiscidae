@@ -396,6 +396,41 @@ AddedMass:
     - physics.fluid.FluidSolver.apply
   tests:
     - tests.test_added_mass
+    - tests.test_added_mass::test_the_tensor_follows_the_direction_of_motion
+
+ImplicitAeroDamping:
+  implementation:
+    - physics.fluid.ImplicitAeroDamping
+    - physics.fluid.strip_damping
+    - physics.fluid.finish_bodies
+  tests:
+    - tests.test_physics::test_lift_and_drag_are_integrated_implicitly
+    - tests.test_physics::test_the_limiter_and_the_weight_cancellation
+  note: lift and drag damping split into MuJoCo's implicit dof_damping (F-03); per-machine limiter (F-04); entrained weight at the CoM (F-14)
+
+UnsteadyFlow:
+  implementation:
+    - physics.fluid.UnsteadyState
+    - physics.fluid.InducedFlow
+    - physics.fluid.rossby_lev
+    - physics.fluid.machine_flow
+    - physics.fluid.FluidSolver.steady
+  tests:
+    - tests.test_physics::test_the_circulation_has_a_history
+    - tests.test_physics::test_the_inflow_has_both_limits
+    - tests.test_physics::test_the_model_reproduces_the_robofly
+  note: Wagner lag, LEV from travel and Rossby number (F-02), Glauert inflow over the tip-to-tip span (F-12, F-13); validated against the robofly (experiments/robofly)
+
+Rotor:
+  implementation:
+    - physics.rotor.RotorSpec
+    - physics.rotor.bemt
+    - physics.rotor.RotorSet
+    - envs.triphibian.rotor_lift_ratio
+    - core.bodyplans.quad
+  tests:
+    - tests.test_physics::test_the_rotor_model_matches_a_measured_propeller
+  note: blade-element momentum propellers, the comparison to flapping; checked against UIUC APC 10x4.7 (experiments/rotor); the reference quad flies the real air segment (experiments/rotor/fly.py)
 
 Medium:
   implementation:

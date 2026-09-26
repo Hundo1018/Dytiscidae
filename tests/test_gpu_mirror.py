@@ -44,6 +44,7 @@ FUNCTION_MIRRORS = {
     "_skin_friction_cd": "skin_friction_cd",
     "_lift_coefficient": "lift_coefficient",
     "_drag_coefficient": "drag_coefficient",
+    "_stall_weight": "_stall",
 }
 
 #: Block markers a Mojo docstring may name.  Each must exist in `fluid.py`.

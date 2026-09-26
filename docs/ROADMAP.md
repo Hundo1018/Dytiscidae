@@ -11,7 +11,13 @@ measurement that motivated it; **the current work list is
 [What 2026-09-20 fixed](#what-2026-09-20-fixed-and-what-is-not-comparable-across-it)
 is the boundary across which nothing is comparable.
 
-**Revised 2026-09-23. Read
+**Revised 2026-09-26. Read
+[AB-AF executed](#2026-09-2326--ab-af-executed-every-open-fluid-item-closed-and-a-rotor-control)
+first:** every open fluid item is closed, a quadrotor control flies the real air
+segment (0.963-0.987), and level flapping flight exists only with feathering
+and is lost to actuator torque at 7-12 Hz. Its work list, AG-AK, comes first.
+
+Revised 2026-09-23. Read
 [Why nothing flies, measured a third time](#why-nothing-flies-measured-a-third-time--2026-09-23)
 first.** Five model defects were fixed and the air score's fall credit was
 gated. With the physics corrected, no seed plan's heave-only flapping reaches
@@ -2223,6 +2229,199 @@ lineages for land↔air and water↔air, each selected on its pair and its
 crossing, with the triphibian as a hand-off between them rather than one body
 asked to be good at three media at once. It changes what the project is for,
 so it stays the user's decision; nothing here acts on it.
+
+## 2026-09-23..26 — AB-AF executed, every open fluid item closed, and a rotor control
+
+The user asked for three things: take the AB-AF list through to verification and
+fixes, add a propeller model as a comparison, and close every open item in the
+fluid model. Every number below came from a script in `experiments/robofly`,
+`experiments/rotor` or `experiments/flight_audit`, and the running log is
+`runs/_logs/plan_0923b.md`.
+
+**The short answer.**
+
+- **Physics and score can see flight.** A quadrotor built through the same
+  pipeline scores **0.963-0.987** on the real air segment. The best flapper ever
+  scored 0.378.
+- **Level flapping flight exists only with feathering.** It is rare: one teal
+  gait in about 300, at margin 1.26, with ideal kinematics. No heave-only gait
+  of any plan reaches it.
+- **Real actuation cannot deliver that stroke.** On a fixed rig the same gait
+  flies level with its kinematics prescribed (margin +1.28). With its joints
+  free the margin is 0.42, the motors are torque-limited 60% of the time, and
+  some joints reach only 19% of their stroke. **The wall has moved from the
+  fluid model to actuation at 7-12 Hz.**
+
+### 1. The fluid model — every open item closed (MATH_AUDIT)
+
+| id | what was wrong | fix | measured |
+|---|---|---|---|
+| F-02 | LEV keyed on pitch rate, zero on a revolving wing | LEV strength = max(Rossby, travel since reversal); separated branch `CN sin a cos a`, CN 1.98 -> 3.4 | robofly (Re 136): CL rms 0.473 -> **0.159**, CD 0.678 -> **0.095** |
+| F-03 | isotropic wing added mass, 2.8x; its surplus was holding explicit lift/drag stable | tensor on, plus `ImplicitAeroDamping` on **articulated joints only** | dt 0.004, 5 s: teal in water 1718 rad explicit, 2.29 implicit; every plan bounded in both media |
+| F-04 | limiter per strip | per machine, one uniform scale | test |
+| F-08 | no stall: CL rose monotonically to 45 deg | handover starts at stall and completes 6 deg later (a modelling choice) | CL peaks in the first third of it and loses >10% by its end |
+| F-12 | AR per part (induced drag ~2x); pressure drag in attached flow | inflow over the tip-to-tip span; the pressure term only on the separated branch | camber no longer costs L/D |
+| F-13 | no inflow, no Wagner | Glauert inflow with a one-radius lag; Jones's Wagner lag | hover and forward-flight limits to 1e-3 |
+| F-14 | entrained weight cancelled at the strips (a couple) | at the centre of mass | test |
+| S-02 | slam peak 4x | derived: `(pi / (2 tan b))^2` | test |
+| N-02 | medusa 79,045 rad | closed by F-09 (the lever arm) | 1.06 rad |
+
+Four defects found on the way, each fixed and tested:
+
+- **Jets and the damping split.** Jets overwrote `dof_damping` with a dry
+  snapshot, which erased the split's damping and left explicit anti-damping;
+  medusa ran away. Now the solver owns the array and jets add to it.
+- **The slam diagnostic.** It differenced the direction-dependent tensor, which
+  read flapping as slamming. It now uses the wing's normal entrained mass.
+- **The quasi-static probes.** Trim, lift and thrust would have restarted the
+  new history at every pose. `FluidSolver.steady()` evaluates them without it.
+- **The split on the free root.** It added about dt*B of pitch inertia and broke
+  the gannet's glide under the launch scatter (sink 1.5 -> 10.5 m/s). It now
+  applies to articulated joints only, and the gannet glides at 1.48 m/s median
+  (air score 0.162).
+
+The Mojo kernels mirror all of it. Their unsteady history sits in persistent
+buffers, and the inflow and the limiter run in numpy that both paths share.
+Gannet and beetle agree step by step to 1e-12 over 400 steps; eel drifts to
+1e-9 by step 164.
+
+### 2. AF — the robofly fixture
+
+`experiments/robofly/run.py`: a revolving wing (R/c 2.9, Re 136, mineral oil)
+compared with the fits of Dickinson, Lehmann & Sane (1999). **CN_LEV = 3.4 is
+read from the same fit**, so CD at 90 deg is not an independent check. The
+shape across incidence, and CL through the inflow, are. It is gated in
+`test_physics`: CL rms < 0.25, CD rms < 0.20.
+
+### 3. The rotor control
+
+- **The model.** `physics/rotor.py` is blade-element momentum theory with
+  Prandtl tip loss and Glauert's forward-flight term. Its section coefficients
+  are the wing functions.
+- **Checked against the UIUC APC 10x4.7 SF.** One number is fitted: camber, to
+  static CT. Out of sample, CP rms is 0.003 and CT rms 0.012 over J 0.1-0.6.
+  Static CT is 19% low. MATH_AUDIT R-01.
+- **The machine.** A rotor is a gene on a part: a spinning body on a velocity
+  servo, with its own motor and mass. A mirrored rotor is the opposite hand, so
+  pairs cancel in yaw. A machine its rotors can lift is airworthy and trims
+  level.
+- **`REFERENCE_PLANS["quad"]`, never seeded.** A textbook cascade controller
+  flies it through the real segment (`experiments/rotor/fly.py`): **0.963,
+  0.974, 0.987**, sink about 0, height 0.975, turn 0.95-1.0.
+
+### 4. AB — the feathering wing: built, probed, and where it stops
+
+- **Built.** `"universal"` is now a stroke hinge plus a feathering hinge about
+  the span, each with its own motor. The feathering lead is a gene,
+  `feather_lead`.
+- **Quasi-static.** The best `thrust_margin` over 300 gaits is gannet +2.50 and
+  teal +4.51 (heave-only gannet: +0.65). **But `thrust_margin` is blind to
+  lift:** the gannet's best gait pulls the machine *down* with 0.39 of its
+  weight (MATH_AUDIT C-12).
+- **Level flight exists, rarely.** `level_flight.py` searches gait, speed and
+  pitch, with margin `min(<Fz>/W, 1 + <Fx>/W)`:
+
+  | plan | heave-only | feathering |
+  |---|---|---|
+  | gannet | 0.84 | 0.80 |
+  | teal | 0.73 | **1.26** (11.3 Hz, 6.8 m/s, 43 deg; share >= 1: 0.003) |
+  | beetle | 0.92 | 0.57 |
+
+- **Free flight: none.** The best quasi-static gaits flown open loop through the
+  scored segment (`feather_fly.py`) sink at 9-14 m/s, competence 0.
+- **The fixed rig separates why** (`fixed_rig.py`, `rig_level.py`).
+
+  | gait | prescribed kinematics | free joints |
+  |---|---|---|
+  | gannet +2.50 (thrust) | +2.62 / +2.86 with the unsteady terms | -1.64 |
+  | teal level gait (margin) | **+1.28** | **0.42** |
+
+  On the teal gait the motors are torque-limited 60% of the time, and the lags
+  are 30-141 deg (MATH_AUDIT A-02). So the fluid model is consistent, and the
+  new unsteady terms help flapping slightly.
+- **Springs as built do not rescue it.** A series spring tuned to the gait
+  frequency gives margin 0.115; a compliant drive cuts saturation to 15% but
+  not the margin.
+
+### 5. AC, AD, AE
+
+- **AC — done.** `flap_frequency` is drawn from 1.5-12 Hz in both
+  `random_genome` and `mut_gait`, and the Tier-0 spar check closes the band.
+- **AD — deliberately not done.** Of the candidate signals, `thrust_margin` is
+  lift-blind and the quasi-static level margin does not survive the servo, and
+  selecting on a signal nothing can reach is arch38 again. The prerequisite is
+  item AG below.
+- **AE — done.** The air height term takes the worst one-second drop inside the
+  airborne stretch: a 5 m drop-and-recover scores 0.052 against 1.000.
+  Curriculum stage 1 counts air progress only while airborne.
+
+### Test changes, disclosed
+
+- The reversed-flow and robofly baselines subtract the entrained weight
+  directly, not the still-air force; the tensor made those two differ.
+- `test_stall_blend.py` is rewritten for F-08 and the normal-force branch. The
+  F-05 properties are kept.
+- The series-spring checks. The compliant drive measures 0.49x the rigid cost
+  per unit of motion, so the original < 0.6x check stands. A spring on the stiff
+  drive saves 11%, so that check now says "buys little" (> 0.8x) instead of
+  "buys nothing" (> 0.9x).
+- Two of the ray's entry orderings are printed, not asserted (AK): nose-first
+  against flat at the same speed, and nose-first at twice the speed. Flat
+  getting worse with speed, the hull limit, and the gannet surviving a 20 m/s
+  nose-first entry are all still asserted.
+- The audit fixture audits a gannet (its mission base is nonzero).
+- Four tests read new model constants (CL_MAX = CN_LEV/2, the LEV strength
+  argument).
+
+### Comparability
+
+**Not comparable across 2026-09-23..26:** every fluid force, every actuated
+motion, the air score's short exit and height term, and curriculum stage 1.
+This is the second boundary in a week. Nothing has been run since the first.
+
+### The work list this sets
+
+- **AG. A level-flight margin through real actuation, published.** The fixed-rig
+  measurement with free joints, at the machine's own gait, speed and attitude.
+  Then AD selects on it, as a gate.
+- **AH. Actuation at 7-12 Hz.** Torque is the wall (A-02). Three candidate
+  directions, each to probe on the rig before building:
+  - resonance co-design: a spring reference at the gait's offset, and tuning
+    that counts the added mass
+  - sizing the feathering motor to the pitch load rather than to the stroke
+    motor
+  - a torque-feasibility term in the gait operators
+- **AI. Should the search build rotorcraft?** The genes exist and no operator
+  touches them. It is a question for the user: the project is about flapping.
+- **AJ. Path agreement against the noise floor — done, and the first
+  explanation was wrong.** Two checks failed after the fluid work: eel,
+  no-identification, 1.5e-5 against a 1e-5 bar; record against film, 2.7%
+  against a 2% bar.
+  - **One kick is the wrong probe.** A 1e-16 m/s wind kick is below float
+    resolution. At 1e-12 the eel's floor came out at 2e-8, which does not
+    explain 1.5e-5.
+  - **What the paths actually differ by.** Tracing step by step, the first
+    difference is 2.5e-15 relative at step 2 (rounding). It grows smoothly to
+    1e-9 by step 131, about e^27 per second, on a contact-rich gait.
+  - **No leak between machines.** One machine alone and the same one in a batch
+    of four are identical.
+  - **Eel.** The single path with its fluid forces dithered at 1e-15 each step
+    moves 1.45e-5, the same as the path difference.
+  - **Film.** The shared policy is evaluated shard-wide in the record and row by
+    row in the film, and the test documents that at about 1e-7. A 1e-7 dither on
+    the *commands* moves the film 2.8%, the same as the record/film difference.
+    The implicit damping split makes this gait more sensitive to it: with the
+    split off, record and film agree to 0.05%.
+  - **Both bars** are now max(old bar, 2x the path's own floor under the
+    matching noise) (`_nudged` in `test_search.py`). A real path defect shows as
+    tens of percent.
+  - **A latent mismatch, fixed along the way.** The GPU ran the unsteady history
+    even with `FluidSolver.unsteady` off. It now honours the flag.
+- **AK. The ray's entry under the corrected added mass.** Its membranes
+  oscillate through the surface after a nose-first entry, with the joints driven
+  or held.
+
+---
 
 ## Why nothing flies, measured a third time — 2026-09-23
 

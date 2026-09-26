@@ -558,9 +558,15 @@ def slam_pressure(impact_speed: float, deadrise_deg: float = 20.0) -> float:
     flat-bottomed generated design should be penalised.
     """
     dr = math.radians(max(deadrise_deg, 1.0))
-    # Wagner: p_max ~ 0.5 * rho * v^2 * (pi/tan(beta))^2 for small beta,
-    # limited by the compressible/ventilated regime at very small deadrise.
-    k = min((math.pi / math.tan(dr)) ** 2, 250.0)
+    # Wagner (1932) for a wedge of deadrise beta entering at V: the wetted
+    # half-width grows as c = (pi/2) V t / tan(beta), faster than the
+    # geometric V t / tan(beta) because the water piles up, and the peak
+    # pressure sits at the spray root, p_max = rho c_dot^2 / 2.  So
+    #     p_max = 0.5 rho V^2 (pi / (2 tan beta))^2.
+    # This was (pi / tan beta)^2 -- 4x the peak at every deadrise (74.5
+    # against 18.6 at 20 degrees; MATH_AUDIT S-02, closed 2026-09-23).  The
+    # cap is the compressible/ventilated regime at very small deadrise.
+    k = min((math.pi / (2.0 * math.tan(dr))) ** 2, 250.0)
     return 0.5 * SEAWATER.rho * impact_speed**2 * k
 
 

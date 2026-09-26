@@ -384,11 +384,10 @@ def check_coefficients_against_theory(cfg: dict) -> dict:
     coded_k = coded_p / (0.5 * SEAWATER.rho)
     quoted_k = (math.pi / (2 * math.tan(math.radians(beta)))) ** 2
     report("I. slam pressure coefficient at 20 deg deadrise",
-           quoted_k, coded_k, 4.0, kind="theory",
-           note="the code uses (pi/tan beta)^2; the coefficient usually quoted "
-                "for a Wagner wedge is (pi/(2 tan beta))^2, a factor of 4 "
-                "lower.  This is conservative for structure, and it is an "
-                "unresolved source question, not a demonstrated error.")
+           quoted_k, coded_k, 1e-12, kind="theory",
+           note="Wagner's spray-root peak, 0.5 rho (dc/dt)^2 with the wetted "
+                "half-width growing at (pi/2) V / tan beta; the code used "
+                "(pi/tan beta)^2, 4x this, until 2026-09-23 (MATH_AUDIT S-02).")
     out["slam_k_coded"] = float(coded_k)
     out["slam_k_quoted"] = float(quoted_k)
 

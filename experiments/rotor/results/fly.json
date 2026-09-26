@@ -1,0 +1,47 @@
+[
+ {
+  "seed": 0,
+  "competence": 0.9632632435820803,
+  "z_start": 30.128084530088657,
+  "z_end": 30.0,
+  "energy_wh": 0.6526219216619691,
+  "height_hold": 0.9745760783518975,
+  "turn_response": 0.951950408812263,
+  "cruise_tracking": 0.9150998449086235,
+  "turn_tracking": 0.9231783814355428,
+  "measured_sink_rate": -0.003441431845822344,
+  "airborne_fraction": 1.0,
+  "task_score": 0.9632632435820803,
+  "spin_rate": 0.2823244038834599
+ },
+ {
+  "seed": 1,
+  "competence": 0.9736862168979975,
+  "z_start": 30.066087415236677,
+  "z_end": 30.0,
+  "energy_wh": 0.6501757389406906,
+  "height_hold": 0.9755474606885496,
+  "turn_response": 0.9718249731074454,
+  "cruise_tracking": 0.9497153154983693,
+  "turn_tracking": 0.919289776758296,
+  "measured_sink_rate": -0.00044948835057037867,
+  "airborne_fraction": 1.0,
+  "task_score": 0.9736862168979975,
+  "spin_rate": 0.3087308579316741
+ },
+ {
+  "seed": 2,
+  "competence": 0.986947236650965,
+  "z_start": 29.91738729132162,
+  "z_end": 30.0,
+  "energy_wh": 0.632975388973374,
+  "height_hold": 0.9738944733019299,
+  "turn_response": 1.0,
+  "cruise_tracking": 0.9500778380753493,
+  "turn_tracking": 0.9254202369845475,
+  "measured_sink_rate": 0.0023629515750649326,
+  "airborne_fraction": 1.0,
+  "task_score": 0.986947236650965,
+  "spin_rate": 0.19623653489044762
+ }
+]

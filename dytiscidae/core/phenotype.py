@@ -193,6 +193,11 @@ class Segment:
     #: capsule, is what the mass budget, the buoyancy and the fluid panels read.
     field: object | None = None
     actuator: Actuator | None = None
+    #: The second motor of a ``"universal"`` joint: pitch about the span.
+    feather_actuator: Actuator | None = None
+    #: A propeller at the tip (`physics.rotor.RotorSpec`) and its motor.
+    rotor: object | None = None
+    rotor_actuator: Actuator | None = None
     #: Moment of inertia of this segment and everything it carries, about its
     #: own joint axis.  Sizes the series-elastic spring to resonance.
     joint_inertia: float = 0.0
@@ -652,6 +657,47 @@ def build(genome: Genome) -> Phenotype:
             n_actuated += 1
             if s.part.sealed:
                 n_sealed += 1
+            if s.part.joint == "universal":
+                # The feathering axis has its own motor, with its own mass: one
+                # motor cannot drive two degrees of freedom, and pretending it
+                # could would make the pitch free.
+                act2 = Actuator(
+                    motor_class=s.part.motor_class,
+                    mass=s.part.motor_mass * max(s.scale, 0.3),
+                    gear_ratio=s.part.gear_ratio,
+                    sealed=s.part.sealed,
+                )
+                s.feather_actuator = act2
+                actuators.append(act2)
+                budget.actuators += act2.mass
+                n_actuated += 1
+                if s.part.sealed:
+                    n_sealed += 1
+
+    # --- propellers ----------------------------------------------------------
+    # After every joint motor, so the actuator order stays the one `mjcf` emits:
+    # a segment's joint actuators, then its rotor, then its children.  (The loop
+    # above already walks segments in that order; this pass appends each
+    # rotor motor right after its segment's own.)
+    ordered: list = []
+    for s in segments:
+        own = [a for a in (s.actuator, s.feather_actuator) if a is not None]
+        ordered.extend(own)
+        R = float(getattr(s.part, "rotor_radius", 0.0))
+        if R > 1e-3:
+            from ..physics.rotor import RotorSpec
+            s.rotor = RotorSpec(radius=R, pitch=float(s.part.rotor_pitch_ratio) * 2.0 * R,
+                                handed=-1 if s.mirrored else 1)
+            # Scaled from an APC 10x4.7 (11 g) and a 60 g outrunner that turns
+            # it: blades as R^3, motor as the disc area it has to power.
+            ma = Actuator(motor_class="bldc", mass=0.06 * (R / 0.127) ** 2,
+                          gear_ratio=1.0, sealed=s.part.sealed)
+            s.rotor_actuator = ma
+            ordered.append(ma)
+            budget.actuators += ma.mass
+            budget.structure += 0.011 * (R / 0.127) ** 3
+            n_actuated += 1
+    actuators[:] = ordered
 
     # --- global masses ------------------------------------------------------
     battery = Battery(genome.battery_chem, wh=genome.battery_wh)

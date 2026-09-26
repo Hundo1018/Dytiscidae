@@ -657,6 +657,45 @@ BODY_PLANS = {
 }
 
 
+def quad() -> Genome:
+    """A quadrotor: the control for "can anything fly in this simulator".
+
+    Four APC 10x4.7-sized propellers on an H frame, counter-rotating in pairs
+    (the mirrored arms spin the other way, `mjcf`).  It makes thrust the way
+    most small aircraft do, through the same airfoil coefficients, media and
+    battery as every flapping plan, so where it flies and a flapper does not,
+    the difference is the flapping (ROADMAP "Why nothing flies, measured a
+    third time").  Deliberately **not** in `BODY_PLANS`: it is a reference, not
+    a seed -- `sample_body_plan` draws seeds from that table.
+    """
+    g = Genome()
+    g.cppns = []
+    g.body_cppns = [_fusiform(taper=0.9)]
+    hull = Part(kind=HULL, length=0.22, radius=0.05, material="petg", joint="none",
+                actuated=False, sealed=True, dry_fraction=0.9, body_cppn=0)
+    # Elevation 0 points an arm straight out to the side (`phenotype.expand`);
+    # roll = pi puts its local +Z, the spin axis, world-up.  The mirrored arm's
+    # +Z is then world-down, and its opposite-handed propeller pushes up.
+    arm = Part(kind=STRUT, length=0.20, radius=0.008, material="cfrp_tube",
+               joint="none", actuated=False, rotor_radius=0.127,
+               rotor_pitch_ratio=0.47, rotor_throttle=0.45)
+    g.parts = [hull, arm]
+    g.edges = [
+        Edge(parent=0, child=1, pos_u=0.15, elevation=0.0, roll=math.pi,
+             scale=1.0, reflect=True),
+        Edge(parent=0, child=1, pos_u=0.85, elevation=0.0, roll=math.pi,
+             scale=1.0, reflect=True),
+    ]
+    g.battery_wh, g.battery_chem = 60.0, "lipo"
+    g.flap_frequency = 1.0
+    g.lineage = ["quad"]
+    return g
+
+
+#: Reference machines: built through the same pipeline, never seeded.
+REFERENCE_PLANS = {"quad": _stamped("quad", quad)}
+
+
 def sample_body_plan(rng: np.random.Generator, *, perturb: int = 0) -> Genome:
     """Draw one archetype and optionally mutate it."""
     from .genome import mutate

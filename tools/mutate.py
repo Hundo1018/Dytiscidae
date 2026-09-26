@@ -639,6 +639,92 @@ MUTATIONS: tuple = (
                "paid for flight, more than one that stayed up longer",
         suites=("test_physics",), item="sinking is not a capability"),
 
+    # --- the fluid model's open items, closed 2026-09-23..26 ---------------
+    Mutation(
+        id='lift-drag-explicit',
+        path='dytiscidae/physics/fluid.py',
+        find='        self.implicit_damping = True\n',
+        replace='        self.implicit_damping = False\n',
+        defect='lift and drag integrated explicitly: the corrected added mass runs the teal away in water',
+        suites=('test_physics',), item='F-03'),
+    Mutation(
+        id='weight-cancelled-at-strips',
+        path='dytiscidae/physics/fluid.py',
+        find='    fb[:, 2] += m_body * GRAVITY\n',
+        replace='    pass\n',
+        defect="the entrained fluid's weight is not cancelled at the centre of mass",
+        suites=('test_physics',), item='F-14'),
+    Mutation(
+        id='limiter-scales-nothing',
+        path='dytiscidae/physics/fluid.py',
+        find='        fb *= limit / total\n',
+        replace='        pass\n',
+        defect='the per-machine limiter flags but does not bound the load',
+        suites=('test_physics',), item='F-04'),
+    Mutation(
+        id='stall-over-sixteen-degrees',
+        path='dytiscidae/physics/fluid.py',
+        find='SEPARATION_COMPLETE = np.radians(6.0)',
+        replace='SEPARATION_COMPLETE = np.radians(16.0)',
+        defect='the handover is wide again and the drop after stall shrinks',
+        suites=('test_stall_blend',), item='F-08'),
+    Mutation(
+        id='lev-never-from-rotation',
+        path='dytiscidae/physics/fluid.py',
+        find='    return 1.0 - _smoothstep((ro - rlo) / (rhi - rlo))',
+        replace='    return np.zeros_like(ro)',
+        defect='a revolving wing gets no leading-edge vortex: the robofly reads CL 1.1',
+        suites=('test_physics',), item='F-02'),
+    Mutation(
+        id='no-wagner-lag',
+        path='dytiscidae/physics/fluid.py',
+        find='        alpha_e = alpha * (1.0 - a1 - a2) + a1 * self.x[0] + a2 * self.x[1]',
+        replace='        alpha_e = alpha',
+        defect='an impulsively started strip carries its whole circulation at once',
+        suites=('test_physics',), item='F-13'),
+    Mutation(
+        id='inflow-disc-halved',
+        path='dytiscidae/physics/fluid.py',
+        find='            k = T / (2.0 * rho * self.area)',
+        replace='            k = T / (rho * self.area)',
+        defect='the momentum inflow is sqrt(2) too large in hover',
+        suites=('test_physics',), item='F-13'),
+    Mutation(
+        id='slam-four-times',
+        path='dytiscidae/physics/structure.py',
+        find='    k = min((math.pi / (2.0 * math.tan(dr))) ** 2, 250.0)',
+        replace='    k = min((math.pi / math.tan(dr)) ** 2, 250.0)',
+        defect="Wagner's slam peak is 4x too high",
+        suites=('test_physics',), item='S-02'),
+    Mutation(
+        id='propellers-one-handed',
+        path='dytiscidae/physics/rotor.py',
+        find='            thrust_dir = self.spec[k].handed * sgn * ax',
+        replace='            thrust_dir = sgn * ax',
+        defect='a mirrored propeller is the same hand: half the rotors push down',
+        suites=('test_physics',), item='rotor'),
+    Mutation(
+        id='universal-built-as-hinge',
+        path='dytiscidae/core/mjcf.py',
+        find='            if s.part.joint == "universal":\n',
+        replace='            if False:\n',
+        defect='a universal joint is a plain hinge again: no wing can feather',
+        suites=('test_physics',), item='AB'),
+    Mutation(
+        id='height-from-endpoints',
+        path='dytiscidae/envs/triphibian.py',
+        find='                                sink = max(sink, float(drops.max()))',
+        replace='                                sink = sink',
+        defect='a drop-and-recover trajectory reads as holding height',
+        suites=('test_physics',), item='AE'),
+    Mutation(
+        id='stage-one-pays-coast',
+        path='dytiscidae/evolution/curriculum.py',
+        find='                v *= float(np.clip(meas.get("air", {}).get("airborne_fraction", 0.0), 0.0, 1.0))',
+        replace='                v *= 1.0',
+        defect="curriculum stage 1 pays the launch's coast after the machine is in the sea",
+        suites=('test_physics',), item='AE'),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",
