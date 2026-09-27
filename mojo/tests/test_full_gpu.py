@@ -10,6 +10,8 @@ copy went stale when the layout grew on 2026-09-23; it goes through
 
 Run:  PYTHONPATH=. python mojo/tests/test_full_gpu.py
 """
+import zlib
+
 import numpy as np
 import mujoco
 
@@ -41,9 +43,11 @@ def pose(env, seed):
 def main():
     # Two identical copies of every machine: one stepped by the batched
     # pipeline exactly as a search step runs it, one by FluidSolver.
-    batched = [pose(TriphibianEnv(build(p())), hash(k) % 9973)
+    # crc32, not hash(): str hashing is salted per process, so the poses --
+    # and whether this test could fail -- changed from run to run.
+    batched = [pose(TriphibianEnv(build(p())), zlib.crc32(k.encode()) % 9973)
                for k, p in BODY_PLANS.items()]
-    single = [pose(TriphibianEnv(build(p())), hash(k) % 9973)
+    single = [pose(TriphibianEnv(build(p())), zlib.crc32(k.encode()) % 9973)
               for k, p in BODY_PLANS.items()]
     b = BatchedFluid(batched)
     print(f"{len(batched)} machines, {b.n} panels, {b.nb} bodies")
@@ -53,8 +57,15 @@ def main():
 
     worst_f, worst_m = 0.0, 0.0
     for eb, e in zip(batched, single):
+        # What TriphibianEnv.step applies before mj_step: the fluid, then the
+        # jets and rotors on top -- the batched finish does the same.  Without
+        # them the medusa (nine jets) read 5.7e-3 apart on its jet thrust alone.
         e.data.xfrc_applied[:] = 0.0
         e.solver.apply(e.data, t)
+        if e.jets.n:
+            e.jets.apply(e.model, e.data, e.medium, t, e.timestep)
+        if e.rotors.n:
+            e.rotors.apply(e.model, e.data, e.medium, t)
         ref_f, got_f = e.data.xfrc_applied, eb.data.xfrc_applied
         sc = max(float(np.abs(ref_f).max()), 1e-12)
         worst_f = max(worst_f, float(np.abs(ref_f - got_f).max()) / sc)

@@ -2372,19 +2372,26 @@ time** in every run: the CUDA wait is a busy spin, so GPU latency was CPU time.
 - the ten per-panel kernels fused into one (`panel_kernel`; each stage is an
   `*_at` body that its own kernel also calls, so there is one copy of the
   physics);
-- pinned host blocks and `launch`/`wait`: `step_batch` launches the next step's
-  fluid as soon as `mj_step` is done, and the caller's recording and policy run
-  while the device works -- `wait` is then 3 us median, 8993 of 9000 steps
-  found their fluid already launched (`PRELAUNCH`; bit-identical on and off,
-  held by `test_the_early_fluid_launch_changes_nothing`);
+- `launch`/`wait`: `step_batch` launches the next step's fluid as soon as
+  `mj_step` is done, and the caller's recording and policy run while the device
+  works; the download is in `wait`. Measured in place: `launch` 18 us, `wait`
+  16 us, 8993 of 9000 steps found their fluid already launched (`PRELAUNCH`;
+  bit-identical on and off, held by
+  `test_the_early_fluid_launch_changes_nothing`). **Not with pinned memory**:
+  Mojo's first host buffer reserves a ~1.35 GB pinned pool per process, which
+  tripped arch44's first launch on its memory ceiling at gen 0 (8793 MB) and
+  got an 8x2 pool OOM-killed; the blocks are ordinary numpy arrays;
 - `BatchedPower`: the energy model for the whole batch in one pass
   (`test_the_batched_power_budget_is_the_power_budget`);
 - `np.cross` written out, the CPG's clip as min/max and its clipped params
   cached between control decisions.
 
-Result: benchmark CPU 17.8-18.1 s -> 12.2 s beside a live run, 9.0 s alone;
-with identification (the generation's main evaluation) 45.4 / 53.7 s -> 32.9 s.
-GPU step 382 -> 89 us back to back.
+Result, bit-identical to `df95498` on all 700 numbers
+(`experiments/perf/reference_df95498.json`): benchmark CPU on the idle machine
+13.27 s -> 8.25 s (1.61x); a generation's main evaluation (16 designs with
+identification, 4x4 pool) 55.9 s -> 42.6 s (1.31x). GPU cost per step 382 us
+-> 34 us of host time. arch44's first generation reproduced arch43's line
+exactly in 486 s against 892 s.
 
 **What did not work, and why.** `DeviceContext(api="cpu")` exists but kernel
 launch on it is `Unimplemented`, so the kernels cannot simply run on the host.
@@ -2394,6 +2401,7 @@ same cores, where the GPU's cost is latency the early launch now hides. And
 of 4.7 GHz, the sweep beside the live run moved only from 77.4 s (HEAD, 4x4)
 to 74.6 s (new, 4x4) and 64.3 s (new, 8x2). Throughput under full load is set
 by CPU work, which is why the later steps went after instructions, not waits.
+And the worker count is bounded by memory before cores: 4x4 stays.
 
 **Hazards found on the way.**
 - `mojo build -o` overwrites its output in place (same inode), and a live run

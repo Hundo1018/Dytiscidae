@@ -22,7 +22,7 @@ rollout of thousands of steps.
 """
 
 from std.gpu import global_idx
-from std.gpu.host import DeviceContext, DeviceBuffer, HostBuffer
+from std.gpu.host import DeviceContext, DeviceBuffer
 from std.math import ceildiv
 from std.os import abort
 from std.python import Python, PythonObject
@@ -253,12 +253,15 @@ struct FullPipeline(Movable, Writable):
     # BatchedFluid packs its numpy views the same way.
     var inbuf: DeviceBuffer[F64]
     var outbuf: DeviceBuffer[F64]
-    # Their host sides, in pinned memory the Python half writes and reads in
-    # place (`host_blocks`).  Pinned, because a copy to or from pageable memory
-    # blocks the host until it is done, and `launch` exists so that the host
-    # can do other work while the step runs.
-    var h_in: HostBuffer[F64]
-    var h_out: HostBuffer[F64]
+    # Where `wait` downloads the output block to, and how much of it: set by
+    # `launch`.  The host blocks are ordinary numpy memory, not pinned: Mojo's
+    # first host buffer reserves a ~1.35 GB pinned pool per process (measured
+    # 2026-09-27), five processes' worth of unswappable memory on a 16 GB
+    # machine, and it tripped arch44's memory ceiling at generation 0.  A small
+    # upload from pageable memory is staged and returns, so the kernels still
+    # run while the host works; only the download waits, and it is in `wait`.
+    var host_out: Int
+    var n_out: Int
     # Written by gather_body_kernel and never read: the limiter is on the host.
     var clamped: DeviceBuffer[I32]
 
@@ -317,8 +320,8 @@ struct FullPipeline(Movable, Writable):
         self.clamped = c.enqueue_create_buffer[I32](cap_m)
         self.inbuf = c.enqueue_create_buffer[F64](cap_b * 21 + cap_m * 3)
         self.outbuf = c.enqueue_create_buffer[F64](cap_b * 8 + cap_p * 17)
-        self.h_in = c.enqueue_create_host_buffer[F64](cap_b * 21 + cap_m * 3)
-        self.h_out = c.enqueue_create_host_buffer[F64](cap_b * 8 + cap_p * 17)
+        self.host_out = 0
+        self.n_out = 0
         self.ctx.synchronize()
 
     def write_to(self, mut writer: Some[Writer]):
@@ -541,32 +544,27 @@ struct FullPipeline(Movable, Writable):
             p_fsum_b, Int32(nb),
             grid_dim=ceildiv(nb, BLOCK), block_dim=BLOCK)
 
-        ctx.enqueue_copy(dst_ptr=host_out,
-                         src_buf=s.outbuf.create_sub_buffer[F64](0, n_out))
+        s.host_out = Int(host_out)
+        s.n_out = n_out
         return PythonObject(n)
 
     @staticmethod
     def wait(self_ptr: UnsafePointer[Self, MutAnyOrigin]) raises -> PythonObject:
-        """Block until the last `launch` has finished and its outputs are in
-        the host block."""
-        self_ptr[].ctx.synchronize()
+        """Download the last `launch`'s outputs into the host block; returns
+        once they are there."""
+        ref s = self_ptr[]
+        s.ctx.enqueue_copy(
+            dst_ptr=UnsafePointer[Float64, MutAnyOrigin](unsafe_from_address=s.host_out),
+            src_buf=s.outbuf.create_sub_buffer[F64](0, s.n_out))
+        s.ctx.synchronize()
         return PythonObject(None)
 
     @staticmethod
     def step(self_ptr: UnsafePointer[Self, MutAnyOrigin], desc: PythonObject) raises -> PythonObject:
         """`launch` then `wait`."""
         var n = Self.launch(self_ptr, desc)
-        self_ptr[].ctx.synchronize()
+        _ = Self.wait(self_ptr)
         return n
-
-    @staticmethod
-    def host_blocks(self_ptr: UnsafePointer[Self, MutAnyOrigin]) raises -> PythonObject:
-        """(input address, output address, input capacity, output capacity) of
-        the pinned host blocks, in float64 elements."""
-        ref s = self_ptr[]
-        return Python.tuple(
-            PythonObject(Int(s.h_in.unsafe_ptr())), PythonObject(Int(s.h_out.unsafe_ptr())),
-            PythonObject(s.cap_b * 21 + s.cap_m * 3), PythonObject(s.cap_b * 8 + s.cap_p * 17))
 
 
 @export
@@ -580,7 +578,6 @@ def PyInit_full_pipeline() abi("C") -> PythonObject:
             .def_method[FullPipeline.step]("step")
             .def_method[FullPipeline.launch]("launch")
             .def_method[FullPipeline.wait]("wait")
-            .def_method[FullPipeline.host_blocks]("host_blocks")
         )
         return m.finalize()
     except e:

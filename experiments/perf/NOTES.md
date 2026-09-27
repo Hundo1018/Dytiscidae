@@ -73,3 +73,25 @@ HEAD 45.4 / 53.7 s, now 32.9-34.0 s.
 - `mojo/tests/test_full_gpu.py` had been stale since 2026-09-23 (hand-written
   descriptor); it goes through `BatchedFluid` now: 7 plans, 554 panels,
   xfrc 4.0e-16, added mass 3.5e-16 relative to `FluidSolver`.
+
+## 2026-09-27, afternoon: pinned memory cost 1.35 GB a process, so it is gone
+
+The first launch of arch44 stopped itself at generation 0: "resident set 8793
+MB is over the 5000 MB ceiling". Mojo's first `enqueue_create_host_buffer`
+reserves a ~1.35 GB pinned pool (RssShmem 8 MB -> 1350 MB for a 4 MB buffer;
+a second buffer adds nothing), in every process: five processes held 6.75 GB of
+unswappable memory, and 8x2 was killed by systemd-oomd within a minute.
+
+The blocks are ordinary numpy memory again. The overlap survives: `launch`
+enqueues the upload (a small pageable upload is staged and returns) and the
+kernels; the download moved into the pipeline's `wait`. Measured in place:
+`launch` 18 us, `wait` 16 us median, 8993 of 9000 steps launched early --
+34 us per step against 382 us at HEAD. Per process after building the
+pipeline: VmRSS 175 MB (1.52 GB with the pinned pool).
+
+`reference_df95498.json` is the 700-number benchmark from the last commit
+before any of this (its own kernel build); the current code matches it to the
+bit. On the idle machine: 13.27 s CPU at df95498, 8.25 s now (1.61x).
+
+Pool, idle machine, 16 designs with identification: HEAD 4x4 55.9 s, new 4x4
+42.6 s (1.31x). 8x2 not measurable here: with the pinned pool it was OOM-killed.

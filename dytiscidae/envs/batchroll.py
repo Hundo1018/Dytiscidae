@@ -39,7 +39,6 @@ and grows to about 1.4e-6 in mission_fraction over a full evaluation.
 """
 from __future__ import annotations
 
-import ctypes
 import os as _os
 
 import numpy as np
@@ -183,9 +182,12 @@ def usable(timeout: float = 180.0) -> tuple:
 #: because it cannot grow afterwards; exceeding it raises rather than quietly
 #: constructing a second one and hanging.
 _POOL = {"pipe": None, "cap": (0, 0, 0),
-         # A `launch` whose `finish` has not run.  The host blocks are one per
-         # process, so any new launch waits for it before writing into them.
-         "outstanding": False}
+         # The output block of a `launch` whose download has not run, or None.
+         # The device buffers are one per process, so any new launch waits for
+         # it first -- and it holds the block, because `wait` writes into it
+         # and its BatchedFluid may already be gone (the early launch after a
+         # rollout's last step is never finished by that rollout).
+         "outstanding": None}
 
 #: Headroom, because the capacity cannot grow after the first allocation and
 #: exceeding it stops the run.  Measured on a batch of 16 archetypes: 1,290
@@ -279,9 +281,9 @@ class BatchedFluid:
         self.lever2 = [e.solver._lever2.copy() for e in self.envs]
 
         self.pipe = _get_pipeline(n, nb, nm)
-        if _POOL["outstanding"]:
+        if _POOL["outstanding"] is not None:
             self.pipe.wait()
-            _POOL["outstanding"] = False
+            _POOL["outstanding"] = None
         self.pipe.upload_static(np.array(
             [a.ctypes.data for a in (
                 self.body_id, self.machine, self.is_wing, self.pos_local,
@@ -294,13 +296,8 @@ class BatchedFluid:
         # Two contiguous blocks, laid out exactly as `FullPipeline.step` reads
         # and writes them, so a step is one upload and one download.  Every
         # array below is a view into one of them.
-        # The blocks are the pipeline's pinned host memory (one per process,
-        # like the pipeline), viewed in place: see `launch`.
-        a_in, a_out, cap_in, cap_out = self.pipe.host_blocks()
-        pinned = lambda addr, size: np.ctypeslib.as_array(
-            (ctypes.c_double * size).from_address(addr))
-        self._inbuf = pinned(a_in, cap_in)[:nb * 21 + nm * 3]
-        self._outbuf = pinned(a_out, cap_out)[:nb * 8 + n * 17]
+        self._inbuf = np.zeros(nb * 21 + nm * 3)
+        self._outbuf = np.zeros(nb * 8 + n * 17)
         ib, ob = self._inbuf, self._outbuf
         self.xpos = ib[0:nb * 3].reshape(nb, 3)
         self.xmat = ib[nb * 3:nb * 12].reshape(nb, 9)
@@ -378,6 +375,8 @@ class BatchedFluid:
         a MuJoCo position, velocity or the inflow, which this has already read,
         but it may do anything else -- record the last step, run the policy --
         while the device works.  The wait was a busy spin of ~100 us a step.
+        The output block is filled by `finish` (the download is in the
+        pipeline's `wait`), so nothing may read `self.out` in between.
 
         `active` is an optional boolean mask; a machine whose battery has gone
         flat stops being stepped but stays in the batch. Dropping it would mean
@@ -385,9 +384,9 @@ class BatchedFluid:
         more than letting a few dead machines ride along in a kernel that is
         launch-bound rather than compute-bound.
         """
-        if _POOL["outstanding"]:
+        if _POOL["outstanding"] is not None:
             self.pipe.wait()
-            _POOL["outstanding"] = False
+            _POOL["outstanding"] = None
         for i, e in enumerate(self.envs):
             if active is not None and not active[i]:
                 continue
@@ -439,7 +438,7 @@ class BatchedFluid:
                      float(bool(sol.wing_added_mass_tensor)), dt_u,
                      float(self._reset_u), float(bool(sol.unsteady)))
         self.pipe.launch(self._desc)
-        _POOL["outstanding"] = True
+        _POOL["outstanding"] = self._outbuf
         self._reset_u = False
         self._launched = (t, dt_u)
         self._pending = (t, self._epoch)
@@ -449,7 +448,7 @@ class BatchedFluid:
         machine: limiter, weight cancellation, implicit damping, inflow, jets,
         rotors, added mass and the diagnostics."""
         self.pipe.wait()
-        _POOL["outstanding"] = False
+        _POOL["outstanding"] = None
         self._pending = None
         o = self.out
         e0 = self.envs[0]
