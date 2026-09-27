@@ -33,7 +33,9 @@ from mathx import sind, cosd, expd, logd, clampd
 comptime BLOCK = 128
 
 
-def medium_kernel(
+@always_inline
+def medium_at(
+    i: Int,
     pos: UnsafePointer[Float64, MutAnyOrigin],
     half_height: UnsafePointer[Float64, MutAnyOrigin],
     rho_out: UnsafePointer[Float64, MutAnyOrigin],
@@ -56,11 +58,8 @@ def medium_kernel(
     wind_x: Float64,
     wind_y: Float64,
     wind_z: Float64,
-    n: Int32,
 ):
-    var i = Int(global_idx.x)
-    if Int32(i) >= n:
-        return
+    """`medium_kernel`'s work for panel `i`, callable from a fused kernel."""
     var j = i * 3
     var px = pos[unsafe_offset=j + 0]
     var py = pos[unsafe_offset=j + 1]
@@ -109,6 +108,37 @@ def medium_kernel(
     uflow_out[unsafe_offset=j + 0] = (1.0 - f2) * wind_x + f2 * (cur_x + ox)
     uflow_out[unsafe_offset=j + 1] = (1.0 - f2) * wind_y + f2 * (cur_y + oy)
     uflow_out[unsafe_offset=j + 2] = (1.0 - f2) * wind_z + f2 * (cur_z + oz)
+
+
+def medium_kernel(
+    pos: UnsafePointer[Float64, MutAnyOrigin],
+    half_height: UnsafePointer[Float64, MutAnyOrigin],
+    rho_out: UnsafePointer[Float64, MutAnyOrigin],
+    mu_out: UnsafePointer[Float64, MutAnyOrigin],
+    subf_out: UnsafePointer[Float64, MutAnyOrigin],
+    uflow_out: UnsafePointer[Float64, MutAnyOrigin],
+    amplitude: Float64,
+    wavelength: Float64,
+    period: Float64,
+    kx: Float64,
+    ky: Float64,
+    t: Float64,
+    air_rho: Float64,
+    air_mu: Float64,
+    water_rho: Float64,
+    water_mu: Float64,
+    cur_x: Float64,
+    cur_y: Float64,
+    cur_z: Float64,
+    wind_x: Float64,
+    wind_y: Float64,
+    wind_z: Float64,
+    n: Int32,
+):
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    medium_at(i, pos, half_height, rho_out, mu_out, subf_out, uflow_out, amplitude, wavelength, period, kx, ky, t, air_rho, air_mu, water_rho, water_mu, cur_x, cur_y, cur_z, wind_x, wind_y, wind_z)
 
 
 def medium(desc: PythonObject, scalars: PythonObject) raises -> PythonObject:

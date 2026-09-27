@@ -34,7 +34,9 @@ comptime BLOCK = 128
 comptime DeviceBufferF64 = DeviceBuffer[DType.float64]
 
 
-def kin_kernel(
+@always_inline
+def kin_at(
+    i: Int,
     xpos: UnsafePointer[Float64, MutAnyOrigin],
     xmat: UnsafePointer[Float64, MutAnyOrigin],
     body_id: UnsafePointer[Int32, MutAnyOrigin],
@@ -46,11 +48,8 @@ def kin_kernel(
     span_w: UnsafePointer[Float64, MutAnyOrigin],
     chord_w: UnsafePointer[Float64, MutAnyOrigin],
     normal_w: UnsafePointer[Float64, MutAnyOrigin],
-    n: Int32,
 ):
-    var i = Int(global_idx.x)
-    if Int32(i) >= n:
-        return
+    """`kin_kernel`'s work for panel `i`, callable from a fused kernel."""
 
     var b = Int(body_id[unsafe_offset=i])
     var r = b * 9
@@ -96,6 +95,25 @@ def kin_kernel(
     normal_w[unsafe_offset=j + 1] = m3 * nx + m4 * ny + m5 * nz
     normal_w[unsafe_offset=j + 2] = m6 * nx + m7 * ny + m8 * nz
 
+
+def kin_kernel(
+    xpos: UnsafePointer[Float64, MutAnyOrigin],
+    xmat: UnsafePointer[Float64, MutAnyOrigin],
+    body_id: UnsafePointer[Int32, MutAnyOrigin],
+    loc: UnsafePointer[Float64, MutAnyOrigin],
+    span: UnsafePointer[Float64, MutAnyOrigin],
+    chord: UnsafePointer[Float64, MutAnyOrigin],
+    normal: UnsafePointer[Float64, MutAnyOrigin],
+    pos_w: UnsafePointer[Float64, MutAnyOrigin],
+    span_w: UnsafePointer[Float64, MutAnyOrigin],
+    chord_w: UnsafePointer[Float64, MutAnyOrigin],
+    normal_w: UnsafePointer[Float64, MutAnyOrigin],
+    n: Int32,
+):
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    kin_at(i, xpos, xmat, body_id, loc, span, chord, normal, pos_w, span_w, chord_w, normal_w)
 
 
 comptime PI_D: Float64 = 3.14159265358979323846
@@ -152,7 +170,9 @@ def _drag_coefficient(
     return _skin_friction_cd(re) + cd_i + w * cn * sa * sa
 
 
-def unsteady_kernel(
+@always_inline
+def unsteady_at(
+    i: Int,
     alpha: UnsafePointer[Float64, MutAnyOrigin],
     rev: UnsafePointer[Float64, MutAnyOrigin],
     u: UnsafePointer[Float64, MutAnyOrigin],
@@ -169,14 +189,8 @@ def unsteady_kernel(
     dt: Float64,
     reset: Int32,
     enabled: Int32,
-    n: Int32,
 ):
-    """Mirrors `fluid.UnsteadyState.update`: Wagner lag (Jones's two terms) and
-    the LEV's travel-since-reversal and Rossby mechanisms, one strip a thread,
-    with the history in persistent buffers."""
-    var i = Int(global_idx.x)
-    if Int32(i) >= n:
-        return
+    """`unsteady_kernel`'s work for panel `i`, callable from a fused kernel."""
     var j = i * 3
     if enabled == 0:
         # `FluidSolver.unsteady` off: no lag, and the LEV from the Rossby
@@ -246,10 +260,40 @@ def unsteady_kernel(
     lev_out[unsafe_offset=i] = lev_r if lev_r > lev_t else lev_t
 
 
+def unsteady_kernel(
+    alpha: UnsafePointer[Float64, MutAnyOrigin],
+    rev: UnsafePointer[Float64, MutAnyOrigin],
+    u: UnsafePointer[Float64, MutAnyOrigin],
+    chord: UnsafePointer[Float64, MutAnyOrigin],
+    omega: UnsafePointer[Float64, MutAnyOrigin],
+    s_hat: UnsafePointer[Float64, MutAnyOrigin],
+    x0: UnsafePointer[Float64, MutAnyOrigin],
+    x1: UnsafePointer[Float64, MutAnyOrigin],
+    trav: UnsafePointer[Float64, MutAnyOrigin],
+    rev_prev: UnsafePointer[Float64, MutAnyOrigin],
+    primed: UnsafePointer[Float64, MutAnyOrigin],
+    ae_out: UnsafePointer[Float64, MutAnyOrigin],
+    lev_out: UnsafePointer[Float64, MutAnyOrigin],
+    dt: Float64,
+    reset: Int32,
+    enabled: Int32,
+    n: Int32,
+):
+    """Mirrors `fluid.UnsteadyState.update`: Wagner lag (Jones's two terms) and
+    the LEV's travel-since-reversal and Rossby mechanisms, one strip a thread,
+    with the history in persistent buffers."""
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    unsteady_at(i, alpha, rev, u, chord, omega, s_hat, x0, x1, trav, rev_prev, primed, ae_out, lev_out, dt, reset, enabled)
+
+
 comptime CD_CROSSFLOW: Float64 = 1.1
 
 
-def bluff_kernel(
+@always_inline
+def bluff_at(
+    i: Int,
     v_rel: UnsafePointer[Float64, MutAnyOrigin],
     s_hat: UnsafePointer[Float64, MutAnyOrigin],
     c_hat: UnsafePointer[Float64, MutAnyOrigin],
@@ -263,19 +307,8 @@ def bluff_kernel(
     d_out: UnsafePointer[Float64, MutAnyOrigin],
     dfull_out: UnsafePointer[Float64, MutAnyOrigin],
     cd_scale: Float64,
-    n: Int32,
 ):
-    """Munk slender-body plus Allen-Perkins cross-flow.
-
-    Mirrors the block marked `--- bluff-body drag` in `fluid.py`.
-
-    `d_full` is written for every panel, wing or not: it is computed over all N
-    in the Python (the `~is_wing` mask is only applied at the accumulate), and
-    the added-mass block downstream reads it for wing panels too.
-    """
-    var i = Int(global_idx.x)
-    if Int32(i) >= n:
-        return
+    """`bluff_kernel`'s work for panel `i`, callable from a fused kernel."""
     var j = i * 3
 
     var vx = v_rel[unsafe_offset=j + 0]
@@ -345,10 +378,42 @@ def bluff_kernel(
     d_out[unsafe_offset=i] = abs(f_axial) + f_cross
 
 
+def bluff_kernel(
+    v_rel: UnsafePointer[Float64, MutAnyOrigin],
+    s_hat: UnsafePointer[Float64, MutAnyOrigin],
+    c_hat: UnsafePointer[Float64, MutAnyOrigin],
+    n_hat: UnsafePointer[Float64, MutAnyOrigin],
+    rho: UnsafePointer[Float64, MutAnyOrigin],
+    mu: UnsafePointer[Float64, MutAnyOrigin],
+    ext: UnsafePointer[Float64, MutAnyOrigin],
+    cd_bluff: UnsafePointer[Float64, MutAnyOrigin],
+    is_wing: UnsafePointer[Int32, MutAnyOrigin],
+    f_out: UnsafePointer[Float64, MutAnyOrigin],
+    d_out: UnsafePointer[Float64, MutAnyOrigin],
+    dfull_out: UnsafePointer[Float64, MutAnyOrigin],
+    cd_scale: Float64,
+    n: Int32,
+):
+    """Munk slender-body plus Allen-Perkins cross-flow.
+
+    Mirrors the block marked `--- bluff-body drag` in `fluid.py`.
+
+    `d_full` is written for every panel, wing or not: it is computed over all N
+    in the Python (the `~is_wing` mask is only applied at the accumulate), and
+    the added-mass block downstream reads it for wing panels too.
+    """
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    bluff_at(i, v_rel, s_hat, c_hat, n_hat, rho, mu, ext, cd_bluff, is_wing, f_out, d_out, dfull_out, cd_scale)
+
+
 comptime GRAVITY: Float64 = 9.80665
 
 
-def added_mass_kernel(
+@always_inline
+def added_mass_at(
+    i: Int,
     v_rel: UnsafePointer[Float64, MutAnyOrigin],
     s_hat: UnsafePointer[Float64, MutAnyOrigin],
     c_hat: UnsafePointer[Float64, MutAnyOrigin],
@@ -368,24 +433,8 @@ def added_mass_kernel(
     scale: Float64,
     has_bluff: Int32,
     wing_tensor: Int32,
-    n: Int32,
 ):
-    """Anisotropic added mass and its scatter.
-
-    Mirrors the block marked `--- added mass` in `fluid.py`.
-
-    The scatter is `np.add.at(m_body, body_id, m_add)`: many panels share a
-    body, so the collisions are the rule and not the exception.  Float64
-    `Atomic.fetch_add` handles it directly -- verified on this card at 100000
-    additions into 16 buckets, exact.
-
-    What this deliberately does NOT do is write `model.body_mass`.  That is a
-    MuJoCo model array read by `mj_step` on the very next line, so it stays on
-    the host; this kernel only produces the per-body sum it is built from.
-    """
-    var i = Int(global_idx.x)
-    if Int32(i) >= n:
-        return
+    """`added_mass_kernel`'s work for panel `i`, callable from a fused kernel."""
     var j = i * 3
 
     var vx = v_rel[unsafe_offset=j + 0]
@@ -472,7 +521,50 @@ def added_mass_kernel(
     _ = body_id
 
 
-def coeff_kernel(
+def added_mass_kernel(
+    v_rel: UnsafePointer[Float64, MutAnyOrigin],
+    s_hat: UnsafePointer[Float64, MutAnyOrigin],
+    c_hat: UnsafePointer[Float64, MutAnyOrigin],
+    n_hat: UnsafePointer[Float64, MutAnyOrigin],
+    d_full: UnsafePointer[Float64, MutAnyOrigin],
+    rho: UnsafePointer[Float64, MutAnyOrigin],
+    ext: UnsafePointer[Float64, MutAnyOrigin],
+    chord: UnsafePointer[Float64, MutAnyOrigin],
+    dr: UnsafePointer[Float64, MutAnyOrigin],
+    volume: UnsafePointer[Float64, MutAnyOrigin],
+    is_wing: UnsafePointer[Int32, MutAnyOrigin],
+    body_id: UnsafePointer[Int32, MutAnyOrigin],
+    m_add: UnsafePointer[Float64, MutAnyOrigin],
+    vn_out: UnsafePointer[Float64, MutAnyOrigin],
+    m_body: UnsafePointer[Float64, MutAnyOrigin],
+    fz: UnsafePointer[Float64, MutAnyOrigin],
+    scale: Float64,
+    has_bluff: Int32,
+    wing_tensor: Int32,
+    n: Int32,
+):
+    """Anisotropic added mass and its scatter.
+
+    Mirrors the block marked `--- added mass` in `fluid.py`.
+
+    The scatter is `np.add.at(m_body, body_id, m_add)`: many panels share a
+    body, so the collisions are the rule and not the exception.  Float64
+    `Atomic.fetch_add` handles it directly -- verified on this card at 100000
+    additions into 16 buckets, exact.
+
+    What this deliberately does NOT do is write `model.body_mass`.  That is a
+    MuJoCo model array read by `mj_step` on the very next line, so it stays on
+    the host; this kernel only produces the per-body sum it is built from.
+    """
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    added_mass_at(i, v_rel, s_hat, c_hat, n_hat, d_full, rho, ext, chord, dr, volume, is_wing, body_id, m_add, vn_out, m_body, fz, scale, has_bluff, wing_tensor)
+
+
+@always_inline
+def coeff_at(
+    i: Int,
     alpha: UnsafePointer[Float64, MutAnyOrigin],
     re: UnsafePointer[Float64, MutAnyOrigin],
     ar: UnsafePointer[Float64, MutAnyOrigin],
@@ -481,11 +573,8 @@ def coeff_kernel(
     cl_out: UnsafePointer[Float64, MutAnyOrigin],
     cd_out: UnsafePointer[Float64, MutAnyOrigin],
     alpha_e: UnsafePointer[Float64, MutAnyOrigin],
-    n: Int32,
 ):
-    var i = Int(global_idx.x)
-    if Int32(i) >= n:
-        return
+    """`coeff_kernel`'s work for panel `i`, callable from a fused kernel."""
     # np.where(is_wing, ..., 0.0): bluff elements get their drag from the
     # cross-flow model instead, not from strip theory.
     if is_wing[unsafe_offset=i] == 0:
@@ -501,6 +590,23 @@ def coeff_kernel(
     cd_out[unsafe_offset=i] = _drag_coefficient(a, r, arv, cl, lv)
 
 
+def coeff_kernel(
+    alpha: UnsafePointer[Float64, MutAnyOrigin],
+    re: UnsafePointer[Float64, MutAnyOrigin],
+    ar: UnsafePointer[Float64, MutAnyOrigin],
+    lev: UnsafePointer[Float64, MutAnyOrigin],
+    is_wing: UnsafePointer[Int32, MutAnyOrigin],
+    cl_out: UnsafePointer[Float64, MutAnyOrigin],
+    cd_out: UnsafePointer[Float64, MutAnyOrigin],
+    alpha_e: UnsafePointer[Float64, MutAnyOrigin],
+    n: Int32,
+):
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    coeff_at(i, alpha, re, ar, lev, is_wing, cl_out, cd_out, alpha_e)
+
+
 @always_inline
 def _dl(ctx: DeviceContext, buf: DeviceBufferF64, addr: Int) raises:
     """Download a device buffer straight into a host address."""
@@ -510,7 +616,9 @@ def _dl(ctx: DeviceContext, buf: DeviceBufferF64, addr: Int) raises:
     )
 
 
-def strip_kernel(
+@always_inline
+def strip_at(
+    i: Int,
     v_rel: UnsafePointer[Float64, MutAnyOrigin],
     s_hat: UnsafePointer[Float64, MutAnyOrigin],
     c_hat: UnsafePointer[Float64, MutAnyOrigin],
@@ -527,14 +635,8 @@ def strip_kernel(
     alpha_out: UnsafePointer[Float64, MutAnyOrigin],
     rf_out: UnsafePointer[Float64, MutAnyOrigin],
     lift_axis: UnsafePointer[Float64, MutAnyOrigin],
-    n: Int32,
 ):
-    """Strip theory, the block marked `--- strip theory` in `fluid.py`.
-
-    One thread per panel."""
-    var i = Int(global_idx.x)
-    if Int32(i) >= n:
-        return
+    """`strip_kernel`'s work for panel `i`, callable from a fused kernel."""
     var j = i * 3
 
     var vx = v_rel[unsafe_offset=j + 0]
@@ -627,6 +729,34 @@ def strip_kernel(
     lift_axis[unsafe_offset=j + 0] = lx / ln_safe
     lift_axis[unsafe_offset=j + 1] = ly / ln_safe
     lift_axis[unsafe_offset=j + 2] = lz / ln_safe
+
+
+def strip_kernel(
+    v_rel: UnsafePointer[Float64, MutAnyOrigin],
+    s_hat: UnsafePointer[Float64, MutAnyOrigin],
+    c_hat: UnsafePointer[Float64, MutAnyOrigin],
+    n_hat: UnsafePointer[Float64, MutAnyOrigin],
+    omega: UnsafePointer[Float64, MutAnyOrigin],
+    rho: UnsafePointer[Float64, MutAnyOrigin],
+    mu: UnsafePointer[Float64, MutAnyOrigin],
+    chord: UnsafePointer[Float64, MutAnyOrigin],
+    camber: UnsafePointer[Float64, MutAnyOrigin],
+    u_out: UnsafePointer[Float64, MutAnyOrigin],
+    d_hat: UnsafePointer[Float64, MutAnyOrigin],
+    q_out: UnsafePointer[Float64, MutAnyOrigin],
+    re_out: UnsafePointer[Float64, MutAnyOrigin],
+    alpha_out: UnsafePointer[Float64, MutAnyOrigin],
+    rf_out: UnsafePointer[Float64, MutAnyOrigin],
+    lift_axis: UnsafePointer[Float64, MutAnyOrigin],
+    n: Int32,
+):
+    """Strip theory, the block marked `--- strip theory` in `fluid.py`.
+
+    One thread per panel."""
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    strip_at(i, v_rel, s_hat, c_hat, n_hat, omega, rho, mu, chord, camber, u_out, d_hat, q_out, re_out, alpha_out, rf_out, lift_axis)
 
 
 @always_inline
@@ -935,6 +1065,56 @@ def PyInit_fluid_gpu() abi("C") -> PythonObject:
         abort(String("failed to create module: ", e))
 
 
+@always_inline
+def velocity_at(
+    i: Int,
+    vel6: UnsafePointer[Float64, MutAnyOrigin],
+    xpos: UnsafePointer[Float64, MutAnyOrigin],
+    pos_w: UnsafePointer[Float64, MutAnyOrigin],
+    u_flow: UnsafePointer[Float64, MutAnyOrigin],
+    body_id: UnsafePointer[Int32, MutAnyOrigin],
+    omega_out: UnsafePointer[Float64, MutAnyOrigin],
+    vrel_out: UnsafePointer[Float64, MutAnyOrigin],
+    machine: UnsafePointer[Int32, MutAnyOrigin],
+    is_wing: UnsafePointer[Int32, MutAnyOrigin],
+    v_ind: UnsafePointer[Float64, MutAnyOrigin],
+):
+    """`velocity_kernel`'s work for panel `i`, callable from a fused kernel."""
+    var j = i * 3
+    var b = Int(body_id[unsafe_offset=i])
+    var v6 = b * 6
+
+    var wx = vel6[unsafe_offset=v6 + 0]
+    var wy = vel6[unsafe_offset=v6 + 1]
+    var wz = vel6[unsafe_offset=v6 + 2]
+    omega_out[unsafe_offset=j + 0] = wx
+    omega_out[unsafe_offset=j + 1] = wy
+    omega_out[unsafe_offset=j + 2] = wz
+
+    # r = element centroid minus the point vel6 is measured at (xipos)
+    var rx = pos_w[unsafe_offset=j + 0] - xpos[unsafe_offset=b * 3 + 0]
+    var ry = pos_w[unsafe_offset=j + 1] - xpos[unsafe_offset=b * 3 + 1]
+    var rz = pos_w[unsafe_offset=j + 2] - xpos[unsafe_offset=b * 3 + 2]
+
+    # v_elem = v_org + omega x r
+    var ex = vel6[unsafe_offset=v6 + 3] + (wy * rz - wz * ry)
+    var ey = vel6[unsafe_offset=v6 + 4] + (wz * rx - wx * rz)
+    var ez = vel6[unsafe_offset=v6 + 5] + (wx * ry - wy * rx)
+
+    # v_rel is the fluid seen from the element, so the sign is flow minus body.
+    var ux = u_flow[unsafe_offset=j + 0]
+    var uy = u_flow[unsafe_offset=j + 1]
+    var uz = u_flow[unsafe_offset=j + 2]
+    if is_wing[unsafe_offset=i] != 0:
+        var m3 = Int(machine[unsafe_offset=i]) * 3
+        ux = ux + v_ind[unsafe_offset=m3 + 0]
+        uy = uy + v_ind[unsafe_offset=m3 + 1]
+        uz = uz + v_ind[unsafe_offset=m3 + 2]
+    vrel_out[unsafe_offset=j + 0] = ux - ex
+    vrel_out[unsafe_offset=j + 1] = uy - ey
+    vrel_out[unsafe_offset=j + 2] = uz - ez
+
+
 def velocity_kernel(
     vel6: UnsafePointer[Float64, MutAnyOrigin],
     xpos: UnsafePointer[Float64, MutAnyOrigin],
@@ -972,36 +1152,6 @@ def velocity_kernel(
     var i = Int(global_idx.x)
     if Int32(i) >= n:
         return
-    var j = i * 3
-    var b = Int(body_id[unsafe_offset=i])
-    var v6 = b * 6
+    velocity_at(i, vel6, xpos, pos_w, u_flow, body_id, omega_out, vrel_out, machine, is_wing, v_ind)
 
-    var wx = vel6[unsafe_offset=v6 + 0]
-    var wy = vel6[unsafe_offset=v6 + 1]
-    var wz = vel6[unsafe_offset=v6 + 2]
-    omega_out[unsafe_offset=j + 0] = wx
-    omega_out[unsafe_offset=j + 1] = wy
-    omega_out[unsafe_offset=j + 2] = wz
 
-    # r = element centroid minus the point vel6 is measured at (xipos)
-    var rx = pos_w[unsafe_offset=j + 0] - xpos[unsafe_offset=b * 3 + 0]
-    var ry = pos_w[unsafe_offset=j + 1] - xpos[unsafe_offset=b * 3 + 1]
-    var rz = pos_w[unsafe_offset=j + 2] - xpos[unsafe_offset=b * 3 + 2]
-
-    # v_elem = v_org + omega x r
-    var ex = vel6[unsafe_offset=v6 + 3] + (wy * rz - wz * ry)
-    var ey = vel6[unsafe_offset=v6 + 4] + (wz * rx - wx * rz)
-    var ez = vel6[unsafe_offset=v6 + 5] + (wx * ry - wy * rx)
-
-    # v_rel is the fluid seen from the element, so the sign is flow minus body.
-    var ux = u_flow[unsafe_offset=j + 0]
-    var uy = u_flow[unsafe_offset=j + 1]
-    var uz = u_flow[unsafe_offset=j + 2]
-    if is_wing[unsafe_offset=i] != 0:
-        var m3 = Int(machine[unsafe_offset=i]) * 3
-        ux = ux + v_ind[unsafe_offset=m3 + 0]
-        uy = uy + v_ind[unsafe_offset=m3 + 1]
-        uz = uz + v_ind[unsafe_offset=m3 + 2]
-    vrel_out[unsafe_offset=j + 0] = ux - ex
-    vrel_out[unsafe_offset=j + 1] = uy - ey
-    vrel_out[unsafe_offset=j + 2] = uz - ez

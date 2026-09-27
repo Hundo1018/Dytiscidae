@@ -52,7 +52,9 @@ def _up(ctx: DeviceContext, addr: Int, count: Int) raises -> DeviceBuffer[DType.
     return b^
 
 
-def assembly_kernel(
+@always_inline
+def assembly_at(
+    i: Int,
     q: UnsafePointer[Float64, MutAnyOrigin],
     area: UnsafePointer[Float64, MutAnyOrigin],
     cl: UnsafePointer[Float64, MutAnyOrigin],
@@ -78,11 +80,8 @@ def assembly_kernel(
     lift_scale: Float64,
     cd_scale: Float64,
     water_rho: Float64,
-    n: Int32,
 ):
-    var i = Int(global_idx.x)
-    if Int32(i) >= n:
-        return
+    """`assembly_kernel`'s work for panel `i`, callable from a fused kernel."""
     var j = i * 3
     var wing = is_wing[unsafe_offset=i] != 0
 
@@ -138,6 +137,40 @@ def assembly_kernel(
     f_out[unsafe_offset=j + 0] = fx
     f_out[unsafe_offset=j + 1] = fy
     f_out[unsafe_offset=j + 2] = fz
+
+
+def assembly_kernel(
+    q: UnsafePointer[Float64, MutAnyOrigin],
+    area: UnsafePointer[Float64, MutAnyOrigin],
+    cl: UnsafePointer[Float64, MutAnyOrigin],
+    cd: UnsafePointer[Float64, MutAnyOrigin],
+    lift_axis: UnsafePointer[Float64, MutAnyOrigin],
+    d_hat: UnsafePointer[Float64, MutAnyOrigin],
+    f_bluff: UnsafePointer[Float64, MutAnyOrigin],
+    c_rot: UnsafePointer[Float64, MutAnyOrigin],
+    rho: UnsafePointer[Float64, MutAnyOrigin],
+    u: UnsafePointer[Float64, MutAnyOrigin],
+    omega: UnsafePointer[Float64, MutAnyOrigin],
+    s_hat: UnsafePointer[Float64, MutAnyOrigin],
+    chord: UnsafePointer[Float64, MutAnyOrigin],
+    dr: UnsafePointer[Float64, MutAnyOrigin],
+    vol_buoy: UnsafePointer[Float64, MutAnyOrigin],
+    subf: UnsafePointer[Float64, MutAnyOrigin],
+    fz_added: UnsafePointer[Float64, MutAnyOrigin],
+    is_wing: UnsafePointer[Int32, MutAnyOrigin],
+    f_out: UnsafePointer[Float64, MutAnyOrigin],
+    l_out: UnsafePointer[Float64, MutAnyOrigin],
+    d_out: UnsafePointer[Float64, MutAnyOrigin],
+    buoy_out: UnsafePointer[Float64, MutAnyOrigin],
+    lift_scale: Float64,
+    cd_scale: Float64,
+    water_rho: Float64,
+    n: Int32,
+):
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    assembly_at(i, q, area, cl, cd, lift_axis, d_hat, f_bluff, c_rot, rho, u, omega, s_hat, chord, dr, vol_buoy, subf, fz_added, is_wing, f_out, l_out, d_out, buoy_out, lift_scale, cd_scale, water_rho)
 
 
 def assembly(desc: PythonObject, scalars: PythonObject) raises -> PythonObject:

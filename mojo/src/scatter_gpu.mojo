@@ -38,6 +38,24 @@ from std.python.bindings import PythonModuleBuilder
 comptime BLOCK = 128
 
 
+@always_inline
+def fmag_at(
+    i: Int,
+    f: UnsafePointer[Float64, MutAnyOrigin],
+    machine: UnsafePointer[Int32, MutAnyOrigin],
+    fmag: UnsafePointer[Float64, MutAnyOrigin],
+    fmax: UnsafePointer[Float64, MutAnyOrigin],
+):
+    """`fmag_kernel`'s work for panel `i`, callable from a fused kernel."""
+    var j = i * 3
+    var x = f[unsafe_offset=j + 0]
+    var y = f[unsafe_offset=j + 1]
+    var z = f[unsafe_offset=j + 2]
+    var m = sqrt(x * x + y * y + z * z)
+    fmag[unsafe_offset=i] = m
+    _ = Atomic.max(fmax + Int(machine[unsafe_offset=i]), m)
+
+
 def fmag_kernel(
     f: UnsafePointer[Float64, MutAnyOrigin],
     machine: UnsafePointer[Int32, MutAnyOrigin],
@@ -53,13 +71,7 @@ def fmag_kernel(
     var i = Int(global_idx.x)
     if Int32(i) >= n:
         return
-    var j = i * 3
-    var x = f[unsafe_offset=j + 0]
-    var y = f[unsafe_offset=j + 1]
-    var z = f[unsafe_offset=j + 2]
-    var m = sqrt(x * x + y * y + z * z)
-    fmag[unsafe_offset=i] = m
-    _ = Atomic.max(fmax + Int(machine[unsafe_offset=i]), m)
+    fmag_at(i, f, machine, fmag, fmax)
 
 
 def limit_scatter_kernel(

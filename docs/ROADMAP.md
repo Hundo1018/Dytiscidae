@@ -2348,6 +2348,73 @@ curriculum stage 1.
 
 ---
 
+## 2026-09-27 — where a worker's time went, and what moved it
+
+Asked: find why the training load sits almost entirely on the CPU, and
+parallelise it, move it to the GPU, or use an acceleration library.
+Measurements and method: `experiments/perf/NOTES.md`; harnesses beside it.
+
+**What the time was.** Four workers at 83-96% of a core each, the parent
+idle, the GPU 5% busy (60 s of `/proc` jiffies on arch43). Inside a worker
+(py-spy, sampled, not cProfile -- cProfile inflated small Python calls by ~2x):
+the per-step GPU round trip was the largest single item, ~30% of real time --
+382 us per step for a 4-machine shard of only 190 panels, of which 5 uploads, 4
+fills and 17 downloads of pageable memory were 210 us and eleven kernel
+launches 90 us. `mj_step` was 7-8%. The rest was host-side numpy on arrays of a
+handful of elements, ~25 calls per machine per step. **CPU time equals wall
+time** in every run: the CUDA wait is a busy spin, so GPU latency was CPU time.
+
+**What was done, all bit-identical** (700 segment and transition numbers of a
+4-design benchmark compared to the last bit after every step):
+
+- one packed upload and one download a step, the descriptor built once, the
+  scalars read by pointer (`FullPipeline.step`);
+- the ten per-panel kernels fused into one (`panel_kernel`; each stage is an
+  `*_at` body that its own kernel also calls, so there is one copy of the
+  physics);
+- pinned host blocks and `launch`/`wait`: `step_batch` launches the next step's
+  fluid as soon as `mj_step` is done, and the caller's recording and policy run
+  while the device works -- `wait` is then 3 us median, 8993 of 9000 steps
+  found their fluid already launched (`PRELAUNCH`; bit-identical on and off,
+  held by `test_the_early_fluid_launch_changes_nothing`);
+- `BatchedPower`: the energy model for the whole batch in one pass
+  (`test_the_batched_power_budget_is_the_power_budget`);
+- `np.cross` written out, the CPG's clip as min/max and its clipped params
+  cached between control decisions.
+
+Result: benchmark CPU 17.8-18.1 s -> 12.2 s beside a live run, 9.0 s alone;
+with identification (the generation's main evaluation) 45.4 / 53.7 s -> 32.9 s.
+GPU step 382 -> 89 us back to back.
+
+**What did not work, and why.** `DeviceContext(api="cpu")` exists but kernel
+launch on it is `Unimplemented`, so the kernels cannot simply run on the host.
+A CPU port would scale with panel count and compete with the workers for the
+same cores, where the GPU's cost is latency the early launch now hides. And
+**on this laptop the pool is power-bound, not latency-bound**: at 96 C and 3.2
+of 4.7 GHz, the sweep beside the live run moved only from 77.4 s (HEAD, 4x4)
+to 74.6 s (new, 4x4) and 64.3 s (new, 8x2). Throughput under full load is set
+by CPU work, which is why the later steps went after instructions, not waits.
+
+**Hazards found on the way.**
+- `mojo build -o` overwrites its output in place (same inode), and a live run
+  has `mojo/build/*.so` mapped. `build-all` now builds to a temporary name and
+  renames. `DYTISCIDAE_KERNEL_DIR` points a process at a staged build.
+- `mojo/tests/test_full_gpu.py` had been stale since 2026-09-23 (a hand-copied
+  descriptor); it goes through `BatchedFluid` now -- 7 plans, xfrc 4.0e-16 and
+  added mass 3.5e-16 relative to `FluidSolver`.
+- arch43 died at gen 39 in a global OOM (`runs/arch43_notes.md`): runs launched
+  from a Claude session live in its cgroup scope, and `setsid` does not leave
+  it. Launch with `systemd-run --user`.
+
+**Not done, measured as the next levers.** The remaining host time is spread
+thin (the damping projection 8-9%, `mj_step` 8%, clearance and twist recording
+~8%, the inflow ~4%, the CPG ~3%). Vectorising the per-machine sums across the
+batch would take most of it, but `reduceat` sums are not bit-identical to slice
+sums, so that step needs the path-agreement noise floors instead of exact
+comparison. Identification is 53% of the main evaluation and waits on the
+device more than the rollouts do (7.8%): its steps have little host work to
+hide the launch behind.
+
 ## 2026-09-23..26 — AB-AF executed, every open fluid item closed, and a rotor control
 
 The user asked for three things: take the AB-AF list through to verification and

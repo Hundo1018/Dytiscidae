@@ -338,37 +338,37 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `basis_from_probes` | function | 550 | `(deltas, responses, *, medium: str='air', max_modes: int=6) -> MobilityBasis` | Fit the mobility basis from probe deltas and their measured responses. |
-| `CPG` | class | 83 | — | A bank of phase-coupled oscillators, one per actuated joint. |
+| `basis_from_probes` | function | 561 | `(deltas, responses, *, medium: str='air', max_modes: int=6) -> MobilityBasis` | Fit the mobility basis from probe deltas and their measured responses. |
+| `CPG` | class | 87 | — | A bank of phase-coupled oscillators, one per actuated joint. |
 | `CPGParams` | class | 46 | — | Open parameters of the pattern generator. |
-| `gait_gain` | function | 183 | `(intent: float) -> float` | The amplitude factor a gain intent asks for. |
-| `identify_mobility` | function | 504 | `(step_fn, reset_fn, n_params: int, *, n_probes: int=24, probe_scale: float=0.35, medium: str='air', rng: np.random.Generator \| None=None, max_modes: int=6) -> MobilityBasis` | Empirically identify a body's control axes. |
-| `MobilityBasis` | class | 223 | — | The control axes a particular body actually has, in a particular medium. |
-| `Policy` | class | 597 | — | Maps observations to intent coefficients in the mobility basis. |
-| `required_probes` | function | 488 | `(n_params: int, *, margin: float=1.5) -> int` | Probes needed for the mobility fit to be determined, with headroom. |
-| `split_command` | function | 188 | `(raw, n_modes: int)` | ``(mode coefficients, gain)`` from what a policy returned. |
-| `CPG.__init__` | method | 93 | `(self, n_joints: int, base_frequency: float=2.0, joint_range: np.ndarray \| None=None) -> None` | — |
-| `CPG.command` | method | 137 | `(self, params: CPGParams, t: float) -> np.ndarray` | Target joint angles at time ``t``. |
-| `CPG.n_params` | property | 156 | `(self) -> int` | — |
-| `CPG.pop_rate` | method | 150 | `(self) -> np.ndarray \| None` | The rate of the last command, once; None if it was already taken. |
-| `CPG.reset` | method | 133 | `(self) -> None` | — |
+| `gait_gain` | function | 194 | `(intent: float) -> float` | The amplitude factor a gain intent asks for. |
+| `identify_mobility` | function | 515 | `(step_fn, reset_fn, n_params: int, *, n_probes: int=24, probe_scale: float=0.35, medium: str='air', rng: np.random.Generator \| None=None, max_modes: int=6) -> MobilityBasis` | Empirically identify a body's control axes. |
+| `MobilityBasis` | class | 234 | — | The control axes a particular body actually has, in a particular medium. |
+| `Policy` | class | 608 | — | Maps observations to intent coefficients in the mobility basis. |
+| `required_probes` | function | 499 | `(n_params: int, *, margin: float=1.5) -> int` | Probes needed for the mobility fit to be determined, with headroom. |
+| `split_command` | function | 199 | `(raw, n_modes: int)` | ``(mode coefficients, gain)`` from what a policy returned. |
+| `CPG.__init__` | method | 97 | `(self, n_joints: int, base_frequency: float=2.0, joint_range: np.ndarray \| None=None) -> None` | — |
+| `CPG.command` | method | 143 | `(self, params: CPGParams, t: float) -> np.ndarray` | Target joint angles at time ``t``. |
+| `CPG.n_params` | property | 167 | `(self) -> int` | — |
+| `CPG.pop_rate` | method | 161 | `(self) -> np.ndarray \| None` | The rate of the last command, once; None if it was already taken. |
+| `CPG.reset` | method | 139 | `(self) -> None` | — |
 | `CPGParams.clipped` | method | 74 | `(self, lo: np.ndarray, hi: np.ndarray) -> 'CPGParams'` | Clamp offsets and amplitudes into the joints' physical travel. |
 | `CPGParams.flat` | method | 61 | `(self) -> np.ndarray` | — |
 | `CPGParams.from_flat` | method | 65 | `(v: np.ndarray, n: int) -> 'CPGParams'` | — |
 | `CPGParams.n` | property | 58 | `(self) -> int` | — |
-| `MobilityBasis.coeffs_for_twist` | method | 453 | `(self, intent: np.ndarray) -> np.ndarray` | Coefficients that best deliver a commanded body twist. |
-| `MobilityBasis.command_params` | method | 366 | `(self, base: CPGParams, coeffs: np.ndarray, n: int, gain: float=1.0) -> CPGParams` | Turn intent coefficients into concrete CPG parameters. |
-| `MobilityBasis.command_policy` | method | 381 | `(self, base: CPGParams, raw, n: int, policy)` | ``(params, mode coefficients, gain or None)`` for what ``policy`` returned. |
-| `MobilityBasis.condition` | property | 305 | `(self) -> float` | `sigma_0 / sigma_r` over the retained modes.  Infinite if any is 0. |
-| `MobilityBasis.control_rank` | property | 280 | `(self) -> int` | How many axes are worth commanding.  An engineering threshold. |
-| `MobilityBasis.describe` | method | 349 | `(self) -> list[str]` | Human-readable names for the discovered axes. |
-| `MobilityBasis.diagnostics` | method | 334 | `(self) -> dict` | Everything a consumer needs to judge this basis, in one call. |
-| `MobilityBasis.numerical_rank` | property | 263 | `(self) -> int` | Rank in the linear-algebra sense: singular values above the level |
-| `MobilityBasis.twist_of` | method | 478 | `(self, coeffs: np.ndarray) -> np.ndarray` | The twist a coefficient vector produces.  The forward model. |
-| `MobilityBasis.underdetermined` | property | 318 | `(self) -> bool` | Whether the fit behind this basis had fewer probes than parameters. |
-| `Policy.act` | method | 641 | `(self, obs: np.ndarray) -> np.ndarray` | — |
-| `Policy.n_out` | property | 630 | `(self) -> int` | — |
-| `Policy.n_weights` | property | 635 | `(self) -> int` | — |
+| `MobilityBasis.coeffs_for_twist` | method | 464 | `(self, intent: np.ndarray) -> np.ndarray` | Coefficients that best deliver a commanded body twist. |
+| `MobilityBasis.command_params` | method | 377 | `(self, base: CPGParams, coeffs: np.ndarray, n: int, gain: float=1.0) -> CPGParams` | Turn intent coefficients into concrete CPG parameters. |
+| `MobilityBasis.command_policy` | method | 392 | `(self, base: CPGParams, raw, n: int, policy)` | ``(params, mode coefficients, gain or None)`` for what ``policy`` returned. |
+| `MobilityBasis.condition` | property | 316 | `(self) -> float` | `sigma_0 / sigma_r` over the retained modes.  Infinite if any is 0. |
+| `MobilityBasis.control_rank` | property | 291 | `(self) -> int` | How many axes are worth commanding.  An engineering threshold. |
+| `MobilityBasis.describe` | method | 360 | `(self) -> list[str]` | Human-readable names for the discovered axes. |
+| `MobilityBasis.diagnostics` | method | 345 | `(self) -> dict` | Everything a consumer needs to judge this basis, in one call. |
+| `MobilityBasis.numerical_rank` | property | 274 | `(self) -> int` | Rank in the linear-algebra sense: singular values above the level |
+| `MobilityBasis.twist_of` | method | 489 | `(self, coeffs: np.ndarray) -> np.ndarray` | The twist a coefficient vector produces.  The forward model. |
+| `MobilityBasis.underdetermined` | property | 329 | `(self) -> bool` | Whether the fit behind this basis had fewer probes than parameters. |
+| `Policy.act` | method | 652 | `(self, obs: np.ndarray) -> np.ndarray` | — |
+| `Policy.n_out` | property | 641 | `(self) -> int` | — |
+| `Policy.n_weights` | property | 646 | `(self) -> int` | — |
 
 ## `control.train` — `dytiscidae/control/train.py`
 
@@ -701,17 +701,20 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `BatchedFluid` | class | 212 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 791 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `identify_batch` | function | 532 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `observation_finite` | function | 481 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
-| `rollout_batch` | function | 608 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 972 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 496 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
-| `usable` | function | 93 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
-| `BatchedFluid.__init__` | method | 223 | `(self, envs)` | — |
-| `BatchedFluid.apply` | method | 324 | `(self, t: float, active=None) -> None` | Run the fluid for every environment and write their xfrc_applied. |
-| `BatchedFluid.reset_slam` | method | 307 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
+| `BatchedFluid` | class | 218 | — | One GPU pipeline serving N environments stepped in lockstep. |
+| `evaluate_tier1_batch` | function | 878 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `identify_batch` | function | 619 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `observation_finite` | function | 553 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
+| `rollout_batch` | function | 695 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 1059 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 574 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `usable` | function | 96 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
+| `BatchedFluid.__init__` | method | 229 | `(self, envs)` | — |
+| `BatchedFluid.apply` | method | 368 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
+| `BatchedFluid.finish` | method | 447 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
+| `BatchedFluid.launch` | method | 374 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
+| `BatchedFluid.ready` | method | 364 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
+| `BatchedFluid.reset_slam` | method | 343 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
@@ -741,9 +744,9 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `freshness` | function | 46 | `(src: Path \| None=None, build: Path \| None=None) -> tuple` | ``(state, reason)`` where state is "fresh", "stale" or "unverified". |
-| `source_hashes` | function | 29 | `(src: Path \| None=None) -> dict` | — |
-| `write_manifest` | function | 37 | `(src: Path \| None=None, build: Path \| None=None) -> Path` | Record what was compiled.  Called by ``pixi run build-all``. |
+| `freshness` | function | 50 | `(src: Path \| None=None, build: Path \| None=None) -> tuple` | ``(state, reason)`` where state is "fresh", "stale" or "unverified". |
+| `source_hashes` | function | 33 | `(src: Path \| None=None) -> dict` | — |
+| `write_manifest` | function | 41 | `(src: Path \| None=None, build: Path \| None=None) -> Path` | Record what was compiled.  Called by ``pixi run build-all``. |
 
 ## `envs.mission` — `dytiscidae/envs/mission.py`
 
@@ -1216,25 +1219,29 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `Actuator` | class | 21 | — | One electromechanical actuator sized against a motor family. |
+| `BatchedPower` | class | 241 | — | `PowerBudget.step` for a batch of machines, the loss terms evaluated for |
 | `Battery` | class | 104 | — | Pack-level energy store. |
-| `crawl_power_land` | function | 320 | `(mass: float, speed: float, *, cost_of_transport: float=4.0, drivetrain_eff: float=0.55) -> tuple[float, str]` | Electrical power for legged or wheeled locomotion, W. |
-| `cruise_power_air` | function | 256 | `(mass: float, span: float, wing_area: float, speed: float, *, ld_ratio: float \| None=None, propulsive_eff: float=0.55, drivetrain_eff: float=0.7, rho: float=1.225) -> tuple[float, str]` | Electrical power for steady forward flapping flight, W. |
-| `cruise_power_water` | function | 294 | `(volume: float, frontal_area: float, speed: float, *, cd: float=0.25, propulsive_eff: float=0.45, drivetrain_eff: float=0.7, rho: float=1025.0, seal_count: int=0) -> tuple[float, str]` | Electrical power for steady submerged cruise, W. |
-| `DomainEnergyEstimate` | class | 242 | — | Closed-form power estimate for one operating domain. |
-| `mission_energy_wh` | function | 363 | `(estimates: list[DomainEnergyEstimate], transitions: list[str], mass: float) -> float` | Total mission energy including transitions, Wh. |
+| `crawl_power_land` | function | 383 | `(mass: float, speed: float, *, cost_of_transport: float=4.0, drivetrain_eff: float=0.55) -> tuple[float, str]` | Electrical power for legged or wheeled locomotion, W. |
+| `cruise_power_air` | function | 319 | `(mass: float, span: float, wing_area: float, speed: float, *, ld_ratio: float \| None=None, propulsive_eff: float=0.55, drivetrain_eff: float=0.7, rho: float=1.225) -> tuple[float, str]` | Electrical power for steady forward flapping flight, W. |
+| `cruise_power_water` | function | 357 | `(volume: float, frontal_area: float, speed: float, *, cd: float=0.25, propulsive_eff: float=0.45, drivetrain_eff: float=0.7, rho: float=1025.0, seal_count: int=0) -> tuple[float, str]` | Electrical power for steady submerged cruise, W. |
+| `DomainEnergyEstimate` | class | 305 | — | Closed-form power estimate for one operating domain. |
+| `mission_energy_wh` | function | 426 | `(estimates: list[DomainEnergyEstimate], transitions: list[str], mass: float) -> float` | Total mission energy including transitions, Wh. |
 | `PowerBudget` | class | 144 | — | Tracks the whole machine's electrical consumption over an episode. |
-| `transition_energy` | function | 339 | `(mass: float, kind: str) -> float` | Energy for one domain transition, J. |
+| `transition_energy` | function | 402 | `(mass: float, kind: str) -> float` | Energy for one domain transition, J. |
 | `Actuator.electrical_power` | method | 68 | `(self, torque: np.ndarray, omega: np.ndarray) -> np.ndarray` | Electrical power drawn for an output torque and speed, W. |
 | `Actuator.max_speed` | property | 64 | `(self) -> float` | Output speed at the continuous rating, rad/s. |
 | `Actuator.stall_torque` | property | 59 | `(self) -> float` | Torque at the continuous thermal limit, N.m at the output shaft. |
 | `Actuator.thermal_overload` | method | 91 | `(self, torque: np.ndarray, omega: np.ndarray) -> np.ndarray` | Ratio of dissipated power to the continuous rating. |
+| `BatchedPower.__init__` | method | 253 | `(self, envs) -> None` | — |
+| `BatchedPower.step` | method | 265 | `(self, envs, active) -> None` | Charge every active machine one step of its own ``timestep``; |
 | `Battery.draw` | method | 126 | `(self, power_w: float, dt: float) -> bool` | Remove energy.  Returns False once the pack is empty. |
 | `Battery.reset` | method | 117 | `(self) -> None` | — |
 | `Battery.soc` | property | 123 | `(self) -> float` | — |
-| `DomainEnergyEstimate.energy_wh` | property | 252 | `(self) -> float` | — |
+| `DomainEnergyEstimate.energy_wh` | property | 315 | `(self) -> float` | — |
 | `PowerBudget.actuator_mass` | property | 189 | `(self) -> float` | — |
-| `PowerBudget.endurance_at_current_rate` | method | 230 | `(self) -> float` | Seconds of remaining runtime if the present mean draw continued. |
-| `PowerBudget.mean_power` | property | 227 | `(self) -> float` | — |
+| `PowerBudget.charge` | method | 218 | `(self, p: float, dt: float) -> bool` | Book ``p`` watts for ``dt`` and draw it from the pack: the half of |
+| `PowerBudget.endurance_at_current_rate` | method | 235 | `(self) -> float` | Seconds of remaining runtime if the present mean draw continued. |
+| `PowerBudget.mean_power` | property | 232 | `(self) -> float` | — |
 | `PowerBudget.reset` | method | 180 | `(self) -> None` | — |
 | `PowerBudget.step` | method | 192 | `(self, torques: np.ndarray, speeds: np.ndarray, dt: float) -> bool` | Charge one control step.  Returns False when the pack is flat. |
 

@@ -69,6 +69,14 @@ renderer at `import mujoco`.
 cd mojo && pixi run build-all      # full_pipeline.so, fluid_gpu.so, and the manifest
 ```
 
+`mojo build -o` overwrites its output **in place** (same inode, checked
+2026-09-27), and a live run has `mojo/build/*.so` mapped, so `build-all` now
+builds to a temporary name and renames. Even so, verify a new kernel before a
+run can pick it up: build it elsewhere and point processes at it with
+`DYTISCIDAE_KERNEL_DIR=<dir>` (it needs its own `BUILD_MANIFEST.json`:
+`write_manifest(build=Path(dir))`). Install into `mojo/build` only when no run
+is using it.
+
 `mojo/build/*.so` is a compiled mirror of `physics/fluid.py`, and the search
 scores through it while every verification, probe and film uses the numpy half.
 Measured 2026-09-20: the built kernel was from 2026-08-04 and `mojo/src` had

@@ -21,20 +21,20 @@ batch and needs one more upload; that is a few hundred microseconds against a
 rollout of thousands of steps.
 """
 
-from std.gpu.host import DeviceContext, DeviceBuffer
+from std.gpu import global_idx
+from std.gpu.host import DeviceContext, DeviceBuffer, HostBuffer
 from std.math import ceildiv
 from std.os import abort
-from std.python import PythonObject
+from std.python import Python, PythonObject
 from std.python.bindings import PythonModuleBuilder
 
 from fluid_gpu import (
-    added_mass_kernel, bluff_kernel, coeff_kernel, kin_kernel, strip_kernel,
-    velocity_kernel,
-    unsteady_kernel,
+    added_mass_at, bluff_at, coeff_at, kin_at, strip_at, velocity_at,
+    unsteady_at,
 )
-from medium_gpu import medium_kernel
-from assembly_gpu import assembly_kernel
-from scatter_gpu import fmag_kernel, gather_body_kernel
+from medium_gpu import medium_at
+from assembly_gpu import assembly_at
+from scatter_gpu import fmag_at, gather_body_kernel
 
 comptime BLOCK = 128
 comptime F64 = DType.float64
@@ -73,6 +73,120 @@ def _dn_i32(ctx: DeviceContext, buf: DeviceBuffer[I32], addr: Int,
         src_buf=buf.create_sub_buffer[I32](0, count))
 
 
+def panel_kernel(
+    xpos: UnsafePointer[Float64, MutAnyOrigin],
+    xmat: UnsafePointer[Float64, MutAnyOrigin],
+    body_id: UnsafePointer[Int32, MutAnyOrigin],
+    pos_local: UnsafePointer[Float64, MutAnyOrigin],
+    span_local: UnsafePointer[Float64, MutAnyOrigin],
+    chord_local: UnsafePointer[Float64, MutAnyOrigin],
+    normal_local: UnsafePointer[Float64, MutAnyOrigin],
+    pos_w: UnsafePointer[Float64, MutAnyOrigin],
+    s_hat: UnsafePointer[Float64, MutAnyOrigin],
+    c_hat: UnsafePointer[Float64, MutAnyOrigin],
+    n_hat: UnsafePointer[Float64, MutAnyOrigin],
+    half_height: UnsafePointer[Float64, MutAnyOrigin],
+    rho: UnsafePointer[Float64, MutAnyOrigin],
+    mu: UnsafePointer[Float64, MutAnyOrigin],
+    subf: UnsafePointer[Float64, MutAnyOrigin],
+    u_flow: UnsafePointer[Float64, MutAnyOrigin],
+    sc0: Float64,
+    sc1: Float64,
+    sc2: Float64,
+    sc3: Float64,
+    sc4: Float64,
+    sc5: Float64,
+    sc6: Float64,
+    sc7: Float64,
+    sc8: Float64,
+    sc9: Float64,
+    sc10: Float64,
+    sc11: Float64,
+    sc12: Float64,
+    sc13: Float64,
+    sc14: Float64,
+    sc15: Float64,
+    vel6: UnsafePointer[Float64, MutAnyOrigin],
+    xipos: UnsafePointer[Float64, MutAnyOrigin],
+    omega: UnsafePointer[Float64, MutAnyOrigin],
+    v_rel: UnsafePointer[Float64, MutAnyOrigin],
+    machine: UnsafePointer[Int32, MutAnyOrigin],
+    is_wing: UnsafePointer[Int32, MutAnyOrigin],
+    v_ind: UnsafePointer[Float64, MutAnyOrigin],
+    chord: UnsafePointer[Float64, MutAnyOrigin],
+    camber: UnsafePointer[Float64, MutAnyOrigin],
+    u: UnsafePointer[Float64, MutAnyOrigin],
+    d_hat: UnsafePointer[Float64, MutAnyOrigin],
+    q: UnsafePointer[Float64, MutAnyOrigin],
+    re: UnsafePointer[Float64, MutAnyOrigin],
+    alpha: UnsafePointer[Float64, MutAnyOrigin],
+    rf: UnsafePointer[Float64, MutAnyOrigin],
+    lift_axis: UnsafePointer[Float64, MutAnyOrigin],
+    st_x0: UnsafePointer[Float64, MutAnyOrigin],
+    st_x1: UnsafePointer[Float64, MutAnyOrigin],
+    st_s: UnsafePointer[Float64, MutAnyOrigin],
+    st_rev: UnsafePointer[Float64, MutAnyOrigin],
+    st_primed: UnsafePointer[Float64, MutAnyOrigin],
+    ae: UnsafePointer[Float64, MutAnyOrigin],
+    lev: UnsafePointer[Float64, MutAnyOrigin],
+    sc20: Float64,
+    reset_unsteady: Int32,
+    unsteady_on: Int32,
+    ar: UnsafePointer[Float64, MutAnyOrigin],
+    cl: UnsafePointer[Float64, MutAnyOrigin],
+    cd: UnsafePointer[Float64, MutAnyOrigin],
+    ext: UnsafePointer[Float64, MutAnyOrigin],
+    cd_bluff: UnsafePointer[Float64, MutAnyOrigin],
+    f_bluff: UnsafePointer[Float64, MutAnyOrigin],
+    d_bluff: UnsafePointer[Float64, MutAnyOrigin],
+    d_full: UnsafePointer[Float64, MutAnyOrigin],
+    sc16: Float64,
+    dr: UnsafePointer[Float64, MutAnyOrigin],
+    volume: UnsafePointer[Float64, MutAnyOrigin],
+    m_add: UnsafePointer[Float64, MutAnyOrigin],
+    vn: UnsafePointer[Float64, MutAnyOrigin],
+    m_body: UnsafePointer[Float64, MutAnyOrigin],
+    fz: UnsafePointer[Float64, MutAnyOrigin],
+    sc17: Float64,
+    has_bluff: Int32,
+    wing_tensor: Int32,
+    area: UnsafePointer[Float64, MutAnyOrigin],
+    c_rot: UnsafePointer[Float64, MutAnyOrigin],
+    vol_buoy: UnsafePointer[Float64, MutAnyOrigin],
+    force: UnsafePointer[Float64, MutAnyOrigin],
+    lift: UnsafePointer[Float64, MutAnyOrigin],
+    drag: UnsafePointer[Float64, MutAnyOrigin],
+    buoy: UnsafePointer[Float64, MutAnyOrigin],
+    sc18: Float64,
+    fmag: UnsafePointer[Float64, MutAnyOrigin],
+    fmax: UnsafePointer[Float64, MutAnyOrigin],
+    n: Int32,
+):
+    """Every per-panel stage of a step in one launch: kinematics, medium,
+    relative flow, strip theory, unsteady history, coefficients, bluff drag,
+    added mass, assembly and force magnitude, in the order the eleven separate
+    launches ran them.  Each stage reads only its own panel's values and
+    per-body inputs, so one thread can run them back to back with nothing
+    shared across threads.  Eleven launches were 90 us of a 215 us step for a
+    190-panel shard, almost all of it launch latency (2026-09-27).  The stage
+    bodies are the `*_at` functions the separate kernels also call, so there
+    is one copy of the physics.
+    """
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    kin_at(i, xpos, xmat, body_id, pos_local, span_local, chord_local, normal_local, pos_w, s_hat, c_hat, n_hat)
+    medium_at(i, pos_w, half_height, rho, mu, subf, u_flow, sc0, sc1, sc2, sc3, sc4, sc5, sc6, sc7, sc8, sc9, sc10, sc11, sc12, sc13, sc14, sc15)
+    velocity_at(i, vel6, xipos, pos_w, u_flow, body_id, omega, v_rel, machine, is_wing, v_ind)
+    strip_at(i, v_rel, s_hat, c_hat, n_hat, omega, rho, mu, chord, camber, u, d_hat, q, re, alpha, rf, lift_axis)
+    unsteady_at(i, alpha, rf, u, chord, omega, s_hat, st_x0, st_x1, st_s, st_rev, st_primed, ae, lev, sc20, reset_unsteady, unsteady_on)
+    coeff_at(i, alpha, re, ar, lev, is_wing, cl, cd, ae)
+    bluff_at(i, v_rel, s_hat, c_hat, n_hat, rho, mu, ext, cd_bluff, is_wing, f_bluff, d_bluff, d_full, sc16)
+    added_mass_at(i, v_rel, s_hat, c_hat, n_hat, d_full, rho, ext, chord, dr, volume, is_wing, body_id, m_add, vn, m_body, fz, sc17, has_bluff, wing_tensor)
+    assembly_at(i, q, area, cl, cd, lift_axis, d_hat, f_bluff, c_rot, rho, u, omega, s_hat, chord, dr, vol_buoy, subf, fz, is_wing, force, lift, drag, buoy, sc18, sc16, sc8)
+    fmag_at(i, force, machine, fmag, fmax)
+
+
 struct FullPipeline(Movable, Writable):
     var ctx: DeviceContext
     var cap_p: Int
@@ -102,44 +216,26 @@ struct FullPipeline(Movable, Writable):
     var limit: DeviceBuffer[F64]
 
     # per-step inputs
-    var xpos: DeviceBuffer[F64]
-    var xmat: DeviceBuffer[F64]
-    var xipos: DeviceBuffer[F64]
-    var vel6: DeviceBuffer[F64]
 
     # intermediates
-    var pos_w: DeviceBuffer[F64]
     var s_hat: DeviceBuffer[F64]
     var c_hat: DeviceBuffer[F64]
     var n_hat: DeviceBuffer[F64]
-    var rho: DeviceBuffer[F64]
     var mu: DeviceBuffer[F64]
-    var subf: DeviceBuffer[F64]
     var u_flow: DeviceBuffer[F64]
     var omega: DeviceBuffer[F64]
     var v_rel: DeviceBuffer[F64]
     var d_full: DeviceBuffer[F64]
     var u: DeviceBuffer[F64]
     var d_hat: DeviceBuffer[F64]
-    var q: DeviceBuffer[F64]
     var re: DeviceBuffer[F64]
-    var alpha: DeviceBuffer[F64]
     var rf: DeviceBuffer[F64]
     var lift_axis: DeviceBuffer[F64]
     var cl: DeviceBuffer[F64]
     var cd: DeviceBuffer[F64]
     var f_bluff: DeviceBuffer[F64]
-    var d_bluff: DeviceBuffer[F64]
-    var m_add: DeviceBuffer[F64]
-    var vn: DeviceBuffer[F64]
     var fz: DeviceBuffer[F64]
-    var force: DeviceBuffer[F64]
-    var lift: DeviceBuffer[F64]
-    var drag: DeviceBuffer[F64]
-    var buoy: DeviceBuffer[F64]
-    var fmag: DeviceBuffer[F64]
     var fmax: DeviceBuffer[F64]
-    var fsum_b: DeviceBuffer[F64]
     # 2026-09-23: unsteady history (Wagner, LEV travel) and the inflow.
     var ae: DeviceBuffer[F64]
     var lev: DeviceBuffer[F64]
@@ -148,11 +244,22 @@ struct FullPipeline(Movable, Writable):
     var st_s: DeviceBuffer[F64]
     var st_rev: DeviceBuffer[F64]
     var st_primed: DeviceBuffer[F64]
-    var v_ind: DeviceBuffer[F64]
 
-    # outputs
-    var xfrc: DeviceBuffer[F64]
-    var m_body: DeviceBuffer[F64]
+    # Every per-step input in one block and every output the host reads in
+    # another, so a step is one upload and one download.  It was 5 uploads, 4
+    # fills and 17 downloads of pageable memory: 210 of the 382 us a step took
+    # for a 4-machine shard, against 101 us for all eleven kernels (measured
+    # 2026-09-27).  Layout: `_in_offsets` / `_out_offsets`, and batchroll's
+    # BatchedFluid packs its numpy views the same way.
+    var inbuf: DeviceBuffer[F64]
+    var outbuf: DeviceBuffer[F64]
+    # Their host sides, in pinned memory the Python half writes and reads in
+    # place (`host_blocks`).  Pinned, because a copy to or from pageable memory
+    # blocks the host until it is done, and `launch` exists so that the host
+    # can do other work while the step runs.
+    var h_in: HostBuffer[F64]
+    var h_out: HostBuffer[F64]
+    # Written by gather_body_kernel and never read: the limiter is on the host.
     var clamped: DeviceBuffer[I32]
 
     def __init__(out self, cap_p: Int, cap_b: Int, cap_m: Int) raises:
@@ -181,42 +288,24 @@ struct FullPipeline(Movable, Writable):
         self.ar = c.enqueue_create_buffer[F64](cap_p)
         self.c_rot = c.enqueue_create_buffer[F64](cap_p)
         self.limit = c.enqueue_create_buffer[F64](cap_m)
-        self.xpos = c.enqueue_create_buffer[F64](cap_b * 3)
-        self.xmat = c.enqueue_create_buffer[F64](cap_b * 9)
-        self.xipos = c.enqueue_create_buffer[F64](cap_b * 3)
-        self.vel6 = c.enqueue_create_buffer[F64](cap_b * 6)
-        self.pos_w = c.enqueue_create_buffer[F64](cap_p * 3)
         self.s_hat = c.enqueue_create_buffer[F64](cap_p * 3)
         self.c_hat = c.enqueue_create_buffer[F64](cap_p * 3)
         self.n_hat = c.enqueue_create_buffer[F64](cap_p * 3)
-        self.rho = c.enqueue_create_buffer[F64](cap_p)
         self.mu = c.enqueue_create_buffer[F64](cap_p)
-        self.subf = c.enqueue_create_buffer[F64](cap_p)
         self.u_flow = c.enqueue_create_buffer[F64](cap_p * 3)
         self.omega = c.enqueue_create_buffer[F64](cap_p * 3)
         self.v_rel = c.enqueue_create_buffer[F64](cap_p * 3)
         self.d_full = c.enqueue_create_buffer[F64](cap_p * 3)
         self.u = c.enqueue_create_buffer[F64](cap_p)
         self.d_hat = c.enqueue_create_buffer[F64](cap_p * 3)
-        self.q = c.enqueue_create_buffer[F64](cap_p)
         self.re = c.enqueue_create_buffer[F64](cap_p)
-        self.alpha = c.enqueue_create_buffer[F64](cap_p)
         self.rf = c.enqueue_create_buffer[F64](cap_p)
         self.lift_axis = c.enqueue_create_buffer[F64](cap_p * 3)
         self.cl = c.enqueue_create_buffer[F64](cap_p)
         self.cd = c.enqueue_create_buffer[F64](cap_p)
         self.f_bluff = c.enqueue_create_buffer[F64](cap_p * 3)
-        self.d_bluff = c.enqueue_create_buffer[F64](cap_p)
-        self.m_add = c.enqueue_create_buffer[F64](cap_p)
-        self.vn = c.enqueue_create_buffer[F64](cap_p)
         self.fz = c.enqueue_create_buffer[F64](cap_p)
-        self.force = c.enqueue_create_buffer[F64](cap_p * 3)
-        self.lift = c.enqueue_create_buffer[F64](cap_p)
-        self.drag = c.enqueue_create_buffer[F64](cap_p)
-        self.buoy = c.enqueue_create_buffer[F64](cap_p)
-        self.fmag = c.enqueue_create_buffer[F64](cap_p)
         self.fmax = c.enqueue_create_buffer[F64](cap_m)
-        self.fsum_b = c.enqueue_create_buffer[F64](cap_b)
         self.ae = c.enqueue_create_buffer[F64](cap_p)
         self.lev = c.enqueue_create_buffer[F64](cap_p)
         self.st_x0 = c.enqueue_create_buffer[F64](cap_p)
@@ -224,11 +313,12 @@ struct FullPipeline(Movable, Writable):
         self.st_s = c.enqueue_create_buffer[F64](cap_p)
         self.st_rev = c.enqueue_create_buffer[F64](cap_p)
         self.st_primed = c.enqueue_create_buffer[F64](cap_p)
-        self.v_ind = c.enqueue_create_buffer[F64](cap_m * 3)
         self.st_primed.enqueue_fill(0.0)
-        self.xfrc = c.enqueue_create_buffer[F64](cap_b * 6)
-        self.m_body = c.enqueue_create_buffer[F64](cap_b)
         self.clamped = c.enqueue_create_buffer[I32](cap_m)
+        self.inbuf = c.enqueue_create_buffer[F64](cap_b * 21 + cap_m * 3)
+        self.outbuf = c.enqueue_create_buffer[F64](cap_b * 8 + cap_p * 17)
+        self.h_in = c.enqueue_create_host_buffer[F64](cap_b * 21 + cap_m * 3)
+        self.h_out = c.enqueue_create_host_buffer[F64](cap_b * 8 + cap_p * 17)
         self.ctx.synchronize()
 
     def write_to(self, mut writer: Some[Writer]):
@@ -284,15 +374,17 @@ struct FullPipeline(Movable, Writable):
         return PythonObject(n)
 
     @staticmethod
-    def step(self_ptr: UnsafePointer[Self, MutAnyOrigin], desc: PythonObject,
-             scalars: PythonObject) raises -> PythonObject:
-        """in : xpos, xmat, xipos, vel6
-        out: xfrc, m_body, clamped, m_add, subf, alpha, q, lift, drag, buoy,
-             vn
-        then n, nbody, nmachine, has_bluff
-        then out: fsum_b, fmag, rho, pos_w, d_bluff, force; in: v_ind
+    def launch(self_ptr: UnsafePointer[Self, MutAnyOrigin], desc: PythonObject) raises -> PythonObject:
+        """Descriptor (int64): 0 host input block, 1 host output block, 2 scalars
+        (float64[23]), 3 n, 4 nbody, 5 nmachine, 6 has_bluff.
 
-        scalars (19): 0 amplitude, 1 wavelength, 2 period, 3 khat_x,
+        input block  (float64): xpos[nb*3] xmat[nb*9] xipos[nb*3] vel6[nb*6]
+                                v_ind[nm*3]
+        output block (float64): xfrc[nb*6] m_body[nb] fsum_b[nb], then per
+                                panel m_add subf alpha q lift drag buoy vn fmag
+                                rho d_bluff [n each], pos_w[n*3] force[n*3]
+
+        scalars (23): 0 amplitude, 1 wavelength, 2 period, 3 khat_x,
         4 khat_y, 5 t, 6 air_rho, 7 air_mu, 8 water_rho, 9 water_mu,
         10-12 current xyz, 13-15 wind xyz, 16 cd_scale, 17 am_scale,
         18 lift_scale, 19 wing added-mass tensor (0/1), 20 dt,
@@ -300,151 +392,181 @@ struct FullPipeline(Movable, Writable):
         """
         var d = UnsafePointer[Int64, MutAnyOrigin](
             unsafe_from_address=Int(py=desc.ctypes.data))
-        var n = Int(d[unsafe_offset=15])
-        var nb = Int(d[unsafe_offset=16])
-        var nm = Int(d[unsafe_offset=17])
-        var has_bluff = Int(d[unsafe_offset=18])
+        var n = Int(d[unsafe_offset=3])
+        var nb = Int(d[unsafe_offset=4])
+        var nm = Int(d[unsafe_offset=5])
+        var has_bluff = Int(d[unsafe_offset=6])
+        var host_in = UnsafePointer[Float64, MutAnyOrigin](
+            unsafe_from_address=Int(d[unsafe_offset=0]))
+        var host_out = UnsafePointer[Float64, MutAnyOrigin](
+            unsafe_from_address=Int(d[unsafe_offset=1]))
+        # The scalars are read from a float64 array rather than converted from
+        # a Python tuple: 23 conversions a step, for numbers the host already
+        # holds in memory.
+        var sc = UnsafePointer[Float64, MutAnyOrigin](
+            unsafe_from_address=Int(d[unsafe_offset=2]))
         ref s = self_ptr[]
         if n > s.cap_p or nb > s.cap_b or nm > s.cap_m:
             raise Error("FullPipeline: batch exceeds capacity")
         var ctx = s.ctx
 
-        _up_f64(ctx, s.xpos, Int(d[unsafe_offset=0]), nb * 3)
-        _up_f64(ctx, s.xmat, Int(d[unsafe_offset=1]), nb * 9)
-        _up_f64(ctx, s.xipos, Int(d[unsafe_offset=2]), nb * 3)
-        _up_f64(ctx, s.vel6, Int(d[unsafe_offset=3]), nb * 6)
-        _up_f64(ctx, s.v_ind, Int(d[unsafe_offset=25]), nm * 3)
-        s.m_body.create_sub_buffer[F64](0, nb).enqueue_fill(0.0)
-        s.xfrc.create_sub_buffer[F64](0, nb * 6).enqueue_fill(0.0)
-        s.clamped.create_sub_buffer[I32](0, nm).enqueue_fill(0)
-        s.fmax.create_sub_buffer[F64](0, nm).enqueue_fill(0.0)
+        var n_in = nb * 21 + nm * 3
+        var n_out = nb * 8 + n * 17
+        ctx.enqueue_copy(dst_buf=s.inbuf.create_sub_buffer[F64](0, n_in),
+                         src_ptr=host_in)
+        var ib = s.inbuf.unsafe_ptr()
+        var p_xpos = ib
+        var p_xmat = ib + nb * 3
+        var p_xipos = ib + nb * 12
+        var p_vel6 = ib + nb * 15
+        var p_v_ind = ib + nb * 21
+        var ob = s.outbuf.unsafe_ptr()
+        var p_xfrc = ob
+        var p_m_body = ob + nb * 6
+        var p_fsum_b = ob + nb * 7
+        var pb = ob + nb * 8
+        var p_m_add = pb
+        var p_subf = pb + n
+        var p_alpha = pb + n * 2
+        var p_q = pb + n * 3
+        var p_lift = pb + n * 4
+        var p_drag = pb + n * 5
+        var p_buoy = pb + n * 6
+        var p_vn = pb + n * 7
+        var p_fmag = pb + n * 8
+        var p_rho = pb + n * 9
+        var p_d_bluff = pb + n * 10
+        var p_pos_w = pb + n * 11
+        var p_force = pb + n * 14
 
         var g = ceildiv(n, BLOCK)
 
-        ctx.enqueue_function[kin_kernel](
-            s.xpos.unsafe_ptr(), s.xmat.unsafe_ptr(), s.body_id.unsafe_ptr(),
-            s.pos_local.unsafe_ptr(), s.span_local.unsafe_ptr(),
-            s.chord_local.unsafe_ptr(), s.normal_local.unsafe_ptr(),
-            s.pos_w.unsafe_ptr(), s.s_hat.unsafe_ptr(), s.c_hat.unsafe_ptr(),
-            s.n_hat.unsafe_ptr(), Int32(n), grid_dim=g, block_dim=BLOCK)
-
-        ctx.enqueue_function[medium_kernel](
-            s.pos_w.unsafe_ptr(), s.half_height.unsafe_ptr(),
-            s.rho.unsafe_ptr(), s.mu.unsafe_ptr(), s.subf.unsafe_ptr(),
+        ctx.enqueue_function[panel_kernel](
+            p_xpos,
+            p_xmat,
+            s.body_id.unsafe_ptr(),
+            s.pos_local.unsafe_ptr(),
+            s.span_local.unsafe_ptr(),
+            s.chord_local.unsafe_ptr(),
+            s.normal_local.unsafe_ptr(),
+            p_pos_w,
+            s.s_hat.unsafe_ptr(),
+            s.c_hat.unsafe_ptr(),
+            s.n_hat.unsafe_ptr(),
+            s.half_height.unsafe_ptr(),
+            p_rho,
+            s.mu.unsafe_ptr(),
+            p_subf,
             s.u_flow.unsafe_ptr(),
-            Float64(py=scalars[0]), Float64(py=scalars[1]),
-            Float64(py=scalars[2]), Float64(py=scalars[3]),
-            Float64(py=scalars[4]), Float64(py=scalars[5]),
-            Float64(py=scalars[6]), Float64(py=scalars[7]),
-            Float64(py=scalars[8]), Float64(py=scalars[9]),
-            Float64(py=scalars[10]), Float64(py=scalars[11]),
-            Float64(py=scalars[12]), Float64(py=scalars[13]),
-            Float64(py=scalars[14]), Float64(py=scalars[15]),
+            sc[unsafe_offset=0],
+            sc[unsafe_offset=1],
+            sc[unsafe_offset=2],
+            sc[unsafe_offset=3],
+            sc[unsafe_offset=4],
+            sc[unsafe_offset=5],
+            sc[unsafe_offset=6],
+            sc[unsafe_offset=7],
+            sc[unsafe_offset=8],
+            sc[unsafe_offset=9],
+            sc[unsafe_offset=10],
+            sc[unsafe_offset=11],
+            sc[unsafe_offset=12],
+            sc[unsafe_offset=13],
+            sc[unsafe_offset=14],
+            sc[unsafe_offset=15],
+            p_vel6,
+            p_xipos,
+            s.omega.unsafe_ptr(),
+            s.v_rel.unsafe_ptr(),
+            s.machine.unsafe_ptr(),
+            s.is_wing.unsafe_ptr(),
+            p_v_ind,
+            s.chord.unsafe_ptr(),
+            s.camber.unsafe_ptr(),
+            s.u.unsafe_ptr(),
+            s.d_hat.unsafe_ptr(),
+            p_q,
+            s.re.unsafe_ptr(),
+            p_alpha,
+            s.rf.unsafe_ptr(),
+            s.lift_axis.unsafe_ptr(),
+            s.st_x0.unsafe_ptr(),
+            s.st_x1.unsafe_ptr(),
+            s.st_s.unsafe_ptr(),
+            s.st_rev.unsafe_ptr(),
+            s.st_primed.unsafe_ptr(),
+            s.ae.unsafe_ptr(),
+            s.lev.unsafe_ptr(),
+            sc[unsafe_offset=20],
+            Int32(Int(sc[unsafe_offset=21])),
+            Int32(Int(sc[unsafe_offset=22])),
+            s.ar.unsafe_ptr(),
+            s.cl.unsafe_ptr(),
+            s.cd.unsafe_ptr(),
+            s.ext.unsafe_ptr(),
+            s.cd_bluff.unsafe_ptr(),
+            s.f_bluff.unsafe_ptr(),
+            p_d_bluff,
+            s.d_full.unsafe_ptr(),
+            sc[unsafe_offset=16],
+            s.dr.unsafe_ptr(),
+            s.volume.unsafe_ptr(),
+            p_m_add,
+            p_vn,
+            p_m_body,
+            s.fz.unsafe_ptr(),
+            sc[unsafe_offset=17],
+            Int32(has_bluff),
+            Int32(Int(sc[unsafe_offset=19])),
+            s.area.unsafe_ptr(),
+            s.c_rot.unsafe_ptr(),
+            s.vol_buoy.unsafe_ptr(),
+            p_force,
+            p_lift,
+            p_drag,
+            p_buoy,
+            sc[unsafe_offset=18],
+            p_fmag,
+            s.fmax.unsafe_ptr(),
             Int32(n), grid_dim=g, block_dim=BLOCK)
-
-        # The lever arm is from the centre of mass: vel6's linear part is the
-        # velocity *at xipos* (mj_objectVelocity, mjOBJ_BODY).  It was xpos
-        # until 2026-09-23 -- the same bug as fluid.py's, see there.
-        ctx.enqueue_function[velocity_kernel](
-            s.vel6.unsafe_ptr(), s.xipos.unsafe_ptr(), s.pos_w.unsafe_ptr(),
-            s.u_flow.unsafe_ptr(), s.body_id.unsafe_ptr(),
-            s.omega.unsafe_ptr(), s.v_rel.unsafe_ptr(),
-            s.machine.unsafe_ptr(), s.is_wing.unsafe_ptr(), s.v_ind.unsafe_ptr(),
-            Int32(n), grid_dim=g, block_dim=BLOCK)
-
-        ctx.enqueue_function[strip_kernel](
-            s.v_rel.unsafe_ptr(), s.s_hat.unsafe_ptr(), s.c_hat.unsafe_ptr(),
-            s.n_hat.unsafe_ptr(), s.omega.unsafe_ptr(), s.rho.unsafe_ptr(),
-            s.mu.unsafe_ptr(), s.chord.unsafe_ptr(), s.camber.unsafe_ptr(),
-            s.u.unsafe_ptr(), s.d_hat.unsafe_ptr(), s.q.unsafe_ptr(),
-            s.re.unsafe_ptr(), s.alpha.unsafe_ptr(), s.rf.unsafe_ptr(),
-            s.lift_axis.unsafe_ptr(), Int32(n), grid_dim=g, block_dim=BLOCK)
-
-        ctx.enqueue_function[unsteady_kernel](
-            s.alpha.unsafe_ptr(), s.rf.unsafe_ptr(), s.u.unsafe_ptr(),
-            s.chord.unsafe_ptr(), s.omega.unsafe_ptr(), s.s_hat.unsafe_ptr(),
-            s.st_x0.unsafe_ptr(), s.st_x1.unsafe_ptr(), s.st_s.unsafe_ptr(),
-            s.st_rev.unsafe_ptr(), s.st_primed.unsafe_ptr(),
-            s.ae.unsafe_ptr(), s.lev.unsafe_ptr(),
-            Float64(py=scalars[20]), Int32(Int(py=scalars[21])),
-            Int32(Int(py=scalars[22])), Int32(n), grid_dim=g, block_dim=BLOCK)
-
-        ctx.enqueue_function[coeff_kernel](
-            s.alpha.unsafe_ptr(), s.re.unsafe_ptr(), s.ar.unsafe_ptr(),
-            s.lev.unsafe_ptr(), s.is_wing.unsafe_ptr(), s.cl.unsafe_ptr(),
-            s.cd.unsafe_ptr(), s.ae.unsafe_ptr(), Int32(n),
-            grid_dim=g, block_dim=BLOCK)
-
-        ctx.enqueue_function[bluff_kernel](
-            s.v_rel.unsafe_ptr(), s.s_hat.unsafe_ptr(), s.c_hat.unsafe_ptr(),
-            s.n_hat.unsafe_ptr(), s.rho.unsafe_ptr(), s.mu.unsafe_ptr(),
-            s.ext.unsafe_ptr(), s.cd_bluff.unsafe_ptr(), s.is_wing.unsafe_ptr(),
-            s.f_bluff.unsafe_ptr(), s.d_bluff.unsafe_ptr(),
-            s.d_full.unsafe_ptr(), Float64(py=scalars[16]),
-            Int32(n), grid_dim=g, block_dim=BLOCK)
-
-        ctx.enqueue_function[added_mass_kernel](
-            s.v_rel.unsafe_ptr(), s.s_hat.unsafe_ptr(), s.c_hat.unsafe_ptr(),
-            s.n_hat.unsafe_ptr(), s.d_full.unsafe_ptr(), s.rho.unsafe_ptr(),
-            s.ext.unsafe_ptr(), s.chord.unsafe_ptr(), s.dr.unsafe_ptr(),
-            s.volume.unsafe_ptr(), s.is_wing.unsafe_ptr(),
-            s.body_id.unsafe_ptr(), s.m_add.unsafe_ptr(), s.vn.unsafe_ptr(),
-            s.m_body.unsafe_ptr(), s.fz.unsafe_ptr(),
-            Float64(py=scalars[17]), Int32(has_bluff),
-            Int32(Int(py=scalars[19])), Int32(n), grid_dim=g, block_dim=BLOCK)
-
-        ctx.enqueue_function[assembly_kernel](
-            s.q.unsafe_ptr(), s.area.unsafe_ptr(), s.cl.unsafe_ptr(),
-            s.cd.unsafe_ptr(), s.lift_axis.unsafe_ptr(), s.d_hat.unsafe_ptr(),
-            s.f_bluff.unsafe_ptr(), s.c_rot.unsafe_ptr(), s.rho.unsafe_ptr(),
-            s.u.unsafe_ptr(), s.omega.unsafe_ptr(), s.s_hat.unsafe_ptr(),
-            s.chord.unsafe_ptr(), s.dr.unsafe_ptr(), s.vol_buoy.unsafe_ptr(),
-            s.subf.unsafe_ptr(), s.fz.unsafe_ptr(), s.is_wing.unsafe_ptr(),
-            s.force.unsafe_ptr(), s.lift.unsafe_ptr(), s.drag.unsafe_ptr(),
-            s.buoy.unsafe_ptr(),
-            Float64(py=scalars[18]), Float64(py=scalars[16]),
-            Float64(py=scalars[8]), Int32(n), grid_dim=g, block_dim=BLOCK)
-
-        ctx.enqueue_function[fmag_kernel](
-            s.force.unsafe_ptr(), s.machine.unsafe_ptr(), s.fmag.unsafe_ptr(),
-            s.fmax.unsafe_ptr(), Int32(n), grid_dim=g, block_dim=BLOCK)
         # One thread per body, summing its own panels in index order.  Replaces
         # two atomic scatters whose accumulation order was decided by warp
         # arrival, which made a whole evaluation irreproducible.
         ctx.enqueue_function[gather_body_kernel](
-            s.m_add.unsafe_ptr(), s.force.unsafe_ptr(), s.fmag.unsafe_ptr(),
+            p_m_add, p_force, p_fmag,
             s.machine.unsafe_ptr(), s.limit.unsafe_ptr(), s.fmax.unsafe_ptr(),
-            s.pos_w.unsafe_ptr(), s.xipos.unsafe_ptr(),
-            s.body_start.unsafe_ptr(), s.m_body.unsafe_ptr(),
-            s.xfrc.unsafe_ptr(), s.clamped.unsafe_ptr(),
-            s.fsum_b.unsafe_ptr(), Int32(nb),
+            p_pos_w, p_xipos,
+            s.body_start.unsafe_ptr(), p_m_body,
+            p_xfrc, s.clamped.unsafe_ptr(),
+            p_fsum_b, Int32(nb),
             grid_dim=ceildiv(nb, BLOCK), block_dim=BLOCK)
 
-        _dn_f64(ctx, s.xfrc, Int(d[unsafe_offset=4]), nb * 6)
-        _dn_f64(ctx, s.m_body, Int(d[unsafe_offset=5]), nb)
-        _dn_i32(ctx, s.clamped, Int(d[unsafe_offset=6]), nm)
-        _dn_f64(ctx, s.m_add, Int(d[unsafe_offset=7]), n)
-        _dn_f64(ctx, s.subf, Int(d[unsafe_offset=8]), n)
-        _dn_f64(ctx, s.alpha, Int(d[unsafe_offset=9]), n)
-        _dn_f64(ctx, s.q, Int(d[unsafe_offset=10]), n)
-        _dn_f64(ctx, s.lift, Int(d[unsafe_offset=11]), n)
-        _dn_f64(ctx, s.drag, Int(d[unsafe_offset=12]), n)
-        _dn_f64(ctx, s.buoy, Int(d[unsafe_offset=13]), n)
-        # vn is the normal-velocity component the slam diagnostic differences
-        # against.  It is cheap to carry and expensive to be without: the
-        # transition score reads slam as the entry load, so omitting it zeroes
-        # every crossing's shock term without any error being raised.
-        _dn_f64(ctx, s.vn, Int(d[unsafe_offset=14]), n)
-        # 2026-09-23: what the host needs for the per-machine limiter and the
-        # implicit damping split (fluid.finish_bodies, ImplicitAeroDamping).
-        _dn_f64(ctx, s.fsum_b, Int(d[unsafe_offset=19]), nb)
-        _dn_f64(ctx, s.fmag, Int(d[unsafe_offset=20]), n)
-        _dn_f64(ctx, s.rho, Int(d[unsafe_offset=21]), n)
-        _dn_f64(ctx, s.pos_w, Int(d[unsafe_offset=22]), n * 3)
-        _dn_f64(ctx, s.d_bluff, Int(d[unsafe_offset=23]), n)
-        _dn_f64(ctx, s.force, Int(d[unsafe_offset=24]), n * 3)
-        ctx.synchronize()
+        ctx.enqueue_copy(dst_ptr=host_out,
+                         src_buf=s.outbuf.create_sub_buffer[F64](0, n_out))
         return PythonObject(n)
+
+    @staticmethod
+    def wait(self_ptr: UnsafePointer[Self, MutAnyOrigin]) raises -> PythonObject:
+        """Block until the last `launch` has finished and its outputs are in
+        the host block."""
+        self_ptr[].ctx.synchronize()
+        return PythonObject(None)
+
+    @staticmethod
+    def step(self_ptr: UnsafePointer[Self, MutAnyOrigin], desc: PythonObject) raises -> PythonObject:
+        """`launch` then `wait`."""
+        var n = Self.launch(self_ptr, desc)
+        self_ptr[].ctx.synchronize()
+        return n
+
+    @staticmethod
+    def host_blocks(self_ptr: UnsafePointer[Self, MutAnyOrigin]) raises -> PythonObject:
+        """(input address, output address, input capacity, output capacity) of
+        the pinned host blocks, in float64 elements."""
+        ref s = self_ptr[]
+        return Python.tuple(
+            PythonObject(Int(s.h_in.unsafe_ptr())), PythonObject(Int(s.h_out.unsafe_ptr())),
+            PythonObject(s.cap_b * 21 + s.cap_m * 3), PythonObject(s.cap_b * 8 + s.cap_p * 17))
 
 
 @export
@@ -456,6 +578,9 @@ def PyInit_full_pipeline() abi("C") -> PythonObject:
             .def_py_init[FullPipeline.py_init]()
             .def_method[FullPipeline.upload_static]("upload_static")
             .def_method[FullPipeline.step]("step")
+            .def_method[FullPipeline.launch]("launch")
+            .def_method[FullPipeline.wait]("wait")
+            .def_method[FullPipeline.host_blocks]("host_blocks")
         )
         return m.finalize()
     except e:

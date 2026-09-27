@@ -725,6 +725,21 @@ MUTATIONS: tuple = (
         defect="curriculum stage 1 pays the launch's coast after the machine is in the sea",
         suites=('test_physics',), item='AE'),
 
+    # --- the host-side speed-up, 2026-09-27 ----------------------------------
+    Mutation(
+        id='batched-power-one-sum',
+        path='dytiscidae/physics/energy.py',
+        find='                p += float(np.sum(terms[a:b]))\n',
+        replace='                p += float(np.sum(terms))\n',
+        defect="every machine is charged for the whole batch's actuators",
+        suites=('test_physics',), item='perf'),
+    Mutation(
+        id='caller-moves-state-under-launch',
+        path='dytiscidae/envs/batchroll.py',
+        find='                for i, e in enumerate(envs):\n                    acc[i] += e.body_twist()\n',
+        replace='                for i, e in enumerate(envs):\n                    e._mj.mj_forward(e.model, e.data)\n                    acc[i] += e.body_twist()\n',
+        defect='a caller refreshes the kinematics between steps, after the early launch read them',
+        suites=('test_search',), item='perf'),
     # --- arch43's pool, 2026-09-26 --------------------------------------------
     Mutation(
         id='nan-observation-reaches-policy',

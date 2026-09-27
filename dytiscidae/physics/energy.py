@@ -213,6 +213,11 @@ class PowerBudget:
                               + self._k_visc[:n] * om_m ** 2))
             self.max_overload = max(
                 self.max_overload, float(np.max(copper_raw / self._rating[:n])))
+        return self.charge(p, dt)
+
+    def charge(self, p: float, dt: float) -> bool:
+        """Book ``p`` watts for ``dt`` and draw it from the pack: the half of
+        `step` after the power is known, shared with `BatchedPower`."""
         self.avionics_j += self.avionics_w * dt
         self.actuator_j += (p - self.avionics_w) * dt
         self.total_j += p * dt
@@ -231,6 +236,64 @@ class PowerBudget:
         """Seconds of remaining runtime if the present mean draw continued."""
         p = self.mean_power
         return self.battery.energy_j / max(p, 1e-9)
+
+
+class BatchedPower:
+    """`PowerBudget.step` for a batch of machines, the loss terms evaluated for
+    every actuator of every machine in one pass.
+
+    Per machine it was about twenty numpy calls on arrays of a handful of
+    actuators, every step -- 7% of a batched evaluation (2026-09-27), all of
+    it per-call dispatch.  The element-wise terms are the same expressions on
+    the same numbers, and each machine's sum and maximum are taken over its own
+    contiguous slice exactly as `step` takes them over its own array, so the
+    result is bit-identical; `tests/test_physics.py` pins the two together.
+    """
+
+    def __init__(self, envs) -> None:
+        self.n = [min(len(e.budget.actuators), int(e.model.nu)) for e in envs]
+        self.off = np.cumsum([0] + self.n)
+        cat = lambda name: np.concatenate(
+            [getattr(e.budget, name)[:k] for e, k in zip(envs, self.n)]) \
+            if self.off[-1] else np.zeros(0)
+        self.seal, self.ratio, self.gear = cat("_seal"), cat("_ratio"), cat("_gear")
+        self.km, self.k_iron, self.k_visc = cat("_km"), cat("_k_iron"), cat("_k_visc")
+        self.rating = cat("_rating")
+        self.raw = np.zeros(int(self.off[-1]))
+        self.om = np.zeros(int(self.off[-1]))
+
+    def step(self, envs, active) -> None:
+        """Charge every active machine one step of its own ``timestep``;
+        clears ``active`` for a machine whose pack went flat."""
+        off, raw, om = self.off, self.raw, self.om
+        for i, e in enumerate(envs):
+            if active[i] and self.n[i]:
+                a, b = off[i], off[i + 1]
+                raw[a:b] = e.data.actuator_force[:self.n[i]]
+                om[a:b] = e.data.actuator_velocity[:self.n[i]]
+        # `step_batch` handed `step` the magnitudes; `step` then took them
+        # again, which is a no-op kept for the identical arithmetic.
+        raw_ = np.abs(raw)
+        om_ = np.abs(om)
+        tau = raw_ + np.sign(om_) * self.seal
+        om_m = np.abs(om_) * self.ratio
+        copper_power = (np.abs(tau) / self.gear / self.km) ** 2
+        copper_raw = (np.abs(raw_) / self.gear / self.km) ** 2
+        terms = (np.abs(tau * om_) + copper_power
+                 + self.k_iron * om_m + self.k_visc * om_m ** 2)
+        over = copper_raw / self.rating
+        for i, e in enumerate(envs):
+            if not active[i]:
+                continue
+            budget = e.budget
+            p = budget.avionics_w
+            if self.n[i]:
+                a, b = off[i], off[i + 1]
+                p += float(np.sum(terms[a:b]))
+                budget.max_overload = max(budget.max_overload,
+                                          float(np.max(over[a:b])))
+            if not budget.charge(p, e.timestep):
+                active[i] = False
 
 
 # --------------------------------------------------------------------------

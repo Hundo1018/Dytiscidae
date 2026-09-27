@@ -18,11 +18,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "mojo" / "src"
-BUILD = ROOT / "mojo" / "build"
+#: ``DYTISCIDAE_KERNEL_DIR`` points every process at a staged build instead:
+#: a live run has ``mojo/build/*.so`` mapped, so a new kernel is built and
+#: verified elsewhere and installed only once nothing is using the old one.
+BUILD = Path(os.environ.get("DYTISCIDAE_KERNEL_DIR") or ROOT / "mojo" / "build")
 MANIFEST = BUILD / "BUILD_MANIFEST.json"
 
 

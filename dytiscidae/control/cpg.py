@@ -75,9 +75,13 @@ class CPGParams:
         """Clamp offsets and amplitudes into the joints' physical travel."""
         span = 0.5 * (hi - lo)
         mid = 0.5 * (hi + lo)
-        off = np.clip(self.offset, lo + 0.05 * span, hi - 0.05 * span)
-        amp = np.clip(self.amplitude, 0.0, np.maximum(span - np.abs(off - mid), 1e-3))
-        return CPGParams(amp, self.phase, off, float(np.clip(self.frequency, 0.1, 20.0)))
+        # minimum(maximum()) rather than np.clip: bit-identical for lo <= hi,
+        # and np.clip's dispatch was 3 s of a 79 s shard evaluation.
+        off = np.minimum(np.maximum(self.offset, lo + 0.05 * span), hi - 0.05 * span)
+        amp = np.minimum(np.maximum(self.amplitude, 0.0),
+                         np.maximum(span - np.abs(off - mid), 1e-3))
+        return CPGParams(amp, self.phase, off,
+                         float(min(max(float(self.frequency), 0.1), 20.0)))
 
 
 class CPG:
@@ -113,6 +117,8 @@ class CPG:
         #: reports was the same number at the same moment of every episode the
         #: policy ever saw.
         self.phase_offset = 0.0
+        self._clip_src = None
+        self._clip = None
         self._continuity_reset()
 
     def _continuity_reset(self) -> None:
@@ -136,7 +142,12 @@ class CPG:
 
     def command(self, params: CPGParams, t: float) -> np.ndarray:
         """Target joint angles at time ``t``."""
-        p = params.clipped(self.lo, self.hi)
+        # The same params object is commanded for every step between two
+        # control decisions, so its clipped form is kept rather than rebuilt
+        # each step.  Held by reference (not id), so a new object always misses.
+        if params is not self._clip_src:
+            self._clip_src, self._clip = params, params.clipped(self.lo, self.hi)
+        p = self._clip
         f = float(p.frequency)
         if self._f_last is None or t < self._t_last:
             self._psi = 0.0                  # a new timeline starts at the closed form

@@ -3727,6 +3727,45 @@ def test_a_propeller_can_go_under_water() -> None:
           bad == 0 and worst < 600.0, f"{bad} bad-qacc, largest |qvel| {worst:.1f}")
 
 
+def test_the_batched_power_budget_is_the_power_budget() -> None:
+    """`BatchedPower` charges a whole batch in one pass (2026-09-27, 7% of a
+    batched evaluation was per-machine numpy dispatch in `PowerBudget.step`).
+    It must be the same model to the bit, or the two evaluation paths drift."""
+    print("\nenergy: the batched power budget is the power budget")
+    import copy
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import TriphibianEnv
+    from dytiscidae.physics.energy import BatchedPower
+
+    envs = [TriphibianEnv(build(BODY_PLANS[k]())) for k in ("beetle", "teal", "ray")]
+    envs[1].budget.battery.energy_j = 20.0          # goes flat mid-fixture
+    ref = [copy.deepcopy(e.budget) for e in envs]
+    rng = np.random.default_rng(7)
+    power = BatchedPower(envs)
+    active = np.ones(len(envs), dtype=bool)
+    alive_ref = [True] * len(envs)
+    for _ in range(50):
+        for i, e in enumerate(envs):
+            e.data.actuator_force[:] = rng.normal(0.0, 3.0, e.model.nu)
+            e.data.actuator_velocity[:] = rng.normal(0.0, 20.0, e.model.nu)
+            if alive_ref[i]:
+                alive_ref[i] = ref[i].step(np.abs(e.data.actuator_force),
+                                           np.abs(e.data.actuator_velocity), e.timestep)
+        power.step(envs, active)
+    fields = ("total_j", "actuator_j", "avionics_j", "max_overload", "t")
+    same = all(getattr(e.budget, f) == getattr(r, f) for e, r in zip(envs, ref) for f in fields)
+    same &= all(e.budget.battery.energy_j == r.battery.energy_j for e, r in zip(envs, ref))
+    check("every field bit-identical to PowerBudget.step over 50 steps", same,
+          f"{[(e.budget.total_j, r.total_j) for e, r in zip(envs, ref)]}")
+    check("and the fixture draws real power", all(r.actuator_j > 1.0 for r in ref),
+          f"{[r.actuator_j for r in ref]}")
+    check("a flat pack leaves the batch as it left the loop, and one did",
+          [bool(a) for a in active] == alive_ref and not alive_ref[1] and alive_ref[0],
+          f"{list(active)} vs {alive_ref}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -3751,6 +3790,7 @@ def main() -> int:
         test_the_rotor_table_is_the_rotor_model,
         test_the_search_can_build_rotorcraft,
         test_a_propeller_can_go_under_water,
+        test_the_batched_power_budget_is_the_power_budget,
         test_each_phase_is_scored_on_its_own_purpose,
         test_the_first_air_reset_is_like_every_other,
         test_chattering_commands_are_measured,

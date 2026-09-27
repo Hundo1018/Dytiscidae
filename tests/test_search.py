@@ -4172,6 +4172,57 @@ def test_a_nan_observation_fails_the_rollout_not_the_batch() -> None:
           f"{[(seg.failure, seg.competence) for seg in good]}")
 
 
+def test_the_early_fluid_launch_changes_nothing() -> None:
+    """`step_batch` starts the next step's fluid on the device before the caller
+    records this step and runs the policy (2026-09-27): the wait was a busy
+    spin of ~100 us a step.  That is only an optimisation if nothing the caller
+    does in between feeds the fluid, so the whole evaluation must come out the
+    same to the bit with it on and off."""
+    print("\nbatched: the early fluid launch changes nothing")
+    import torch
+
+    from dytiscidae.control.cpg import TWIST_DIM
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import batchroll
+    from dytiscidae.envs.triphibian import MissionSpec, TriphibianEnv
+    from dytiscidae.learning.ppo import SharedPolicy
+
+    phenos = [build(BODY_PLANS[k]()) for k in ("beetle", "teal")]
+    torch.manual_seed(0)
+    net = SharedPolicy(TriphibianEnv.OBS_DIM, TWIST_DIM + 1, hidden=16)
+    net.eval()
+
+    def run():
+        res = batchroll.evaluate_tier1_batch(
+            phenos, spec=MissionSpec(), segment_seconds=1.0, seed=5,
+            identify_axes=True, shared=net)
+        out = {}
+        for i, r in enumerate(res):
+            for d, seg in r.segments.items():
+                for k, v in list(vars(seg).items()) + list(seg.measurements.items()):
+                    if isinstance(v, float):
+                        out[f"{i}.{d}.{k}"] = v
+            for d, tr in r.transitions.results.items():
+                for k, v in vars(tr).items():
+                    if isinstance(v, float):
+                        out[f"{i}.T{d}.{k}"] = v
+        return out
+
+    was = batchroll.PRELAUNCH
+    try:
+        batchroll.PRELAUNCH = True
+        early = run()
+        batchroll.PRELAUNCH = False
+        late = run()
+    finally:
+        batchroll.PRELAUNCH = was
+    moved = [k for k in early if not (early[k] == late.get(k)
+                                      or (early[k] != early[k] and late.get(k) != late.get(k)))]
+    check("every measurement bit-identical with the launch early and in place",
+          not moved and len(early) > 50, f"{len(early)} numbers, moved {moved[:5]}")
+
+
 def test_structure_can_be_recombined_and_duplicated() -> None:
     """Structure was asexual: every graph descended from one seed by mutation.
 
@@ -4407,6 +4458,7 @@ def main() -> int:
         test_sharding_a_generation_does_not_change_a_score,
         test_the_gait_gain_drives_the_same_on_every_path,
         test_a_nan_observation_fails_the_rollout_not_the_batch,
+        test_the_early_fluid_launch_changes_nothing,
         test_structure_can_be_recombined_and_duplicated,
     ])
     return report("all search-machinery checks passed")

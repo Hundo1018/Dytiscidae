@@ -39,10 +39,12 @@ and grows to about 1.4e-6 in mission_fraction over a full evaluation.
 """
 from __future__ import annotations
 
+import ctypes
 import os as _os
 
 import numpy as np
 
+from ..physics.energy import BatchedPower
 from ..physics.medium import GRAVITY
 from ..physics.fluid import (INFLOW_AR, InducedFlow, finish_bodies, machine_flow,
                              slam_mass, strip_damping)
@@ -51,7 +53,8 @@ from .triphibian import Domain
 
 #: ``mojo/build``, as an absolute path.  Used both to put the extension on
 #: ``sys.path`` here and to tell :func:`usable`'s subprocess where it is.
-_BUILD_DIR = _os.path.join(
+#: ``DYTISCIDAE_KERNEL_DIR`` overrides it (see ``envs.kernel.BUILD``).
+_BUILD_DIR = _os.environ.get("DYTISCIDAE_KERNEL_DIR") or _os.path.join(
     _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))),
     "mojo", "build")
 
@@ -179,7 +182,10 @@ def usable(timeout: float = 180.0) -> tuple:
 #: re-uploaded per batch anyway.  Capacity is taken generously on first use
 #: because it cannot grow afterwards; exceeding it raises rather than quietly
 #: constructing a second one and hanging.
-_POOL = {"pipe": None, "cap": (0, 0, 0)}
+_POOL = {"pipe": None, "cap": (0, 0, 0),
+         # A `launch` whose `finish` has not run.  The host blocks are one per
+         # process, so any new launch waits for it before writing into them.
+         "outstanding": False}
 
 #: Headroom, because the capacity cannot grow after the first allocation and
 #: exceeding it stops the run.  Measured on a batch of 16 archetypes: 1,290
@@ -273,6 +279,9 @@ class BatchedFluid:
         self.lever2 = [e.solver._lever2.copy() for e in self.envs]
 
         self.pipe = _get_pipeline(n, nb, nm)
+        if _POOL["outstanding"]:
+            self.pipe.wait()
+            _POOL["outstanding"] = False
         self.pipe.upload_static(np.array(
             [a.ctypes.data for a in (
                 self.body_id, self.machine, self.is_wing, self.pos_local,
@@ -282,18 +291,40 @@ class BatchedFluid:
                 self.c_rot, self.limit, self.body_start)]
             + [n, nm, nb], dtype=np.int64))
 
-        self.xpos = np.zeros((nb, 3)); self.xmat = np.zeros((nb, 9))
-        self.xipos = np.zeros((nb, 3)); self.vel6 = np.zeros((nb, 6))
-        self.out = {k: np.zeros(s) for k, s in (
-            ("xfrc", (nb, 6)), ("m_body", nb), ("m_add", n), ("subf", n),
-            ("alpha", n), ("q", n), ("lift", n), ("drag", n), ("buoy", n),
-            ("vn", n), ("fsum_b", nb), ("fmag", n), ("rho", n), ("pos_w", (n, 3)),
-            ("d_bluff", n), ("force", (n, 3)))}
-        self.v_ind = np.zeros((nm, 3))
+        # Two contiguous blocks, laid out exactly as `FullPipeline.step` reads
+        # and writes them, so a step is one upload and one download.  Every
+        # array below is a view into one of them.
+        # The blocks are the pipeline's pinned host memory (one per process,
+        # like the pipeline), viewed in place: see `launch`.
+        a_in, a_out, cap_in, cap_out = self.pipe.host_blocks()
+        pinned = lambda addr, size: np.ctypeslib.as_array(
+            (ctypes.c_double * size).from_address(addr))
+        self._inbuf = pinned(a_in, cap_in)[:nb * 21 + nm * 3]
+        self._outbuf = pinned(a_out, cap_out)[:nb * 8 + n * 17]
+        ib, ob = self._inbuf, self._outbuf
+        self.xpos = ib[0:nb * 3].reshape(nb, 3)
+        self.xmat = ib[nb * 3:nb * 12].reshape(nb, 9)
+        self.xipos = ib[nb * 12:nb * 15].reshape(nb, 3)
+        self.vel6 = ib[nb * 15:nb * 21].reshape(nb, 6)
+        self.v_ind = ib[nb * 21:nb * 21 + nm * 3].reshape(nm, 3)
+        self.out = {"xfrc": ob[0:nb * 6].reshape(nb, 6),
+                    "m_body": ob[nb * 6:nb * 7], "fsum_b": ob[nb * 7:nb * 8]}
+        at = nb * 8
+        for k in ("m_add", "subf", "alpha", "q", "lift", "drag", "buoy", "vn",
+                  "fmag", "rho", "d_bluff"):
+            self.out[k] = ob[at:at + n]
+            at += n
+        self.out["pos_w"] = ob[at:at + 3 * n].reshape(n, 3)
+        self.out["force"] = ob[at + 3 * n:at + 6 * n].reshape(n, 3)
+        self._scalars = np.zeros(23)
+        self._desc = np.array([ib.ctypes.data, ob.ctypes.data,
+                               self._scalars.ctypes.data, n, nb, nm, 0],
+                              dtype=np.int64)
         self._prev_t_u = None
         self._reset_u = True
         self.clamped = np.zeros(nm, dtype=np.int32)
         self._has_bluff = int((self.is_wing == 0).any())
+        self._desc[6] = self._has_bluff
         self._v6 = np.zeros(6)
         # Slam is a one-step finite difference of the entrained mass, so it
         # needs the previous step's values and a primed flag, exactly as
@@ -301,6 +332,11 @@ class BatchedFluid:
         # one: the transition score reads it as the hydrodynamic entry load, so
         # leaving it at zero silently zeroed every crossing's shock term.
         self._prev_ma = np.zeros(n)
+        #: `step_batch`'s energy model, built on the first step.
+        self.power = None
+        #: (t, epoch) of a launched, unfinished step; see `step_batch`.
+        self._pending = None
+        self._epoch = 0
         self._prev_t = [None] * nm
         self._primed = [False] * nm
 
@@ -320,9 +356,28 @@ class BatchedFluid:
         # as `FluidSolver.reset` restarts it on the single-machine path.
         self._prev_t_u = None
         self._reset_u = True
+        # Every caller resets or restores its machines before this, so a
+        # launch from before it is of a state that no longer exists.
+        self._epoch += 1
+        self._pending = None
+
+    def ready(self, t: float) -> bool:
+        """Whether the step at ``t`` was already launched from this state."""
+        return self._pending == (t, self._epoch)
 
     def apply(self, t: float, active=None) -> None:
-        """Run the fluid for every environment and write their xfrc_applied.
+        """`launch` then `finish`: the fluid for every environment, written
+        into their ``xfrc_applied``."""
+        self.launch(t, active)
+        self.finish(t, active)
+
+    def launch(self, t: float, active=None) -> None:
+        """Gather every machine's state and start the step on the device.
+
+        Returns without waiting: nothing the host does until `finish` may touch
+        a MuJoCo position, velocity or the inflow, which this has already read,
+        but it may do anything else -- record the last step, run the policy --
+        while the device works.  The wait was a busy spin of ~100 us a step.
 
         `active` is an optional boolean mask; a machine whose battery has gone
         flat stops being stepped but stays in the batch. Dropping it would mean
@@ -330,6 +385,9 @@ class BatchedFluid:
         more than letting a few dead machines ride along in a kernel that is
         launch-bound rather than compute-bound.
         """
+        if _POOL["outstanding"]:
+            self.pipe.wait()
+            _POOL["outstanding"] = False
         for i, e in enumerate(self.envs):
             if active is not None and not active[i]:
                 continue
@@ -355,7 +413,13 @@ class BatchedFluid:
             off = e.data.xipos - e.data.subtree_com[e.model.body_rootid]
             ang = e.data.cvel[:, 0:3]
             self.vel6[a:b, 0:3] = ang
-            self.vel6[a:b, 3:6] = e.data.cvel[:, 3:6] - np.cross(off, ang)
+            # off x ang written out: np.cross is bit-identical and was 8 s of a
+            # 79 s shard evaluation in its own dispatch (moveaxis and friends).
+            v = self.vel6[a:b]
+            lin = e.data.cvel[:, 3:6]
+            v[:, 3] = lin[:, 0] - (off[:, 1] * ang[:, 2] - off[:, 2] * ang[:, 1])
+            v[:, 4] = lin[:, 1] - (off[:, 2] * ang[:, 0] - off[:, 0] * ang[:, 2])
+            v[:, 5] = lin[:, 2] - (off[:, 0] * ang[:, 1] - off[:, 1] * ang[:, 0])
 
         for i, e in enumerate(self.envs):
             self.v_ind[i] = e.solver._inflow.w if e.solver.inflow else 0.0
@@ -365,25 +429,33 @@ class BatchedFluid:
         o = self.out
         e0 = self.envs[0]
         med, sol, s = e0.solver.medium, e0.solver, e0.solver.medium.sea_state
-        desc = np.array(
-            [a.ctypes.data for a in (self.xpos, self.xmat, self.xipos, self.vel6)]
-            + [o["xfrc"].ctypes.data, o["m_body"].ctypes.data,
-               self.clamped.ctypes.data]
-            + [o[k].ctypes.data for k in
-               ("m_add", "subf", "alpha", "q", "lift", "drag", "buoy", "vn")]
-            + [self.n, self.nb, self.nm, self._has_bluff]
-            + [o[k].ctypes.data for k in ("fsum_b", "fmag", "rho", "pos_w", "d_bluff", "force")]
-            + [self.v_ind.ctypes.data],
-            dtype=np.int64)
-        self.pipe.step(desc, (
-            s.amplitude, s.wavelength, s.period,
-            float(np.cos(s.direction)), float(np.sin(s.direction)), t,
-            med.air.rho, med.air.mu, med.water.rho, med.water.mu,
-            *[float(x) for x in med.current], *[float(x) for x in med.wind],
-            sol.cd_scale, sol.added_mass_scale, sol.lift_scale,
-            int(bool(sol.wing_added_mass_tensor)), float(dt_u), int(self._reset_u),
-            int(bool(sol.unsteady))))
+        sc = self._scalars
+        sc[0:6] = (s.amplitude, s.wavelength, s.period,
+                   np.cos(s.direction), np.sin(s.direction), t)
+        sc[6:10] = (med.air.rho, med.air.mu, med.water.rho, med.water.mu)
+        sc[10:13] = med.current
+        sc[13:16] = med.wind
+        sc[16:23] = (sol.cd_scale, sol.added_mass_scale, sol.lift_scale,
+                     float(bool(sol.wing_added_mass_tensor)), dt_u,
+                     float(self._reset_u), float(bool(sol.unsteady)))
+        self.pipe.launch(self._desc)
+        _POOL["outstanding"] = True
         self._reset_u = False
+        self._launched = (t, dt_u)
+        self._pending = (t, self._epoch)
+
+    def finish(self, t: float, active=None) -> None:
+        """Wait for the step `launch` started and scatter it into each
+        machine: limiter, weight cancellation, implicit damping, inflow, jets,
+        rotors, added mass and the diagnostics."""
+        self.pipe.wait()
+        _POOL["outstanding"] = False
+        self._pending = None
+        o = self.out
+        e0 = self.envs[0]
+        sol = e0.solver
+        t_l, dt_u = self._launched
+        assert t_l == t, "finish() for a different step than launch()"
 
         # Scatter back into each machine, and fold the added mass into its mass
         # matrix.  That write stays here rather than in a kernel because these
@@ -493,6 +565,12 @@ def observation_finite(obs) -> bool:
     return bool(np.all(np.isfinite(obs)))
 
 
+#: Start each step's fluid as soon as the last `mj_step` is done (see the end of
+#: `step_batch`).  Off makes every step launch and wait in place; the two are
+#: bit-identical, which `tests/test_search.py` holds.
+PRELAUNCH = True
+
+
 def step_batch(envs, angles_list, bf: BatchedFluid, active=None):
     """One timestep for the whole batch.  Returns the updated active mask.
 
@@ -516,16 +594,25 @@ def step_batch(envs, angles_list, bf: BatchedFluid, active=None):
     # stale phase.  That showed up as mission_fraction drifting by up to 6%
     # once episodes started terminating early.
     live_i = int(np.argmax(active)) if active.any() else 0
-    bf.apply(envs[live_i].data.time, active=active)
+    t = envs[live_i].data.time
+    if not bf.ready(t):
+        bf.launch(t, active)
+    bf.finish(t, active)
 
     for i, e in enumerate(envs):
-        if not active[i]:
-            continue
-        e._mj.mj_step(e.model, e.data)
-        alive = e.budget.step(np.abs(e.data.actuator_force),
-                              np.abs(e.data.actuator_velocity), e.timestep)
-        if not alive:
-            active[i] = False
+        if active[i]:
+            e._mj.mj_step(e.model, e.data)
+    if bf.power is None:
+        bf.power = BatchedPower(envs)
+    bf.power.step(envs, active)
+    # Start the next step's fluid now.  It reads only the state `mj_step` just
+    # left, and the caller's next moves -- recording this step, running the
+    # policy, setting the controls -- change none of it, so they run while the
+    # device works instead of after it.  A caller that resets or restores its
+    # machines instead calls `reset_slam`, which discards this launch.
+    if PRELAUNCH and active.any():
+        live_i = int(np.argmax(active))
+        bf.launch(envs[live_i].data.time, active)
     return active
 
 
