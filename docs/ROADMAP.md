@@ -2423,6 +2423,63 @@ comparison. Identification is 53% of the main evaluation and waits on the
 device more than the rollouts do (7.8%): its steps have little host work to
 hide the launch behind.
 
+## arch45 — the work list
+
+arch44 is running (600 gens, launched 2026-09-27); nothing here touches it.
+
+### AJ. Work stealing across the pool -- **not built; measured as a symptom, sized by nothing yet**
+
+Raised 2026-09-29 while reading arch44 at gen 402. The pool is CPU-bound in
+the workers, and it wastes part of that on the tail of every generation.
+
+**What was seen.** 130 s of `/proc` jiffies on arch44: while evaluating, each
+busy worker sits at 100% of a core, the parent at 0%, the GPU at 9%, and the
+machine has 20 cores of which the run uses 4. At several instants only 2-3 of 4
+workers were busy: the rest had finished their shard and were waiting on the
+slowest one. Per-design wall (`evaluate` events, `wall`) varies widely inside a
+generation and grows with DOF (about 0.9 s per DOF above a ~35 s floor), so the
+four shards of four are not equal work, and `split()` fixes them before anyone
+knows which is slow.
+
+**What is not known, and must be measured first (no code before this):**
+- the idle fraction: sum over a generation of `(slowest shard - each shard)`
+  as a share of `workers x slowest shard`. Every `evaluate` event has `wall`;
+  the shard's end time is in the parent's `_batched` call. Log per-shard wall
+  in `ActorPool` first, for a few hundred generations of an existing run.
+  If it is under ~10%, close this item.
+- the ceiling. 16x1 took 93.3 s against 4x4's 31.7 s (CLAUDE.md, pool sweep):
+  the lockstep batch amortises the fluid launch, so **the unit stolen cannot be
+  one machine**. The candidates are more shards than workers (say 6 shards of
+  2-3 pulled from a queue by 4 workers) or splitting by predicted cost (DOF)
+  instead of by count. Sweep both against the real evaluation path; do not model
+  it -- a wall-time model was wrong by 3x once already.
+- memory. Worker count is bounded by memory, not cores (8x2 was OOM-killed);
+  a queue keeps 4 workers, so it should not change that, but check RSS.
+
+**Constraints already established.**
+- Scores do not depend on sharding (`envs/actors.py`; `tests/test_search.py`
+  asserts it), except that the *shared policy's sampled exploration* depends on
+  how work was split. A dynamic queue makes the split depend on timing, so a run
+  stops being reproducible from its seed unless each machine's actions are
+  drawn from a per-machine stream. Decide that before building; it is what
+  arch44's "gens 0-39 reproduce arch43" check relies on.
+- `split()` and the `--min-shard` trap (one Tier-0 rejection at batch 16 gives
+  `15 // 8 = 1`) are the same code; a queue removes the trap if done right.
+- Bit-identity gate: the 700-number benchmark
+  (`experiments/perf/reference_df95498.json`) must not change.
+
+**Not the same as the other perf levers** in "where a worker's time went":
+those cut instructions per machine; this recovers wall time the workers spend
+idle. They compose.
+
+**Pre-registered read.** Generation wall at fixed seed, before against after,
+on an idle machine, over at least 30 generations (arch44's per-generation
+timing is confounded by whatever else the laptop is running: 284-384 s/gen at
+gens 250-400 against 86-130 s at gens 7-32). A gain under the run-to-run spread
+is not a gain.
+
+---
+
 ## 2026-09-23..26 — AB-AF executed, every open fluid item closed, and a rotor control
 
 The user asked for three things: take the AB-AF list through to verification and
