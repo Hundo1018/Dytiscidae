@@ -539,6 +539,44 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_holding_height_is_flight_only_if_the_actuators_can",),
         item="AD level gate"),
     Mutation(
+        id="funnel-refines-everyone",
+        path="dytiscidae/evolution/loop.py",
+        find="            if w is None or w.size == 0 or (chosen is not None and not chosen[i]):",
+        replace="            if w is None or w.size == 0:",
+        defect="the refinement funnel is recorded and ignored: every candidate "
+               "still enters every step's batch, so it saves nothing (AK)",
+        suites=("test_search::test_the_refinement_funnel_refines_only_what_it_selects",),
+        item="AK funnel"),
+    Mutation(
+        id="exploration-noise-per-shard",
+        path="dytiscidae/envs/batchroll.py",
+        find="        if shared is None or buffer is None:\n            return None\n",
+        replace="        return None\n",
+        defect="the learning rollout draws its noise from torch's stream seeded "
+               "per shard, so a machine explores differently in another shard "
+               "and the pool's shape changes what the learner sees (AJ)",
+        suites=("test_search::test_sharding_a_generation_does_not_change_a_score",),
+        item="AJ reproducibility"),
+    Mutation(
+        id="queue-results-in-shard-order",
+        path="dytiscidae/envs/actors.py",
+        find="            for i, r in zip(idx, res):\n                results[i] = r\n",
+        replace="            for i, r in zip(sorted(range(n))[len([x for x in results if x is not None]):], res):\n"
+                "                results[i] = r\n",
+        defect="results come back in shard order rather than to the machines "
+               "that earned them once shards are not contiguous (AJ)",
+        suites=("test_search::test_sharding_a_generation_does_not_change_a_score",),
+        item="AJ queue"),
+    Mutation(
+        id="promotion-re-identifies",
+        path="dytiscidae/evolution/loop.py",
+        find='        bases = MobilityBasis.bases_from_record(elite.meta.get("mobility_basis"))',
+        replace="        bases = {}",
+        defect="a promotion re-identifies the elite at a fresh seed and hands "
+               "Tier-2 a basis its Tier-1 score was not earned with (AL)",
+        suites=("test_search::test_promotion_spends_refinement_and_keeps_what_it_buys",),
+        item="AL promotion"),
+    Mutation(
         id="identify-one-means-identify-all",
         path="dytiscidae/envs/batchroll.py",
         find="        wanted = [i for i in live if identify_axes[i]]",

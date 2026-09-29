@@ -2512,8 +2512,78 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
         check("elites carry policy weights forward",
               len(stored) == len(state.archive.cells) and stored,
               f"{len(stored)} of {len(state.archive.cells)}")
+        # AL: the stage walls are recorded, and a promotion refines from the
+        # basis the elite was scored with instead of re-identifying it.
+        check("each promotion records its refinement, Tier-1.5 and Tier-2 walls",
+              all({"refine_wall", "tier1_5_wall", "tier2_wall"} <= set(p)
+                  for p in promotions), f"{sorted(promotions[0]) if promotions else []}")
+        import numpy as _np
+
+        from dytiscidae.core.phenotype import build
+        from dytiscidae.evolution import loop as loop_mod
+        elite = next(e for e in state.archive.cells.values()
+                     if e.meta.get("mobility_basis"))
+        rec = elite.meta["mobility_basis"]
+        state.pool = None
+        got = loop_mod._refined_controllers_for(
+            state, [elite], [build(elite.genome)], MissionSpec(),
+            _np.random.default_rng(0))[0]
+        same = (got is not None and set(got.bases or {}) == set(rec) and all(
+            _np.array_equal(got.bases[k].modes, _np.asarray(rec[k]["modes"]))
+            for k in rec))
+        check("promotion drives the recorded basis, not a fresh identification",
+              same, f"media {sorted((got.bases or {}) if got else [])} against {sorted(rec)}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_the_refinement_funnel_refines_only_what_it_selects() -> None:
+    """ROADMAP AK: with a funnel, only the selected candidates enter a step's
+    batch -- that is the saving -- and the others keep their re-scored result."""
+    if needs_batched_evaluator("test_the_refinement_funnel_refines_only_what_it_selects"):
+        return
+    print("\nloop: the refinement funnel")
+    from dytiscidae.control.cpg import Policy
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import MissionSpec, TriphibianEnv
+    from dytiscidae.evolution import loop as loop_mod
+
+    cfg = loop_mod.SearchConfig(segment_seconds=0.5, controller_refine_steps=2)
+    phenos = [build(BODY_PLANS[k]()) for k in ("beetle", "gannet", "teal")]
+    ctrls = []
+    for i, _p in enumerate(phenos):
+        pol = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=cfg.n_modes, hidden=0)
+        pol.weights = np.random.default_rng(i).normal(0.0, 0.2, pol.n_weights)
+        ctrls.append(Controller(params=None, policy=pol))
+    spec = MissionSpec()
+    base = loop_mod._batched(None, phenos, spec=spec, controllers=ctrls,
+                             segment_seconds=cfg.segment_seconds,
+                             identify_axes=True, seed=5, n_modes=cfg.n_modes)
+    before = [c.policy for c in ctrls]
+    sizes = []
+    real = loop_mod.batchroll_eval
+
+    def counting(ph, *a, **kw):
+        sizes.append(len(ph))
+        return real(ph, *a, **kw)
+
+    loop_mod.batchroll_eval = counting
+    try:
+        log = {}
+        out = loop_mod._refine_controllers(
+            phenos, ctrls, list(base), cfg, spec=spec, seed=5, log=log,
+            select=lambda slot, r: slot == 1)
+    finally:
+        loop_mod.batchroll_eval = real
+    check("each step's batch holds only the selected candidate",
+          sizes == [1, 1], f"batch sizes {sizes}")
+    check("the funnel is recorded",
+          log.get("funnel") == [1, 3], f"{log.get('funnel')}")
+    check("and the others keep their controller and their result",
+          ctrls[0].policy is before[0] and ctrls[2].policy is before[2]
+          and out[0] is base[0] and out[2] is base[2])
 
 
 def test_a_shared_command_means_the_same_thing_on_every_body() -> None:
@@ -2697,7 +2767,7 @@ def test_every_path_agrees_on_the_control_law() -> None:
         check(f"{fn.__name__} accepts the shared policy",
               "shared" in inspect.signature(fn).parameters,
               f"parameters: {list(inspect.signature(fn).parameters)}")
-    src = inspect.getsource(loop_mod._refined_controller_for)
+    src = inspect.getsource(loop_mod._refined_controllers_for)
     check("promotion-time refinement passes it on",
           "shared=state.shared" in src)
     check("and Tier-2 verification is given the summed law",
@@ -4045,6 +4115,40 @@ def test_sharding_a_generation_does_not_change_a_score() -> None:
           f"; without the shared policy it would be "
           f"{max(abs(a - b) for a, b in zip(without, sharded)):.3g}")
 
+    # AJ: the *learning* rollout samples, and its noise used to come from
+    # torch's stream seeded per shard, so a machine explored differently in
+    # another shard.  Each machine now has its own stream, keyed by its place in
+    # the generation, so one shard, three in order, and a cost-balanced queue
+    # of three must bank the same trajectories and score the same.
+    from dytiscidae.envs.actors import plan_shards
+    from dytiscidae.learning.ppo import RolloutBuffer
+
+    def learn(workers, **pool_kw):
+        pool = ActorPool(workers, min_shard=2, **pool_kw)
+        ctrls = [Controller(params=None, policy=None, bases=dict(c.bases or {}))
+                 for c in ctrls0]
+        buf = RolloutBuffer()
+        try:
+            res = pool.evaluate_tier1(phenos, controllers=ctrls, shared=net,
+                                      buffer=buf, **rescore)
+        finally:
+            pool.close()
+        acts = sorted(round(float(np.sum(t.act)), 4) for t in buf.trajectories)
+        return [round(float(seg.distance), 9) for r in res
+                for _d, seg in sorted(r.segments.items(), key=lambda kv: str(kv[0]))], acts
+
+    l1, l3 = learn(1), learn(3, per_worker=1.5, balance=True)
+    check("a balanced queue plans more shards than workers, all machines once",
+          sorted(i for s in plan_shards([p.n_actuated for p in phenos], 2, 2,
+                                        per_worker=1.5, balance=True) for i in s)
+          == list(range(len(phenos)))
+          and len(plan_shards([p.n_actuated for p in phenos], 2, 2,
+                              per_worker=1.5, balance=True)) == 3)
+    check("a sampled rollout explores the same in one shard or a queue of three",
+          l1[1] == l3[1] and max(abs(a - b) for a, b in zip(l1[0], l3[0])) < 1e-4,
+          f"{len(l1[1])} trajectories; max distance difference "
+          f"{max(abs(a - b) for a, b in zip(l1[0], l3[0])):.3g}")
+
 
 def test_the_gait_gain_drives_the_same_on_every_path() -> None:
     """The gain channel is honoured by the batched pool and the single path alike.
@@ -4463,6 +4567,7 @@ def main() -> int:
         test_the_headline_is_the_mission,
         test_an_audit_perturbs_the_scored_experiment_and_nothing_else,
         test_promotion_spends_refinement_and_keeps_what_it_buys,
+        test_the_refinement_funnel_refines_only_what_it_selects,
         test_a_shared_command_means_the_same_thing_on_every_body,
         test_the_identification_width_reaches_the_policy,
         test_the_search_is_pointed_at_the_mission_and_compounds,

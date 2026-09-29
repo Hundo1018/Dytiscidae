@@ -166,6 +166,9 @@ def cmd_search(args) -> int:
         seed=args.seed,
         workers=args.workers,
         min_shard=args.min_shard,
+        pool_per_worker=args.pool_per_worker,
+        pool_balance=bool(args.pool_balance),
+        controller_refine_funnel=args.refine_funnel,
         action_rate_penalty=args.action_rate_penalty,
         descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
         gait_gain=bool(args.gait_gain),
@@ -532,17 +535,11 @@ def controller_for_elite(design_dir, elite, p, seed: int, *, log=print):
     # and until `eval_seed` was recorded there was no way to ask for the
     # draw the score used.  So prefer what is stored and fall back to a
     # fresh identification, saying which happened.
-    bases, basis_src = {}, "stored"
+    basis_src = "stored"
     stored = (elite.meta or {}).get("mobility_basis") or {}
-    for dom_name, b in stored.items():
-        try:
-            bases[dom_name] = _Basis(
-                modes=_np.asarray(b["modes"], float),
-                effects=_np.asarray(b["effects"], float),
-                authority=_np.asarray(b["authority"], float),
-                medium=str(b.get("medium") or dom_name))
-        except Exception as exc:                              # noqa: BLE001
-            log(f"  stored basis for {dom_name} unusable: {exc}")
+    bases = _Basis.bases_from_record(stored)
+    for dom_name in sorted(set(stored) - set(bases)):
+        log(f"  stored basis for {dom_name} unusable")
     if not bases:
         basis_src = "re-identified"
         seed = (elite.meta or {}).get("eval_seed")
@@ -837,6 +834,16 @@ def main(argv=None) -> int:
                         "is not worth a batch's fixed cost, so the pool never "
                         "makes more than --batch // --min-shard of them: to "
                         "use more cores, raise --batch.")
+    p.add_argument("--pool-per-worker", type=float, default=1.0,
+                   help="shards per worker; above 1 the pool becomes a queue "
+                        "that hands the next shard to whichever worker is free "
+                        "(ROADMAP AJ). 1 is the pool every stored run used")
+    p.add_argument("--refine-funnel", type=float, default=None,
+                   help="refine only candidates within this fraction of their "
+                        "cell's incumbent (ROADMAP AK); unset refines all")
+    p.add_argument("--pool-balance", action="store_true",
+                   help="assign machines to shards by predicted cost (DOF) "
+                        "rather than by position (ROADMAP AJ)")
     p.add_argument("--min-shard", type=int, default=4,
                    help="fewest machines a worker is given at once. Measured "
                         "per machine-step: 238 us alone, 149 in a shard of "

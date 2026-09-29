@@ -246,7 +246,7 @@ class SharedPolicy(nn.Module if AVAILABLE else object):
         base = self.latent(obs)
         return self._log_prob_under(base, act), self.entropy_of(base)
 
-    def act_many(self, obs_np, *, deterministic: bool = False):
+    def act_many(self, obs_np, *, deterministic: bool = False, rngs=None):
         """One decision per row, in a single forward pass.
 
         Identical in distribution to calling :meth:`act` once per row -- the
@@ -261,13 +261,18 @@ class SharedPolicy(nn.Module if AVAILABLE else object):
         What it does change is the order the samples are drawn in, so a run
         using this is reproducible against itself and not against a run that
         called :meth:`act` per machine.
+
+        ``rngs``, one numpy generator per row, draws each row's noise from its
+        own stream instead of torch's global one.  The batched evaluator passes
+        one per machine, keyed by the machine's place in the generation, so a
+        machine explores the same way whichever shard it lands in (ROADMAP AJ).
         """
         with torch.no_grad():
             obs = torch.as_tensor(np.asarray(obs_np, np.float32))
             if obs.ndim == 1:
                 obs = obs.unsqueeze(0)
             base = self.latent(obs)
-            u = base.mean if deterministic else base.sample()
+            u = base.mean if deterministic else _draw(base, rngs)
             a = torch.tanh(u)
             logp = (base.log_prob(u).sum(-1)
                     - torch.log1p(-a.pow(2) + 1e-6).sum(-1))
@@ -275,18 +280,32 @@ class SharedPolicy(nn.Module if AVAILABLE else object):
         return (a.numpy().astype(float), logp.numpy().astype(float),
                 v.numpy().astype(float))
 
-    def act(self, obs_np, *, deterministic: bool = False):
-        """One decision, numpy in and numpy out, for use inside a rollout."""
+    def act(self, obs_np, *, deterministic: bool = False, rng=None):
+        """One decision, numpy in and numpy out, for use inside a rollout.
+
+        ``rng`` as in :meth:`act_many`, for the one row.
+        """
         with torch.no_grad():
             obs = torch.as_tensor(np.asarray(obs_np, np.float32)).unsqueeze(0)
             base = self.latent(obs)
-            u = base.mean if deterministic else base.sample()
+            u = (base.mean if deterministic
+                 else _draw(base, None if rng is None else [rng]))
             a = torch.tanh(u)
             logp = (base.log_prob(u).sum(-1)
                     - torch.log1p(-a.pow(2) + 1e-6).sum(-1))
             v = self.value(obs)
         return (a.squeeze(0).numpy().astype(float),
                 float(logp.item()), float(v.item()))
+
+
+def _draw(base, rngs):
+    """A sample of ``base``: torch's stream, or one numpy stream per row."""
+    if rngs is None:
+        return base.sample()
+    mean, std = base.mean, base.stddev
+    eps = np.stack([np.asarray(g.standard_normal(mean.shape[-1]), np.float32)
+                    for g in rngs])
+    return mean + std * torch.as_tensor(eps)
 
 
 @dataclass

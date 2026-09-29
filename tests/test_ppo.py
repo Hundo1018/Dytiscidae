@@ -1064,9 +1064,9 @@ def test_the_learner_is_wired_to_the_evaluator() -> None:
     calls = {"sampled": 0, "mean": 0}
     inner = scorer.act
 
-    def counting_act(obs, *, deterministic=False):
+    def counting_act(obs, *, deterministic=False, rng=None):
         calls["mean" if deterministic else "sampled"] += 1
-        return inner(obs, deterministic=deterministic)
+        return inner(obs, deterministic=deterministic, rng=rng)
 
     scorer.act = counting_act
     evaluate_tier1_batch([build(beetle())], segment_seconds=0.4,

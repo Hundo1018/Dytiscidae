@@ -693,7 +693,7 @@ def identify_batch(envs, domain, *, probe_time: float = 1.2, n_probes: int = 24,
 
 def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                   domain, control_hz: float = 25.0, policies=None,
-                  bases=None, shared=None, collector=None):
+                  bases=None, shared=None, collector=None, noise_rngs=None):
     """`TriphibianEnv.rollout` for a whole batch, one GPU call per timestep.
 
     Mirrors the single-machine version step for step, including which sample
@@ -751,7 +751,9 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
             if rows:
                 acts, logps, vals = shared.act_many(
                     np.asarray(obs_rows, np.float32),
-                    deterministic=collector is None)
+                    deterministic=collector is None,
+                    rngs=(None if noise_rngs is None
+                          else [noise_rngs[m] for m in rows]))
                 shared_out = {
                     m: (obs_rows[j], acts[j], float(logps[j]), float(vals[j]))
                     for j, m in enumerate(rows)}
@@ -878,7 +880,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                          segment_seconds: float = 10.0,
                          identify_axes=False, seed: int = 0,
                          sea_state=None, perturb: dict | None = None,
-                         shared=None, buffer=None, n_modes: int = 6):
+                         shared=None, buffer=None, n_modes: int = 6,
+                         streams=None):
     """`evaluate_tier1` for a whole generation, sharing one GPU pipeline.
 
     ``identify_axes`` is one bool for the whole batch or one per phenotype.
@@ -887,6 +890,14 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     bool, and the generation passed ``any`` of its candidates' wishes, so
     ``identify_axes_every > 1`` identified every candidate whenever one of
     them was due (ROADMAP AN).
+
+    ``streams`` names each phenotype's exploration stream, one int each,
+    default its position here.  The actor pool passes each machine's position
+    in the whole generation, so a sampled rollout explores identically however
+    the generation is split into shards (ROADMAP AJ).  Until 2026-09-30 the
+    noise came from torch's global stream, seeded per *shard*, so moving a
+    machine to another shard changed what it explored and therefore what the
+    learner saw.
 
     Both the three domain segments and the three transitions are batched. What
     is not, and cannot be, is the mobility identification: it drives each CPG
@@ -985,6 +996,17 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
 
     group = [envs[i] for i in live]
     bf = BatchedFluid(group)
+    streams = list(range(k)) if streams is None else [int(x) for x in streams]
+    if len(streams) != k:
+        raise ValueError(f"streams has {len(streams)} entries for {k} phenotypes")
+
+    def _noise(tag: int):
+        # Only a rollout that feeds the learner samples; the rest act at the
+        # mean and need no stream.
+        if shared is None or buffer is None:
+            return None
+        return [np.random.default_rng([int(seed) & 0x7FFFFFFF, streams[i], tag])
+                for i in live]
 
     for dom in DOMAIN_CYCLE:
         # One draw per domain, shared by every machine: candidates in a
@@ -1013,7 +1035,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
             group, bf, segment_seconds, [ctrls[i].params for i in live], dom,
             policies=[ctrls[i].policy for i in live],
             bases=[ctrls[i].basis_for(dom) for i in live],
-            shared=shared, collector=collector)
+            shared=shared, collector=collector,
+            noise_rngs=_noise(DOMAIN_CYCLE.index(dom)))
         for slot, i in enumerate(live):
             results[i].segments[dom.value] = segs[slot]
             clamped[i] = clamped[i] or bool(envs[i].solver.diag.clamped)
@@ -1027,14 +1050,15 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     # (transitions.py records exactly that for all six seed plans).  Two
     # runs of take-off scoring later, 4.0% of arch36 cleared 0.30 m with a
     # lifting surface while holding posture, so the reason is spent.
-    for kind in ("air_to_water", "water_to_air", "water_to_land",
-                 "land_to_air"):
+    for t_index, kind in enumerate(("air_to_water", "water_to_air",
+                                    "water_to_land", "land_to_air")):
         tcollector = None
         if shared is not None and buffer is not None:
             from ..learning.ppo import SegmentCollector
             tcollector = SegmentCollector(len(group))
         trs = run_transition_batch(group, bf, kind, [ctrls[i] for i in live],
-                                   shared=shared, collector=tcollector)
+                                   shared=shared, collector=tcollector,
+                                   noise_rngs=_noise(100 + t_index))
         for slot, i in enumerate(live):
             tr = trs[slot]
             results[i].transitions.results[kind] = tr
@@ -1070,7 +1094,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
 
 
 def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
-                         duration: float = 6.0, shared=None, collector=None):
+                         duration: float = 6.0, shared=None, collector=None,
+                         noise_rngs=None):
     """`run_transition` for a whole batch, one GPU call per timestep.
 
     Mirrors the single-machine version exactly, including the two post-loop
@@ -1154,7 +1179,8 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
                         gain = float(own[n_own])
                 if shared is not None:
                     a, logp, val = shared.act(
-                        obs, deterministic=collector is None)
+                        obs, deterministic=collector is None,
+                        rng=None if noise_rngs is None else noise_rngs[m])
                     a_np = _np.asarray(a, float)
                     if len(a_np) > TWIST_DIM:
                         gain = (gain or 0.0) + float(a_np[TWIST_DIM])

@@ -99,8 +99,11 @@ def _run_shard(payload):
     design carrying its parent's axes, which is the failure the identification
     exists to prevent.
     """
+    import time
+
     from . import batchroll
 
+    t0 = time.perf_counter()
     (phenos, ctrls, kwargs, shared_spec, shard_index) = payload
     shared = buffer = None
     if shared_spec is not None:
@@ -126,7 +129,8 @@ def _run_shard(payload):
 
     results = batchroll.evaluate_tier1_batch(
         phenos, controllers=ctrls, shared=shared, buffer=buffer, **kwargs)
-    return results, ctrls, (list(buffer.trajectories) if buffer else [])
+    return (results, ctrls, (list(buffer.trajectories) if buffer else []),
+            time.perf_counter() - t0)
 
 
 def split(n: int, workers: int, min_shard: int) -> list:
@@ -156,6 +160,50 @@ def split(n: int, workers: int, min_shard: int) -> list:
     return out
 
 
+def plan_shards(costs, workers: int, min_shard: int, *,
+                per_worker: float = 1.0, balance: bool = False) -> list:
+    """Shards as lists of indices, most expensive first (ROADMAP AJ).
+
+    With the defaults it is exactly ``split``: contiguous, one per worker,
+    never finer than ``min_shard``.  ``per_worker > 1`` makes more shards than
+    workers, and the pool's executor hands each worker the next one as it
+    finishes -- a queue, so a worker that drew cheap machines does not sit idle
+    while another finishes an expensive shard.  ``balance`` assigns machines to
+    shards by ``costs`` (longest first, each to the lightest shard) instead of
+    by position, so the shards are equal work rather than equal count.
+
+    The composition is decided before anything runs and depends only on the
+    phenotypes, never on timing, so a run stays reproducible from its seed:
+    which *worker* runs a shard changes nothing (the exploration noise is per
+    machine, ``batchroll.evaluate_tier1_batch(streams=...)``).
+    """
+    n = len(costs)
+    if n <= 0:
+        return []
+    cap = max(1, n // max(int(min_shard), 1))
+    k = max(1, min(int(round(max(int(workers), 1) * max(float(per_worker), 1.0))), cap))
+    if not balance:
+        base, extra = divmod(n, k)
+        out, at = [], 0
+        for i in range(k):
+            step = base + (1 if i < extra else 0)
+            out.append(list(range(at, at + step)))
+            at += step
+        return out
+    load = [0.0] * k
+    size = [0] * k
+    width = -(-n // k)
+    out = [[] for _ in range(k)]
+    for i in sorted(range(n), key=lambda j: (-float(costs[j]), j)):
+        j = min((b for b in range(k) if size[b] < width),
+                key=lambda b: (load[b], size[b], b))
+        out[j].append(i)
+        load[j] += float(costs[i])
+        size[j] += 1
+    order = sorted(range(k), key=lambda b: (-load[b], b))
+    return [sorted(out[b]) for b in order if out[b]]
+
+
 def _pool_is_broken(exc: Exception) -> bool:
     """Whether the pool itself failed -- a dead worker, or a worker that could
     not start (the unguarded-main case) -- as opposed to one evaluation
@@ -180,10 +228,19 @@ class ActorPool:
     #: Consecutive batches a worker may raise on before the pool is dropped.
     RETRY_STREAK = 3
 
-    def __init__(self, workers: int = 1, *, min_shard: int = 4) -> None:
+    def __init__(self, workers: int = 1, *, min_shard: int = 4,
+                 per_worker: float = 1.0, balance: bool = False) -> None:
         self.workers = max(int(workers), 1)
         self.min_shard = max(int(min_shard), 1)
+        #: See ``plan_shards``.  1.0 and False are the pool every run used.
+        self.per_worker = max(float(per_worker), 1.0)
+        self.balance = bool(balance)
         self._pool = None
+        #: One entry per sharded call: each shard's wall inside its worker,
+        #: its size, and the parent's wall for the whole call.  AJ's
+        #: measurement -- how long the other workers wait on the slowest shard
+        #: -- is ``sum(max - w) / (len * max)``.  The caller drains it.
+        self.shard_log: list = []
         if self.workers > 1:
             import multiprocessing as mp
             from concurrent.futures import ProcessPoolExecutor
@@ -210,7 +267,14 @@ class ActorPool:
 
         n = len(phenos)
         ctrls = list(controllers) if controllers is not None else [None] * n
-        shards = split(n, self.workers, self.min_shard)
+        # Every machine's exploration stream is its place in this call, passed
+        # down with it, so the split below cannot change what it explores.
+        if kwargs.get("streams") is None:
+            kwargs = dict(kwargs, streams=list(range(n)))
+        shards = plan_shards(
+            [0.9 * float(getattr(p, "n_actuated", 0)) + 35.0 for p in phenos],
+            self.workers, self.min_shard, per_worker=self.per_worker,
+            balance=self.balance)
         if self._pool is None or len(shards) <= 1:
             return batchroll.evaluate_tier1_batch(
                 phenos, controllers=ctrls, shared=shared, buffer=buffer,
@@ -242,14 +306,18 @@ class ActorPool:
                 buffer is not None,
             )
 
+        import time
+
+        t_call = time.perf_counter()
         futures = []
-        for j, (a, b) in enumerate(shards):
-            kw = kwargs
-            # A per-phenotype identify list travels with its shard.
+        for j, idx in enumerate(shards):
+            # Per-phenotype lists travel with their shard.
+            kw = dict(kwargs, streams=[kwargs["streams"][i] for i in idx])
             if isinstance(kwargs.get("identify_axes"), (list, tuple)):
-                kw = dict(kwargs, identify_axes=list(kwargs["identify_axes"][a:b]))
+                kw["identify_axes"] = [kwargs["identify_axes"][i] for i in idx]
             futures.append(self._pool.submit(
-                _run_shard, (phenos[a:b], ctrls[a:b], kw, spec, j)))
+                _run_shard, ([phenos[i] for i in idx], [ctrls[i] for i in idx],
+                             kw, spec, j)))
 
         # Collect everything before applying any of it.  A worker that dies
         # halfway would otherwise leave the buffer holding some shards'
@@ -270,10 +338,15 @@ class ActorPool:
                 **kwargs)
 
         self._streak = 0
+        self.shard_log.append({
+            "walls": [round(float(c[3]), 3) for c in collected],
+            "sizes": [len(idx) for idx in shards],
+            "call": round(time.perf_counter() - t_call, 3)})
         results = [None] * n
-        for (a, b), (res, back, trajectories) in zip(shards, collected):
-            results[a:b] = res
-            for local, remote in zip(ctrls[a:b], back):
+        for idx, (res, back, trajectories, _wall) in zip(shards, collected):
+            for i, r in zip(idx, res):
+                results[i] = r
+            for local, remote in zip([ctrls[i] for i in idx], back):
                 if local is None or remote is None:
                     continue
                 # In place: the caller holds these references and stores what

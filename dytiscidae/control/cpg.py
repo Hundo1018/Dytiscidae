@@ -270,6 +270,26 @@ class MobilityBasis:
     n_probes: int = 0
     residual_fraction: float = 0.0
 
+    @classmethod
+    def bases_from_record(cls, record) -> dict:
+        """``{medium: MobilityBasis}`` from an elite's ``meta["mobility_basis"]``.
+
+        The record is what the search wrote beside the score -- the basis the
+        score was earned against (``evolution.loop._meta``).  A medium whose
+        record will not rebuild is left out, so an empty result means "not
+        recorded" and the caller re-identifies.
+        """
+        out = {}
+        for dom, b in (record or {}).items():
+            try:
+                out[dom] = cls(modes=np.asarray(b["modes"], float),
+                               effects=np.asarray(b["effects"], float),
+                               authority=np.asarray(b["authority"], float),
+                               medium=str(b.get("medium") or dom))
+            except (KeyError, TypeError, ValueError):
+                continue
+        return out
+
     @property
     def numerical_rank(self) -> int:
         """Rank in the linear-algebra sense: singular values above the level

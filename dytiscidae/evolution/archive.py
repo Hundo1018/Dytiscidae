@@ -223,21 +223,51 @@ class Archive:
             cell=cell, meta=meta or {}, born_at=self.generation, tier=tier,
             objectives=obj,
         )
+        if front and self.cells.get(cell) is None:
+            # A front with no representative should be impossible, but repairing
+            # it is strictly better than raising from inside an evaluation.
+            self.cells[cell] = self._representative(front)
 
+        status, kept = self._verdict(cell, cand)
+        if kept is not None:
+            self.fronts[cell] = kept
+            self.cells[cell] = self._representative(kept)
+        return status
+
+    def would_add(self, fitness: float, descriptor, objectives=None) -> str:
+        """What ``add`` would return for this candidate, changing nothing.
+
+        The same verdict, from the same code (``_verdict``).  AK's dry run: the
+        status a design would get before its controller was refined, against
+        the archive as it stands when the refined one is filed.
+        """
+        if not math.isfinite(fitness):
+            return "rejected"
+        obj = np.zeros(0) if objectives is None else np.asarray(objectives, float)
+        cell = self.cell_of(descriptor)
+        cand = Elite(genome=None, fitness=fitness,
+                     descriptor=np.asarray(descriptor, float), cell=cell,
+                     meta={}, born_at=self.generation, objectives=obj)
+        return self._verdict(cell, cand)[0]
+
+    @staticmethod
+    def _representative(front):
+        return max(front, key=lambda e: e.objectives[0] if e.objectives.size else e.fitness)
+
+    def _verdict(self, cell, cand):
+        """``(status, new_front)`` for ``cand`` in ``cell``; ``None`` = unchanged.
+
+        Reads the archive and writes only ``cand``'s own bookkeeping.
+        """
+        front = self.fronts.get(cell) or []
+        obj, fitness = cand.objectives, cand.fitness
         if not front:
-            self.fronts[cell] = [cand]
-            self.cells[cell] = cand
-            return "new"
+            return "new", [cand]
 
         # Inherit the cell's exploration bookkeeping: it describes the region,
         # not the individual, and resetting it every time an occupant changes
         # makes every cell look permanently untried to the curator.
-        incumbent = self.cells.get(cell)
-        if incumbent is None:
-            # A front with no representative should be impossible, but repairing
-            # it is strictly better than raising from inside an evaluation.
-            incumbent = max(front, key=lambda e: e.objectives[0] if e.objectives.size else e.fitness)
-            self.cells[cell] = incumbent
+        incumbent = self.cells.get(cell) or self._representative(front)
         cand.offspring = incumbent.offspring
         cand.offspring_placed = incumbent.offspring_placed
         cand.improvements = incumbent.improvements + 1
@@ -245,13 +275,11 @@ class Archive:
         if obj.size == 0 or any(e.objectives.size != obj.size for e in front):
             # No objective vector to compare on: fall back to the scalar.
             if fitness > incumbent.fitness:
-                self.fronts[cell] = [cand]
-                self.cells[cell] = cand
-                return "improved"
-            return "rejected"
+                return "improved", [cand]
+            return "rejected", None
 
         if any(self._dominates(e.objectives, obj) for e in front):
-            return "rejected"
+            return "rejected", None
 
         kept = [e for e in front if not self._dominates(obj, e.objectives)]
         kept.append(cand)
@@ -261,12 +289,8 @@ class Archive:
             if not any(e is cand for e in kept):
                 # Survived dominance but lost on crowding: it sits on top of
                 # designs the cell already has.
-                self.fronts[cell] = kept
-                self.cells[cell] = max(kept, key=lambda e: e.objectives[0])
-                return "rejected"
-        self.fronts[cell] = kept
-        self.cells[cell] = max(kept, key=lambda e: e.objectives[0])
-        return "improved"
+                return "rejected", kept
+        return "improved", kept
 
     def remove(self, cell: tuple[int, ...]) -> bool:
         """Empty a cell completely.

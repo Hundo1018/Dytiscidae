@@ -2511,7 +2511,30 @@ identification exists to prevent. **Now:** refuse `identify_axes_every > 1` at
 config load, with a mutation that sets it to 2 and expects the refusal, so the
 knob cannot silently lie.
 
-### 2. Telemetry bundle -- **not built; no behaviour change**
+### 2. Telemetry bundle -- **built 2026-09-30**
+
+**Done, no behaviour change, and checked against a baseline run.** Two 8-gen
+searches at seed 7 (batch 8, 2 workers, 2 s segments, refine 2, shared policy)
+were run, one at `5221fe1` and one with this change. Every `generations.jsonl`
+line and every event outside the new fields was identical through gen 5 (216
+events). What each generation now writes:
+- a `stages` event: walls of `main`, `rescore` and each refinement step;
+  `accepted` trials per step; `placed`, `refined` (designs a step changed) and
+  `placement_changed`; `shards`, each sharded call's per-shard walls inside the
+  workers; and `idle`, the share of worker time spent waiting on the slowest
+  shard. `placement_changed` comes from a dry run: `_score_candidate(commit=False)`
+  plus `Archive.would_add`. That is the same code `_place` and `Archive.add`
+  run, split out rather than copied (`_verdict`). The only difference is that a
+  dry run's population standings do not yet count the candidate itself.
+- `stage_wall` events for `verify` and `audit`, and `refine_wall`,
+  `tier1_5_wall` and `tier2_wall` on every `promote`.
+- `snapshots/gen{NNNN}_{island}.json`, every island's archive every
+  `snapshot_every` (50) gens, with `n_rotors` on every elite's meta.
+
+What the 8-gen check already showed, as a size and not a result: at 2 s
+segments, refinement accepted **0 of 8 trials in every step of every
+generation**, and two of the six generations ran as one shard (one Tier-0
+rejection at batch 8 gives `7 // 4 = 1`).
 
 The measurement steps of AK (per-stage wall, trials accepted per refinement
 step, placement status before against after refinement via a dry-run `_place`),
@@ -2520,7 +2543,17 @@ AL (wall of promotion, Tier-1.5, Tier-2 and audit), AJ (per-shard wall in
 split rotor from flapping by generation without one). The 700-number benchmark
 must not change.
 
-### 3. AK. What `--refine-steps 2` buys has never been measured -- **not built; measure first**
+### 3. AK. What `--refine-steps 2` buys has never been measured -- **both levers built 2026-09-30; the read decides which**
+
+**Built.** Cutting is a flag, as it always was (`--refine-steps`). Targeting is
+now one too: `--refine-funnel m` (`controller_refine_funnel`) refines only a
+candidate whose noise-free score, filed dry against the archive, is at least
+`(1 - m)` of its cell's incumbent. An empty cell always qualifies. The other
+candidates leave every step's batch, and that is where the saving comes from.
+Off by default. Held by `test_the_refinement_funnel_refines_only_what_it_selects`
+and the mutation `funnel-refines-everyone` (caught). The read below still
+decides between 0, 1 and the funnel: its numbers are in the `stages` event
+(item 2).
 
 Raised 2026-09-30 by a review that assumed the opposite: that
 refinement runs only at promotion (`controller_refine_steps` defaults to 0,
@@ -2612,7 +2645,22 @@ are not bit-exact to slice sums, so these steps cannot use the 700-number
 bit-identity benchmark; they need the path-agreement noise floor, and the
 first such step must say what that floor is before it claims anything.
 
-### 8. AL. Promotion, Tier-1.5, Tier-2 and the audit run in the parent with the pool idle -- **not built; small, measure first**
+### 8. AL. Promotion, Tier-1.5, Tier-2 and the audit run in the parent with the pool idle -- **promotion half built 2026-09-30**
+
+**Built: the round's promotions are refined as one batch through the pool,
+from the basis each elite was scored with** (`_refined_controllers_for`). The
+elite's `mobility_basis` is rebuilt by `MobilityBasis.bases_from_record`, which
+the film's reader (`ops/run.py`) now shares. Only an elite without a recorded
+basis is identified, in the same batch (per machine, AN). With a shared policy,
+the baseline evaluation is skipped: `_refine_controllers` re-scores at the mean
+anyway. `should_promote` is asked again before each Tier-2, so a round that
+spends the budget stops where the one-at-a-time loop did. Held by
+`test_promotion_spends_refinement_and_keeps_what_it_buys` (stage walls present,
+and the refined controller drives the recorded basis) and the mutation
+`promotion-re-identifies` (caught). **Not done:** Tier-2 and the audit still
+run on the numpy path in the parent, one elite at a time. Moving them to
+workers is the remaining half. Its size is `stage_wall` against `stages.main`,
+which the next run logs.
 
 The concrete cost behind "the islands are not parallel" (2026-09-30): the
 islands themselves are not the lever, the idle pool during the parent stages is. `_verify_and_label` and `_audit` (`evolution/loop.py`) run
@@ -2645,7 +2693,27 @@ that is a size, not a number to beat.
 two thirds of that 7.5%, roughly 5% of a run. Log the stage walls first (same
 telemetry as AK), and close this if the idle-machine share is under 3%.
 
-### 9. AJ. Work stealing across the pool -- **not built; measured as a symptom, sized by nothing yet**
+### 9. AJ. Work stealing across the pool -- **built 2026-09-30, off by default; `idle` decides**
+
+**Built, with the reproducibility decision taken first.** The learning
+rollout's exploration noise now comes from one numpy stream per machine,
+`default_rng([seed, place in the generation, segment])`
+(`evaluate_tier1_batch(streams=...)`, `SharedPolicy.act_many(rngs=...)`), and
+the pool passes every machine its place. So a machine explores identically in
+any shard. Before this, the noise was torch's stream seeded per shard, so pool
+shape changed what the learner saw. That contradicted `_RESOURCE_FIELDS`'
+claim that pool shape "changes the result by nothing". It no longer does, to
+the 1e-7 of the shared network's batch width. `plan_shards` (`envs/actors.py`)
+adds `--pool-per-worker` (more shards than workers; the executor is the queue)
+and `--pool-balance` (machines assigned by predicted cost,
+`35 + 0.9 * DOF` s, longest first). Composition is fixed before anything runs,
+so a run stays reproducible from its seed. Both are off by default, which is
+exactly the old split. Held by the sharding test (a sampled rollout banks the
+same 42 trajectories in one shard and in a balanced queue of three; max
+distance difference 8.6e-8) and two mutations (`exploration-noise-per-shard`,
+0.33; `queue-results-in-shard-order`, 19.6), both caught. **The sweep of
+per-worker and balance against the real path is still to do**, after `idle`
+has read above ~10%.
 
 Raised 2026-09-29 while reading arch44 at gen 402. The pool is CPU-bound in
 the workers, and it wastes part of that on the tail of every generation.

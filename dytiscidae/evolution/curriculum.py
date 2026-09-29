@@ -268,11 +268,16 @@ class Curriculum:
         which is what ``update`` already does.
         """
         key = tuple(cell)
-        if key in self.stages:
-            return int(self.stages[key])
-        s = int(np.clip(stage, 0, N_STAGES - 1))
+        s = self.stage_for(key, stage)
         self.stages[key] = s
         return s
+
+    def stage_for(self, cell, stage: int) -> int:
+        """The stage ``seed_stage`` would give ``cell``, without giving it."""
+        key = tuple(cell)
+        if key in self.stages:
+            return int(self.stages[key])
+        return int(np.clip(stage, 0, N_STAGES - 1))
 
     def observe_blend(self, island_score: float, curriculum_score: float,
                       stage: int = 0, mission: float = 0.0) -> None:
@@ -399,9 +404,14 @@ class Curriculum:
         m = np.array([c for _, _, c in w], float)
         return float(np.mean(m <= float(mission)))
 
-    def evaluate(self, cell, result, transitions=None) -> StageResult:
-        """Score a design at its cell's stage, and at the next one up."""
-        s = self.stage_of(cell)
+    def evaluate(self, cell, result, transitions=None, *,
+                 stage: int | None = None) -> StageResult:
+        """Score a design at its cell's stage, and at the next one up.
+
+        ``stage`` overrides the cell's own, for a dry run on a cell not yet
+        seeded (see ``stage_for``).
+        """
+        s = self.stage_of(cell) if stage is None else int(stage)
         own = dict(domains=getattr(self, "domains", None),
                    transition_names=getattr(self, "transition_names", None))
         here = stage_score(s, result, transitions, **own)

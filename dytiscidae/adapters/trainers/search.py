@@ -58,6 +58,7 @@ RESUME_GLOBS = ("archive_*.pkl",)
 _CONFIG_FIELDS = (
     "batch", "segment_seconds", "tier0_gate", "tier2_every", "tier1_5_seconds",
     "identify_axes_every", "controller_refine_steps", "controller_refine_sigma",
+    "controller_refine_funnel",
     "promotion_refine_steps", "mission_weight", "reward_shaping",
     "descriptor_bins", "descriptor_refit_every", "learned_axes",
     "migrate_every", "n_migrants", "use_critic", "critic_refit_every",
@@ -65,7 +66,7 @@ _CONFIG_FIELDS = (
     "judge_quantile", "judge_update_every", "policy_hidden", "n_modes",
     "use_shared_policy", "shared_hidden", "shared_lr", "shared_epochs",
     "shared_target_kl", "shared_ent_coef", "shared_lr_anneal",
-    "shared_minibatch", "audits_per_review", "checkpoint_every",
+    "shared_minibatch", "audits_per_review", "checkpoint_every", "snapshot_every",
     "event_sample", "n_reference_seeds", "n_random_seeds", "islands",
 )
 #: Accepted from the job's ``resources`` rather than its plan, because they are
@@ -73,7 +74,8 @@ _CONFIG_FIELDS = (
 #: 4 shards of 4 at 31.7 s against 16x1 at 93.3 s on the same work: pool shape
 #: changes wall time by 3x and the result by nothing, so it must not enter the
 #: plan digest.
-_RESOURCE_FIELDS = ("workers", "min_shard", "memory_ceiling_mb")
+_RESOURCE_FIELDS = ("workers", "min_shard", "pool_per_worker", "pool_balance",
+                    "memory_ceiling_mb")
 
 #: Mission settings, which are a property of the task rather than of the search.
 _SPEC_FIELDS = ("cycles", "seconds_per_domain", "target_depth")
