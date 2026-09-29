@@ -1346,12 +1346,15 @@ def test_series_elasticity_needs_a_compliant_drive() -> None:
     very_soft, p_soft, s_soft, e_soft = cost(1.0, 0.05)
 
     # "Little", not "nothing", since the servo feeds its rate forward and since
-    # the implicit damping split: 185 against 209 W/rad (2026-09-26).
+    # the implicit damping split: 185 against 209 W/rad (2026-09-26).  Those
+    # figures came from a ray the missing entrainment reaction had driven
+    # 4.5 m under water after its air spawn (ROADMAP AK); flapping at the
+    # surface it is 148 against 171 (2026-09-30).
     check("a spring under the old hard-wired gain buys little",
           stiff_spring > 0.8 * rigid,
-          f"{stiff_spring:.0f} W/rad against {rigid:.0f} rigid -- it cut power from "
-          f"{p_rigid:.0f} W to {p_stiff:.0f} W only by cutting motion from "
-          f"{s_rigid:.2f} to {s_stiff:.2f} rad")
+          f"{stiff_spring:.0f} W/rad against {rigid:.0f} rigid -- power "
+          f"{p_rigid:.0f} W -> {p_stiff:.0f} W, motion {s_rigid:.2f} -> "
+          f"{s_stiff:.2f} rad")
     # 0.49x on 2026-09-26 (it read 0.79x between the feed-forward and the root
     # being taken out of the damping split).
     check("the same spring with a compliant drive is far cheaper per unit of motion",
@@ -1535,10 +1538,15 @@ def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
           f"{p.slam_pressure_capacity / 1e3:.0f} kPa")
 
     window = max(int(0.010 / env.timestep), 1)
+    # Per entry: (label, sinking speed the step before first wetting, fastest
+    # sinking speed after it), and the peak pressure in kPa.
+    sinking: list[tuple[str, float, float]] = []
+    kpa: dict[tuple, float] = {}
 
-    def enter(pitch_deg: float, speed: float) -> float:
+    def enter(pitch_deg: float, speed: float, dz: float = 0.0,
+              hold: bool = False) -> float:
         env.reset(Domain.AIR, randomise=False)
-        env.data.qpos[:3] = (-8.0, 0.0, 1.2)
+        env.data.qpos[:3] = (-8.0, 0.0, 1.2 + dz)
         a = math.radians(-pitch_deg)
         env.data.qpos[3:7] = (math.cos(a / 2), 0.0, math.sin(a / 2), 0.0)
         env.data.qvel[:] = 0.0
@@ -1546,14 +1554,27 @@ def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
         env.solver.reset()
         mujoco.mj_forward(env.model, env.data)
         w, peak = [], 0.0
+        v_before, v_hit, v_after = -float(env.data.qvel[2]), None, 0.0
         for _ in range(int(1.2 / env.timestep)):
-            env.step(env.cpg.command(env.cpg.base, env.data.time))
+            u = env.cpg.command(env.cpg.base, env.data.time)
+            env.step(np.zeros_like(u) if hold else u)
             w.append(float(env.solver.diag.slam))
             if len(w) > window:
                 w.pop(0)
             if len(w) == window:
                 peak = max(peak, float(np.mean(w)))
+            v = -float(env.data.qvel[2])
+            if v_hit is None:
+                if env.solver.diag.max_submerged > 0.0:
+                    v_hit = v_before
+                else:
+                    v_before = v
+            else:
+                v_after = max(v_after, v)
+        sinking.append((f"{pitch_deg:.0f} deg at {speed:.1f} m/s",
+                        v_hit if v_hit is not None else float("nan"), v_after))
         pressure = peak / max(p.frontal_area, 1e-3)
+        kpa[(pitch_deg, speed, dz, hold)] = pressure / 1e3
         return float(np.clip(1.0 - (pressure / p.slam_pressure_capacity) ** 2, 0.0, 1.0))
 
     flat_slow = enter(0.0, 4.0)
@@ -1577,19 +1598,64 @@ def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
 
     check("entering flat faster is worse", flat_fast < flat_slow,
           f"{flat_slow:.3f} at 4 m/s -> {flat_fast:.3f} at 8 m/s")
-    # Measured, no longer asserted, for the reason given under the next one
-    # (ROADMAP AK): true for the gannet, not for the ray's membranes under the
-    # corrected added mass.
-    print(f"         [measured] nose-first at 4 m/s scores {nose_slow:.3f} against "
-          f"{flat_slow:.3f} flat (ROADMAP AK)")
-    # Measured, no longer asserted (2026-09-26): "a nose-first entry at twice
-    # the speed beats a flat one at half of it" held under the isotropic wing
-    # added mass and does not under the corrected tensor (F-03) -- the ray's
-    # big membranes, lighter in the water now, oscillate through the surface
-    # after a nose-first entry, joints driven or held (348-1463 kPa against
-    # 250-347 flat).  The cause is identified, not resolved: ROADMAP AK.
-    print(f"         [measured] nose-first at 8 m/s scores {nose_fast:.3f}, "
-          f"flat at 4 m/s scores {flat_slow:.3f} (ROADMAP AK)")
+    # The two orderings this test used to assert -- nose-first beats flat at
+    # the same 4 m/s, and nose-first at 8 m/s beats flat at 4 -- were demoted
+    # to prints on 2026-09-26 (ROADMAP AK).  Two defects stood behind them.
+    #
+    #   * The mass matrix carried the entrained water without its reaction
+    #     (`entrainment_reaction`): every step the added mass grew created
+    #     ``dm v`` of momentum.  Nose-first at 8 m/s, the hull *accelerated*
+    #     to 21.9 m/s downward and peaked at 1292 kPa, above the 760 kPa at
+    #     20 m/s.
+    #   * The implicit damping was formed on its 4-step cadence only, so first
+    #     contact could meet up to three steps of water loads with a B formed
+    #     in air (`ImplicitAeroDamping.due`).  A strut joint was thrown to
+    #     100 rad/s and the peak depended on which step contact fell on.
+    #
+    # With both fixed, peak kPa over six start heights 0-7.5 cm apart, i.e.
+    # over two steps of travel (`experiments/ray_entry/phase.py`):
+    #
+    #                    flat 4    flat 8    nose 4    nose 8    nose 20
+    #   joints driven   157-198   257-354   202-286   174-257   244-293
+    #   joints held     130-156   245-367    93-120   300-450   183-285
+    #
+    # So the orderings are not the ray's, and it is not noise: at 4 m/s flat
+    # beats nose-first in all six driven entries and loses all six held, and
+    # nose-first at 8 m/s loses to flat at 4 in eleven of twelve.  The ray is
+    # not streamlined for entry -- its membranes and struts set the load on
+    # contact, driven or not.  What is true of it, driven, in all six:
+    check("at 8 m/s, nose-first loads the hull less than flat",
+          nose_fast > flat_fast,
+          f"{kpa[(80.0, 8.0, 0.0, False)]:.0f} kPa nose-first against "
+          f"{kpa[(0.0, 8.0, 0.0, False)]:.0f} flat")
+    # ...and the reason the gannet survives: a flat entry's load grows with
+    # speed and a nose-first one's does not (4 -> 8 m/s: flat x1.48-2.01,
+    # nose-first x0.83-1.02 over the six).
+    grow_flat = kpa[(0.0, 8.0, 0.0, False)] / kpa[(0.0, 4.0, 0.0, False)]
+    grow_nose = kpa[(80.0, 8.0, 0.0, False)] / kpa[(80.0, 4.0, 0.0, False)]
+    check("a flat entry's load grows with speed faster than a nose-first one's",
+          grow_flat > 1.3 * grow_nose,
+          f"4 -> 8 m/s: flat x{grow_flat:.2f}, nose-first x{grow_nose:.2f}")
+    # Which step of the damping's cycle contact lands on is an accident of the
+    # start height and must not decide the load.  Four heights 4 cm apart put
+    # contact on each of the four steps (~9.4 m/s at contact).  Held, because
+    # that is where the stale damping bit hardest: 279-1307 kPa (4.7x) on the
+    # cadence alone, 372-418 (1.12x) refreshed at the surface.
+    cycle = []
+    for dz in (0.0, 0.04, 0.08, 0.12):
+        enter(80.0, 8.0, dz, hold=True)
+        cycle.append(kpa[(80.0, 8.0, dz, True)])
+    check("a held nose-first entry loads the hull the same whichever step it lands on",
+          max(cycle) < 2.0 * min(cycle),
+          " / ".join(f"{c:.0f}" for c in cycle) + " kPa over start heights 0-12 cm")
+    # Entering water takes momentum from a machine; nothing about it can give
+    # the machine more.  10% over the speed at contact is room for gravity
+    # (worst 0.97 over the sixty entries of `phase.py`, driven and held; 2.38
+    # without the reaction).
+    worst = max(sinking, key=lambda r: r[2] / max(r[1], 1e-6))
+    check("no entry leaves the machine sinking faster than it hit the water",
+          all(after <= 1.1 * hit for _, hit, after in sinking),
+          f"worst {worst[0]}: {worst[1]:.1f} m/s at contact, {worst[2]:.1f} after")
     check("a flat entry well past the hull limit scores nothing",
           flat_dead == 0.0 and v_dead < 200.0,
           f"{flat_dead:.3f} at {v_dead:.1f} m/s flat, against a slam capacity "

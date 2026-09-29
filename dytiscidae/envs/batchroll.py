@@ -45,8 +45,8 @@ import numpy as np
 
 from ..physics.energy import BatchedPower
 from ..physics.medium import GRAVITY
-from ..physics.fluid import (INFLOW_AR, InducedFlow, finish_bodies, machine_flow,
-                             slam_mass, strip_damping)
+from ..physics.fluid import (INFLOW_AR, InducedFlow, entrainment_reaction,
+                             finish_bodies, machine_flow, slam_mass, strip_damping)
 from ..control.cpg import TWIST_DIM, gait_gain
 from .triphibian import Domain
 
@@ -497,6 +497,17 @@ class BatchedFluid:
                 sol_i._inflow.tick()
             fb = o["xfrc"][a:b].copy()
             self.clamped[i] = int(finish_bodies(fb, o["fsum_b"][a:b], mb, float(self.limit[i])))
+            # The reaction to entrained added mass, after the limiter, exactly
+            # as `FluidSolver.apply` does it (ROADMAP AK, the ray's entry): the
+            # mass matrix alone creates the momentum of the water a body
+            # entrains.  Its previous mass lives on the machine's own solver,
+            # which `reset` clears, so the first step after a reset is skipped
+            # on both paths.
+            if sol_i.entrainment and not sol_i.quasi_static:
+                if sol_i._prev_mbody is not None:
+                    entrainment_reaction(fb, mb, sol_i._prev_mbody, self.lever2[i],
+                                         self.vel6[a:b], e.model.opt.timestep)
+                sol_i._prev_mbody = np.array(mb, float)
             e.data.xfrc_applied[:] = fb
             # Jet thrust is CPU-side in both paths: a handful of bells per
             # machine against thousands of panels, so it stays out of the
@@ -1115,7 +1126,8 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
     import numpy as _np
 
     from .transitions import (
-        TRANSITION_ENDPOINTS, TransitionResult, _place_for, _score)
+        TRANSITION_ENDPOINTS, TransitionResult, _place_for, _score,
+        transition_scatter_seed)
     from .triphibian import Domain as _D
 
     k = len(envs)
@@ -1123,11 +1135,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
     res = [TransitionResult(kind=kind, duration=duration, start_back=float(back))
            for _ in envs]
 
-    # Stable across processes: an index into a fixed list, never hash(str).
-    _KINDS = ("air_to_water", "water_to_air", "water_to_land", "land_to_air",
-              "land_to_water", "air_to_land")
-    scatter_seed = (0x9E3779B9 * (_KINDS.index(kind) + 1
-                                  if kind in _KINDS else 7)) & 0x7FFFFFFF
+    scatter_seed = transition_scatter_seed(kind)
     for m, e in enumerate(envs):
         _place_for(e, kind, back)
         # Each crossing kind used to present exactly one entry state, with no

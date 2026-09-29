@@ -193,6 +193,21 @@ class TransitionResult:
         }
 
 
+def transition_scatter_seed(kind: str) -> int:
+    """The entry-state draw every machine's ``kind`` crossing starts from.
+
+    Stable across processes -- an index into a fixed list, never ``hash(str)``
+    -- and shared by both evaluation paths.  Until 2026-09-30 only the batched
+    path scattered a crossing's entry state; ``run_transition`` started every
+    machine from the bare placement, so Tier-2, every film and every offline
+    probe measured a different crossing from the one the search scored (peak
+    entry speed differed by up to 7.3 m/s on the seed plans).
+    """
+    kinds = ("air_to_water", "water_to_air", "water_to_land", "land_to_air",
+             "land_to_water", "air_to_land")
+    return (0x9E3779B9 * (kinds.index(kind) + 1 if kind in kinds else 7)) & 0x7FFFFFFF
+
+
 def _place_for(env: TriphibianEnv, kind: str, back: float = 0.0) -> None:
     """Put the machine where the crossing begins.
 
@@ -250,6 +265,9 @@ def run_transition(
 
     _, target = TRANSITION_ENDPOINTS[kind]
     _place_for(env, kind, back)
+    # The same entry-state draw the batched path makes (see
+    # ``transition_scatter_seed``).
+    env.scatter(np.random.default_rng(transition_scatter_seed(kind)))
     r.survivable_entry_speed = float(env.p.max_entry_speed)
 
     basis = controller.basis_for(Domain.WATER if "water" in kind else Domain.AIR)

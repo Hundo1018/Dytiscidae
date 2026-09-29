@@ -2991,6 +2991,19 @@ def test_the_two_evaluation_paths_score_the_same_machine_the_same() -> None:
               f"{n0} measurements, worst absolute difference {w0:.6f}"
               + (f" on {key0}" if key0 else "")
               + f"; bar {bar:.2e} (own noise floor {floor:.2e})")
+        # And the crossings.  Only the batched path used to scatter a
+        # crossing's entry state, so every crossing Tier-2 or a film measured
+        # started somewhere the scored one had not: peak entry speed differed
+        # by up to 7.3 m/s on the seed plans (2026-09-30).
+        tw = max(abs(rb0.transitions.results[k].peak_entry_speed
+                     - rs0.transitions.results[k].peak_entry_speed)
+                 for k in rb0.transitions.results)
+        same_cross = all(rb0.transitions.results[k].crossed
+                         == rs0.transitions.results[k].crossed
+                         for k in rb0.transitions.results)
+        check(f"{plan}: and every crossing starts and ends the same on both paths",
+              same_cross and tw < max(1e-3, 2.0 * floor),
+              f"worst entry-speed difference {tw:.2e}")
 
 
 def test_the_batched_path_tells_the_policy_it_is_wet() -> None:

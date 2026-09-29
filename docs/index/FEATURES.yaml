@@ -408,10 +408,12 @@ ImplicitAeroDamping:
     - physics.fluid.ImplicitAeroDamping
     - physics.fluid.strip_damping
     - physics.fluid.finish_bodies
+    - physics.fluid.entrainment_reaction
   tests:
     - tests.test_physics::test_lift_and_drag_are_integrated_implicitly
     - tests.test_physics::test_the_limiter_and_the_weight_cancellation
-  note: lift and drag damping split into MuJoCo's implicit dof_damping (F-03); per-machine limiter (F-04); entrained weight at the CoM (F-14)
+    - tests.test_physics::test_entry_shock_is_hydrodynamic_not_a_speed_limit
+  note: lift and drag damping split into MuJoCo's implicit dof_damping (F-03), refreshed when a strip crosses the surface (AK); per-machine limiter (F-04); entrained weight at the CoM (F-14); -dm/dt v reaction to added mass that grows (AK)
 
 UnsteadyFlow:
   implementation:
