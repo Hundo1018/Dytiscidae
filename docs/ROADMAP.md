@@ -2423,9 +2423,39 @@ comparison. Identification is 53% of the main evaluation and waits on the
 device more than the rollouts do (7.8%): its steps have little host work to
 hide the launch behind.
 
+## 2026-09-30 — arch44 finished; its pre-registered reads, written up late
+
+arch44 completed 600/600 generations and its postrun (60.6 h, 9343
+evaluations); the reads pre-registered in `runs/arch44_notes.md` were not
+written up when the run finished. Full numbers and method are there; summary:
+
+- **gen 10 cost:** 130 s/gen steady state, in line with arch43's 166 on a
+  busier machine.
+- **gen 50 health:** nothing broken — divergence 0.60%, `level_margin`
+  published on 99.4% of evaluations, water/land scoring normally, air still
+  near-zero (expected this early).
+- **gen 200, AD's threshold:** `level_margin` p50 0.006, p90 0.705, max 1.354,
+  1.39% >= 0.95. Correlation to air competence is weak (+0.11) — clearing the
+  rig check is necessary, not sufficient. **The gate itself is not set; that's
+  a selection-pressure decision for the user, not a measurement.**
+- **gen 200, rotorcraft vs flapping:** no separation yet at gen 200. By the
+  run's end, rotor-carrying archive elites do lead on air (best 0.038 of 228,
+  against 0.002 of 188 non-rotor) — but 0.038 is nowhere near the 0.3 bar for
+  "first evolved machine to fly."
+- **gen 600, mission:** `mission_fraction` 0.001, **transitions 0/2** — the
+  sixth run running at 0/2. Water leg on-task 0.0%. Item Y's diagnosis
+  (nothing in selection asks a design to move between media under its own
+  power) still stands; item O (the air spawn) is unchanged.
+
+Two follow-ups this surfaces, neither started: set AD's gate (needs a user
+call on where in 0.7-1.0), and the rotor-vs-flapping split has no gen-resolved
+data because the run kept no periodic archive snapshots — only the final
+state and per-evaluation events, which undercounts rotor share (inherited
+rotors don't show as a fresh `mut_rotor` operator).
+
 ## arch45 — the work list
 
-arch44 is running (600 gens, launched 2026-09-27); nothing here touches it.
+arch44 ran 600 gens from 2026-09-27 and finished 2026-09-30 (reads in the section above).
 
 ### AJ. Work stealing across the pool -- **not built; measured as a symptom, sized by nothing yet**
 
@@ -2477,6 +2507,168 @@ on an idle machine, over at least 30 generations (arch44's per-generation
 timing is confounded by whatever else the laptop is running: 284-384 s/gen at
 gens 250-400 against 86-130 s at gens 7-32). A gain under the run-to-run spread
 is not a gain.
+
+**Two more framings of the same item, raised 2026-09-30.** "Workers are capped
+by `min_shard`" (`k = max(1, min(workers, n // min_shard))`, so at batch 16 any
+`--workers` above 4 adds nothing) and "`batch` is both the evolutionary batch
+and the hardware batch" are both this item. The hardware batch is already the
+shard, not `batch`; what is still coupled is that the shard *count* cannot
+exceed `batch // min_shard`, and a queue of small shards is what removes that.
+One option this adds to the candidates above: pull the next generation's first
+shards into the tail of this one. The next generation visits a different
+island, so its parents do not depend on this generation's placements -- but
+its candidates would be scored with the shared policy *before* this
+generation's PPO update, and the curator's operator credit would lag by one
+generation. Both change the algorithm, not just the schedule; that needs its
+own arm.
+
+### AK. What `--refine-steps 2` buys has never been measured -- **not built; measure first**
+
+Raised 2026-09-30 by an outside review that assumed the opposite: that
+refinement runs only at promotion (`controller_refine_steps` defaults to 0,
+`promotion_refine_steps` is 6) and that this was the right design to keep. The
+default is 0, but **every run since arch34 has passed `--refine-steps 2`**
+(`runs/arch34_notes.md` through `runs/arch44`; checked in each `run_start`
+config), so every candidate of every generation gets a noise-free re-score and
+two (1+1)-ES steps after its main evaluation: four batched evaluations of the
+whole batch per generation (`_refine_controllers`, `evolution/loop.py`).
+
+**Its cost, estimated from `experiments/perf/NOTES.md`** (one 4-design shard,
+idle machine): main evaluation with identification ~33 s, a batched evaluation
+without it ~12 s. So a shard's generation is ~33 + 12 + 2 x 12 = ~69 s, of
+which the two refinement steps are ~35% and the re-score ~17%. Estimate, not
+measurement -- the stage walls are not logged.
+
+**Its worth has one measurement**, `docs/CPU_LEGACY.md` §1: three seeds at
+`segment_seconds=0.4`, `steps=4` against `steps=0`, two of three moved. Nothing
+since, and `_refine_controllers` logs neither how many trials were accepted nor
+whether acceptance changed a candidate's placement.
+
+**Order.**
+1. Telemetry, no behaviour change: per generation, the wall of each stage
+   (main, re-score, each refine step), trials accepted per step, and how many
+   candidates' placement status (`new` / `improved` / `rejected`) differs
+   between the pre-refinement and the final score. The second needs a dry-run
+   `_place` against the pre-refinement result; it must not touch the archive.
+2. Read over >= 100 generations of a run. If acceptance at step 2 is small and
+   placement changes are rare, cut to 1 step or 0; if acceptance is
+   concentrated in candidates already close to their cell's incumbent, refine
+   only those (the funnel an outside review wanted, placed where the cost is).
+   Either is a search-design change and needs an arm, not a read.
+
+**Pre-registered.** If refinement changes fewer than 5% of placements, it is
+not buying selection and at most one step stays.
+
+### AL. Promotion, Tier-1.5, Tier-2 and the audit run in the parent with the pool idle -- **not built; small, measure first**
+
+The concrete cost behind an outside review's "the islands are not parallel"
+(2026-09-30; see "Raised and not listed" below for why the islands themselves
+are not the lever). `_verify_and_label` and `_audit` (`evolution/loop.py`) run
+one elite at a time in the parent: `_refined_controller_for` calls
+`evaluate_tier1_batch([pheno], ...)` with a batch of one and **no pool**, then
+six refinement steps on that batch of one, then a 60 s Tier-1.5 leg and the
+Tier-2 mission; the audit re-evaluates each elite several times on the numpy
+path. The four workers do nothing meanwhile.
+
+**Measured on arch44 (gens >= 7):** the 35 generations that carry a `promote`
+or `audit` event (the audit gens all coincide with promote gens) took a median
+**405 s** longer than the median plain generation (313 s), 7.5% of the run's
+wall. arch44's timings are confounded by the laptop's other load (see AJ), so
+that is a size, not a number to beat.
+
+**Candidates.**
+- The three promotions of a round refined together through the pool, as one
+  batch of three, instead of three batches of one.
+- **Do not re-identify the promoted elite.** The stored elite "carries weights
+  but not the basis" -- but the basis the elite was *scored* with is already
+  written to its `evaluate` event (`mobility_basis`, both media). Re-measuring
+  it at a fresh seed costs a full identification per promotion and hands
+  Tier-2 a basis the Tier-1 score was not earned with. Keyed by
+  `(genome_id, eval_seed)` this is exact, not a cache approximation.
+- Tier-2 and the audit stay on the numpy path on purpose (verification runs on
+  the half that is verified), so they can go to worker processes but not onto
+  the GPU path.
+
+**Ceiling.** Three promotions spread over four workers recovers at most about
+two thirds of that 7.5%, roughly 5% of a run. Log the stage walls first (same
+telemetry as AK), and close this if the idle-machine share is under 3%.
+
+### AM. Host-side per-machine loops -- **the lever already named above, as an item**
+
+"Not done, measured as the next levers" in "where a worker's time went" is the
+same finding as an outside review's "a batch step is still a Python loop per
+candidate" (2026-09-30), and it is true: `step_batch` still loops over
+machines for `mj_step`, the observation, the CPG command, clearance and the
+twist recording. Two parts of that review are out of date or impossible. The
+energy model is already one pass for the batch (`BatchedPower`). And `mj_step`
+cannot become a batch operation: the batch is heterogeneous MuJoCo models,
+MJX needs one model, and `mujoco.rollout` takes its applied forces as a
+sequence fixed in advance, where the fluid force depends on each step's state.
+
+**What is left, measured** (py-spy, 2026-09-27): the damping projection 8-9%,
+clearance and twist recording ~8%, inflow ~4%, CPG ~3% of worker time. Worth
+roughly a fifth of a worker, not a multiple. **Constraint:** `reduceat` sums
+are not bit-exact to slice sums, so these steps cannot use the 700-number
+bit-identity benchmark; they need the path-agreement noise floor, and the
+first such step must say what that floor is before it claims anything.
+
+### AN. `identify=any(...)` breaks `identify_axes_every` -- **latent: zero effect on every stored run**
+
+Raised 2026-09-30, and true as code: each candidate gets its own
+`identify = (counter % identify_axes_every) == 0`, and the generation then
+passes `identify=any(b[2] for b in built)` to `evaluate_candidates`, so one
+identifying candidate makes the whole batch identify. The knob cannot do what
+its name says for any value above 1.
+
+It has changed nothing so far: `identify_axes_every` is 1 in every run's
+`run_start` config (arch40-arch44, all launches and void launches), where every
+candidate identifies and `any` is the same answer.
+
+**Fix, when anyone wants a value above 1** -- and not before, because that is
+itself a search-design change: identification on the subset (`identify_batch`
+already takes an arbitrary group of environments), and a decision about what a
+non-identified child drives through. Today it would keep its parent's inherited
+bases, which is the exact thing the overwrite in `evaluate_tier1_batch` says
+identification exists to prevent. **Now:** refuse `identify_axes_every > 1` at
+config load, with a mutation that sets it to 2 and expects the refusal, so the
+knob cannot silently lie.
+
+### Raised 2026-09-30 and not listed, with why
+
+An outside review of the evaluation architecture raised ten points. Six map to
+the items above: the shard cap and the doubled meaning of `batch` to AJ, the
+refinement to AK, the islands in part to AL, the Python loops to AM, `any` to
+AN. The rest, checked against the code and arch44:
+
+- **"Run the six islands in parallel through one evaluation queue."** There are
+  seven islands, and they are visited in turn (`order[gen % len(order)]`). But
+  the pool already evaluates 16 candidates at once, and the ceiling on this
+  machine is memory (8x2 OOM-killed) and package power (96 C, 3.2 of 4.7 GHz),
+  not a shortage of concurrent candidates. More concurrency recovers only
+  idle time, which is AJ (the tail) and AL (the parent stages). Running the
+  islands concurrently would also change the algorithm: seven times fewer PPO
+  updates on seven times more data, and migrants arriving out of order.
+- **"Split each worker's pipeline into CPU pre-processing, a GPU batch and CPU
+  post-processing."** The overlap that split would buy already exists: the
+  next step's fluid is launched as soon as `mj_step` finishes and 8993 of 9000
+  steps find it done (`launch`/`wait`). The GPU is 5-9% busy; the workers are
+  CPU-bound under a power cap, and moving host work into another process does
+  not reduce it. The lever is fewer instructions, which is AM.
+- **"A mobility-basis cache keyed on body and actuators, because controller
+  mutations re-identify."** They do not: controller-only variation is the
+  refinement, and `_refine_controllers` never re-identifies. In the main loop,
+  98.2% of arch44's children (gens >= 7) carry a genome change, which changes
+  the body or the CPG base the probes linearise around, so a cache would miss.
+  The 1.8% with no applied operator (164 of 9129) are a cache hit worth ~0.5% of
+  a generation. The exact hit that does exist is the promoted elite, in AL.
+- **"A coarse-to-fine funnel: reject before paying for full Tier-1."** Of
+  arch44's evaluated children (gens >= 7), 41.2% improved a cell, 32.8% filled
+  a new one, and 26.0% were rejected, in the same shares of evaluation wall.
+  So a *perfect* pre-screen saves at most a quarter of the main evaluation,
+  before paying for itself -- and it cannot know that a child fills a new cell
+  without the descriptors the full evaluation produces. Tier-0 already rejects
+  structurally (389 in arch44). Where a funnel can pay is the refinement, AK.
+- **"Tune workers and batch last."** Agreed, and already the order here.
 
 ---
 
