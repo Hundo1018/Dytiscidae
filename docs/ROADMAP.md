@@ -6,8 +6,8 @@ the list because it seemed like a good idea, and nothing is marked done without
 the number it produced.
 
 **Revised 2026-09-30: the current work list is
-[arch45](#arch45--the-work-list), ranked by build cost against what it does for
-the search and for the loop's speed.** Everything older is kept for its
+[arch45](#arch45--the-work-list), ranked by build cost first, then loop speed,
+then what it does for the search and the learner.** Everything older is kept for its
 measurements.
 
 Revised 2026-09-19, after arch38 ran. Everything below is kept for the
@@ -2428,7 +2428,7 @@ written up when the run finished. Full numbers and method are there; summary:
 - **gen 200, AD's threshold:** `level_margin` p50 0.006, p90 0.705, max 1.354,
   1.39% >= 0.95. Correlation to air competence is weak (+0.11) — clearing the
   rig check is necessary, not sufficient. **The user set the gate at 0.7
-  (2026-09-30); it is item 1 of the arch45 list.**
+  (2026-09-30); it is item 4 of the arch45 list.**
 - **gen 200, rotorcraft vs flapping:** no separation yet at gen 200. By the
   run's end, rotor-carrying archive elites do lead on air (best 0.038 of 228,
   against 0.002 of 188 non-rotor) — but 0.038 is nowhere near the 0.3 bar for
@@ -2452,53 +2452,32 @@ arch44 ran 600 gens from 2026-09-27 and finished 2026-09-30 (reads in the sectio
 The search keeps building rotorcraft (AI). The mission stays one triphibian
 machine, not a chain of pairs.
 
-**Ranked by balance of three things**: what it costs to build, how much it
-helps the search find better mechanisms or the learner learn, and how much it
-shortens the loop (a generation, and so every future experiment). An item that
-only measures ranks by what its measurement unlocks.
+**Ranked, 2026-09-30 (the user), by three keys in strict order**: first what it
+costs to build (cheapest first); among equal cost, how much it shortens the
+loop (a generation, and so every future experiment); only then how much it
+helps the search find better mechanisms or the learner learn. An item that only
+measures ranks by what its measurement unlocks. Dependencies are kept: an item
+that needs another's read says so.
 
-| # | item | build cost | mechanisms / learning | loop speed | why here |
+| # | item | build cost | loop speed | mechanisms / learning | why here |
 |---|---|---|---|---|---|
-| 1 | **AD** level-margin gate at 0.7 | low: one gate on the flight rungs, one mutation | **high**: first selection that reads flight through real actuation | none | the cheapest direct push toward flight; the signal has been published since arch43 |
-| 2 | **Telemetry bundle**: AK stage walls + acceptance, AL stage walls, AJ per-shard wall, periodic archive snapshots | low, no behaviour change | indirect: gen-resolved rotor/flapping split and refinement's real effect | decides 3, 5, 6 | rides in the same launch as 1 without touching its measurement |
-| 3 | **AN** refuse `identify_axes_every > 1` | trivial | none | none | a knob that silently lies; ships with 1-2 |
-| 4 | **AK** cut or target `--refine-steps 2` | low once 2 has read (a flag) | risk: may cost selection, hence an arm | **high**: re-score + 2 steps ~ half a shard's generation (estimate) | largest speed lever on the list, and nearly free to try |
-| 5 | **Y/O** transition-distance curriculum (and the air launch stepped down from 30 m) | high: changes what every transition score means; needs crossing rates by distance first | **highest**: six runs at 0/2 transitions, nothing in selection asks for a crossing | none | the mission's actual wall; after 1 so the two arms do not share their reads |
-| 6 | **AL** promotions through the pool, the scored basis reused | medium | exactness gain: Tier-2 gets the basis Tier-1 was earned with | <= ~5% | close if 2 reads < 3% on an idle machine |
-| 7 | **R** `shared_ent_coef` sweep | low | learner: the shared policy's value is still unmeasured | none | a short sweep; decides whether N is worth anything |
-| 8 | **AJ** work stealing | medium-high, and a reproducibility decision | none | unknown until 2 reads; close under ~10% idle | cost is certain, gain is not |
-| 9 | **AM** host-side per-machine loops | medium; needs its own noise floor | none | ~1/5 of a worker | real but bounded, and cannot use the bit-identity gate |
-| 10 | **N** GRPO for the shared policy | high | learner, conditional on 7 | negative (G rollouts) | only if 7 shows the shared policy carries weight |
-| 11 | ray entry under corrected added mass; TEST_AUDIT 7's remaining 10 mutations | low-medium | hygiene | none | when the machine is otherwise idle |
+| 1 | **AN** refuse `identify_axes_every > 1` | trivial | none | none | a knob that silently lies; one config check and one mutation |
+| 2 | **Telemetry bundle**: AK stage walls + acceptance, AL stage walls, AJ per-shard wall, periodic archive snapshots | low, no behaviour change | decides 3, 7, 8, 9 | indirect: gen-resolved rotor/flapping split and refinement's real effect | cheapest item that unlocks every speed lever below |
+| 3 | **AK** cut or target `--refine-steps 2` | low once 2 has read (a flag) | **high**: re-score + 2 steps ~ half a shard's generation (estimate) | risk: may cost selection, hence an arm | largest speed lever on the list, and nearly free to try |
+| 4 | **AD** level-margin gate at 0.7 | low: one gate on the flight rungs, one mutation | none | **high**: first selection that reads flight through real actuation | the cheapest direct push toward flight; can share a launch with 1-2 |
+| 5 | **R** `shared_ent_coef` sweep | low | none | learner: the shared policy's value is still unmeasured | a short sweep; decides whether 11 is worth anything |
+| 6 | ray entry under corrected added mass; TEST_AUDIT 7's remaining 10 mutations | low-medium | none | hygiene | when the machine is otherwise idle |
+| 7 | **AM** host-side per-machine loops | medium; needs its own noise floor | ~1/5 of a worker | none | the larger of the two medium-cost speed levers; cannot use the bit-identity gate |
+| 8 | **AL** promotions through the pool, the scored basis reused | medium | <= ~5% | exactness gain: Tier-2 gets the basis Tier-1 was earned with | close if 2 reads < 3% on an idle machine |
+| 9 | **AJ** work stealing | medium-high, and a reproducibility decision | unknown until 2 reads; close under ~10% idle | none | cost is certain, gain is not |
+| 10 | **Y/O** transition-distance curriculum (and the air launch stepped down from 30 m) | high: changes what every transition score means; needs crossing rates by distance first | none | **highest**: six runs at 0/2 transitions, nothing in selection asks for a crossing | the mission's actual wall; after 4 so the two arms do not share their reads |
+| 11 | **N** GRPO for the shared policy | high | negative (G rollouts) | learner, conditional on 5 | only if 5 shows the shared policy carries weight |
 
 AH is not listed: probed on the rig, nothing cleared 1, and the search already
 owns the genes (motor mass, spring, compliance, feathering) with AD to select on
 them.
 
-### 1. AD. Gate the flight rungs on `level_margin >= 0.7` -- **decided, not built**
-
-The threshold is the user's (2026-09-30), set from arch44's gen-200
-distribution: p50 0.006, p90 0.705, max 1.354. **At gen 200 about one design
-in ten clears it**, so it must gate the rungs that mean flight, not the whole
-air score -- gating every air rung would be the `moves at 0.1 m/s` wall again,
-with 90% of the population on the floor. A missing `level_margin` (the rig
-could not measure) stops `rung_reached` where it stands; it is not a zero.
-
-**Pre-registered.** The share of evaluations clearing 0.7 rises between gen 50
-and gen 300; the best air competence beats arch44's 0.038 by gen 600. If fewer
-than 2% clear by gen 100 the gate is a wall and is lowered, not waited out.
-Add the mutation that removes the gate and expect a check to fail.
-
-### 2. Telemetry bundle -- **not built; no behaviour change**
-
-The measurement steps of AK (per-stage wall, trials accepted per refinement
-step, placement status before against after refinement via a dry-run `_place`),
-AL (wall of promotion, Tier-1.5, Tier-2 and audit), AJ (per-shard wall in
-`ActorPool`), and an archive snapshot every 50 generations (arch44 could not
-split rotor from flapping by generation without one). The 700-number benchmark
-must not change.
-
-### 3. AN. `identify=any(...)` breaks `identify_axes_every` -- **latent: zero effect on every stored run**
+### 1. AN. `identify=any(...)` breaks `identify_axes_every` -- **latent: zero effect on every stored run**
 
 Raised 2026-09-30, and true as code: each candidate gets its own
 `identify = (counter % identify_axes_every) == 0`, and the generation then
@@ -2519,7 +2498,16 @@ identification exists to prevent. **Now:** refuse `identify_axes_every > 1` at
 config load, with a mutation that sets it to 2 and expects the refusal, so the
 knob cannot silently lie.
 
-### 4. AK. What `--refine-steps 2` buys has never been measured -- **not built; measure first**
+### 2. Telemetry bundle -- **not built; no behaviour change**
+
+The measurement steps of AK (per-stage wall, trials accepted per refinement
+step, placement status before against after refinement via a dry-run `_place`),
+AL (wall of promotion, Tier-1.5, Tier-2 and audit), AJ (per-shard wall in
+`ActorPool`), and an archive snapshot every 50 generations (arch44 could not
+split rotor from flapping by generation without one). The 700-number benchmark
+must not change.
+
+### 3. AK. What `--refine-steps 2` buys has never been measured -- **not built; measure first**
 
 Raised 2026-09-30 by a review that assumed the opposite: that
 refinement runs only at promotion (`controller_refine_steps` defaults to 0,
@@ -2556,16 +2544,48 @@ whether acceptance changed a candidate's placement.
 **Pre-registered.** If refinement changes fewer than 5% of placements, it is
 not buying selection and at most one step stays.
 
-### 5. Y/O. Transition-distance curriculum -- **designed 2026-09-22, not built**
+### 4. AD. Gate the flight rungs on `level_margin >= 0.7` -- **decided, not built**
 
-The design is in "Y / O -- what a continuous start would do" (2026-09-22):
-each transition probe's start steps back from the interface as the population
-learns to cross it, and the air launch steps down from 30 m the same way.
-First measurement: crossing rate by start distance on arch44's elites; the
-step rule is set from it. It changes what every transition score means, so
-nothing after it is comparable across it on transitions.
+The threshold is the user's (2026-09-30), set from arch44's gen-200
+distribution: p50 0.006, p90 0.705, max 1.354. **At gen 200 about one design
+in ten clears it**, so it must gate the rungs that mean flight, not the whole
+air score -- gating every air rung would be the `moves at 0.1 m/s` wall again,
+with 90% of the population on the floor. A missing `level_margin` (the rig
+could not measure) stops `rung_reached` where it stands; it is not a zero.
 
-### 6. AL. Promotion, Tier-1.5, Tier-2 and the audit run in the parent with the pool idle -- **not built; small, measure first**
+**Pre-registered.** The share of evaluations clearing 0.7 rises between gen 50
+and gen 300; the best air competence beats arch44's 0.038 by gen 600. If fewer
+than 2% clear by gen 100 the gate is a wall and is lowered, not waited out.
+Add the mutation that removes the gate and expect a check to fail.
+
+### 5. R. `shared_ent_coef` sweep -- **queued since 2026-09-22**
+
+See R in the arch39 list. Short, needs the machine idle.
+
+### 6. Ray entry under corrected added mass; TEST_AUDIT 7's remaining 10 mutations
+
+As described under AK in the AB-AF list (the ray), and `docs/TEST_AUDIT.md` §7.
+
+### 7. AM. Host-side per-machine loops -- **the lever already named above, as an item**
+
+"Not done, measured as the next levers" in "where a worker's time went" is the
+same finding as a review's "a batch step is still a Python loop per
+candidate" (2026-09-30), and it is true: `step_batch` still loops over
+machines for `mj_step`, the observation, the CPG command, clearance and the
+twist recording. Two parts of that review are out of date or impossible. The
+energy model is already one pass for the batch (`BatchedPower`). And `mj_step`
+cannot become a batch operation: the batch is heterogeneous MuJoCo models,
+MJX needs one model, and `mujoco.rollout` takes its applied forces as a
+sequence fixed in advance, where the fluid force depends on each step's state.
+
+**What is left, measured** (py-spy, 2026-09-27): the damping projection 8-9%,
+clearance and twist recording ~8%, inflow ~4%, CPG ~3% of worker time. Worth
+roughly a fifth of a worker, not a multiple. **Constraint:** `reduceat` sums
+are not bit-exact to slice sums, so these steps cannot use the 700-number
+bit-identity benchmark; they need the path-agreement noise floor, and the
+first such step must say what that floor is before it claims anything.
+
+### 8. AL. Promotion, Tier-1.5, Tier-2 and the audit run in the parent with the pool idle -- **not built; small, measure first**
 
 The concrete cost behind "the islands are not parallel" (2026-09-30): the
 islands themselves are not the lever, the idle pool during the parent stages is. `_verify_and_label` and `_audit` (`evolution/loop.py`) run
@@ -2598,11 +2618,7 @@ that is a size, not a number to beat.
 two thirds of that 7.5%, roughly 5% of a run. Log the stage walls first (same
 telemetry as AK), and close this if the idle-machine share is under 3%.
 
-### 7. R. `shared_ent_coef` sweep -- **queued since 2026-09-22**
-
-See R in the arch39 list. Short, needs the machine idle.
-
-### 8. AJ. Work stealing across the pool -- **not built; measured as a symptom, sized by nothing yet**
+### 9. AJ. Work stealing across the pool -- **not built; measured as a symptom, sized by nothing yet**
 
 Raised 2026-09-29 while reading arch44 at gen 402. The pool is CPU-bound in
 the workers, and it wastes part of that on the tail of every generation.
@@ -2667,29 +2683,19 @@ generation's PPO update, and the curator's operator credit would lag by one
 generation. Both change the algorithm, not just the schedule; that needs its
 own arm.
 
-### 9. AM. Host-side per-machine loops -- **the lever already named above, as an item**
+### 10. Y/O. Transition-distance curriculum -- **designed 2026-09-22, not built**
 
-"Not done, measured as the next levers" in "where a worker's time went" is the
-same finding as a review's "a batch step is still a Python loop per
-candidate" (2026-09-30), and it is true: `step_batch` still loops over
-machines for `mj_step`, the observation, the CPG command, clearance and the
-twist recording. Two parts of that review are out of date or impossible. The
-energy model is already one pass for the batch (`BatchedPower`). And `mj_step`
-cannot become a batch operation: the batch is heterogeneous MuJoCo models,
-MJX needs one model, and `mujoco.rollout` takes its applied forces as a
-sequence fixed in advance, where the fluid force depends on each step's state.
+The design is in "Y / O -- what a continuous start would do" (2026-09-22):
+each transition probe's start steps back from the interface as the population
+learns to cross it, and the air launch steps down from 30 m the same way.
+First measurement: crossing rate by start distance on arch44's elites; the
+step rule is set from it. It changes what every transition score means, so
+nothing after it is comparable across it on transitions.
 
-**What is left, measured** (py-spy, 2026-09-27): the damping projection 8-9%,
-clearance and twist recording ~8%, inflow ~4%, CPG ~3% of worker time. Worth
-roughly a fifth of a worker, not a multiple. **Constraint:** `reduceat` sums
-are not bit-exact to slice sums, so these steps cannot use the 700-number
-bit-identity benchmark; they need the path-agreement noise floor, and the
-first such step must say what that floor is before it claims anything.
+### 11. N. GRPO for the shared policy -- **conditional on 5**
 
-### 10. N, 11. ray entry, TEST_AUDIT 7
-
-As described under N (arch40 list), AK in the AB-AF list (the ray), and
-`docs/TEST_AUDIT.md` §7.
+As described under N (arch40 list). Only if R (item 5) shows the shared
+policy carries weight.
 
 ---
 
