@@ -595,9 +595,16 @@ class ImplicitAeroDamping:
     diagonal.
     """
 
-    def __init__(self, model) -> None:
+    def __init__(self, model, medium=None, half_height=None) -> None:
         self.model = model
         self.base = model.dof_damping.copy()
+        # What it needs to see a strip cross the free surface (`due`).
+        self._medium = medium
+        self._half = (None if half_height is None
+                      else np.maximum(np.asarray(half_height, float), 1e-3))
+        self._wet_ref: np.ndarray | None = None
+        self._prev_pos: np.ndarray | None = None
+        self._stale = False
         nb, nv = model.nbody, model.nv
         # anc[j, k]: dof k moves body j (k's body is j or one of j's ancestors).
         anc = np.zeros((nb, nv), bool)
@@ -630,13 +637,32 @@ class ImplicitAeroDamping:
     REFRESH_EVERY = 4
 
     def due(self) -> bool:
-        """Whether this step recomputes B (callers skip forming ``b`` if not)."""
-        return self._count % self.REFRESH_EVERY == 0
+        """Whether this step recomputes B (callers skip forming ``b`` if not).
+
+        Every `REFRESH_EVERY` steps, and also on any step where a strip is
+        about to cross the free surface (ROADMAP AK).  B scales with density,
+        so a B formed in air is about 1/800 of the one the same strips need in
+        water, and on the cadence alone first contact could run up to three
+        steps of water loads against it -- explicitly.  Measured on the ray
+        entering nose-first at 8 m/s: a strut joint thrown to 100 rad/s by
+        530 N m in two steps, a membrane whipped back out at 48 m/s, and a slam
+        peak that ran 164-1732 kPa with the start height moved 0-6 cm, i.e.
+        with which step of the cycle contact fell on
+        (`experiments/ray_entry/phase.py`).
+        """
+        return self._stale or self._count % self.REFRESH_EVERY == 0
+
+    def _wet(self, pos: np.ndarray, t: float) -> np.ndarray:
+        """Strips with any part below the free surface."""
+        return self._medium.depth(pos, t) > -self._half
 
     def reset(self) -> None:
         self.model.dof_damping[:] = self.base
         self.last_b[:] = 0.0
         self._count = 0
+        self._wet_ref = None
+        self._prev_pos = None
+        self._stale = False
 
     def clear(self, data) -> None:
         """The step's damping with the split off: the dry model's own.  Called
@@ -698,6 +724,23 @@ class ImplicitAeroDamping:
             return
         if b is not None:
             self.last_b = self.projected(data, pos, body_id, b)
+        if self._medium is not None and len(pos) == len(self._half):
+            # Which strips are wet now, and which will be next step on this
+            # step's motion; B is stale the moment either differs from the set
+            # it was formed on, so the step that first wets a strip forms its
+            # own.  Both paths call this every step with the strip positions,
+            # so the batched one refreshes on the same steps.
+            wet = self._wet(pos, data.time)
+            if b is not None:
+                self._wet_ref = wet
+            if self._prev_pos is not None and self._prev_pos.shape == pos.shape:
+                ahead = self._wet(2.0 * pos - self._prev_pos,
+                                  data.time + m.opt.timestep)
+            else:
+                ahead = wet
+            self._stale = self._wet_ref is not None and bool(
+                np.any(wet != self._wet_ref) or np.any(ahead != self._wet_ref))
+            self._prev_pos = np.array(pos, float)
         self._count += 1
         B = self.last_b
         m.dof_damping[:] = self.base + B
@@ -767,6 +810,42 @@ def finish_bodies(fb: np.ndarray, fsum_b: np.ndarray, m_body: np.ndarray,
         fb *= limit / total
     fb[:, 2] += m_body * GRAVITY
     return clamped
+
+
+def entrainment_reaction(fb: np.ndarray, m_new: np.ndarray, m_old: np.ndarray,
+                         lever2: np.ndarray, vel: np.ndarray, h: float) -> None:
+    """The ``-dm/dt v`` half of ``F = -d(m_a v)/dt``, added in place to ``fb``
+    (nb, 6: world force, world torque).  ROADMAP AK.
+
+    The added mass is folded into the mass matrix, and MuJoCo keeps ``qvel``
+    when the mass matrix changes.  That supplies ``-m_a dv/dt`` and nothing
+    else: a body that entrains ``dm`` of water in a step carries it off at its
+    own velocity, so ``dm v`` of momentum appears with no reaction on the body.
+    Once a heavy membrane (tens of kilograms of entrained water on 0.2 kg of
+    structure) is moving, its joints hand that momentum to the hull.  Measured
+    on the ray entering nose-first at 8 m/s: the hull *accelerated* to 21.9 m/s
+    downward in water while the net fluid force on it pointed up
+    (`experiments/ray_entry/probe.py`, `plunge.py`).
+
+    The impulse ``-dm v`` over one step conserves the momentum of body plus
+    entrained water exactly -- ``v' = v m_old / m_new`` -- so it can slow a body
+    and never speed one up.  Only growth is reacted.  Mass that is shed (a
+    strip drying, or the tensor's projection turning away from the normal)
+    leaves at the body's velocity and takes its momentum with it, which is what
+    keeping ``qvel`` already does; reacting ``-dm v`` there instead would *push*
+    a surfacing body out of the water by an amount set by the density blend,
+    and every flap whose projection turns away from the normal.  Measured: the
+    two-sided form ran the eel to 1.1e6 m/s in water within 6 s
+    (`experiments/ray_entry/swim.py`, patched).  One-sided, the beetle's peak
+    speed from the water spawn falls from 4.70 to 0.43 m/s and the eel's from
+    3.78 to 0.63: that much of their swimming was the momentum this creates.
+    The rotational entry is the same statement for ``dm * lever2``, the
+    isotropic inertia `_publish_inertia` adds.  ``vel`` is (nb, 6), angular then
+    linear, world frame, at each body's centre of mass.
+    """
+    dm = np.maximum(np.asarray(m_new, float) - np.asarray(m_old, float), 0.0) / h
+    fb[:, :3] -= dm[:, None] * vel[:, 3:]
+    fb[:, 3:] -= (dm * lever2)[:, None] * vel[:, :3]
 
 
 class FluidSolver:
@@ -870,7 +949,12 @@ class FluidSolver:
         self.wing_added_mass_tensor = True
         #: Lift and drag damping integrated implicitly (`ImplicitAeroDamping`).
         self.implicit_damping = True
-        self._damping = ImplicitAeroDamping(model)
+        #: React the entrainment of added mass, ``-dm/dt v`` (`entrainment_reaction`,
+        #: ROADMAP AK).  Off, the mass matrix creates ``dm v`` of momentum every
+        #: step the added mass grows.
+        self.entrainment = True
+        self._prev_mbody: np.ndarray | None = None
+        self._damping = ImplicitAeroDamping(model, medium, panels.half_height)
         #: Wagner lag and the LEV's travel/Rossby history (F-02, F-13).
         self.unsteady = True
         self._unsteady = UnsteadyState(panels.n)
@@ -947,6 +1031,9 @@ class FluidSolver:
         self._damping.reset()
         self._unsteady.reset()
         self._inflow.reset()
+        # A body placed in water is placed with its water: a reset is not an
+        # entrainment event, so the first step after it reacts nothing.
+        self._prev_mbody = None
         self.diag = FluidDiagnostics()
 
     # ------------------------------------------------------------------ step
@@ -1298,9 +1385,11 @@ class FluidSolver:
         # also put a couple ``sum (r_i - com) x m_i g`` on every body: 22.8 N m
         # about the beetle's wing axis in water (MATH_AUDIT F-14).
 
-        # The slamming rate term is still computed, but only as a *diagnostic*:
-        # the structural check needs to know the peak entry load, while the
-        # dynamics get the same physics through the varying mass matrix.
+        # The slamming rate term is also computed as a *diagnostic*: the
+        # structural check needs to know the peak entry load.  The dynamics get
+        # ``-m_a dv/dt`` through the varying mass matrix and ``-dm/dt v``
+        # through `entrainment_reaction` below -- the mass matrix alone does not
+        # supply the second half, whatever this comment said until 2026-09-30.
         m_s = slam_mass(m_add, rho, p.chord, p.dr, is_wing, self.added_mass_scale)
         if self._primed:
             slam = float(np.abs((m_s - self._prev_ma) / dt * vn).max())
@@ -1339,6 +1428,15 @@ class FluidSolver:
         clamped = finish_bodies(fb, fsum_b, m_body, 60.0 * weight)
         if clamped:
             self.diag.clamped = True
+        if self.entrainment and not self.quasi_static:
+            # After the limiter, not inside it: this is not a fluid load the
+            # quasi-steady model estimated but the momentum bookkeeping of the
+            # mass matrix it just wrote, and by construction it cannot exceed
+            # the body's own momentum.
+            if self._prev_mbody is not None:
+                entrainment_reaction(fb, m_body, self._prev_mbody, self._lever2,
+                                     vel, self.model.opt.timestep)
+            self._prev_mbody = m_body.copy()
         data.xfrc_applied[:] += fb
 
         # --- diagnostics ---------------------------------------------------

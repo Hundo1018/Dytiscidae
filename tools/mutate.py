@@ -815,6 +815,28 @@ MUTATIONS: tuple = (
         replace="            omega_e = omega",
         defect="rotor thrust is taken at the start-of-step spin, and a propeller entering water is fired out of it",
         suites=("test_physics",), item="rotor in water"),
+    Mutation(
+        id="entrainment-not-reacted",
+        path="dytiscidae/physics/fluid.py",
+        find="            if self._prev_mbody is not None:\n"
+             "                entrainment_reaction(",
+        replace="            if False:\n"
+                "                entrainment_reaction(",
+        defect="added mass grows in the mass matrix with no -dm/dt v reaction, so "
+               "every step of entrainment creates dm v of momentum: the ray "
+               "accelerates to 21.9 m/s after entering at 8 (AK)",
+        suites=("test_physics::test_entry_shock_is_hydrodynamic_not_a_speed_limit",),
+        item="AK water entry"),
+    Mutation(
+        id="damping-stale-at-the-surface",
+        path="dytiscidae/physics/fluid.py",
+        find="        return self._stale or self._count % self.REFRESH_EVERY == 0",
+        replace="        return self._count % self.REFRESH_EVERY == 0",
+        defect="the implicit damping is refreshed on its 4-step cadence only, so "
+               "first contact with water can run three steps of water loads "
+               "against a B formed in air: a strut joint thrown to 100 rad/s (AK)",
+        suites=("test_physics::test_entry_shock_is_hydrodynamic_not_a_speed_limit",),
+        item="AK water entry"),
 
     # --- the job layer ----------------------------------------------------
     Mutation(

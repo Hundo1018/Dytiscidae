@@ -2867,6 +2867,7 @@ shape across incidence, and CL through the inflow, are. It is gated in
   against flat at the same speed, and nose-first at twice the speed. Flat
   getting worse with speed, the hull limit, and the gannet surviving a 20 m/s
   nose-first entry are all still asserted.
+  (Closed 2026-09-30 by AK: see AK below for what is asserted now.)
 - The audit fixture audits a gannet (its mission base is nonzero).
 - Four tests read new model constants (CL_MAX = CN_LEV/2, the LEV strength
   argument).
@@ -2919,9 +2920,62 @@ This is the second boundary in a week. Nothing has been run since the first.
     inflow ran on their 4-step cadence.
   - **A latent mismatch, fixed along the way.** The GPU ran the unsteady history
     even with `FluidSolver.unsteady` off. It now honours the flag.
-- **AK. The ray's entry under the corrected added mass.** Its membranes
-  oscillate through the surface after a nose-first entry, with the joints driven
-  or held.
+- **AK. The ray's entry under the corrected added mass -- done 2026-09-30.**
+  Its membranes oscillated through the surface after a nose-first entry, with
+  the joints driven or held. Two defects, both in `physics/fluid.py`, and
+  neither was the added mass itself. Probes in `experiments/ray_entry/`.
+  - **The mass matrix created momentum.** Added mass is folded into the mass
+    matrix and MuJoCo keeps `qvel` when it changes, which supplies
+    `-m_a dv/dt` and never `-dm/dt v`: every step the entrained mass grew, the
+    water came along at the body's speed with no reaction. Nose-first at
+    8 m/s the hull *accelerated* from 9.2 to 21.9 m/s downward in water while
+    the net fluid force on it pointed up, and the slam peak read 1292 kPa
+    against 760 at 20 m/s. The ray spawned in air flapped itself 4.5 m under.
+    `entrainment_reaction` adds `-max(dm, 0)/dt v` (and the rotational term)
+    at each body's CoM, which conserves momentum exactly and cannot speed a
+    body up. Shed mass is not reacted: the two-sided form ran the eel to
+    1.1e6 m/s. From the water spawn over 6 s, peak speed with/without:
+    beetle 0.43/4.70 m/s, eel 0.63/3.78, ray 0.59/0.63, gannet 0.36/0.36.
+    So most of the beetle's and eel's swimming was this momentum.
+  - **The implicit damping was stale at first contact.** B is refreshed every
+    4 steps and scales with density, so contact could meet up to three steps
+    of water loads with a B formed in air (~1/800). One strut joint took
+    up to 530 N m and gained 100 rad/s in two steps. The entry peak then depended
+    on which step contact fell on: 164-1732 kPa nose-first at 8 m/s as the
+    start height moved 0-6 cm. `ImplicitAeroDamping.due` now also refreshes
+    when a strip is wet, or will be next step, and was dry when B was formed
+    (or the reverse). Held, over one refresh cycle: 279-1307 kPa before,
+    372-418 after. `REFRESH_EVERY = 1` gives the same peaks within 1.5 kPa.
+  - **The two printed orderings are not the ray's.** With both fixed, peak kPa
+    over six start heights (flat 4 / flat 8 / nose 4 / nose 8 / nose 20):
+    driven 157-198 / 257-354 / 202-286 / 174-257 / 244-293, held 130-156 /
+    245-367 / 93-120 / 300-450 / 183-285. At 4 m/s flat beats nose-first in
+    all six driven entries and loses all six held. Nose-first at 8 m/s loses
+    to flat at 4 in 11 of 12. The ray's membranes and struts set its entry
+    load, not its attitude. `test_entry_shock_is_hydrodynamic_not_a_speed_limit`
+    now asserts what holds in every driven draw instead: at 8 m/s nose-first
+    beats flat; flat's load grows 1.48-2.01x from 4 to 8 m/s and nose-first's
+    0.83-1.02x; no entry leaves the machine sinking faster than it hit the
+    water (worst 0.97x, 2.38x without the reaction); and a held entry's peak
+    is within 2x across a refresh cycle. Mutations `entrainment-not-reacted`
+    and `damping-stale-at-the-surface` are each caught 1/1.
+  - **Side effect.** `test_resonance_needs_a_soft_drive`'s ray had been
+    measured 4.5 m under water. At the surface the stiff spring reads 148
+    against 171 W/rad rigid (0.87x, the > 0.8x check holds), and the compliant
+    drive 75.
+  - **Open. The batched path does not have the reaction yet.** The damping
+    refresh is in `ImplicitAeroDamping`, and `batchroll` calls it every step,
+    so both paths have that fix. `entrainment_reaction` is called only from
+    `FluidSolver.apply`. `BatchedFluid.finish` needs the same call
+    (old mass = `e.model.body_mass - dry_mass` before it is overwritten,
+    per-body velocities from `mj_objectVelocity`, skipped on the first step
+    after a reset) or the search and verification paths disagree in water.
+    It was not made here because another session owns `batchroll.py`.
+    `mojo/src` is unaffected: both fixes are host-side.
+  - **Open. The slam diagnostic stops resolving entry above ~20 m/s.** One
+    step there is 8-12 cm of travel, and a thin strip's density blend crosses
+    in a single step. Nose-first at 23.8 m/s reads 446-1539 kPa as the start
+    height moves 0-8 cm. The survival check stays at 20 m/s for that reason.
 
 ---
 

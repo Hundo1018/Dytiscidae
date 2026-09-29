@@ -2,7 +2,7 @@
 
 # Modules
 
-102 modules, 34,248 lines, 1,024 indexed symbols.
+102 modules, 34,346 lines, 1,025 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -143,7 +143,7 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `physics.energy` | Electrical power train: actuators, battery, and the mission energy budget. | 432 | — | `numpy` | `physics.materials`, `physics.medium` |
-| `physics.fluid` | Quasi-steady blade-element fluid loads for flapping surfaces and bluff bodies. | 1425 | — | `mujoco`, `numpy` | `physics.medium` |
+| `physics.fluid` | Quasi-steady blade-element fluid loads for flapping surfaces and bluff bodies. | 1523 | — | `mujoco`, `numpy` | `physics.medium` |
 | `physics.jet` | Pulsed-jet propulsion: medusa bells and squid mantles. | 280 | — | `numpy` | `physics.medium` |
 | `physics.materials` | Material and component property database. | 257 | — | — | — |
 | `physics.medium` | Medium field: air above the free surface, water below, and the blended | 191 | — | `numpy` | — |
