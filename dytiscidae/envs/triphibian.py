@@ -295,6 +295,16 @@ GATED_AIR_CREDIT = 0.05
 #: that a tumble's fall does not.
 HEIGHT_WINDOW = 1.0
 
+#: The level-flight gate (ROADMAP AD): the air task's *flight* term -- holding
+#: height, as distinct from gliding down -- is paid only to a machine whose
+#: actuators can hold it level on the rig, ``level_margin >= LEVEL_GATE``.  Set
+#: by the user 2026-09-30 from arch44's gen-200 distribution (p50 0.006, p90
+#: 0.705, max 1.354): about one design in ten clears it, so it gates the part of
+#: the score that means flight and leaves the glide term to everyone -- gating
+#: all of air would put 90% of the population on the floor, the `moves` wall.
+#: A margin the rig could not measure does not clear it.
+LEVEL_GATE = 0.7
+
 
 def rotor_lift_ratio(p: Phenotype) -> float:
     """Static thrust of every propeller at top speed, in air, over the weight."""
@@ -1039,6 +1049,14 @@ class TriphibianEnv:
     #: Rig timing for `level_margin`, seconds: settle, then average.  Long
     #: enough for a 1.5 Hz gait's full cycle in the averaging window.
     RIG_SETTLE, RIG_AVERAGE = 0.5, 0.7
+
+    def flies_level(self) -> bool:
+        """Whether ``level_margin`` clears ``LEVEL_GATE`` (ROADMAP AD).
+
+        False when the rig could not measure it: absent is not a pass.
+        """
+        lm = self.level_margin()
+        return lm is not None and np.isfinite(lm) and float(lm) >= LEVEL_GATE
 
     def level_margin(self):
         """Can this machine hold height *and* speed, with its own actuators?
@@ -1878,6 +1896,12 @@ class TriphibianEnv:
                                 drops = (seg_clr[:-win] - seg_clr[win:]) / (win * dt)
                                 sink = max(sink, float(drops.max()))
                             flight = float(np.clip(1.0 - sink / 1.5, 0.0, 1.0))
+                            # A trajectory that holds height is flight only
+                            # when the actuators could have held it (AD); a
+                            # glider launched level at trim sinks slowly for
+                            # a few seconds on its airframe alone.
+                            if not self.flies_level():
+                                flight = 0.0
                             glide = float(np.clip(1.0 - sink / SINK_BALLISTIC, 0.0, 1.0))
                             vert = ((0.55 * flight + 0.25 * glide) / 0.80
                                     * stay / max(hi - lo, 1))

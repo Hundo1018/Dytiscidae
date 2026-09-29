@@ -876,10 +876,17 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
 
 def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                          segment_seconds: float = 10.0,
-                         identify_axes: bool = False, seed: int = 0,
+                         identify_axes=False, seed: int = 0,
                          sea_state=None, perturb: dict | None = None,
                          shared=None, buffer=None, n_modes: int = 6):
     """`evaluate_tier1` for a whole generation, sharing one GPU pipeline.
+
+    ``identify_axes`` is one bool for the whole batch or one per phenotype.
+    Only the machines asked for are identified; the rest keep whatever bases
+    their controller arrived with (none, for a fresh one).  It used to be one
+    bool, and the generation passed ``any`` of its candidates' wishes, so
+    ``identify_axes_every > 1`` identified every candidate whenever one of
+    them was due (ROADMAP AN).
 
     Both the three domain segments and the three transitions are batched. What
     is not, and cannot be, is the mobility identification: it drives each CPG
@@ -941,19 +948,26 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     # experiment -- see identify_batch for why that does not prevent batching.
     # It was 26.7% of a generation and the last thing still calling the numpy
     # solver.
-    if identify_axes:
+    if isinstance(identify_axes, (list, tuple)):
+        if len(identify_axes) != k:
+            raise ValueError(f"identify_axes has {len(identify_axes)} entries "
+                             f"for {k} phenotypes")
+        wanted = [i for i in live if identify_axes[i]]
+    else:
+        wanted = list(live) if identify_axes else []
+    if wanted:
         from .triphibian import Domain as _D
-        group = [envs[i] for i in live]
+        group = [envs[i] for i in wanted]
         for dom in (_D.AIR, _D.WATER):
             try:
                 found = identify_batch(group, dom, seed=seed,
                                        max_modes=n_modes)
             except Exception as exc:
-                for i in live:
+                for i in wanted:
                     results[i].notes.append(
                         f"mobility id failed in {dom.value}: {exc}")
                 continue
-            for slot, i in enumerate(live):
+            for slot, i in enumerate(wanted):
                 results[i].mobility[dom.value] = found[slot]
 
         # Overwrite rather than fill-if-empty, and only once both domains are
@@ -961,7 +975,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         # and an inherited controller arrives carrying its parent's.  Keeping
         # those would drive a child through its parent's axes, which is
         # precisely the thing the identification exists to prevent.
-        for i in live:
+        for i in wanted:
             ctrls[i].bases = results[i].mobility
 
     # See `evaluate_tier1`: the seed travels with the result so the archive can

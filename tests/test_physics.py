@@ -3602,6 +3602,10 @@ def test_a_drop_and_recovery_is_not_holding_height() -> None:
     from dytiscidae.evolution.curriculum import stage_score
 
     env = TriphibianEnv(build(BODY_PLANS["gannet"]()))
+    # This is about the shape of the trajectory, so the level-flight gate (AD)
+    # is held open; `test_holding_height_is_flight_only_if_the_actuators_can`
+    # is the gate's own test.
+    env.level_margin = lambda: 1.0
     dt = env.timestep
     n = int(8.0 / dt)
     sched = TaskSchedule("air", (Phase(CRUISE, 0.0, heading=0.0, speed=10.0),
@@ -3635,6 +3639,61 @@ def test_a_drop_and_recovery_is_not_holding_height() -> None:
     flew = stage_score(1, result(0.8, 1.0))
     check("stage 1 does not pay air progress made after falling into the sea",
           fell == 0.0 and abs(flew - 0.8) < 1e-12, f"fell {fell}, flew {flew}")
+
+
+def test_holding_height_is_flight_only_if_the_actuators_can() -> None:
+    """ROADMAP AD: the air task's flight term, and the ladder's flight rungs,
+    are gated on `level_margin >= LEVEL_GATE`; the glide term is not."""
+    print("\nair score: the level-flight gate")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.tasks import CRUISE, Phase, TaskSchedule
+    from dytiscidae.envs.triphibian import LEVEL_GATE, Domain, TriphibianEnv
+    from dytiscidae.evolution.judge import LADDER, rung_reached
+
+    env = TriphibianEnv(build(BODY_PLANS["gannet"]()))
+    dt = env.timestep
+    n = int(8.0 / dt)
+    sched = TaskSchedule("air", (Phase(CRUISE, 0.0, heading=0.0, speed=10.0),
+                                 Phase(CRUISE, 0.5, heading=0.0, speed=10.0)))
+    xy = np.zeros((n, 2))
+    xy[:, 0] = 10.0 * dt * np.arange(n)
+    level = np.full(n, 20.0)
+    gliding = 20.0 - 2.0 * dt * np.arange(n)          # 2 m/s down: a glide
+
+    def hold(clr, margin):
+        env.level_margin = lambda: margin
+        env._active_task = sched
+        try:
+            return env._task_scores(Domain.AIR, -clr, clr, xy, n,
+                                    airborne=np.ones(n, bool))["measurements"]["height_hold"]
+        finally:
+            env._active_task = None
+
+    flies, cannot, unmeasured = (hold(level, LEVEL_GATE + 0.1),
+                                 hold(level, LEVEL_GATE - 0.1), hold(level, None))
+    check("holding height pays flight only to a machine whose actuators can hold it",
+          flies > 0.9 and cannot < 0.5 * flies,
+          f"{flies:.3f} over the gate, {cannot:.3f} under it")
+    check("and a margin the rig could not measure does not clear the gate",
+          unmeasured == cannot, f"{unmeasured:.3f} against {cannot:.3f}")
+    g_over, g_under = hold(gliding, LEVEL_GATE + 0.1), hold(gliding, LEVEL_GATE - 0.1)
+    check("a glide still scores under the gate: it is a capability, not flight",
+          g_under > 0.0 and abs(g_over - g_under) < 1e-12,
+          f"{g_under:.3f} under, {g_over:.3f} over")
+
+    names = [r[0] for r in LADDER["air"]]
+    top = {"lift_margin": 5.0, "airborne_fraction": 1.0, "sink_rate": -1.0,
+           "thrust_margin": 1.0, "station_keeping": 1.0, "turn_response": 1.0}
+    check("the air ladder stops at `flies_level` without a level margin",
+          rung_reached("air", top) == names.index("flies_level"),
+          f"rung {rung_reached('air', top)} of {names}")
+    check("and under the gate, and climbs past it over the gate",
+          rung_reached("air", {**top, "level_margin": LEVEL_GATE - 0.01})
+          == names.index("flies_level")
+          and rung_reached("air", {**top, "level_margin": LEVEL_GATE}) == len(names))
+    check("the ladder's rung and the task's gate are the same number",
+          dict((r[0], r[2]) for r in LADDER["air"])["flies_level"] == LEVEL_GATE)
 
 
 def test_the_level_margin_measures_what_the_actuators_deliver() -> None:
@@ -3786,6 +3845,7 @@ def main() -> int:
         test_the_circulation_has_a_history,
         test_the_model_reproduces_the_robofly,
         test_a_drop_and_recovery_is_not_holding_height,
+        test_holding_height_is_flight_only_if_the_actuators_can,
         test_the_level_margin_measures_what_the_actuators_deliver,
         test_the_rotor_table_is_the_rotor_model,
         test_the_search_can_build_rotorcraft,

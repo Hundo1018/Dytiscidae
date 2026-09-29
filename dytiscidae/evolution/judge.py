@@ -140,6 +140,12 @@ LADDER: dict[str, list[tuple[str, str, float]]] = {
         ("flaps_forward", "thrust_margin", 0.002),   # 36.2%
         ("makes_thrust", "thrust_margin", 0.010),    # 21.2%
         ("pushes_itself", "thrust_margin", 0.020),   # 7.5%
+        # Level flight through the real actuators (ROADMAP AD, AG): the rig's
+        # `min(<Fz>/W, 1 + <Fx>/W)` with free joints.  Every rung below reads a
+        # trajectory, and a glider launched level at trim holds one for a few
+        # seconds on its airframe alone.  0.7 is the user's, 2026-09-30, from
+        # arch44 gen 200 (p50 0.006, p90 0.705).  Absent stops the ladder here.
+        ("flies_level", "level_margin", 0.7),
         # Holding *a* height, not losing one slowly.  A machine gliding down at
         # 0.4 m/s clears ``holds_height`` for a whole segment while never
         # holding anything, which is why the two are separate rungs: this one

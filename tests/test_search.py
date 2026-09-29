@@ -3962,6 +3962,34 @@ def test_sharding_a_generation_does_not_change_a_score() -> None:
           one[1] == many[1] and one[2] == many[2],
           f"air ranks {one[2]}")
 
+    # `identify_axes` per machine (ROADMAP AN).  The generation used to pass
+    # `any` of its candidates' wishes, so `identify_axes_every > 1` identified
+    # the whole batch whenever one candidate was due.  Only the machines asked
+    # for may come back with bases, in one shard or three.
+    want = [True, False, False, True, False, True]
+
+    def run_some(workers):
+        pool = ActorPool(workers, min_shard=2)
+        ctrls = [Controller(params=None, policy=None) for _ in phenos]
+        try:
+            res = pool.evaluate_tier1(phenos, controllers=ctrls,
+                                      **dict(kw, identify_axes=want))
+        finally:
+            pool.close()
+        return ([bool(c.bases) for c in ctrls], [bool(r.mobility) for r in res],
+                [r.mission_fraction for r in res],
+                getattr(pool, "retried", 0))
+
+    some1, some3 = run_some(1), run_some(3)
+    check("only the machines asked to identify come back with bases",
+          some1[0] == want and some1[1] == want, f"bases {some1[0]} want {want}")
+    # A shard handed the whole list raises in its worker and the pool quietly
+    # re-runs the batch in the parent, which would pass the first half of this.
+    check("and the per-machine request survives sharding, in the workers",
+          some3[0] == want and some3[1] == want and some1[2] == some3[2]
+          and some3[3] == 0,
+          f"bases {some3[0]}, batches re-run in the parent {some3[3]}")
+
     # The shared policy has to cross the process boundary too, and until
     # 2026-09-21 it only did when a rollout *buffer* came with it -- i.e. on the
     # generation's learning rollout.  The noise-free re-score and every

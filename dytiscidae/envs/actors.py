@@ -244,8 +244,12 @@ class ActorPool:
 
         futures = []
         for j, (a, b) in enumerate(shards):
+            kw = kwargs
+            # A per-phenotype identify list travels with its shard.
+            if isinstance(kwargs.get("identify_axes"), (list, tuple)):
+                kw = dict(kwargs, identify_axes=list(kwargs["identify_axes"][a:b]))
             futures.append(self._pool.submit(
-                _run_shard, (phenos[a:b], ctrls[a:b], kwargs, spec, j)))
+                _run_shard, (phenos[a:b], ctrls[a:b], kw, spec, j)))
 
         # Collect everything before applying any of it.  A worker that dies
         # halfway would otherwise leave the buffer holding some shards'

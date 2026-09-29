@@ -520,6 +520,43 @@ MUTATIONS: tuple = (
                "numbers the archive keeps -- is scored without it",
         suites=("test_search",), item="film = evaluation"),
     Mutation(
+        id="level-gate-removed-from-the-task",
+        path="dytiscidae/envs/triphibian.py",
+        find="                            if not self.flies_level():\n"
+             "                                flight = 0.0\n",
+        replace="",
+        defect="the air task pays holding height to any airframe that glides "
+               "level for a few seconds, whatever its actuators deliver (AD)",
+        suites=("test_physics::test_holding_height_is_flight_only_if_the_actuators_can",),
+        item="AD level gate"),
+    Mutation(
+        id="level-gate-removed-from-the-ladder",
+        path="dytiscidae/evolution/judge.py",
+        find='        ("flies_level", "level_margin", 0.7),\n',
+        replace="",
+        defect="the flight rungs read trajectories only, so a glider launched at "
+               "trim climbs them on its airframe (AD)",
+        suites=("test_physics::test_holding_height_is_flight_only_if_the_actuators_can",),
+        item="AD level gate"),
+    Mutation(
+        id="identify-one-means-identify-all",
+        path="dytiscidae/envs/batchroll.py",
+        find="        wanted = [i for i in live if identify_axes[i]]",
+        replace="        wanted = list(live) if any(identify_axes) else []",
+        defect="one candidate due for identification identifies the whole batch, so "
+               "identify_axes_every > 1 does not do what its name says (AN)",
+        suites=("test_search::test_sharding_a_generation_does_not_change_a_score",),
+        item="AN identify cadence"),
+    Mutation(
+        id="identify-list-not-sliced-per-shard",
+        path="dytiscidae/envs/actors.py",
+        find='                kw = dict(kwargs, identify_axes=list(kwargs["identify_axes"][a:b]))',
+        replace="                pass",
+        defect="every shard receives the whole batch's identify list, so shard j "
+               "identifies by shard 0's wishes (AN)",
+        suites=("test_search::test_sharding_a_generation_does_not_change_a_score",),
+        item="AN identify cadence"),
+    Mutation(
         id="trim-probes-the-live-state",
         path="dytiscidae/envs/triphibian.py",
         find="        m, d = self.model, mj.MjData(self.model)",

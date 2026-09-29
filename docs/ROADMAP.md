@@ -2477,7 +2477,20 @@ AH is not listed: probed on the rig, nothing cleared 1, and the search already
 owns the genes (motor mass, spring, compliance, feathering) with AD to select on
 them.
 
-### 1. AN. `identify=any(...)` breaks `identify_axes_every` -- **latent: zero effect on every stored run**
+### 1. AN. `identify=any(...)` breaks `identify_axes_every` -- **fixed 2026-09-30, not refused**
+
+**Done.** Refusing `> 1` was not possible: nine sites in `tests/test_search.py`
+pass `identify_axes_every=999` to keep identification off. So the knob now does
+what its name says. `evaluate_tier1_batch(identify_axes=...)` takes one bool or
+one per phenotype and identifies only the machines asked for, and
+`ActorPool.evaluate_tier1` slices the list per shard. A child that is not
+identified drives with the bases its controller arrived with, and a fresh
+controller arrives with none, which is what `identify_axes=False` always meant.
+At the value every run uses (1), the list is all-True and the batch is the same
+as before. Held by the sharding test (bases only where asked, identical in 1 or
+3 shards, no batch re-run in the parent) and by two mutations,
+`identify-one-means-identify-all` and `identify-list-not-sliced-per-shard`.
+Both caught.
 
 Raised 2026-09-30, and true as code: each candidate gets its own
 `identify = (counter % identify_axes_every) == 0`, and the generation then
@@ -2544,7 +2557,21 @@ whether acceptance changed a candidate's placement.
 **Pre-registered.** If refinement changes fewer than 5% of placements, it is
 not buying selection and at most one step stays.
 
-### 4. AD. Gate the flight rungs on `level_margin >= 0.7` -- **decided, not built**
+### 4. AD. Gate the flight rungs on `level_margin >= 0.7` -- **built 2026-09-30, unrun**
+
+**Built, in both places selection and the record read.** In the air task
+(`_task_scores`), the height term is `(0.55 * flight + 0.25 * glide) / 0.80`.
+Its `flight` part is now paid only when `TriphibianEnv.flies_level()` is true,
+meaning `level_margin >= LEVEL_GATE = 0.7`. A margin the rig could not measure
+fails the gate. The glide part is paid to everyone, so a level trajectory under
+the gate scores 0.312 where it scored 1.000, and a 2 m/s glide scores 0.208
+either way. On the ladder, `flies_level` (`level_margin`, 0.7) sits after
+`pushes_itself`, so it gates `holds_station`, `climbs` and `manoeuvres`.
+Selection reads the task, and the ladder goes into `meta` and the scout's
+`distance_to_next_rung`. **Air competence is not comparable across this
+change**, and the air ladder now has 15 rungs. Held by
+`test_holding_height_is_flight_only_if_the_actuators_can` and two mutations
+(`level-gate-removed-from-the-task`, `-from-the-ladder`). Both caught.
 
 The threshold is the user's (2026-09-30), set from arch44's gen-200
 distribution: p50 0.006, p90 0.705, max 1.354. **At gen 200 about one design

@@ -397,7 +397,7 @@ def evaluate_candidates(
     cfg: SearchConfig,
     *,
     inherited=None,
-    identify: bool = True,
+    identify=True,
     spec: MissionSpec | None = None,
     seeds=None,
     shared=None,
@@ -423,6 +423,10 @@ def evaluate_candidates(
     inherited = inherited or [None] * k
     seeds = seeds or [0] * k
     out = [None] * k
+    # One bool for the group, or one per genome: the generation's
+    # `identify_axes_every` cadence (ROADMAP AN).
+    wants = (list(identify) if isinstance(identify, (list, tuple))
+             else [bool(identify)] * k)
 
     # Build and gate one at a time.  A genome that will not build is one dead
     # candidate, not a dead group -- as a list comprehension here would have
@@ -452,7 +456,7 @@ def evaluate_candidates(
         for i in passed:
             out[i] = evaluate_candidate(
                 genomes[i], cfg, inherited_policy=inherited[i],
-                identify=identify, spec=spec, seed=seeds[i])
+                identify=wants[i], spec=spec, seed=seeds[i])
         return out
 
     ctrls = []
@@ -470,7 +474,8 @@ def evaluate_candidates(
         # mobility axes and driving it with a policy are independent; the
         # batched evaluator has always accepted both in one call.
         controllers=ctrls,
-        segment_seconds=cfg.segment_seconds, identify_axes=identify,
+        segment_seconds=cfg.segment_seconds,
+        identify_axes=[wants[i] for i in passed],
         seed=seeds[passed[0]])
 
     results = _refine_controllers(
@@ -1142,7 +1147,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             evaluated = evaluate_candidates(
                 [b[0] for b in built], cfg,
                 inherited=[b[1] for b in built],
-                identify=any(b[2] for b in built), spec=spec,
+                identify=[b[2] for b in built], spec=spec,
                 seeds=[b[5] for b in built],
                 shared=state.shared, buffer=buffer, pool=state.pool)
         except Exception as exc:
