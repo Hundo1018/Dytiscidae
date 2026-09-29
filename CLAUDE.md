@@ -9,10 +9,9 @@ measurement behind every item — **read it before proposing anything**.
 ## Session start
 
 1. `git status` and `git log --oneline -5`.
-2. Read `docs/ROADMAP.md` §"arch39 — the work list", and §"What is set by
-   measurement, and what is typed" before proposing any threshold. arch38 has
-   run; its result and the two void launches before it are in
-   `runs/arch38_notes.md`.
+2. Read `docs/ROADMAP.md` §"arch45 — the work list" (ranked), and §"What is
+   set by measurement, and what is typed" before proposing any threshold. The
+   latest finished run is arch44: `runs/arch44_notes.md`.
 3. Canary — the three suites, filtered, ~15 min total:
 
 ```bash

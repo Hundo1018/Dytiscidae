@@ -5,6 +5,11 @@ built. Every item names the measurement that motivates it; nothing here is on
 the list because it seemed like a good idea, and nothing is marked done without
 the number it produced.
 
+**Revised 2026-09-30: the current work list is
+[arch45](#arch45--the-work-list), ranked by build cost against what it does for
+the search and for the loop's speed.** Everything older is kept for its
+measurements.
+
 Revised 2026-09-19, after arch38 ran. Everything below is kept for the
 measurement that motivated it; **the current work list is
 [arch40](#arch40--the-work-list)**; arch39's list is kept below it, and
@@ -2196,7 +2201,6 @@ not taken from the headings below (two of which were stale).
 | R `shared_ent_coef` | a short sweep, after arch42 (it needs the machine) | queued |
 | N GRPO | held on purpose: arch42 is the first run in which the shared policy is scored at all (item Z), and whether it helps decides whether a better estimator for it is worth building | after arch42's read |
 | W, T, V | superseded by X / closed / subsumed | closed |
-| Q triphibian conflict | a written decision for the user: what "a chain of pairs" would change | memo |
 | TEST_AUDIT 7 | 15 mutations are caught only by `test_search`. The 5 for this commit's code are caught by named checks — two of them against their own test function after the full-suite run timed out under four-way contention. The 10 older ones wait for the machine, after arch42 | 5 of 15 |
 
 ### Y / O — what a continuous start would do, measured before building it
@@ -2220,19 +2224,6 @@ it is a curriculum on the thing no score has ever read. The air spawn (O) is the
 same curriculum run the other way: launch height steps down from 30 m.
 Not built: it changes what every transition score means, and the step rule
 needs its own measurement of crossing rates by distance first.
-
-### Q — the decision memo
-
-Measured three ways now: `corr(air, water)` −0.17 by arch37's end; a wing
-costing 2.5x in water what it buys in air; and today, CPPN complexity buying
-air (+0.139) and costing water (−0.280) with part count held fixed. The
-`land_air` island produced arch37's mission-best, and every transition any
-machine makes in a continuous mission is one gravity makes for it. The option
-the project has not tried is to make the mission **a chain of pairs** — separate
-lineages for land↔air and water↔air, each selected on its pair and its
-crossing, with the triphibian as a hand-off between them rather than one body
-asked to be good at three media at once. It changes what the project is for,
-so it stays the user's decision; nothing here acts on it.
 
 ## 2026-09-26, later — AG, AH and AI, and arch43
 
@@ -2436,8 +2427,8 @@ written up when the run finished. Full numbers and method are there; summary:
   near-zero (expected this early).
 - **gen 200, AD's threshold:** `level_margin` p50 0.006, p90 0.705, max 1.354,
   1.39% >= 0.95. Correlation to air competence is weak (+0.11) — clearing the
-  rig check is necessary, not sufficient. **The gate itself is not set; that's
-  a selection-pressure decision for the user, not a measurement.**
+  rig check is necessary, not sufficient. **The user set the gate at 0.7
+  (2026-09-30); it is item 1 of the arch45 list.**
 - **gen 200, rotorcraft vs flapping:** no separation yet at gen 200. By the
   run's end, rotor-carrying archive elites do lead on air (best 0.038 of 228,
   against 0.002 of 188 non-rotor) — but 0.038 is nowhere near the 0.3 bar for
@@ -2447,8 +2438,8 @@ written up when the run finished. Full numbers and method are there; summary:
   (nothing in selection asks a design to move between media under its own
   power) still stands; item O (the air spawn) is unchanged.
 
-Two follow-ups this surfaces, neither started: set AD's gate (needs a user
-call on where in 0.7-1.0), and the rotor-vs-flapping split has no gen-resolved
+Two follow-ups this surfaces: AD's gate (set at 0.7 by the user, 2026-09-30;
+item 1 below), and the rotor-vs-flapping split has no gen-resolved
 data because the run kept no periodic archive snapshots — only the final
 state and per-evaluation events, which undercounts rotor share (inherited
 rotors don't show as a fresh `mut_rotor` operator).
@@ -2457,7 +2448,161 @@ rotors don't show as a fresh `mut_rotor` operator).
 
 arch44 ran 600 gens from 2026-09-27 and finished 2026-09-30 (reads in the section above).
 
-### AJ. Work stealing across the pool -- **not built; measured as a symptom, sized by nothing yet**
+**Decisions, 2026-09-30 (the user).** AD's gate is `level_margin >= 0.7`.
+The search keeps building rotorcraft (AI). The mission stays one triphibian
+machine, not a chain of pairs.
+
+**Ranked by balance of three things**: what it costs to build, how much it
+helps the search find better mechanisms or the learner learn, and how much it
+shortens the loop (a generation, and so every future experiment). An item that
+only measures ranks by what its measurement unlocks.
+
+| # | item | build cost | mechanisms / learning | loop speed | why here |
+|---|---|---|---|---|---|
+| 1 | **AD** level-margin gate at 0.7 | low: one gate on the flight rungs, one mutation | **high**: first selection that reads flight through real actuation | none | the cheapest direct push toward flight; the signal has been published since arch43 |
+| 2 | **Telemetry bundle**: AK stage walls + acceptance, AL stage walls, AJ per-shard wall, periodic archive snapshots | low, no behaviour change | indirect: gen-resolved rotor/flapping split and refinement's real effect | decides 3, 5, 6 | rides in the same launch as 1 without touching its measurement |
+| 3 | **AN** refuse `identify_axes_every > 1` | trivial | none | none | a knob that silently lies; ships with 1-2 |
+| 4 | **AK** cut or target `--refine-steps 2` | low once 2 has read (a flag) | risk: may cost selection, hence an arm | **high**: re-score + 2 steps ~ half a shard's generation (estimate) | largest speed lever on the list, and nearly free to try |
+| 5 | **Y/O** transition-distance curriculum (and the air launch stepped down from 30 m) | high: changes what every transition score means; needs crossing rates by distance first | **highest**: six runs at 0/2 transitions, nothing in selection asks for a crossing | none | the mission's actual wall; after 1 so the two arms do not share their reads |
+| 6 | **AL** promotions through the pool, the scored basis reused | medium | exactness gain: Tier-2 gets the basis Tier-1 was earned with | <= ~5% | close if 2 reads < 3% on an idle machine |
+| 7 | **R** `shared_ent_coef` sweep | low | learner: the shared policy's value is still unmeasured | none | a short sweep; decides whether N is worth anything |
+| 8 | **AJ** work stealing | medium-high, and a reproducibility decision | none | unknown until 2 reads; close under ~10% idle | cost is certain, gain is not |
+| 9 | **AM** host-side per-machine loops | medium; needs its own noise floor | none | ~1/5 of a worker | real but bounded, and cannot use the bit-identity gate |
+| 10 | **N** GRPO for the shared policy | high | learner, conditional on 7 | negative (G rollouts) | only if 7 shows the shared policy carries weight |
+| 11 | ray entry under corrected added mass; TEST_AUDIT 7's remaining 10 mutations | low-medium | hygiene | none | when the machine is otherwise idle |
+
+AH is not listed: probed on the rig, nothing cleared 1, and the search already
+owns the genes (motor mass, spring, compliance, feathering) with AD to select on
+them.
+
+### 1. AD. Gate the flight rungs on `level_margin >= 0.7` -- **decided, not built**
+
+The threshold is the user's (2026-09-30), set from arch44's gen-200
+distribution: p50 0.006, p90 0.705, max 1.354. **At gen 200 about one design
+in ten clears it**, so it must gate the rungs that mean flight, not the whole
+air score -- gating every air rung would be the `moves at 0.1 m/s` wall again,
+with 90% of the population on the floor. A missing `level_margin` (the rig
+could not measure) stops `rung_reached` where it stands; it is not a zero.
+
+**Pre-registered.** The share of evaluations clearing 0.7 rises between gen 50
+and gen 300; the best air competence beats arch44's 0.038 by gen 600. If fewer
+than 2% clear by gen 100 the gate is a wall and is lowered, not waited out.
+Add the mutation that removes the gate and expect a check to fail.
+
+### 2. Telemetry bundle -- **not built; no behaviour change**
+
+The measurement steps of AK (per-stage wall, trials accepted per refinement
+step, placement status before against after refinement via a dry-run `_place`),
+AL (wall of promotion, Tier-1.5, Tier-2 and audit), AJ (per-shard wall in
+`ActorPool`), and an archive snapshot every 50 generations (arch44 could not
+split rotor from flapping by generation without one). The 700-number benchmark
+must not change.
+
+### 3. AN. `identify=any(...)` breaks `identify_axes_every` -- **latent: zero effect on every stored run**
+
+Raised 2026-09-30, and true as code: each candidate gets its own
+`identify = (counter % identify_axes_every) == 0`, and the generation then
+passes `identify=any(b[2] for b in built)` to `evaluate_candidates`, so one
+identifying candidate makes the whole batch identify. The knob cannot do what
+its name says for any value above 1.
+
+It has changed nothing so far: `identify_axes_every` is 1 in every run's
+`run_start` config (arch40-arch44, all launches and void launches), where every
+candidate identifies and `any` is the same answer.
+
+**Fix, when anyone wants a value above 1** -- and not before, because that is
+itself a search-design change: identification on the subset (`identify_batch`
+already takes an arbitrary group of environments), and a decision about what a
+non-identified child drives through. Today it would keep its parent's inherited
+bases, which is the exact thing the overwrite in `evaluate_tier1_batch` says
+identification exists to prevent. **Now:** refuse `identify_axes_every > 1` at
+config load, with a mutation that sets it to 2 and expects the refusal, so the
+knob cannot silently lie.
+
+### 4. AK. What `--refine-steps 2` buys has never been measured -- **not built; measure first**
+
+Raised 2026-09-30 by a review that assumed the opposite: that
+refinement runs only at promotion (`controller_refine_steps` defaults to 0,
+`promotion_refine_steps` is 6) and that this was the right design to keep. The
+default is 0, but **every run since arch34 has passed `--refine-steps 2`**
+(`runs/arch34_notes.md` through `runs/arch44`; checked in each `run_start`
+config), so every candidate of every generation gets a noise-free re-score and
+two (1+1)-ES steps after its main evaluation: four batched evaluations of the
+whole batch per generation (`_refine_controllers`, `evolution/loop.py`).
+
+**Its cost, estimated from `experiments/perf/NOTES.md`** (one 4-design shard,
+idle machine): main evaluation with identification ~33 s, a batched evaluation
+without it ~12 s. So a shard's generation is ~33 + 12 + 2 x 12 = ~69 s, of
+which the two refinement steps are ~35% and the re-score ~17%. Estimate, not
+measurement -- the stage walls are not logged.
+
+**Its worth has one measurement**, `docs/CPU_LEGACY.md` §1: three seeds at
+`segment_seconds=0.4`, `steps=4` against `steps=0`, two of three moved. Nothing
+since, and `_refine_controllers` logs neither how many trials were accepted nor
+whether acceptance changed a candidate's placement.
+
+**Order.**
+1. Telemetry, no behaviour change: per generation, the wall of each stage
+   (main, re-score, each refine step), trials accepted per step, and how many
+   candidates' placement status (`new` / `improved` / `rejected`) differs
+   between the pre-refinement and the final score. The second needs a dry-run
+   `_place` against the pre-refinement result; it must not touch the archive.
+2. Read over >= 100 generations of a run. If acceptance at step 2 is small and
+   placement changes are rare, cut to 1 step or 0; if acceptance is
+   concentrated in candidates already close to their cell's incumbent, refine
+   only those (a funnel, placed where the cost is).
+   Either is a search-design change and needs an arm, not a read.
+
+**Pre-registered.** If refinement changes fewer than 5% of placements, it is
+not buying selection and at most one step stays.
+
+### 5. Y/O. Transition-distance curriculum -- **designed 2026-09-22, not built**
+
+The design is in "Y / O -- what a continuous start would do" (2026-09-22):
+each transition probe's start steps back from the interface as the population
+learns to cross it, and the air launch steps down from 30 m the same way.
+First measurement: crossing rate by start distance on arch44's elites; the
+step rule is set from it. It changes what every transition score means, so
+nothing after it is comparable across it on transitions.
+
+### 6. AL. Promotion, Tier-1.5, Tier-2 and the audit run in the parent with the pool idle -- **not built; small, measure first**
+
+The concrete cost behind "the islands are not parallel" (2026-09-30): the
+islands themselves are not the lever, the idle pool during the parent stages is. `_verify_and_label` and `_audit` (`evolution/loop.py`) run
+one elite at a time in the parent: `_refined_controller_for` calls
+`evaluate_tier1_batch([pheno], ...)` with a batch of one and **no pool**, then
+six refinement steps on that batch of one, then a 60 s Tier-1.5 leg and the
+Tier-2 mission; the audit re-evaluates each elite several times on the numpy
+path. The four workers do nothing meanwhile.
+
+**Measured on arch44 (gens >= 7):** the 35 generations that carry a `promote`
+or `audit` event (the audit gens all coincide with promote gens) took a median
+**405 s** longer than the median plain generation (313 s), 7.5% of the run's
+wall. arch44's timings are confounded by the laptop's other load (see AJ), so
+that is a size, not a number to beat.
+
+**Candidates.**
+- The three promotions of a round refined together through the pool, as one
+  batch of three, instead of three batches of one.
+- **Do not re-identify the promoted elite.** The stored elite "carries weights
+  but not the basis" -- but the basis the elite was *scored* with is already
+  written to its `evaluate` event (`mobility_basis`, both media). Re-measuring
+  it at a fresh seed costs a full identification per promotion and hands
+  Tier-2 a basis the Tier-1 score was not earned with. Keyed by
+  `(genome_id, eval_seed)` this is exact, not a cache approximation.
+- Tier-2 and the audit stay on the numpy path on purpose (verification runs on
+  the half that is verified), so they can go to worker processes but not onto
+  the GPU path.
+
+**Ceiling.** Three promotions spread over four workers recovers at most about
+two thirds of that 7.5%, roughly 5% of a run. Log the stage walls first (same
+telemetry as AK), and close this if the idle-machine share is under 3%.
+
+### 7. R. `shared_ent_coef` sweep -- **queued since 2026-09-22**
+
+See R in the arch39 list. Short, needs the machine idle.
+
+### 8. AJ. Work stealing across the pool -- **not built; measured as a symptom, sized by nothing yet**
 
 Raised 2026-09-29 while reading arch44 at gen 402. The pool is CPU-bound in
 the workers, and it wastes part of that on the tail of every generation.
@@ -2522,81 +2667,10 @@ generation's PPO update, and the curator's operator credit would lag by one
 generation. Both change the algorithm, not just the schedule; that needs its
 own arm.
 
-### AK. What `--refine-steps 2` buys has never been measured -- **not built; measure first**
-
-Raised 2026-09-30 by an outside review that assumed the opposite: that
-refinement runs only at promotion (`controller_refine_steps` defaults to 0,
-`promotion_refine_steps` is 6) and that this was the right design to keep. The
-default is 0, but **every run since arch34 has passed `--refine-steps 2`**
-(`runs/arch34_notes.md` through `runs/arch44`; checked in each `run_start`
-config), so every candidate of every generation gets a noise-free re-score and
-two (1+1)-ES steps after its main evaluation: four batched evaluations of the
-whole batch per generation (`_refine_controllers`, `evolution/loop.py`).
-
-**Its cost, estimated from `experiments/perf/NOTES.md`** (one 4-design shard,
-idle machine): main evaluation with identification ~33 s, a batched evaluation
-without it ~12 s. So a shard's generation is ~33 + 12 + 2 x 12 = ~69 s, of
-which the two refinement steps are ~35% and the re-score ~17%. Estimate, not
-measurement -- the stage walls are not logged.
-
-**Its worth has one measurement**, `docs/CPU_LEGACY.md` §1: three seeds at
-`segment_seconds=0.4`, `steps=4` against `steps=0`, two of three moved. Nothing
-since, and `_refine_controllers` logs neither how many trials were accepted nor
-whether acceptance changed a candidate's placement.
-
-**Order.**
-1. Telemetry, no behaviour change: per generation, the wall of each stage
-   (main, re-score, each refine step), trials accepted per step, and how many
-   candidates' placement status (`new` / `improved` / `rejected`) differs
-   between the pre-refinement and the final score. The second needs a dry-run
-   `_place` against the pre-refinement result; it must not touch the archive.
-2. Read over >= 100 generations of a run. If acceptance at step 2 is small and
-   placement changes are rare, cut to 1 step or 0; if acceptance is
-   concentrated in candidates already close to their cell's incumbent, refine
-   only those (the funnel an outside review wanted, placed where the cost is).
-   Either is a search-design change and needs an arm, not a read.
-
-**Pre-registered.** If refinement changes fewer than 5% of placements, it is
-not buying selection and at most one step stays.
-
-### AL. Promotion, Tier-1.5, Tier-2 and the audit run in the parent with the pool idle -- **not built; small, measure first**
-
-The concrete cost behind an outside review's "the islands are not parallel"
-(2026-09-30; see "Raised and not listed" below for why the islands themselves
-are not the lever). `_verify_and_label` and `_audit` (`evolution/loop.py`) run
-one elite at a time in the parent: `_refined_controller_for` calls
-`evaluate_tier1_batch([pheno], ...)` with a batch of one and **no pool**, then
-six refinement steps on that batch of one, then a 60 s Tier-1.5 leg and the
-Tier-2 mission; the audit re-evaluates each elite several times on the numpy
-path. The four workers do nothing meanwhile.
-
-**Measured on arch44 (gens >= 7):** the 35 generations that carry a `promote`
-or `audit` event (the audit gens all coincide with promote gens) took a median
-**405 s** longer than the median plain generation (313 s), 7.5% of the run's
-wall. arch44's timings are confounded by the laptop's other load (see AJ), so
-that is a size, not a number to beat.
-
-**Candidates.**
-- The three promotions of a round refined together through the pool, as one
-  batch of three, instead of three batches of one.
-- **Do not re-identify the promoted elite.** The stored elite "carries weights
-  but not the basis" -- but the basis the elite was *scored* with is already
-  written to its `evaluate` event (`mobility_basis`, both media). Re-measuring
-  it at a fresh seed costs a full identification per promotion and hands
-  Tier-2 a basis the Tier-1 score was not earned with. Keyed by
-  `(genome_id, eval_seed)` this is exact, not a cache approximation.
-- Tier-2 and the audit stay on the numpy path on purpose (verification runs on
-  the half that is verified), so they can go to worker processes but not onto
-  the GPU path.
-
-**Ceiling.** Three promotions spread over four workers recovers at most about
-two thirds of that 7.5%, roughly 5% of a run. Log the stage walls first (same
-telemetry as AK), and close this if the idle-machine share is under 3%.
-
-### AM. Host-side per-machine loops -- **the lever already named above, as an item**
+### 9. AM. Host-side per-machine loops -- **the lever already named above, as an item**
 
 "Not done, measured as the next levers" in "where a worker's time went" is the
-same finding as an outside review's "a batch step is still a Python loop per
+same finding as a review's "a batch step is still a Python loop per
 candidate" (2026-09-30), and it is true: `step_batch` still loops over
 machines for `mj_step`, the observation, the CPG command, clearance and the
 twist recording. Two parts of that review are out of date or impossible. The
@@ -2612,63 +2686,10 @@ are not bit-exact to slice sums, so these steps cannot use the 700-number
 bit-identity benchmark; they need the path-agreement noise floor, and the
 first such step must say what that floor is before it claims anything.
 
-### AN. `identify=any(...)` breaks `identify_axes_every` -- **latent: zero effect on every stored run**
+### 10. N, 11. ray entry, TEST_AUDIT 7
 
-Raised 2026-09-30, and true as code: each candidate gets its own
-`identify = (counter % identify_axes_every) == 0`, and the generation then
-passes `identify=any(b[2] for b in built)` to `evaluate_candidates`, so one
-identifying candidate makes the whole batch identify. The knob cannot do what
-its name says for any value above 1.
-
-It has changed nothing so far: `identify_axes_every` is 1 in every run's
-`run_start` config (arch40-arch44, all launches and void launches), where every
-candidate identifies and `any` is the same answer.
-
-**Fix, when anyone wants a value above 1** -- and not before, because that is
-itself a search-design change: identification on the subset (`identify_batch`
-already takes an arbitrary group of environments), and a decision about what a
-non-identified child drives through. Today it would keep its parent's inherited
-bases, which is the exact thing the overwrite in `evaluate_tier1_batch` says
-identification exists to prevent. **Now:** refuse `identify_axes_every > 1` at
-config load, with a mutation that sets it to 2 and expects the refusal, so the
-knob cannot silently lie.
-
-### Raised 2026-09-30 and not listed, with why
-
-An outside review of the evaluation architecture raised ten points. Six map to
-the items above: the shard cap and the doubled meaning of `batch` to AJ, the
-refinement to AK, the islands in part to AL, the Python loops to AM, `any` to
-AN. The rest, checked against the code and arch44:
-
-- **"Run the six islands in parallel through one evaluation queue."** There are
-  seven islands, and they are visited in turn (`order[gen % len(order)]`). But
-  the pool already evaluates 16 candidates at once, and the ceiling on this
-  machine is memory (8x2 OOM-killed) and package power (96 C, 3.2 of 4.7 GHz),
-  not a shortage of concurrent candidates. More concurrency recovers only
-  idle time, which is AJ (the tail) and AL (the parent stages). Running the
-  islands concurrently would also change the algorithm: seven times fewer PPO
-  updates on seven times more data, and migrants arriving out of order.
-- **"Split each worker's pipeline into CPU pre-processing, a GPU batch and CPU
-  post-processing."** The overlap that split would buy already exists: the
-  next step's fluid is launched as soon as `mj_step` finishes and 8993 of 9000
-  steps find it done (`launch`/`wait`). The GPU is 5-9% busy; the workers are
-  CPU-bound under a power cap, and moving host work into another process does
-  not reduce it. The lever is fewer instructions, which is AM.
-- **"A mobility-basis cache keyed on body and actuators, because controller
-  mutations re-identify."** They do not: controller-only variation is the
-  refinement, and `_refine_controllers` never re-identifies. In the main loop,
-  98.2% of arch44's children (gens >= 7) carry a genome change, which changes
-  the body or the CPG base the probes linearise around, so a cache would miss.
-  The 1.8% with no applied operator (164 of 9129) are a cache hit worth ~0.5% of
-  a generation. The exact hit that does exist is the promoted elite, in AL.
-- **"A coarse-to-fine funnel: reject before paying for full Tier-1."** Of
-  arch44's evaluated children (gens >= 7), 41.2% improved a cell, 32.8% filled
-  a new one, and 26.0% were rejected, in the same shares of evaluation wall.
-  So a *perfect* pre-screen saves at most a quarter of the main evaluation,
-  before paying for itself -- and it cannot know that a child fills a new cell
-  without the descriptors the full evaluation produces. Tier-0 already rejects
-  structurally (389 in arch44). Where a funnel can pay is the refinement, AK.
-- **"Tune workers and batch last."** Agreed, and already the order here.
+As described under N (arch40 list), AK in the AB-AF list (the ray), and
+`docs/TEST_AUDIT.md` §7.
 
 ---
 
@@ -2835,8 +2856,8 @@ This is the second boundary in a week. Nothing has been run since the first.
   - sizing the feathering motor to the pitch load rather than to the stroke
     motor
   - a torque-feasibility term in the gait operators
-- **AI. Should the search build rotorcraft?** The genes exist and no operator
-  touches them. It is a question for the user: the project is about flapping.
+- **AI. Should the search build rotorcraft?** Yes (the user, 2026-09-26, and
+  again 2026-09-30); `mut_rotor` built for arch43.
 - **AJ. Path agreement against the noise floor — done, and the first
   explanation was wrong.** Two checks failed after the fluid work: eel,
   no-identification, 1.5e-5 against a 1e-5 bar; record against film, 2.7%
@@ -3125,8 +3146,6 @@ Then, in this order:
    glide no longer *scores*, which removes the reason the spawn was tolerable.
 6. **R, `shared_ent_coef`**, still the value measured to do nothing, still
    un-swept.
-7. **Q, the triphibian conflict**, unchanged and still written down rather than
-   acted on.
 
 ---
 
@@ -3600,23 +3619,6 @@ Still 400 (`evolution/loop.py:181`, CLI `ops/run.py:733`). arch38 made it
 measurable for the first time and measured it: **19.0% median merge loss per
 refit, 11.1–31.2%, over 660 median archipelago cells.** Unfixed, and now with a
 number to judge a change against.
-
-### Q. The triphibian conflict itself
-
-`corr(air, water)` runs +0.04 to −0.17 across arch37's nine bands and a wing
-costs 2.5x more in water than it buys in air. arch38 added a second instance of
-the same shape: a fixed evaluation budget moved to water the moment water had
-somewhere to climb. The `land_air` island — added in arch37, finished second of
-seven, produced that run's mission-best — is evidence that pairs work where the
-whole does not.
-
-**Whether the mission should be a chain of pairs rather than one machine asked to
-be good at three things at once is a change to what this project is for, so it is
-written down and not acted on.** It is now supported by two runs rather than one.
-reproducible from `--seed` at all (‖dW‖ = 7.4 between runs). Full audit in
-`docs/LEARNER_AUDIT.md`.
-
----
 
 ## arch34's phases, kept for the measurements behind them
 
