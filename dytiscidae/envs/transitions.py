@@ -125,6 +125,8 @@ class TransitionResult:
     kind: str
     crossed: bool = False
     failure: str = ""
+    #: How far back from the interface this probe started, metres (Y/O).
+    start_back: float = 0.0
     #: MuJoCo bad-qacc events during the crossing; same auto-reset channel the
     #: segment rollouts guard against (see SegmentResult.bad_qacc).
     bad_qacc: int = 0
@@ -191,19 +193,26 @@ class TransitionResult:
         }
 
 
-def _place_for(env: TriphibianEnv, kind: str) -> None:
-    """Put the machine where the crossing begins."""
+def _place_for(env: TriphibianEnv, kind: str, back: float = 0.0) -> None:
+    """Put the machine where the crossing begins.
+
+    ``back`` moves the start away from the interface, metres (ROADMAP Y/O):
+    higher over the sea, deeper under it, further seaward of the ramp, further
+    up the beach.  ``land_to_air`` has no interface to step back from and
+    ignores it.  0 is the placement every run before Y/O used.
+    """
     start, _ = TRANSITION_ENDPOINTS[kind]
     env.reset(start, randomise=False)
     if env.model.nq < 7:
         return
+    back = max(float(back), 0.0)
     if kind == "air_to_water":
         # Committed descent from low altitude: the machine has to arrive at the
         # surface, not decide whether to.
-        env.data.qpos[2] = 2.5
+        env.data.qpos[2] = 2.5 + back
         env.data.qvel[2] = -1.5
     elif kind == "water_to_air":
-        env.data.qpos[2] = -2.0
+        env.data.qpos[2] = -2.0 - back
     elif kind == "water_to_land":
         # Floating just above the submerged part of the ramp, a few metres
         # seaward of the shoreline: a machine that has swum up to the beach and
@@ -214,10 +223,14 @@ def _place_for(env: TriphibianEnv, kind: str) -> None:
         # depth this close in.  That is the same mistake that made the land
         # domain unreachable for the whole project, so the height comes from the
         # terrain here too rather than from a constant.
-        x = 8.0
+        x = 8.0 - back
         env.data.qpos[2] = env._clear_of_terrain(x, 0.0, 0.0, gap=0.02)
     elif kind == "land_to_water":
-        env.data.qpos[0] = 14.0
+        env.data.qpos[0] = 14.0 + back
+        if back > 0.0:
+            # Up the beach the ground is higher; set down on it, not in it.
+            env.data.qpos[2] = env._clear_of_terrain(14.0 + back, 0.0,
+                                                     float(env.data.qpos[2]))
     env._mj.mj_forward(env.model, env.data)
 
 
@@ -227,15 +240,16 @@ def run_transition(
     controller,
     *,
     duration: float = 6.0,
+    back: float = 0.0,
 ) -> TransitionResult:
-    """Simulate one crossing and measure it."""
-    r = TransitionResult(kind=kind, duration=duration)
+    """Simulate one crossing and measure it.  ``back``: see ``_place_for``."""
+    r = TransitionResult(kind=kind, duration=duration, start_back=float(back))
     if kind not in TRANSITION_ENDPOINTS:
         r.failure = f"unknown transition {kind}"
         return r
 
     _, target = TRANSITION_ENDPOINTS[kind]
-    _place_for(env, kind)
+    _place_for(env, kind, back)
     r.survivable_entry_speed = float(env.p.max_entry_speed)
 
     basis = controller.basis_for(Domain.WATER if "water" in kind else Domain.AIR)

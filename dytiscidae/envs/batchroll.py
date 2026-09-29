@@ -932,6 +932,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         try:
             envs[i] = TriphibianEnv(p, seed=seed, sea_state=sea_state,
                                     perturb=perturb)
+            envs[i].air_launch_height = spec.air_launch_height
             live.append(i)
         except Exception as exc:
             r.notes.append(f"compile failed: {type(exc).__name__}: {exc}")
@@ -1058,7 +1059,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
             tcollector = SegmentCollector(len(group))
         trs = run_transition_batch(group, bf, kind, [ctrls[i] for i in live],
                                    shared=shared, collector=tcollector,
-                                   noise_rngs=_noise(100 + t_index))
+                                   noise_rngs=_noise(100 + t_index),
+                                   back=float((spec.transition_back or {}).get(kind, 0.0)))
         for slot, i in enumerate(live):
             tr = trs[slot]
             results[i].transitions.results[kind] = tr
@@ -1095,7 +1097,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
 
 def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
                          duration: float = 6.0, shared=None, collector=None,
-                         noise_rngs=None):
+                         noise_rngs=None, back: float = 0.0):
     """`run_transition` for a whole batch, one GPU call per timestep.
 
     Mirrors the single-machine version exactly, including the two post-loop
@@ -1118,7 +1120,8 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
 
     k = len(envs)
     _, target = TRANSITION_ENDPOINTS[kind]
-    res = [TransitionResult(kind=kind, duration=duration) for _ in envs]
+    res = [TransitionResult(kind=kind, duration=duration, start_back=float(back))
+           for _ in envs]
 
     # Stable across processes: an index into a fixed list, never hash(str).
     _KINDS = ("air_to_water", "water_to_air", "water_to_land", "land_to_air",
@@ -1126,7 +1129,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
     scatter_seed = (0x9E3779B9 * (_KINDS.index(kind) + 1
                                   if kind in _KINDS else 7)) & 0x7FFFFFFF
     for m, e in enumerate(envs):
-        _place_for(e, kind)
+        _place_for(e, kind, back)
         # Each crossing kind used to present exactly one entry state, with no
         # noise at all, to every machine of every generation.  A real arrival
         # carries whatever speed and attitude the previous leg left behind.

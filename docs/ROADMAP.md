@@ -2516,8 +2516,8 @@ knob cannot silently lie.
 **Done, no behaviour change, and checked against a baseline run.** Two 8-gen
 searches at seed 7 (batch 8, 2 workers, 2 s segments, refine 2, shared policy)
 were run, one at `5221fe1` and one with this change. Every `generations.jsonl`
-line and every event outside the new fields was identical through gen 5 (216
-events). What each generation now writes:
+line and every event outside the new fields was identical, across all 8
+generations (241 events). What each generation now writes:
 - a `stages` event: walls of `main`, `rescore` and each refinement step;
   `accepted` trials per step; `placed`, `refined` (designs a step changed) and
   `placement_changed`; `shards`, each sharded call's per-shard walls inside the
@@ -2778,7 +2778,35 @@ generation's PPO update, and the curator's operator credit would lag by one
 generation. Both change the algorithm, not just the schedule; that needs its
 own arm.
 
-### 10. Y/O. Transition-distance curriculum -- **designed 2026-09-22, not built**
+### 10. Y/O. Transition-distance curriculum -- **built 2026-09-30, off by default; its step rule is unmeasured**
+
+**Built as a mechanism, with the step rule's numbers as parameters.**
+- **The probe start.** `MissionSpec.transition_back` sets, per transition kind,
+  how far back from its interface the probe starts. `air_to_water` starts
+  higher, `water_to_air` deeper, `water_to_land` further seaward, and
+  `land_to_water` further up the beach, where it is set down on the ground
+  rather than inside it. `land_to_air` has no interface and ignores it.
+- **The air launch (item O).** `MissionSpec.air_launch_height` is the air
+  segment's launch height. `None` is the 30 m spawn.
+- **Both paths read the spec.** `evaluate_tier1_batch` and `evaluate_tier1`
+  honour both fields. Every `TransitionResult` records its `start_back`.
+- **The step rule.** `curriculum.DistanceCurriculum` steps a start back by
+  `step` (0.5 m) once `advance_share` (0.5) of the last `window` (200)
+  evaluations crossed from the current distance. Evidence from any other
+  distance is ignored, and the window clears on a step. The launch steps down
+  by 2 m, to a 4 m floor, when the same share of air segments reach 0.1
+  competence.
+- **In the search.** `--distance-curriculum` turns it on. The curriculum is
+  checkpointed and restored into the spec on resume, every step is published as
+  a `distance_step` event, and the generation report carries its state.
+
+Off by default, so every probe starts where it always has. **The four numbers
+above are placeholders**: the first measurement named below (crossing rate by
+start distance on arch44's elites) is what sets them, before this is turned on
+for a run. Held by `test_a_transition_can_start_back_from_its_interface`
+(physics) and `test_the_distance_curriculum_steps_back_only_on_evidence`
+(search, both paths), and by two mutations, both caught:
+`batched-transition-ignores-its-start` and `distance-counts-other-distances`.
 
 The design is in "Y / O -- what a continuous start would do" (2026-09-22):
 each transition probe's start steps back from the interface as the population

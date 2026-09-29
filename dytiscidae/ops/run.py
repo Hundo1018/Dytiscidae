@@ -169,6 +169,7 @@ def cmd_search(args) -> int:
         pool_per_worker=args.pool_per_worker,
         pool_balance=bool(args.pool_balance),
         controller_refine_funnel=args.refine_funnel,
+        distance_curriculum=bool(args.distance_curriculum),
         action_rate_penalty=args.action_rate_penalty,
         descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
         gait_gain=bool(args.gait_gain),
@@ -838,6 +839,10 @@ def main(argv=None) -> int:
                    help="shards per worker; above 1 the pool becomes a queue "
                         "that hands the next shard to whichever worker is free "
                         "(ROADMAP AJ). 1 is the pool every stored run used")
+    p.add_argument("--distance-curriculum", action="store_true",
+                   help="step transition starts back from their interfaces and "
+                        "the air launch down from 30 m as the population learns "
+                        "(ROADMAP Y/O); changes what transition and air scores mean")
     p.add_argument("--refine-funnel", type=float, default=None,
                    help="refine only candidates within this fraction of their "
                         "cell's incumbent (ROADMAP AK); unset refines all")

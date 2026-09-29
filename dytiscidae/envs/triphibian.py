@@ -90,6 +90,17 @@ class MissionSpec:
     #: Reference mass.  Not enforced; recorded so the archive can be read
     #: against the original 15 kg ambition.
     reference_mass: float = 15.0
+    #: How far back from its interface each transition probe starts, metres
+    #: (ROADMAP Y/O).  Empty is 0 for every kind: the probe starts at the
+    #: waterline, the shore or 2.5 m over the sea, as it always has.  Set by the
+    #: search's ``DistanceCurriculum`` as the population learns to cross; at its
+    #: limit a probe is the continuous mission.  See ``transitions._place_for``.
+    transition_back: dict = field(default_factory=dict)
+    #: The air segment's launch height, metres; ``None`` is ``SPAWN`` (30 m).
+    #: The same curriculum run the other way (item O): it steps *down* as the
+    #: population learns to hold height, so a score stops being paid for time
+    #: spent falling from a height nothing climbed to.
+    air_launch_height: float | None = None
 
     @property
     def total_seconds(self) -> float:
@@ -556,6 +567,10 @@ class TriphibianEnv:
     #: ``None`` means "whatever ``tasks.schedule_for`` gives by default", which
     #: is what probes and tests that call ``rollout`` directly get.
     task: "TaskSchedule | None" = None
+    #: ``MissionSpec.air_launch_height`` for this machine; ``None`` is ``SPAWN``.
+    #: Read by ``reset`` only -- the trim sweep and the level rig keep the
+    #: canonical pose, since they measure the airframe, not the episode.
+    air_launch_height: float | None = None
     #: The schedule in force while a segment is running, and the clock it runs
     #: on.  ``None`` outside a segment -- during a transition, or the continuous
     #: mission's own loop -- so the controller is told no task there, which is
@@ -721,6 +736,8 @@ class TriphibianEnv:
         self.task = None
         self._active_task = None
         x, y, z = self.SPAWN[domain]
+        if domain is Domain.AIR and self.air_launch_height is not None:
+            z = float(self.air_launch_height)
         if randomise:
             x += float(self.rng.normal(0, 0.4))
             y += float(self.rng.normal(0, 0.4))

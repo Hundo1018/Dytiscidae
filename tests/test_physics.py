@@ -3696,6 +3696,50 @@ def test_holding_height_is_flight_only_if_the_actuators_can() -> None:
           dict((r[0], r[2]) for r in LADDER["air"])["flies_level"] == LEVEL_GATE)
 
 
+def test_a_transition_can_start_back_from_its_interface() -> None:
+    """ROADMAP Y/O: a probe's start steps back from the interface, the air
+    launch steps down, and 0 / None are the placements every run used."""
+    print("\ntransitions: starting back from the interface")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.transitions import _place_for, run_transition
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(BODY_PLANS["beetle"]()), seed=0)
+
+    def at(kind, back):
+        _place_for(env, kind, back)
+        return env.data.qpos[:3].copy(), float(env.clearance())
+
+    (a0, _), (a3, _) = at("air_to_water", 0.0), at("air_to_water", 3.0)
+    (w0, _), (w3, _) = at("water_to_air", 0.0), at("water_to_air", 3.0)
+    (s0, _), (s3, _) = at("water_to_land", 0.0), at("water_to_land", 3.0)
+    (l0, c0), (l3, c3) = at("land_to_water", 0.0), at("land_to_water", 3.0)
+    check("air_to_water starts higher, water_to_air deeper, by the distance asked",
+          abs((a3[2] - a0[2]) - 3.0) < 1e-9 and abs((w0[2] - w3[2]) - 3.0) < 1e-9,
+          f"air {a0[2]:.2f} -> {a3[2]:.2f}, water {w0[2]:.2f} -> {w3[2]:.2f}")
+    check("water_to_land starts further seaward, land_to_water further up the beach",
+          abs((s0[0] - s3[0]) - 3.0) < 1e-9 and abs((l3[0] - l0[0]) - 3.0) < 1e-9,
+          f"x {s0[0]:.2f} -> {s3[0]:.2f}; {l0[0]:.2f} -> {l3[0]:.2f}")
+    check("and up the beach it is set down on the ground, not inside it",
+          c3 > -0.01, f"clearance {c3:.3f} (at the old start {c0:.3f})")
+
+    env.air_launch_height = 12.0
+    env.reset(Domain.AIR, randomise=False)
+    z12 = float(env.data.qpos[2])
+    env.air_launch_height = None
+    env.reset(Domain.AIR, randomise=False)
+    check("the air launch height is honoured, and None is the 30 m spawn",
+          z12 == 12.0 and float(env.data.qpos[2]) == TriphibianEnv.SPAWN[Domain.AIR][2],
+          f"{z12} / {float(env.data.qpos[2])}")
+
+    tr = run_transition(env, "water_to_air", Controller(params=env.cpg.base),
+                        duration=0.2, back=2.0)
+    check("a transition records where it started", tr.start_back == 2.0,
+          f"{tr.start_back}")
+
+
 def test_the_level_margin_measures_what_the_actuators_deliver() -> None:
     """ROADMAP AG: min(<Fz>/W, 1 + <Fx>/W) on a rig, with the real actuators."""
     print("\nair: the level-flight margin")
@@ -3847,6 +3891,7 @@ def main() -> int:
         test_a_drop_and_recovery_is_not_holding_height,
         test_holding_height_is_flight_only_if_the_actuators_can,
         test_the_level_margin_measures_what_the_actuators_deliver,
+        test_a_transition_can_start_back_from_its_interface,
         test_the_rotor_table_is_the_rotor_model,
         test_the_search_can_build_rotorcraft,
         test_a_propeller_can_go_under_water,

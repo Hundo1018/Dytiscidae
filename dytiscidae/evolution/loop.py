@@ -106,6 +106,17 @@ class SearchConfig:
     #: leave the batch, which is where the saving is.  Set from the ``stages``
     #: telemetry (``placement_changed`` against ``refined``), not before.
     controller_refine_funnel: float | None = None
+    #: ROADMAP Y/O: step each transition probe's start back from its interface,
+    #: and the air launch down from 30 m, as the population learns to cross
+    #: and to hold height (``curriculum.DistanceCurriculum``).  Off: every probe
+    #: starts where it always has.  **Changes what every transition and air
+    #: score means** from the first step on, and every step is published as a
+    #: ``distance_step`` event.  Its numbers are parameters until crossing rates
+    #: by distance have been measured.
+    distance_curriculum: bool = False
+    distance_step: float = 0.5
+    distance_advance_share: float = 0.5
+    distance_window: int = 200
     pool_balance: bool = False
     #: Weight of the command-rate penalty on every competence (ROADMAP item Y:
     #: a controller chattering at the control rate).  0 = off, which is the
@@ -309,6 +320,8 @@ class SearchState:
     island_visits: dict = field(default_factory=dict)
     #: The policy shared by every morphology, or None when not in use.
     shared: object = None
+    #: ``DistanceCurriculum`` when ``distance_curriculum`` is on (ROADMAP Y/O).
+    distance: object = None
     shared_opt: object = None
     #: The stream PPO draws its minibatch order from.  Separate from ``rng``,
     #: which draws evaluation seeds: mixing them would make the number of
@@ -1190,6 +1203,11 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             if cfg.learned_axes else None),
         spec=spec,
     )
+    if cfg.distance_curriculum:
+        from .curriculum import DistanceCurriculum
+        state.distance = DistanceCurriculum(
+            step=cfg.distance_step, advance_share=cfg.distance_advance_share,
+            window=cfg.distance_window)
 
     if cfg.use_shared_policy:
         from ..learning import ppo as _ppo
@@ -1346,6 +1364,14 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                         != _dry_status(state, pheno, result, parent)):
                     changed += 1
             _place(state, child, pheno, result, ctrl, parent, operators)
+            if state.distance is not None and result.tier > 0:
+                state.distance.observe(result)
+        if state.distance is not None:
+            moves = state.distance.update()
+            if moves:
+                state.distance.apply(spec)
+                telemetry.event({"kind": "distance_step", "gen": gen,
+                                 "moves": moves, **state.distance.report()})
         _stage_event(state, gen, stage_log, refined=refined, changed=changed,
                      placed=sum(1 for g in evaluated if g is not None))
 
@@ -1520,6 +1546,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         if state.scout is not None:
             report["scout"] = state.scout.report()
         report["archipelago"] = archipelago.report()
+        if state.distance is not None:
+            report["distance"] = state.distance.report()
         best = archive.best
         if best is not None:
             report["best"] = {k: v for k, v in best.meta.items()
@@ -1666,6 +1694,11 @@ def save_state(state: SearchState, gen: int) -> None:
         # `takeoff_height` of 2.288 m re-measured as 0.000 for exactly that
         # reason.  A plain dict of ints and arrays, not a live object.
         "rng_state": state.rng.bit_generator.state,
+        # Y/O: where every transition probe starts, and the evidence toward
+        # its next step.  Without it a resume starts every probe at the
+        # interface again and the scores on either side of the boundary mean
+        # different things.
+        "distance": state.distance,
     }
     # The learner's two streams, for the same reason and with the same failure
     # mode one level down.  ``learner_rng_state`` is the minibatch order;
@@ -1816,6 +1849,10 @@ def load_state(state: SearchState) -> int:
 
     state.evaluated = int(d.get("evaluated", 0))
     state.tier0_rejected = int(d.get("tier0_rejected", 0))
+    if state.distance is not None and d.get("distance") is not None:
+        state.distance = d["distance"]
+        if state.spec is not None:
+            state.distance.apply(state.spec)
     # Per-island visit counts.  A checkpoint written before these existed has
     # none; reconstructing them from the generation number is exact, because
     # the rotation is deterministic -- island i is active on every generation

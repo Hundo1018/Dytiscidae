@@ -539,6 +539,26 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_holding_height_is_flight_only_if_the_actuators_can",),
         item="AD level gate"),
     Mutation(
+        id="batched-transition-ignores-its-start",
+        path="dytiscidae/envs/batchroll.py",
+        find="                                   back=float((spec.transition_back or {}).get(kind, 0.0)))",
+        replace="                                   back=0.0)",
+        defect="the path the search scores with starts every probe at the "
+               "interface while verification starts it where the curriculum "
+               "says, so the two score different crossings (Y/O)",
+        suites=("test_search::test_the_distance_curriculum_steps_back_only_on_evidence",),
+        item="Y/O distance"),
+    Mutation(
+        id="distance-counts-other-distances",
+        path="dytiscidae/evolution/curriculum.py",
+        find="            if kind in self.kinds and abs(float(getattr(tr, \"start_back\", 0.0))\n"
+             "                                          - self.back.get(kind, 0.0)) < 1e-9:",
+        replace="            if kind in self.kinds:",
+        defect="crossings made from an easier start count as evidence for the "
+               "harder one, so the start runs away from what anyone can cross (Y/O)",
+        suites=("test_search::test_the_distance_curriculum_steps_back_only_on_evidence",),
+        item="Y/O distance"),
+    Mutation(
         id="funnel-refines-everyone",
         path="dytiscidae/evolution/loop.py",
         find="            if w is None or w.size == 0 or (chosen is not None and not chosen[i]):",

@@ -286,6 +286,7 @@ def evaluate_tier1(
         r.notes.append(f"compile failed: {type(exc).__name__}: {exc}")
         r.wall_time = time.time() - t0
         return r
+    env.air_launch_height = spec.air_launch_height
 
     ctrl = controller or Controller(params=env.cpg.base)
     if ctrl.params is None:  # see batchroll: the rhythm belongs to the body
@@ -347,7 +348,8 @@ def evaluate_tier1(
     # lifting surface while holding posture, so the reason is spent.
     for kind in ("air_to_water", "water_to_air", "water_to_land",
                  "land_to_air"):
-        tr = run_transition(env, kind, ctrl)
+        tr = run_transition(env, kind, ctrl,
+                            back=float((spec.transition_back or {}).get(kind, 0.0)))
         r.transitions.results[kind] = tr
         r.transition_ok[kind] = tr.crossed
         if tr.failure:

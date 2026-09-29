@@ -524,3 +524,92 @@ class Curriculum:
                 float(np.mean([self.handover(s) for s in self.stages.values()])), 4),
             "rank_windows": {STAGES[s][0]: len(w) for s, w in sorted(self._recent.items())},
         }
+
+
+# --------------------------------------------------------------------------
+# Distance: how far from an interface a crossing starts (ROADMAP Y/O)
+# --------------------------------------------------------------------------
+
+
+@dataclass(eq=False)
+class DistanceCurriculum:
+    """Move each transition probe's start back as the population crosses it.
+
+    Six runs have scored 0/2 continuous transitions, and a continuous
+    evaluation today would zero every leg after the first for almost everyone
+    (``probe_continuity``: 0 of 90 completed both, 2026-09-22).  So the probe
+    stays, and its start steps back from the interface -- deeper, higher,
+    further seaward or up the beach -- whenever ``advance_share`` of the last
+    ``window`` evaluations crossed from where it is now.  At its start it is
+    today's probe; at ``max_back`` it approaches the continuous mission.  The
+    air launch (item O) is the same rule run the other way: it steps down from
+    30 m by ``launch_step`` whenever ``advance_share`` of the window's air
+    segments reached ``launch_bar`` competence, to ``launch_floor``.
+
+    Every number here is a parameter because none of them has been measured:
+    the step rule needs crossing rates by start distance first (ROADMAP item
+    10).  Off unless the search enables it.
+    """
+
+    kinds: tuple = ("air_to_water", "water_to_air", "water_to_land", "land_to_water")
+    step: float = 0.5
+    advance_share: float = 0.5
+    window: int = 200
+    max_back: float = 20.0
+    launch_height: float = 30.0
+    launch_step: float = 2.0
+    launch_floor: float = 4.0
+    launch_bar: float = 0.1
+    back: dict = field(default_factory=dict)
+    _seen: dict = field(default_factory=dict)
+
+    def observe(self, result) -> None:
+        """Record one Tier-1 result's crossings and its air score."""
+        for kind, tr in (getattr(getattr(result, "transitions", None), "results", {}) or {}).items():
+            if kind in self.kinds and abs(float(getattr(tr, "start_back", 0.0))
+                                          - self.back.get(kind, 0.0)) < 1e-9:
+                self._push(kind, bool(tr.crossed))
+        air = (getattr(result, "segments", {}) or {}).get("air")
+        if air is not None:
+            self._push("air_launch", float(air.competence) >= self.launch_bar)
+
+    def _push(self, key: str, ok: bool) -> None:
+        w = self._seen.setdefault(key, [])
+        w.append(ok)
+        if len(w) > self.window:
+            del w[: len(w) - self.window]
+
+    def update(self) -> list:
+        """Step any start the population has earned.  Returns the moves."""
+        moves = []
+        for key, w in list(self._seen.items()):
+            if len(w) < self.window or sum(w) < self.advance_share * len(w):
+                continue
+            if key == "air_launch":
+                new = max(self.launch_height - self.launch_step, self.launch_floor)
+                if new < self.launch_height:
+                    moves.append({"what": key, "from": self.launch_height, "to": new,
+                                  "share": round(sum(w) / len(w), 3)})
+                    self.launch_height = new
+            else:
+                old = self.back.get(key, 0.0)
+                new = min(old + self.step, self.max_back)
+                if new > old:
+                    moves.append({"what": key, "from": old, "to": new,
+                                  "share": round(sum(w) / len(w), 3)})
+                    self.back[key] = new
+            # Evidence gathered at the old distance says nothing about the new.
+            self._seen[key] = []
+        return moves
+
+    def apply(self, spec) -> None:
+        """Write the current starts into the mission spec the evaluators read."""
+        spec.transition_back = {k: float(v) for k, v in self.back.items() if v > 0.0}
+        spec.air_launch_height = (None if self.launch_height >= 30.0
+                                  else float(self.launch_height))
+
+    def report(self) -> dict:
+        return {"back": {k: round(v, 3) for k, v in sorted(self.back.items())},
+                "launch_height": round(self.launch_height, 3),
+                "window_share": {k: (round(sum(w) / len(w), 3) if w else None)
+                                 for k, w in sorted(self._seen.items())}}

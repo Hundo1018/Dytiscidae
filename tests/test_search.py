@@ -2586,6 +2586,59 @@ def test_the_refinement_funnel_refines_only_what_it_selects() -> None:
           and out[0] is base[0] and out[2] is base[2])
 
 
+def test_the_distance_curriculum_steps_back_only_on_evidence() -> None:
+    """ROADMAP Y/O: a start steps back when enough evaluations crossed from
+    where it is now, evidence from another distance does not count, and the
+    batched evaluator honours what the spec says."""
+    print("\ncurriculum: transition distance")
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.curriculum import DistanceCurriculum
+
+    dc = DistanceCurriculum(window=10, step=0.5, advance_share=0.5,
+                            launch_step=2.0, launch_bar=0.1)
+
+    def result(crossed, back=0.0, air=0.0):
+        return NS(transitions=NS(results={"water_to_air": NS(crossed=crossed, start_back=back)}),
+                  segments={"air": NS(competence=air)})
+
+    for _ in range(10):
+        dc.observe(result(False))
+    check("no step while too few cross", dc.update() == [] and not dc.back)
+    for _ in range(10):
+        dc.observe(result(True, air=0.2))
+    moves = dc.update()
+    check("a step once half the window crossed from here, and the launch steps down",
+          dc.back.get("water_to_air") == 0.5 and dc.launch_height == 28.0,
+          f"{moves}")
+    for _ in range(10):
+        dc.observe(result(True, back=0.0))
+    check("crossings from the old distance are not evidence for the new one",
+          dc.update() == [] and dc.back["water_to_air"] == 0.5)
+    spec = MissionSpec()
+    dc.apply(spec)
+    check("the spec carries the starts to the evaluators",
+          spec.transition_back == {"water_to_air": 0.5} and spec.air_launch_height == 28.0,
+          f"{spec.transition_back}, {spec.air_launch_height}")
+
+    if needs_batched_evaluator("test_the_distance_curriculum_steps_back_only_on_evidence"):
+        return
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.batchroll import evaluate_tier1_batch
+    from dytiscidae.envs.evaluate import evaluate_tier1
+
+    far = MissionSpec(transition_back={"water_to_air": 3.0, "air_to_water": 1.0})
+    ph = build(BODY_PLANS["beetle"]())
+    rb = evaluate_tier1_batch([ph], spec=far, segment_seconds=0.4, seed=4)[0]
+    rn = evaluate_tier1(ph, spec=far, segment_seconds=0.4, seed=4)
+    starts = lambda r: {k: t.start_back for k, t in r.transitions.results.items()}
+    check("both evaluation paths start each probe where the spec says",
+          starts(rb) == starts(rn) and starts(rb)["water_to_air"] == 3.0
+          and starts(rb)["water_to_land"] == 0.0, f"{starts(rb)}")
+
+
 def test_a_shared_command_means_the_same_thing_on_every_body() -> None:
     """A mode index is a private coordinate; a body twist is not.
 
@@ -4568,6 +4621,7 @@ def main() -> int:
         test_an_audit_perturbs_the_scored_experiment_and_nothing_else,
         test_promotion_spends_refinement_and_keeps_what_it_buys,
         test_the_refinement_funnel_refines_only_what_it_selects,
+        test_the_distance_curriculum_steps_back_only_on_evidence,
         test_a_shared_command_means_the_same_thing_on_every_body,
         test_the_identification_width_reaches_the_policy,
         test_the_search_is_pointed_at_the_mission_and_compounds,
