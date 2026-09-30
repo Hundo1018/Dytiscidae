@@ -2477,6 +2477,29 @@ AH is not listed: probed on the rig, nothing cleared 1, and the search already
 owns the genes (motor mass, spring, compliance, feathering) with AD to select on
 them.
 
+**Status after the 2026-09-30 build pass** (the user: build as much as
+possible, measure only where it cannot be avoided, do not start arch45). Each
+item's own section has the detail and the mutations that hold it.
+
+| # | item | state | what decides the rest |
+|---|---|---|---|
+| 1 | AN | built: identification per candidate | nothing |
+| 2 | telemetry | built; an 8-gen run is identical to `5221fe1` | nothing |
+| 3 | AK | both levers built; the funnel is off | `stages.placement_changed` against `refined`, from the next run |
+| 4 | AD | built and **on**: air scores are not comparable across `5221fe1` | its pre-registered read (share clearing 0.7 by gen 100) |
+| 5 | R | not run: it is a sweep | the sweep; it gates 11 |
+| 6 | ray entry | built: entrainment reacted on both paths, damping refreshed at the surface | none; the mutation re-runs are in their own section |
+| 7 | AM | not built: the gain only exists as a timing | a timing against the path-agreement noise floor |
+| 8 | AL | built: promotions batched from the scored basis, Tier-1.5 and Tier-2 on workers; the audit stays in the parent | the audit's `stage_wall` |
+| 9 | AJ | built: per-machine exploration noise (on), a shard queue and cost balance (off) | `stages.idle` above ~10%, then a sweep |
+| 10 | Y/O | built and off; its step numbers are placeholders | crossing rate by start distance on arch44's elites |
+| 11 | N | not built | 5 |
+
+Found and fixed on the way: until this pass, only the batched path scattered a
+crossing's entry state, so every crossing that Tier-2 or a film measured
+started somewhere the scored one had not (up to 7.3 m/s of entry speed apart
+at `5221fe1`). See the ray-entry notes under AK.
+
 ### 1. AN. `identify=any(...)` breaks `identify_axes_every` -- **fixed 2026-09-30, not refused**
 
 **Done.** Refusing `> 1` was not possible: nine sites in `tests/test_search.py`
