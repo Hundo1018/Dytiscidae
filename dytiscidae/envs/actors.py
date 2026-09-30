@@ -360,6 +360,32 @@ class ActorPool:
                     buffer.add(t)
         return results
 
+    # ------------------------------------------------------------ anything else
+
+    def map(self, fn, jobs) -> list:
+        """``[fn(*job) for job in jobs]``, one job per worker at a time.
+
+        For work that is not a batched Tier-1 -- the single-machine Tier-1.5 and
+        Tier-2 of a round's promotions (ROADMAP AL), which used to run one after
+        another in the parent with every worker idle.  ``fn`` must be a
+        module-level function so a worker can import it.  In order; a pool of
+        one, a single job, or a pool that fails runs them here instead, as
+        ``evaluate_tier1`` does.
+        """
+        jobs = list(jobs)
+        if self._pool is None or len(jobs) <= 1:
+            return [fn(*job) for job in jobs]
+        futures = [self._pool.submit(fn, *job) for job in jobs]
+        try:
+            return [f.result() for f in futures]
+        except Exception as exc:
+            self._streak = getattr(self, "_streak", 0) + 1
+            if _pool_is_broken(exc) or self._streak >= self.RETRY_STREAK:
+                self._degrade(exc)
+            else:
+                self._retry_here(exc)
+            return [fn(*job) for job in jobs]
+
     # ---------------------------------------------------------------- failure
 
     def _retry_here(self, exc: Exception) -> None:

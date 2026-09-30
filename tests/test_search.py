@@ -1438,17 +1438,20 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # needs the flapping to make net forward force.  Derived, not written out,
     # so inserting another rung moves the expectations instead of breaking them.
     THR = sum(1 for _n, m, _t in LADDER["air"] if m == "thrust_margin")
+    # And the level-flight gate after them (AD): everything above it asks
+    # whether the actuators can hold the machine level on the rig.
+    LEV = sum(1 for _n, m, _t in LADDER["air"] if m == "level_margin")
     flies = {"lift_margin": 1.5}
-    pushes = {**flies, "thrust_margin": 2.0}
+    pushes = {**flies, "thrust_margin": 2.0, "level_margin": 1.0}
     seq = [
         ({**flies, "airborne_fraction": 0.05}, LIFT + 0),
         ({**flies, "airborne_fraction": 0.7, "sink_rate": 6.0}, LIFT + 2),
         ({**flies, "airborne_fraction": 0.7, "sink_rate": 2.0}, LIFT + 3),
         ({**flies, "airborne_fraction": 0.9, "sink_rate": 0.2}, LIFT + 4),
         ({**pushes, "airborne_fraction": 0.9, "sink_rate": 0.2,
-          "station_keeping": 0.8}, LIFT + THR + 5),
+          "station_keeping": 0.8}, LIFT + THR + LEV + 5),
         ({**pushes, "airborne_fraction": 0.95, "sink_rate": -1.0,
-          "station_keeping": 0.8, "turn_response": 0.0}, LIFT + THR + 6),
+          "station_keeping": 0.8, "turn_response": 0.0}, LIFT + THR + LEV + 6),
     ]
     ok = all(rung_reached("air", m) == k for m, k in seq)
     check("the ladder orders capability", ok,
@@ -1483,8 +1486,8 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
           f"rung {rung_reached('air', {**glider, 'thrust_margin': -0.2})} -- "
           f"held station 0.9 and climbed, and cannot make thrust")
     check("and the same episode with thrust goes to the top",
-          rung_reached("air", {**glider, "sink_rate": -1.0,
-                               "thrust_margin": 2.0}) == len(LADDER["air"]),
+          rung_reached("air", {**glider, "sink_rate": -1.0, "thrust_margin": 2.0,
+                               "level_margin": 1.0}) == len(LADDER["air"]),
           "thrust is what separates the two")
     # The probe values are derived from the rungs rather than written out, so
     # re-deriving the thresholds from a new population moves the expectations
@@ -1495,11 +1498,12 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     probes = [THR_BARS[0] - 0.1] + [b + (THR_BARS[i + 1] - b) / 2
                                     if i + 1 < len(THR_BARS) else b * 2.0
                                     for i, b in enumerate(THR_BARS)]
+    levels = {**glider, "level_margin": 1.0}
     check("the thrust rungs are ordered and sit above holds_height",
-          [rung_reached("air", {**glider, "thrust_margin": v}) for v in probes]
-          == [LIFT + 4, LIFT + 5, LIFT + 6, LIFT + 4 + THR + 1],
+          [rung_reached("air", {**levels, "thrust_margin": v}) for v in probes]
+          == [LIFT + 4, LIFT + 5, LIFT + 6, LIFT + 4 + THR + LEV + 1],
           "margins " + " / ".join(f"{v:+.4f}" for v in probes) + " -> rungs "
-          + " ".join(str(rung_reached("air", {**glider, "thrust_margin": v}))
+          + " ".join(str(rung_reached("air", {**levels, "thrust_margin": v}))
                      for v in probes))
 
     # An archived elite has to carry what it takes to reproduce its own numbers.
@@ -2499,6 +2503,9 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
             n_reference_seeds=2, n_random_seeds=0, islands=("generalist",),
             tier2_every=1, audit_every=999, migrate_every=999,
             checkpoint_every=999, run_dir=tmp, identify_axes_every=999,
+            # Two workers, so the round's refinement batch and its Tier-1.5
+            # and Tier-2 legs (`ActorPool.map`) go through real processes (AL).
+            workers=2, min_shard=1,
             promotion_refine_steps=2), MissionSpec())
         events = [json.loads(l) for l in open(Path(tmp) / "events.jsonl")]
         promotions = [e for e in events if e.get("kind") == "promote"]
@@ -2515,7 +2522,7 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
         # AL: the stage walls are recorded, and a promotion refines from the
         # basis the elite was scored with instead of re-identifying it.
         check("each promotion records its refinement, Tier-1.5 and Tier-2 walls",
-              all({"refine_wall", "tier1_5_wall", "tier2_wall"} <= set(p)
+              all({"refine_wall", "tier1_5_wall", "tier2_wall", "verify_wall"} <= set(p)
                   for p in promotions), f"{sorted(promotions[0]) if promotions else []}")
         import numpy as _np
 
@@ -3955,10 +3962,11 @@ def test_a_long_leg_runs_on_promotion_candidates_only() -> None:
           f"competence {seg.competence:.3f}")
 
     src = inspect.getsource(loop_mod._verify_and_label)
+    job = inspect.getsource(loop_mod._verification_job)
     check("and it runs at promotion, where the cost is per promotion",
-          "_tier1_5(state, elite, p2, ctrl2, spec, rng)" in src)
+          "_verification_job" in src and "_tier1_5(elite, seg, seconds, c)" in src)
     check("before the Tier-2 mission, not instead of it",
-          src.index("_tier1_5(") < src.index("evaluate_tier2("))
+          job.index("evaluate_tier1_5(") < job.index("evaluate_tier2("))
     check("the retention is recorded so the correlation is measurable",
           '"tier1_5_retention"' in inspect.getsource(loop_mod._tier1_5))
 
@@ -4072,6 +4080,18 @@ def test_sharding_a_generation_does_not_change_a_score() -> None:
           split(3, 8, 4) == [(0, 3)], f"{split(3, 8, 4)}")
     check("a pool of one runs in this process",
           ActorPool(1)._pool is None)
+    # `map` is how a round's Tier-1.5 and Tier-2 legs reach the workers (AL):
+    # results in the caller's order, from real processes, and nothing re-run
+    # in the parent.
+    import math as _math
+    _mp = ActorPool(2, min_shard=1)
+    try:
+        _got = _mp.map(_math.hypot, [(3.0, 4.0), (5.0, 12.0), (8.0, 15.0)])
+        _retried = getattr(_mp, "retried", 0)
+    finally:
+        _mp.close()
+    check("the pool maps other work over its workers, in order",
+          _got == [5.0, 13.0, 17.0] and _retried == 0, f"{_got}, re-run {_retried}")
 
     plans = list(BODY_PLANS.values())
     phenos = [build(plans[i % len(plans)]()) for i in range(6)]
@@ -4583,14 +4603,19 @@ def test_something_asks_a_machine_to_leave_the_ground() -> None:
 
     # And the transition has to be scored, or the objective asks for something
     # the evaluator never computes.
-    import inspect
-
-    from dytiscidae.envs import batchroll, evaluate as _ev
-    for mod in (batchroll, _ev):
-        src = inspect.getsource(mod)
-        check(f"{mod.__name__.split('.')[-1]} scores land_to_air",
-              'for kind in ("air_to_water", "water_to_air", "water_to_land",\n'
-              '                 "land_to_air"):' in src)
+    # Asked of what each path returns, not of its source text: the grep this
+    # replaced broke on a reformatted loop header while the loop was intact.
+    from dytiscidae.core.bodyplans import BODY_PLANS as _BP
+    from dytiscidae.core.phenotype import build as _b
+    from dytiscidae.envs import batchroll
+    from dytiscidae.envs.evaluate import evaluate_tier1 as _t1
+    _ph = _b(_BP["beetle"]())
+    check("evaluate scores land_to_air",
+          "land_to_air" in _t1(_ph, segment_seconds=0.2, seed=1).transitions.results)
+    if batchroll.AVAILABLE:
+        check("batchroll scores land_to_air",
+              "land_to_air" in batchroll.evaluate_tier1_batch(
+                  [_ph], segment_seconds=0.2, seed=1)[0].transitions.results)
 
 
 def main() -> int:

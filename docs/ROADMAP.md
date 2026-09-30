@@ -2645,7 +2645,7 @@ are not bit-exact to slice sums, so these steps cannot use the 700-number
 bit-identity benchmark; they need the path-agreement noise floor, and the
 first such step must say what that floor is before it claims anything.
 
-### 8. AL. Promotion, Tier-1.5, Tier-2 and the audit run in the parent with the pool idle -- **promotion half built 2026-09-30**
+### 8. AL. Promotion, Tier-1.5, Tier-2 and the audit run in the parent with the pool idle -- **promotion and verification built 2026-09-30; the audit stays**
 
 **Built: the round's promotions are refined as one batch through the pool,
 from the basis each elite was scored with** (`_refined_controllers_for`). The
@@ -2657,10 +2657,21 @@ anyway. `should_promote` is asked again before each Tier-2, so a round that
 spends the budget stops where the one-at-a-time loop did. Held by
 `test_promotion_spends_refinement_and_keeps_what_it_buys` (stage walls present,
 and the refined controller drives the recorded basis) and the mutation
-`promotion-re-identifies` (caught). **Not done:** Tier-2 and the audit still
-run on the numpy path in the parent, one elite at a time. Moving them to
-workers is the remaining half. Its size is `stage_wall` against `stages.main`,
-which the next run logs.
+`promotion-re-identifies` (caught).
+
+**Also built: each elite's Tier-1.5 leg and Tier-2 mission run on a worker**,
+one elite per worker (`_verification_job`, `ActorPool.map`), still on the numpy
+path. Seeds are drawn in the parent in the order the sequential loop drew them
+(Tier-1.5, then Tier-2, elite by elite). The only difference is that an elite
+later skipped by the budget recheck has had its seeds drawn, and its legs run,
+for nothing. The budget, the critic label and the elite's meta stay in the
+parent, in the old order. Each `promote` event gains `verify_wall`, the wall
+of the whole round's legs. Held by the pool's `map` check (order kept, from
+real processes, nothing re-run in the parent) and the mutation
+`pool-map-out-of-order` (caught). **Not moved: the audit.** It re-evaluates
+through a closure the auditor calls several times per elite and mutates the
+archive as it goes. Its wall is its own `stage_wall` event, so whether it is
+worth moving is read, not guessed.
 
 The concrete cost behind "the islands are not parallel" (2026-09-30): the
 islands themselves are not the lever, the idle pool during the parent stages is. `_verify_and_label` and `_audit` (`evolution/loop.py`) run

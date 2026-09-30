@@ -2190,12 +2190,45 @@ def _refined_controllers_for(state: SearchState, elites, phenos, spec, rng):
     return out
 
 
-def _tier1_5(state: SearchState, elite, pheno, ctrl, spec, rng) -> dict:
+def _verification_job(pheno, law, spec, seconds, competences, seed_1_5, seed_2):
+    """One promotion's Tier-1.5 leg and Tier-2 mission, where a worker can run it.
+
+    Module-level and free of the search state so ``ActorPool.map`` can ship it
+    (ROADMAP AL): a round's promotions used to run these one after another in
+    the parent while the four workers sat idle.  Everything that reads or
+    writes the search -- the budget, the critic, the elite's meta -- stays in
+    the parent, in ``_verify_and_label``, in the order it always ran.
+
+    Returns ``(tier1_5, tier2, walls)``; ``tier1_5`` is a segment, an error
+    string, or ``None`` when the leg is disabled, and ``tier2`` a result or an
+    error string.
+    """
+    import time as _time
+
+    t1 = _time.perf_counter()
+    leg = None
+    if seconds > 0.0:
+        try:
+            leg = evaluate_tier1_5(pheno, spec=spec, controller=law,
+                                   seconds=seconds, seed=seed_1_5,
+                                   competences=competences)
+        except Exception as exc:
+            leg = f"{type(exc).__name__}: {exc}"
+    t2 = _time.perf_counter()
+    try:
+        r2 = evaluate_tier2(pheno, spec=spec, controller=law, seed=seed_2)
+    except Exception as exc:
+        r2 = f"{type(exc).__name__}: {exc}"
+    return leg, r2, (round(t2 - t1, 3), round(_time.perf_counter() - t2, 3))
+
+
+def _tier1_5(elite, seg, seconds: float, competences: dict) -> dict:
     """One 60 s leg on a promotion candidate, and what it retained.
 
-    Placed here rather than in the generation loop because this is the only
-    place the cost is affordable: at most three promotions per verification
-    round, against sixteen candidates per generation.
+    Placed at promotion rather than in the generation loop because this is the
+    only place the cost is affordable: at most three promotions per
+    verification round, against sixteen candidates per generation.  Run by
+    ``_verification_job``; this turns what it returned into telemetry.
 
     Reported, not enforced.  What the retention distribution looks like is an
     open measurement -- the number this exists to produce -- and gating Tier-2
@@ -2204,20 +2237,12 @@ def _tier1_5(state: SearchState, elite, pheno, ctrl, spec, rng) -> dict:
     also happens to be the pair the critic learns from, so a gate would remove
     the ground truth that would justify the gate.
 
-    Returns telemetry fields, empty when the leg is disabled or fails.
+    Returns telemetry fields, empty when the leg is disabled.
     """
-    seconds = float(getattr(state.config, "tier1_5_seconds", 0.0))
-    if seconds <= 0.0:
+    if seg is None:
         return {}
-    competences = {k: float(elite.meta.get(k, 0.0) or 0.0)
-                   for k in ("air", "water", "land")}
-    try:
-        seg = evaluate_tier1_5(
-            pheno, spec=spec, controller=_with_shared(state, ctrl),
-            seconds=seconds, seed=int(rng.integers(1 << 30)),
-            competences=competences)
-    except Exception as exc:
-        return {"tier1_5_error": f"{type(exc).__name__}: {exc}"}
+    if isinstance(seg, str):
+        return {"tier1_5_error": seg}
     dom = seg.domain.value
     short = competences.get(dom, 0.0)
     out = {
@@ -2266,21 +2291,35 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
                                "error": f"{type(exc).__name__}: {exc}"})
         refined = [None] * len(chosen)
     refine_wall = round(time.perf_counter() - t0, 3)
+
+    # The seeds in the order the one-at-a-time loop drew them -- Tier-1.5's,
+    # then Tier-2's, elite by elite -- and then every elite's two legs at once,
+    # one per worker (AL).
+    seconds = float(getattr(cfg, "tier1_5_seconds", 0.0))
+    jobs, comps = [], []
     for elite, p2, ctrl2 in zip(chosen, phenos, refined):
+        c = {k: float(elite.meta.get(k, 0.0) or 0.0) for k in ("air", "water", "land")}
+        s15 = int(rng.integers(1 << 30)) if seconds > 0.0 else 0
+        jobs.append((p2, _with_shared(state, ctrl2), spec, seconds, c, s15,
+                     int(rng.integers(1 << 30))))
+        comps.append(c)
+    t1 = time.perf_counter()
+    done = (state.pool.map(_verification_job, jobs) if state.pool is not None
+            else [_verification_job(*j) for j in jobs])
+    verify_wall = round(time.perf_counter() - t1, 3)
+
+    for elite, p2, ctrl2, c, (seg, r2, (w15, w2)) in zip(
+            chosen, phenos, refined, comps, done):
         # Asked again: a promotion earlier in this round can have spent the
         # budget, which is what the one-at-a-time loop used to see.
         if not curator.should_promote(elite):
             continue
         try:
-            t1 = time.perf_counter()
-            long_leg = _tier1_5(state, elite, p2, ctrl2, spec, rng)
-            t2 = time.perf_counter()
-            r2 = evaluate_tier2(p2, spec=spec,
-                                controller=_with_shared(state, ctrl2),
-                                seed=int(rng.integers(1 << 30)))
-            walls = {"refine_wall": refine_wall,
-                     "tier1_5_wall": round(t2 - t1, 3),
-                     "tier2_wall": round(time.perf_counter() - t2, 3)}
+            if isinstance(r2, str):
+                raise RuntimeError(r2)
+            long_leg = _tier1_5(elite, seg, seconds, c)
+            walls = {"refine_wall": refine_wall, "tier1_5_wall": w15,
+                     "tier2_wall": w2, "verify_wall": verify_wall}
             f2 = fitness(p2, r2)
             curator.record_promotion(elite, f2)
             if ctrl2 is not None and ctrl2.policy is not None:

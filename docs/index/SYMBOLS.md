@@ -694,8 +694,9 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `plan_shards` | function | 163 | `(costs, workers: int, min_shard: int, *, per_worker: float=1.0, balance: bool=False) -> list` | Shards as lists of indices, most expensive first (ROADMAP AJ). |
 | `split` | function | 136 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
 | `ActorPool.__init__` | method | 231 | `(self, workers: int=1, *, min_shard: int=4, per_worker: float=1.0, balance: bool=False) -> None` | — |
-| `ActorPool.close` | method | 408 | `(self) -> None` | — |
+| `ActorPool.close` | method | 434 | `(self) -> None` | — |
 | `ActorPool.evaluate_tier1` | method | 258 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
+| `ActorPool.map` | method | 365 | `(self, fn, jobs) -> list` | ``[fn(*job) for job in jobs]``, one job per worker at a time. |
 
 ## `envs.batchroll` — `dytiscidae/envs/batchroll.py`
 

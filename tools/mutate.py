@@ -608,6 +608,15 @@ MUTATIONS: tuple = (
         suites=("test_search::test_sharding_a_generation_does_not_change_a_score",),
         item="AJ queue"),
     Mutation(
+        id="pool-map-out-of-order",
+        path="dytiscidae/envs/actors.py",
+        find="            return [f.result() for f in futures]\n        except Exception as exc:",
+        replace="            return [f.result() for f in reversed(futures)]\n        except Exception as exc:",
+        defect="a round's Tier-2 results come back to the wrong elites once they "
+               "run on the workers (AL)",
+        suites=("test_search::test_sharding_a_generation_does_not_change_a_score",),
+        item="AL promotion"),
+    Mutation(
         id="promotion-re-identifies",
         path="dytiscidae/evolution/loop.py",
         find='        bases = MobilityBasis.bases_from_record(elite.meta.get("mobility_basis"))',
