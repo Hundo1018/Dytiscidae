@@ -2645,9 +2645,23 @@ Add the mutation that removes the gate and expect a check to fail.
 
 See R in the arch39 list. Short, needs the machine idle.
 
-### 6. Ray entry under corrected added mass; TEST_AUDIT 7's remaining 10 mutations
+### 6. Ray entry under corrected added mass; TEST_AUDIT 7's remaining 10 mutations -- **ray entry built; the mutations re-run 2026-09-30**
 
-As described under AK in the AB-AF list (the ray), and `docs/TEST_AUDIT.md` §7.
+The ray half is under AK in the AB-AF list. **The mutation half is closed.**
+The list said 10 older mutations waited for the machine; counted in
+`tools/mutate.py` it was 17 whose `suites` still named the whole `test_search`
+suite (25-40 minutes each). Each now names the one function that catches it,
+and each was run alone, on `main` `1fd0a24` with the kernel linked in: 17 of 17
+print `caught 1/1` with a named `[FAIL]` check, in 0.2 s to 297 s (12 of them
+under 4 s; the three that drive the batched evaluator take 95, 180 and 297 s).
+None survived, none needed the whole suite, none timed out; each function
+passes on the unmutated tree. The table is in `docs/TEST_AUDIT.md` §7.
+
+Found on the way: `gait-touches-one-part` had stopped applying (`mut_gait`'s
+draw moved to 1.5-12 Hz on 2026-09-23) and the harness called it `MISAPPLIED`;
+its text is updated. And one function picked by name did not catch its mutation
+(`stage-one-reads-gross-measurements` against the gradient test), a hole in that
+function, not in the suite; the island-curriculum test holds it.
 
 ### 7. AM. Host-side per-machine loops -- **the lever already named above, as an item**
 

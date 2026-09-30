@@ -269,17 +269,17 @@ MUTATIONS: tuple = (
         replace="        pass  # phase and rest left where the parent had them",
         defect="mut_gait degrades to an amplitude-and-frequency move, so two of "
                "the four coordinates the thrust sweep needed never move",
-        suites=("test_search",), item="arch39 S jointness"),
+        suites=("test_search::test_the_gait_operator_moves_every_coordinate_at_once",), item="arch39 S jointness"),
     Mutation(
         id="gait-touches-one-part",
         path="dytiscidae/core/genome.py",
-        find="    g.flap_frequency = float(rng.uniform(1.5, 8.0))\n"
+        find="    g.flap_frequency = float(rng.uniform(1.5, 12.0))\n"
              "    for part in movable:",
-        replace="    g.flap_frequency = float(rng.uniform(1.5, 8.0))\n"
+        replace="    g.flap_frequency = float(rng.uniform(1.5, 12.0))\n"
                 "    for part in movable[:1]:",
         defect="mut_gait resamples one part rather than the actuated set, which "
                "is what mut_stroke already did",
-        suites=("test_search",), item="arch39 S jointness"),
+        suites=("test_search::test_the_gait_operator_moves_every_coordinate_at_once",), item="arch39 S jointness"),
 
     Mutation(
         id="continuous-mission-ignores-auto-reset",
@@ -292,7 +292,7 @@ MUTATIONS: tuple = (
         defect="a MuJoCo auto-reset teleports the machine mid-mission and the "
                "mission carries on across the jump (measured: survived=True, "
                "1500 of 1500 steps after a reset at step 400)",
-        suites=("test_search",), item="QACC auto-reset"),
+        suites=("test_search::test_a_mujoco_auto_reset_ends_the_continuous_mission",), item="QACC auto-reset"),
 
     Mutation(
         id="island-best-reads-the-best-domain",
@@ -303,7 +303,7 @@ MUTATIONS: tuple = (
                 "@dataclass(eq=False)",
         defect="an island's best is judged on its strongest own domain, so a "
                "one-medium specialist wins a pairing island",
-        suites=("test_search",), item="per-island best"),
+        suites=("test_search::test_an_islands_best_is_judged_on_its_own_domains",), item="per-island best"),
 
     Mutation(
         id="island-archive-read-through-the-merge",
@@ -312,7 +312,7 @@ MUTATIONS: tuple = (
         replace="    if False:\n        if island not in names:",
         defect="one island's archive is read through the cross-island merge, so "
                "an elite that lost its cell to another island is never filmed",
-        suites=("test_search",), item="per-island best"),
+        suites=("test_search::test_one_islands_archive_is_read_alone_not_through_the_merge",), item="per-island best"),
 
     Mutation(
         id="curriculum-reads-every-medium",
@@ -321,7 +321,7 @@ MUTATIONS: tuple = (
         replace="    if False:\n        segs = {d: s for d, s in segs.items() if d in domains}",
         defect="a specialist island's curriculum pays for another medium again, "
                "so the air and land islands fill with water machines",
-        suites=("test_search",), item="island purity"),
+        suites=("test_search::test_a_specialist_islands_curriculum_reads_only_its_own_medium",), item="island purity"),
 
     Mutation(
         id="bandit-without-an-exploration-floor",
@@ -330,7 +330,7 @@ MUTATIONS: tuple = (
         replace="                 epsilon: float = 0.0) -> None:",
         defect="the tilted argmax alone decides every slot, so a non-structural "
                "operator with a good mean can go unpicked for 80 generations",
-        suites=("test_search",), item="operator dormancy"),
+        suites=("test_search::test_no_operator_can_go_dormant_under_the_structural_tilt",), item="operator dormancy"),
 
     Mutation(
         id="checkpoint-asks-git-at-every-write",
@@ -339,7 +339,7 @@ MUTATIONS: tuple = (
         replace="",
         defect="each checkpoint names whatever HEAD is when it is written, not "
                "the code the process is running",
-        suites=("test_search",), item="provenance"),
+        suites=("test_search::test_a_checkpoint_names_the_commit_the_process_started_from",), item="provenance"),
 
     Mutation(
         id="stale-kernel-used-anyway",
@@ -348,7 +348,7 @@ MUTATIONS: tuple = (
         replace="",
         defect="a GPU kernel older than its source is used to score anyway, so "
                "the search and every verification run different physics",
-        suites=("test_search",), item="kernel freshness"),
+        suites=("test_search::test_a_kernel_older_than_its_source_is_not_usable",), item="kernel freshness"),
 
     # --- the task: each phase scored on its own purpose (2026-09-21) --------
     Mutation(
@@ -507,7 +507,7 @@ MUTATIONS: tuple = (
         defect="the batched path asks every machine the default task while the "
                "single path asks the drawn one, so the search scores one experiment "
                "and every verification runs another",
-        suites=("test_search",), item="path agreement"),
+        suites=("test_search::test_the_two_evaluation_paths_score_the_same_machine_the_same",), item="path agreement"),
 
     # --- the film is the evaluation (2026-09-21) --------------------------
     Mutation(
@@ -518,7 +518,7 @@ MUTATIONS: tuple = (
         defect="the actor pool ships the shared policy to its workers only with a "
                "rollout buffer, so every re-score and refinement trial -- the "
                "numbers the archive keeps -- is scored without it",
-        suites=("test_search",), item="film = evaluation"),
+        suites=("test_search::test_sharding_a_generation_does_not_change_a_score",), item="film = evaluation"),
     Mutation(
         id="level-gate-removed-from-the-task",
         path="dytiscidae/envs/triphibian.py",
@@ -667,7 +667,7 @@ MUTATIONS: tuple = (
         replace="    seed = 0",
         defect="the film re-runs the evaluation from a different initial condition "
                "and stamps it with the recorded score anyway",
-        suites=("test_search",), item="film = evaluation"),
+        suites=("test_search::test_a_film_reproduces_the_scored_experiment",), item="film = evaluation"),
 
     Mutation(
         id="reversal-counts-agreement",
@@ -693,7 +693,7 @@ MUTATIONS: tuple = (
         replace="            if False:",
         defect="the refit gate is configured and never keeps the axes, so every "
                "refit re-bins and merges the archive as before",
-        suites=("test_search",), item="P refit"),
+        suites=("test_search::test_a_refit_that_changes_nothing_can_be_skipped",), item="P refit"),
 
     Mutation(
         id="batched-fluid-diagnostics-stay-default",
@@ -702,7 +702,7 @@ MUTATIONS: tuple = (
         replace="                pass",
         defect="the batched path leaves diag.mean_submerged at 0.0, so the "
                "policy the search scores is told it is dry however deep it is",
-        suites=("test_search",), item="path agreement"),
+        suites=("test_search::test_the_batched_path_tells_the_policy_it_is_wet",), item="path agreement"),
 
     Mutation(
         id="stage-one-reads-gross-measurements",
@@ -712,7 +712,7 @@ MUTATIONS: tuple = (
                 '        for dom, key in (("water", "cruise_progress"),',
         defect="the curriculum's directed stage pays for gliding from the 30 m "
                "launch again, which a machine with its actuators off also does",
-        suites=("test_search",), item="sinking is not a capability"),
+        suites=("test_search::test_a_specialist_islands_curriculum_reads_only_its_own_medium",), item="sinking is not a capability"),
 
     # --- why nothing flew, 2026-09-23 -------------------------------------
     Mutation(
@@ -863,7 +863,7 @@ MUTATIONS: tuple = (
         find='                for i, e in enumerate(envs):\n                    acc[i] += e.body_twist()\n',
         replace='                for i, e in enumerate(envs):\n                    e._mj.mj_forward(e.model, e.data)\n                    acc[i] += e.body_twist()\n',
         defect='a caller refreshes the kinematics between steps, after the early launch read them',
-        suites=('test_search',), item='perf'),
+        suites=('test_search::test_the_early_fluid_launch_changes_nothing',), item='perf'),
     # --- arch43's pool, 2026-09-26 --------------------------------------------
     Mutation(
         id='nan-observation-reaches-policy',
@@ -871,7 +871,7 @@ MUTATIONS: tuple = (
         find='    return bool(np.all(np.isfinite(obs)))\n',
         replace='    return True\n',
         defect='a NaN observation reaches the shared policy and raises out of the batch',
-        suites=('test_search',), item='arch43'),
+        suites=('test_search::test_a_nan_observation_fails_the_rollout_not_the_batch',), item='arch43'),
     # --- AG and AI, 2026-09-26 ---------------------------------------------
     Mutation(
         id='level-rig-spends-battery',
