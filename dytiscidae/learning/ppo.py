@@ -110,6 +110,12 @@ def _mlp(n_in: int, n_hidden: int, n_out: int, out_gain: float = 1.0):
     )
 
 
+#: Rows below which `SharedPolicy.act_many` pads a deterministic batch, so a
+#: row's action does not depend on how many rows share it.  The measured
+#: threshold on the machine that set it was 3; one row of margin.
+MEAN_MIN_ROWS = 4
+
+
 class SharedPolicy(nn.Module if AVAILABLE else object):
     """A Gaussian policy and a value head, shared by every morphology.
 
@@ -266,12 +272,23 @@ class SharedPolicy(nn.Module if AVAILABLE else object):
             obs = torch.as_tensor(np.asarray(obs_np, np.float32))
             if obs.ndim == 1:
                 obs = obs.unsqueeze(0)
+            # A small batch on the mean is padded to MEAN_MIN_ROWS.  Measured
+            # (experiments/perf/batch_invariance.py, torch 2.14 CPU): a row's
+            # bits are the same in every batch of 3 to 64 rows and differ by
+            # ~3e-9 at 1 and 2, where the matmul takes other paths.  Without
+            # this, a shard whose other machines have stopped -- or a merge of
+            # two evaluations into one batch -- makes a score depend on what
+            # else shared its batch, and a rollout amplifies 1e-9 into percent.
+            n = obs.shape[0]
+            if deterministic and n < MEAN_MIN_ROWS:
+                obs = torch.cat([obs, obs[:1].expand(MEAN_MIN_ROWS - n, -1)])
             base = self.latent(obs)
             u = base.mean if deterministic else base.sample()
             a = torch.tanh(u)
             logp = (base.log_prob(u).sum(-1)
                     - torch.log1p(-a.pow(2) + 1e-6).sum(-1))
             v = self.value(obs)
+            a, logp, v = a[:n], logp[:n], v[:n]
         return (a.numpy().astype(float), logp.numpy().astype(float),
                 v.numpy().astype(float))
 

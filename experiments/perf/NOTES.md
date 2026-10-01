@@ -208,3 +208,39 @@ climb: plain generations alone still go from ~120 s to ~310 s.
 Checked on a CPU run (2 designs, 0.5 s segments): identify 57,600, segments
 750, transitions 12,000, rig 598 -- each exactly the schedule; the phases sum
 to the difference of `elapsed` with `untimed` 0.0.
+
+## 2026-10-01: the re-score and refinement step one in one batch
+
+`_refine_controllers` scored the noise-free re-score and then each (1+1)-ES
+step as separate batched calls. Step one's trials are drawn from the incoming
+weights and the refinement's own generator, and are compared with the
+re-score only afterwards, so nothing in step one waits on the re-score.
+`MERGE_FIRST_REFINE` scores both in one call of 2k machines: per generation,
+one trip through the pool fewer (4 -> 3 with `--refine-steps 2`) and shards
+twice as wide (4x4 pool: 4 machines a shard -> 8).
+
+**What makes it exact, and what had to change for that.** A machine's score
+must not depend on what shares its batch. The physics side is asserted by
+`test_search`. The policy side was not true: `SharedPolicy.act_many` on the
+mean gave a row different bits at batch 1 and 2 than at 3 or more
+(`batch_invariance.py`, torch 2.14 CPU, ~3e-9; rows match across every batch
+of 3 to 64). A shard whose other machines have stopped already hit this; a
+merged batch would hit it differently. `act_many` now pads a deterministic
+batch below `MEAN_MIN_ROWS = 4` rows. This changes scores against the code
+before it only where a shard was left with one or two live machines.
+
+**Checked here** (no GPU): `test_merging_the_rescore_with_the_first_refinement_changes_nothing`
+-- with an evaluator that is a pure function of each row, merged and split
+keep the same weights and return the same results in one call fewer;
+`test_a_decision_on_the_mean_does_not_depend_on_its_batch` (batches 1-16);
+mutations `merged-rescore-halves-swapped` and `mean-not-padded`.
+
+**Not checked here, and it decides whether this stays:** that the batched GPU
+path gives a machine the same bits in a shard of 8 as in a shard of 4, on the
+run's machine and its BLAS. `merge_check.py` does exactly that comparison and
+prints both wall times:
+
+    python experiments/perf/merge_check.py --n 16 --workers 4 --min-shard 4
+
+Exit 0 means every number agreed. If it does not, set `MERGE_FIRST_REFINE =
+False` and the search is as it was.

@@ -562,6 +562,17 @@ def evaluate_candidates(
     return out
 
 
+#: Score the noise-free re-score and the first refinement step in one batch.
+#: The trials of step one are drawn from the incoming weights and a generator
+#: of their own, and are compared with the re-score only afterwards, so
+#: nothing in step one waits on the re-score.  Both are deterministic, and a
+#: machine's score does not depend on what shares its batch (asserted by
+#: `test_search`; the policy's side by `MEAN_MIN_ROWS` in `learning/ppo.py`),
+#: so one call of 2k machines returns exactly what two calls of k did: one
+#: fewer trip through the pool per generation, and shards twice as wide.
+MERGE_FIRST_REFINE = True
+
+
 def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
                         steps: int | None = None, shared=None, pool=None,
                         cost: GenerationCost | None = None):
@@ -605,20 +616,10 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
     #
     # The cost is one batched evaluation per generation, which is why it is
     # spent only when there is a shared policy to be noisy.
-    if shared is not None:
-        with _phase(cost, "evaluate.rescore"):
-            results = batchroll_eval(phenos, ctrls, cfg, spec=spec, seed=seed,
-                                     shared=shared, pool=pool)
-        if cost is not None:
-            cost.count("rescore", results)
-    if steps <= 0:
-        return results
-
     sigma = float(getattr(cfg, "controller_refine_sigma", 0.1))
     rng = np.random.default_rng(seed ^ 0x9E3779B9)
-    best = [float(r.mission_fraction) for r in results]
 
-    for _ in range(steps):
+    def draw():
         trials, sizes = [], []
         for c in ctrls:
             w = c.policy.weights if c.policy is not None else None
@@ -632,13 +633,41 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
                                bases=c.bases)
             trials.append(trial)
             sizes.append(step)
+        return trials, sizes
 
-        if all(s is None for s in sizes):
-            break
+    k = len(ctrls)
+    first = None
+    if shared is not None:
+        if steps > 0 and MERGE_FIRST_REFINE:
+            trials, sizes = draw()
+            if any(s is not None for s in sizes):
+                first = trials, sizes
+        if first is not None:
+            with _phase(cost, "evaluate.rescore_refine"):
+                both = batchroll_eval(phenos + phenos, ctrls + first[0], cfg,
+                                      spec=spec, seed=seed, shared=shared, pool=pool)
+            results, first = both[:k], (first[0], first[1], both[k:])
+        else:
+            with _phase(cost, "evaluate.rescore"):
+                results = batchroll_eval(phenos, ctrls, cfg, spec=spec, seed=seed,
+                                         shared=shared, pool=pool)
+        if cost is not None:
+            cost.count("rescore", results)
+    if steps <= 0:
+        return results
 
-        with _phase(cost, "evaluate.refine"):
-            trial_results = batchroll_eval(
-                phenos, trials, cfg, spec=spec, seed=seed, shared=shared, pool=pool)
+    best = [float(r.mission_fraction) for r in results]
+
+    for n in range(steps):
+        if n == 0 and first is not None:
+            trials, sizes, trial_results = first
+        else:
+            trials, sizes = draw()
+            if all(s is None for s in sizes):
+                break
+            with _phase(cost, "evaluate.refine"):
+                trial_results = batchroll_eval(
+                    phenos, trials, cfg, spec=spec, seed=seed, shared=shared, pool=pool)
         if cost is not None:
             cost.count("refine", [r for r in trial_results if r is not None])
 

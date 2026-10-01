@@ -2705,6 +2705,70 @@ def test_every_path_agrees_on_the_control_law() -> None:
           in inspect.getsource(loop_mod._verify_and_label))
 
 
+def test_merging_the_rescore_with_the_first_refinement_changes_nothing() -> None:
+    """One batch of re-score + step-one trials gives what two batches gave.
+
+    ``MERGE_FIRST_REFINE`` rests on two claims: the step-one trials do not
+    depend on the re-score (they come from the incoming weights and the
+    refinement's own generator), and a machine's score does not depend on what
+    shares its batch.  The second is the evaluator's and is held elsewhere;
+    this holds the first, with an evaluator that is a pure function of each
+    row, so the merged and split paths must agree exactly -- in the weights
+    kept, the results returned and the generator's draws -- in one call fewer.
+    """
+    print("\nrefinement: the re-score and step one share a batch")
+    from types import SimpleNamespace
+
+    import dytiscidae.evolution.loop as loop_mod
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import MissionResult
+
+    calls = []
+
+    def fake_eval(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None):
+        calls.append(len(phenos))
+        out = []
+        for p, c in zip(phenos, ctrls):
+            w = c.policy.weights
+            r = MissionResult(tier=1)
+            # Along a direction, so a random step helps half the time.
+            r.mission_fraction = float(1.0 / (1.0 + np.exp(-w @ p.target)))
+            r.notes.append(repr(w.round(12).tolist()))
+            out.append(r)
+        return out
+
+    rng = np.random.default_rng(4)
+    phenos = [SimpleNamespace(target=rng.normal(0, 0.3, size=Policy(n_obs=4, n_modes=2).n_weights))
+              for _ in range(5)]
+    cfg = SimpleNamespace(controller_refine_steps=3, controller_refine_sigma=0.2)
+
+    def run(merge):
+        ctrls = [Controller(params=None, policy=Policy(n_obs=4, n_modes=2))
+                 for _ in phenos]
+        calls.clear()
+        saved = loop_mod.batchroll_eval, loop_mod.MERGE_FIRST_REFINE
+        loop_mod.batchroll_eval, loop_mod.MERGE_FIRST_REFINE = fake_eval, merge
+        try:
+            res = loop_mod._refine_controllers(
+                phenos, ctrls, [MissionResult(tier=1) for _ in phenos], cfg,
+                spec=None, seed=11, shared=object())
+        finally:
+            loop_mod.batchroll_eval, loop_mod.MERGE_FIRST_REFINE = saved
+        return ([c.policy.weights.copy() for c in ctrls],
+                [(r.mission_fraction, r.notes[-1]) for r in res], list(calls))
+
+    w_split, r_split, c_split = run(False)
+    w_merge, r_merge, c_merge = run(True)
+    check("the same weights are kept",
+          all(np.array_equal(a, b) for a, b in zip(w_split, w_merge)))
+    check("the same results are returned", r_split == r_merge)
+    check("refinement moved something, so the comparison has teeth",
+          any(np.any(w != 0) for w in w_merge))
+    check(f"one call fewer ({c_split} -> {c_merge})",
+          len(c_merge) == len(c_split) - 1 and c_merge[0] == 2 * len(phenos),
+          f"split {c_split}, merged {c_merge}")
+
+
 def _nudged(fn, rel: float = 1e-15, commands: bool = False, seed: int = 20260926):
     """Run ``fn()`` with every machine's fluid forces dithered by ``rel``
     (relative, Gaussian, seeded) at every step: rounding-sized noise in the
@@ -4401,6 +4465,7 @@ def main() -> int:
     print("=" * 68)
     run_all([
         test_mobility_recovers_known_basis,
+        test_merging_the_rescore_with_the_first_refinement_changes_nothing,
         test_archive_placement_and_improvement,
         test_bandit_learns_which_operator_pays,
         test_no_operator_can_go_dormant_under_the_structural_tilt,
