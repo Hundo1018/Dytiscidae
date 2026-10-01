@@ -95,3 +95,44 @@ bit. On the idle machine: 13.27 s CPU at df95498, 8.25 s now (1.61x).
 
 Pool, idle machine, 16 designs with identification: HEAD 4x4 55.9 s, new 4x4
 42.6 s (1.31x). 8x2 not measurable here: with the pinned pool it was OOM-killed.
+
+## 2026-10-01: steps per phase, and what a generation repeats
+
+`phase_budget.py` attributes every `mj_step` and every second of wall time to
+the phase it ran in, on the single-machine numpy path (no GPU in the container
+that measured it). Step counts are path-independent: `identify_batch` runs the
+same probes as `TriphibianEnv.identify`. Wall time is the numpy path's.
+
+Four designs (`profile_shard.designs(4, 3)`), 8 s segments, identification on:
+
+| phase | steps | share | wall s | share | us/step |
+|---|---|---|---|---|---|
+| identify | 115,200 | 70.1% | 79.0 | 65.4% | 686 |
+| segment | 24,000 | 14.6% | 21.1 | 17.5% | 879 |
+| transition | 24,000 | 14.6% | 19.8 | 16.4% | 824 |
+| level_margin | 1,196 | 0.7% | 0.8 | 0.6% | 636 |
+
+Identical for every design: identification is 2 media x 24 probes x 2 signs x
+1.2 s = 115.2 s simulated (28,800 steps), against 24 s of segments and 24 s of
+transitions. On the GPU path it was 53% of the main evaluation's wall time.
+
+**The main evaluation is not the generation.** With `--shared-policy` and
+`--refine-steps 2` (every stored run since arch42), `_refine_controllers`
+re-scores every candidate once without exploration noise and then runs two
+(1+1)-ES steps, each a full evaluation without identification. Per design per
+generation:
+
+| | steps | share |
+|---|---|---|
+| re-score + 2 refine steps | 36,897 | 47.3% |
+| main: identify | 28,800 | 36.9% |
+| main: segments | 6,000 | 7.7% |
+| main: transitions | 6,000 | 7.7% |
+
+Tier-1.5 (60 s, 15,000 steps on each promotion candidate) is not in this table.
+
+Prediction, from 42.6 s main evaluation at 4x4 and 47% of it being the
+no-identification part: the re-score and refinement add about 3 x 20 s = 60 s,
+so a steady-state generation's evaluation is ~100 s, of which identification is
+~23 s. Checkable against arch44's `generations.jsonl` (`elapsed` differences
+after gen 5); not checked here, `runs/` is not in this container.
