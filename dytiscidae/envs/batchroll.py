@@ -349,6 +349,10 @@ class BatchedFluid:
         self._prev_ma[:] = 0.0
         self._prev_t = [None] * self.nm
         self._primed = [False] * self.nm
+        for e in self.envs:
+            d = e.solver.diag
+            d.max_submerged = d.max_alpha = d.max_dynamic_pressure = float("nan")
+            d.lift = d.drag = d.buoyancy = float("nan")
         # The unsteady history (Wagner, LEV travel) restarts with the segment,
         # as `FluidSolver.reset` restarts it on the single-machine path.
         self._prev_t_u = None
@@ -522,20 +526,16 @@ class BatchedFluid:
             # the policy conditions its action on it, so a batched and a
             # single-machine run of the *same* policy command different
             # things once either path is actually under water.
-            if pb > pa:
-                e.solver.diag.mean_submerged = float(o["subf"][pa:pb].mean())
-                e.solver.diag.max_submerged = float(o["subf"][pa:pb].max())
-                e.solver.diag.max_alpha = float(np.abs(o["alpha"][pa:pb]).max())
-                e.solver.diag.max_dynamic_pressure = float(o["q"][pa:pb].max())
-            else:
-                e.solver.diag.mean_submerged = 0.0
-                e.solver.diag.max_submerged = 0.0
-                e.solver.diag.max_alpha = 0.0
-                e.solver.diag.max_dynamic_pressure = 0.0
-            e.solver.diag.lift = float(np.abs(o["lift"][pa:pb]).sum())
-            # Bluff drag included, as the single-machine solver's `D` is.
-            e.solver.diag.drag = float(np.abs(o["drag"][pa:pb] + o["d_bluff"][pa:pb]).sum())
-            e.solver.diag.buoyancy = float(o["buoy"][pa:pb].sum())
+            #
+            # Only the fields something on this path reads are refreshed:
+            # `mean_submerged` (the observation), `added_mass` and `slam` (the
+            # transition score).  The other six were refreshed too and read by
+            # nothing, at ~40 us a batched step of host numpy
+            # (experiments/perf/diag_cost.py) -- more than the whole device
+            # round trip.  `reset_slam` sets them to NaN, so a reader added
+            # later gets a value that cannot pass for a measurement.
+            e.solver.diag.mean_submerged = (
+                float(o["subf"][pa:pb].mean()) if pb > pa else 0.0)
             e.solver.diag.added_mass = float(mb.sum())
             if self._primed[i] and self._prev_t[i] is not None:
                 dt = max(t - self._prev_t[i], 1e-6)
