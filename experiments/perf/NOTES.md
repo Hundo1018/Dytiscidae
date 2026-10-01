@@ -244,3 +244,33 @@ prints both wall times:
 
 Exit 0 means every number agreed. If it does not, set `MERGE_FIRST_REFINE =
 False` and the search is as it was.
+
+## 2026-10-01: what the CPU<->GPU traffic costs now, and the host work beside it
+
+Per batched step after 09-27: one packed upload (`nb*21 + nm*3` doubles) and
+one download (`nb*8 + n*17` doubles; at 190 panels about 26 KB), 34 us of host
+time (`launch` 18, `wait` 16). Against the benchmark's 8.25 s CPU over 12,000
+batched steps (4 designs, no identification: 3 x 2,000 + 4 x 1,500), that is
+34 of ~690 us, about 5%. It is latency, not bytes: at that size the copy
+itself is a few microseconds, so trimming the download (`alpha` is never read
+on this path, and `q/lift/drag/d_bluff/pos_w/force/buoy` only on the 1-in-4
+damping and inflow steps) would save little and needs a kernel rebuild.
+
+What does move the traffic's cost is **batch width**: one round trip per
+physics step whatever the batch, so its cost per machine falls as 1/k. The
+merged re-score (k 4 -> 8) does that for one call a generation; running
+identification's probes side by side would do it for 36.9% of a generation's
+steps, which is also where the wait is least hidden.
+
+**Done here: the unread diagnostics.** `BatchedFluid.finish` refreshed all
+eight `FluidDiagnostics` fields per machine per step from the downloaded
+arrays. Two are read on the batched path (`mean_submerged`, `slam`) and
+`added_mass` is cheap; the other six (`max_submerged`, `max_alpha`,
+`max_dynamic_pressure`, `lift`, `drag`, `buoyancy`) are read nowhere outside
+`physics/fluid.py` and tests of the single-machine `FluidSolver`.
+`diag_cost.py` (this container's CPU, 4 machines x 48 panels): the six cost
+40.0 us a batched step, the two that are read 30.6 us -- the unread ones
+cost more than the device round trip. They are no longer computed; `reset_slam`
+sets them to NaN at each rollout's start, so a later reader on this path gets a
+value that cannot pass for a measurement. Nothing that is read changes, so
+every score is unchanged by construction; not run on the GPU path here.

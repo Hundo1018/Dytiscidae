@@ -710,10 +710,10 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `step_batch` | function | 573 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 95 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
 | `BatchedFluid.__init__` | method | 231 | `(self, envs)` | — |
-| `BatchedFluid.apply` | method | 365 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
-| `BatchedFluid.finish` | method | 446 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
-| `BatchedFluid.launch` | method | 371 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
-| `BatchedFluid.ready` | method | 361 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
+| `BatchedFluid.apply` | method | 369 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
+| `BatchedFluid.finish` | method | 450 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
+| `BatchedFluid.launch` | method | 375 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
+| `BatchedFluid.ready` | method | 365 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
 | `BatchedFluid.reset_slam` | method | 340 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
