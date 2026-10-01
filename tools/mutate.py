@@ -779,6 +779,30 @@ MUTATIONS: tuple = (
         defect="rotor thrust is taken at the start-of-step spin, and a propeller entering water is fired out of it",
         suites=("test_physics",), item="rotor in water"),
 
+    Mutation(
+        id="steps-not-counted",
+        path="dytiscidae/envs/triphibian.py",
+        find="        self.steps_run += 1\n",
+        replace="",
+        defect="an evaluation reports no physics steps, and a generation's cost cannot be attributed",
+        suites=("test_physics",), item="generation cost"),
+
+    Mutation(
+        id="rig-steps-charged-to-segments",
+        path="dytiscidae/envs/triphibian.py",
+        find="            self.rig_steps += self.steps_run - steps0\n",
+        replace="",
+        defect="level_margin's rig steps are counted as segment steps",
+        suites=("test_physics",), item="generation cost"),
+
+    Mutation(
+        id="cost-untimed-counts-subphases",
+        path="dytiscidae/evolution/loop.py",
+        find='        timed = sum(v for k, v in self.seconds.items() if "." not in k)\n',
+        replace="        timed = sum(self.seconds.values())\n",
+        defect="a sub-phase is subtracted twice and untimed goes negative",
+        suites=("test_physics",), item="generation cost"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

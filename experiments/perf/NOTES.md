@@ -169,3 +169,42 @@ of the designs evaluated (panels, DoF, bodies), the share of rollout steps
 actually stepped (a segment stops when its battery is flat or it diverges), and
 load on the host from anything else. Each of those is a competing explanation
 for the climb.
+
+### Correction, same day: Tier-2 and the audit count island visits
+
+The duty rows above are wrong. Tier-2 and the audit fire on
+`visits % every == 0` for the generation's *island* (`SearchState.island_visits`,
+first visit included), not on `gen % every`; the checkpoint's cost lands in the
+next generation's difference. Re-read with that (`gen_cost.py`, fixed):
+
+| | n | median s | extra over plain |
+|---|---|---|---|
+| plain | 523 | 312.6 | |
+| Tier-2 | 36 | 698.3 | +385.7 |
+| audit (always also a Tier-2 generation) | 15 | 661.7 | +349.1 |
+| checkpoint | 29 | 364.6 | +52.0 |
+| migration | 9 | 396.5 | +83.9 |
+
+A Tier-2 generation costs about twice a plain one. It does not explain the
+climb: plain generations alone still go from ~120 s to ~310 s.
+
+### `cost` on every generation line
+
+`GenerationCost` (`evolution/loop.py`) now writes, per generation:
+
+- `seconds`: wall time per phase -- `build`, `evaluate` (with `evaluate.tier0`,
+  `evaluate.main`, `evaluate.rescore`, `evaluate.refine` inside it), `place`
+  (which holds Tier-1.5 and promotion refinement), `ppo`, `tier2`, `audit`,
+  `judge_scout_critic`, `refit`, `migrate`, `report`, and `untimed`; and
+  `checkpoint_prev`, the checkpoint written after the previous line.
+- `steps`: `MissionResult.steps` summed per call and part
+  (`main.identify`, `rescore.segments`, `refine.transitions`, `*.rig`, ...).
+  Scheduled per design: identify 28,800; segments 3 x segment_seconds / 0.004;
+  transitions 6,000; rig 299 per evaluation that measures `level_margin`.
+  A shortfall is steps not taken because a battery went flat or a rollout
+  diverged.
+- `designs`: count, mean and max bodies and DoF of what reached Tier 1.
+
+Checked on a CPU run (2 designs, 0.5 s segments): identify 57,600, segments
+750, transitions 12,000, rig 598 -- each exactly the schedule; the phases sum
+to the difference of `elapsed` with `untimed` 0.0.

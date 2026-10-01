@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import os
 import time
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -370,6 +371,76 @@ def evaluate_candidate(
 _WARNED_CPU = False
 
 
+class GenerationCost:
+    """Where one generation's wall time and physics steps went.
+
+    arch44 took 120 s a generation over its first fifty and ~320 s after, and
+    its telemetry could not say which part grew: it recorded ``elapsed`` and
+    nothing per phase, the size of the designs it evaluated, or how many of the
+    scheduled physics steps were taken (experiments/perf/NOTES.md, 2026-10-01).
+
+    ``seconds`` is wall time per phase.  The generation loop marks the end of
+    each of its phases with `lap`, so the undotted phases partition the
+    generation in order; a name with a dot is part of the phase before the dot
+    ("evaluate.main" is inside "evaluate").  ``untimed`` is the generation's
+    wall time minus the undotted phases.  ``steps`` sums
+    ``MissionResult.steps`` per evaluation call ("main", "rescore", "refine")
+    and part.  ``designs`` is the size of what reached Tier 1.
+    """
+
+    def __init__(self):
+        self.seconds: dict[str, float] = {}
+        self.steps: dict[str, int] = {}
+        self.sizes: list[tuple[int, int]] = []
+        self.started = self._mark = time.perf_counter()
+
+    def lap(self, name: str) -> None:
+        """Charge the time since the previous lap (or the start) to ``name``."""
+        now = time.perf_counter()
+        self.seconds[name] = self.seconds.get(name, 0.0) + now - self._mark
+        self._mark = now
+
+    @contextmanager
+    def phase(self, name: str):
+        t = time.perf_counter()
+        try:
+            yield
+        finally:
+            self.seconds[name] = self.seconds.get(name, 0.0) + time.perf_counter() - t
+
+    def count(self, call: str, results) -> None:
+        for r in results:
+            for part, n in (getattr(r, "steps", None) or {}).items():
+                key = f"{call}.{part}"
+                self.steps[key] = self.steps.get(key, 0) + int(n)
+
+    def size(self, pheno) -> None:
+        self.sizes.append((len(pheno.segments), int(pheno.n_actuated)))
+
+    def report(self, wall: float | None = None) -> dict:
+        if wall is None:
+            wall = time.perf_counter() - self.started
+        timed = sum(v for k, v in self.seconds.items() if "." not in k)
+        seconds = {k: round(v, 2) for k, v in sorted(self.seconds.items())}
+        seconds["untimed"] = round(wall - timed, 2)
+        out = {"seconds": seconds, "steps": dict(sorted(self.steps.items()))}
+        if self.sizes:
+            bodies = [b for b, _ in self.sizes]
+            dof = [d for _, d in self.sizes]
+            out["designs"] = {
+                "n": len(self.sizes),
+                "bodies_mean": round(float(np.mean(bodies)), 2),
+                "bodies_max": max(bodies),
+                "dof_mean": round(float(np.mean(dof)), 2),
+                "dof_max": max(dof)}
+        return out
+
+
+def _phase(cost, name):
+    """``cost.phase(name)``, or nothing when no one is counting."""
+    return cost.phase(name) if cost is not None else nullcontext()
+
+
 def _warn_cpu_fallback() -> None:
     """Say once, on stderr, that this run is not using the GPU.
 
@@ -403,6 +474,7 @@ def evaluate_candidates(
     shared=None,
     buffer=None,
     pool=None,
+    cost: GenerationCost | None = None,
 ):
     """Tier-0 gate then a shared Tier-1 for the whole group.
 
@@ -432,27 +504,31 @@ def evaluate_candidates(
     # empty and the run would proceed against a blank archive.
     phenos: list = [None] * k
     passed = []
-    for i, g in enumerate(genomes):
-        try:
-            pheno = build(g)
-            t0 = evaluate_tier0(pheno, spec)
-        except Exception:
-            continue
-        phenos[i] = pheno
-        if pheno.report.gate_margin < cfg.tier0_gate or t0.mission_fraction <= 0.0:
-            out[i] = (pheno, t0, None)
-        else:
-            passed.append(i)
+    with _phase(cost, "evaluate.tier0"):
+        for i, g in enumerate(genomes):
+            try:
+                pheno = build(g)
+                t0 = evaluate_tier0(pheno, spec)
+            except Exception:
+                continue
+            phenos[i] = pheno
+            if pheno.report.gate_margin < cfg.tier0_gate or t0.mission_fraction <= 0.0:
+                out[i] = (pheno, t0, None)
+            else:
+                passed.append(i)
 
     if not passed:
         return out
 
     if not batchroll.AVAILABLE:
         _warn_cpu_fallback()
-        for i in passed:
-            out[i] = evaluate_candidate(
-                genomes[i], cfg, inherited_policy=inherited[i],
-                identify=identify, spec=spec, seed=seeds[i])
+        with _phase(cost, "evaluate.main"):
+            for i in passed:
+                out[i] = evaluate_candidate(
+                    genomes[i], cfg, inherited_policy=inherited[i],
+                    identify=identify, spec=spec, seed=seeds[i])
+        if cost is not None:
+            cost.count("main", [out[i][1] for i in passed])
         return out
 
     ctrls = []
@@ -460,22 +536,26 @@ def evaluate_candidates(
         policy = _controller_for(phenos[i], genomes[i], cfg, inherited[i])
         ctrls.append(Controller(params=None, policy=policy))
 
-    results = _batched(
-        pool, [phenos[i] for i in passed], spec=spec,
-        shared=shared, buffer=buffer, n_modes=cfg.n_modes,
-        # The controller goes in whether or not axes are being identified.
-        # These used to be the same switch -- `None if identify else c` -- and
-        # since identify_axes_every defaults to 1, that made it None always, so
-        # no evaluation in the search ever ran a policy.  Identifying a body's
-        # mobility axes and driving it with a policy are independent; the
-        # batched evaluator has always accepted both in one call.
-        controllers=ctrls,
-        segment_seconds=cfg.segment_seconds, identify_axes=identify,
-        seed=seeds[passed[0]])
+    with _phase(cost, "evaluate.main"):
+        results = _batched(
+            pool, [phenos[i] for i in passed], spec=spec,
+            shared=shared, buffer=buffer, n_modes=cfg.n_modes,
+            # The controller goes in whether or not axes are being identified.
+            # These used to be the same switch -- `None if identify else c` --
+            # and since identify_axes_every defaults to 1, that made it None
+            # always, so no evaluation in the search ever ran a policy.
+            # Identifying a body's mobility axes and driving it with a policy
+            # are independent; the batched evaluator has always accepted both
+            # in one call.
+            controllers=ctrls,
+            segment_seconds=cfg.segment_seconds, identify_axes=identify,
+            seed=seeds[passed[0]])
+    if cost is not None:
+        cost.count("main", results)
 
     results = _refine_controllers(
         [phenos[i] for i in passed], ctrls, results, cfg,
-        spec=spec, seed=seeds[passed[0]], shared=shared, pool=pool)
+        spec=spec, seed=seeds[passed[0]], shared=shared, pool=pool, cost=cost)
 
     for slot, i in enumerate(passed):
         out[i] = (phenos[i], results[slot], ctrls[slot])
@@ -483,7 +563,8 @@ def evaluate_candidates(
 
 
 def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
-                        steps: int | None = None, shared=None, pool=None):
+                        steps: int | None = None, shared=None, pool=None,
+                        cost: GenerationCost | None = None):
     """Local search on policy weights, every candidate advanced in one batch.
 
     A (1+1) evolution strategy: perturb, evaluate, keep the perturbation if the
@@ -525,8 +606,11 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
     # The cost is one batched evaluation per generation, which is why it is
     # spent only when there is a shared policy to be noisy.
     if shared is not None:
-        results = batchroll_eval(phenos, ctrls, cfg, spec=spec, seed=seed,
-                                 shared=shared, pool=pool)
+        with _phase(cost, "evaluate.rescore"):
+            results = batchroll_eval(phenos, ctrls, cfg, spec=spec, seed=seed,
+                                     shared=shared, pool=pool)
+        if cost is not None:
+            cost.count("rescore", results)
     if steps <= 0:
         return results
 
@@ -552,8 +636,11 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
         if all(s is None for s in sizes):
             break
 
-        trial_results = batchroll_eval(
-            phenos, trials, cfg, spec=spec, seed=seed, shared=shared, pool=pool)
+        with _phase(cost, "evaluate.refine"):
+            trial_results = batchroll_eval(
+                phenos, trials, cfg, spec=spec, seed=seed, shared=shared, pool=pool)
+        if cost is not None:
+            cost.count("refine", [r for r in trial_results if r is not None])
 
         for i, (tr, step) in enumerate(zip(trial_results, sizes)):
             if step is None or tr is None:
@@ -1075,7 +1162,9 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
     order = list(cfg.islands) or ["generalist"]
     pending: list = []
 
+    checkpoint_s = None
     for gen in range(start_gen, cfg.generations):
+        cost = GenerationCost()
         state.island = order[gen % len(order)]
         # This island's own visit number, which is what the periodic jobs below
         # count.  See ``SearchState.island_visits``.
@@ -1139,12 +1228,13 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 from ..learning.ppo import RolloutBuffer
                 buffer = RolloutBuffer(shaping=cfg.reward_shaping)
                 _save_scoring_network(state, gen)
+            cost.lap("build")
             evaluated = evaluate_candidates(
                 [b[0] for b in built], cfg,
                 inherited=[b[1] for b in built],
                 identify=any(b[2] for b in built), spec=spec,
                 seeds=[b[5] for b in built],
-                shared=state.shared, buffer=buffer, pool=state.pool)
+                shared=state.shared, buffer=buffer, pool=state.pool, cost=cost)
         except Exception as exc:
             telemetry.event({"kind": "error", "gen": gen, "island": state.island,
                              "error": f"{type(exc).__name__}: {exc}"})
@@ -1152,17 +1242,22 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 curator.credit(operators, "rejected", 0.0)
             evaluated = []
 
+        cost.lap("evaluate")
         gen_diverged = gen_rollouts = 0
         for (child, _inh, _idf, operators, parent, _sd), got in zip(built, evaluated):
             if got is None:
                 curator.credit(operators, "rejected", 0.0)
                 continue
             pheno, result, ctrl = got
+            if ctrl is not None:
+                cost.size(pheno)
             state.evaluated += 1
             curator.evaluations += 1
             gen_diverged += result.diverged_rollouts
             gen_rollouts += result.n_rollouts
             _place(state, child, pheno, result, ctrl, parent, operators)
+
+        cost.lap("place")
 
         # --- the shared policy learns from everything the generation saw ----
         if state.shared is not None and buffer is not None:
@@ -1194,9 +1289,13 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                              "shaping": cfg.reward_shaping,
                              **{k: v for k, v in info.items()}})
 
+        cost.lap("ppo")
+
         # --- verification, and the critic's only source of truth ------------
         if visits % max(cfg.tier2_every, 1) == 0 and archive.cells:
             _verify_and_label(state, gen, spec, rng)
+
+        cost.lap("tier2")
 
         # --- the third party ------------------------------------------------
         if visits % max(cfg.audit_every, 1) == 0 and archive.cells:
@@ -1210,6 +1309,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                                      "vetoed": vetoed,
                                      "invalid_designs": invalid})
             state.judge_moves = []
+
+        cost.lap("audit")
 
         # --- the judge tightens ---------------------------------------------
         moved = state.judge.maybe_tighten(gen)
@@ -1232,6 +1333,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         # --- the critic refits ----------------------------------------------
         if state.critic is not None and state.critic.due() and state.critic.fit():
             telemetry.event({"kind": "critic_fit", "gen": gen, **state.critic.report()})
+
+        cost.lap("judge_scout_critic")
 
         # --- learned descriptor axes ----------------------------------------
         #
@@ -1289,11 +1392,15 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                              "fronts": sum(s.get("fronts", 0) for s in per.values()),
                              "islands": per, **learned.report()})
 
+        cost.lap("refit")
+
         # --- migration and hybridisation -------------------------------------
         if archipelago.due(gen):
             pending.extend(archipelago.migrate(gen, rng, crossover=crossover))
             telemetry.event({"kind": "migrate", "gen": gen, "pending": len(pending),
                              **archipelago.report()})
+
+        cost.lap("migrate")
 
         # --- report -----------------------------------------------------------
         report = curator.generation_report()
@@ -1335,16 +1442,26 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                               if k not in ("policy", "mobility_axes", "features",
                                            "critic_features", "scout_features")}
             report["best_fitness"] = round(best.fitness, 4)
+        cost.lap("report")
+        # Where this generation's time and physics steps went (GenerationCost).
+        # The checkpoint is written after this line, so the previous one's
+        # seconds ride on the next generation's.
+        report["cost"] = cost.report()
+        if checkpoint_s is not None:
+            report["cost"]["checkpoint_prev"] = round(checkpoint_s, 2)
         archive.history.append(archive.snapshot())
         telemetry.generation(report)
         if on_generation is not None:
             on_generation(state, report)
 
+        checkpoint_s = None
         if gen % max(cfg.checkpoint_every, 1) == 0:
+            t_ckpt = time.perf_counter()
             for name, a in archipelago.archives.items():
                 a.save(Path(cfg.run_dir) / f"archive_{name}.pkl")
                 a.export_json(Path(cfg.run_dir) / f"archive_{name}.json")
             save_state(state, gen)
+            checkpoint_s = time.perf_counter() - t_ckpt
 
             # Checked here and nowhere else: the state on disk is current at
             # exactly this point, so stopping now costs nothing but the

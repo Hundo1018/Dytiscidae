@@ -147,6 +147,23 @@ TAKEOFF_FULL = 0.30
 TAKEOFF_FLOOR = 0.05
 
 
+def step_mark(env) -> tuple:
+    """Where an env's step counters stand, for `record_steps`."""
+    return (env.steps_run, env.rig_steps)
+
+
+def record_steps(r: MissionResult, part: str, mark: tuple, env) -> None:
+    """Add the steps ``env`` took since ``mark`` to ``r.steps[part]``.
+
+    Steps on `level_margin`'s rig go to ``r.steps["rig"]`` whichever part they
+    happened in.  Shared by both evaluators for the reason `finalise_tier1` is.
+    """
+    rig = env.rig_steps - mark[1]
+    r.steps[part] = r.steps.get(part, 0) + env.steps_run - mark[0] - rig
+    if rig:
+        r.steps["rig"] = r.steps.get("rig", 0) + rig
+
+
 def finalise_tier1(r: MissionResult, clamped_any: bool) -> None:
     """Turn measured segments and transitions into mission_fraction, and flag
     exploits.
@@ -292,12 +309,14 @@ def evaluate_tier1(
         ctrl.params = env.cpg.base
 
     if identify_axes:
+        mark = step_mark(env)
         for dom in (Domain.AIR, Domain.WATER):
             try:
                 r.mobility[dom.value] = env.identify(
                     dom, seed=seed, max_modes=n_modes)
             except Exception as exc:
                 r.notes.append(f"mobility id failed in {dom.value}: {exc}")
+        record_steps(r, "identify", mark, env)
         # Overwrite: a basis belongs to the body it was measured on, and an
         # inherited controller carries its parent's.  See batchroll for the
         # same correction on the batched path.
@@ -311,6 +330,7 @@ def evaluate_tier1(
     r.eval_seed = int(seed)
 
     clamped_any = False
+    mark = step_mark(env)
     for dom in DOMAIN_CYCLE:
         env.reset(dom)
         # The same initial-condition pipeline the batched evaluator uses, with
@@ -345,6 +365,8 @@ def evaluate_tier1(
     # (transitions.py records exactly that for all six seed plans).  Two
     # runs of take-off scoring later, 4.0% of arch36 cleared 0.30 m with a
     # lifting surface while holding posture, so the reason is spent.
+    record_steps(r, "segments", mark, env)
+    mark = step_mark(env)
     for kind in ("air_to_water", "water_to_air", "water_to_land",
                  "land_to_air"):
         tr = run_transition(env, kind, ctrl)
@@ -352,6 +374,7 @@ def evaluate_tier1(
         r.transition_ok[kind] = tr.crossed
         if tr.failure:
             r.notes.append(f"{kind}: {tr.failure}")
+    record_steps(r, "transitions", mark, env)
 
     # Energy: measured steady power extrapolated over the domain durations, plus
     # simulated transition costs.

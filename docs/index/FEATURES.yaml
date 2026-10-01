@@ -574,8 +574,12 @@ CommandLine:
 Telemetry:
   implementation:
     - ops.telemetry.Telemetry
+    - evolution.loop.GenerationCost
+    - envs.evaluate.record_steps
   tests:
     - tests.test_search
+    - tests.test_physics::test_an_evaluation_counts_the_steps_it_took
+  note: every generation line carries `cost` -- seconds per phase, physics steps per evaluation call and part, and the size of the designs that reached Tier 1; experiments/perf/gen_cost.py reads it
 
 RunCheckpoint:
   implementation:
