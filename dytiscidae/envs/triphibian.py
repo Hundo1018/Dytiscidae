@@ -199,6 +199,12 @@ class MissionResult:
     #: visible per generation to be managed at all.
     diverged_rollouts: int = 0
     n_rollouts: int = 0
+    #: Physics steps this evaluation actually took, by part: ``identify``,
+    #: ``segments``, ``transitions``.  A rollout stops stepping a machine whose
+    #: battery is flat or that diverged, so these fall short of the schedule by
+    #: exactly the work that was not done -- the cost side of an evaluation,
+    #: which ``elapsed`` alone cannot attribute.
+    steps: dict[str, int] = field(default_factory=dict)
     #: Flight gates this design fails, as reasons.  Computed closed-form at
     #: Tier 0 and carried forward, because Tier 1 used to simulate an air
     #: segment for a machine Tier 0 had already established has no wing, and
@@ -592,6 +598,11 @@ class TriphibianEnv:
             _os.environ.get("DYTISCIDAE_ACTION_RATE_PENALTY", "0") or 0.0)
         self.medium = MediumField(sea_state=sea_state, current=current, wind=wind)
         self.timestep = timestep
+        #: Every ``mj_step`` taken through `step` or `batchroll.step_batch`.
+        #: Evaluators difference it around each part (``MissionResult.steps``).
+        self.steps_run = 0
+        #: The part of ``steps_run`` taken on `level_margin`'s rig.
+        self.rig_steps = 0
 
         from ..core.mjcf import scene_xml
 
@@ -1065,6 +1076,7 @@ class TriphibianEnv:
         out = None
         import copy
         budget = copy.deepcopy(self.budget)      # the rig must not spend the battery
+        steps0 = self.steps_run
         try:
             mj, m, d = self._mj, self.model, self.data
             if m.nq >= 7:
@@ -1105,6 +1117,7 @@ class TriphibianEnv:
             out = None
         finally:
             self.budget = budget
+            self.rig_steps += self.steps_run - steps0
         out = float(np.clip(out, -10.0, 10.0)) if out is not None else None
         try:
             self.p._measured_level = out
@@ -1609,6 +1622,7 @@ class TriphibianEnv:
         if self.rotors.n:
             self.rotors.apply(self.model, self.data, self.medium, self.data.time)
         self._mj.mj_step(self.model, self.data)
+        self.steps_run += 1
         alive = self.budget.step(
             np.abs(self.data.actuator_force), np.abs(self.data.actuator_velocity), self.timestep
         )

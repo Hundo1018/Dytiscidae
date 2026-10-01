@@ -601,6 +601,7 @@ def step_batch(envs, angles_list, bf: BatchedFluid, active=None):
     for i, e in enumerate(envs):
         if active[i]:
             e._mj.mj_step(e.model, e.data)
+            e.steps_run += 1
     if bf.power is None:
         bf.power = BatchedPower(envs)
     bf.power.step(envs, active)
@@ -893,7 +894,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     import time as _time
 
     from .evaluate import (
-        Controller, evaluate_tier0, finalise_tier1, transition_energy)
+        Controller, evaluate_tier0, finalise_tier1, record_steps, step_mark,
+        transition_energy)
     from .triphibian import DOMAIN_CYCLE, MissionResult, MissionSpec, TriphibianEnv
 
     spec = spec or MissionSpec()
@@ -944,6 +946,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     if identify_axes:
         from .triphibian import Domain as _D
         group = [envs[i] for i in live]
+        marks = {i: step_mark(envs[i]) for i in live}
         for dom in (_D.AIR, _D.WATER):
             try:
                 found = identify_batch(group, dom, seed=seed,
@@ -955,6 +958,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                 continue
             for slot, i in enumerate(live):
                 results[i].mobility[dom.value] = found[slot]
+        for i in live:
+            record_steps(results[i], "identify", marks[i], envs[i])
 
         # Overwrite rather than fill-if-empty, and only once both domains are
         # in.  A mobility basis is a property of the body it was measured on,
@@ -972,6 +977,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     group = [envs[i] for i in live]
     bf = BatchedFluid(group)
 
+    marks = {i: step_mark(envs[i]) for i in live}
     for dom in DOMAIN_CYCLE:
         # One draw per domain, shared by every machine: candidates in a
         # generation must face the same conditions to be comparable with each
@@ -1013,6 +1019,9 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     # (transitions.py records exactly that for all six seed plans).  Two
     # runs of take-off scoring later, 4.0% of arch36 cleared 0.30 m with a
     # lifting surface while holding posture, so the reason is spent.
+    for i in live:
+        record_steps(results[i], "segments", marks[i], envs[i])
+    marks = {i: step_mark(envs[i]) for i in live}
     for kind in ("air_to_water", "water_to_air", "water_to_land",
                  "land_to_air"):
         tcollector = None
@@ -1039,6 +1048,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                               "economy", "exit_state")])))
                 for t in trs], tag=f"transition:{kind}")
 
+    for i in live:
+        record_steps(results[i], "transitions", marks[i], envs[i])
     for i in live:
         r, p = results[i], phenos[i]
         cruise_j = sum(s.mean_power * spec.seconds_per_domain * spec.cycles
