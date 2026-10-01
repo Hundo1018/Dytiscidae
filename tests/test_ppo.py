@@ -175,6 +175,31 @@ def test_batched_and_single_decisions_agree_when_deterministic() -> None:
           f"max |dv| = {np.abs(v_many - v_one).max():.2e}")
 
 
+def test_a_decision_on_the_mean_does_not_depend_on_its_batch() -> None:
+    """A row's action on the mean has the same bits in a batch of any size.
+
+    The search merges evaluations into wider batches only on the promise that
+    a machine scores the same whatever shares its shard.  Measured, a row's
+    bits agree across batches of 2 to 32 and differed by ~7e-9 at batch 1,
+    where the matmul takes another path -- the case of a shard whose other
+    machines have stopped.  ``act_many`` computes a lone row as two.
+    """
+    print("\npolicy: a decision on the mean is the same in any batch")
+    import torch
+    torch.manual_seed(2)
+    torch.set_num_threads(1)
+    rng = np.random.default_rng(2)
+    p = SharedPolicy(N_OBS, N_MODES, hidden=64)
+    obs = rng.normal(size=(16, N_OBS)).astype(np.float32)
+    alone = np.stack([p.act_many(obs[i:i + 1], deterministic=True)[0][0]
+                      for i in range(16)])
+    for n in range(2, 17):
+        got = p.act_many(obs[:n], deterministic=True)[0]
+        check(f"batch {n:2d} gives every row the bits it has alone",
+              bool(np.array_equal(got, alone[:n])),
+              f"max |da| = {np.abs(got - alone[:n]).max():.2e}")
+
+
 def test_the_importance_ratio_starts_at_one() -> None:
     """PPO's derivation needs ``pi_new/pi_old == 1`` before the first step.
 
@@ -1094,6 +1119,7 @@ def main() -> int:
 
     test_one_decision_has_the_right_shape()
     test_batched_and_single_decisions_agree_when_deterministic()
+    test_a_decision_on_the_mean_does_not_depend_on_its_batch()
     test_the_importance_ratio_starts_at_one()
     test_the_observation_normaliser_is_associative()
 

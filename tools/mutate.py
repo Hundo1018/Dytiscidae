@@ -803,6 +803,22 @@ MUTATIONS: tuple = (
         defect="a sub-phase is subtracted twice and untimed goes negative",
         suites=("test_physics",), item="generation cost"),
 
+    Mutation(
+        id="merged-rescore-halves-swapped",
+        path="dytiscidae/evolution/loop.py",
+        find="            results, first = both[:k], (first[0], first[1], both[k:])\n",
+        replace="            results, first = both[k:], (first[0], first[1], both[:k])\n",
+        defect="the merged batch hands the trials' scores to the re-score and back",
+        suites=("test_search",), item="merged re-score"),
+
+    Mutation(
+        id="mean-not-padded",
+        path="dytiscidae/learning/ppo.py",
+        find="MEAN_MIN_ROWS = 4\n",
+        replace="MEAN_MIN_ROWS = 1\n",
+        defect="a row's action on the mean depends on how many rows share its batch",
+        suites=("test_ppo",), item="merged re-score"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

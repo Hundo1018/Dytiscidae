@@ -1070,16 +1070,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 665 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `batchroll_eval` | function | 694 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
 | `evaluate_candidate` | function | 343 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
 | `evaluate_candidates` | function | 466 | `(genomes, cfg: SearchConfig, *, inherited=None, identify: bool=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
 | `GenerationCost` | class | 374 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 1685 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 1010 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 1565 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `load_state` | function | 1714 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 1039 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 1594 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 64 | — | Everything adjustable about a run. |
 | `SearchState` | class | 255 | — | — |
-| `seed_archipelago` | function | 1945 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `seed_archipelago` | function | 1974 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
 | `GenerationCost.__init__` | method | 391 | `(self)` | — |
 | `GenerationCost.count` | method | 411 | `(self, call: str, results) -> None` | — |
 | `GenerationCost.lap` | method | 397 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
@@ -1138,30 +1138,30 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `potential_of` | function | 317 | `(obs, domain: str) -> float` | A state's potential, for potential-based reward shaping. |
-| `ppo_update` | function | 461 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None) -> dict` | One PPO update over everything the generation collected. |
-| `RolloutBuffer` | class | 357 | — | Trajectories from a whole generation, flattened into a PPO batch. |
-| `SegmentCollector` | class | 430 | — | Records one segment's decisions, per machine, into trajectories. |
-| `SharedPolicy` | class | 113 | `(nn.Module if AVAILABLE else object)` | A Gaussian policy and a value head, shared by every morphology. |
-| `Trajectory` | class | 293 | — | One segment's worth of decisions from one machine. |
-| `RolloutBuffer.__init__` | method | 371 | `(self, gamma: float=0.99, lam: float=0.95, shaping: float=0.2)` | — |
-| `RolloutBuffer.add` | method | 377 | `(self, traj: Trajectory) -> None` | — |
-| `RolloutBuffer.build` | method | 392 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |
-| `RolloutBuffer.n_transitions` | property | 382 | `(self) -> int` | — |
-| `SegmentCollector.__init__` | method | 438 | `(self, k: int)` | — |
-| `SegmentCollector.finish` | method | 450 | `(self, buffer: RolloutBuffer, rewards, tag: str='') -> None` | Attach each machine's segment competence and bank the trajectory. |
-| `SegmentCollector.record` | method | 442 | `(self, m: int, obs, act, logp, val, phi: float=0.0) -> None` | — |
-| `SharedPolicy.__init__` | method | 121 | `(self, n_obs: int, n_modes: int, hidden: int=64)` | — |
-| `SharedPolicy.act` | method | 278 | `(self, obs_np, *, deterministic: bool=False)` | One decision, numpy in and numpy out, for use inside a rollout. |
-| `SharedPolicy.act_many` | method | 249 | `(self, obs_np, *, deterministic: bool=False)` | One decision per row, in a single forward pass. |
-| `SharedPolicy.entropy` | method | 203 | `(self, obs)` | Differential entropy of this policy at ``obs``, one-sample estimate. |
-| `SharedPolicy.entropy_of` | method | 233 | `(base)` | The estimator above, on an already-computed ``latent`` distribution. |
-| `SharedPolicy.latent` | method | 172 | `(self, obs)` | The pre-squash Gaussian over intent. |
-| `SharedPolicy.log_prob` | method | 191 | `(self, obs, act)` | Log-density of an already-squashed action, with the tanh Jacobian. |
-| `SharedPolicy.log_prob_and_entropy` | method | 240 | `(self, obs, act)` | Both, from one forward pass through the actor trunk. |
-| `SharedPolicy.normalise` | method | 146 | `(self, obs)` | — |
-| `SharedPolicy.observe` | method | 150 | `(self, obs_np) -> None` | Fold a batch of observations into the running statistics. |
-| `SharedPolicy.value` | method | 188 | `(self, obs)` | — |
+| `potential_of` | function | 334 | `(obs, domain: str) -> float` | A state's potential, for potential-based reward shaping. |
+| `ppo_update` | function | 478 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None) -> dict` | One PPO update over everything the generation collected. |
+| `RolloutBuffer` | class | 374 | — | Trajectories from a whole generation, flattened into a PPO batch. |
+| `SegmentCollector` | class | 447 | — | Records one segment's decisions, per machine, into trajectories. |
+| `SharedPolicy` | class | 119 | `(nn.Module if AVAILABLE else object)` | A Gaussian policy and a value head, shared by every morphology. |
+| `Trajectory` | class | 310 | — | One segment's worth of decisions from one machine. |
+| `RolloutBuffer.__init__` | method | 388 | `(self, gamma: float=0.99, lam: float=0.95, shaping: float=0.2)` | — |
+| `RolloutBuffer.add` | method | 394 | `(self, traj: Trajectory) -> None` | — |
+| `RolloutBuffer.build` | method | 409 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |
+| `RolloutBuffer.n_transitions` | property | 399 | `(self) -> int` | — |
+| `SegmentCollector.__init__` | method | 455 | `(self, k: int)` | — |
+| `SegmentCollector.finish` | method | 467 | `(self, buffer: RolloutBuffer, rewards, tag: str='') -> None` | Attach each machine's segment competence and bank the trajectory. |
+| `SegmentCollector.record` | method | 459 | `(self, m: int, obs, act, logp, val, phi: float=0.0) -> None` | — |
+| `SharedPolicy.__init__` | method | 127 | `(self, n_obs: int, n_modes: int, hidden: int=64)` | — |
+| `SharedPolicy.act` | method | 295 | `(self, obs_np, *, deterministic: bool=False)` | One decision, numpy in and numpy out, for use inside a rollout. |
+| `SharedPolicy.act_many` | method | 255 | `(self, obs_np, *, deterministic: bool=False)` | One decision per row, in a single forward pass. |
+| `SharedPolicy.entropy` | method | 209 | `(self, obs)` | Differential entropy of this policy at ``obs``, one-sample estimate. |
+| `SharedPolicy.entropy_of` | method | 239 | `(base)` | The estimator above, on an already-computed ``latent`` distribution. |
+| `SharedPolicy.latent` | method | 178 | `(self, obs)` | The pre-squash Gaussian over intent. |
+| `SharedPolicy.log_prob` | method | 197 | `(self, obs, act)` | Log-density of an already-squashed action, with the tanh Jacobian. |
+| `SharedPolicy.log_prob_and_entropy` | method | 246 | `(self, obs, act)` | Both, from one forward pass through the actor trunk. |
+| `SharedPolicy.normalise` | method | 152 | `(self, obs)` | — |
+| `SharedPolicy.observe` | method | 156 | `(self, obs_np) -> None` | Fold a batch of observations into the running statistics. |
+| `SharedPolicy.value` | method | 194 | `(self, obs)` | — |
 
 ## `ops.checkpoint` — `dytiscidae/ops/checkpoint.py`
 

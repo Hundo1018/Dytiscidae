@@ -37,8 +37,9 @@ SharedPolicy:
     - tests.test_ppo::test_one_decision_has_the_right_shape
     - tests.test_ppo::test_batched_and_single_decisions_agree_when_deterministic
     - tests.test_ppo::test_the_observation_normaliser_is_associative
+    - tests.test_ppo::test_a_decision_on_the_mean_does_not_depend_on_its_batch
     - tests.test_search
-  note: one Gaussian policy and value head for every morphology in the search
+  note: one Gaussian policy and value head for every morphology in the search; on the mean, act_many pads a batch below MEAN_MIN_ROWS so a row's bits do not depend on its batch
 
 PPO:
   implementation:
@@ -146,6 +147,13 @@ ControllerSearch:
     - evolution.cmaes.Emitter
   tests:
     - tests.test_search::test_cmaes_optimises_a_known_function
+
+ControllerRefinement:
+  implementation:
+    - evolution.loop.evaluate_candidates
+  tests:
+    - tests.test_search::test_merging_the_rescore_with_the_first_refinement_changes_nothing
+  note: the (1+1)-ES on each candidate's policy weights after the generation's evaluation (_refine_controllers, called from evaluate_candidates); with MERGE_FIRST_REFINE the noise-free re-score and step one are scored in one batch; experiments/perf/merge_check.py checks the premise on the GPU path
 
 # ----------------------------------------------------- the evaluation ladder
 
