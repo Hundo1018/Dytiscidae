@@ -136,3 +136,36 @@ no-identification part: the re-score and refinement add about 3 x 20 s = 60 s,
 so a steady-state generation's evaluation is ~100 s, of which identification is
 ~23 s. Checkable against arch44's `generations.jsonl` (`elapsed` differences
 after gen 5); not checked here, `runs/` is not in this container.
+
+## 2026-10-01: the prediction against arch44, and what the telemetry cannot say
+
+`gen_cost.py` reads a run's `generations.jsonl`. arch44: 600 generations,
+60.6 h, 16 designs evaluated every generation.
+
+| generations | median s/gen | min | max |
+|---|---|---|---|
+| 6-49 | 120 | 83 | 372 |
+| 50-99 | 277 | 160 | 516 |
+| 100-299 | 303-341 | 85 | 1082 |
+| 300-349 | 441 | 142 | 1335 |
+| 500-549 | 458 | 182 | 1472 |
+| all, 6-599 | 322 | p10 165 | p90 595 |
+
+The ~100 s predicted above holds for generations 6-49 (120 s) and fails for the
+rest of the run: the cost climbs over generations 40-70 to ~300 s, without a
+step, and stays 2.5-3.8x the prediction.
+
+Excluded by the telemetry: the count of designs (16 every generation), Tier-0
+rejections (median 0), promotions (median 0), the critic (never fitted by
+gen 75), and the periodic duties -- median extra over plain generations: Tier-2
++32 s (n 39), audit +61 s (n 19), migration +74 s (n 9), checkpoint none.
+Plain generations alone have the same median (322 s). Correlation of seconds
+per generation with the generation-best's DoF 0.03, with total archive cells
+0.24, with diverged rollouts 0.15.
+
+Not recorded, so not decidable from this file: seconds per phase (main
+evaluation, re-score, refinement, Tier-1.5, PPO update, archive work), the size
+of the designs evaluated (panels, DoF, bodies), the share of rollout steps
+actually stepped (a segment stops when its battery is flat or it diverges), and
+load on the host from anything else. Each of those is a competing explanation
+for the climb.
