@@ -3872,6 +3872,181 @@ def test_the_search_can_build_rotorcraft() -> None:
           f"rotor count ranged {min(counts)}-{max(counts)}")
 
 
+def test_the_rotor_batch_is_the_per_rotor_loop() -> None:
+    """`RotorBatch` steps every rotor of a shard as one array computation
+    (2026-10-03: the per-rotor loop was 198 us a rotor-step, 82% of a
+    rotor-heavy evaluation).  It must be that loop to the bit -- thrust, torque,
+    the damping split and the end-of-step speed -- with a different table per
+    rotor, rotors in air, in water and across the surface, idle ones and
+    reversed ones, on a calm sea and on waves, one machine and two at once."""
+    print("\nrotor: the vectorised rotors are the per-rotor loop")
+    from dytiscidae.core.bodyplans import REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+    from dytiscidae.physics.medium import SeaState
+    from dytiscidae.physics.rotor import RotorBatch, RotorSet, RotorSpec
+
+    rng = np.random.default_rng(11)
+
+    def machine(sea, k0):
+        env = TriphibianEnv(build(REFERENCE_PLANS["quad"]()), seed=0, sea_state=sea)
+        env.reset(Domain.WATER, randomise=False)
+        names = [mujoco.mj_id2name(env.model, mujoco.mjtObj.mjOBJ_BODY, b)
+                 for b in env.rotors.body]
+        # Four different rotors, so a lookup that reads one rotor's table
+        # for another's cannot agree by accident.
+        specs = {nm: RotorSpec(radius=0.08 + 0.03 * ((j + k0) % 4),
+                               pitch=0.06 + 0.025 * ((j + 2 * k0) % 3),
+                               blades=2 + (j % 2), handed=(1 if j % 2 else -1))
+                 for j, nm in enumerate(names)}
+        env.rotors = RotorSet(env.model, specs)
+        return env
+
+    def place(env, depth_of_first):
+        d, m = env.data, env.model
+        d.qpos[3:7] = [math.cos(0.2), math.sin(0.2), 0.0, 0.0]       # rolled 23 deg
+        mujoco.mj_forward(m, d)
+        z = d.xipos[env.rotors.body, 2]
+        d.qpos[2] += -depth_of_first - z[0]
+        d.qvel[:] = rng.normal(0.0, 2.0, m.nv)
+        for j, k in enumerate(env.rotors.dof):
+            d.qvel[k] = (0.0, -450.0, 700.0, 300.0)[j % 4] * (1.0 + 0.1 * rng.random())
+        mujoco.mj_forward(m, d)
+        d.xfrc_applied[:] = rng.normal(0.0, 1.0, d.xfrc_applied.shape)
+        d.qfrc_applied[:] = rng.normal(0.0, 1.0, m.nv)
+
+    def state(env):
+        return (env.data.xfrc_applied.copy(), env.data.qfrc_applied.copy(),
+                env.model.dof_damping.copy())
+
+    def restore(env, s):
+        env.data.xfrc_applied[:], env.data.qfrc_applied[:], env.model.dof_damping[:] = s
+
+    worst, cases, unequal, fracs = 0.0, 0, 0, []
+    for sea in (None, SeaState(amplitude=0.3, period=2.0, wavelength=5.0, direction=0.6)):
+        envs = [machine(sea, 0), machine(sea, 1)]
+        for depth in (0.004, -0.5, 0.3, 0.0):
+            for env in envs:
+                place(env, depth)
+            fracs += [float(f) for env in envs for f in env.medium.properties(
+                env.data.xipos[env.rotors.body], np.full(env.rotors.n, 0.01),
+                env.data.time)[2]]
+            before = [state(e) for e in envs]
+            ref = []
+            for e, s in zip(envs, before):
+                tot = e.rotors.apply_per_rotor(e.model, e.data, e.medium, e.data.time)
+                ref.append((*state(e), e.rotors.last_thrust.copy(),
+                            e.rotors.last_torque.copy(), np.array([tot])))
+                restore(e, s)
+            # One machine at a time (the single path), then both as one batch.
+            one = []
+            for e in envs:
+                tot = e.rotors.apply(e.model, e.data, e.medium, e.data.time)
+                one.append((*state(e), e.rotors.last_thrust.copy(),
+                            e.rotors.last_torque.copy(), np.array([tot])))
+            for e, s in zip(envs, before):
+                restore(e, s)
+            batch = RotorBatch([e.rotors for e in envs])
+            tots = batch.apply([(i, e.model, e.data, e.medium) for i, e in enumerate(envs)],
+                               envs[0].data.time)
+            both = [(*state(e), e.rotors.last_thrust.copy(), e.rotors.last_torque.copy(),
+                     np.array([tots[i]])) for i, e in enumerate(envs)]
+            for got in (one, both):
+                for g, r in zip(got, ref):
+                    cases += 1
+                    for a, b in zip(g, r):
+                        if not np.array_equal(a, b):
+                            unequal += 1
+                            worst = max(worst, float(np.nanmax(np.abs(a - b))))
+            for e, s in zip(envs, before):
+                restore(e, s)
+    fracs = np.array(fracs)
+    check("the fixture has rotors in air, in water and across the surface",
+          (fracs == 0).any() and (fracs == 1).any() and ((fracs > 0) & (fracs < 1)).any(),
+          f"submerged fractions {np.round(np.unique(fracs), 3).tolist()}")
+    check("every force, torque, damping, thrust and total is the loop's to the bit",
+          cases == 32 and unequal == 0,
+          f"{cases} cases, {unequal} arrays differ, worst difference {worst:.3g}")
+    check("and the rotors make force: the comparison is not of zeros",
+          np.abs(ref[0][3]).max() > 0.1 and np.abs(ref[0][4]).max() > 0.0,
+          f"thrusts {np.round(ref[0][3], 3).tolist()}")
+
+    # The tables themselves: `rotor_table` builds its grid through
+    # `bemt_many` (28x faster, 2026-10-03); the grid must be the scalar
+    # loop's, and `bemt_many` must be `bemt` off the grid too, windmilling
+    # and edgewise included.
+    from dytiscidae.physics.medium import AIR, SEAWATER
+    from dytiscidae.physics.rotor import _build_table, bemt, bemt_many
+    sp = RotorSpec(radius=0.09, pitch=0.11, blades=3)
+    same = all(np.array_equal(x, y) for fl in (AIR, SEAWATER)
+               for x, y in zip(_build_table(sp, fl.rho, fl.mu, scalar=True),
+                               _build_table(sp, fl.rho, fl.mu)))
+    om = rng.uniform(50.0, 1500.0, 40) * rng.choice([-1.0, 1.0], 40)
+    vax, vip = rng.normal(0.0, 6.0, 40), np.abs(rng.normal(0.0, 4.0, 40))
+    T, Q = bemt_many(sp, om, vax, vip, SEAWATER.rho, SEAWATER.mu)
+    one = [bemt(sp, o, a, b, SEAWATER.rho, SEAWATER.mu) for o, a, b in zip(om, vax, vip)]
+    check("the lookup tables, and bemt at 40 random points, are the scalar loop's to the bit",
+          same and np.array_equal(T, [x[0] for x in one]) and np.array_equal(Q, [x[1] for x in one]),
+          f"tables {same}, worst thrust difference "
+          f"{np.abs(T - np.array([x[0] for x in one])).max():.3g}")
+
+
+def test_the_clearance_of_a_batch_is_each_machines_own() -> None:
+    """AM, 2026-10-03: `clearance` was 18% of a shard's profile, read up to four
+    times a step on a state that had not moved.  It is now remembered per
+    state, and `clearance_many` fills the memo for a whole batch in one pass.
+    Both must return what `_clearance_now` computes, to the bit, and the memo
+    must never answer for a state it was not computed on."""
+    print("\nclearance: one pass for the batch, a memo per machine")
+    from dytiscidae.core.bodyplans import BODY_PLANS, REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+    from dytiscidae.physics.medium import SeaState
+
+    plans = [BODY_PLANS[k]() for k in ("beetle", "gannet", "teal", "ray")]
+    plans.append(REFERENCE_PLANS["quad"]())
+    unequal, n, seen = 0, 0, []
+    for sea in (None, SeaState(amplitude=0.3, period=2.0, wavelength=5.0)):
+        envs = [TriphibianEnv(build(p), seed=0, sea_state=sea) for p in plans]
+        for dom in (Domain.LAND, Domain.WATER, Domain.AIR):
+            for e in envs:
+                e.reset(dom)
+                e.scatter(np.random.default_rng(5))
+            for step in range(30):
+                for e in envs:
+                    e.step(e.cpg.command(e.cpg.base, e.data.time))
+                if step % 10:
+                    continue
+                for e in envs:
+                    e._clear_memo = None
+                TriphibianEnv.clearance_many(envs)
+                for e in envs:
+                    n += 1
+                    got, want = e.clearance(), e._clearance_now()
+                    seen.append(want)
+                    unequal += int(got != want or np.signbit(got) != np.signbit(want))
+    seen = np.array(seen)
+    check("the batch pass is each machine's own clearance to the bit, waves included",
+          unequal == 0 and n == 90, f"{n} reads, {unequal} differ")
+    check("and the fixture is on the ground, afloat and aloft",
+          (seen < 0.05).any() and (seen > 1.0).any(),
+          f"clearance {seen.min():.3f} to {seen.max():.3f} m")
+    # The memo must not survive a change of state at the same clock: a
+    # restore (identification) or a placement puts a machine back at a time
+    # it has already been at.
+    e = envs[0]
+    e._mj.mj_forward(e.model, e.data)        # the kinematics `restore` leaves
+    snap = e.snapshot()
+    before = e.clearance()
+    e.data.qpos[2] += 0.7
+    e._mj.mj_forward(e.model, e.data)
+    moved = e.clearance()
+    e.restore(snap)
+    check("a memo answers only for the state it was computed on",
+          abs(moved - before - 0.7) < 0.05 and e.clearance() == before,
+          f"{before:.3f} -> {moved:.3f} after lifting 0.7 m, back to {e.clearance():.3f}")
+
+
 def test_a_propeller_can_go_under_water() -> None:
     """arch43 was stopped at gen 3: 5.1% of rollouts diverged, rotor designs
     crossing into water.  A rotor spinning at 550 rad/s put under water reached
@@ -3960,6 +4135,8 @@ def main() -> int:
         test_a_transition_can_start_back_from_its_interface,
         test_the_rotor_table_is_the_rotor_model,
         test_the_search_can_build_rotorcraft,
+        test_the_rotor_batch_is_the_per_rotor_loop,
+        test_the_clearance_of_a_batch_is_each_machines_own,
         test_a_propeller_can_go_under_water,
         test_the_batched_power_budget_is_the_power_budget,
         test_each_phase_is_scored_on_its_own_purpose,

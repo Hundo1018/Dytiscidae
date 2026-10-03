@@ -706,19 +706,19 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `BatchedFluid` | class | 220 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 890 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `identify_batch` | function | 629 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `observation_finite` | function | 563 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
-| `rollout_batch` | function | 705 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 1118 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 584 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `evaluate_tier1_batch` | function | 905 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `identify_batch` | function | 640 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `observation_finite` | function | 574 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
+| `rollout_batch` | function | 716 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 1133 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 595 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 95 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
 | `BatchedFluid.__init__` | method | 231 | `(self, envs)` | — |
-| `BatchedFluid.apply` | method | 365 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
-| `BatchedFluid.finish` | method | 446 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
-| `BatchedFluid.launch` | method | 371 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
-| `BatchedFluid.ready` | method | 361 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
-| `BatchedFluid.reset_slam` | method | 340 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
+| `BatchedFluid.apply` | method | 367 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
+| `BatchedFluid.finish` | method | 448 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
+| `BatchedFluid.launch` | method | 373 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
+| `BatchedFluid.ready` | method | 363 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
+| `BatchedFluid.reset_slam` | method | 342 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
@@ -867,28 +867,29 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `SegmentResult.cost_of_transport` | property | 175 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
 | `TriphibianEnv.__init__` | method | 595 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
 | `TriphibianEnv.body_twist` | method | 1325 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
-| `TriphibianEnv.clearance` | method | 1407 | `(self) -> float` | Height of the machine above the ground beneath it, metres. |
+| `TriphibianEnv.clearance` | method | 1414 | `(self) -> float` | `_clearance_now`, remembered for the state it was computed on. |
+| `TriphibianEnv.clearance_many` | method | 1433 | `(envs, active=None) -> None` | Fill the `clearance` memo of every (active) machine in one array |
 | `TriphibianEnv.depth` | method | 1353 | `(self) -> float` | — |
 | `TriphibianEnv.flap_travel` | method | 925 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
 | `TriphibianEnv.flies_level` | method | 1074 | `(self) -> bool` | Whether ``level_margin`` clears ``LEVEL_GATE`` (ROADMAP AD). |
 | `TriphibianEnv.ground_height` | method | 1377 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
 | `TriphibianEnv.ground_heights` | method | 1386 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
-| `TriphibianEnv.identify` | method | 2827 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.identify` | method | 2890 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
 | `TriphibianEnv.launch_pitch` | property | 895 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
 | `TriphibianEnv.launch_speed` | property | 863 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
 | `TriphibianEnv.level_margin` | method | 1082 | `(self)` | Can this machine hold height *and* speed, with its own actuators? |
 | `TriphibianEnv.lift_margin` | property | 911 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
-| `TriphibianEnv.morphology_context` | property | 1454 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
-| `TriphibianEnv.observation` | method | 1493 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
+| `TriphibianEnv.morphology_context` | property | 1517 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
+| `TriphibianEnv.observation` | method | 1556 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
 | `TriphibianEnv.reset` | method | 738 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
 | `TriphibianEnv.restore` | method | 1316 | `(self, snap: tuple) -> None` | — |
-| `TriphibianEnv.rollout` | method | 1656 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
+| `TriphibianEnv.rollout` | method | 1719 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
 | `TriphibianEnv.root_pos` | method | 1350 | `(self) -> np.ndarray` | — |
 | `TriphibianEnv.scatter` | method | 771 | `(self, rng, *, strength: float=1.0) -> None` | Widen the initial condition, from a caller-supplied generator. |
-| `TriphibianEnv.servo_command` | method | 1630 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
+| `TriphibianEnv.servo_command` | method | 1693 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
 | `TriphibianEnv.snapshot` | method | 1313 | `(self) -> tuple` | — |
-| `TriphibianEnv.step` | method | 1639 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
-| `TriphibianEnv.task_channels` | method | 1578 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
+| `TriphibianEnv.step` | method | 1702 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
+| `TriphibianEnv.task_channels` | method | 1641 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
 | `TriphibianEnv.thrust_margin` | method | 953 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
 
 ## `evolution.archive` — `dytiscidae/evolution/archive.py`
@@ -1386,12 +1387,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `bemt` | function | 80 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, rho: float, mu: float) -> tuple[float, float]` | Thrust (N, along the spin axis) and aerodynamic torque (N m, resisting |
-| `rotor_forces` | function | 183 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, medium_frac: float, air, water) -> tuple[float, float]` | Thrust and torque from the tables, blended across the free surface by |
-| `rotor_table` | function | 143 | `(spec: RotorSpec, rho: float, mu_visc: float)` | ``(CT, CQ)`` over ``TABLE_J x TABLE_MU``, with ``T = rho Om^2 R^4 CT`` |
-| `RotorSet` | class | 208 | — | Every rotor of one machine, applied each step like `JetSet`. |
+| `bemt_many` | function | 130 | `(spec: RotorSpec, omega, v_ax, v_ip, rho: float, mu: float)` | `bemt` at many operating points of one rotor at once: ``omega``, |
+| `rotor_forces` | function | 262 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, medium_frac: float, air, water) -> tuple[float, float]` | Thrust and torque from the tables, blended across the free surface by |
+| `rotor_forces_many` | function | 290 | `(omega, v_ax, v_ip, frac_w, R, R4, tabs, rhos, rows=None)` | `rotor_forces` for many rotors at once, each with its own table. |
+| `rotor_table` | function | 206 | `(spec: RotorSpec, rho: float, mu_visc: float)` | ``(CT, CQ)`` over ``TABLE_J x TABLE_MU``, with ``T = rho Om^2 R^4 CT`` |
+| `RotorBatch` | class | 343 | — | The rotors of several machines, stepped as one array computation. |
+| `RotorSet` | class | 497 | — | Every rotor of one machine, applied each step like `JetSet`. |
 | `RotorSpec` | class | 51 | — | Geometry of one fixed-pitch rotor. |
-| `RotorSet.__init__` | method | 211 | `(self, model, specs: dict) -> None` | ``specs`` maps a rotor body name to its `RotorSpec`. |
-| `RotorSet.apply` | method | 261 | `(self, model, data, medium, t: float) -> float` | Add rotor thrust and aerodynamic torque to ``data.xfrc_applied``. |
+| `RotorBatch.__init__` | method | 354 | `(self, sets) -> None` | — |
+| `RotorBatch.apply` | method | 384 | `(self, items, t: float) -> np.ndarray` | ``items``: ``(index of the set, model, data, medium)`` per machine to |
+| `RotorSet.__init__` | method | 500 | `(self, model, specs: dict) -> None` | ``specs`` maps a rotor body name to its `RotorSpec`. |
+| `RotorSet.apply` | method | 557 | `(self, model, data, medium, t: float) -> float` | Add rotor thrust and aerodynamic torque to ``data.xfrc_applied``. |
+| `RotorSet.apply_per_rotor` | method | 567 | `(self, model, data, medium, t: float) -> float` | The per-rotor loop `RotorBatch` replaced, kept as the readable |
 | `RotorSpec.stations` | method | 71 | `(self)` | — |
 
 ## `physics.structure` — `dytiscidae/physics/structure.py`

@@ -336,6 +336,8 @@ class BatchedFluid:
         self._epoch = 0
         self._prev_t = [None] * nm
         self._primed = [False] * nm
+        #: Every machine's rotors as one batch, built on the first step with any.
+        self._rotors = None
 
     def reset_slam(self):
         """Clear the slam history, as `FluidSolver.reset` does.
@@ -516,8 +518,10 @@ class BatchedFluid:
             if e.jets.n:
                 e.jets.apply(e.model, e.data, e.solver.medium, t,
                              e.model.opt.timestep)
-            if e.rotors.n:
-                e.rotors.apply(e.model, e.data, e.solver.medium, t)
+            # Rotors come after the jets, as they did; they read nothing the
+            # rest of this loop writes, so every machine's rotors go in one
+            # array computation below (`RotorBatch`, the code the single path
+            # runs for one machine).
             e.model.body_mass[:] = self.dry_mass[i] + mb
             e.model.body_inertia[:] = (
                 self.dry_inertia[i] + (mb * self.lever2[i])[:, None])
@@ -558,6 +562,13 @@ class BatchedFluid:
                 self._primed[i] = True
             self._prev_t[i] = t
         self._prev_ma[:] = m_slam
+        rot = [(i, e.model, e.data, e.solver.medium) for i, e in enumerate(self.envs)
+               if e.rotors.n and (active is None or active[i])]
+        if rot:
+            if self._rotors is None:
+                from ..physics.rotor import RotorBatch
+                self._rotors = RotorBatch([e.rotors for e in self.envs])
+            self._rotors.apply(rot, t)
 
 
 def observation_finite(obs) -> bool:
@@ -832,6 +843,9 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
         for m in range(k):
             if was[m] and not active[m]:
                 res[m].failure = "battery exhausted"
+        # Every live machine's clearance in one pass; `e.clearance()` below
+        # then reads it from the memo (AM, 2026-10-03).
+        envs[0].clearance_many(envs, active)
 
         for m, e in enumerate(envs):
             if not active[m]:
@@ -849,8 +863,9 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
             R = e.data.xmat[e.root_body].reshape(3, 3)
             r["ups"].append(float(R[2, 2]))
             r["contacts"].append(1.0 if e._touching_ground() else 0.0)
-            r["spins"].append(float(np.linalg.norm(e.body_twist()[3:])))
-            r["vzs"].append(float(e.body_twist()[2]))
+            tw = e.body_twist()                # once: the state has not moved
+            r["spins"].append(float(np.linalg.norm(tw[3:])))
+            r["vzs"].append(float(tw[2]))
             if r["gain"] is not None:
                 r["gains"].append(r["gain"])
             r["xys"].append(pos[:2].copy())
@@ -1221,6 +1236,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
         for m in range(k):
             if was[m] and not active[m]:
                 res[m].failure = "battery exhausted mid-transition"
+        envs[0].clearance_many(envs, active)
 
         for m, e in enumerate(envs):
             if not active[m]:

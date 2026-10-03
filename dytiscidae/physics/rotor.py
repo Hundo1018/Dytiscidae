@@ -127,6 +127,69 @@ def bemt(spec: RotorSpec, omega: float, v_ax: float, v_ip: float,
     return float(np.sum(dT * dr)), float(np.sum(dQ * dr))
 
 
+def bemt_many(spec: RotorSpec, omega, v_ax, v_ip, rho: float, mu: float):
+    """`bemt` at many operating points of one rotor at once: ``omega``,
+    ``v_ax``, ``v_ip`` are arrays of one length, every ``|omega|`` at least
+    1e-6.  Returns thrust and torque arrays.
+
+    The same arithmetic in the same order, one row per operating point, so
+    each row is `bemt`'s answer to the bit (`tests/test_physics.py`).  Built
+    2026-10-03 for `rotor_table`: its 510 scalar calls took ~2.5 s per rotor
+    spec and medium, and once the per-step lookup was vectorised (`RotorBatch`)
+    table building was the larger part of what a rotor cost a worker -- every
+    new design brings new radius and pitch genes, so new tables, in every
+    worker that evaluates it.
+    """
+    om = np.abs(np.asarray(omega, float))[:, None]
+    vax = np.asarray(v_ax, float)[:, None]
+    vip = np.asarray(v_ip, float)[:, None]
+    r, dr, c, theta = spec.stations()
+    B = spec.blades
+    R = spec.radius
+    shape = (len(om), len(r))
+
+    def blade(v):
+        ua = vax + v
+        ut = om * r
+        phi = np.arctan2(ua, ut)
+        W2 = ua * ua + ut * ut
+        alpha = theta - phi + 2.0 * spec.camber
+        re = rho * np.sqrt(W2) * c / max(mu, 1e-12)
+        cl = lift_coefficient(alpha, re, np.full(shape, 1e6), np.zeros(shape))
+        cd = drag_coefficient(alpha, re, np.full(shape, 1e6), cl, 0.0)
+        q = 0.5 * rho * W2 * B * c
+        dT = q * (cl * np.cos(phi) - cd * np.sin(phi))
+        dQ = q * (cl * np.sin(phi) + cd * np.cos(phi)) * r
+        sphi = np.maximum(np.abs(np.sin(phi)), 1e-6)
+        f = B * (R - r) / (2.0 * r * sphi)
+        F = (2.0 / np.pi) * np.arccos(np.clip(np.exp(-f), 0.0, 1.0))
+        return dT, dQ, np.maximum(F, 1e-3)
+
+    def residual(v):
+        dT, _, F = blade(v)
+        mom = 4.0 * np.pi * r * rho * np.sqrt(vip * vip + (vax + v) ** 2) * v * F
+        return dT - mom
+
+    lo = np.zeros(shape)
+    hi = np.broadcast_to(np.maximum(np.maximum(om * R, np.abs(vax)), 1.0), shape).copy()
+    g0 = residual(lo)
+    active = g0 > 0.0
+    for _ in range(50):
+        mid = 0.5 * (lo + hi)
+        g = residual(mid)
+        pos = g > 0.0
+        lo = np.where(active & pos, mid, lo)
+        hi = np.where(active & ~pos, mid, hi)
+    v = np.where(active, 0.5 * (lo + hi), 0.0)
+    dT, dQ, _ = blade(v)
+    # Row by row, as `bemt` sums one rotor's annuli: numpy's pairwise sum of a
+    # 16-element row is the same whether the row stands alone or not, but that
+    # is an implementation detail this does not lean on.
+    T = np.array([np.sum(row) for row in dT * dr])
+    Q = np.array([np.sum(row) for row in dQ * dr])
+    return T, Q
+
+
 #: Advance-ratio grids for the lookup table: axial ``J = V_ax / (Omega R)``
 #: and in-plane ``mu = V_ip / (Omega R)``.
 #: Denser near zero, where Glauert's term and the inflow change fastest.
@@ -154,18 +217,34 @@ def rotor_table(spec: RotorSpec, rho: float, mu_visc: float):
            spec.hub_ratio, spec.camber, round(rho, 3), round(mu_visc, 9))
     if key in _TABLES:
         return _TABLES[key]
+    ct, cq = _build_table(spec, rho, mu_visc)
+    _TABLES[key] = (ct, cq)
+    return ct, cq
+
+
+def _build_table(spec: RotorSpec, rho: float, mu_visc: float, *, scalar: bool = False):
+    """`rotor_table`'s grid, every operating point through `bemt_many` in one
+    pass (``scalar``: one `bemt` call per point, the original loop, which
+    `tests/test_physics.py` holds it equal to)."""
     R = spec.radius
     ct = np.zeros((len(TABLE_TIP_SPEEDS), len(TABLE_J), len(TABLE_MU)))
     cq = np.zeros_like(ct)
+    pts = []
     for a, tip in enumerate(TABLE_TIP_SPEEDS):
         om = tip / max(R, 1e-6)
         norm_t = rho * om**2 * R**4
         for i, J in enumerate(TABLE_J):
             for k, mu in enumerate(TABLE_MU):
-                T, Q = bemt(spec, om, J * om * R, mu * om * R, rho, mu_visc)
-                ct[a, i, k] = T / norm_t
-                cq[a, i, k] = Q / (norm_t * R)
-    _TABLES[key] = (ct, cq)
+                pts.append((a, i, k, om, J * om * R, mu * om * R, norm_t))
+    if scalar or R <= 0.0:
+        TQ = [bemt(spec, p[3], p[4], p[5], rho, mu_visc) for p in pts]
+    else:
+        T, Q = bemt_many(spec, np.array([p[3] for p in pts]), np.array([p[4] for p in pts]),
+                         np.array([p[5] for p in pts]), rho, mu_visc)
+        TQ = list(zip(T.tolist(), Q.tolist()))
+    for (a, i, k, _, _, _, norm_t), (T_, Q_) in zip(pts, TQ):
+        ct[a, i, k] = T_ / norm_t
+        cq[a, i, k] = Q_ / (norm_t * R)
     return ct, cq
 
 
@@ -205,6 +284,216 @@ def rotor_forces(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, medium
     return float(out[0]), float(out[1])
 
 
+_LOG_TIPS = np.log(TABLE_TIP_SPEEDS)
+
+
+def rotor_forces_many(omega, v_ax, v_ip, frac_w, R, R4, tabs, rhos, rows=None):
+    """`rotor_forces` for many rotors at once, each with its own table.
+
+    ``tabs[m]`` is ``(n, len(TABLE_TIP_SPEEDS), len(TABLE_J), len(TABLE_MU),
+    2)`` -- every rotor's ``(CT, CQ)`` table in medium ``m`` (0 air, 1 water),
+    stacked (or more rotors' tables, with ``rows`` naming which row of ``tabs``
+    belongs to each rotor); ``rhos[m]`` that medium's density; ``R4`` is
+    ``R**4``.  A row whose
+    medium fraction is zero may hold any table: it is never read into the
+    result.  Elementwise the same arithmetic, in the same order, as the scalar
+    `rotor_forces`, which stays the definition: `tests/test_physics.py` holds the
+    two equal to the bit (2026-10-03).  It exists because the scalar version,
+    called twice per rotor per step, was 82% of a rotor-heavy evaluation.
+    """
+    om = np.abs(omega)
+    live = (om >= 1e-6) & (R > 0.0)
+    om = np.where(live, om, 1.0)
+    omR = om * R
+    J, mu = v_ax / omR, v_ip / omR
+    # ``om**2`` on a Python float is C ``pow``; numpy's ``**2`` is ``x*x``,
+    # which differs in the last bit about once in a thousand.  An array
+    # exponent keeps ``pow``.
+    om2 = np.power(om, np.full_like(om, 2.0))
+    lt = np.log(np.clip(omR, TABLE_TIP_SPEEDS[0], TABLE_TIP_SPEEDS[-1]))
+    a = np.minimum(np.searchsorted(_LOG_TIPS, lt, "right") - 1, len(_LOG_TIPS) - 2)
+    w = (lt - _LOG_TIPS[a]) / (_LOG_TIPS[a + 1] - _LOG_TIPS[a])
+    # `_bilinear`'s corner and weights, the same for every table of a rotor.
+    x = np.clip(J, TABLE_J[0], TABLE_J[-1])
+    y = np.clip(mu, TABLE_MU[0], TABLE_MU[-1])
+    i = np.minimum(np.searchsorted(TABLE_J, x, "right") - 1, len(TABLE_J) - 2)
+    k = np.minimum(np.searchsorted(TABLE_MU, y, "right") - 1, len(TABLE_MU) - 2)
+    tx = ((x - TABLE_J[i]) / (TABLE_J[i + 1] - TABLE_J[i]))[:, None]
+    ty = ((y - TABLE_MU[k]) / (TABLE_MU[k + 1] - TABLE_MU[k]))[:, None]
+    w = w[:, None]
+    r = np.arange(len(om)) if rows is None else rows
+    T = np.zeros(len(om))
+    Q = np.zeros(len(om))
+    for m, frac in ((0, 1.0 - frac_w), (1, frac_w)):
+        on = live & (frac > 0.0)
+        if not on.any():
+            continue
+        tab = tabs[m]
+
+        def bil(a_):
+            return ((1 - tx) * (1 - ty) * tab[r, a_, i, k] + tx * (1 - ty) * tab[r, a_, i + 1, k]
+                    + (1 - tx) * ty * tab[r, a_, i, k + 1] + tx * ty * tab[r, a_, i + 1, k + 1])
+        c = (1 - w) * bil(a) + w * bil(a + 1)            # (n, 2): c_t, c_q
+        n_ = rhos[m] * om2 * R4
+        T = np.where(on, T + frac * (n_ * c[:, 0]), T)
+        Q = np.where(on, Q + frac * (n_ * R * c[:, 1]), Q)
+    return T, Q
+
+
+class RotorBatch:
+    """The rotors of several machines, stepped as one array computation.
+
+    `RotorSet.apply` (the single-machine path) is a batch of one, and
+    `BatchedFluid.finish` (the search's path) is a batch of every machine in the
+    shard, so both paths run this one implementation.  It replaced a Python
+    loop over rotors that called `rotor_forces` twice per rotor per step, each
+    call doing ~4 scalar table lookups per medium: 198 us per rotor-step, 82% of
+    the wall of a rotor-heavy evaluation (`experiments/perf/rotor_cost.py`).
+    """
+
+    def __init__(self, sets) -> None:
+        self.sets = [s for s in sets]
+        self.off = np.cumsum([0] + [s.n for s in self.sets])
+        self.n = int(self.off[-1])
+        n = self.n
+        flat = lambda name: [x for s in self.sets for x in getattr(s, name)]  # noqa: E731
+        self.spec = flat("spec")
+        self.axis = np.array(flat("axis_local"), float).reshape(n, 3)
+        self.inertia = np.array(flat("inertia"), float)
+        self.handed = np.array([float(sp.handed) for sp in self.spec])
+        self.R = np.array([float(sp.radius) for sp in self.spec])
+        self.R4 = np.array([float(sp.radius) ** 4 for sp in self.spec])
+        shape = (n, len(TABLE_TIP_SPEEDS), len(TABLE_J), len(TABLE_MU), 2)
+        self._tabs = [np.zeros(shape), np.zeros(shape)]
+        self._have = [np.zeros(n, bool), np.zeros(n, bool)]
+        self._fluid = [None, None]
+
+    def _tables(self, m: int, fl, need) -> None:
+        """Fill medium ``m``'s table for the rotors in ``need`` from the cache
+        `rotor_table` keeps -- built when first used, as the scalar path did."""
+        key = (fl.rho, fl.mu)
+        if self._fluid[m] != key:
+            self._fluid[m] = key
+            self._have[m][:] = False
+        for j in np.flatnonzero(need & ~self._have[m]):
+            ct, cq = rotor_table(self.spec[j], fl.rho, fl.mu)
+            self._tabs[m][j, ..., 0] = ct
+            self._tabs[m][j, ..., 1] = cq
+            self._have[m][j] = True
+
+    def apply(self, items, t: float) -> np.ndarray:
+        """``items``: ``(index of the set, model, data, medium)`` per machine to
+        step.  Adds every rotor's thrust and torque to ``data.xfrc_applied`` and
+        its drag damping split to ``dof_damping`` / ``qfrc_applied``, exactly as
+        the per-rotor loop did.  Returns the total thrust per item, N."""
+        groups: dict = {}
+        for it in items:
+            med = it[3]
+            ss = med.sea_state
+            sig = (med.air, med.water, tuple(med.current), tuple(med.wind),
+                   ss.amplitude, ss.period, ss.wavelength, ss.direction)
+            groups.setdefault(sig, []).append(it)
+        totals = {}
+        for group in groups.values():
+            totals.update(self._apply_group(group, t))
+        return np.array([totals[it[0]] for it in items])
+
+    def _apply_group(self, items, t: float) -> dict:
+        medium = items[0][3]
+        sl, xm, om, cv, xi, com, dts = [], [], [], [], [], [], []
+        for s_i, model, data, _ in items:
+            s = self.sets[s_i]
+            sl.append(slice(int(self.off[s_i]), int(self.off[s_i + 1])))
+            dts.append(np.full(s.n, float(model.opt.timestep)))
+            xm.append(data.xmat[s.body_arr])
+            om.append(data.qvel[s.dof_arr])
+            cv.append(data.cvel[s.body_arr])
+            xi.append(data.xipos[s.body_arr])
+            com.append(data.subtree_com[s.root_arr])
+        rows = np.concatenate([np.arange(q.start, q.stop) for q in sl]) if len(sl) > 1 \
+            else np.arange(sl[0].start, sl[0].stop)
+        cat = (lambda v: np.concatenate(v)) if len(sl) > 1 else (lambda v: v[0])  # noqa: E731
+        xm, omega, cv, pos, com, dt = cat(xm), cat(om), cat(cv), cat(xi), cat(com), cat(dts)
+        n = len(rows)
+        # The spin axis in the world: per row the same matrix-vector product
+        # the loop did (a stacked matmul takes the same BLAS kernel; the
+        # elementwise expansion does not, it misses the fused multiply-add).
+        ax = (xm.reshape(n, 3, 3) @ self.axis[rows][:, :, None])[:, :, 0]
+        # Hub velocity: `mj_objectVelocity` for mjOBJ_BODY in the world frame,
+        # written out as `BatchedFluid.launch` does it (bit-exact to the call).
+        off = pos - com
+        ang = cv[:, 0:3]
+        lin = cv[:, 3:6]
+        v = np.empty((n, 3))
+        v[:, 0] = lin[:, 0] - (off[:, 1] * ang[:, 2] - off[:, 2] * ang[:, 1])
+        v[:, 1] = lin[:, 1] - (off[:, 2] * ang[:, 0] - off[:, 0] * ang[:, 2])
+        v[:, 2] = lin[:, 2] - (off[:, 0] * ang[:, 1] - off[:, 1] * ang[:, 0])
+        if medium.sea_state.amplitude <= 0.0:
+            # A calm surface: every term of the two queries is elementwise.
+            _, _, subf = medium.properties(pos, np.full(n, 0.01), t)
+            flow = np.asarray(medium.flow_velocity(pos, t), float).reshape(n, 3)
+        else:
+            # Waves take a dot product whose BLAS kernel depends on how many
+            # rows it is given, so the rows go one at a time, as before.
+            subf, flow = np.empty(n), np.empty((n, 3))
+            for j in range(n):
+                subf[j] = medium.properties(pos[j][None, :], np.array([0.01]), t)[2][0]
+                flow[j] = np.asarray(medium.flow_velocity(pos[j][None, :], t), float).reshape(3)
+        rel = v - flow                                  # hub velocity through the fluid
+        # With positive spin the blades push along +axis (see `apply` below).
+        sgn = np.where(omega >= 0.0, 1.0, -1.0)
+        td = (self.handed[rows] * sgn)[:, None] * ax
+        v_ax = (rel * td).sum(axis=1)
+        d = rel - v_ax[:, None] * td
+        v_ip = np.sqrt((d * d).sum(axis=1))
+        for m, fl, on in ((0, medium.air, (1.0 - subf) > 0.0), (1, medium.water, subf > 0.0)):
+            need = on & (np.abs(omega) >= 1e-6)
+            if self._fluid[m] != (fl.rho, fl.mu) or (need & ~self._have[m][rows]).any():
+                full = np.zeros(self.n, bool)
+                full[rows] = need
+                self._tables(m, fl, full)
+        tabs = self._tabs
+        rhos = (medium.air.rho, medium.water.rho)
+        R, R4 = self.R[rows], self.R4[rows]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            T0, Q0 = rotor_forces_many(omega, v_ax, v_ip, subf, R, R4, tabs, rhos, rows)
+            # `RotorSet._end_of_step`, row by row: backward Euler on the
+            # rotor's own drag for the end-of-step speed.
+            w_ = np.abs(omega)
+            c = np.abs(Q0) / (w_ * w_)
+            a = self.inertia[rows] / dt
+            w2 = (-a + np.sqrt(a * a + 4.0 * c * a * w_)) / (2.0 * c)
+            omega_e = np.where((w_ < 1e-6) | (c < 1e-12), omega, sgn * w2)
+            second = omega_e != omega
+            if second.any():
+                T1, Q1 = rotor_forces_many(omega_e, v_ax, v_ip, subf, R, R4, tabs, rhos, rows)
+                T = np.where(second, T1, T0)
+                Q = np.where(second, Q1, Q0)
+            else:
+                T, Q = T0, Q0
+            dq = 2.0 * np.abs(Q) / np.maximum(np.abs(omega_e), 1e-6)
+        f_lin = T[:, None] * td
+        f_ang = ((-Q) * sgn)[:, None] * ax
+        damp = dq * omega
+        out = {}
+        at = 0
+        for (s_i, model, data, _), q in zip(items, sl):
+            s = self.sets[s_i]
+            b = at + (q.stop - q.start)
+            data.xfrc_applied[s.body_arr, :3] += f_lin[at:b]
+            data.xfrc_applied[s.body_arr, 3:] += f_ang[at:b]
+            model.dof_damping[s.dof_arr] += dq[at:b]
+            data.qfrc_applied[s.dof_arr] += damp[at:b]
+            s.last_thrust[:] = T[at:b]
+            s.last_torque[:] = Q[at:b]
+            total = 0.0
+            for x in T[at:b].tolist():                  # the loop's own order
+                total += x
+            out[s_i] = total
+            at = b
+        return out
+
+
 class RotorSet:
     """Every rotor of one machine, applied each step like `JetSet`."""
 
@@ -238,6 +527,13 @@ class RotorSet:
         self.n = len(self.body)
         self.last_thrust = np.zeros(self.n)
         self.last_torque = np.zeros(self.n)
+        self.body_arr = np.array(self.body, dtype=int)
+        self.dof_arr = np.array(self.dof, dtype=int)
+        self.root_arr = np.array([int(model.body_rootid[b]) for b in self.body], dtype=int)
+        # The batch writes with fancy-indexed `+=`, which is the loop's
+        # arithmetic only while no two rotors share a body or a DOF.
+        assert len(set(self.body)) == self.n and len(set(self.dof)) == self.n
+        self._batch = None
 
     def _end_of_step(self, model, data, k: int, omega: float, Q: float) -> float:
         dof = self.dof[k]
@@ -260,7 +556,20 @@ class RotorSet:
 
     def apply(self, model, data, medium, t: float) -> float:
         """Add rotor thrust and aerodynamic torque to ``data.xfrc_applied``.
-        Returns total thrust, N."""
+        Returns total thrust, N.  A `RotorBatch` of one machine: the batched
+        path steps every machine of a shard through the same code."""
+        if self.n == 0:
+            return 0.0
+        if self._batch is None:
+            self._batch = RotorBatch([self])
+        return float(self._batch.apply([(0, model, data, medium)], t)[0])
+
+    def apply_per_rotor(self, model, data, medium, t: float) -> float:
+        """The per-rotor loop `RotorBatch` replaced, kept as the readable
+        statement of the physics and as the reference
+        `tests/test_physics.py` holds the batch to, bit for bit.  No
+        evaluation path calls it: at 198 us per rotor-step it was 82% of a
+        rotor-heavy evaluation's wall (2026-10-03)."""
         if self.n == 0:
             return 0.0
         import mujoco
