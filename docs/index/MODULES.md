@@ -2,7 +2,7 @@
 
 # Modules
 
-102 modules, 35,458 lines, 1,048 indexed symbols.
+102 modules, 35,464 lines, 1,048 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -104,7 +104,7 @@ is what makes a violation visible while reading.
 | `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 336 | — | `numpy` | `envs.triphibian` |
 | `envs.skills` | The actuator skill bench: learning to operate components, not vehicles. | 655 | — | `numpy` | `evolution.cmaes`, `physics.energy`, `physics.materials`, `physics.medium`, `physics.structure` |
 | `envs.tasks` | What a segment asks the machine to do, phase by phase. | 248 | — | — | — |
-| `envs.transitions` | Crossing between media, scored rather than merely survived. | 727 | — | `numpy` | `core.mjcf`, `envs.triphibian` |
+| `envs.transitions` | Crossing between media, scored rather than merely survived. | 733 | — | `numpy` | `core.mjcf`, `envs.triphibian` |
 | `envs.triphibian` | The triphibian mission environment. | 2864 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
 
 ## `evolution`

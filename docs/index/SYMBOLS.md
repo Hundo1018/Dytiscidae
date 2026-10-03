@@ -828,21 +828,21 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `CrossingTracker` | class | 294 | — | What a crossing is, shared by ``run_transition`` and the batched path. |
-| `medium_of` | function | 267 | `(env: TriphibianEnv, ground_tol: float=0.0) -> Domain` | Which medium the machine is in: root under water, else on the ground |
-| `reseat_after_scatter` | function | 470 | `(env: TriphibianEnv, kind: str) -> None` | Put a land start back on the ground at the pose ``scatter`` left. |
-| `run_transition` | function | 497 | `(env: TriphibianEnv, kind: str, controller, *, duration: float=6.0, back: float=0.0) -> TransitionResult` | Simulate one crossing and measure it.  ``back``: see ``_place_for``. |
-| `transition_scatter_seed` | function | 217 | `(kind: str) -> int` | The entry-state draw every machine's ``kind`` crossing starts from. |
-| `TransitionResult` | class | 121 | — | One crossing, measured.  Every field is a raw physical quantity or a |
-| `TransitionSet` | class | 703 | — | All crossings attempted in one evaluation. |
-| `CrossingTracker.__init__` | method | 316 | `(self, env: TriphibianEnv, kind: str)` | — |
-| `CrossingTracker.commanded` | method | 332 | `(self, i: int) -> Domain` | The medium the controller is told about at step ``i``. |
-| `CrossingTracker.finish` | method | 379 | `(self, env: TriphibianEnv, r: TransitionResult, n_steps: int) -> int` | Set ``r.hold``, ``r.started_in``, ``r.crossed``; return the cross step. |
-| `CrossingTracker.hold_score` | method | 368 | `(self) -> float` | — |
-| `CrossingTracker.observe` | method | 336 | `(self, env: TriphibianEnv, i: int) -> None` | — |
-| `TransitionResult.components` | property | 203 | `(self) -> dict[str, float]` | The scored parts, for the judge to weight. |
-| `TransitionSet.component_means` | method | 714 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
-| `TransitionSet.crossed_fraction` | property | 709 | `(self) -> float` | — |
+| `CrossingTracker` | class | 300 | — | What a crossing is, shared by ``run_transition`` and the batched path. |
+| `medium_of` | function | 273 | `(env: TriphibianEnv, ground_tol: float=0.0) -> Domain` | Which medium the machine is in: root under water, else on the ground |
+| `reseat_after_scatter` | function | 476 | `(env: TriphibianEnv, kind: str) -> None` | Put a land start back on the ground at the pose ``scatter`` left. |
+| `run_transition` | function | 503 | `(env: TriphibianEnv, kind: str, controller, *, duration: float=6.0, back: float=0.0) -> TransitionResult` | Simulate one crossing and measure it.  ``back``: see ``_place_for``. |
+| `transition_scatter_seed` | function | 223 | `(kind: str) -> int` | The entry-state draw every machine's ``kind`` crossing starts from. |
+| `TransitionResult` | class | 127 | — | One crossing, measured.  Every field is a raw physical quantity or a |
+| `TransitionSet` | class | 709 | — | All crossings attempted in one evaluation. |
+| `CrossingTracker.__init__` | method | 322 | `(self, env: TriphibianEnv, kind: str)` | — |
+| `CrossingTracker.commanded` | method | 338 | `(self, i: int) -> Domain` | The medium the controller is told about at step ``i``. |
+| `CrossingTracker.finish` | method | 385 | `(self, env: TriphibianEnv, r: TransitionResult, n_steps: int) -> int` | Set ``r.hold``, ``r.started_in``, ``r.crossed``; return the cross step. |
+| `CrossingTracker.hold_score` | method | 374 | `(self) -> float` | — |
+| `CrossingTracker.observe` | method | 342 | `(self, env: TriphibianEnv, i: int) -> None` | — |
+| `TransitionResult.components` | property | 209 | `(self) -> dict[str, float]` | The scored parts, for the judge to weight. |
+| `TransitionSet.component_means` | method | 720 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
+| `TransitionSet.crossed_fraction` | property | 715 | `(self) -> float` | — |
 
 ## `envs.triphibian` — `dytiscidae/envs/triphibian.py`
 
