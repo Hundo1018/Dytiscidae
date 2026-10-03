@@ -706,19 +706,19 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `BatchedFluid` | class | 220 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 890 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `identify_batch` | function | 629 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `observation_finite` | function | 563 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
-| `rollout_batch` | function | 705 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 1109 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 584 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `evaluate_tier1_batch` | function | 901 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `identify_batch` | function | 640 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `observation_finite` | function | 574 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
+| `rollout_batch` | function | 716 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 1120 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 595 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 95 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
 | `BatchedFluid.__init__` | method | 231 | `(self, envs)` | — |
-| `BatchedFluid.apply` | method | 365 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
-| `BatchedFluid.finish` | method | 446 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
-| `BatchedFluid.launch` | method | 371 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
-| `BatchedFluid.ready` | method | 361 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
-| `BatchedFluid.reset_slam` | method | 340 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
+| `BatchedFluid.apply` | method | 367 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
+| `BatchedFluid.finish` | method | 448 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
+| `BatchedFluid.launch` | method | 373 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
+| `BatchedFluid.ready` | method | 363 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
+| `BatchedFluid.reset_slam` | method | 342 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
@@ -1367,12 +1367,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `bemt` | function | 80 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, rho: float, mu: float) -> tuple[float, float]` | Thrust (N, along the spin axis) and aerodynamic torque (N m, resisting |
-| `rotor_forces` | function | 183 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, medium_frac: float, air, water) -> tuple[float, float]` | Thrust and torque from the tables, blended across the free surface by |
-| `rotor_table` | function | 143 | `(spec: RotorSpec, rho: float, mu_visc: float)` | ``(CT, CQ)`` over ``TABLE_J x TABLE_MU``, with ``T = rho Om^2 R^4 CT`` |
-| `RotorSet` | class | 208 | — | Every rotor of one machine, applied each step like `JetSet`. |
+| `bemt_many` | function | 130 | `(spec: RotorSpec, omega, v_ax, v_ip, rho: float, mu: float)` | `bemt` at many operating points of one rotor at once: ``omega``, |
+| `rotor_forces` | function | 262 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, medium_frac: float, air, water) -> tuple[float, float]` | Thrust and torque from the tables, blended across the free surface by |
+| `rotor_forces_many` | function | 290 | `(omega, v_ax, v_ip, frac_w, R, R4, tabs, rhos, rows=None)` | `rotor_forces` for many rotors at once, each with its own table. |
+| `rotor_table` | function | 206 | `(spec: RotorSpec, rho: float, mu_visc: float)` | ``(CT, CQ)`` over ``TABLE_J x TABLE_MU``, with ``T = rho Om^2 R^4 CT`` |
+| `RotorBatch` | class | 343 | — | The rotors of several machines, stepped as one array computation. |
+| `RotorSet` | class | 497 | — | Every rotor of one machine, applied each step like `JetSet`. |
 | `RotorSpec` | class | 51 | — | Geometry of one fixed-pitch rotor. |
-| `RotorSet.__init__` | method | 211 | `(self, model, specs: dict) -> None` | ``specs`` maps a rotor body name to its `RotorSpec`. |
-| `RotorSet.apply` | method | 261 | `(self, model, data, medium, t: float) -> float` | Add rotor thrust and aerodynamic torque to ``data.xfrc_applied``. |
+| `RotorBatch.__init__` | method | 354 | `(self, sets) -> None` | — |
+| `RotorBatch.apply` | method | 384 | `(self, items, t: float) -> np.ndarray` | ``items``: ``(index of the set, model, data, medium)`` per machine to |
+| `RotorSet.__init__` | method | 500 | `(self, model, specs: dict) -> None` | ``specs`` maps a rotor body name to its `RotorSpec`. |
+| `RotorSet.apply` | method | 557 | `(self, model, data, medium, t: float) -> float` | Add rotor thrust and aerodynamic torque to ``data.xfrc_applied``. |
+| `RotorSet.apply_per_rotor` | method | 567 | `(self, model, data, medium, t: float) -> float` | The per-rotor loop `RotorBatch` replaced, kept as the readable |
 | `RotorSpec.stations` | method | 71 | `(self)` | — |
 
 ## `physics.structure` — `dytiscidae/physics/structure.py`

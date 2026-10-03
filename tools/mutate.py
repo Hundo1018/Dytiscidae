@@ -859,6 +859,21 @@ MUTATIONS: tuple = (
         defect="curriculum stage 1 pays the launch's coast after the machine is in the sea",
         suites=('test_physics',), item='AE'),
 
+    # --- the rotor lookup, vectorised, 2026-10-03 ----------------------------
+    Mutation(
+        id='rotor-batch-one-table',
+        path='dytiscidae/physics/rotor.py',
+        find='    r = np.arange(len(om)) if rows is None else rows\n',
+        replace='    r = (np.arange(len(om)) if rows is None else rows)[:1].repeat(len(om))\n',
+        defect="every rotor of a batch is looked up in the first rotor's table",
+        suites=('test_physics::test_the_rotor_batch_is_the_per_rotor_loop',), item='perf'),
+    Mutation(
+        id='rotor-table-one-sum',
+        path='dytiscidae/physics/rotor.py',
+        find='    T = np.array([np.sum(row) for row in dT * dr])\n',
+        replace='    T = np.full(len(om), np.sum(dT * dr) / len(om))\n',
+        defect="the vectorised table build averages thrust over the grid instead of per point",
+        suites=('test_physics::test_the_rotor_batch_is_the_per_rotor_loop',), item='perf'),
     # --- the host-side speed-up, 2026-09-27 ----------------------------------
     Mutation(
         id='batched-power-one-sum',

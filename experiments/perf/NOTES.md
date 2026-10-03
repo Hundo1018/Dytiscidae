@@ -95,3 +95,24 @@ bit. On the idle machine: 13.27 s CPU at df95498, 8.25 s now (1.61x).
 
 Pool, idle machine, 16 designs with identification: HEAD 4x4 55.9 s, new 4x4
 42.6 s (1.31x). 8x2 not measurable here: with the pinned pool it was OOM-killed.
+
+## 2026-10-03: the rotor lookup, vectorised (WORK IN PROGRESS -- draft numbers)
+
+Reconciliation, measured with `rotor_cost.py --count` (current code, 4 arch46
+elites with 4/22/5/21 rotors, identification on, shared policy, 6 s segments):
+wall 402.6 s, `RotorSet.apply` 331.3 s = 82%; 1,547,286 rotor-steps, 93.2%
+spinning, 2.00 `rotor_forces` calls per rotor-step; 197.9 us per rotor-step
+excluding table builds; 10 table builds = 25.2 s. Micro (`--micro`, same
+designs): 150 us per rotor-step in air and in water.
+The +1.6 s/rotor regression slope is the wall of the *placed* result, which with
+a shared policy is the re-score (no identification: 3 x 1500 + 4 x 1500 =
+10,500 steps at 6 s segments): 10,500 x 198 us = 2.1 s. The generation pays
+main (~33.6k steps) + re-score + refine steps, ~10.8 s of worker time per rotor
+at refine-steps 2. arch46 check: +3 rotors/design x 16 designs x 10.8 s / 4
+workers = +130 s/gen predicted against +116 s observed (114 -> 230 s).
+- after RotorBatch: rotor-heavy no-id batch bit-identical 750/750 numbers vs be3dbe0; wall 142.6 -> 76.8 s (not interleaved)
+- noise floor (rotor_cost.py --floor, two arch46 elites with 3 rotors, 2 s segments,
+  identification off): single path vs itself under 1e-15 dither, max of 3 seeds:
+  1.21e-9 and 1.23e-12; bar = max(1e-5, 2 x floor) = 1e-5; batched vs single 2.2e-9.
+- table build vectorised (bemt_many): 2.7-3.1 s -> 0.10-0.16 s per (spec, medium), bit-identical.
+- old rotor-heavy evaluation with identification (be3dbe0): 467.8 s, 747 numbers dumped.
