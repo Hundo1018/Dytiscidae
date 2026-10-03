@@ -116,3 +116,7 @@ workers = +130 s/gen predicted against +116 s observed (114 -> 230 s).
   1.21e-9 and 1.23e-12; bar = max(1e-5, 2 x floor) = 1e-5; batched vs single 2.2e-9.
 - table build vectorised (bemt_many): 2.7-3.1 s -> 0.10-0.16 s per (spec, medium), bit-identical.
 - old rotor-heavy evaluation with identification (be3dbe0): 467.8 s, 747 numbers dumped.
+- A/B Part 1 (be3dbe0 vs c35c402, alternating processes, 3 reps, ab.sh): micro us/rotor-step
+  old 192.3/164.2/140.1 new 23.1/20.6/18.8 (ratio 0.120/0.125/0.134); rotor-heavy no-id wall
+  old 125.8/111.7/94.5 new 24.0/20.9/19.9 (0.191/0.187/0.211); with id old 366.2/348.9/271.6
+  new 71.5/62.7/55.4 (0.195/0.180/0.204).
