@@ -2897,7 +2897,7 @@ real fix to rotor cost. State, updated as each lands:
 | R | needs a `--shared-ent-coef` flag (there was none: direct runs were always 0.01) and `log_std` in the `ppo` event |
 | Y/O | on arch46's elites (no run's elites were scored under the 10-03 crossings); `land_to_water` is in the curriculum's kinds but no evaluator runs it |
 | N | GRPO built off by default; switched on only if R says the shared policy carries weight |
-| 6 | ray entry: `test_entry_shock_is_hydrodynamic_not_a_speed_limit` and the 18 test_search mutations re-run on the post-10-03 tree |
+| 6 | ray entry: whole `test_physics.py` at `be3dbe0` (kernel linked), 0 `[fail]`, `all physics checks passed` with no skip, `test_entry_shock_is_hydrodynamic_not_a_speed_limit` included. Mutations: all 117 in `tools/mutate.py` re-run at `be3dbe0` (52 name a `test_search` function, not 18) |
 
 ## 2026-09-23..26 — AB-AF executed, every open fluid item closed, and a rotor control
 
