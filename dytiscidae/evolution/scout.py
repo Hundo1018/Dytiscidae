@@ -17,7 +17,7 @@ that has not learned to use it scores near zero, and it is worth more than a
 mediocre design that is already at its ceiling.  Greedy selection cannot see the
 difference, so it breeds the second and discards the first.
 
-The trap has a particular shape here.  Six islands, a curriculum that promotes
+The trap has a particular shape here.  Eight islands, a curriculum that promotes
 on measured performance, and a judge whose bar ratchets: all three sharpen
 selection, and sharper selection is exactly what kills a dark horse faster.
 

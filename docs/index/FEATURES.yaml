@@ -278,8 +278,14 @@ Islands:
     - evolution.islands.island_score
     - evolution.islands.own_domain_score
     - evolution.islands.curriculum_for
+    - evolution.islands.triphibian_score
+    - evolution.islands.Archipelago.colonists
   tests:
     - tests.test_search::test_the_island_objective_takes_its_weight_back
+    - tests.test_search::test_the_triphibian_island_pays_the_weakest_medium
+    - tests.test_search::test_a_still_machine_climbs_nothing_on_the_triphibian_island
+    - tests.test_search::test_a_pair_cross_reaches_the_triphibian_island
+    - tests.test_search::test_the_triphibian_island_joins_a_resumed_run
     - tests.test_search::test_every_island_is_reached_by_verification_and_audit
     - tests.test_search::test_an_islands_best_is_judged_on_its_own_domains
     - tests.test_search::test_one_islands_archive_is_read_alone_not_through_the_merge
@@ -299,8 +305,10 @@ Curriculum:
   implementation:
     - evolution.curriculum.Curriculum
     - evolution.curriculum.stage_score
+    - evolution.curriculum.triphibian_stage_score
   tests:
     - tests.test_search::test_curriculum_and_islands_give_gradient_where_the_mission_gives_none
+    - tests.test_search::test_the_triphibian_island_pays_the_weakest_medium
 
 Judge:
   implementation:

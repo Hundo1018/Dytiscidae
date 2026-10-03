@@ -1,7 +1,7 @@
 # Dytiscidae — project operating notes
 
 Generative design + control search for triphibian flapping-wing machines.
-MAP-Elites over six islands, MuJoCo rigid bodies plus this project's own
+MAP-Elites over eight islands, MuJoCo rigid bodies plus this project's own
 quasi-steady fluid solver, a shared PPO policy the search keeps for its
 variation operator. `docs/ROADMAP.md` is the work list and carries the
 measurement behind every item — **read it before proposing anything**.
@@ -151,7 +151,7 @@ early and ~225 s late in a run, because rotors accumulate.
 parent with the workers idle. Two generations in three ran that way before it
 was found.
 
-Generations 0–5 are a one-time six-island verification burst at ~300 s each;
+Generations 0–7 are a one-time eight-island verification burst at ~300 s each;
 steady state is ~74 s. Not a regression.
 
 ## Hard rules

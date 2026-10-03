@@ -32,13 +32,21 @@ not have: deliberate hybridisation.
                        three runs filmed 0/2 transitions: `land_to_air` was in
                        no island's objective, so nothing had ever been asked to
                        leave the ground.
+    triphibian         all three media at once, paid on the *weakest*, with a
+                       gradient where it is zero.  Added 2026-10-03: no arch46
+                       evaluation had competence > 0.15 in all three media, and
+                       the generalist's mission is zero for 98.8% of them, so
+                       nothing paid for the stepping stone between "good in
+                       two" and "does all three".  See ``triphibian_score``.
     generalist         the full mission, scored as everywhere else.
 
-Islands evolve independently.  Periodically the best of each migrates to its
-neighbours, and -- the part that has no biological counterpart -- specialists
-from different islands are crossed directly, so a water specialist's hull can
-meet an air specialist's surfaces without either lineage having had to survive
-the valley between them.
+Eight islands.  Islands evolve independently.  Periodically the best of each
+migrates to its neighbours, and -- the part that has no biological counterpart --
+specialists from different islands are crossed directly, so a water specialist's
+hull can meet an air specialist's surfaces without either lineage having had to
+survive the valley between them.  A pair island's champion is crossed with the
+specialist of its missing medium, and that cross goes to the triphibian island
+(``TRIPLE_HOME``).
 
 That is the whole point of doing this in simulation rather than in a river.  The
 irreversibility is a property of *inheritance*, not of physics, and a search
@@ -55,6 +63,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import numpy as np
+
+from .curriculum import WEAKEST_BARS
 
 #: Which domains each island cares about, and which crossings.
 ISLANDS: dict[str, dict] = {
@@ -91,11 +101,23 @@ ISLANDS: dict[str, dict] = {
     "land_air": {
         "domains": ("land", "air"),
         "transitions": ("land_to_air",),
-        # The pair the archipelago never had.  Six islands covered three
+        # The pair the archipelago never had.  The first six islands covered three
         # singles, water+land and air+water, and left out the one crossing the
         # mission is actually blocked on: three runs have filmed 0/2
         # transitions and 0 m of depth while every elite sat on the beach.
         "note": "the takeoff problem: carry yourself, then leave the ground",
+    },
+    "triphibian": {
+        "domains": ("air", "water", "land"),
+        # Owned for the curriculum's crossing and chain stages only; the
+        # island's own objective carries no transition factor (see
+        # ``triphibian_score``).
+        "transitions": ("air_to_water", "water_to_air", "water_to_land",
+                        "land_to_air"),
+        # Read by ``island_score``, ``own_domain_score`` and ``curriculum_for``:
+        # the weakest medium, not the island's mean or its best.
+        "objective": "weakest",
+        "note": "all three media at once, paid on the weakest",
     },
     "generalist": {
         "domains": ("air", "water", "land"),
@@ -106,19 +128,76 @@ ISLANDS: dict[str, dict] = {
 }
 
 
+#: The triphibian objective's floor.  Half the triphibian ladder's ``third`` bar
+#: (``WEAKEST_BARS[1]`` = 0.012, the p95 of the weakest medium among arch46
+#: evaluations that operate in two), so a machine with all three media at that
+#: bar outranks every machine missing one.  See ``triphibian_score``.
+TRIPHIBIAN_FLOOR: float = WEAKEST_BARS[1] / 2.0
+
+
+def triphibian_score(comps, floor: float = TRIPHIBIAN_FLOOR) -> float:
+    """The triphibian island's objective: a soft minimum of the three media.
+
+    ``H = 3 / sum(1 / (c_i + e)) - e``, the harmonic mean of the competences
+    lifted by a floor ``e`` and lowered by it again, with ``e`` =
+    ``TRIPHIBIAN_FLOOR`` = 0.006.  A medium with no segment is a zero.
+
+    Why this shape, measured on arch46's 7,804 Tier-1 evaluations:
+
+    * **The weakest medium decides.**  A machine missing a medium scores below
+      ``2e`` = 0.012 however good the other two are (as c1, c2 -> inf, H -> 2e);
+      a machine with all three at or above 0.012 scores at least 0.012.  So any
+      machine that clears the ``third`` bar in all three outranks every machine
+      that does not.  The geometric mean with the same floor fails this: it
+      scores air 0.9 + water 0.9 + land 0 at 0.164, above 0.1 in all three.
+    * **A gradient where the minimum has none.**  ``min`` is flat in two of its
+      three arguments everywhere and flat in all three wherever the weakest is
+      0 -- 98.2% of arch46.  H is strictly increasing in every competence, so
+      among machines with a zero medium it still ranks the second-best one, the
+      stepping stone, and the marginal value of the weakest is
+      ``((c_j + e) / (c_w + e))^2`` times that of a stronger one c_j (312x at
+      c_j = 0.1, c_w = 0).  Only order matters: the blend ranks this score as a
+      population quantile (``Curriculum.standing``), so a small magnitude is no
+      handicap.
+    * **No energy, transition or take-off factor.**  Those are the generalist's
+      (``mission_fraction``), and they are why it is zero for 98.8% of
+      evaluations.  Crossings enter this island at its curriculum's ``crossing``
+      and ``chain`` stages, gated on the weakest medium.
+
+    Held still (``experiments/triphibian_still``, 7 plans x 2 seeds), the worst
+    reading is 0.0081 -- gannet seed 1 glides in air (0.128) and floats in
+    water (0.020) with land 0 -- below the 0.012 any three-medium machine at the
+    bar scores.
+    """
+    vals = list(comps.values()) if isinstance(comps, dict) else list(comps)
+    vals = (vals + [0.0, 0.0, 0.0])[:3]
+    e = float(floor)
+    inv = sum(1.0 / (max(float(v), 0.0) + e) for v in vals)
+    return float(3.0 / inv - e)
+
+
+def _triphibian_comps(result, domains) -> list:
+    segs = getattr(result, "segments", {}) or {}
+    return [float(getattr(segs[d], "competence", 0.0)) if d in segs else 0.0
+            for d in domains]
+
+
 def island_score(island: str, result, transitions=None) -> float:
     """Score a design on one island's own terms.
 
     A specialist island reads only its own domains, so a design that has given
     up the others is not punished for having given them up.  That is the point:
     it is the only way anything ever gets far enough out along an axis to be
-    worth crossing back in.
+    worth crossing back in.  The triphibian island reads all three through
+    ``triphibian_score`` and nothing else.
     """
     spec = ISLANDS.get(island)
     if spec is None:
         return float(getattr(result, "mission_fraction", 0.0))
     if island == "generalist":
         return float(getattr(result, "mission_fraction", 0.0))
+    if spec.get("objective") == "weakest":
+        return triphibian_score(_triphibian_comps(result, spec["domains"]))
 
     segs = getattr(result, "segments", {}) or {}
     comps = [float(getattr(segs[d], "competence", 0.0))
@@ -159,7 +238,8 @@ def curriculum_for(island: str):
     if spec is None:
         return Curriculum()
     return Curriculum(domains=tuple(spec["domains"]),
-                      transition_names=tuple(spec["transitions"]))
+                      transition_names=tuple(spec["transitions"]),
+                      weakest=spec.get("objective") == "weakest")
 
 
 def own_domain_score(island: str, meta: dict) -> float:
@@ -184,6 +264,8 @@ def own_domain_score(island: str, meta: dict) -> float:
         v = meta.get("mission_fraction")
         return float(v) if isinstance(v, (int, float)) else 0.0
     comps = [float(meta.get(d) or 0.0) for d in spec["domains"]]
+    if spec.get("objective") == "weakest":
+        return triphibian_score(comps)
     if not comps:
         return 0.0
     return float(np.min(comps)) ** 0.5 * float(np.mean(comps))
@@ -287,10 +369,50 @@ class Archipelago:
                         self.hybrids += 1
                         break
 
+            # The third medium: a pair island's champion crossed with the
+            # specialist of the medium it lacks, filed on the island that pays
+            # for all three.  A specialist pair stays with its pair island
+            # (``HYBRID_HOME``): scored here it would be ranked on a medium
+            # neither parent was selected for.
+            for pair_name, (single, dst) in TRIPLE_HOME.items():
+                if dst not in self.archives:
+                    continue
+                gp, gs = self.emigrants(pair_name), self.emigrants(single)
+                if not gp or not gs:
+                    continue
+                out.append({
+                    "island": dst, "genome": crossover(gp[0], gs[0], rng),
+                    "origin": f"{pair_name}x{single}", "kind": "hybrid",
+                })
+                self.hybrids += 1
+
         self.log.append({
             "generation": generation, "moved": len(out),
             "migrations": self.migrations, "hybrids": self.hybrids,
         })
+        return out
+
+    def colonists(self, name: str, n: int) -> list:
+        """Immigrants for an island that is empty, from every other island.
+
+        A checkpoint written before an island existed resumes with that island
+        empty, and an empty island breeds random genomes -- hundreds of
+        generations behind every other island.  Instead it is offered the ``n``
+        elites of the rest of the archipelago that its own objective rates
+        highest (``own_domain_score`` on their stored meta), as pending
+        migrants: each is evaluated and has to earn its cell under the island's
+        objective like any immigrant.  Empty when the island already has cells.
+        """
+        a = self.archives.get(name)
+        if a is None or a.cells or n <= 0:
+            return []
+        pool = [(own_domain_score(name, e.meta), src, e.genome)
+                for src, arch in self.archives.items() if src != name
+                for e in arch.cells.values()]
+        pool.sort(key=lambda t: -t[0])
+        out = [{"island": name, "genome": g, "origin": src, "kind": "migrant"}
+               for _, src, g in pool[:n]]
+        self.migrations += len(out)
         return out
 
     def report(self) -> dict:
@@ -311,6 +433,14 @@ HYBRID_HOME: dict[frozenset, tuple[str, ...]] = {
     frozenset(("air", "water")): ("aerial_diver", "generalist"),
     frozenset(("water", "land")): ("amphibian", "generalist"),
     frozenset(("air", "land")): ("land_air", "generalist"),
+}
+
+#: A pair island, the specialist of the medium it lacks, and where their cross
+#: goes.  Three crosses per migration, one per pair island.
+TRIPLE_HOME: dict[str, tuple[str, str]] = {
+    "amphibian": ("air", "triphibian"),
+    "aerial_diver": ("land", "triphibian"),
+    "land_air": ("water", "triphibian"),
 }
 
 

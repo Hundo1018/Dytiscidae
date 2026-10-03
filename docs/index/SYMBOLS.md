@@ -1014,26 +1014,29 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Curriculum` | class | 207 | — | Tracks what each lineage is ready to be asked. |
-| `DistanceCurriculum` | class | 535 | — | Move each transition probe's start back as the population crosses it. |
-| `stage_score` | function | 100 | `(stage: int, result, transitions=None, *, domains=None, transition_names=None) -> float` | How well a result answers the question *this* stage asks. |
-| `StageResult` | class | 77 | — | — |
-| `Curriculum.evaluate` | method | 407 | `(self, cell, result, transitions=None, *, stage: int \| None=None) -> StageResult` | Score a design at its cell's stage, and at the next one up. |
-| `Curriculum.forget` | method | 486 | `(self, cell) -> None` | Drop a cell's stage when the cell itself is gone. |
-| `Curriculum.handover` | method | 294 | `(self, stage: int) -> float` | How much weight the island's own objective has earned, in [0, 1]. |
-| `Curriculum.mission_standing` | method | 382 | `(self, mission: float, stage: int=0) -> float` | ``mission_fraction`` as a population quantile, on the same scale. |
-| `Curriculum.observe_blend` | method | 282 | `(self, island_score: float, curriculum_score: float, stage: int=0, mission: float=0.0) -> None` | Record what each half of the blend said about one design. |
-| `Curriculum.rebuild_from` | method | 459 | `(self, archive) -> dict` | Re-key the stage record after the descriptor axes have moved. |
-| `Curriculum.report` | method | 495 | `(self) -> dict` | — |
-| `Curriculum.seed_stage` | method | 256 | `(self, cell, stage: int) -> int` | Give an unvisited cell the stage its parent had earned. |
-| `Curriculum.stage_for` | method | 275 | `(self, cell, stage: int) -> int` | The stage ``seed_stage`` would give ``cell``, without giving it. |
-| `Curriculum.stage_of` | method | 253 | `(self, cell) -> int` | — |
-| `Curriculum.standing` | method | 341 | `(self, island_score: float, curriculum_score: float, stage: int=0)` | Both halves of the blend as population quantiles in [0, 1]. |
-| `Curriculum.update` | method | 430 | `(self, cell, sr: StageResult) -> str` | Promote or demote the cell.  Returns what happened. |
-| `DistanceCurriculum.apply` | method | 605 | `(self, spec) -> None` | Write the current starts into the mission spec the evaluators read. |
-| `DistanceCurriculum.observe` | method | 566 | `(self, result) -> None` | Record one Tier-1 result's crossings and its air score. |
-| `DistanceCurriculum.report` | method | 611 | `(self) -> dict` | — |
-| `DistanceCurriculum.update` | method | 582 | `(self) -> list` | Step any start the population has earned.  Returns the moves. |
+| `Curriculum` | class | 290 | — | Tracks what each lineage is ready to be asked. |
+| `DistanceCurriculum` | class | 653 | — | Move each transition probe's start back as the population crosses it. |
+| `stage_score` | function | 165 | `(stage: int, result, transitions=None, *, domains=None, transition_names=None, weakest: bool=False) -> float` | How well a result answers the question *this* stage asks. |
+| `StageResult` | class | 142 | — | — |
+| `triphibian_stage_score` | function | 109 | `(stage: int, comps, crossing: dict \| None=None, mission: float=0.0) -> float` | What stage ``stage`` of the triphibian ladder reads. |
+| `Curriculum.bar` | method | 343 | `(self, stage: int) -> float` | The bar to leave ``stage`` on this curriculum's ladder. |
+| `Curriculum.evaluate` | method | 505 | `(self, cell, result, transitions=None, *, stage: int \| None=None) -> StageResult` | Score a design at its cell's stage, and at the next one up. |
+| `Curriculum.forget` | method | 604 | `(self, cell) -> None` | Drop a cell's stage when the cell itself is gone. |
+| `Curriculum.handover` | method | 392 | `(self, stage: int) -> float` | How much weight the island's own objective has earned, in [0, 1]. |
+| `Curriculum.mission_standing` | method | 480 | `(self, mission: float, stage: int=0) -> float` | ``mission_fraction`` as a population quantile, on the same scale. |
+| `Curriculum.observe_blend` | method | 380 | `(self, island_score: float, curriculum_score: float, stage: int=0, mission: float=0.0) -> None` | Record what each half of the blend said about one design. |
+| `Curriculum.rebuild_from` | method | 577 | `(self, archive) -> dict` | Re-key the stage record after the descriptor axes have moved. |
+| `Curriculum.report` | method | 613 | `(self) -> dict` | — |
+| `Curriculum.seed_stage` | method | 354 | `(self, cell, stage: int) -> int` | Give an unvisited cell the stage its parent had earned. |
+| `Curriculum.stage_for` | method | 373 | `(self, cell, stage: int) -> int` | The stage ``seed_stage`` would give ``cell``, without giving it. |
+| `Curriculum.stage_name` | method | 349 | `(self, stage: int) -> str` | — |
+| `Curriculum.stage_of` | method | 340 | `(self, cell) -> int` | — |
+| `Curriculum.standing` | method | 439 | `(self, island_score: float, curriculum_score: float, stage: int=0)` | Both halves of the blend as population quantiles in [0, 1]. |
+| `Curriculum.update` | method | 529 | `(self, cell, sr: StageResult) -> str` | Promote or demote the cell.  Returns what happened. |
+| `DistanceCurriculum.apply` | method | 723 | `(self, spec) -> None` | Write the current starts into the mission spec the evaluators read. |
+| `DistanceCurriculum.observe` | method | 684 | `(self, result) -> None` | Record one Tier-1 result's crossings and its air score. |
+| `DistanceCurriculum.report` | method | 729 | `(self) -> dict` | — |
+| `DistanceCurriculum.update` | method | 700 | `(self) -> list` | Step any start the population has earned.  Returns the moves. |
 
 ## `evolution.descriptors` — `dytiscidae/evolution/descriptors.py`
 
@@ -1058,16 +1061,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Archipelago` | class | 193 | — | Several archives, evolved in parallel, with migration and hybridisation. |
-| `curriculum_for` | function | 148 | `(island: str)` | A curriculum that asks an island's questions in the island's own media. |
-| `island_score` | function | 109 | `(island: str, result, transitions=None) -> float` | Score a design on one island's own terms. |
-| `own_domain_score` | function | 165 | `(island: str, meta: dict) -> float` | How good a stored elite is at *its island's own* domains, from its meta. |
-| `Archipelago.due` | method | 229 | `(self, generation: int) -> bool` | — |
-| `Archipelago.emigrants` | method | 232 | `(self, name: str) -> list` | The designs this island sends abroad: its best, by its own lights. |
-| `Archipelago.migrate` | method | 240 | `(self, generation: int, rng: np.random.Generator, crossover=None) -> list` | Move genomes between islands and cross specialists. |
-| `Archipelago.names` | property | 220 | `(self) -> list` | — |
-| `Archipelago.register` | method | 223 | `(self, name: str, archive, curator) -> None` | — |
-| `Archipelago.report` | method | 296 | `(self) -> dict` | — |
+| `Archipelago` | class | 275 | — | Several archives, evolved in parallel, with migration and hybridisation. |
+| `curriculum_for` | function | 227 | `(island: str)` | A curriculum that asks an island's questions in the island's own media. |
+| `island_score` | function | 185 | `(island: str, result, transitions=None) -> float` | Score a design on one island's own terms. |
+| `own_domain_score` | function | 245 | `(island: str, meta: dict) -> float` | How good a stored elite is at *its island's own* domains, from its meta. |
+| `triphibian_score` | function | 138 | `(comps, floor: float=TRIPHIBIAN_FLOOR) -> float` | The triphibian island's objective: a soft minimum of the three media. |
+| `Archipelago.colonists` | method | 395 | `(self, name: str, n: int) -> list` | Immigrants for an island that is empty, from every other island. |
+| `Archipelago.due` | method | 311 | `(self, generation: int) -> bool` | — |
+| `Archipelago.emigrants` | method | 314 | `(self, name: str) -> list` | The designs this island sends abroad: its best, by its own lights. |
+| `Archipelago.migrate` | method | 322 | `(self, generation: int, rng: np.random.Generator, crossover=None) -> list` | Move genomes between islands and cross specialists. |
+| `Archipelago.names` | property | 302 | `(self) -> list` | — |
+| `Archipelago.register` | method | 305 | `(self, name: str, archive, curator) -> None` | — |
+| `Archipelago.report` | method | 418 | `(self) -> dict` | — |
 
 ## `evolution.judge` — `dytiscidae/evolution/judge.py`
 
@@ -1093,18 +1098,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 680 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `evaluate_candidate` | function | 382 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 435 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `load_state` | function | 1806 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 1111 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 1681 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 681 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `evaluate_candidate` | function | 383 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 436 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `load_state` | function | 1830 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 1114 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 1705 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 63 | — | Everything adjustable about a run. |
 | `SearchState` | class | 292 | — | — |
-| `seed_archipelago` | function | 2070 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `SearchState.archive` | property | 351 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 355 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 359 | `(self) -> Curriculum` | — |
+| `seed_archipelago` | function | 2094 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `SearchState.archive` | property | 352 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 356 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 360 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 

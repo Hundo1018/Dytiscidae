@@ -4214,8 +4214,16 @@ def test_every_island_is_reached_by_verification_and_audit() -> None:
     check("and so does the audit",
           "if visits % max(cfg.audit_every, 1) == 0" in src)
 
-    islands, gens = 6, 900
-    for every in (15, 30):
+    import math
+
+    from dytiscidae.evolution.islands import ISLANDS
+    # The archipelago's real size (eight since 2026-10-03), and the six the
+    # aliasing was measured on.  ``gen % every`` aliases only when the cadence
+    # shares a factor with the island count -- 15 and 30 both do with six, only
+    # 30 does with eight -- so the old rule is shown failing where it fails,
+    # and the new rule must reach every island at both sizes.
+    gens = 900
+    for islands, every in ((6, 15), (6, 30), (len(ISLANDS), 15), (len(ISLANDS), 30)):
         old, new = set(), set()
         visits = {}
         fires_old = fires_new = 0
@@ -4229,12 +4237,17 @@ def test_every_island_is_reached_by_verification_and_audit() -> None:
             if v % every == 0:
                 new.add(isl)
                 fires_new += 1
-        check(f"every {every} generations: the old rule reached "
-              f"{len(old)}/{islands} islands",
-              len(old) < islands, f"islands {sorted(old)}")
+        if math.gcd(every, islands) > 1:
+            check(f"every {every} generations: the old rule reached "
+                  f"{len(old)}/{islands} islands",
+                  len(old) < islands, f"islands {sorted(old)}")
         check(f"the new rule reaches all {islands}", len(new) == islands,
               f"islands {sorted(new)}")
-        check("at the same total cost", abs(fires_new - fires_old) <= 1,
+        # Each island fires on its own visit 0, so the new rule can fire at
+        # most once more per island than the old (900 / 8 = 112.5 visits:
+        # 8 islands x ceil(112.5 / 15) = 64 against 60).
+        check("at the same total cost, to one firing per island",
+              abs(fires_new - fires_old) <= islands,
               f"{fires_old} firings before, {fires_new} after")
 
     # And the counters survive an interruption, or a resumed run re-fires
@@ -4974,6 +4987,301 @@ def test_something_asks_a_machine_to_leave_the_ground() -> None:
                   [_ph], segment_seconds=0.2, seed=1)[0].transitions.results)
 
 
+def _tri_res(air: float, water: float, land: float, mission: float = 0.0):
+    """A result with three competences and nothing else, for the island tests."""
+    from types import SimpleNamespace as NS
+    return NS(mission_fraction=mission, segments={
+        d: NS(competence=c, measurements={})
+        for d, c in (("air", air), ("water", water), ("land", land))})
+
+
+def test_the_triphibian_island_pays_the_weakest_medium() -> None:
+    """No arch46 evaluation had competence > 0.15 in all three media.
+
+    A fitness-1.0 design at gen >= 800 of arch45 had air 0.000, water 0.337,
+    land 0.003 and mission 0: every island either reads one or two media or,
+    the generalist, reads ``mission_fraction``, which is zero for 98.8% of
+    evaluations.  So nothing paid for the step between "good in two" and "does
+    all three".  The triphibian island's objective and every stage of its
+    curriculum read the weaker media; a still machine, a one-medium machine and
+    a two-medium machine must each be ranked below one that does all three.
+    """
+    print("\nislands: the triphibian island pays the weakest medium")
+    from dytiscidae.evolution.curriculum import (
+        WEAKEST_BARS,
+        Curriculum,
+        stage_score,
+        triphibian_stage_score,
+    )
+    from dytiscidae.evolution.islands import (
+        ISLANDS,
+        TRIPHIBIAN_FLOOR,
+        curriculum_for,
+        island_score,
+        own_domain_score,
+        triphibian_score,
+    )
+
+    spec = ISLANDS.get("triphibian", {})
+    check("a triphibian island reads all three media",
+          set(spec.get("domains", ())) == {"air", "water", "land"}, str(spec))
+
+    b0, b1 = WEAKEST_BARS[0], WEAKEST_BARS[1]
+    # Readings.  ``still`` is the worst still-machine row measured
+    # (experiments/triphibian_still: gannet seed 1 glides in air and floats);
+    # ``still_mean`` is the 14-row mean.  ``one`` is arch45's fitness-1.0 design.
+    rows = {
+        "still": (0.1276, 0.0199, 0.0),
+        "still_mean": (0.0091, 0.0284, 0.0005),
+        "one": (0.0, 0.337, 0.003),
+        "one_strong": (0.0, 0.9, 0.0),
+        "two": (0.9, 0.9, 0.0),
+        "two_perfect": (1.0, 1.0, 0.0),
+        "three_at_bar": (b1, b1, b1),
+        "three": (0.1, 0.1, 0.1),
+    }
+    s = {k: island_score("triphibian", _tri_res(*v)) for k, v in rows.items()}
+    print("    " + "  ".join(f"{k} {v:.4f}" for k, v in s.items()))
+    check("a still machine scores ~0: below the floor any three-medium machine "
+          "at the bar reaches", s["still"] < 2 * TRIPHIBIAN_FLOOR <= s["three_at_bar"] + 1e-12,
+          f"still {s['still']:.4f}, mean still {s['still_mean']:.4f}, "
+          f"three at the bar {s['three_at_bar']:.4f}")
+    missing = [k for k in ("still", "still_mean", "one", "one_strong", "two", "two_perfect")
+               if s[k] >= s["three_at_bar"]]
+    check("every machine missing a medium ranks below all three at the bar",
+          not missing, f"outranking: {missing}")
+    check("two perfect media and nothing in the third lose to 0.1 in all three",
+          s["two_perfect"] < s["three"],
+          f"{s['two_perfect']:.4f} against {s['three']:.4f}")
+    check("the arch45 fitness-1.0 one-medium design scores below a still glider",
+          s["one"] < s["still"], f"{s['one']:.4f} against {s['still']:.4f}")
+    # A gradient where the minimum has none: with the weakest at zero, the
+    # second medium still ranks, and the weakest is worth most at the margin.
+    lo = triphibian_score([0.9, 0.05, 0.0])
+    hi = triphibian_score([0.9, 0.10, 0.0])
+    check("with a zero medium, a better second medium still scores higher",
+          hi > lo, f"{lo:.5f} -> {hi:.5f}")
+    h = 1e-6
+    d_weak = (triphibian_score([0.9, 0.1, h]) - triphibian_score([0.9, 0.1, 0.0])) / h
+    d_second = (triphibian_score([0.9, 0.1 + h, 0.0]) - triphibian_score([0.9, 0.1, 0.0])) / h
+    check("and the weakest medium is worth >100x the second at the margin",
+          d_weak > 100 * d_second, f"{d_weak:.4f} against {d_second:.6f}")
+    check("no energy, transition or take-off factor: a zero mission costs nothing",
+          island_score("triphibian", _tri_res(0.1, 0.1, 0.1, mission=0.0))
+          == island_score("triphibian", _tri_res(0.1, 0.1, 0.1, mission=0.5)))
+    check("a missing segment is a zero medium",
+          island_score("triphibian", NS_two_media()) == triphibian_score([0.5, 0.5, 0.0]))
+    check("the stored-meta score is the same objective",
+          abs(own_domain_score("triphibian", {"air": 0.1, "water": 0.2, "land": 0.05})
+              - triphibian_score([0.1, 0.2, 0.05])) < 1e-12)
+
+    # --- the curriculum reads the weaker media at every stage ------------------
+    st = {k: [triphibian_stage_score(i, v) for i in range(2)] for k, v in rows.items()}
+    check("stage 0 reads the second medium: a one-medium machine cannot pass",
+          st["one"][0] == 0.003 and st["one_strong"][0] == 0.0 and st["one_strong"][0] < b0,
+          f"one {st['one'][0]}, one_strong {st['one_strong'][0]}")
+    check("a still machine cannot pass stage 0 either",
+          st["still"][0] < b0, f"{st['still'][0]:.4f} against bar {b0}")
+    check("stage 1 reads the weakest", st["two"][1] == 0.0 and st["three"][1] == 0.1)
+    gen = dict(domains=tuple(ISLANDS["generalist"]["domains"]),
+               transition_names=tuple(ISLANDS["generalist"]["transitions"]))
+    check("where the shared ladder pays the one-medium design its best medium",
+          stage_score(0, _tri_res(*rows["one"]), **gen) == 0.337
+          and stage_score(0, _tri_res(*rows["one"]), weakest=True, **gen) == 0.003)
+
+    cur = curriculum_for("triphibian")
+    check("the island's curriculum is the weakest-medium ladder",
+          getattr(cur, "weakest", False) and cur.bar(0) == b0 and cur.stage_name(1) == "third")
+    outcome = {}
+    for k in ("still", "still_mean", "one", "one_strong", "two"):
+        cell = (k,)
+        outcome[k] = cur.update(cell, cur.evaluate(cell, _tri_res(*rows[k])))
+    check("still, one-medium and two-medium machines all stay at stage 0",
+          all(v == "held" for v in outcome.values())
+          and all(cur.stage_of((k,)) == 0 for k in outcome), str(outcome))
+    cell = ("three",)
+    up = cur.update(cell, cur.evaluate(cell, _tri_res(*rows["three"])))
+    check("all three media above the bars promotes", up == "promoted"
+          and cur.stage_of(cell) == 1, up)
+    held = cur.update(cell, cur.evaluate(cell, _tri_res(0.1, 0.1, 0.4 * b1 + 1e-4)))
+    dropped = cur.update(cell, cur.evaluate(cell, _tri_res(0.1, 0.1, 0.4 * b1 - 1e-4)))
+    check("the hold line is 0.4 of the stage's own bar, not the stage below's",
+          held == "held" and dropped == "demoted", f"{held}, {dropped}")
+    check("and a cell whose next answer would be demoted is not promoted",
+          cur.update(("edge",), cur.evaluate(("edge",), _tri_res(0.1, 0.1, 0.004)))
+          == "held")
+    rep = cur.report()
+    check("the report names the island's own stages",
+          set(rep["stages"]) <= {"second", "third", "crossing", "chain", "mission"},
+          str(rep["stages"]))
+
+    # A curriculum pickled before the field existed keeps the shared ladder.
+    old = Curriculum()
+    old.__dict__.pop("weakest", None)
+    check("an unpickled pre-triphibian curriculum keeps its ladder",
+          old.bar(0) == 0.25 and old.stage_name(0) == "single"
+          and old.evaluate((0,), _tri_res(*rows["one"])).detail["here"] == 0.337)
+
+
+def NS_two_media():
+    """A result that was never evaluated on land at all."""
+    from types import SimpleNamespace as NS
+    return NS(mission_fraction=0.0, segments={
+        "air": NS(competence=0.5, measurements={}),
+        "water": NS(competence=0.5, measurements={})})
+
+
+def test_a_still_machine_climbs_nothing_on_the_triphibian_island() -> None:
+    """Every body plan held still, on the real Tier-1 path, scored by the island.
+
+    CLAUDE.md: run the still-machine check on every score.  A still machine
+    earns a little in a medium -- measured 2026-10-03, a gannet glides to 0.128
+    in air and a ray reads 0.244 in water with every amplitude at zero -- so the
+    question for an island that pays the weakest medium is whether "a little in
+    two" climbs it.  Seven plans x two seeds, ~8 s each.
+    """
+    print("\nislands: a still machine climbs nothing on the triphibian island")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.envs.evaluate import Controller, evaluate_tier1
+    from dytiscidae.envs.triphibian import TriphibianEnv
+    from dytiscidae.evolution.curriculum import WEAKEST_BARS
+    from dytiscidae.evolution.islands import (
+        TRIPHIBIAN_FLOOR,
+        curriculum_for,
+        island_score,
+    )
+
+    cur = curriculum_for("triphibian")
+    worst_score, worst_c2, worst_c3, promoted, n = 0.0, 0.0, 0.0, 0, 0
+    for plan in BODY_PLANS:
+        p = build(BODY_PLANS[plan]())
+        for seed in (0, 1):
+            b = TriphibianEnv(p, seed=seed).cpg.base
+            still = CPGParams(amplitude=np.zeros_like(np.asarray(b.amplitude, float)),
+                              phase=np.asarray(b.phase, float),
+                              offset=np.asarray(b.offset, float),
+                              frequency=float(b.frequency))
+            r = evaluate_tier1(p, controller=Controller(params=still),
+                               segment_seconds=8.0, seed=seed)
+            c = sorted((float(r.segments[d].competence) if d in r.segments else 0.0
+                        for d in ("air", "water", "land")), reverse=True)
+            worst_score = max(worst_score, island_score("triphibian", r))
+            worst_c2, worst_c3 = max(worst_c2, c[1]), max(worst_c3, c[2])
+            cell = (plan, seed)
+            promoted += cur.update(cell, cur.evaluate(cell, r)) == "promoted"
+            n += 1
+    check(f"held still, {n} evaluations: the island score stays below the "
+          f"three-medium floor", worst_score < 2 * TRIPHIBIAN_FLOOR,
+          f"max {worst_score:.4f} against {2 * TRIPHIBIAN_FLOOR:.4f}")
+    check("the second medium stays below the stage-0 bar",
+          worst_c2 < WEAKEST_BARS[0], f"max c2 {worst_c2:.4f} against {WEAKEST_BARS[0]}")
+    check("the weakest stays below the stage-1 bar",
+          worst_c3 < WEAKEST_BARS[1], f"max c3 {worst_c3:.4f} against {WEAKEST_BARS[1]}")
+    check("and no still machine is promoted", promoted == 0, f"{promoted} of {n}")
+
+
+def test_a_pair_cross_reaches_the_triphibian_island() -> None:
+    """The third medium arrives by crossing, and an empty island is colonised.
+
+    Specialist pairs go to their pair islands (``HYBRID_HOME``); a pair
+    island's champion crossed with the specialist of its missing medium goes to
+    the triphibian island (``TRIPLE_HOME``).  And a run resumed from a
+    checkpoint written before the island existed has it empty: it is offered
+    the archipelago's elites its own objective rates highest.
+    """
+    print("\nislands: a pair cross reaches the triphibian island")
+    from dytiscidae.evolution.islands import ISLANDS, TRIPLE_HOME, Archipelago
+
+    axes = [("m", 0.0, 1.0, 4), ("d", 0.0, 1.0, 4)]
+
+    def archipelago():
+        arch = Archipelago(migrate_every=1, n_migrants=1)
+        for name in ISLANDS:
+            a = Archive(list(axes))
+            arch.register(name, a, Curator(a, seed=0))
+        return arch
+
+    arch = archipelago()
+    for name in ("air", "water", "land", "amphibian", "aerial_diver", "land_air"):
+        arch.archives[name].add(name, 0.9, np.array([0.5, 0.5]), {}, tier=1)
+    moved = arch.migrate(1, np.random.default_rng(0),
+                         crossover=lambda a, b, r: f"{a}+{b}")
+    hyb = [m for m in moved if m["kind"] == "hybrid"]
+    tri = sorted(m["origin"] for m in hyb if m["island"] == "triphibian")
+    check("each pair island's champion is crossed with its missing specialist",
+          tri == sorted(f"{p}x{s}" for p, (s, _) in TRIPLE_HOME.items()), str(tri))
+    check("and each cross carries all three media's parents",
+          all({"air", "water", "land"} <= set(m["genome"].replace("amphibian", "water+land")
+                                              .replace("aerial_diver", "air+water")
+                                              .replace("land_air", "land+air").split("+"))
+              for m in hyb if m["island"] == "triphibian"))
+    check("specialist pairs still go to their pair islands",
+          sorted(m["island"] for m in hyb if m["island"] != "triphibian")
+          == ["aerial_diver", "amphibian", "land_air"])
+
+    arch = archipelago()
+    arch.archives["water"].add("swimmer", 0.9, np.array([0.1, 0.1]),
+                               {"air": 0.0, "water": 0.9, "land": 0.0}, tier=1)
+    arch.archives["amphibian"].add("amphib", 0.5, np.array([0.5, 0.5]),
+                                   {"air": 0.0, "water": 0.4, "land": 0.3}, tier=1)
+    arch.archives["generalist"].add("allround", 0.1, np.array([0.9, 0.9]),
+                                    {"air": 0.05, "water": 0.05, "land": 0.05}, tier=1)
+    col = arch.colonists("triphibian", 2)
+    check("an empty island is offered the elites its own objective ranks highest",
+          [c["genome"] for c in col] == ["allround", "amphib"]
+          and all(c["island"] == "triphibian" for c in col),
+          str([(c["genome"], c["origin"]) for c in col]))
+    check("and an island with cells is offered none",
+          arch.colonists("water", 2) == [])
+
+
+def test_the_triphibian_island_joins_a_resumed_run() -> None:
+    """A checkpoint written before the island existed resumes, and the island fills.
+
+    arch47 or any run checkpointed before 2026-10-03 has seven archives.  A
+    resume with eight must keep the seven and start the eighth empty -- then
+    fill it, from colonists, not from nothing.
+    """
+    if needs_batched_evaluator("test_the_triphibian_island_joins_a_resumed_run"):
+        return
+    print("\nloop: the triphibian island joins a resumed run")
+    import json
+    import shutil
+    import tempfile
+
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+
+    tmp = tempfile.mkdtemp(prefix="dyt-tri-resume-")
+    try:
+        base = dict(batch=1, seed=5, segment_seconds=1.0, n_reference_seeds=1,
+                    n_random_seeds=0, tier2_every=999, audit_every=999,
+                    migrate_every=999, checkpoint_every=1, run_dir=tmp,
+                    identify_axes_every=999)
+        first = run_search(SearchConfig(generations=2, islands=("water", "generalist"),
+                                        **base), MissionSpec())
+        before = {n: len(a.cells) for n, a in first.archipelago.archives.items()}
+        check("the old run has no triphibian archive",
+              not (Path(tmp) / "archive_triphibian.pkl").exists()
+              and all(before.values()), str(before))
+        again = run_search(SearchConfig(generations=5, resume=True,
+                                        islands=("water", "triphibian", "generalist"),
+                                        **base), MissionSpec())
+        after = {n: len(a.cells) for n, a in again.archipelago.archives.items()}
+        check("the old islands come back", all(after[n] >= before[n] for n in before),
+              f"{before} -> {after}")
+        events = [json.loads(line) for line in
+                  (Path(tmp) / "events.jsonl").read_text().splitlines() if line.strip()]
+        col = [e for e in events if e.get("kind") == "colonise"]
+        check("the new island started empty and was colonised",
+              len(col) == 1 and col[0]["island"] == "triphibian", str(col))
+        check("and it fills", after.get("triphibian", 0) >= 1, str(after))
+        tri = again.curricula["triphibian"]
+        check("with the weakest-medium ladder", getattr(tri, "weakest", False))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -5045,6 +5353,10 @@ def main() -> int:
         test_a_nan_observation_fails_the_rollout_not_the_batch,
         test_the_early_fluid_launch_changes_nothing,
         test_structure_can_be_recombined_and_duplicated,
+        test_the_triphibian_island_pays_the_weakest_medium,
+        test_a_still_machine_climbs_nothing_on_the_triphibian_island,
+        test_a_pair_cross_reaches_the_triphibian_island,
+        test_the_triphibian_island_joins_a_resumed_run,
     ])
     return report("all search-machinery checks passed")
 

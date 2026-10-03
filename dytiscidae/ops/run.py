@@ -943,7 +943,7 @@ def main(argv=None) -> int:
                         "fraction buying 32%% more competence.")
     p.add_argument("--descriptor-bins", type=int, default=5,
                    help="bins per learned archive axis. Four axes at 8 bins is "
-                        "4096 cells per island, 24,576 across six, against "
+                        "4096 cells per island, 32,768 across eight, against "
                         "arch31's entire budget of 9,620 evaluations -- so "
                         "81.9%% of cells were never improved on. Size the map "
                         "to the budget.")

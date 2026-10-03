@@ -52,7 +52,7 @@ from .archive import Archive
 from .auditor import Auditor
 from .critic import CRITIC_TARGETS, Critic, critic_features, expensive_outcome
 from .curator import Curator
-from .curriculum import STAGES, Curriculum
+from .curriculum import STAGES, WEAKEST_BARS, Curriculum
 from .descriptors import LearnedDescriptors, episode_features
 from .islands import ISLANDS, Archipelago, curriculum_for, island_score
 from .judge import Judge
@@ -318,8 +318,9 @@ class SearchState:
     #: How many generations each island has been the active one.
     #:
     #: Every periodic job used to fire on ``gen % N``, and the island rotates
-    #: once per generation, so with six islands any N sharing a factor with six
-    #: could only ever fire on a subset of them: ``tier2_every = 15`` reaches
+    #: once per generation, so with six islands (the count then; eight since
+    #: 2026-10-03) any N sharing a factor with six could only ever fire on a
+    #: subset of them: ``tier2_every = 15`` reaches
     #: islands 0 and 3, ``audit_every = 30`` reaches island 0 alone.  Four
     #: islands had never had a design verified at full fidelity in any run, and
     #: every audit in arch30, arch31 and arch33 landed on ``air``.  Counting
@@ -976,7 +977,9 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     meta["objectives"] = {n: round(float(v), 4) for n, v in zip(OBJECTIVE_NAMES, obj)}
     meta["island"] = state.island
     meta["stage"] = sr.stage
-    meta["stage_name"] = STAGES[sr.stage][0]
+    meta["stage_name"] = (state.curriculum.stage_name(sr.stage)
+                          if hasattr(state.curriculum, "stage_name")
+                          else STAGES[sr.stage][0])
     meta["rungs"] = {d: j["rung"] for d, j in judged.items()}
     meta["judged"] = {d: round(j["total"], 3) for d, j in judged.items()}
     # The raw numbers the judge's bars are quantiles *of*.  Kept so that if this
@@ -1268,6 +1271,18 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
 
     order = list(cfg.islands) or ["generalist"]
     pending: list = []
+    if start_gen:
+        # An island the checkpoint did not have (the triphibian island, for any
+        # run checkpointed before 2026-10-03) resumes empty.  It is offered the
+        # archipelago's elites its own objective rates highest, as immigrants
+        # that must earn their cells, rather than breeding random genomes.
+        for name in order:
+            col = archipelago.colonists(name, max(int(cfg.batch), 1))
+            if col:
+                pending.extend(col)
+                telemetry.event({"kind": "colonise", "gen": start_gen,
+                                 "island": name, "pending": len(col),
+                                 "origins": sorted({c["origin"] for c in col})})
 
     for gen in range(start_gen, cfg.generations):
         state.island = order[gen % len(order)]
@@ -1546,6 +1561,15 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                     and float(np.std(mfs)) > 1e-9):
                 report["mission_corr"] = round(
                     float(np.corrcoef(fits, mfs)[0, 1]), 4)
+        # The triphibian island's own headline: the best weakest medium in its
+        # archive, and how many elites clear its ``third`` bar in all three.
+        t_arch = archipelago.archives.get("triphibian")
+        if t_arch is not None and t_arch.cells:
+            weakest = [min(float((e.meta or {}).get(d) or 0.0)
+                           for d in ("air", "water", "land"))
+                       for e in t_arch.cells.values()]
+            report["weakest_best"] = round(max(weakest), 4)
+            report["three_media"] = int(sum(w >= WEAKEST_BARS[1] for w in weakest))
         report["elapsed"] = round(time.time() - state.started, 1)
         report["curriculum"] = state.curriculum.report()
         report["judge"] = state.judge.report()

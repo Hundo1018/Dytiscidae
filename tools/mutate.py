@@ -306,6 +306,38 @@ MUTATIONS: tuple = (
         suites=("test_search::test_an_islands_best_is_judged_on_its_own_domains",), item="per-island best"),
 
     Mutation(
+        id="triphibian-island-pays-the-best-medium",
+        path="dytiscidae/evolution/islands.py",
+        find="    inv = sum(1.0 / (max(float(v), 0.0) + e) for v in vals)\n"
+             "    return float(3.0 / inv - e)",
+        replace="    return float(max(vals))",
+        defect="the triphibian island pays the best medium, so a one-medium "
+               "specialist (arch45's fitness-1.0 design: air 0, water 0.337, "
+               "land 0.003) outranks a machine that does all three",
+        suites=("test_search::test_the_triphibian_island_pays_the_weakest_medium",),
+        item="triphibian island"),
+
+    Mutation(
+        id="triphibian-ladder-reads-the-best-medium",
+        path="dytiscidae/evolution/curriculum.py",
+        find="    if stage <= 0:\n        return c2",
+        replace="    if stage <= 0:\n        return c1",
+        defect="the triphibian island's stage 0 reads the best medium, so 75% of "
+               "its selection (the curriculum half at stage 0) pays a specialist",
+        suites=("test_search::test_the_triphibian_island_pays_the_weakest_medium",),
+        item="triphibian island"),
+
+    Mutation(
+        id="triphibian-curriculum-is-the-shared-ladder",
+        path="dytiscidae/evolution/islands.py",
+        find='                      weakest=spec.get("objective") == "weakest")',
+        replace="                      weakest=False)",
+        defect="the triphibian island is built with the shared ladder, whose "
+               "stages 0-3 pay the best one or two media",
+        suites=("test_search::test_the_triphibian_island_pays_the_weakest_medium",),
+        item="triphibian island"),
+
+    Mutation(
         id="island-archive-read-through-the-merge",
         path="dytiscidae/ops/run.py",
         find="    if island is not None:\n        if island not in names:",
