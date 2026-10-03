@@ -99,17 +99,25 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
 .warnbox{margin-top:14px;padding:11px 14px;border:1px solid var(--bad);
   border-radius:9px;background:var(--surface-1)}
 .warnbox h3{color:var(--bad)}
+.notes{margin:18px 0 8px;padding:4px 18px 12px;border:1px solid var(--border, #8884);border-radius:8px}
+.notes p,.notes li{font-size:13.5px;line-height:1.6;color:var(--text-secondary)}
+.notes ul{padding-left:20px;margin:6px 0}
+.notes h3,.notes h4{margin:16px 0 4px}
+.notes table{margin:8px 0}
+.notes code{font-size:12px}
 .warnbox p{margin:5px 0 0;font-size:12.5px;color:var(--text-secondary);line-height:1.55}
 </style>
 
 <div class="viz-root"><div class="wrap">
 
 <h1>__TITLE__</h1>
-<p class="sub" id="subtitle" data-sub="__SUBTITLE__">MAP-Elites over six islands with a
+<p class="sub" id="subtitle" data-sub="__SUBTITLE__">MAP-Elites with a
 shared PPO policy · __SUBTITLE__</p>
 
 <div class="tiles" id="tiles"></div>
 <div class="evbar" id="evbar"></div>
+
+__NOTES__
 
 __FILM__
 
@@ -124,12 +132,13 @@ every design evaluated, not the elite alone.</p>
     <div id="c_return"></div>
     <p class="note">Two measures of different magnitude are shown on one axis by scaling
       mission fraction ×100 — stated here rather than drawn as a second y-axis.</p>
+    <p class="note" id="fit_note"></p>
   </div>
 </div>
 
 <h2>2 · Evaluation return — and the gap this run exists to measure</h2>
-<p class="sub">Every promotion is scored twice: an 8 s Tier-1 estimate and a full
-Tier-2 mission. If the estimate predicted the measurement, the scatter would lie on
+<p class="sub">Every promotion is scored twice: a <span data-m="segment_seconds">?</span> s
+Tier-1 estimate and a full Tier-2 mission. If the estimate predicted the measurement, the scatter would lie on
 a rising line.</p>
 <div class="grid">
   <div class="card">
@@ -159,8 +168,10 @@ gates the search actually passes or fails.</p>
 </div>
 
 <h2 data-sec="ret">4 · Episode length — read as score retention</h2>
-<p class="sub" data-sec="ret">Segments are fixed at 8 s, so length carries no signal. The honest
-analogue is Tier-1.5: what fraction of an 8 s competence survives a 60 s leg.</p>
+<p class="sub" data-sec="ret">Segments are fixed at <span data-m="segment_seconds">?</span> s,
+so length carries no signal. The honest analogue is Tier-1.5: what fraction of a
+<span data-m="segment_seconds">?</span> s competence survives a
+<span data-m="tier1_5_seconds">?</span> s leg.</p>
 <div class="grid" data-sec="ret">
   <div class="card">
     <h3>Retention distribution</h3>
@@ -170,8 +181,7 @@ analogue is Tier-1.5: what fraction of an 8 s competence survives a 60 s leg.</p
   <div class="card" data-sec="ret">
     <h3>The inversion</h3>
     <div id="c_retsplit"></div>
-    <p class="note">Designs above the median 8 s score keep almost nothing at 60 s;
-      those below it keep an order of magnitude more.</p>
+    <p class="note" id="inv_note"></p>
   </div>
 </div>
 
@@ -268,7 +278,7 @@ sequence and not a checklist.</p>
 
 <div class="grid">
   <div class="card">
-    <h3>The six islands and what each one scores</h3>
+    <h3>The islands and what each one scores</h3>
     <p class="note">A specialist island reads only its own domains, so a design
       that gave up the others is not punished for it. Immigrants must re-earn
       their place under the receiving island's objective.</p>
@@ -284,9 +294,10 @@ sequence and not a checklist.</p>
 </section>
 
 <h2>8 · State visitation — the archive</h2>
-<p class="sub">In MAP-Elites the archive <em>is</em> the visited state space. Coverage
-sawtooths because the learned descriptor axes are refitted every 400 evaluations and
-merge cells.</p>
+<p class="sub">In MAP-Elites the archive <em>is</em> the visited state space. The
+learned descriptor axes are refitted every <span data-m="refit_every">?</span> evaluations,
+and a refit that re-bins the archive merges cells; a refit whose axes overlap the
+current ones at or above <span data-m="keep_if_overlap">?</span> keeps them (0 = never).</p>
 <div class="grid">
   <div class="card wide">
     <h3>Archive coverage, with descriptor refits marked</h3>
@@ -320,7 +331,7 @@ merge cells.</p>
   <div class="card">
     <h3>Energy-infeasible share by part count</h3>
     <div id="c_pe"></div>
-    <p class="note">The removed 8-part cap was doing energy work nobody had credited it with.</p>
+    <p class="note" id="pe_note"></p>
   </div>
 </div>
 
@@ -577,8 +588,11 @@ const m=D.meta, b=D.best, R=D.retention;
    hard-coded to 900, so a run that stopped early drew a line ending in a third
    of empty chart and read as a collapse rather than as a shorter run. */
 const XS=[0,m.generations];
+document.querySelectorAll('[data-m]').forEach(el=>{
+  const v=m[el.dataset.m]; el.textContent = v==null ? 'not recorded' : v; });
 document.getElementById('subtitle').textContent =
-  `MAP-Elites over six islands with a shared PPO policy · ${m.generations} generations`
+  `MAP-Elites over ${m.islands||'an unrecorded number of'} islands with a shared PPO policy`
+  + ` · ${m.generations} generations`
   + ` · ${document.getElementById('subtitle').dataset.sub||''}`;
 document.getElementById('evbar').innerHTML=eventLegend()
   || '<span class="evkey">no refits, audits or bar changes were logged for this run</span>';
@@ -588,11 +602,12 @@ document.getElementById('tiles').innerHTML=[
    'batch '+m.batch+' · '+m.segment_seconds+' s segments'],
   [fmt(D.dist.mission_max,4), 'best mission fraction',
    'best single evaluation of the run'],
-  [Object.keys(D.archive.islands).length+' / '+(m.islands||6), 'islands promoted into',
+  [Object.keys(D.archive.islands).length+' / '+(m.islands||'?'), 'islands promoted into',
    m.promotions+' promotions in total'],
   [(D.eval_return.corr_all>=0?'+':'')+fmt(D.eval_return.corr_all,3), 'corr(Tier-1, Tier-2)',
    D.eval_return.scatter.length+' promotions'],
-  R ? [fmt(R.median,3), 'median 60 s retention', 'of an 8 s score']
+  R ? [fmt(R.median,3), `median ${m.tier1_5_seconds} s retention`,
+         `of a ${m.segment_seconds} s score · defined for ${R.n} of ${m.promotions} promotions`]
     : [fmt(D.dist.mission_median,4), 'median mission fraction', 'across every evaluation'],
 ].map(([n,l,d])=>`<div class="tile"><div class="n">${n}</div><div class="l">${l}</div>
   <div class="d">${d}</div></div>`).join('');
@@ -602,6 +617,21 @@ lineChart(document.getElementById('c_return'),[
   {pts:D.train_return.mission.map(p=>[p.g,p.v*100]),c:'var(--s1)',tag:'mission ×100'},
   {pts:D.train_return.fitness.map(p=>[p.g,p.v]),c:'var(--s2)',tag:'fitness'},
 ],{xs:XS,h:220,ylab:v=>fmt(v,2)});
+(function(){
+  const F=D.fitness_parts, el=document.getElementById('fit_note');
+  if(!F){ el.textContent='score_parts were not recorded for this run.'; return; }
+  el.textContent = `Fitness is a blend of population quantiles, not an absolute score. `+
+    `Median fitness ${fmt(F.fitness_median,3)}, of which the mission term `+
+    `(mission_weight × mission standing) is ${fmt(F.mission_term_median,3)}. `+
+    (F.zero_mission_q_median!=null
+      ? `${Math.round(100*F.zero_mission_share)}% of evaluations had a mission of exactly 0, `+
+        `and their median mission standing was ${fmt(F.zero_mission_q_median,3)}: `+
+        (F.zero_mission_q_median>0.9
+          ? `the standing counts ties as "at or above", so where nearly every mission is 0 that term `+
+            `is paid almost equally to everyone and carries no ranking.`
+          : `the term still separates designs.`)
+      : `Every evaluation had a nonzero mission.`);
+})();
 
 /* 2 scatter */
 (function(){
@@ -641,12 +671,21 @@ barChart(document.getElementById('c_rethist'),
   {h:210});
 document.getElementById('ret_note').textContent =
   `n = ${R.n}. Median ${R.median}, mean ${R.mean}. `+
-  `${Math.round(100*(R.hist[0]+R.hist[1])/R.n)}% keep under a quarter of their 8 s score; `+
+  `Defined only where the ${m.segment_seconds} s competence in the leg's medium was nonzero: `+
+  `${R.n} of ${m.promotions} promotions. `+
+  `${Math.round(100*(R.hist[0]+R.hist[1])/R.n)}% keep under a quarter of their ${m.segment_seconds} s score; `+
   `${Math.round(100*(R.hist[5]+R.hist[6]+R.hist[7])/R.n)}% hold or improve.`;
 barChart(document.getElementById('c_retsplit'),[
-  {k:`8 s above median (n=${R.hi_n})`,v:R.hi_med,c:'var(--s2)'},
-  {k:`8 s below median (n=${R.lo_n})`,v:R.lo_med,c:'var(--s3)'},
+  {k:`${m.segment_seconds} s above median (n=${R.hi_n})`,v:R.hi_med,c:'var(--s2)'},
+  {k:`${m.segment_seconds} s below median (n=${R.lo_n})`,v:R.lo_med,c:'var(--s3)'},
 ],{h:210,vfmt:v=>fmt(v,3),ylab:v=>fmt(v,2)});
+document.getElementById('inv_note').textContent =
+  `Median retention ${fmt(R.hi_med,3)} above the median ${m.segment_seconds} s score `+
+  `and ${fmt(R.lo_med,3)} below it` +
+  (Math.abs(R.hi_med-R.lo_med) < 0.05 || Math.min(R.hi_n,R.lo_n) < 10
+     ? ` (n = ${R.hi_n} and ${R.lo_n}): no difference worth reading.`
+   : R.hi_med < R.lo_med ? ': the designs that score best cheaply keep less.'
+   : ': the cheap score ranks the long leg the right way round.');
 }
 
 /* 5,6 ppo */
@@ -821,10 +860,20 @@ if(D.scoring){
 lineChart(document.getElementById('c_cov'),
   [{pts:D.archive.coverage.filter((_,i)=>i%3===0).map(p=>[p.g,p.v]),c:'var(--s1)',tag:'coverage'}],
   {xs:XS,h:220,ylab:v=>fmt(v,0)+'%',marks:D.archive.refits});
-document.getElementById('cov_note').textContent =
-  `${D.archive.refits.length} descriptor refits (dashed). Archive size at each refit fell `+
-  `${D.archive.refit_before[0]} → ${D.archive.refit_before[D.archive.refit_before.length-1]}: `+
-  `the search stopped refilling to its previous peak.`;
+(function(){
+  const A=D.archive, rb=A.refit_before, mg=A.refit_merged||[];
+  const med=a=>{ if(!a.length) return null; const s=[...a].sort((x,y)=>x-y); return s[Math.floor(s.length/2)]; };
+  let t=`${A.refits.length} descriptor refits (dashed)`;
+  if(A.refit_skipped) t+=`, ${A.refit_skipped} of them skipped by the overlap guard`;
+  t+='. ';
+  if(rb.length>1){
+    const z=rb[rb.length-1], pk=Math.max(...rb), at=rb.indexOf(pk)+1;
+    t+=`Archive size at refit: first ${rb[0]}, peak ${pk} at refit ${at} of ${rb.length}, last ${z}`+
+       (z < 0.9*pk ? ` (${Math.round(100*(1-z/pk))}% below the peak). ` : '. ');
+  }
+  if(mg.length) t+=`Median cells merged per refit: ${med(mg)}.`;
+  document.getElementById('cov_note').textContent=t;
+})();
 barChart(document.getElementById('c_isl'),
   Object.entries(D.archive.islands).map(([k,v])=>({k:k.replace('aerial_diver','diver'),v})),
   {h:200,c:'var(--s3)'});
@@ -839,11 +888,22 @@ lineChart(document.getElementById('c_parts'),
 barChart(document.getElementById('c_pe'),
   D.parts.infeasible.map(d=>({k:d.p+(d.p===10?'+':''),v:d.v})),
   {h:200,c:'var(--s2)',vfmt:v=>fmt(v,0)+'%',ylab:v=>fmt(v,0)+'%'});
+(function(){
+  const I=D.parts.infeasible, el=document.getElementById('pe_note');
+  if(I.length<2){ el.textContent='Too few part counts with more than 50 designs to compare.'; return; }
+  const a=I[0], z=I[I.length-1];
+  el.textContent=`${fmt(a.v,0)}% energy-infeasible at ${a.p} parts (n=${a.n}) against `+
+    `${fmt(z.v,0)}% at ${z.p}${z.p===10?'+':''} (n=${z.n})`+
+    (z.v>a.v+10 ? ': more parts cost energy feasibility.'
+     : z.v<a.v-10 ? ': larger designs were more often feasible.'
+     : ': part count does not move feasibility much in this run.');
+})();
 
 /* 10 best */
 document.getElementById('best').innerHTML=`
  <h3>Generation ${b.gen}, ${b.island} island, ${b.body_plan} plan
-   <span class="flag g">no airworthiness gate</span></h3>
+   ${(b.air_gates||[]).length ? `<span class="flag">air-gated: ${b.air_gates.join(', ')}</span>`
+      : '<span class="flag g">no airworthiness gate</span>'}</h3>
  <div class="scroll"><table>
   <tr><th>mission fraction</th><th class="num">${fmt(b.mission_fraction,4)}</th>
       <th>air / water / land competence</th>
@@ -857,10 +917,11 @@ document.getElementById('best').innerHTML=`
   <tr><td>energy margin</td><td class="num">${b.energy_margin>=0?'+':''}${fmt(b.energy_margin,3)}</td>
       <td>island</td><td class="num">${b.island}</td></tr>
  </table></div>
- <p class="note">A wing loading of ${fmt(b.wing_loading,0)} N/m² sits far below the
-   992 N/m² airworthiness bar, so this is a machine that can actually carry its weight
-   in lift: above 992 N/m² no attitude at any speed this mission flies produces the
-   machine's weight in lift, and Tier-0 gates it.</p>`;
+ <p class="note">Wing loading ${fmt(b.wing_loading,0)} N/m² against the 992 N/m²
+   airworthiness bar: ${b.wing_loading<992
+     ? 'below it, so lift can carry this machine at some attitude and speed the mission flies.'
+     : 'above it, so no attitude at any speed this mission flies produces its weight in lift.'}
+   Air competence ${fmt(b.air,3)}.</p>`;
 
 /* Every chart says what it is showing, in what units, and how the number was
    arrived at.  The axis labels are project shorthand and nobody outside this

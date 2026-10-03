@@ -107,6 +107,18 @@ The failure mode of a report is flattery. Three rules earned from arch34:
   in the generation line belong to whichever island that generation visited, and
   a descriptor refit merges cells every 400 evaluations. The coverage chart
   marks the refits for exactly this reason.
+- **The template states no findings.** Until 2026-10-03 it carried sentences
+  written about arch34-era runs ("an 8 s Tier-1 estimate", "six islands",
+  "the removed 8-part cap was doing energy work", "designs above the median
+  keep almost nothing"), and they printed unchanged on every later report,
+  true or not. Every sentence in `template.html` is now a definition, a value
+  read from the run's config (`data-m` spans), or computed from its data with
+  the comparison spelled out. A new note follows the same rule: if it needs a
+  number, compute it; if it needs a judgement, it goes in the notes file.
+- **Findings live in `runs/<run>_notes.md`**, which the report embeds at the top
+  as "0 · What this run measured". A report without one shows a red box saying
+  nothing on the page interprets the charts. Write the notes after the run, from
+  measurements with their scripts, and regenerate the report.
 
 ## 4 · Charts the source data cannot support
 

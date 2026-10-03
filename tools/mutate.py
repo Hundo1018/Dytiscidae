@@ -944,6 +944,42 @@ MUTATIONS: tuple = (
         suites=("test_index",), item="A/J index gate"),
     # --- the critic's label and calibration (2026-10-03) ------------------
     Mutation(
+        id="refit-trigger-reads-a-stale-alias",
+        path="dytiscidae/evolution/loop.py",
+        find="    start_gen = load_state(state) if getattr(cfg, \"resume\", False) else 0",
+        replace="    _stale = state.descriptors\n"
+                "    start_gen = load_state(state) if getattr(cfg, \"resume\", False) else 0\n"
+                "    if _stale is not None: state.descriptors = _stale",
+        defect="the arch24 resume bug: the refit trigger reads descriptors captured "
+               "before load_state replaced them, so a resumed run never refits",
+        suites=("test_search::test_learned_axes_survive_resume",),
+        item="arch24 resume"),
+    Mutation(
+        id="tier1_5-ignores-the-floor",
+        path="dytiscidae/envs/evaluate.py",
+        find="    dom = domain or weakest_domain(competences or {}, floor=LEG_COMPETENCE_BAR)",
+        replace="    dom = domain or weakest_domain(competences or {})",
+        defect="Tier-1.5 runs a medium the design scored 0 in, so its retention "
+               "is 0/0 -- arch45, 124 of 147 promotions",
+        suites=("test_search::test_a_long_leg_runs_on_promotion_candidates_only",),
+        item="ARCH46 2a"),
+    Mutation(
+        id="tier2-probe-legs-enter-the-mission",
+        path="dytiscidae/envs/evaluate.py",
+        find="            r.probe_segments[dom.value] = env.rollout(",
+        replace="            r.segments[dom.value] = env.rollout(",
+        defect="label-only Tier-2 legs land in segments, which fitness scores",
+        suites=("test_search::test_tier2_probe_legs_label_without_scoring",),
+        item="ARCH46 2b"),
+    Mutation(
+        id="critic-ignores-probe-legs",
+        path="dytiscidae/evolution/critic.py",
+        find="    seg = {**(getattr(result, \"probe_segments\", None) or {}),",
+        replace="    seg = {**({}),",
+        defect="the probe legs run and the critic never reads them",
+        suites=("test_search::test_tier2_probe_legs_label_without_scoring",),
+        item="ARCH46 2b"),
+    Mutation(
         id="critic-unmeasured-medium-is-zero",
         path="dytiscidae/evolution/critic.py",
         find="        [float(seg[k].competence) if k in seg else np.nan for k in CRITIC_TARGETS],",

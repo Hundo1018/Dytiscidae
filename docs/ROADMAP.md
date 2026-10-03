@@ -4,7 +4,10 @@
 arch45's critic never fitted: a `Tier-1 mission > 1e-4` gate dropped 128 of
 147 labels, and every kept label was 0. The critic now learns per-medium
 residuals (built, unrun). The spec ranks the rest of the outside proposal
-(SAIL, Deb, T-DominO, PGA, RUDDER) against arch45's measurements.
+(SAIL, Deb, T-DominO, PGA, RUDDER) against arch45's measurements. **Its §8 is
+the largest finding:** `water_to_land` credits a still machine for settling
+*into* the water (any wetness flip counts), `air_to_water` is crossed by
+gravity, and these are the learner's two largest rewards.
 
 Written 2026-09-03 after arch33, and revised the same day once every phase was
 built. Every item names the measurement that motivates it; nothing here is on

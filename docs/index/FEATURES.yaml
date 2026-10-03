@@ -326,6 +326,7 @@ Critic:
   tests:
     - tests.test_search::test_critic_learns_the_exploit_signature
     - tests.test_search::test_critic_learns_from_a_cheap_score_of_zero
+    - tests.test_search::test_tier2_probe_legs_label_without_scoring
 
 Scout:
   implementation:

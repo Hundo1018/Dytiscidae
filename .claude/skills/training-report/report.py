@@ -85,8 +85,12 @@ def build(run: Path) -> dict:
         "hours": round(G[-1]["elapsed"] / 3600, 1), "ppo_updates": len(PPO),
         "seed": cfg.get("seed"), "batch": cfg.get("batch"),
         "segment_seconds": cfg.get("segment_seconds"),
+        "tier1_5_seconds": cfg.get("tier1_5_seconds"),
+        "refit_every": cfg.get("descriptor_refit_every"),
+        "keep_if_overlap": cfg.get("descriptor_keep_if_overlap", 0.0),
+        "mission_weight": cfg.get("mission_weight"),
         "sec_per_gen": round(st.median(d)) if d else 0,
-        "islands": len(cfg.get("islands") or []) or 6,
+        "islands": len(cfg.get("islands") or []) or None,
         "has_ppo": bool(PPO)}}
 
     out["train_return"] = {"mission": binned(E, "mission_fraction", n_gens),
@@ -162,12 +166,32 @@ def build(run: Path) -> dict:
         "tier0_rejects": len(REJ), "evaluations": len(E),
         "energy_infeasible": sum(1 for e in E if (e.get("energy_margin") or 0) < 0)}
 
+    # How much of `fitness` is the mission quantile, and how much of that is
+    # paid to designs whose mission is zero.  `mission_standing` is
+    # mean(window <= mission), so where nearly every mission is 0 a 0 earns a
+    # standing near 1: arch45 paid 0.29 of a median 0.71 fitness that way.
+    SP = [e for e in E if e.get("score_parts")]
+    if SP:
+        mq = [e["score_parts"].get("mission_q", 0.0) for e in SP]
+        mw = [e["score_parts"].get("mission_weight", 0.0) for e in SP]
+        z = [q for q, e in zip(mq, SP) if not (e.get("mission_fraction") or 0)]
+        out["fitness_parts"] = {
+            "n": len(SP),
+            "fitness_median": round(st.median(e["fitness"] for e in SP), 3),
+            "mission_term_median": round(st.median(a * b for a, b in zip(mq, mw)), 3),
+            "zero_mission_share": round(len(z) / len(SP), 3),
+            "zero_mission_q_median": round(st.median(z), 3) if z else None}
+    else:
+        out["fitness_parts"] = None
+
     refits = [e for e in EV if e.get("kind") == "descriptor_refit"]
     out["archive"] = {
         "coverage": [{"g": r["generation"], "v": 100 * r["coverage"]} for r in G],
         "qd": [{"g": r["generation"], "v": r["qd_score"]} for r in G],
         "refits": [e["gen"] for e in refits],
         "refit_before": [e.get("before") for e in refits if e.get("before") is not None],
+        "refit_merged": [e.get("merged") for e in refits if e.get("merged") is not None],
+        "refit_skipped": sum(1 for e in refits if e.get("skipped")),
         "islands": dict(collections.Counter(p.get("island") for p in P))}
 
     byp = collections.defaultdict(lambda: [0, 0])
@@ -188,7 +212,7 @@ def build(run: Path) -> dict:
     out["best"] = {k: best.get(k) for k in
                    ("gen", "island", "body_plan", "n_parts", "dof", "mass", "span",
                     "wing_area", "wing_loading", "air", "water", "land",
-                    "mission_fraction", "energy_margin")}
+                    "mission_fraction", "energy_margin", "air_gates")}
 
     out["scoring"] = scoring_spec()
     out["events"] = event_marks(run, EV)
@@ -605,6 +629,80 @@ transitions {_h.escape(str(mis.get('transitions')))}, max depth {mis.get('max_de
 footage and must not be read as evidence for that medium.</p></section>"""
 
 
+def _md(text: str) -> str:
+    """The small Markdown the run notes use: headings, lists, tables, emphasis."""
+    import html as H
+    import re
+
+    def inline(s):
+        s = H.escape(s)
+        s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
+        s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
+        return re.sub(r"(?<![*\w])\*([^*]+)\*(?!\w)", r"<em>\1</em>", s)
+
+    out, para, items, table = [], [], [], []
+
+    def flush():
+        if para:
+            out.append(f"<p>{inline(' '.join(para))}</p>"); para.clear()
+        if items:
+            out.append("<ul>" + "".join(f"<li>{inline(i)}</li>" for i in items) + "</ul>")
+            items.clear()
+        if table:
+            rows = [r for r in table if not re.fullmatch(r"\|[\s:|-]+\|", r)]
+            cells = [[c.strip() for c in r.strip("|").split("|")] for r in rows]
+            head, body = cells[0], cells[1:]
+            out.append('<table class="cmp"><tr>' + "".join(f"<th>{inline(c)}</th>" for c in head)
+                       + "</tr>" + "".join("<tr>" + "".join(f"<td>{inline(c)}</td>" for c in r)
+                                           + "</tr>" for r in body) + "</table>")
+            table.clear()
+
+    for line in text.splitlines():
+        s = line.rstrip()
+        if not s.strip():
+            flush(); continue
+        if s.startswith("#"):
+            flush()
+            level = min(len(s) - len(s.lstrip("#")) + 1, 4)
+            out.append(f"<h{level}>{inline(s.lstrip('#').strip())}</h{level}>")
+        elif s.lstrip().startswith("|"):
+            if para or items:
+                flush()
+            table.append(s.strip())
+        elif re.match(r"\s*([-*]|\d+\.)\s", s):
+            if para or table:
+                flush()
+            items.append(re.sub(r"^\s*([-*]|\d+\.)\s+", "", s))
+        elif items and line.startswith("  "):
+            items[-1] += " " + s.strip()
+        else:
+            if items or table:
+                flush()
+            para.append(s.strip())
+    flush()
+    return "\n".join(out)
+
+
+def notes_section(run: Path) -> str:
+    """The run's written findings, from ``runs/<run>_notes.md``, or a warning.
+
+    Everything else on the page is generated from telemetry and interprets
+    nothing.  The interpretation lives in the notes file, and a report without
+    one says so at the top instead of letting the template's fixed sentences
+    stand in for findings -- which is how the report's text went stale.
+    """
+    for cand in (run.parent / f"{run.name}_notes.md", run / "notes.md"):
+        if cand.exists():
+            return (f'<section class="notes"><h2>0 · What this run measured</h2>'
+                    f'<p class="sub">From <code>{cand.as_posix()}</code>, written after the '
+                    f'run; every chart below is generated from telemetry.</p>'
+                    f'{_md(cand.read_text())}</section>')
+    return ('<div class="warnbox notes-missing"><strong>No written findings for this run.</strong> '
+            f'<code>{run.parent.as_posix()}/{run.name}_notes.md</code> does not exist, so nothing '
+            'on this page interprets the charts: every sentence below is either generated '
+            'from this run\'s numbers or a definition.</div>')
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("run")
@@ -636,6 +734,8 @@ def main() -> int:
                .replace("__TITLE__", title)
                .replace("__SUBTITLE__", sub)
                .replace("__FILM__", film_section(run)))
+    notes = notes_section(run)
+    html = html.replace("__NOTES__", notes)
     out = Path(a.out) if a.out else run / "report.html"
     out.write_text(html)
     print(f"{out}  ({out.stat().st_size // 1024} KB)")
@@ -643,6 +743,9 @@ def main() -> int:
           f"{m['hours']} h, {m['sec_per_gen']} s/gen")
     if not m["has_ppo"]:
         print("  no PPO events: the learner sections will be empty for this run")
+    if "notes-missing" in notes:
+        print(f"  no written findings ({run.parent / (run.name + '_notes.md')}): "
+              "the report says so at the top")
     if data["retention"] is None:
         print("  no tier1_5 retentions: section 4 will be empty for this run")
     return 0

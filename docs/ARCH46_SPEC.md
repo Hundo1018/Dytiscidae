@@ -38,6 +38,17 @@ Two more measurements the proposal did not have:
 
 ---
 
+### Measured after the spec, 2026-10-03 (a second outside reading of the report)
+
+| claim | measured | verdict |
+|---|---|---|
+| PPO reward concentrates in `air_to_water` 0.54 and `water_to_land` 0.51 | final `reward_by_tag` means 0.41 and 0.23; air 0.0, land 0.001 | true in level. But each tag is a separate episode type with **one terminal reward**, and the buffer divides each tag by its own std, so these are not shares of one gradient |
+| a transition can be triggered repeatedly for reward | one trajectory is one probe and is rewarded once, at its last step (`ppo.py`, `rew[-1]`) | false |
+| the mission should be a min, not a sum | `mission_fraction` is already `min(comp)^0.5 · mean(comp) · energy · transition` | already so, and **that** is why it is 0 for 98.8% of evaluations and carries no ranking |
+| energy dominates selection (the proposal's own test: corr ≈ −0.85) | `corr(fitness, energy_margin) = 0.032`, `corr(fitness, feasible) = 0.058`, against 0.456 for the best competence | false for selection. But see the next row |
+| (not claimed) what does a still machine score on a crossing? | held still against the base gait, 7 plans × 2 seeds: `air_to_water` 0.834 vs 0.693, `water_to_land` 0.865 vs 0.861; `economy` is 1.000 still in both | **the two largest rewards pay for doing nothing**. §8 |
+| (not claimed) what is "fitness ≈ 0.75" made of? | `mission_standing` is `mean(window ≤ mission)`, so a mission of 0 earns ~0.98 where nearly all are 0: 0.293 of a median 0.714 | a constant ~40% of fitness. It doesn't change ranking, but it hides how little the rest says. §4 |
+
 ## 1. Done: the critic learns per-medium residuals — **built 2026-10-03, unrun**
 
 This is the proposal's first item, corrected by §0.
@@ -78,7 +89,16 @@ reached near generation 370, and each medium sees about a third of the labels.
 
 ---
 
-## 2. Tier-1.5 and Tier-2 label what they can — **low cost, no loop cost**
+## 2. Tier-1.5 and Tier-2 label what they can — **built 2026-10-03, unrun**
+
+Built as specified. Tier-2's extra legs are kept in a separate
+`MissionResult.probe_segments` dict, not marked inside `segments`, so nothing
+that scores `segments` can see them. `tier2_label_all_media` is on by default
+(`--no-tier2-label-all-media` turns it off). Held by
+`test_tier2_probe_legs_label_without_scoring` and by the 2a checks in
+`test_a_long_leg_runs_on_promotion_candidates_only`; the three mutations
+`tier1_5-ignores-the-floor`, `tier2-probe-legs-enter-the-mission` and
+`critic-ignores-probe-legs` are all caught.
 
 The cheapest way to get more labels is to stop wasting the expensive runs that
 already happen.
@@ -110,7 +130,11 @@ marked `label_only`. That turns ~1 label per promotion into 3.
 
 ---
 
-## 3. Refit: switch on the guard that exists — **trivial; the proposal's dual archive is not needed**
+## 3. Refit: switch on the guard that exists — **built 2026-10-03 (default 0.95), unrun**
+
+`descriptor_keep_if_overlap` now defaults to 0.95 in `SearchConfig` and on the
+CLI. Jobs can set it too: it was missing from the job adapter's
+`_CONFIG_FIELDS`, so a job plan that named it would have been refused.
 
 `descriptor_keep_if_overlap` (`descriptors.py:187`) already skips a refit whose
 subspace overlaps the current one above a threshold. It ran at 0.0 (off) in
@@ -138,7 +162,13 @@ cost of axis motion. Some refits merge many cells even at high overlap.
 
 ---
 
-## 4. Measure before reshaping: what does fitness pay for? — **measurement, cheap**
+## 4. Measure before reshaping: what does fitness pay for? — **partly answered 2026-10-03**
+
+Answered so far: the mission term is ~0.29 of every design's fitness,
+near-constant, because ties count as "at or above" (§0, second table). The
+report now prints this decomposition under section 1. Still open: how much of
+the remaining ~0.42 is island standing and how much is curriculum standing, per
+island.
 
 The proposal puts T-DominO on the generalist island to stop a scalar from
 hiding a weak medium. arch45 shows something more basic. Fitness is
@@ -234,6 +264,50 @@ built and off. Use Y/O rather than a second potential.
 
 ---
 
+## 8. Crossings that pay for nothing — **the largest item on this list; not built, a decision**
+
+Measured 2026-10-03 (`experiments/still_transitions/`). There are two
+mechanisms:
+
+- **`water_to_land` is credited for going the wrong way.** `_place_for` puts
+  the machine *dry* on the ramp just above the waterline (beetle: depth −0.18
+  at x = 6). `run_transition` sets `was_wet` from that start, and counts any
+  change of wetness as the crossing. A still machine settles into the water,
+  stays where it is (x 6.00 → 5.99), and is credited for crossing. ROADMAP Y/O's
+  `back` does not help: still machines cross 100% at 0, 1, 2 and 4 m back.
+- **`air_to_water` is a real crossing made by gravity.** It starts 2.5 m up,
+  descending at 1.5 m/s. A still machine crosses 100% of the time, against 86%
+  for the base gait, and scores higher on shock, settle and economy.
+
+Fixes, cheapest first:
+
+1. **Directional crossing.** Count only a flip from the start medium's wetness
+   to the target's, and require the start to *be* in the start medium (wet for
+   `water_to_land`). A bug fix, but it changes what every transition score, and
+   so `mission_fraction`, means: not comparable across it.
+2. **A gate on motion, not a reweighting.** CLAUDE.md's rule: a crossing scores
+   only if the machine did something the still machine does not. The task
+   conditioning that fixed water (2026-09-21) is the precedent: make the
+   crossing a commanded phase, which a passive body cannot satisfy for both
+   commands.
+3. **`economy` is 1.000 for a still machine.** An energy-economy term on a
+   crossing pays for not actuating. Gate it on 1 or 2, or drop it from the
+   crossing's quality.
+
+- **Prediction (after 1 and 2):** a still machine's crossing reward is ≤ 0.05
+  in every kind (a mutation fixture asserts this). `reward_by_tag` for the two
+  passive kinds falls from 0.41 and 0.23. The share of evaluations with a
+  nonzero mission falls too: some of today's 1.2% is passive crossings.
+- **Falsified if:** after the fix, the still machine still scores above 0.05
+  on any crossing.
+- Every downstream conclusion that read a transition score (mission fraction,
+  island scores, curriculum stage "crossing", PPO's transition tags) is
+  suspect back to whenever the probes were last changed. Say "not comparable"
+  across it.
+
+This is a selection change, so it goes to the user rather than into the
+measurement bundle.
+
 ## The bundle for arch46
 
 Bundle §1 + §2 + §3. Each one changes what the run *measures*, not what it
@@ -248,3 +322,4 @@ only after §1's generation-500 read, and §7 only after §4.
 | §3 refit guard | per-island filled cells across skipped refits | sawtooth > 3 pts remains |
 | §4 fitness | decomposition at 300 / 600 / 899 | n/a, a measurement |
 | §5 Deb (arm) | infeasible share, last vs first 100 gens | still rising |
+| §8 crossings (decision) | still-machine crossing reward | > 0.05 in any kind |

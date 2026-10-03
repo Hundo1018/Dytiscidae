@@ -187,6 +187,10 @@ class MissionResult:
     feasible: bool = False
     structural_margin: float = 0.0
     segments: dict[str, SegmentResult] = field(default_factory=dict)
+    #: Tier-2 only: one leg in each medium the mission never reached, run for
+    #: the critic's labels.  Kept apart so nothing that scores ``segments`` --
+    #: the mission fraction, energy, ``fitness`` -- can see them.
+    probe_segments: dict[str, SegmentResult] = field(default_factory=dict)
     transition_ok: dict[str, bool] = field(default_factory=dict)
     #: The graded record of every crossing attempted.  ``transition_ok`` is kept
     #: as the boolean summary because the curator and the telemetry read it, but

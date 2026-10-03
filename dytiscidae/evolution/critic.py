@@ -115,14 +115,16 @@ _TARGET_IDX = np.array([CRITIC_FEATURES.index(k) for k in CRITIC_TARGETS])
 def expensive_outcome(result) -> np.ndarray:
     """The expensive tier's values for ``CRITIC_TARGETS``, from a MissionResult.
 
-    A medium with no segment was never run -- Tier-2 stops at the first failed
-    leg -- and is NaN, not 0: "could not measure" must not share a value with
+    A mission segment wins over a probe leg (``label_all_media``) for the same
+    medium.  A medium with neither was never run -- Tier-2 stops at the first
+    failed leg -- and is NaN, not 0: "could not measure" must not share a value with
     "measured zero".  A result flagged as an exploit retained nothing in any
     medium, whatever its numbers say.
     """
     if result is None or getattr(result, "exploit", ""):
         return np.zeros(len(CRITIC_TARGETS))
-    seg = getattr(result, "segments", {}) or {}
+    seg = {**(getattr(result, "probe_segments", None) or {}),
+           **(getattr(result, "segments", {}) or {})}
     return np.array(
         [float(seg[k].competence) if k in seg else np.nan for k in CRITIC_TARGETS],
         dtype=float)

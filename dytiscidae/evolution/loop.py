@@ -133,6 +133,10 @@ class SearchConfig:
     #: Tier-2 mission.  Zero disables it.  See ``envs.evaluate.evaluate_tier1_5``
     #: for why 60 and why only here.
     tier1_5_seconds: float = 60.0
+    #: Run one Tier-2 leg in every medium the mission never reached, for the
+    #: critic's labels only (``evaluate_tier2(label_all_media=...)``).  Up to
+    #: two extra compressed legs per promotion; ARCH46_SPEC §2b.
+    tier2_label_all_media: bool = True
 
     # Controller refinement.  Each step is one extra batched Tier-1 for the
     # whole generation, so a generation costs (1 + steps) evaluations.
@@ -220,9 +224,11 @@ class SearchConfig:
     descriptor_refit_every: int = 400
     #: ROADMAP item P: keep the learned axes when a refit would reproduce them
     #: (subspace overlap at or above this), so the archive is not re-binned and
-    #: loses nothing.  0 = off, the baseline; the overlap is recorded on every
-    #: refit event either way.
-    descriptor_keep_if_overlap: float = 0.0
+    #: loses nothing.  0 = off; the overlap is recorded on every refit event
+    #: either way.  0.95 from 2026-10-03 (ARCH46_SPEC §3): on arch45's 33
+    #: refits it skips 19 and avoids 1601 of 3066 cell merges; arch45 and every
+    #: earlier run used 0.
+    descriptor_keep_if_overlap: float = 0.95
     #: The gait-gain channel (``control.cpg.GAIN_RANGE``): one more output on
     #: every per-candidate policy and one more action on the shared one, a
     #: factor on the commanded amplitude, so stopping and throttling are in the
@@ -2190,7 +2196,8 @@ def _refined_controllers_for(state: SearchState, elites, phenos, spec, rng):
     return out
 
 
-def _verification_job(pheno, law, spec, seconds, competences, seed_1_5, seed_2):
+def _verification_job(pheno, law, spec, seconds, competences, seed_1_5, seed_2,
+                      label_all_media=False):
     """One promotion's Tier-1.5 leg and Tier-2 mission, where a worker can run it.
 
     Module-level and free of the search state so ``ActorPool.map`` can ship it
@@ -2216,7 +2223,8 @@ def _verification_job(pheno, law, spec, seconds, competences, seed_1_5, seed_2):
             leg = f"{type(exc).__name__}: {exc}"
     t2 = _time.perf_counter()
     try:
-        r2 = evaluate_tier2(pheno, spec=spec, controller=law, seed=seed_2)
+        r2 = evaluate_tier2(pheno, spec=spec, controller=law, seed=seed_2,
+                            label_all_media=label_all_media)
     except Exception as exc:
         r2 = f"{type(exc).__name__}: {exc}"
     return leg, r2, (round(t2 - t1, 3), round(_time.perf_counter() - t2, 3))
@@ -2301,7 +2309,7 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
         c = {k: float(elite.meta.get(k, 0.0) or 0.0) for k in ("air", "water", "land")}
         s15 = int(rng.integers(1 << 30)) if seconds > 0.0 else 0
         jobs.append((p2, _with_shared(state, ctrl2), spec, seconds, c, s15,
-                     int(rng.integers(1 << 30))))
+                     int(rng.integers(1 << 30)), bool(cfg.tier2_label_all_media)))
         comps.append(c)
     t1 = time.perf_counter()
     done = (state.pool.map(_verification_job, jobs) if state.pool is not None

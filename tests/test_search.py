@@ -1834,6 +1834,47 @@ def test_critic_learns_the_exploit_signature() -> None:
           f"x{blind.discount(hi):.3f}")
 
 
+def test_tier2_probe_legs_label_without_scoring() -> None:
+    """The label-only legs reach the critic and nothing else (ARCH46_SPEC §2b).
+
+    Tier-2 stops at the first failed leg, and arch45 failed it in 143 of 147
+    promotions, so most results measured one medium.  One extra leg per medium
+    the mission never reached gives the critic three labels instead of one --
+    and must not move the mission fraction, the energy, the segments or the
+    fitness, or the verification would be measuring a different mission.
+    """
+    print("\ntier-2: probe legs label every medium and score none")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import evaluate_tier2, fitness
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.critic import expensive_outcome
+
+    spec = MissionSpec(cycles=1, seconds_per_domain=24.0)
+    p = build(BODY_PLANS["beetle"]())
+    a = evaluate_tier2(p, spec=spec, seed=0)
+    b = evaluate_tier2(p, spec=spec, seed=0, label_all_media=True)
+    check("the fixture's mission stops early, so there is something to probe",
+          len(a.segments) < 3, f"mission reached {sorted(a.segments)}")
+    check("off by default: no probe legs",
+          not a.probe_segments, str(sorted(a.probe_segments)))
+    check("on: one probe leg in each medium the mission never reached",
+          sorted(b.probe_segments) == sorted({"air", "water", "land"} - set(a.segments)),
+          f"probed {sorted(b.probe_segments)}, mission {sorted(a.segments)}")
+    same = (a.mission_fraction == b.mission_fraction
+            and a.energy_required_wh == b.energy_required_wh
+            and sorted(a.segments) == sorted(b.segments)
+            and all(a.segments[k].competence == b.segments[k].competence
+                    for k in a.segments)
+            and fitness(p, a, spec) == fitness(p, b, spec))
+    check("and the mission, its energy, its segments and its fitness are unchanged",
+          same, f"mission {a.mission_fraction} vs {b.mission_fraction}, "
+                f"fitness {fitness(p, a, spec):.6f} vs {fitness(p, b, spec):.6f}")
+    out = expensive_outcome(b)
+    check("the critic's label covers every medium",
+          bool(np.all(np.isfinite(out))), str(np.round(out, 4).tolist()))
+
+
 def test_critic_learns_from_a_cheap_score_of_zero() -> None:
     """Every promotion is a label, and an unmeasured medium is not a zero.
 
@@ -3628,7 +3669,10 @@ def test_learned_axes_survive_resume() -> None:
             d.observe(rng.normal(size=16))
         check("the projection fits once fed", d.fit())
         d.refit_every = 1  # the next refit falls due inside the resumed run
-        refits_before = d.refits
+        # Attempts, not refits: from 2026-10-03 the overlap guard (default 0.95)
+        # skips a refit whose axes did not move, and a skipped refit is still
+        # the trigger firing on the restored object.
+        tried_before = d.refits + d.skipped
         latent = [(f"latent{i}", float(lo), float(hi), 8)
                   for i, (lo, hi) in enumerate(d.bounds())]
         n_latent = len(latent)
@@ -3652,9 +3696,11 @@ def test_learned_axes_survive_resume() -> None:
         check("the restored descriptors keep their memory",
               again.descriptors.seen >= d.min_samples,
               f"seen={again.descriptors.seen}")
+        tried = again.descriptors.refits + again.descriptors.skipped
         check("and the refit trigger reads the restored object, not a stale alias",
-              again.descriptors.refits > refits_before,
-              f"refits {refits_before} -> {again.descriptors.refits}")
+              tried > tried_before,
+              f"refits + skipped {tried_before} -> {tried} "
+              f"({again.descriptors.skipped} skipped by the overlap guard)")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -4060,10 +4106,20 @@ def test_a_long_leg_runs_on_promotion_candidates_only() -> None:
     check("and a missing competence counts as zero, not as absent",
           weakest_domain({"air": 0.5}) in (Domain.WATER, Domain.LAND))
 
+    # ARCH46_SPEC §2a: a long leg in a medium scored 0 cheaply measures 0/0.
+    # arch45 ran one in 124 of 147 promotions.
+    from dytiscidae.envs.evaluate import LEG_COMPETENCE_BAR as bar
+    check("with a floor, the weakest medium the design can do at all",
+          weakest_domain({"air": 0.0, "water": 0.3, "land": 0.6}, floor=bar)
+          is Domain.WATER)
+    check("and the weakest overall when it can do none",
+          weakest_domain({"air": 0.1, "water": 0.0, "land": 0.05}, floor=bar)
+          is Domain.WATER)
+
     seg = evaluate_tier1_5(build(BODY_PLANS["beetle"]()), seconds=2.0,
-                           competences={"air": 0.9, "water": 0.9, "land": 0.0})
-    check("it runs the weakest leg and scores it",
-          seg.domain is Domain.LAND and seg.duration == 2.0,
+                           competences={"air": 0.2, "water": 0.9, "land": 0.0})
+    check("it runs the weakest leg above the bar and scores it",
+          seg.domain is Domain.AIR and seg.duration == 2.0,
           f"{seg.domain.value} for {seg.duration:.0f} s, "
           f"competence {seg.competence:.3f}")
 
@@ -4753,6 +4809,7 @@ def main() -> int:
         test_judge_ladder_is_fixed_and_bar_only_tightens,
         test_auditor_can_invalidate_and_veto,
         test_critic_learns_the_exploit_signature,
+        test_tier2_probe_legs_label_without_scoring,
         test_critic_learns_from_a_cheap_score_of_zero,
         test_a_specialist_islands_curriculum_reads_only_its_own_medium,
         test_an_islands_best_is_judged_on_its_own_domains,

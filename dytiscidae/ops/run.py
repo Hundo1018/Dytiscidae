@@ -172,6 +172,7 @@ def cmd_search(args) -> int:
         distance_curriculum=bool(args.distance_curriculum),
         action_rate_penalty=args.action_rate_penalty,
         descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
+        tier2_label_all_media=not args.no_tier2_label_all_media,
         gait_gain=bool(args.gait_gain),
         segment_seconds=args.segment_seconds,
         controller_refine_steps=args.refine_steps,
@@ -943,10 +944,13 @@ def main(argv=None) -> int:
     p.add_argument("--n-modes", type=int, default=6,
                    help="mobility modes identified per body per domain, and "
                         "the width the shared policy commands through")
-    p.add_argument("--descriptor-keep-if-overlap", type=float, default=0.0,
+    p.add_argument("--descriptor-keep-if-overlap", type=float, default=0.95,
                    help="keep the learned axes when a refit would reproduce "
-                        "them (subspace overlap at or above this); 0 = off "
-                        "(ROADMAP item P)")
+                        "them (subspace overlap at or above this); 0 = off, "
+                        "which every run through arch45 used (ARCH46_SPEC §3)")
+    p.add_argument("--no-tier2-label-all-media", action="store_true",
+                   help="do not run the label-only Tier-2 legs in media the "
+                        "mission never reached (ARCH46_SPEC §2b)")
     p.add_argument("--gait-gain", action="store_true",
                    help="give both policies a gait-gain output, a factor on the "
                         "commanded amplitude, so stopping and throttling are "
