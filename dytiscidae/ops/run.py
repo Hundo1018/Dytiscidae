@@ -185,6 +185,9 @@ def cmd_search(args) -> int:
         shared_epochs=args.shared_epochs,
         shared_target_kl=args.shared_target_kl,
         shared_ent_coef=args.shared_ent_coef,
+        shared_learner=args.shared_learner,
+        grpo_group=args.grpo_group,
+        grpo_bodies=args.grpo_bodies,
         run_dir=args.run,
         tier2_every=args.tier2_every,
         n_reference_seeds=args.reference_seeds,
@@ -902,6 +905,19 @@ def main(argv=None) -> int:
                         "2026-10-03 there was no flag and direct runs were "
                         "always 0.01; exploration is not comparable across a "
                         "change of it")
+    p.add_argument("--shared-learner", default="ppo",
+                   choices=("ppo", "grpo", "ppo+grpo"),
+                   help="estimator for the shared policy (ROADMAP N). ppo is "
+                        "every run to date; ppo+grpo adds --grpo-bodies x "
+                        "--grpo-group learning-only rollouts per generation "
+                        "with group-relative advantages; grpo trains on those "
+                        "alone. Needs --shared-policy. Off by default: built "
+                        "2026-10-03, to be switched on only if the shared "
+                        "policy is measured to carry weight (item R)")
+    p.add_argument("--grpo-group", type=int, default=4,
+                   help="rollouts of one body per group (>= 2)")
+    p.add_argument("--grpo-bodies", type=int, default=4,
+                   help="bodies given a group each generation")
     p.add_argument("--policy-hidden", type=int, default=0,
                    help="hidden units in the policy; 0 is linear (60 weights), "
                         "16 is 308")

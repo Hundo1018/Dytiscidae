@@ -2210,7 +2210,7 @@ not taken from the headings below (two of which were stale).
 | L aspect ratio | `runs/analysis_L_aspect_ratio.md`: no cost — AR buys static lift (+0.153) that never becomes flight | **closed** |
 | P refit | `runs/analysis_P_refit.md`: each refit erases more than islands grow between refits; subspace overlap now recorded, `descriptor_keep_if_overlap` (default 0) keeps unchanged axes | **done**, flag off |
 | R `shared_ent_coef` | a short sweep, after arch42 (it needs the machine) | queued |
-| N GRPO | held on purpose: arch42 is the first run in which the shared policy is scored at all (item Z), and whether it helps decides whether a better estimator for it is worth building | after arch42's read |
+| N GRPO | held on purpose: arch42 is the first run in which the shared policy is scored at all (item Z), and whether it helps decides whether a better estimator for it is worth building | after arch42's read. **2026-10-03: built, off by default** (`--shared-learner ppo\|grpo\|ppo+grpo`, default `ppo`); see item N below |
 | W, T, V | superseded by X / closed / subsumed | closed |
 | TEST_AUDIT 7 | 15 mutations are caught only by `test_search`. The 5 for this commit's code are caught by named checks — two of them against their own test function after the full-suite run timed out under four-way contention. The 10 older ones wait for the machine, after arch42 | 5 of 15 |
 
@@ -2482,7 +2482,7 @@ that needs another's read says so.
 | 8 | **AL** promotions through the pool, the scored basis reused | medium | <= ~5% | exactness gain: Tier-2 gets the basis Tier-1 was earned with | close if 2 reads < 3% on an idle machine |
 | 9 | **AJ** work stealing | medium-high, and a reproducibility decision | unknown until 2 reads; close under ~10% idle | none | cost is certain, gain is not |
 | 10 | **Y/O** transition-distance curriculum (and the air launch stepped down from 30 m) | high: changes what every transition score means; needs crossing rates by distance first | none | **highest**: six runs at 0/2 transitions, nothing in selection asks for a crossing | the mission's actual wall; after 4 so the two arms do not share their reads |
-| 11 | **N** GRPO for the shared policy | high | negative (G rollouts) | learner, conditional on 5 | only if 5 shows the shared policy carries weight |
+| 11 | **N** GRPO for the shared policy | high | negative (G rollouts) | learner, conditional on 5 | only if 5 shows the shared policy carries weight. **Built 2026-10-03, off by default; switching it on is still conditional on 5** |
 
 AH is not listed: probed on the rig, nothing cleared 1, and the search already
 owns the genes (motor mass, spring, compliance, feathering) with AD to select on
@@ -2879,6 +2879,10 @@ nothing after it is comparable across it on transitions.
 As described under N (arch40 list). Only if R (item 5) shows the shared
 policy carries weight.
 
+**2026-10-03: built, off by default.** The mechanism is done and tested; the
+decision to run it is not. See item N (arch40 list) for what it is, what it
+costs, and the gates that hold it to "changes nothing when off".
+
 ---
 
 ## 2026-10-03 — the eight-item pass (the user: do not start arch47 yet)
@@ -2896,8 +2900,8 @@ real fix to rotor cost. State, updated as each lands:
 | island | **built 2026-10-03, unrun: `triphibian`, the eighth island.** Why: in arch46's 7,804 Tier-1 evaluations the weakest medium is 0 in 98.2%, c2 (the second-best) in 77.6%, and no evaluation clears 0.15 in all three; `generalist` scores `mission_fraction` (zero for 98.8%) and its curriculum stages 0-3 pay the best one or two media. Objective: `triphibian_score` = harmonic mean of `c_i + e` minus `e`, `e` = 0.006: any machine missing a medium scores < 0.012, any machine with all three >= 0.012 scores >= 0.012, the score is strictly increasing in every medium (so it still ranks c2 where c3 = 0), and it carries no energy, transition or take-off factor. The geometric mean was rejected: it puts air 0.9 + water 0.9 + land 0 (0.164) above 0.1 in all three. Ladder (`Curriculum(weakest=True)`): stage 0 reads c2 (bar 0.055 = p95 of c2; p90 is 0.020 and a still machine reaches 0.0199), stage 1 reads c3 (bar 0.012 = p95 of c3 among the 396 evaluations past stage 0), stages 2-3 read the crossings gated on c3, and each stage holds at 0.4 of its own bar. Still machine (`experiments/triphibian_still`, 7 plans x 2 seeds, real Tier-1 path): max island score 0.0081, max c2 0.0199, max c3 0.0000, 0 promotions. A one-medium machine (arch45's fitness-1.0 design, 0/0.337/0.003) scores 0.0047; two perfect media and no third 0.0118; 0.1 in all three 0.100. Routing: specialist pairs stay with their pair islands, and each pair island's champion is crossed with the specialist of its missing medium and sent to `triphibian` (`TRIPLE_HOME`, 3 crosses per migration). On resume an island the checkpoint lacks starts empty and is offered the archipelago's best elites by its own objective as immigrants (`Archipelago.colonists`). The generation report gains `weakest_best` and `three_media` from this island's archive. Tests: `test_the_triphibian_island_pays_the_weakest_medium`, `test_a_still_machine_climbs_nothing_on_the_triphibian_island`, `test_a_pair_cross_reaches_the_triphibian_island`, `test_the_triphibian_island_joins_a_resumed_run`; mutations `triphibian-island-pays-the-best-medium`, `triphibian-ladder-reads-the-best-medium`, `triphibian-curriculum-is-the-shared-ladder`. Not comparable: a run with eight islands visits each 1/8 of generations, not 1/7. |
 | R | needs a `--shared-ent-coef` flag (there was none: direct runs were always 0.01) and `log_std` in the `ppo` event |
 | Y/O | on arch46's elites (no run's elites were scored under the 10-03 crossings); `land_to_water` is in the curriculum's kinds but no evaluator runs it |
-| N | GRPO built off by default; switched on only if R says the shared policy carries weight |
-| 6 | ray entry: whole `test_physics.py` at `be3dbe0` (kernel linked), 0 `[fail]`, `all physics checks passed` with no skip, `test_entry_shock_is_hydrodynamic_not_a_speed_limit` included. Mutations: all 117 in `tools/mutate.py` re-run at `be3dbe0` (52 name a `test_search` function, not 18) |
+| N | **built, off by default, 2026-10-03**: `--shared-learner ppo\|grpo\|ppo+grpo` (default `ppo`), `--grpo-bodies 4`, `--grpo-group 4`; switched on only if R says the shared policy carries weight. Off is bit-identical to the old update (weights and report equal against `main`'s `ppo.py`); generation 0's archive is equal with it on and off (`test_grpo_rollouts_never_reach_the_archive`); mutations `grpo-*` caught 7/7 (re-run independently) |
+| 6 | ray entry: whole `test_physics.py` at `be3dbe0` (kernel linked), 0 `[fail]`, `all physics checks passed` with no skip, `test_entry_shock_is_hydrodynamic_not_a_speed_limit` included. Mutations: all 117 in `tools/mutate.py` re-run at `be3dbe0` (52 name a `test_search` function, not 18): **caught 116/117**; the survivor `audit-perturbs-another-seed` is a fixture hole -- the test sets the audited elite's `eval_seed` to 0, so re-running at seed 0 is the same experiment. **Fixed 2026-10-04**: the fixture audits at seed 5 (the gannet's mission base is nonzero at seeds 0 and 5, zero at 1, 2, 3, 7); the test passes and the mutation now reads `retained 2.8731`, caught 1/1, so **117/117** |
 
 ## 2026-09-23..26 — AB-AF executed, every open fluid item closed, and a rotor control
 
@@ -3869,10 +3873,41 @@ and the conditional effect of each before touching either.**
 
 ### N. GRPO for the shared policy
 
-Not implemented — `learning/` holds `ppo.py` and `distill.py` and no GRPO
-anywhere. Right algorithm, still not the binding constraint, and it waits on
-thrust being in the score in a form the search can climb. Partial form when it
-comes: G=4 learning-only rollouts for a few bodies per generation.
+**Built 2026-10-03, off by default** (`learning/grpo.py`;
+`SearchConfig.shared_learner = "ppo"`). Right algorithm, still not the binding
+constraint, and it waits on thrust being in the score in a form the search can
+climb; whether to switch it on is item R's question (does the shared policy
+carry weight at all).
+
+What was built, the partial form: each generation `grpo_bodies` (default 4)
+bodies drawn from those that passed Tier-0, `grpo_group` (default 4) learning-only
+rollouts each, with different exploration streams, on the generation's own
+evaluation seed (so the same scatter and task) and with the controllers the
+bodies were archived with (no identification repeated). One batched call
+through the actor pool. The results are dropped: nothing is scored, placed or
+counted. Advantage = `(R - mean_g)/(std_g + 0.05)` per (body, segment kind),
+broadcast over the trajectory's steps; replaces GAE for these rows. The rows
+share minibatches with the ordinary PPO rows in one `ppo_update` (a second
+update would see an observation normaliser the first had moved). No value loss
+on group rows, entropy bonus kept, no potential shaping (it cancels in a group).
+Unusable groups are dropped and counted in the `ppo` event. Modes:
+`ppo+grpo` adds the rows, `grpo` trains on them alone (the ordinary rollouts
+are still collected under both, because they are the generation's scores).
+
+Cost, measured 2026-10-03 on a loaded machine, 1 worker, `batch=8`,
+`segment_seconds=2.0`, 4 bodies x 4 = 16 rollouts, gens 0/1/2: GRPO stage 48.6 /
+55.2 / 57.8 s against main 135.0 / 100.5 / 108.6 s and re-score 34.2 / 28.6 /
+30.0 s, i.e. 0.29 / 0.43 / 0.42 of (main + re-score). The 16 GRPO machines are
+fixed while main and re-score grow with `batch`, so at `batch=16` the ratio
+should be about half of that (inference, not measured); the brief's estimate was
++15-25% per generation. Recorded per generation in the `stages` event (`grpo`:
+wall, bodies, rollouts, per-shard walls) and in the `ppo` event (`grpo_*`:
+groups, rows, mean within-group reward std per segment kind, zero-variance
+groups, dropped counts). In that tiny run the within-group std was 0.00 for air
+and every crossing and 0.02-0.07 for land and water: a group-relative advantage
+is zero where every attempt earns the same, so **the signal exists only where
+bodies already score**, which is the thing item R's reading should look at
+before switching it on.
 
 ### O. The air spawn — still the largest structural distortion, still no safe fix
 

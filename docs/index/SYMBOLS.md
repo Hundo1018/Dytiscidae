@@ -200,15 +200,15 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Progress` | class | 301 | — | Turns the loop's per-generation callback into job state. |
-| `SearchTrainer` | class | 86 | — | ``ports.Trainer`` over ``evolution.loop.run_search``. |
-| `_Progress.__init__` | method | 309 | `(self, context: TrainingContext, workspace: Path, *, publish_every: int, checkpoint_every: int) -> None` | — |
-| `_Progress.on_generation` | method | 330 | `(self, state, report: Mapping[str, Any]) -> None` | Progress only.  Called *before* the loop writes its checkpoint. |
-| `_Progress.publish` | method | 369 | `(self, step: int, kind: CheckpointKind, *, force: bool=False)` | Copy the run directory's portable checkpoint into the store. |
-| `_Progress.should_stop` | method | 347 | `(self, generation: int, report: Mapping[str, Any])` | Publish if the loop has just checkpointed, then poll the stop flag. |
-| `SearchTrainer.capabilities` | method | 91 | `(self) -> TrainerCapabilities` | — |
-| `SearchTrainer.export` | method | 136 | `(self, record: CheckpointRecord, payload: CheckpointPayload, *, destination: str, fmt: str) -> dict` | Write the portable checkpoint out as files. |
-| `SearchTrainer.train` | method | 110 | `(self, context: TrainingContext) -> TrainingOutcome` | — |
+| `_Progress` | class | 302 | — | Turns the loop's per-generation callback into job state. |
+| `SearchTrainer` | class | 87 | — | ``ports.Trainer`` over ``evolution.loop.run_search``. |
+| `_Progress.__init__` | method | 310 | `(self, context: TrainingContext, workspace: Path, *, publish_every: int, checkpoint_every: int) -> None` | — |
+| `_Progress.on_generation` | method | 331 | `(self, state, report: Mapping[str, Any]) -> None` | Progress only.  Called *before* the loop writes its checkpoint. |
+| `_Progress.publish` | method | 370 | `(self, step: int, kind: CheckpointKind, *, force: bool=False)` | Copy the run directory's portable checkpoint into the store. |
+| `_Progress.should_stop` | method | 348 | `(self, generation: int, report: Mapping[str, Any])` | Publish if the loop has just checkpointed, then poll the stop flag. |
+| `SearchTrainer.capabilities` | method | 92 | `(self) -> TrainerCapabilities` | — |
+| `SearchTrainer.export` | method | 137 | `(self, record: CheckpointRecord, payload: CheckpointPayload, *, destination: str, fmt: str) -> dict` | Write the portable checkpoint out as files. |
+| `SearchTrainer.train` | method | 111 | `(self, context: TrainingContext) -> TrainingOutcome` | — |
 
 ## `adapters.trainers.synthetic` — `dytiscidae/adapters/trainers/synthetic.py`
 
@@ -695,9 +695,9 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `shard_cost` | function | 163 | `(pheno) -> float` | A machine's predicted evaluation wall, for ``plan_shards(balance=True)``. |
 | `split` | function | 136 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
 | `ActorPool.__init__` | method | 246 | `(self, workers: int=1, *, min_shard: int=2, per_worker: float=2.0, balance: bool=False) -> None` | — |
-| `ActorPool.close` | method | 452 | `(self) -> None` | — |
+| `ActorPool.close` | method | 454 | `(self) -> None` | — |
 | `ActorPool.evaluate_tier1` | method | 276 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
-| `ActorPool.map` | method | 383 | `(self, fn, jobs) -> list` | ``[fn(*job) for job in jobs]``, one job per worker at a time. |
+| `ActorPool.map` | method | 385 | `(self, fn, jobs) -> list` | ``[fn(*job) for job in jobs]``, one job per worker at a time. |
 
 ## `envs.batchroll` — `dytiscidae/envs/batchroll.py`
 
@@ -706,11 +706,11 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `BatchedFluid` | class | 220 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 890 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `evaluate_tier1_batch` | function | 890 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
 | `identify_batch` | function | 629 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
 | `observation_finite` | function | 563 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
 | `rollout_batch` | function | 705 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 1109 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 1118 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
 | `step_batch` | function | 584 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 95 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
 | `BatchedFluid.__init__` | method | 231 | `(self, envs)` | — |
@@ -1098,18 +1098,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 681 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `evaluate_candidate` | function | 383 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 436 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `load_state` | function | 1830 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 1114 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 1705 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 712 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `evaluate_candidate` | function | 411 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 464 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `load_state` | function | 1971 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 1235 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 1846 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 63 | — | Everything adjustable about a run. |
-| `SearchState` | class | 292 | — | — |
-| `seed_archipelago` | function | 2094 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `SearchState.archive` | property | 352 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 356 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 360 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 320 | — | — |
+| `seed_archipelago` | function | 2235 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `SearchState.archive` | property | 380 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 384 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 388 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1153,25 +1153,39 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `DistillResult.lines` | method | 285 | `(self) -> list` | — |
 | `Teacher.policy` | method | 101 | `(self, n_modes: int) -> Policy` | — |
 
+## `learning.grpo` — `dytiscidae/learning/grpo.py`
+
+> GRPO for the shared policy (ROADMAP item N): group-relative advantages.
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `group_advantages` | function | 79 | `(rewards, keys, eps: float=STD_EPS) -> np.ndarray` | ``(R - mean_g) / (std_g + eps)`` for each element, ``g`` being its key. |
+| `GroupRolloutBuffer` | class | 98 | `(RolloutBuffer)` | Trajectories of repeated rollouts, flattened with group-relative advantages. |
+| `GroupRolloutBuffer.__init__` | method | 107 | `(self)` | — |
+| `GroupRolloutBuffer.advantages` | method | 138 | `(self)` | ``(kept trajectories, advantage per trajectory)``. |
+| `GroupRolloutBuffer.build` | method | 144 | `(self)` | — |
+| `GroupRolloutBuffer.n_transitions` | property | 135 | `(self) -> int` | — |
+| `GroupRolloutBuffer.stats` | method | 161 | `(self) -> dict` | What a later reading needs to tell "no signal" from "no data". |
+
 ## `learning.ppo` — `dytiscidae/learning/ppo.py`
 
 > PPO over a policy shared by every morphology in the search.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `potential_of` | function | 336 | `(obs, domain: str) -> float` | A state's potential, for potential-based reward shaping. |
-| `ppo_update` | function | 480 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None) -> dict` | One PPO update over everything the generation collected. |
-| `RolloutBuffer` | class | 376 | — | Trajectories from a whole generation, flattened into a PPO batch. |
-| `SegmentCollector` | class | 449 | — | Records one segment's decisions, per machine, into trajectories. |
+| `potential_of` | function | 340 | `(obs, domain: str) -> float` | A state's potential, for potential-based reward shaping. |
+| `ppo_update` | function | 492 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None, group_buffer=None) -> dict` | One PPO update over everything the generation collected. |
+| `RolloutBuffer` | class | 380 | — | Trajectories from a whole generation, flattened into a PPO batch. |
+| `SegmentCollector` | class | 453 | — | Records one segment's decisions, per machine, into trajectories. |
 | `SharedPolicy` | class | 113 | `(nn.Module if AVAILABLE else object)` | A Gaussian policy and a value head, shared by every morphology. |
 | `Trajectory` | class | 312 | — | One segment's worth of decisions from one machine. |
-| `RolloutBuffer.__init__` | method | 390 | `(self, gamma: float=0.99, lam: float=0.95, shaping: float=0.2)` | — |
-| `RolloutBuffer.add` | method | 396 | `(self, traj: Trajectory) -> None` | — |
-| `RolloutBuffer.build` | method | 411 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |
-| `RolloutBuffer.n_transitions` | property | 401 | `(self) -> int` | — |
-| `SegmentCollector.__init__` | method | 457 | `(self, k: int)` | — |
-| `SegmentCollector.finish` | method | 469 | `(self, buffer: RolloutBuffer, rewards, tag: str='') -> None` | Attach each machine's segment competence and bank the trajectory. |
-| `SegmentCollector.record` | method | 461 | `(self, m: int, obs, act, logp, val, phi: float=0.0) -> None` | — |
+| `RolloutBuffer.__init__` | method | 394 | `(self, gamma: float=0.99, lam: float=0.95, shaping: float=0.2)` | — |
+| `RolloutBuffer.add` | method | 400 | `(self, traj: Trajectory) -> None` | — |
+| `RolloutBuffer.build` | method | 415 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |
+| `RolloutBuffer.n_transitions` | property | 405 | `(self) -> int` | — |
+| `SegmentCollector.__init__` | method | 461 | `(self, k: int)` | — |
+| `SegmentCollector.finish` | method | 473 | `(self, buffer: RolloutBuffer, rewards, tag: str='', groups=None) -> None` | Attach each machine's segment competence and bank the trajectory. |
+| `SegmentCollector.record` | method | 465 | `(self, m: int, obs, act, logp, val, phi: float=0.0) -> None` | — |
 | `SharedPolicy.__init__` | method | 121 | `(self, n_obs: int, n_modes: int, hidden: int=64)` | — |
 | `SharedPolicy.act` | method | 283 | `(self, obs_np, *, deterministic: bool=False, rng=None)` | One decision, numpy in and numpy out, for use inside a rollout. |
 | `SharedPolicy.act_many` | method | 249 | `(self, obs_np, *, deterministic: bool=False, rngs=None)` | One decision per row, in a single forward pass. |
@@ -1209,23 +1223,23 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 491 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `cmd_cohort` | function | 432 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_dashboard` | function | 761 | `(args) -> int` | — |
-| `cmd_distill` | function | 799 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 320 | `(args) -> int` | — |
-| `cmd_postrun` | function | 287 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 494 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `cmd_cohort` | function | 435 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_dashboard` | function | 764 | `(args) -> int` | — |
+| `cmd_distill` | function | 802 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 323 | `(args) -> int` | — |
+| `cmd_postrun` | function | 290 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 123 | `(args) -> int` | — |
-| `cmd_render` | function | 768 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_render` | function | 771 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
 | `cmd_search` | function | 158 | `(args) -> int` | — |
-| `cmd_showcase` | function | 619 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 327 | `(args) -> int` | — |
-| `cmd_train` | function | 361 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_showcase` | function | 622 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 330 | `(args) -> int` | — |
+| `cmd_train` | function | 364 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 116 | `(args) -> int` | — |
-| `controller_for_elite` | function | 501 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 261 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 504 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 264 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 31 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 816 | `(argv=None) -> int` | — |
+| `main` | function | 819 | `(argv=None) -> int` | — |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`
 

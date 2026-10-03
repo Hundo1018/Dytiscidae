@@ -331,6 +331,8 @@ class ActorPool:
         for j, idx in enumerate(shards):
             # Per-phenotype lists travel with their shard.
             kw = dict(kwargs, streams=[kwargs["streams"][i] for i in idx])
+            if kwargs.get("groups") is not None:
+                kw["groups"] = [kwargs["groups"][i] for i in idx]
             if isinstance(kwargs.get("identify_axes"), (list, tuple)):
                 kw["identify_axes"] = [kwargs["identify_axes"][i] for i in idx]
             futures.append(self._pool.submit(

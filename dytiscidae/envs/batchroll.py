@@ -892,7 +892,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                          identify_axes=False, seed: int = 0,
                          sea_state=None, perturb: dict | None = None,
                          shared=None, buffer=None, n_modes: int = 6,
-                         streams=None):
+                         streams=None, groups=None):
     """`evaluate_tier1` for a whole generation, sharing one GPU pipeline.
 
     ``identify_axes`` is one bool for the whole batch or one per phenotype.
@@ -909,6 +909,11 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     noise came from torch's global stream, seeded per *shard*, so moving a
     machine to another shard changed what it explored and therefore what the
     learner saw.
+
+    ``groups``, one int per phenotype (default none), is stamped on every
+    trajectory the machine banks, so ``learning.grpo`` can tell which rollouts
+    are repeats of one body (ROADMAP N).  It changes nothing about the
+    evaluation itself.
 
     Both the three domain segments and the three transitions are batched. What
     is not, and cannot be, is the mobility identification: it drives each CPG
@@ -1011,6 +1016,9 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     streams = list(range(k)) if streams is None else [int(x) for x in streams]
     if len(streams) != k:
         raise ValueError(f"streams has {len(streams)} entries for {k} phenotypes")
+    if groups is not None and len(groups) != k:
+        raise ValueError(f"groups has {len(groups)} entries for {k} phenotypes")
+    live_groups = None if groups is None else [int(groups[i]) for i in live]
 
     def _noise(tag: int):
         # Only a rollout that feeds the learner samples; the rest act at the
@@ -1056,7 +1064,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
             # The reward is the segment's own competence -- the number the
             # search selects on -- delivered once, at the end. See ppo.py for
             # why nothing denser is invented here.
-            collector.finish(buffer, [s.competence for s in segs], tag=dom.value)
+            collector.finish(buffer, [s.competence for s in segs], tag=dom.value,
+                             groups=live_groups)
 
     # `land_to_air` was excluded because "nothing gets off the ground"
     # (transitions.py records exactly that for all six seed plans).  Two
@@ -1088,7 +1097,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                     t.components.get(c, 0.0)
                     for c in ("shock", "control", "settle",
                               "economy", "exit_state")])))
-                for t in trs], tag=f"transition:{kind}")
+                for t in trs], tag=f"transition:{kind}", groups=live_groups)
 
     for i in live:
         r, p = results[i], phenos[i]

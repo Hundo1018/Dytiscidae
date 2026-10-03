@@ -68,6 +68,20 @@ AdvantageAndReturn:
     - tests.test_ppo::test_the_discount_behaves_at_both_ends
   note: GAE, with a zero terminal bootstrap because a segment ends when it ends
 
+GroupRelativeAdvantage:
+  implementation:
+    - learning.grpo.group_advantages
+    - learning.grpo.GroupRolloutBuffer
+    - learning.ppo.ppo_update
+    - evolution.loop.SearchConfig
+  tests:
+    - tests.test_ppo::test_group_advantages_are_relative_to_their_own_group
+    - tests.test_ppo::test_a_grpo_update_moves_toward_the_better_action
+    - tests.test_ppo::test_group_rows_are_not_renormalised_with_the_batch
+    - tests.test_ppo::test_the_ppo_path_is_bit_identical_without_a_group_buffer
+    - tests.test_search::test_grpo_rollouts_never_reach_the_archive
+  note: GRPO for the shared policy (ROADMAP N), off by default (shared_learner="ppo"); learning-only rollouts of a few bodies, advantage relative to the body's own group
+
 RewardShaping:
   implementation:
     - learning.ppo.potential_of

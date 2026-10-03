@@ -1013,6 +1013,287 @@ def test_the_shaping_reads_the_channels_it_thinks_it_does() -> None:
           f"{_ppo.potential_of(on_ground, 'land'):+.4f}")
 
 
+# ==========================================================================
+# algorithm -- GRPO (ROADMAP N), built 2026-10-03 and off by default
+# ==========================================================================
+
+def _grouped(policy, rng, group: int, tag: str, rewards, steps: int = 8):
+    """One group of trajectories with chosen terminal rewards."""
+    out = []
+    for r in rewards:
+        t = _rollout(policy, rng, steps, lambda a: 0.0, tag=tag)
+        t.terminal_reward = float(r)
+        t.group = group
+        out.append(t)
+    return out
+
+
+def test_group_advantages_are_relative_to_their_own_group() -> None:
+    """Zero mean inside each group, no statistic crossing a group, and no noise stretched.
+
+    The reference is the definition written out per group, ``(R - mean) /
+    (std + eps)``, computed here from the raw rewards rather than by calling
+    the function under test.
+    """
+    print("\ngrpo: group-relative advantages")
+    import torch
+
+    from dytiscidae.learning.grpo import STD_EPS, GroupRolloutBuffer, group_advantages
+    torch.manual_seed(5)
+    rng = np.random.default_rng(5)
+    p = SharedPolicy(N_OBS, N_MODES, hidden=16)
+
+    # Two bodies whose rewards live on very different scales -- the point of a
+    # group baseline is that this does not matter -- and one group of
+    # identical returns.
+    rewards = {(0, "air"): [0.10, 0.30, 0.20, 0.40],
+               (1, "air"): [5.0, 9.0, 7.0, 7.0],
+               (2, "air"): [0.5, 0.5, 0.5, 0.5]}
+    buf = GroupRolloutBuffer()
+    for (g, tag), rs in rewards.items():
+        for t in _grouped(p, rng, g, tag, rs):
+            buf.add(t)
+    kept, adv = buf.advantages()
+    by_group: dict = {}
+    for t, a in zip(kept, adv):
+        by_group.setdefault(t.group, []).append(a)
+    means = {g: float(np.mean(v)) for g, v in by_group.items()}
+    check("advantages have zero mean within each group",
+          all(abs(m) < 1e-12 for m in means.values()),
+          "means " + ", ".join(f"{m:+.1e}" for m in means.values()))
+
+    ref = []
+    for (_g, _tag), rs in rewards.items():
+        r = np.asarray(rs, float)
+        ref.extend((r - r.mean()) / (r.std() + STD_EPS))
+    check("and equal the definition, group by group",
+          np.allclose(adv, ref, atol=1e-12),
+          f"max |diff| {np.max(np.abs(np.asarray(adv) - np.asarray(ref))):.1e}")
+    check("a group with identical returns gets exactly zero advantage",
+          all(a == 0.0 for a in by_group[2]), str(by_group[2]))
+
+    # A body's reward scale must not leak into its neighbour: scale group 1 a
+    # hundredfold and group 0's advantages must not move.
+    scaled = group_advantages([0.1, 0.3, 0.2, 0.4, 500., 900., 700., 700.],
+                              [0, 0, 0, 0, 1, 1, 1, 1])
+    plain = group_advantages([0.1, 0.3, 0.2, 0.4, 5., 9., 7., 7.],
+                             [0, 0, 0, 0, 1, 1, 1, 1])
+    check("no statistic crosses a group boundary",
+          np.array_equal(scaled[:4], plain[:4]),
+          f"group 0 moved by {np.max(np.abs(scaled[:4] - plain[:4])):.1e}")
+
+    # The floor: float noise in a group that effectively did nothing must not
+    # be stretched to +-1.
+    tiny = group_advantages([0.5, 0.5 + 1e-9, 0.5 - 1e-9, 0.5], [0, 0, 0, 0])
+    check("float noise in a group is not stretched to unit advantage",
+          float(np.max(np.abs(tiny))) < 1e-6,
+          f"max |A| {np.max(np.abs(tiny)):.1e}")
+
+    # Broadcast: every step of a trajectory carries its trajectory's number.
+    _o, _a, _l, row_adv, _r, _v = buf.build()
+    off = 0
+    ok = True
+    for t, a in zip(kept, adv):
+        ok = ok and bool(np.all(row_adv[off:off + len(t)] == a))
+        off += len(t)
+    check("the trajectory's advantage is broadcast over its steps",
+          ok and off == len(row_adv), f"{off} rows")
+
+    # The same group id under two segment kinds is two groups.
+    b2 = GroupRolloutBuffer()
+    for t in (_grouped(p, rng, 0, "air", [0.1, 0.3])
+              + _grouped(p, rng, 0, "water", [10.0, 30.0])):
+        b2.add(t)
+    st = b2.stats()
+    check("a group id is split by segment kind",
+          st["grpo_groups"] == 2 and st["grpo_bodies"] == 1,
+          f"{st['grpo_groups']} groups, {st['grpo_bodies']} body")
+
+    # Unmeasured is not zero: unusable groups are dropped and counted.
+    b3 = GroupRolloutBuffer()
+    for t in _grouped(p, rng, 0, "air", [0.1, 0.3]):
+        b3.add(t)                                           # usable
+    for t in _grouped(p, rng, 1, "air", [0.2, float("nan")]):
+        b3.add(t)                                           # a NaN member
+    for t in _grouped(p, rng, 2, "air", [0.4]):
+        b3.add(t)                                           # a group of one
+    for t in _grouped(p, rng, -1, "air", [0.1, 0.9]):
+        b3.add(t)                                           # never grouped
+    st = b3.stats()
+    check("unusable groups are dropped and counted, not zero-filled",
+          st["grpo_dropped"] == {"ungrouped": 2, "nonfinite": 2, "singleton": 1}
+          and st["grpo_groups"] == 1 and st["grpo_trajectories"] == 2,
+          str(st["grpo_dropped"]))
+
+    # The collector stamps the group ids it is given, and none when not given.
+    from dytiscidae.learning.ppo import SegmentCollector
+    col = SegmentCollector(2)
+    for m in range(2):
+        col.record(m, np.zeros(N_OBS), np.zeros(N_MODES), 0.0, 0.0)
+    sink = RolloutBuffer()
+    col.finish(sink, [0.1, 0.2], tag="air", groups=[3, 4])
+    for m in range(2):
+        col.record(m, np.zeros(N_OBS), np.zeros(N_MODES), 0.0, 0.0)
+    col.finish(sink, [0.1, 0.2], tag="air")
+    got = [t.group for t in sink.trajectories]
+    check("the collector stamps group ids, and leaves -1 when given none",
+          got == [3, 4, -1, -1], str(got))
+
+
+def test_a_grpo_update_moves_toward_the_better_action() -> None:
+    """Trained on group rollouts alone, the policy climbs a reward whose body effect is huge.
+
+    Each body adds its own large constant to the reward, which is what a
+    group baseline exists to cancel; what is left is ``mean(action 0)``, so
+    the policy should move that way.  The same data under plain GAE with a
+    cold critic is not asked to do it.
+    """
+    print("\ngrpo: does it learn?")
+    import torch
+
+    from dytiscidae.learning.grpo import GroupRolloutBuffer
+    torch.manual_seed(1)
+    rng = np.random.default_rng(0)
+    learner = SharedPolicy(N_OBS, N_MODES, hidden=32)
+    opt = torch.optim.Adam(learner.parameters(), lr=3e-3, eps=1e-5)
+
+    def mode0():
+        probe = np.random.default_rng(99)
+        return float(np.mean([learner.act(probe.normal(size=N_OBS),
+                                          deterministic=True)[0][0]
+                              for _ in range(100)]))
+
+    before = mode0()
+    last = {}
+    for _ in range(12):
+        gb = GroupRolloutBuffer()
+        for body in range(8):
+            offset = 20.0 * rng.normal()                    # the body's own luck
+            for _k in range(4):
+                t = _rollout(learner, rng, 32, lambda a: float(a[:, 0].mean()))
+                t.terminal_reward += offset
+                t.group, t.tag = body, "air"
+                gb.add(t)
+        last = ppo_update(learner, RolloutBuffer(), group_buffer=gb, epochs=4,
+                          minibatch=256, optimiser=opt,
+                          rng=np.random.default_rng(12))
+    after = mode0()
+    check("a GRPO update moves the policy toward the better-returning action",
+          after > before + 0.05, f"mode 0 mean {before:+.4f} -> {after:+.4f}")
+    check("it reports what it trained on",
+          last.get("grpo_groups") == 8 and last.get("grpo_transitions") == 8 * 4 * 32
+          and last.get("ordinary_transitions") == 0 and last.get("skipped") is False,
+          f"{last.get('grpo_groups')} groups, {last.get('grpo_transitions')} rows")
+
+    # Mixed with ordinary PPO rows it runs too, and the value loss is the
+    # ordinary rows' alone.
+    mixed = RolloutBuffer()
+    for _ in range(4):
+        mixed.add(_rollout(learner, rng, 32, lambda a: float(a[:, 0].mean())))
+    gb = GroupRolloutBuffer()
+    for body in range(2):
+        for _k in range(4):
+            t = _rollout(learner, rng, 32, lambda a: float(a[:, 0].mean()))
+            t.group, t.tag = body, "air"
+            gb.add(t)
+    info = ppo_update(learner, mixed, group_buffer=gb, epochs=2, minibatch=64,
+                      optimiser=opt, rng=np.random.default_rng(3))
+    check("mixed with ordinary rows it runs, and counts both",
+          info["transitions"] == 4 * 32 + 8 * 32
+          and info["ordinary_transitions"] == 4 * 32
+          and np.isfinite(info["v_loss"]) and np.isfinite(info["pi_loss"]),
+          f"{info['transitions']} rows, v_loss {info['v_loss']:.4f}")
+
+    # Every group unusable: the update is the ordinary one, and says why.
+    solo = GroupRolloutBuffer()
+    solo.add(_grouped(learner, rng, 0, "air", [0.2])[0])
+    info = ppo_update(learner, mixed, group_buffer=solo, epochs=1, minibatch=64,
+                      optimiser=opt, rng=np.random.default_rng(3))
+    check("with no usable group the ordinary update runs and the drop is reported",
+          info["skipped"] is False and "ordinary_transitions" not in info
+          and info["grpo_dropped"]["singleton"] == 1,
+          str(info.get("grpo_dropped")))
+
+
+def test_group_rows_are_not_renormalised_with_the_batch() -> None:
+    """Ordinary advantages are standardised among themselves; group advantages are left alone.
+
+    With the rate at zero and one epoch the reported ``pi_loss`` is exactly
+    ``-mean(advantage)`` over the rows (every ratio is 1 on the first step).
+    Ordinary rows standardised among themselves contribute mean zero; a group
+    of two trajectories of 10 and 30 steps with rewards 0 and 1 has
+    ``A = -/+ 0.5/(0.5 + eps)``, whose step-weighted mean over its 40 rows is
+    ``+0.5/(0.5 + eps) / 2``.  A batch-wide standardisation would have taken
+    the whole thing to mean zero.
+    """
+    print("\ngrpo: advantages stay where they were computed")
+    import torch
+
+    from dytiscidae.learning.grpo import STD_EPS, GroupRolloutBuffer
+    torch.manual_seed(2)
+    rng = np.random.default_rng(2)
+    p = SharedPolicy(N_OBS, N_MODES, hidden=16)
+    ordinary = RolloutBuffer(shaping=0.0)
+    for r in (0.0, 1.0, 3.0):
+        ordinary.add(_rollout(p, rng, 20, lambda a, r=r: r, tag="air"))
+    gb = GroupRolloutBuffer()
+    short = _rollout(p, rng, 10, lambda a: 0.0, tag="air")
+    long_ = _rollout(p, rng, 30, lambda a: 1.0, tag="air")
+    short.group = long_.group = 0
+    gb.add(short)
+    gb.add(long_)
+    n = 60 + 40
+    info = ppo_update(p, ordinary, group_buffer=gb, lr=0.0, epochs=1,
+                      minibatch=n, ent_coef=0.0, rng=np.random.default_rng(0))
+    a = 0.5 / (0.5 + STD_EPS)
+    expected = -(30 * a - 10 * a) / n
+    check("group rows keep their own advantage inside a mixed batch",
+          abs(info["pi_loss"] - expected) < 1e-4,
+          f"pi_loss {info['pi_loss']:+.6f}, expected {expected:+.6f}")
+
+
+def test_the_ppo_path_is_bit_identical_without_a_group_buffer() -> None:
+    """``shared_learner="ppo"`` passes no group buffer; the update must be what it was."""
+    print("\ngrpo: off means unchanged")
+    import torch
+
+    from dytiscidae.learning.grpo import GroupRolloutBuffer
+
+    def run(**extra):
+        torch.manual_seed(13)
+        rng = np.random.default_rng(14)
+        p = SharedPolicy(N_OBS, N_MODES, hidden=32)
+        opt = torch.optim.Adam(p.parameters(), lr=3e-3, eps=1e-5)
+        b = RolloutBuffer()
+        for _ in range(8):
+            b.add(_rollout(p, rng, 64, lambda a: float(a[:, 0].mean()), tag="air"))
+        info = ppo_update(p, b, epochs=4, minibatch=64, optimiser=opt,
+                          rng=np.random.default_rng(15), **extra)
+        w = np.concatenate([v.detach().numpy().ravel()
+                            for v in p.state_dict().values()])
+        return w, info
+
+    w0, i0 = run()
+    w1, i1 = run(group_buffer=None)
+    w2, i2 = run(group_buffer=GroupRolloutBuffer())
+    check("an update with no group buffer is deterministic and reports no GRPO key",
+          np.array_equal(w0, w1) and not any(k.startswith("grpo") for k in i0)
+          and i0 == i1, f"||dW|| = {np.linalg.norm(w0 - w1):.1e}")
+    check("an empty group buffer changes no weight, bit for bit",
+          np.array_equal(w0, w2), f"||dW|| = {np.linalg.norm(w0 - w2):.1e}")
+    check("and adds only GRPO diagnostics to the report",
+          {k: v for k, v in i2.items() if not k.startswith("grpo")} == i0,
+          ", ".join(sorted(set(i2) - set(i0))))
+
+    # The search config's default is the old learner, and its names are exact.
+    from dytiscidae.evolution.loop import SearchConfig
+    from dytiscidae.learning.grpo import LEARNERS
+    check("the search defaults to ppo, and grpo is a named choice",
+          SearchConfig().shared_learner == "ppo"
+          and set(LEARNERS) == {"ppo", "grpo", "ppo+grpo"},
+          f"{SearchConfig().shared_learner!r}, {LEARNERS}")
+
+
 def test_the_learner_is_wired_to_the_evaluator() -> None:
     """Transitions contribute trajectories, and a scoring rollout uses the mean.
 
@@ -1117,6 +1398,10 @@ def main() -> int:
     test_both_learner_streams_survive_a_checkpoint()
 
     test_the_shaping_reads_the_channels_it_thinks_it_does()
+    test_group_advantages_are_relative_to_their_own_group()
+    test_a_grpo_update_moves_toward_the_better_action()
+    test_group_rows_are_not_renormalised_with_the_batch()
+    test_the_ppo_path_is_bit_identical_without_a_group_buffer()
     test_the_learner_is_wired_to_the_evaluator()
 
     print("\n" + "=" * 68)

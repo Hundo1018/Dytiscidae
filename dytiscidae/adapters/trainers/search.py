@@ -67,6 +67,7 @@ _CONFIG_FIELDS = (
     "judge_quantile", "judge_update_every", "policy_hidden", "n_modes",
     "use_shared_policy", "shared_hidden", "shared_lr", "shared_epochs",
     "shared_target_kl", "shared_ent_coef", "shared_lr_anneal",
+    "shared_learner", "grpo_group", "grpo_bodies",
     "shared_minibatch", "audits_per_review", "checkpoint_every", "snapshot_every",
     "event_sample", "n_reference_seeds", "n_random_seeds", "islands",
     "descriptor_keep_if_overlap", "tier2_label_all_media",
