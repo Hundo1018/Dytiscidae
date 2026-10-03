@@ -120,7 +120,7 @@ python -m dytiscidae.ops.run experiment new --name arch39 --trainer search \
     --steps 900 --seed 20260901 --hypothesis "..." \
     --set batch=16 --set segment_seconds=8 --set controller_refine_steps=2 \
     --set use_shared_policy=true
-python -m dytiscidae.ops.run job start --experiment arch39 --workers 4 --min-shard 4
+python -m dytiscidae.ops.run job start --experiment arch39 --workers 4 --min-shard 2
 python -m dytiscidae.ops.run job status <job-id>      # progress, eta, what is at risk
 python -m dytiscidae.ops.run job pause  <job-id>      # honoured at the next generation
 python -m dytiscidae.ops.run job resume <job-id>      # refuses without a checkpoint
@@ -130,19 +130,22 @@ python -m dytiscidae.ops.run job resume <job-id>      # refuses without a checkp
 
 ```bash
 setsid nohup .venv/bin/python -u -m dytiscidae.ops.run search \
-  --generations 900 --batch 16 --workers 4 --min-shard 4 \
+  --generations 900 --batch 16 --workers 4 \
   --segment-seconds 8 --refine-steps 2 --shared-policy \
   --seed 20260901 --run runs/archNN > runs/archNN.log 2>&1 < /dev/null &
 ```
 
-**`--workers 4 --min-shard 4` is the measured optimum, not a guess.** Swept over
-the real evaluation path: 4 shards of 4 take 31.7 s where 1×16 takes 72.2 s,
-2×8 47.6 s, 8×2 51.8 s and **16×1 takes 93.3 s — slower than a single process.**
-The optimum is a plateau at four shards with a largest shard of four. Sweep pool
-shape, never model it: a wall-time model predicted 16×1 would win and it lost by
-3x. Cost ≈ 74 s/generation, so 900 generations ≈ 21 h.
+**The pool is a queue by default since 2026-10-03: `--min-shard 2
+--pool-per-worker 2`, 8 shards of 2 pulled by 4 workers.** On random bodies
+4 shards of 4 were the optimum (31.7 s, where 1×16 takes 72.2 s, 2×8 47.6 s, 8×2
+51.8 s and **16×1 93.3 s — slower than a single process**). On late,
+rotor-heavy bodies a design's cost is heavy-tailed (+1.6–1.8 s per rotor) and the
+queue takes 0.875× the 4×4 wall, faster on 3/3 batches
+(`experiments/budget_sweetspot/`). Sweep pool shape, never model it: a wall-time
+model predicted 16×1 would win and it lost by 3x. A generation costs ~110 s
+early and ~225 s late in a run, because rotors accumulate.
 
-The default `--min-shard 8` is a trap at batch 16: `split()` is
+`--min-shard 8` is a trap at batch 16: `split()` is
 `max(1, min(workers, n // min_shard))`, so a **single** Tier-0 rejection makes
 `15 // 8 = 1`, one shard, and the pool silently falls back to running in the
 parent with the workers idle. Two generations in three ran that way before it

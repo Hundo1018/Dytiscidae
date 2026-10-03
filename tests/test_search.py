@@ -4374,6 +4374,38 @@ def test_the_shared_controller_question_is_answered_with_a_number() -> None:
           or D._r2(np.zeros((64, 2)), rng.normal(size=(64, 2))) < 0.2)
 
 
+def test_the_pool_queues_and_balances_by_rotors() -> None:
+    """ROADMAP AJ, 2026-10-03: the default pool is a queue, and balance reads
+    rotors.  A design's wall is +1.6-1.8 s per rotor and nothing per DOF once
+    rotors are in (``experiments/budget_sweetspot/cost_model.py``)."""
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.envs.actors import ActorPool, plan_shards, shard_cost
+    from dytiscidae.evolution.loop import SearchConfig
+
+    def body(rotors, dof):
+        return NS(segments=[NS(rotor=object()) for _ in range(rotors)]
+                  + [NS(rotor=None)], n_actuated=dof)
+
+    heavy, light = body(12, 4), body(0, 20)
+    check("a rotor-heavy body is predicted dearer than a high-DOF one",
+          shard_cost(heavy) > shard_cost(light),
+          f"{shard_cost(heavy):.1f} vs {shard_cost(light):.1f}")
+    phenos = [heavy, body(10, 4)] + [body(0, 20) for _ in range(6)]
+    shards = plan_shards([shard_cost(p) for p in phenos], 4, 2,
+                         per_worker=1.0, balance=True)
+    check("balance puts the two rotor-heavy bodies in different shards",
+          not any(0 in s and 1 in s for s in shards), str(shards))
+    cfg = SearchConfig()
+    check("the default pool is a queue of two shards per worker, min shard 2",
+          cfg.pool_per_worker == 2.0 and cfg.min_shard == 2
+          and ActorPool(1).per_worker == 2.0,
+          f"per_worker {cfg.pool_per_worker}, min_shard {cfg.min_shard}")
+    check("at batch 16 on 4 workers the default plans 8 shards of 2",
+          [len(s) for s in plan_shards([1.0] * 16, 4, cfg.min_shard,
+                                       per_worker=cfg.pool_per_worker)] == [2] * 8)
+
+
 def test_sharding_a_generation_does_not_change_a_score() -> None:
     """Worker processes may only make the search faster, never different.
 
@@ -5007,6 +5039,7 @@ def main() -> int:
         test_every_island_is_reached_by_verification_and_audit,
         test_a_long_leg_runs_on_promotion_candidates_only,
         test_the_shared_controller_question_is_answered_with_a_number,
+        test_the_pool_queues_and_balances_by_rotors,
         test_sharding_a_generation_does_not_change_a_score,
         test_the_gait_gain_drives_the_same_on_every_path,
         test_a_nan_observation_fails_the_rollout_not_the_batch,

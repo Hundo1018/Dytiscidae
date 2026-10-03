@@ -678,6 +678,10 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
         "entropy": stats["entropy"] / k,
         "clipfrac": stats["clipfrac"] / k,
         "lr": lr_now,
+        #: Mean of the learned exploration width after the update.  ROADMAP R
+        #: sweeps the entropy bonus by what it does to this; until 2026-10-03
+        #: it could be read only from a stored network.
+        "log_std": float(policy.log_std.detach().mean()),
         "grad_steps": stats["n_batches"],
         "stopped_early": stopped_early,
         #: False where the caller supplied no ``rng``, so the minibatch order

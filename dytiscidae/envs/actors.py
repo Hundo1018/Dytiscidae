@@ -160,6 +160,21 @@ def split(n: int, workers: int, min_shard: int) -> list:
     return out
 
 
+def shard_cost(pheno) -> float:
+    """A machine's predicted evaluation wall, for ``plan_shards(balance=True)``.
+
+    Fitted on every ``evaluate`` event of arch45 and arch46 (21 728 evaluations,
+    ``experiments/budget_sweetspot/cost_model.py``): rotors carry the cost,
+    +1.6-1.8 s each (R^2 0.42 / 0.25), and DOF adds nothing once rotors are in
+    (its coefficient is -0.03 / +0.03).  Until 2026-10-03 this was
+    ``35 + 0.9 * n_actuated``, the weaker predictor (R^2 0.19 / 0.07), and a
+    queue balanced by it was unstable (0.71-1.32x of the plain pool).
+    """
+    rotors = sum(1 for s in getattr(pheno, "segments", ()) or ()
+                 if getattr(s, "rotor", None) is not None)
+    return 18.0 + 1.7 * rotors
+
+
 def plan_shards(costs, workers: int, min_shard: int, *,
                 per_worker: float = 1.0, balance: bool = False) -> list:
     """Shards as lists of indices, most expensive first (ROADMAP AJ).
@@ -228,11 +243,14 @@ class ActorPool:
     #: Consecutive batches a worker may raise on before the pool is dropped.
     RETRY_STREAK = 3
 
-    def __init__(self, workers: int = 1, *, min_shard: int = 4,
-                 per_worker: float = 1.0, balance: bool = False) -> None:
+    def __init__(self, workers: int = 1, *, min_shard: int = 2,
+                 per_worker: float = 2.0, balance: bool = False) -> None:
         self.workers = max(int(workers), 1)
         self.min_shard = max(int(min_shard), 1)
-        #: See ``plan_shards``.  1.0 and False are the pool every run used.
+        #: See ``plan_shards``.  1.0 and False are the pool every run up to
+        #: arch46 used; the default became a queue of two shards per worker on
+        #: 2026-10-03 (``experiments/budget_sweetspot``: 0.875x the 4x4 wall on
+        #: late, rotor-heavy batches, faster on 3/3).
         self.per_worker = max(float(per_worker), 1.0)
         self.balance = bool(balance)
         self._pool = None
@@ -272,7 +290,7 @@ class ActorPool:
         if kwargs.get("streams") is None:
             kwargs = dict(kwargs, streams=list(range(n)))
         shards = plan_shards(
-            [0.9 * float(getattr(p, "n_actuated", 0)) + 35.0 for p in phenos],
+            [shard_cost(p) for p in phenos],
             self.workers, self.min_shard, per_worker=self.per_worker,
             balance=self.balance)
         if self._pool is None or len(shards) <= 1:

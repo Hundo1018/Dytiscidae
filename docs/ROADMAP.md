@@ -2881,6 +2881,24 @@ policy carries weight.
 
 ---
 
+## 2026-10-03 — the eight-item pass (the user: do not start arch47 yet)
+
+The user's list, in their words: R sweep; AM noise floor and build; AJ on by
+default; Y/O measured; N if it can be done; item 6 tested; one new island that
+covers all three media at once; the queue pool now, and keep looking for the
+real fix to rotor cost. State, updated as each lands:
+
+| item | state |
+|---|---|
+| AJ | **on by default**: `--min-shard 2 --pool-per-worker 2` (8 shards of 2 on 4 workers, the budget sweep's 0.875x). `shard_cost` now reads rotors: on 21 728 evaluations of arch45/46, rotors R^2 0.42/0.25, DOF 0.19/0.07, and DOF's coefficient is -0.03/+0.03 once rotors are in (`experiments/budget_sweetspot/cost_model.py`). Balance stays off until a re-sweep with the rotor cost. Test `test_the_pool_queues_and_balances_by_rotors`, mutation `balance-reads-dof-not-rotors` (caught). |
+| rotor cost | **found**: `RotorSet.apply` (`physics/rotor.py:261`) loops over rotors in Python, each step calling `rotor_forces` twice (omega and the backward-Euler end), each doing ~4 `_bilinear` table lookups per medium: ~305 us per rotor-step against ~7 us for `mj_step` of a whole 10-body quad (micro-benchmark, machine loaded). Not fluid panels, not identification probes (fixed at 24). The fix is to vectorise the lookup across rotors and machines. |
+| AM | the same lane as rotor cost (`batchroll.step_batch`); verified against the path-agreement noise floor, not bit-identity |
+| island | `generalist` already scores `mission_fraction` (min-based over all three media) but its curriculum stages 0-3 pay the best one or two media; the new island must pay the weakest |
+| R | needs a `--shared-ent-coef` flag (there was none: direct runs were always 0.01) and `log_std` in the `ppo` event |
+| Y/O | on arch46's elites (no run's elites were scored under the 10-03 crossings); `land_to_water` is in the curriculum's kinds but no evaluator runs it |
+| N | GRPO built off by default; switched on only if R says the shared policy carries weight |
+| 6 | ray entry: `test_entry_shock_is_hydrodynamic_not_a_speed_limit` and the 18 test_search mutations re-run on the post-10-03 tree |
+
 ## 2026-09-23..26 — AB-AF executed, every open fluid item closed, and a rotor control
 
 The user asked for three things: take the AB-AF list through to verification and

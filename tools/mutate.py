@@ -598,6 +598,16 @@ MUTATIONS: tuple = (
         suites=("test_search::test_sharding_a_generation_does_not_change_a_score",),
         item="AJ reproducibility"),
     Mutation(
+        id="balance-reads-dof-not-rotors",
+        path="dytiscidae/envs/actors.py",
+        find="    return 18.0 + 1.7 * rotors\n",
+        replace="    return 35.0 + 0.9 * float(getattr(pheno, \"n_actuated\", 0))\n",
+        defect="the balanced queue predicts a machine's cost from DOF, which "
+               "explains 7-19% of evaluation wall where rotors explain 25-42%, "
+               "so a heavy shard can go last (AJ, 2026-10-03)",
+        suites=("test_search::test_the_pool_queues_and_balances_by_rotors",),
+        item="AJ cost model"),
+    Mutation(
         id="queue-results-in-shard-order",
         path="dytiscidae/envs/actors.py",
         find="            for i, r in zip(idx, res):\n                results[i] = r\n",

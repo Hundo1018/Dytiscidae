@@ -87,17 +87,20 @@ class SearchConfig:
     #: raising ``batch``, which is a search-design decision, not a throughput
     #: one -- so it is left to the caller rather than done here.
     workers: int = 1
-    #: 4, not 8.  At ``batch`` 16 a default of 8 makes a *single* Tier-0
-    #: rejection compute ``15 // 8 == 1``: one shard, run in the parent, every
-    #: worker idle -- and two generations in three ran that way before it was
-    #: found.  4 is the swept optimum, not a guess: 4 shards of 4 take 31.7 s
-    #: where 1x16 takes 72.2, 2x8 47.6, 8x2 51.8 and 16x1 93.3.
-    min_shard: int = 4
+    #: 2 with a queue of two shards per worker, since 2026-10-03.  On random
+    #: bodies 4 shards of 4 were the swept optimum (31.7 s, against 1x16 72.2,
+    #: 2x8 47.6, 8x2 51.8, 16x1 93.3); on late, rotor-heavy bodies a design's
+    #: cost is heavy-tailed and 8 shards of 2 pulled by 4 workers take 0.875x
+    #: the 4x4 wall, faster on 3/3 batches (``experiments/budget_sweetspot``).
+    #: Never 8 at ``batch`` 16: one Tier-0 rejection makes ``15 // 8 == 1``,
+    #: one shard in the parent, every worker idle.
+    min_shard: int = 2
     #: The shard queue (ROADMAP AJ; ``envs.actors.plan_shards``): shards per
-    #: worker, and whether machines are assigned by predicted cost (DOF)
-    #: instead of by position.  1.0 and False are the pool every run used; the
-    #: stage telemetry's ``idle`` says whether changing them is worth a sweep.
-    pool_per_worker: float = 1.0
+    #: worker, and whether machines are assigned by predicted cost
+    #: (``envs.actors.shard_cost``, rotors) instead of by position.  On by
+    #: default since 2026-10-03; 1.0 and False are the pool every run up to
+    #: arch46 used.  Pool shape changes no score.
+    pool_per_worker: float = 2.0
     #: AK's funnel.  ``None`` refines every candidate, as every run has.  A
     #: number ``m`` refines only a candidate whose noise-free score, filed
     #: against the archive as it stands, is at least ``(1 - m)`` of its cell's

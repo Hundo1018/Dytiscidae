@@ -690,13 +690,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `ActorPool` | class | 216 | — | A persistent pool of worker processes, each with its own batched evaluator. |
-| `plan_shards` | function | 163 | `(costs, workers: int, min_shard: int, *, per_worker: float=1.0, balance: bool=False) -> list` | Shards as lists of indices, most expensive first (ROADMAP AJ). |
+| `ActorPool` | class | 231 | — | A persistent pool of worker processes, each with its own batched evaluator. |
+| `plan_shards` | function | 178 | `(costs, workers: int, min_shard: int, *, per_worker: float=1.0, balance: bool=False) -> list` | Shards as lists of indices, most expensive first (ROADMAP AJ). |
+| `shard_cost` | function | 163 | `(pheno) -> float` | A machine's predicted evaluation wall, for ``plan_shards(balance=True)``. |
 | `split` | function | 136 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
-| `ActorPool.__init__` | method | 231 | `(self, workers: int=1, *, min_shard: int=4, per_worker: float=1.0, balance: bool=False) -> None` | — |
-| `ActorPool.close` | method | 434 | `(self) -> None` | — |
-| `ActorPool.evaluate_tier1` | method | 258 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
-| `ActorPool.map` | method | 365 | `(self, fn, jobs) -> list` | ``[fn(*job) for job in jobs]``, one job per worker at a time. |
+| `ActorPool.__init__` | method | 246 | `(self, workers: int=1, *, min_shard: int=2, per_worker: float=2.0, balance: bool=False) -> None` | — |
+| `ActorPool.close` | method | 452 | `(self) -> None` | — |
+| `ActorPool.evaluate_tier1` | method | 276 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
+| `ActorPool.map` | method | 383 | `(self, fn, jobs) -> list` | ``[fn(*job) for job in jobs]``, one job per worker at a time. |
 
 ## `envs.batchroll` — `dytiscidae/envs/batchroll.py`
 
@@ -1092,18 +1093,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 677 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `evaluate_candidate` | function | 379 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 432 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `load_state` | function | 1803 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 1108 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 1678 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 680 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `evaluate_candidate` | function | 382 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 435 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `load_state` | function | 1806 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 1111 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 1681 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 63 | — | Everything adjustable about a run. |
-| `SearchState` | class | 289 | — | — |
-| `seed_archipelago` | function | 2067 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `SearchState.archive` | property | 348 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 352 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 356 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 292 | — | — |
+| `seed_archipelago` | function | 2070 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `SearchState.archive` | property | 351 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 355 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 359 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1203,23 +1204,23 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 490 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `cmd_cohort` | function | 431 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_dashboard` | function | 760 | `(args) -> int` | — |
-| `cmd_distill` | function | 798 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 319 | `(args) -> int` | — |
-| `cmd_postrun` | function | 286 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 491 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `cmd_cohort` | function | 432 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_dashboard` | function | 761 | `(args) -> int` | — |
+| `cmd_distill` | function | 799 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 320 | `(args) -> int` | — |
+| `cmd_postrun` | function | 287 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 123 | `(args) -> int` | — |
-| `cmd_render` | function | 767 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_render` | function | 768 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
 | `cmd_search` | function | 158 | `(args) -> int` | — |
-| `cmd_showcase` | function | 618 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 326 | `(args) -> int` | — |
-| `cmd_train` | function | 360 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_showcase` | function | 619 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 327 | `(args) -> int` | — |
+| `cmd_train` | function | 361 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 116 | `(args) -> int` | — |
-| `controller_for_elite` | function | 500 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 260 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 501 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 261 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 31 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 815 | `(argv=None) -> int` | — |
+| `main` | function | 816 | `(argv=None) -> int` | — |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`
 

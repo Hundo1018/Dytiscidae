@@ -184,6 +184,7 @@ def cmd_search(args) -> int:
         shared_lr=args.shared_lr,
         shared_epochs=args.shared_epochs,
         shared_target_kl=args.shared_target_kl,
+        shared_ent_coef=args.shared_ent_coef,
         run_dir=args.run,
         tier2_every=args.tier2_every,
         n_reference_seeds=args.reference_seeds,
@@ -836,10 +837,12 @@ def main(argv=None) -> int:
                         "is not worth a batch's fixed cost, so the pool never "
                         "makes more than --batch // --min-shard of them: to "
                         "use more cores, raise --batch.")
-    p.add_argument("--pool-per-worker", type=float, default=1.0,
+    p.add_argument("--pool-per-worker", type=float, default=2.0,
                    help="shards per worker; above 1 the pool becomes a queue "
                         "that hands the next shard to whichever worker is free "
-                        "(ROADMAP AJ). 1 is the pool every stored run used")
+                        "(ROADMAP AJ). 2 since 2026-10-03: 0.875x the wall of "
+                        "4x4 on rotor-heavy batches; 1 is the pool every run "
+                        "up to arch46 used")
     p.add_argument("--distance-curriculum", action="store_true",
                    help="step transition starts back from their interfaces and "
                         "the air launch down from 30 m as the population learns "
@@ -848,14 +851,17 @@ def main(argv=None) -> int:
                    help="refine only candidates within this fraction of their "
                         "cell's incumbent (ROADMAP AK); unset refines all")
     p.add_argument("--pool-balance", action="store_true",
-                   help="assign machines to shards by predicted cost (DOF) "
+                   help="assign machines to shards by predicted cost (rotors, "
+                        "envs.actors.shard_cost) "
                         "rather than by position (ROADMAP AJ)")
-    p.add_argument("--min-shard", type=int, default=4,
+    p.add_argument("--min-shard", type=int, default=2,
                    help="fewest machines a worker is given at once. Measured "
                         "per machine-step: 238 us alone, 149 in a shard of "
                         "four, 105 in eight, 89 in sixteen -- so a smaller "
-                        "shard spends the parallelism it gains. 4 is the swept "
-                        "optimum end to end; 8 collapses the pool to one shard "
+                        "shard spends the parallelism it gains. 4 was the swept "
+                        "optimum on random bodies; 2 with --pool-per-worker 2 "
+                        "is the optimum on rotor-heavy ones; 8 collapses the "
+                        "pool to one shard "
                         "as soon as one machine is rejected at batch 16")
     p.add_argument("--segment-seconds", type=float, default=8.0,
                    help="Tier-1 episode length; the main cost/fidelity dial")
@@ -891,6 +897,11 @@ def main(argv=None) -> int:
                    help="PPO passes over each generation's batch")
     p.add_argument("--shared-target-kl", type=float, default=0.015,
                    help="stop an update once its mean KL exceeds this")
+    p.add_argument("--shared-ent-coef", type=float, default=0.01,
+                   help="entropy bonus of the shared policy (ROADMAP R). Until "
+                        "2026-10-03 there was no flag and direct runs were "
+                        "always 0.01; exploration is not comparable across a "
+                        "change of it")
     p.add_argument("--policy-hidden", type=int, default=0,
                    help="hidden units in the policy; 0 is linear (60 weights), "
                         "16 is 308")
