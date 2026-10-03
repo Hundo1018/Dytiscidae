@@ -322,8 +322,10 @@ Critic:
   implementation:
     - evolution.critic.Critic
     - evolution.critic.critic_features
+    - evolution.critic.expensive_outcome
   tests:
     - tests.test_search::test_critic_learns_the_exploit_signature
+    - tests.test_search::test_critic_learns_from_a_cheap_score_of_zero
 
 Scout:
   implementation:

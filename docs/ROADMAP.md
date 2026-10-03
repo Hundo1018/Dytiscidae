@@ -1,5 +1,11 @@
 # Roadmap
 
+**2026-10-03: arch45 finished; read [ARCH46_SPEC.md](ARCH46_SPEC.md) first.**
+arch45's critic never fitted: a `Tier-1 mission > 1e-4` gate dropped 128 of
+147 labels, and every kept label was 0. The critic now learns per-medium
+residuals (built, unrun). The spec ranks the rest of the outside proposal
+(SAIL, Deb, T-DominO, PGA, RUDDER) against arch45's measurements.
+
 Written 2026-09-03 after arch33, and revised the same day once every phase was
 built. Every item names the measurement that motivates it; nothing here is on
 the list because it seemed like a good idea, and nothing is marked done without

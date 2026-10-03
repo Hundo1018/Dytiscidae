@@ -1764,26 +1764,29 @@ def test_critic_learns_the_exploit_signature() -> None:
     c = Critic(min_samples=60, refit_every=20)
 
     def make(kind):
+        """Features, and the expensive tier's (air, water, land)."""
         f = np.zeros(len(CRITIC_FEATURES))
         if kind == "honest":
             f[0] = rng.uniform(0.2, 0.6)
+            f[1:4] = rng.uniform(0.3, 0.8, 3)
             f[8] = rng.uniform(0.3, 2.0)
             f[11] = np.log10(rng.uniform(60, 300))
             f[12] = rng.uniform(3, 12)
-            return f, rng.uniform(0.7, 1.0)
+            return f, np.clip(f[1:4] * rng.uniform(0.85, 1.05), 0, 1)
         # The wingless / battery-death family: looks the same cheaply.
         f[0] = rng.uniform(0.3, 0.7)
+        f[1:4] = rng.uniform(0.3, 0.8, 3)
         f[8] = rng.uniform(-1.0, -0.8)
         f[11] = np.log10(rng.uniform(3000, 500000))
         f[12] = rng.uniform(0.0, 0.3)
-        return f, rng.uniform(0.0, 0.15)
+        return f, f[1:4] * rng.uniform(0.0, 0.15)
 
     check("an unfitted critic abstains entirely",
-          c.discount(make("exploit")[0]) == 1.0 and c.predict(np.zeros(16)) == 1.0)
+          c.discount(make("exploit")[0]) == 1.0 and c.predict(np.zeros(16)) == 0.0)
 
     for i in range(400):
-        f, retained = make("honest" if i % 2 else "exploit")
-        c.label(f, retained)
+        f, expensive = make("honest" if i % 2 else "exploit")
+        c.label(f, expensive)
         if c.due():
             c.fit()
 
@@ -1793,7 +1796,7 @@ def test_critic_learns_the_exploit_signature() -> None:
     honest = np.mean([c.predict(make("honest")[0]) for _ in range(100)])
     exploit = np.mean([c.predict(make("exploit")[0]) for _ in range(100)])
     check("it separates the two families", honest > exploit + 0.3,
-          f"predicts {honest:.2f} retention for honest, {exploit:.2f} for exploits")
+          f"predicts a gap of {honest:+.2f} for honest, {exploit:+.2f} for exploits")
 
     d_honest = np.mean([c.discount(make("honest")[0]) for _ in range(100)])
     d_exploit = np.mean([c.discount(make("exploit")[0]) for _ in range(100)])
@@ -1813,13 +1816,116 @@ def test_critic_learns_the_exploit_signature() -> None:
     check("and it can never raise a score", best <= 1.0 + 1e-9, f"best multiplier x{best:.3f}")
 
     # A critic that has stopped predicting anything must stop mattering.
+    # Uniform cheap scores and expensive outcomes unrelated to them.  The
+    # residual still contains -cheap, and cheap is a feature, so a critic
+    # calibrated on its residual looked 0.70 calibrated here; calibrated on the
+    # expensive outcome, out of fold, it must see nothing.
+    hi = np.zeros(len(CRITIC_FEATURES))
+    hi[:4] = 1.0
     blind = Critic(min_samples=30, refit_every=10)
     for _ in range(200):
-        blind.label(rng.normal(0, 1, len(CRITIC_FEATURES)), float(rng.uniform(0, 1)))
+        f = rng.normal(0, 1, len(CRITIC_FEATURES))
+        f[:4] = rng.uniform(0, 1, 4)
+        blind.label(f, rng.uniform(0, 1, 3))
     blind.fit()
     check("a critic with no signal has no influence",
-          blind.calibration < 0.35 or blind.discount(np.zeros(16)) > 0.9,
-          f"calibration {blind.calibration:.2f}, discount x{blind.discount(np.zeros(16)):.3f}")
+          blind.calibration < 0.2 and blind.discount(hi) > 0.9,
+          f"calibration {blind.calibration:.2f}, discount on a top cheap score "
+          f"x{blind.discount(hi):.3f}")
+
+
+def test_critic_learns_from_a_cheap_score_of_zero() -> None:
+    """Every promotion is a label, and an unmeasured medium is not a zero.
+
+    arch45, measured 2026-10-03: 147 promotions, the label was Tier-2/Tier-1
+    mission and a pair was recorded only above 1e-4, so 128 were dropped and the
+    19 kept were all 0.0 -- the critic never fitted.  The label is now each
+    medium's competence residual, which is defined at a cheap score of zero.
+
+    Tier-2 starts in a random medium and stops at the first failed leg, so the
+    media after it were never run.  Scoring those as 0 would teach the critic
+    that Tier-2 destroys competence it never looked at.
+    """
+    print("\ncritic: a zero cheap score teaches, an unmeasured medium does not")
+    import pickle
+    from types import SimpleNamespace
+
+    from dytiscidae.evolution.critic import (CRITIC_FEATURES, CRITIC_TARGETS,
+                                              Critic, expensive_outcome)
+
+    def tier2(exploit="", **comp):
+        return SimpleNamespace(mission_fraction=0.1667, exploit=exploit,
+                               segments={k: SimpleNamespace(competence=v)
+                                         for k, v in comp.items()})
+
+    got = expensive_outcome(tier2(air=0.4, water=0.5, land=0.6))
+    check("the expensive outcome is each medium's competence",
+          CRITIC_TARGETS == ("air", "water", "land") and np.allclose(got, [0.4, 0.5, 0.6]),
+          str(np.round(got, 4).tolist()))
+    got = expensive_outcome(tier2(air=0.35))
+    check("a medium Tier-2 never ran is NaN, not zero",
+          got[0] == 0.35 and np.isnan(got[1]) and np.isnan(got[2]), str(got.tolist()))
+    check("and an exploit retained nothing in any medium",
+          np.allclose(expensive_outcome(tier2("x", air=0.9, water=0.9, land=0.9)), 0.0))
+
+    # The arch45 shape: Tier-1 mission 0, one Tier-2 leg run.
+    f = np.zeros(len(CRITIC_FEATURES))
+    f[1:4] = (0.3, 0.2, 0.5)
+    c = Critic(min_samples=10, refit_every=5)
+    c.observe(f.tolist(), tier2(air=0.35))
+    check("a promotion with a zero cheap mission is labelled", len(c._y) == 1,
+          f"{len(c._y)} labels")
+    y = c._y[0]
+    check("and the label is the residual where measured, NaN elsewhere",
+          abs(y[0] - 0.05) < 1e-9 and np.isnan(y[1]) and np.isnan(y[2]),
+          str(np.round(y, 4).tolist()))
+    c.observe_invalid(f.tolist())
+    check("an invalidated design is labelled as losing every cheap score",
+          np.allclose(c._y[1], [-0.3, -0.2, -0.5]), str(np.round(c._y[1], 4).tolist()))
+
+    # Learnable from partial labels with the cheap mission zero throughout: one
+    # medium measured per promotion, as in arch45, and the bodies with a dead
+    # battery lose that medium at Tier-2.  Unmeasured media scored as zero
+    # would also look "lost" on the honest half and blur the signature.
+    rng = np.random.default_rng(3)
+    c = Critic(min_samples=60, refit_every=30)
+    for i in range(300):
+        f = np.zeros(len(CRITIC_FEATURES))
+        f[1:4] = rng.uniform(0.2, 0.6, 3)
+        good = i % 2 == 0
+        f[8] = rng.uniform(0.5, 2.0) if good else rng.uniform(-1.0, -0.6)
+        e = np.full(3, np.nan)
+        j = rng.integers(3)
+        e[j] = f[1 + j] * (rng.uniform(0.9, 1.1) if good else rng.uniform(0.0, 0.2))
+        c.label(f, e)
+        if c.due():
+            c.fit()
+    check("partial labels with a zero cheap mission still fit and calibrate",
+          c.fitted and c.calibration > 0.5,
+          f"skill {c.calibration:.2f}, by target {c.calibration_by_target}")
+    check("each target fitted only on the rows that measured it",
+          all(70 < v["labels"] < 130 for v in c.calibration_by_target.values()),
+          str({k: v["labels"] for k, v in c.calibration_by_target.items()}))
+
+    # Where Tier-1 already predicts Tier-2 exactly there is nothing to correct,
+    # and a critic must not take credit for the cheap score's own accuracy.
+    echo = Critic(min_samples=30, refit_every=10)
+    for _ in range(200):
+        f = rng.normal(0, 1, len(CRITIC_FEATURES))
+        f[1:4] = rng.uniform(0, 1, 3)
+        echo.label(f, f[1:4])
+    echo.fit()
+    check("a critic adds nothing where the cheap score is already right",
+          echo.calibration < 0.2, f"skill {echo.calibration:.2f}")
+
+    # A critic pickled under the ratio label must not be read as residuals.
+    legacy = Critic()
+    legacy._x, legacy._y = [np.zeros(16)] * 3, [0.0, 0.0, 0.0]
+    legacy._w, legacy._bias = np.zeros(16), 0.0
+    back = pickle.loads(pickle.dumps(legacy))
+    check("legacy ratio labels are dropped on restore, and counted",
+          back._y == [] and not back.fitted and back.dropped_legacy == 3,
+          f"labels {len(back._y)}, dropped {back.dropped_legacy}")
 
 
 def test_one_islands_archive_is_read_alone_not_through_the_merge() -> None:
@@ -4647,6 +4753,7 @@ def main() -> int:
         test_judge_ladder_is_fixed_and_bar_only_tightens,
         test_auditor_can_invalidate_and_veto,
         test_critic_learns_the_exploit_signature,
+        test_critic_learns_from_a_cheap_score_of_zero,
         test_a_specialist_islands_curriculum_reads_only_its_own_medium,
         test_an_islands_best_is_judged_on_its_own_domains,
         test_one_islands_archive_is_read_alone_not_through_the_merge,

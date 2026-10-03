@@ -50,7 +50,7 @@ from ..ops.telemetry import Telemetry
 from ..envs.transitions import TransitionSet
 from .archive import Archive
 from .auditor import Auditor
-from .critic import Critic, critic_features
+from .critic import CRITIC_TARGETS, Critic, critic_features, expensive_outcome
 from .curator import Curator
 from .curriculum import STAGES, Curriculum
 from .descriptors import LearnedDescriptors, episode_features
@@ -2341,18 +2341,22 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
                 elite.meta["policy_refined"] = int(
                     getattr(cfg, "promotion_refine_steps", 0))
             cheap = float(elite.meta.get("mission_fraction", 0.0))
-            if state.critic is not None and cheap > 1e-4:
-                feats = elite.meta.get("critic_features")
-                if feats:
-                    state.critic.label(
-                        np.asarray(feats, float),
-                        float(r2.mission_fraction) / cheap,
-                    )
+            # Every promotion is a label, a zero cheap score included: arch45's
+            # four Tier-2 successes all had a Tier-1 mission of zero, and a
+            # `cheap > 1e-4` gate here dropped all four (and 124 more).
+            if state.critic is not None:
+                state.critic.observe(elite.meta.get("critic_features"), r2)
             state.telemetry.event({"kind": "promote", "gen": gen,
                                    "island": state.island, "cell": list(elite.cell),
                                    "tier2_fitness": round(f2, 4),
                                    "tier2_fraction": round(r2.mission_fraction, 4),
                                    "tier1_fraction": round(cheap, 4),
+                                   # What the critic was labelled with, so a
+                                   # finished run's labels can be replayed;
+                                   # None is a medium Tier-2 never ran.
+                                   "tier2_media": {
+                                       k: (None if not np.isfinite(v) else round(float(v), 4))
+                                       for k, v in zip(CRITIC_TARGETS, expensive_outcome(r2))},
                                    **long_leg, **walls,
                                    "exploit": r2.exploit, "notes": r2.notes[:3]})
             if r2.exploit:
@@ -2429,7 +2433,5 @@ def _audit(state: SearchState, gen: int, spec, rng) -> list:
             archive.remove(elite.cell)
             state.curriculum.forget(elite.cell)
             if state.critic is not None:
-                f = elite.meta.get("critic_features")
-                if f:
-                    state.critic.label(np.asarray(f, float), 0.0)
+                state.critic.observe_invalid(elite.meta.get("critic_features"))
     return invalid

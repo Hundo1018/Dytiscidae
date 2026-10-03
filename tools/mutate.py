@@ -942,6 +942,53 @@ MUTATIONS: tuple = (
         replace="             \"is in `CLAUDE.md`.\", \"\", \"drifted\"]",
         defect="the committed index stops matching what the source generates",
         suites=("test_index",), item="A/J index gate"),
+    # --- the critic's label and calibration (2026-10-03) ------------------
+    Mutation(
+        id="critic-unmeasured-medium-is-zero",
+        path="dytiscidae/evolution/critic.py",
+        find="        [float(seg[k].competence) if k in seg else np.nan for k in CRITIC_TARGETS],",
+        replace="        [float(seg[k].competence) if k in seg else 0.0 for k in CRITIC_TARGETS],",
+        defect="a medium Tier-2 never ran (legs after a failure) is labelled as "
+               "measured zero, teaching that Tier-2 destroys what it never saw",
+        suites=("test_search::test_critic_learns_from_a_cheap_score_of_zero",),
+        item="critic label"),
+    Mutation(
+        id="critic-refuses-a-zero-cheap-score",
+        path="dytiscidae/evolution/critic.py",
+        find="        if features:\n            self.label(np.asarray(features, float), expensive_outcome(result))",
+        replace="        if features and features[0] > 1e-4:\n            self.label(np.asarray(features, float), expensive_outcome(result))",
+        defect="the arch45 gate: promotions with a zero Tier-1 mission are not "
+               "labelled, which dropped 128 of 147 and every Tier-2 success",
+        suites=("test_search::test_critic_learns_from_a_cheap_score_of_zero",), item="critic label"),
+    Mutation(
+        id="critic-exploit-keeps-its-numbers",
+        path="dytiscidae/evolution/critic.py",
+        find="    if result is None or getattr(result, \"exploit\", \"\"):",
+        replace="    if result is None:",
+        defect="a Tier-2 exploit is labelled with the scores it faked",
+        suites=("test_search::test_critic_learns_from_a_cheap_score_of_zero",), item="critic label"),
+    Mutation(
+        id="critic-calibrates-in-sample-on-the-residual",
+        path="dytiscidae/evolution/critic.py",
+        find="            skills[j] = _skill(np.clip(pj, -1.0, 1.0) + cheap, cheap, yj + cheap)",
+        replace="            skills[j] = max(_corr(Zj @ W[:, j] + bias[j], yj), 0.0)",
+        defect="calibration read on the residual, in sample: -cheap is a feature, "
+               "so noise labels look 0.70 calibrated",
+        suites=("test_search::test_critic_learns_the_exploit_signature",), item="critic calibration"),
+    Mutation(
+        id="critic-takes-credit-for-the-cheap-score",
+        path="dytiscidae/evolution/critic.py",
+        find="    return float(np.clip(_corr(predicted, observed) - max(_corr(cheap, observed), 0.0),",
+        replace="    return float(np.clip(_corr(predicted, observed) - 0.0,",
+        defect="calibration counts the cheap score's own accuracy as the critic's skill",
+        suites=("test_search::test_critic_learns_from_a_cheap_score_of_zero",), item="critic calibration"),
+    Mutation(
+        id="critic-can-raise-a-score",
+        path="dytiscidae/evolution/critic.py",
+        find="        shortfall = float(np.clip(-self.predict(features), 0.0, 1.0))",
+        replace="        shortfall = float(np.clip(-self.predict(features), -1.0, 1.0))",
+        defect="a predicted positive gap raises the cheap score: a second objective",
+        suites=("test_search::test_critic_learns_the_exploit_signature",), item="critic bound"),
 )
 
 

@@ -948,17 +948,21 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Critic` | class | 119 | — | Predicts how much of a cheap score survives expensive checking. |
-| `critic_features` | function | 84 | `(meta: dict, result) -> np.ndarray` | Assemble the cheap feature vector for one candidate. |
-| `Critic.discount` | method | 231 | `(self, features: np.ndarray) -> float` | Multiplier in [1 - max_discount, 1] to apply to a cheap score. |
-| `Critic.distrusts` | method | 259 | `(self, top: int=3) -> list` | Which measurements the critic has learned to read as warning signs. |
-| `Critic.due` | method | 180 | `(self) -> bool` | — |
-| `Critic.fit` | method | 188 | `(self) -> bool` | — |
-| `Critic.fitted` | property | 177 | `(self) -> bool` | — |
-| `Critic.label` | method | 157 | `(self, features: np.ndarray, retained: float) -> None` | Record one (cheap features, expensive outcome) pair. |
-| `Critic.predict` | method | 221 | `(self, features: np.ndarray) -> float` | Predicted fraction of the cheap score that would survive. |
-| `Critic.report` | method | 274 | `(self) -> dict` | — |
-| `Critic.suspicion` | method | 246 | `(self, features: np.ndarray) -> float` | How badly this design is expected to fail expensive checking. |
+| `Critic` | class | 166 | — | Predicts how far a cheap score moves under expensive checking. |
+| `critic_features` | function | 131 | `(meta: dict, result) -> np.ndarray` | Assemble the cheap feature vector for one candidate. |
+| `expensive_outcome` | function | 115 | `(result) -> np.ndarray` | The expensive tier's values for ``CRITIC_TARGETS``, from a MissionResult. |
+| `Critic.discount` | method | 353 | `(self, features: np.ndarray) -> float` | Multiplier in [1 - max_discount, 1] to apply to a cheap score. |
+| `Critic.distrusts` | method | 382 | `(self, top: int=3) -> list` | Which measurements the critic has learned to read as warning signs. |
+| `Critic.due` | method | 270 | `(self) -> bool` | — |
+| `Critic.fit` | method | 278 | `(self) -> bool` | — |
+| `Critic.fitted` | property | 267 | `(self) -> bool` | — |
+| `Critic.label` | method | 226 | `(self, features: np.ndarray, expensive) -> None` | Record one (cheap features, expensive outcome) pair. |
+| `Critic.observe` | method | 256 | `(self, features, result) -> None` | Label from a Tier-2 result: the one call the verification loop makes. |
+| `Critic.observe_invalid` | method | 261 | `(self, features) -> None` | Label a design the auditor invalidated: nothing survived. |
+| `Critic.predict` | method | 349 | `(self, features: np.ndarray) -> float` | Predicted mean residual: negative means the cheap score overstates. |
+| `Critic.predict_components` | method | 338 | `(self, features: np.ndarray) -> np.ndarray` | Predicted residual, expensive minus cheap, for each target. |
+| `Critic.report` | method | 399 | `(self) -> dict` | — |
+| `Critic.suspicion` | method | 369 | `(self, features: np.ndarray) -> float` | How badly this design is expected to fail expensive checking. |
 
 ## `evolution.curator` — `dytiscidae/evolution/curator.py`
 
