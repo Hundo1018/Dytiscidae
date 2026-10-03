@@ -186,6 +186,8 @@ BatchedEvaluation:
     - envs.batchroll.run_transition_batch
     - envs.batchroll.observation_finite
     - physics.energy.BatchedPower
+    - physics.rotor.RotorBatch
+    - envs.triphibian.TriphibianEnv.clearance_many
     - envs.kernel.freshness
     - envs.kernel.write_manifest
     - envs.kernel.source_hashes
@@ -197,6 +199,8 @@ BatchedEvaluation:
     - tests.test_search::test_a_nan_observation_fails_the_rollout_not_the_batch
     - tests.test_search::test_the_early_fluid_launch_changes_nothing
     - tests.test_physics::test_the_batched_power_budget_is_the_power_budget
+    - tests.test_physics::test_the_rotor_batch_is_the_per_rotor_loop
+    - tests.test_physics::test_the_clearance_of_a_batch_is_each_machines_own
   note: the path the search scores with; not interchangeable with evaluate_tier1. Since 2026-09-27 one fused device step per timestep, launched as soon as mj_step is done and read from pinned memory, and the energy model for the whole batch in one pass -- all bit-identical to the unfused path (experiments/perf/NOTES.md); DYTISCIDAE_KERNEL_DIR points a process at a staged kernel build
 
 Vectorisation:

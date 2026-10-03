@@ -843,6 +843,9 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
         for m in range(k):
             if was[m] and not active[m]:
                 res[m].failure = "battery exhausted"
+        # Every live machine's clearance in one pass; `e.clearance()` below
+        # then reads it from the memo (AM, 2026-10-03).
+        envs[0].clearance_many(envs, active)
 
         for m, e in enumerate(envs):
             if not active[m]:
@@ -860,8 +863,9 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
             R = e.data.xmat[e.root_body].reshape(3, 3)
             r["ups"].append(float(R[2, 2]))
             r["contacts"].append(1.0 if e._touching_ground() else 0.0)
-            r["spins"].append(float(np.linalg.norm(e.body_twist()[3:])))
-            r["vzs"].append(float(e.body_twist()[2]))
+            tw = e.body_twist()                # once: the state has not moved
+            r["spins"].append(float(np.linalg.norm(tw[3:])))
+            r["vzs"].append(float(tw[2]))
             if r["gain"] is not None:
                 r["gains"].append(r["gain"])
             r["xys"].append(pos[:2].copy())
@@ -1223,6 +1227,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
         for m in range(k):
             if was[m] and not active[m]:
                 res[m].failure = "battery exhausted mid-transition"
+        envs[0].clearance_many(envs, active)
 
         for m, e in enumerate(envs):
             if not active[m]:

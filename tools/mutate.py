@@ -833,8 +833,8 @@ MUTATIONS: tuple = (
     Mutation(
         id='propellers-one-handed',
         path='dytiscidae/physics/rotor.py',
-        find='            thrust_dir = self.spec[k].handed * sgn * ax',
-        replace='            thrust_dir = sgn * ax',
+        find='        td = (self.handed[rows] * sgn)[:, None] * ax\n',
+        replace='        td = sgn[:, None] * ax\n',
         defect='a mirrored propeller is the same hand: half the rotors push down',
         suites=('test_physics',), item='rotor'),
     Mutation(
@@ -874,6 +874,20 @@ MUTATIONS: tuple = (
         replace='    T = np.full(len(om), np.sum(dT * dr) / len(om))\n',
         defect="the vectorised table build averages thrust over the grid instead of per point",
         suites=('test_physics::test_the_rotor_batch_is_the_per_rotor_loop',), item='perf'),
+    Mutation(
+        id='clearance-batch-first-slice',
+        path='dytiscidae/envs/triphibian.py',
+        find='            e._clear_memo = (e._clearance_key(), float(np.min(diff[at:at + g.size])))\n',
+        replace='            e._clear_memo = (e._clearance_key(), float(np.min(diff[:g.size])))\n',
+        defect="every machine in a batch is given the first machine's clearance",
+        suites=('test_physics::test_the_clearance_of_a_batch_is_each_machines_own',), item='AM'),
+    Mutation(
+        id='clearance-memo-keyed-on-time',
+        path='dytiscidae/envs/triphibian.py',
+        find='        return (d.time, d.geom_xpos.tobytes(), d.geom_xmat.tobytes(),\n                d.xpos[self.root_body].tobytes())\n',
+        replace='        return (d.time,)\n',
+        defect="the clearance memo answers for a restored or re-placed state at the same clock",
+        suites=('test_physics::test_the_clearance_of_a_batch_is_each_machines_own',), item='AM'),
     # --- the host-side speed-up, 2026-09-27 ----------------------------------
     Mutation(
         id='batched-power-one-sum',
@@ -923,8 +937,8 @@ MUTATIONS: tuple = (
     Mutation(
         id="rotor-thrust-at-start-of-step",
         path="dytiscidae/physics/rotor.py",
-        find="            omega_e = self._end_of_step(model, data, k, omega, Q0)",
-        replace="            omega_e = omega",
+        find="            omega_e = np.where((w_ < 1e-6) | (c < 1e-12), omega, sgn * w2)\n",
+        replace="            omega_e = omega\n",
         defect="rotor thrust is taken at the start-of-step spin, and a propeller entering water is fired out of it",
         suites=("test_physics",), item="rotor in water"),
     Mutation(

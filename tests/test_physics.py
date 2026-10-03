@@ -3991,6 +3991,62 @@ def test_the_rotor_batch_is_the_per_rotor_loop() -> None:
           f"{np.abs(T - np.array([x[0] for x in one])).max():.3g}")
 
 
+def test_the_clearance_of_a_batch_is_each_machines_own() -> None:
+    """AM, 2026-10-03: `clearance` was 18% of a shard's profile, read up to four
+    times a step on a state that had not moved.  It is now remembered per
+    state, and `clearance_many` fills the memo for a whole batch in one pass.
+    Both must return what `_clearance_now` computes, to the bit, and the memo
+    must never answer for a state it was not computed on."""
+    print("\nclearance: one pass for the batch, a memo per machine")
+    from dytiscidae.core.bodyplans import BODY_PLANS, REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+    from dytiscidae.physics.medium import SeaState
+
+    plans = [BODY_PLANS[k]() for k in ("beetle", "gannet", "teal", "ray")]
+    plans.append(REFERENCE_PLANS["quad"]())
+    unequal, n, seen = 0, 0, []
+    for sea in (None, SeaState(amplitude=0.3, period=2.0, wavelength=5.0)):
+        envs = [TriphibianEnv(build(p), seed=0, sea_state=sea) for p in plans]
+        for dom in (Domain.LAND, Domain.WATER, Domain.AIR):
+            for e in envs:
+                e.reset(dom)
+                e.scatter(np.random.default_rng(5))
+            for step in range(30):
+                for e in envs:
+                    e.step(e.cpg.command(e.cpg.base, e.data.time))
+                if step % 10:
+                    continue
+                for e in envs:
+                    e._clear_memo = None
+                TriphibianEnv.clearance_many(envs)
+                for e in envs:
+                    n += 1
+                    got, want = e.clearance(), e._clearance_now()
+                    seen.append(want)
+                    unequal += int(got != want or np.signbit(got) != np.signbit(want))
+    seen = np.array(seen)
+    check("the batch pass is each machine's own clearance to the bit, waves included",
+          unequal == 0 and n == 90, f"{n} reads, {unequal} differ")
+    check("and the fixture is on the ground, afloat and aloft",
+          (seen < 0.05).any() and (seen > 1.0).any(),
+          f"clearance {seen.min():.3f} to {seen.max():.3f} m")
+    # The memo must not survive a change of state at the same clock: a
+    # restore (identification) or a placement puts a machine back at a time
+    # it has already been at.
+    e = envs[0]
+    e._mj.mj_forward(e.model, e.data)        # the kinematics `restore` leaves
+    snap = e.snapshot()
+    before = e.clearance()
+    e.data.qpos[2] += 0.7
+    e._mj.mj_forward(e.model, e.data)
+    moved = e.clearance()
+    e.restore(snap)
+    check("a memo answers only for the state it was computed on",
+          abs(moved - before - 0.7) < 0.05 and e.clearance() == before,
+          f"{before:.3f} -> {moved:.3f} after lifting 0.7 m, back to {e.clearance():.3f}")
+
+
 def test_a_propeller_can_go_under_water() -> None:
     """arch43 was stopped at gen 3: 5.1% of rollouts diverged, rotor designs
     crossing into water.  A rotor spinning at 550 rad/s put under water reached
@@ -4080,6 +4136,7 @@ def main() -> int:
         test_the_rotor_table_is_the_rotor_model,
         test_the_search_can_build_rotorcraft,
         test_the_rotor_batch_is_the_per_rotor_loop,
+        test_the_clearance_of_a_batch_is_each_machines_own,
         test_a_propeller_can_go_under_water,
         test_the_batched_power_budget_is_the_power_budget,
         test_each_phase_is_scored_on_its_own_purpose,

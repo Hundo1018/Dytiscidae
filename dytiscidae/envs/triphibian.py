@@ -1404,7 +1404,70 @@ class TriphibianEnv:
         beach = np.where((xs >= lo) & (xs <= hi), beach, -np.inf)
         return np.maximum(surface, beach)
 
+    def _clearance_key(self) -> tuple:
+        """Everything `clearance` reads that changes: the clock (waves), and
+        the geoms' and the root's world pose, as bytes, so equality is exact."""
+        d = self.data
+        return (d.time, d.geom_xpos.tobytes(), d.geom_xmat.tobytes(),
+                d.xpos[self.root_body].tobytes())
+
     def clearance(self) -> float:
+        """`_clearance_now`, remembered for the state it was computed on.
+
+        A batched step reads it up to four times per machine (the segment's
+        record, the crossing tracker twice, the transition's peak) on a state
+        that has not moved, at ~60 us a read: 18% of a shard's profile
+        (2026-10-03, AM).  The memo is keyed on every input that changes, so a
+        hit returns the bits a fresh computation would.  `clearance_many`
+        fills it for a whole batch at once.
+        """
+        key = self._clearance_key()
+        memo = getattr(self, "_clear_memo", None)
+        if memo is not None and memo[0] == key:
+            return memo[1]
+        v = self._clearance_now()
+        self._clear_memo = (key, v)
+        return v
+
+    @staticmethod
+    def clearance_many(envs, active=None) -> None:
+        """Fill the `clearance` memo of every (active) machine in one array
+        pass: the per-geom arithmetic of `_clearance_now` on all machines'
+        geoms concatenated, and each machine's minimum over its own slice.
+        Elementwise the same operations, so the same bits
+        (`tests/test_search.py`).  A machine the pass cannot take -- no
+        colliding geoms, waves (whose surface is a dot product whose kernel
+        depends on how many rows it gets), or a clock out of step with the
+        rest -- is computed alone, as before."""
+        batch, solo = [], []
+        for i, e in enumerate(envs):
+            if active is not None and not active[i]:
+                continue
+            ok = (e._machine_geoms.size > 0 and e.medium.sea_state.amplitude <= 0.0
+                  and (not batch or e.data.time == batch[0].data.time))
+            (batch if ok else solo).append(e)
+        for e in solo:
+            e.clearance()
+        if len(batch) < 2:
+            for e in batch:
+                e.clearance()
+            return
+        gs = [e._machine_geoms for e in batch]
+        aabb = np.concatenate([e.model.geom_aabb.reshape(-1, 6)[g] for e, g in zip(batch, gs)])
+        R = np.concatenate([e.data.geom_xmat[g] for e, g in zip(batch, gs)]).reshape(-1, 3, 3)
+        xp = np.concatenate([e.data.geom_xpos[g] for e, g in zip(batch, gs)])
+        centre_local, half = aabb[:, :3], aabb[:, 3:]
+        centre_z = xp[:, 2] + np.einsum("nij,nj->ni", R, centre_local)[:, 2]
+        drop = np.einsum("nj,nj->n", np.abs(R[:, 2, :]), half)
+        bottom = centre_z - drop
+        ground = batch[0].ground_heights(xp[:, 0])
+        diff = bottom - ground
+        at = 0
+        for e, g in zip(batch, gs):
+            e._clear_memo = (e._clearance_key(), float(np.min(diff[at:at + g.size])))
+            at += g.size
+
+    def _clearance_now(self) -> float:
         """Height of the machine above the ground beneath it, metres.
 
         This exists because ``depth`` measures against the waterline, and the

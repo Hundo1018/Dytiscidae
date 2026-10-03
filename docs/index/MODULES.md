@@ -2,7 +2,7 @@
 
 # Modules
 
-102 modules, 35,820 lines, 1,055 indexed symbols.
+102 modules, 35,888 lines, 1,056 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -98,14 +98,14 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `envs.actors` | Several generations' worth of machines, stepped in several processes. | 461 | — | `torch` | `envs`, `envs.batchroll`, `learning.ppo` |
-| `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1270 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor` |
+| `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1275 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor` |
 | `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 703 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 72 | — | — | — |
 | `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 336 | — | `numpy` | `envs.triphibian` |
 | `envs.skills` | The actuator skill bench: learning to operate components, not vehicles. | 655 | — | `numpy` | `evolution.cmaes`, `physics.energy`, `physics.materials`, `physics.medium`, `physics.structure` |
 | `envs.tasks` | What a segment asks the machine to do, phase by phase. | 248 | — | — | — |
 | `envs.transitions` | Crossing between media, scored rather than merely survived. | 733 | — | `numpy` | `core.mjcf`, `envs.triphibian` |
-| `envs.triphibian` | The triphibian mission environment. | 2864 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
+| `envs.triphibian` | The triphibian mission environment. | 2927 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
 
 ## `evolution`
 
