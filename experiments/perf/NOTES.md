@@ -96,27 +96,113 @@ bit. On the idle machine: 13.27 s CPU at df95498, 8.25 s now (1.61x).
 Pool, idle machine, 16 designs with identification: HEAD 4x4 55.9 s, new 4x4
 42.6 s (1.31x). 8x2 not measurable here: with the pinned pool it was OOM-killed.
 
-## 2026-10-03: the rotor lookup, vectorised (WORK IN PROGRESS -- draft numbers)
+## 2026-10-03: what a rotor costs, and the rotor step vectorised (`rotor_cost.py`)
 
-Reconciliation, measured with `rotor_cost.py --count` (current code, 4 arch46
-elites with 4/22/5/21 rotors, identification on, shared policy, 6 s segments):
-wall 402.6 s, `RotorSet.apply` 331.3 s = 82%; 1,547,286 rotor-steps, 93.2%
-spinning, 2.00 `rotor_forces` calls per rotor-step; 197.9 us per rotor-step
-excluding table builds; 10 table builds = 25.2 s. Micro (`--micro`, same
-designs): 150 us per rotor-step in air and in water.
-The +1.6 s/rotor regression slope is the wall of the *placed* result, which with
-a shared policy is the re-score (no identification: 3 x 1500 + 4 x 1500 =
-10,500 steps at 6 s segments): 10,500 x 198 us = 2.1 s. The generation pays
-main (~33.6k steps) + re-score + refine steps, ~10.8 s of worker time per rotor
-at refine-steps 2. arch46 check: +3 rotors/design x 16 designs x 10.8 s / 4
-workers = +130 s/gen predicted against +116 s observed (114 -> 230 s).
-- after RotorBatch: rotor-heavy no-id batch bit-identical 750/750 numbers vs be3dbe0; wall 142.6 -> 76.8 s (not interleaved)
-- noise floor (rotor_cost.py --floor, two arch46 elites with 3 rotors, 2 s segments,
-  identification off): single path vs itself under 1e-15 dither, max of 3 seeds:
-  1.21e-9 and 1.23e-12; bar = max(1e-5, 2 x floor) = 1e-5; batched vs single 2.2e-9.
-- table build vectorised (bemt_many): 2.7-3.1 s -> 0.10-0.16 s per (spec, medium), bit-identical.
-- old rotor-heavy evaluation with identification (be3dbe0): 467.8 s, 747 numbers dumped.
-- A/B Part 1 (be3dbe0 vs c35c402, alternating processes, 3 reps, ab.sh): micro us/rotor-step
-  old 192.3/164.2/140.1 new 23.1/20.6/18.8 (ratio 0.120/0.125/0.134); rotor-heavy no-id wall
-  old 125.8/111.7/94.5 new 24.0/20.9/19.9 (0.191/0.187/0.211); with id old 366.2/348.9/271.6
-  new 71.5/62.7/55.4 (0.195/0.180/0.204).
+**Batch.** Four arch46 elites with 4, 22, 5 and 21 rotors (`rotor_cost.rotor_designs`,
+seed 1, >= 4 rotors), batched path, shared policy attached, 6 s segments.
+
+**Where a rotor's wall went** (`--count`, be3dbe0): with identification, 402.6 s wall,
+of which `RotorSet.apply` 331.3 s = 82%. 1,547,286 rotor-steps, 93.2% of them
+spinning, 2.00 `rotor_forces` calls per rotor-step, **198 us per rotor-step** (table
+builds excluded); 10 table builds (`bemt` over the 510-point grid) took 25.2 s,
+~2.5 s per (rotor spec, medium). `--micro` on the same machines: 140-192 us.
+
+**Reconciling that with "+1.6 s per rotor".** The regression slope is fitted on the
+`wall` of the placed result (`cost_model.py`), which with a shared policy is the
+noise-free *re-score*: no identification, 3 x 1500 + 4 x 1500 = 10,500 steps at 6 s
+segments. 10,500 x 198 us = 2.1 s per rotor, against a slope of 1.6-1.8 (shard-mates'
+rotors are noise in that fit, and flat batteries end some rollouts early). The 305 us
+micro-benchmark was the same cost on a loaded machine. Idle rotors (6.8% of
+rotor-steps) are cheap, but that is not where the gap was. A generation pays main
+(~33.6k steps with identification) + re-score + refine steps: ~10.8 s of worker time
+per rotor at `--refine-steps 2`. Check against arch46: +3 rotors/design x 16 designs
+x 10.8 s / 4 workers = +130 s/gen predicted, +116 s observed (114 -> 230 s/gen).
+
+**What changed.**
+- `RotorBatch` (`physics/rotor.py`): every rotor of a machine -- of every machine in
+  a shard, on the batched path -- in one array computation: stacked spin axes, hub
+  velocities as `BatchedFluid.launch` forms them, medium queries in one call (one
+  call per rotor on waves, whose dot product's BLAS kernel depends on the row
+  count), `rotor_forces_many` for both the start- and end-of-step speeds, the
+  backward-Euler end-of-step speed per row, fancy-indexed writes. `RotorSet.apply`
+  is a batch of one; `BatchedFluid.finish` runs one batch per step after its
+  per-machine loop. The per-rotor loop stays as `RotorSet.apply_per_rotor`, the
+  reference, called by no path.
+- `bemt_many`: `rotor_table`'s 510-point grid in one pass, 2.7-3.1 s -> 0.10-0.16 s
+  per (spec, medium).
+- Bit-identity needed three choices, each probed first: a stacked `matmul` for the
+  axis (the elementwise expansion misses BLAS's FMA in 19,986 of 20,000 rows);
+  `np.power(om, array of 2.0)` for `om**2` (Python's `pow` and numpy's `x*x` differ
+  in 19 of 20,000); row sums `(a*b).sum(1)` for the 3-vector dots (equal to `ddot` in
+  20,000 of 20,000).
+
+**Noise floor** (`--floor`, before any change; two arch46 elites with 3 rotors, 2 s
+segments, identification off, `_nudged` 1e-15 dither, max of 3 seeds): 1.21e-9 and
+1.23e-12, so the bar max(1e-5, 2 x floor) = 1e-5; batched against single 2.2e-9.
+Not needed in the end: every change below is bit-identical.
+
+**Agreement after the change** (`--dump` before, `--compare` after):
+
+| batch | numbers | not bit-identical |
+|---|---|---|
+| rotor-heavy, identification on | 747 | 0 |
+| rotor-heavy, identification off | 750 | 0 |
+| `profile_shard --n 4 --identify 0` (random designs) | 780 | 0 |
+
+and `test_the_rotor_batch_is_the_per_rotor_loop`: 32 cases (calm and waves, rotors
+in air / water / across the surface, idle and reversed, one machine and two), 0
+arrays differ; tables and 40 off-grid `bemt` points identical.
+
+**Timing**, alternating processes (be3dbe0 / c35c402), 3 repeats, an R-sweep search
+and other agents on the machine, so ratios:
+
+| | old | new | new/old per repeat |
+|---|---|---|---|
+| `apply`, us per rotor-step (`--micro`, air) | 192.3 / 164.2 / 140.1 | 23.1 / 20.6 / 18.8 | 0.120 / 0.125 / 0.134 |
+| rotor-heavy evaluation, no identification, s | 125.8 / 111.7 / 94.5 | 24.0 / 20.9 / 19.9 | 0.191 / 0.187 / 0.211 |
+| rotor-heavy evaluation, identification, s | 366.2 / 348.9 / 271.6 | 71.5 / 62.7 / 55.4 | 0.195 / 0.180 / 0.204 |
+| random designs (`profile_shard`), s | 11.71 / 16.26 / 15.12 | 12.72 / 13.83 / 15.15 | 1.09 / 0.85 / 1.00 |
+
+Not measured here: a generation. Predicted from the per-rotor numbers, late-run
+generations lose most of the ~+116 s rotors added; the arch47 `stages` events are
+that read.
+
+## 2026-10-03: AM, the host loops beside the rotors (`am_ab.py`)
+
+Profile after the rotor change (`profile_shard --n 4 --identify 0`, cProfile,
+cumulative of 23.8 s): `clearance` 4.36 s (18%), read up to four times a step per
+machine on a state that has not moved (the segment record, the crossing tracker
+twice, the transition peak).
+
+**Done.** `clearance` is remembered, keyed on the clock and the geoms' and root's
+pose bytes, so a hit is the computation's own bits; `clearance_many` fills it for
+a batch in one array pass (machines on waves, or with no colliding geoms, alone).
+`rollout_batch` reads `body_twist` once per step instead of twice. Same profile:
+`clearance`+`clearance_many` 4.36 -> 1.77 s. In-process A/B (`am_ab.py`, on/off
+alternating, results asserted identical): random designs on/off 0.870 / 0.900 /
+0.881 / 1.079, mean 0.933; rotor-heavy 1.135 / 0.547 / 0.882 -- inside the load
+noise, not a measurement. Tests: `test_the_clearance_of_a_batch_is_each_machines_own`
+(90 reads, 0 differ, waves included; a memo does not survive a 0.7 m move at the
+same clock).
+
+**Not done, and why.**
+- Damping projection (`ImplicitAeroDamping.projected`): 48 us (8 bodies, 12 DOF) to
+  93 us (45 bodies, 49 DOF) per call, called on one step in four: 12-23 us per
+  machine-step, 7% of the profile. Batching it across machines means a
+  block-diagonal (bodies x DOF) product whose BLAS summation order differs from the
+  per-machine one, so it would leave bit-identity for <= 7%.
+- Inflow (`InducedFlow.update` + `machine_flow`, one step in four) ~7%, CPG command
+  1.6%, entrainment reaction 3.4%: each interleaved with the per-machine limiter,
+  each a few percent at most.
+- `mj_step`: heterogeneous models, cannot be batched.
+
+**Verification, 2026-10-04** (the tree of this commit): `test_physics.py` whole,
+`[fail` lines 0, "all physics checks passed"; `test_search` single functions
+`test_the_two_evaluation_paths_score_the_same_machine_the_same`,
+`test_the_early_fluid_launch_changes_nothing` (378 numbers, moved []),
+`test_sharding_a_generation_does_not_change_a_score`, 0 failures each; the seven
+cheap suites pass. Mutations, each `caught 1/1`: `rotor-batch-one-table` (192
+arrays differ), `rotor-table-one-sum`, `clearance-batch-first-slice` (36 of 90
+reads differ), `clearance-memo-keyed-on-time`, and the two older rotor mutations
+retargeted at the live code, `propellers-one-handed` and
+`rotor-thrust-at-start-of-step`.
