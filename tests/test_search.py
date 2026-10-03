@@ -4974,6 +4974,203 @@ def test_something_asks_a_machine_to_leave_the_ground() -> None:
                   [_ph], segment_seconds=0.2, seed=1)[0].transitions.results)
 
 
+def test_grpo_rollouts_never_reach_the_archive() -> None:
+    """GRPO adds learning data and nothing else: no score, no elite, no evaluation count.
+
+    Two tiny searches at one seed, one with ``shared_learner="ppo"`` and one
+    with ``"ppo+grpo"``.  The statement, and why it is the defensible one:
+
+    * Generation 0 is scored before the policy has been updated, and GRPO
+      draws no number from any stream the run owns, so **everything placed in
+      generation 0 is identical** between the two -- every island's cells,
+      their fitnesses and genome ids, ``state.evaluated``, the curators'
+      counts, and the descriptor and judge sample counts that every committed
+      placement moves.  Captured at the moment verification would start, which is after
+      the update (so the policy has by then diverged) and before anything
+      scores with the updated policy.
+    * The GRPO rollouts did run (a ``grpo`` record in ``stages``, ``grpo_*`` in
+      ``ppo``) and **did change the learner** (the weights differ), so the
+      equality above is not the equality of two runs that did the same thing.
+    * The off run's telemetry carries no GRPO key at all.
+    """
+    if needs_batched_evaluator("test_grpo_rollouts_never_reach_the_archive"):
+        return
+    print("\ngrpo: learning-only rollouts leave the archive alone")
+    import json
+    import shutil
+    import tempfile
+
+    import numpy as np
+
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution import loop
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.learning.ppo import AVAILABLE
+
+    if not AVAILABLE:
+        skip("GRPO against the archive", "torch is not importable here")
+        return
+
+    def signature(state):
+        return {
+            "evaluated": state.evaluated,
+            "tier0_rejected": state.tier0_rejected,
+            # Everything a committed placement feeds: the descriptor fit's
+            # sample buffer and the judge's ratchets.  A rollout filed through
+            # ``_place`` that lost to the incumbent changes no cell, but it
+            # still moves these.
+            "descriptor_samples": (len(state.descriptors._buffer)
+                                   if state.descriptors is not None else None),
+            "judge_seen": sum(len(r._seen)
+                              for r in state.judge.ratchets.values()),
+            "islands": {
+                name: {
+                    "cells": sorted(
+                        (tuple(int(i) for i in cell), round(float(e.fitness), 12),
+                         str(e.genome.genome_id))
+                        for cell, e in arch.cells.items()),
+                    "evaluations": state.archipelago.curators[name].evaluations,
+                } for name, arch in state.archipelago.archives.items()},
+        }
+
+    real_verify, real_audit = loop._verify_and_label, loop._audit
+    taken: dict = {}
+
+    def run(learner: str):
+        tmp = tempfile.mkdtemp(prefix=f"dyt-grpo-{learner.replace('+', '-')}-")
+
+        def grab(state, gen, spec, rng):
+            taken["sig"] = signature(state)
+            taken["w"] = np.concatenate([
+                v.detach().cpu().numpy().ravel()
+                for v in state.shared.parameters()])
+
+        loop._verify_and_label = grab
+        loop._audit = lambda *a, **k: []
+        try:
+            cfg = SearchConfig(
+                generations=1, batch=4, workers=1, min_shard=2, seed=5,
+                segment_seconds=1.0, n_reference_seeds=4, n_random_seeds=0,
+                islands=("generalist",), tier2_every=999, audit_every=999,
+                migrate_every=999, checkpoint_every=999, run_dir=tmp,
+                use_shared_policy=True, promotion_refine_steps=0,
+                controller_refine_steps=0, shared_learner=learner,
+                grpo_bodies=2, grpo_group=2)
+            run_search(cfg, MissionSpec())
+        finally:
+            loop._verify_and_label, loop._audit = real_verify, real_audit
+        events = [json.loads(l) for l in open(Path(tmp) / "events.jsonl")]
+        return tmp, dict(taken), events
+
+    tmp_a = tmp_b = None
+    try:
+        tmp_a, off, ev_off = run("ppo")
+        tmp_b, on, ev_on = run("ppo+grpo")
+
+        check("generation 0 places the same elites with GRPO on as off",
+              on["sig"] == off["sig"],
+              f"{sum(len(i['cells']) for i in on['sig']['islands'].values())} vs "
+              f"{sum(len(i['cells']) for i in off['sig']['islands'].values())} "
+              f"cells; evaluated {on['sig']['evaluated']} vs {off['sig']['evaluated']}")
+        check("and the search was not empty, or that would be vacuous",
+              off["sig"]["evaluated"] >= 1 and any(
+                  i["cells"] for i in off["sig"]["islands"].values()),
+              f"{off['sig']['evaluated']} evaluated")
+        d = float(np.linalg.norm(on["w"] - off["w"]))
+        check("while the shared policy did learn something different",
+              d > 1e-6, f"||dW|| = {d:.3e}")
+
+        stages = [e for e in ev_on if e.get("kind") == "stages" and e.get("grpo")]
+        g = stages[0]["grpo"] if stages else {}
+        check("the GRPO stage ran and recorded its wall and size",
+              bool(g) and g.get("rollouts") == g.get("bodies", 0) * 2
+              and g.get("wall", 0) > 0 and g.get("bodies", 0) >= 1,
+              f"{g.get('bodies')} bodies x 2 = {g.get('rollouts')} rollouts "
+              f"in {g.get('wall')} s")
+        ppo = [e for e in ev_on if e.get("kind") == "ppo"]
+        check("the ppo event reports the groups it trained on",
+              bool(ppo) and ppo[0].get("grpo_groups", 0) >= 1
+              and ppo[0].get("grpo_transitions", 0) > 0
+              and not ppo[0].get("skipped"),     # telemetry writes bool as 0/1
+              f"{ppo[0].get('grpo_groups')} groups, "
+              f"{ppo[0].get('grpo_transitions')} rows" if ppo else "no ppo event")
+        check("the off run's telemetry has no GRPO key at all",
+              not any(e.get("grpo") for e in ev_off if e.get("kind") == "stages")
+              and not any(k.startswith("grpo") for e in ev_off
+                          if e.get("kind") == "ppo" for k in e),
+              "stages and ppo events scanned")
+    finally:
+        for t in (tmp_a, tmp_b):
+            if t:
+                shutil.rmtree(t, ignore_errors=True)
+
+
+def test_grpo_group_ids_survive_the_shard_split() -> None:
+    """A group split across two shards is still one group when the buffer is read.
+
+    The pool slices ``streams`` and ``identify_axes`` per shard; ``groups``
+    has to travel the same way, or the trajectories of one body come back
+    ungrouped (and ``learning.grpo`` drops them, counted).  The pool's worker
+    processes are replaced by an inline executor so the shard split, the
+    payload slicing and ``_run_shard`` all run, in this process.
+    """
+    if needs_batched_evaluator("test_grpo_group_ids_survive_the_shard_split"):
+        return
+    print("\ngrpo: group ids cross the pool")
+    from concurrent.futures import Future
+
+    import torch
+
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.actors import ActorPool
+    from dytiscidae.envs.batchroll import evaluate_tier1_batch
+    from dytiscidae.envs.triphibian import TriphibianEnv
+    from dytiscidae.learning.grpo import GroupRolloutBuffer
+    from dytiscidae.learning.ppo import AVAILABLE, SharedPolicy
+
+    if not AVAILABLE:
+        skip("group ids across the pool", "torch is not importable here")
+        return
+
+    class _Inline:
+        def submit(self, fn, *args):
+            f = Future()
+            f.set_result(fn(*args))
+            return f
+
+    torch.manual_seed(2)
+    shared = SharedPolicy(TriphibianEnv.OBS_DIM, 6, hidden=16)
+    phenos = [build(beetle()) for _ in range(4)]
+    groups, streams = [0, 0, 1, 1], [100, 101, 102, 103]
+    # Identified: the shared policy commands a body twist, which only a
+    # measured mobility basis can deliver, so a machine without one banks no
+    # trajectory at all.
+    kw = dict(segment_seconds=0.4, identify_axes=True, seed=3,
+              streams=streams, groups=groups)
+
+    ref = GroupRolloutBuffer()
+    evaluate_tier1_batch(phenos, shared=shared, buffer=ref, **kw)
+
+    pool = ActorPool(2, min_shard=2, per_worker=1.0)
+    real, pool._pool = pool._pool, _Inline()
+    try:
+        got = GroupRolloutBuffer()
+        pool.evaluate_tier1(phenos, shared=shared, buffer=got, **kw)
+    finally:
+        real.shutdown(wait=False, cancel_futures=True)
+    sharded = bool(pool.shard_log) and len(pool.shard_log[0]["walls"]) == 2
+    s_ref, s_got = ref.stats(), got.stats()
+    check("the call really was split into two shards", sharded,
+          str(pool.shard_log[-1]["sizes"]) if pool.shard_log else "no sharded call")
+    check("every trajectory arrives grouped, as in the unsplit call",
+          s_got["grpo_dropped"]["ungrouped"] == 0
+          and s_got["grpo_groups"] == s_ref["grpo_groups"] > 0
+          and s_got["grpo_bodies"] == s_ref["grpo_bodies"] == 2,
+          f"{s_got['grpo_groups']} groups over {s_got['grpo_bodies']} bodies "
+          f"(unsplit {s_ref['grpo_groups']}), dropped {s_got['grpo_dropped']}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae search-machinery verification")
@@ -5045,6 +5242,8 @@ def main() -> int:
         test_a_nan_observation_fails_the_rollout_not_the_batch,
         test_the_early_fluid_launch_changes_nothing,
         test_structure_can_be_recombined_and_duplicated,
+        test_grpo_rollouts_never_reach_the_archive,
+        test_grpo_group_ids_survive_the_shard_split,
     ])
     return report("all search-machinery checks passed")
 

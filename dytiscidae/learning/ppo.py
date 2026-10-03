@@ -322,6 +322,10 @@ class Trajectory:
     #: Which segment this came from, so its reward can be scaled against the
     #: others of its kind rather than against a water segment.
     tag: str = ""
+    #: Which group of rollouts of the *same body* this belongs to, or -1 for an
+    #: ordinary trajectory.  Only ``learning.grpo`` reads it: a trajectory's
+    #: advantage there is relative to the others sharing ``(group, tag)``.
+    group: int = -1
 
     def __len__(self) -> int:
         return len(self.obs)
@@ -466,13 +470,21 @@ class SegmentCollector:
         t.val.append(float(val))
         t.phi.append(float(phi))
 
-    def finish(self, buffer: RolloutBuffer, rewards, tag: str = "") -> None:
-        """Attach each machine's segment competence and bank the trajectory."""
+    def finish(self, buffer: RolloutBuffer, rewards, tag: str = "",
+               groups=None) -> None:
+        """Attach each machine's segment competence and bank the trajectory.
+
+        ``groups``, one int per machine, marks which rollouts are repeats of
+        one body (``learning.grpo``).  None leaves every trajectory ungrouped,
+        which is what every call before it existed produced.
+        """
         for m, t in enumerate(self.live):
             if not len(t):
                 continue
             t.terminal_reward = float(rewards[m])
             t.tag = tag
+            if groups is not None:
+                t.group = int(groups[m])
             buffer.add(t)
         self.live = [Trajectory() for _ in range(self.k)]
 
@@ -481,8 +493,14 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
                minibatch: int = 2048, clip: float = 0.2,
                vf_coef: float = 0.5, ent_coef: float = 0.01,
                max_grad_norm: float = 0.5, target_kl: float = 0.015,
-               lr_fraction: float = 1.0, optimiser=None, rng=None) -> dict:
+               lr_fraction: float = 1.0, optimiser=None, rng=None,
+               group_buffer=None) -> dict:
     """One PPO update over everything the generation collected.
+
+    ``group_buffer`` (``learning.grpo.GroupRolloutBuffer``, default None) adds
+    GRPO rows to the same pass; None is exactly the update every run before it
+    existed took.  See ``learning/grpo.py`` for what the rows are and why they
+    share minibatches with the ordinary ones.
 
     The defaults were raised after the first full run that used this.  At
     lr=3e-4, 4 epochs and a 4096 minibatch, arch30 pushed 2.93 million
@@ -563,10 +581,33 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
     if not AVAILABLE:
         raise RuntimeError(f"torch unavailable: {UNAVAILABLE_REASON}")
     n = buffer.n_transitions
-    if n < 2:
-        return {"transitions": n, "skipped": True}
+    n_group = group_buffer.n_transitions if group_buffer is not None else 0
+    unused_group = {}
+    if group_buffer is not None and n_group == 0:
+        # Every group was unusable.  Say so in the diagnostics (the dropped
+        # counts are the point) and run the ordinary update as if none came.
+        unused_group = group_buffer.stats()
+        group_buffer = None
+    if n + n_group < 2:
+        return {"transitions": n + n_group, "skipped": True, **unused_group}
 
-    obs_np, act, logp_old, adv, ret, val_old = buffer.build()
+    n_ord = n
+    group_info = None
+    if group_buffer is None:
+        obs_np, act, logp_old, adv, ret, val_old = buffer.build()
+    else:
+        # GRPO rows ride in the same minibatches as the ordinary rows, so one
+        # optimiser pass sees both under one policy and one observation
+        # normaliser.  Two successive updates would not: the first one's
+        # ``observe`` moves the normaliser, and the second's importance ratios
+        # would then compare the rollout's function with a different one before
+        # a single gradient step.  The group rows keep their own advantages
+        # (below) and carry no value loss.
+        parts = ([buffer.build()] if n_ord else []) + [group_buffer.build()]
+        obs_np, act, logp_old, adv, ret, val_old = (
+            np.concatenate([p[k] for p in parts]) for k in range(6))
+        group_info = group_buffer.stats()
+        n = n_ord + n_group
 
     nonfinite = {k: int((~np.isfinite(v)).sum()) for k, v in
                  (("obs", obs_np), ("act", act), ("logp", logp_old),
@@ -585,7 +626,23 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
     val_old = torch.as_tensor(val_old.astype(np.float32))
     # Normalising advantages across the batch is what lets one policy learn from
     # morphologies whose competences live on different scales.
-    adv = (adv - adv.mean()) / (adv.std() + 1e-8)
+    if group_info is None:
+        adv = (adv - adv.mean()) / (adv.std() + 1e-8)
+        is_ord = None
+    else:
+        # The ordinary rows are normalised among themselves, exactly as above,
+        # and the group rows are left alone: their advantage is already
+        # relative to the body's own other attempts, and a batch-wide
+        # standardisation would add the mean and scale of a different kind of
+        # number back into it.
+        is_ord = torch.zeros(n, dtype=torch.bool)
+        is_ord[:n_ord] = True
+        if n_ord >= 2:
+            a_ord = adv[:n_ord]
+            adv = torch.cat([(a_ord - a_ord.mean()) / (a_ord.std() + 1e-8),
+                             adv[n_ord:]])
+        elif n_ord == 1:
+            adv = torch.cat([torch.zeros(1), adv[n_ord:]])
 
     # Adam's default epsilon is 1e-8, which is small enough relative to these
     # gradients that the effective step size varies by orders of magnitude
@@ -621,8 +678,16 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
             # of every other morphology are measured against.
             v = policy.value(obs[b])
             v_clipped = val_old[b] + (v - val_old[b]).clamp(-clip, clip)
-            v_loss = 0.5 * torch.max((v - ret[b]) ** 2,
-                                     (v_clipped - ret[b]) ** 2).mean()
+            if is_ord is None:
+                v_loss = 0.5 * torch.max((v - ret[b]) ** 2,
+                                         (v_clipped - ret[b]) ** 2).mean()
+            else:
+                # Group rows have no value target (GRPO has no critic), so the
+                # loss is the mean over the ordinary rows of this minibatch.
+                w = is_ord[b].float()
+                v_loss = (0.5 * torch.max((v - ret[b]) ** 2,
+                                          (v_clipped - ret[b]) ** 2)
+                          * w).sum() / w.sum().clamp(min=1.0)
             # ``ent`` came out of ``log_prob_and_entropy``: the entropy of
             # *this* policy on a reparameterised sample of its own, not
             # ``-logp.mean()`` over the rollout's actions.  See
@@ -669,7 +734,7 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
     policy.observe(obs_np)
 
     k = max(stats["n_batches"], 1)
-    return {
+    out = {
         "transitions": n,
         "trajectories": len(buffer.trajectories),
         "pi_loss": stats["pi_loss"] / k,
@@ -691,3 +756,8 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
         "deterministic": rng is not None,
         "skipped": False,
     }
+    out.update(unused_group)
+    if group_info is not None:
+        out.update(group_info)
+        out["ordinary_transitions"] = n_ord
+    return out

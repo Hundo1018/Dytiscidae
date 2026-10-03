@@ -193,6 +193,34 @@ class SearchConfig:
     #: log-std collapse early and the policy stop exploring while the search is
     #: still handing it new morphologies every generation.
     shared_ent_coef: float = 0.01
+    #: Which estimator trains the shared policy (ROADMAP N).  ``"ppo"`` is
+    #: every run to date.  ``"ppo+grpo"`` adds ``grpo_bodies`` x ``grpo_group``
+    #: learning-only rollouts per generation whose advantage is relative to
+    #: the body's own other attempts; ``"grpo"`` trains on those alone.  The
+    #: ordinary rollouts are still collected under both, because they are the
+    #: generation's scores.  Built 2026-10-03, off by default: whether the
+    #: shared policy carries any weight is item R's question, not this one's.
+    shared_learner: str = "ppo"
+    #: Rollouts of one body per group.  At least 2: a group of one has no mean.
+    grpo_group: int = 4
+    #: Bodies given a group each generation, drawn without replacement from the
+    #: ones that passed Tier-0.  Cost is ``grpo_bodies * grpo_group`` extra
+    #: machines through one batched Tier-1, with no identification.
+    grpo_bodies: int = 4
+    #: Which estimator trains the shared policy (ROADMAP N).  ``"ppo"`` is
+    #: every run to date.  ``"ppo+grpo"`` adds ``grpo_bodies`` x ``grpo_group``
+    #: learning-only rollouts per generation whose advantage is relative to
+    #: the body's own other attempts; ``"grpo"`` trains on those alone.  The
+    #: ordinary rollouts are still collected under both, because they are the
+    #: generation's scores.  Built 2026-10-03, off by default: whether the
+    #: shared policy carries any weight is item R's question, not this one's.
+    shared_learner: str = "ppo"
+    #: Rollouts of one body per group.  At least 2: a group of one has no mean.
+    grpo_group: int = 4
+    #: Bodies given a group each generation, drawn without replacement from the
+    #: ones that passed Tier-0.  Cost is ``grpo_bodies * grpo_group`` extra
+    #: machines through one batched Tier-1, with no identification.
+    grpo_bodies: int = 4
     #: Anneal the learning rate linearly to zero over the run.  arch33's policy
     #: hit the KL ceiling on 88% of its updates past generation 450 and its
     #: parameter trajectory was anti-correlated step to step, which is the
@@ -528,6 +556,9 @@ def evaluate_candidates(
 
     if log is not None:
         log["main_wall"] = round(_time.perf_counter() - t0, 3)
+        # The evaluation seed fixes the scatter and the task every machine in
+        # the call faced; the GRPO rollouts must face the same (ROADMAP N).
+        log["seed"] = int(seeds[passed[0]])
     results = _refine_controllers(
         [phenos[i] for i in passed], ctrls, results, cfg,
         spec=spec, seed=seeds[passed[0]], shared=shared, pool=pool, log=log,
@@ -1076,6 +1107,94 @@ def _funnel(state: SearchState, parents):
     return near
 
 
+def _check_learner(cfg: SearchConfig) -> None:
+    """Refuse a learner configuration that would silently not do what it says."""
+    from ..learning.grpo import LEARNERS
+    if cfg.shared_learner not in LEARNERS:
+        raise ValueError(f"shared_learner={cfg.shared_learner!r}; expected one "
+                         f"of {LEARNERS}")
+    if cfg.shared_learner == "ppo":
+        return
+    if not cfg.use_shared_policy:
+        raise ValueError(f"shared_learner={cfg.shared_learner!r} trains the "
+                         "shared policy, which is off: add --shared-policy")
+    if cfg.grpo_group < 2:
+        raise ValueError(f"grpo_group={cfg.grpo_group}: a group of one has no "
+                         "mean to be relative to")
+    if cfg.grpo_bodies < 1:
+        raise ValueError(f"grpo_bodies={cfg.grpo_bodies}: need at least one")
+
+
+#: Exploration streams of the GRPO rollouts start here, clear of the
+#: generation's own (a machine's place in the batch, so below ``batch``).
+GRPO_STREAM_BASE = 1 << 20
+
+
+def _grpo_rollouts(state: SearchState, cfg: SearchConfig, gen: int, evaluated,
+                   stage_log: dict, spec):
+    """The learning-only rollouts: ``grpo_group`` repeats of a few bodies.
+
+    Returns ``(GroupRolloutBuffer or None, record)``.  **Nothing here is
+    scored, placed or kept**: the results of the batched call are dropped, the
+    controllers handed to it are copies, and the function touches neither the
+    archive nor the curator nor ``state.evaluated``.  That is the property
+    ``test_search`` holds it to.
+
+    The bodies are drawn from a stream derived from ``(seed, gen)`` alone, so
+    nothing the run's own streams produce moves when this is on, and a resume
+    redraws the same ones.  They face the generation's evaluation seed, hence
+    its scatter and task; only the exploration noise differs between the
+    members of a group (``streams``).  Controllers are the ones the bodies were
+    archived with, with their measured axes, so no identification is repeated.
+    """
+    import time as _time
+
+    from ..envs.evaluate import Controller
+    from ..learning.grpo import GroupRolloutBuffer
+
+    eligible = [j for j, got in enumerate(evaluated)
+                if got is not None and got[2] is not None]
+    seed = stage_log.get("seed")
+    if not eligible or seed is None:
+        return None, {"skipped": True,
+                       "reason": "no body passed Tier-0 through the batched path"}
+    draw = np.random.default_rng([int(cfg.seed) & 0x7FFFFFFF, int(gen), 0x6752])
+    n_b = min(int(cfg.grpo_bodies), len(eligible))
+    chosen = sorted(int(j) for j in draw.choice(eligible, size=n_b, replace=False))
+
+    G = int(cfg.grpo_group)
+    phenos, ctrls, groups, streams = [], [], [], []
+    for b, j in enumerate(chosen):
+        pheno, _result, ctrl = evaluated[j]
+        for g in range(G):
+            phenos.append(pheno)
+            pol = (None if ctrl.policy is None
+                   else _copy_policy(ctrl.policy, ctrl.policy.weights))
+            ctrls.append(Controller(params=ctrl.params, policy=pol,
+                                    bases=ctrl.bases))
+            groups.append(b)
+            streams.append(GRPO_STREAM_BASE + b * G + g)
+
+    gbuf = GroupRolloutBuffer()
+    pool = state.pool
+    n_calls = len(pool.shard_log) if pool is not None else 0
+    t0 = _time.perf_counter()
+    results = _batched(
+        pool, phenos, spec=spec, shared=state.shared, buffer=gbuf,
+        n_modes=cfg.n_modes, controllers=ctrls,
+        segment_seconds=cfg.segment_seconds, identify_axes=False,
+        seed=int(seed), streams=streams, groups=groups)
+    wall = round(_time.perf_counter() - t0, 3)
+    del results                      # learning-only: no score leaves this function
+    calls = []
+    if pool is not None:
+        calls = list(pool.shard_log[n_calls:])
+        del pool.shard_log[n_calls:]
+    return gbuf, {"wall": wall, "bodies": n_b, "group": G,
+                  "rollouts": len(phenos), "chosen": chosen,
+                  "shards": [c["walls"] for c in calls]}
+
+
 def _stage_event(state: SearchState, gen: int, log: dict, *, refined: int,
                  changed: int, placed: int) -> None:
     """One ``stages`` event per generation: where its wall went (AK, AJ).
@@ -1105,6 +1224,8 @@ def _stage_event(state: SearchState, gen: int, log: dict, *, refined: int,
         "placed": placed, "refined": refined, "placement_changed": changed,
         "shards": [c["walls"] for c in calls],
         "idle": round(waited / worked, 4) if worked > 0 else None,
+        # Present only when GRPO ran, so an off run's event is what it was.
+        **({"grpo": log["grpo"]} if log.get("grpo") else {}),
     })
 
 
@@ -1140,6 +1261,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
          specialists from different ones
     """
     spec = spec or MissionSpec()
+    _check_learner(cfg)
 
     # Decide once, here, whether the GPU path can actually run -- not merely
     # whether it imports.  ``batchroll.AVAILABLE`` is an import-time answer and
@@ -1381,6 +1503,16 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 state.distance.apply(spec)
                 telemetry.event({"kind": "distance_step", "gen": gen,
                                  "moves": moves, **state.distance.report()})
+        gbuf = None
+        if (state.shared is not None and buffer is not None
+                and cfg.shared_learner != "ppo"):
+            try:
+                gbuf, stage_log["grpo"] = _grpo_rollouts(
+                    state, cfg, gen, evaluated, stage_log, spec)
+            except Exception as exc:
+                telemetry.event({"kind": "error", "gen": gen,
+                                 "island": state.island,
+                                 "error": f"grpo: {type(exc).__name__}: {exc}"})
         _stage_event(state, gen, stage_log, refined=refined, changed=changed,
                      placed=sum(1 for g in evaluated if g is not None))
 
@@ -1390,14 +1522,23 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             frac = 1.0
             if cfg.shared_lr_anneal and cfg.generations > 0:
                 frac = max(1.0 - gen / float(cfg.generations), 0.0)
-            info = ppo_update(state.shared, buffer, lr=cfg.shared_lr,
+            if cfg.shared_learner == "grpo":
+                # Trained on the group rollouts alone; the ordinary ones were
+                # collected because they are the generation's scores.
+                from ..learning.ppo import RolloutBuffer as _RB
+                update_buffer = _RB(shaping=cfg.reward_shaping)
+            else:
+                update_buffer = buffer
+            info = ppo_update(state.shared, update_buffer, lr=cfg.shared_lr,
                               epochs=cfg.shared_epochs,
                               minibatch=cfg.shared_minibatch,
                               target_kl=cfg.shared_target_kl,
                               ent_coef=cfg.shared_ent_coef,
                               lr_fraction=frac,
                               optimiser=state.shared_opt,
-                              rng=state.learner_rng)
+                              rng=state.learner_rng,
+                              **({"group_buffer": gbuf} if gbuf is not None
+                                 else {}))
             # The reward the update actually saw, per segment kind, so a later
             # reading can tell a policy that stopped learning from one that was
             # never given a gradient.  arch31's ppo line reported neither, and

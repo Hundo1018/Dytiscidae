@@ -1092,6 +1092,69 @@ MUTATIONS: tuple = (
         replace="        shortfall = float(np.clip(-self.predict(features), -1.0, 1.0))",
         defect="a predicted positive gap raises the cheap score: a second objective",
         suites=("test_search::test_critic_learns_the_exploit_signature",), item="critic bound"),
+
+    # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
+    Mutation(
+        id="grpo-advantage-across-the-whole-batch",
+        path="dytiscidae/learning/grpo.py",
+        find="        members.setdefault(k, []).append(i)",
+        replace="        members.setdefault(0, []).append(i)",
+        defect="the group baseline is the whole batch's mean and spread, so a "
+               "body's luck is back in the advantage and GRPO is a worse PPO",
+        suites=("test_ppo",), item="N group advantage"),
+    Mutation(
+        id="grpo-group-ignores-the-segment-kind",
+        path="dytiscidae/learning/grpo.py",
+        find="            by.setdefault((t.group, t.tag), []).append(t)",
+        replace="            by.setdefault((t.group, \"\"), []).append(t)",
+        defect="a body's water competence is compared with its crossing quality",
+        suites=("test_ppo",), item="N group key"),
+    Mutation(
+        id="grpo-std-floor-removed",
+        path="dytiscidae/learning/grpo.py",
+        find="STD_EPS = 0.05\n\n\ndef group_advantages",
+        replace="STD_EPS = 0.0\n\n\ndef group_advantages",
+        defect="float noise in a group that did nothing is stretched to a unit "
+               "advantage, and a group of identical returns divides 0 by 0",
+        suites=("test_ppo",), item="N group floor"),
+    Mutation(
+        id="grpo-rows-renormalised-with-the-batch",
+        path="dytiscidae/learning/ppo.py",
+        find="            adv = torch.cat([(a_ord - a_ord.mean()) / (a_ord.std() + 1e-8),\n"
+             "                             adv[n_ord:]])",
+        replace="            adv = (adv - adv.mean()) / (adv.std() + 1e-8)",
+        defect="a mixed update standardises the group rows with the ordinary "
+               "ones, adding a different kind of number's mean and scale back",
+        suites=("test_ppo",), item="N mixed batch"),
+    Mutation(
+        id="grpo-rollouts-leak-into-the-archive",
+        path="dytiscidae/evolution/loop.py",
+        find="    del results                      # learning-only: no score leaves this function",
+        replace="    for _k, _r in enumerate(results):\n"
+                "        _ph, _res, _ct = evaluated[chosen[groups[_k]]]\n"
+                "        _place(state, _ph.genome, _ph, _r, _ct, None, [\"grpo\"])",
+        defect="the learning-only rollouts are filed as candidates, so a lucky "
+               "exploration sample can become an elite's score",
+        suites=("test_search::test_grpo_rollouts_never_reach_the_archive",),
+        item="N learning-only"),
+    Mutation(
+        id="grpo-rollouts-count-as-evaluations",
+        path="dytiscidae/evolution/loop.py",
+        find="    del results                      # learning-only: no score leaves this function",
+        replace="    state.evaluated += len(results)",
+        defect="the learning-only rollouts advance the evaluation counter, which "
+               "names genomes and sets the identification cadence",
+        suites=("test_search::test_grpo_rollouts_never_reach_the_archive",),
+        item="N learning-only"),
+    Mutation(
+        id="grpo-pool-drops-the-group-ids",
+        path="dytiscidae/envs/actors.py",
+        find="                kw[\"groups\"] = [kwargs[\"groups\"][i] for i in idx]",
+        replace="                pass",
+        defect="a body split across two shards comes back ungrouped, so its "
+               "trajectories are dropped from GRPO and the stage buys nothing",
+        suites=("test_search::test_grpo_group_ids_survive_the_shard_split",),
+        item="N pool"),
 )
 
 
