@@ -18,11 +18,15 @@ def main() -> None:
     ap.add_argument("--total", type=int, default=600)
     a = ap.parse_args()
     rows = [json.loads(l) for l in open(f"{a.run}/generations.jsonl")]
+    # The opening verification burst is one generation per island: 7 before
+    # 2026-10-03, 8 since.  Read the count from the run, not a constant.
+    n_isl = next((len(r["islands"]) for r in rows
+                  if r.get("kind") == "run_start" and r.get("islands")), 8)
     rows = [r for r in rows if "generation" in r]
     g = np.array([r["generation"] for r in rows]); t = np.array([r["t"] for r in rows])
     dt, gg = np.diff(t), g[1:]
     n = len(rows); ahead = np.arange(n, a.total)
-    steady = gg >= 7                      # skip the six-island verification burst
+    steady = gg >= n_isl                  # skip the verification burst
     est = {
         "flat, last 100 mean": len(ahead) * dt[-100:].mean(),
         "trend, last 200": np.polyval(np.polyfit(gg[-200:], dt[-200:], 1), ahead).sum(),

@@ -1,0 +1,260 @@
+{
+ "commit": "be3dbe0a9c39c725b58608a9fb6cc96988e44635",
+ "numpy": "2.5.1",
+ "segment_seconds": 8.0,
+ "wall_s": 214.5,
+ "rows": [
+  {
+   "plan": "beetle",
+   "seed": 0,
+   "drive": "gait",
+   "air": 0.0,
+   "water": 0.0,
+   "land": 0.009433770359885785,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "beetle",
+   "seed": 0,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.0,
+   "land": 0.002588309821689403,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "beetle",
+   "seed": 1,
+   "drive": "gait",
+   "air": 0.0,
+   "water": 7.292620586617406e-05,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "beetle",
+   "seed": 1,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.0,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "medusa",
+   "seed": 0,
+   "drive": "gait",
+   "air": 0.0,
+   "water": 0.0,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "medusa",
+   "seed": 0,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.004644962038583369,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "medusa",
+   "seed": 1,
+   "drive": "gait",
+   "air": 0.0,
+   "water": 0.02623409755121714,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "medusa",
+   "seed": 1,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.03268868334559305,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "bat",
+   "seed": 0,
+   "drive": "gait",
+   "air": 0.0,
+   "water": 0.03775374173861118,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "bat",
+   "seed": 0,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.0,
+   "land": 0.001388314220579772,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "bat",
+   "seed": 1,
+   "drive": "gait",
+   "air": 0.0,
+   "water": 0.0023947172309495414,
+   "land": 0.06767987268703816,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "bat",
+   "seed": 1,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.07252570031382999,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "eel",
+   "seed": 0,
+   "drive": "gait",
+   "air": 0.0,
+   "water": 0.0,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "eel",
+   "seed": 0,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.0,
+   "land": 0.0009702386723655646,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "eel",
+   "seed": 1,
+   "drive": "gait",
+   "air": 0.0,
+   "water": 0.12244417322902554,
+   "land": 0.055548524516301,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "eel",
+   "seed": 1,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.0,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "ray",
+   "seed": 0,
+   "drive": "gait",
+   "air": 0.0,
+   "water": 0.005893402267748936,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "ray",
+   "seed": 0,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.24367593478634433,
+   "land": 0.00022214956858549424,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "ray",
+   "seed": 1,
+   "drive": "gait",
+   "air": 0.0,
+   "water": 0.0016988111134172048,
+   "land": 0.02802768118647723,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "ray",
+   "seed": 1,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.0,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "gannet",
+   "seed": 0,
+   "drive": "gait",
+   "air": 0.0,
+   "water": 0.0036921263191460312,
+   "land": 0.029323787559718067,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "gannet",
+   "seed": 0,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.00594722237445652,
+   "land": 0.0015917491858315439,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "gannet",
+   "seed": 1,
+   "drive": "gait",
+   "air": 0.185345887888775,
+   "water": 0.020622245698181094,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "gannet",
+   "seed": 1,
+   "drive": "still",
+   "air": 0.12763471082731886,
+   "water": 0.01986443910515068,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "teal",
+   "seed": 0,
+   "drive": "gait",
+   "air": 0.0,
+   "water": 0.0,
+   "land": 0.2299640681983027,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "teal",
+   "seed": 0,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.0004742476470617339,
+   "land": 0.0004513917488168851,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "teal",
+   "seed": 1,
+   "drive": "gait",
+   "air": 2.8950173900814873e-05,
+   "water": 0.00241418908400073,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  },
+  {
+   "plan": "teal",
+   "seed": 1,
+   "drive": "still",
+   "air": 0.0,
+   "water": 0.017308730188940902,
+   "land": 0.0,
+   "mission_fraction": 0.0
+  }
+ ]
+}

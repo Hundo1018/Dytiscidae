@@ -28,8 +28,8 @@ makes resume, retention and export answerable without knowing the layout.
 
 A step here is a **generation**.  At this project's measured ~74 s per
 generation in steady state, a budget of 900 steps is about 21 hours, and the
-opening six-island verification burst costs ~300 s a generation for the first
-six.  That is why ``TrainerCapabilities.step_unit`` exists.
+opening eight-island verification burst costs ~300 s a generation for the first
+eight.  That is why ``TrainerCapabilities.step_unit`` exists.
 """
 
 from __future__ import annotations
@@ -101,9 +101,9 @@ class SearchTrainer:
             # determinism across a different worker count -- the pool shards the
             # batch, and a different shard layout evaluates in a different order.
             deterministic=True,
-            description="MAP-Elites over six islands with a shared PPO policy; "
+            description="MAP-Elites over eight islands with a shared PPO policy; "
                         "a step is one generation (~74 s measured in steady "
-                        "state, ~300 s for generations 0-5)")
+                        "state, ~300 s for generations 0-7)")
 
     # -- the contract -----------------------------------------------------
 
