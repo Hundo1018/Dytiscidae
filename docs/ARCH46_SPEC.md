@@ -264,7 +264,57 @@ built and off. Use Y/O rather than a second potential.
 
 ---
 
-## 8. Crossings that pay for nothing — **the largest item on this list; not built, a decision**
+## 8. Crossings that pay for nothing — **built 2026-10-03 (all three steps), unrun; not comparable across it**
+
+**What was built.** `transitions.CrossingTracker` is now the one definition of
+a crossing, and both evaluation paths call it.
+
+- **Directional.** A crossing must start in its start medium (`started_in`). Only
+  a change *into* the target counts, and only if it is still there at the end.
+  `water_to_land` now starts with its root 0.15 m under water, at the most
+  shoreward x where its geometry clears the ramp (3–7.5 m from the shore,
+  depending on the body).
+- **Commanded.** For the first `HOLD_SECONDS` = 1.5 s the controller observes the
+  start medium and must stay in it. In air that means holding height: full
+  marks for losing at most 0.5 m, nothing at 1.5 m; still bodies lose 2.6–9.5
+  m. Only then does it observe the target. A crossing counts at hold ≥ 0.5,
+  and the graded approach is scaled by the hold. `air_to_water` now starts
+  level at the launch speed, 4 m up, at x = −200.
+- **Economy.** It is computed only for a completed crossing, and a still machine
+  no longer completes any, so it now reads 0.000 for one (was 1.000).
+
+**Found on the way** (all fixed, each held by a mutation):
+
+- The graded approach to an air target counted no-contact steps as aloft. A
+  body floating in water has no contacts, so it earned **0.300** of
+  `water_to_air`. Aloft now means clear of the surface below, in the go phase.
+- Its height term read the whole episode's peak clearance, which included the
+  5 cm placement gap: 0.031 for a sitting gannet.
+- `scatter` poses the joints *after* placement. The teal's `land_to_air` start
+  was left **0.5 m off the ground**, so its "leap" (0.52 m in the old test) was a
+  drop. Its real leap is 0.11 m. A land start is now reseated on the ground
+  after scatter, and a water start is stepped off the ramp (the ray sat 8 cm
+  inside it).
+
+**Measured after** (`experiments/still_transitions/run.py`, 7 plans × 2 seeds),
+best still-machine value per kind: reward 0.000 in all four; graded approach
+`water_to_land` 0.013, `land_to_air` 0.000, both air ones 0.000. **Prediction
+met** (≤ 0.05). The base gait also scores ~0. It is open-loop and does not
+observe the command. That the gate is passable is shown by scripted controls
+in `test_a_crossing_is_commanded_and_a_still_machine_makes_none`: hover through
+the hold then go in, and get ashore after the command, both cross; doing either
+during the hold, or reaching land and leaving it, does not.
+
+**What to expect in arch46.** Crossings will be rare: a crossing now needs a
+policy that obeys the command, and `air_to_water` needs height held, which
+almost nothing in the population can do. `mission_fraction`'s transition
+factor, island scores, the curriculum's "crossing" stage and PPO's transition
+tags are **not comparable** with any earlier run. Watch the share of designs
+with a nonzero graded approach per kind. If it stays 0 through gen 200, the
+probe is a wall rather than a gradient, and the start distance or the hold bar
+is the lever, read from the measured distribution.
+
+### The measurement that motivated it
 
 Measured 2026-10-03 (`experiments/still_transitions/`). There are two
 mechanisms:

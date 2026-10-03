@@ -1340,6 +1340,142 @@ def test_transitions_are_graded_not_pass_fail() -> None:
           two <= one, f"{one:.2f} -> {two:.2f} after adding a second crossing")
 
 
+def test_a_crossing_is_commanded_and_a_still_machine_makes_none() -> None:
+    """ARCH46_SPEC §8: a crossing pays only for doing what the machine was told.
+
+    Measured 2026-10-03 with the actuators held still, 7 plans x 2 seeds: the
+    old probes paid a still machine 0.834 on ``air_to_water`` (it fell in) and
+    0.865 on ``water_to_land`` (it started dry on the ramp, settled into the
+    water, and any change of wetness counted), more than the base gait; and the
+    graded approach paid 0.300 on ``water_to_air`` to a body floating with no
+    contacts.  Now a crossing starts in its start medium, holds there on
+    command for HOLD_SECONDS, and only a change *into* the target afterwards,
+    still held at the end, counts.  The positive controls script the state
+    through the real loop, so the gate is shown to be passable, not a wall.
+    """
+    print("\ntransitions: commanded, directional, and nothing for a still machine")
+    from dytiscidae.control.cpg import CPGParams
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import transitions as T
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    def reward(t):
+        return float(t.crossed) * (0.40 + 0.60 * float(np.mean([
+            t.components[c] for c in ("shock", "control", "settle", "economy", "exit_state")])))
+
+    worst, economy = {}, 0.0
+    for plan in ("beetle", "gannet"):
+        env = TriphibianEnv(build(BODY_PLANS[plan]()), seed=0)
+        b = env.cpg.base
+        still = CPGParams(amplitude=np.zeros(env.cpg.n), phase=np.asarray(b.phase, float),
+                          offset=np.asarray(b.offset, float), frequency=float(b.frequency))
+        for kind in ("air_to_water", "water_to_air", "water_to_land", "land_to_air"):
+            t = T.run_transition(env, kind, Controller(params=still))
+            worst[kind] = max(worst.get(kind, 0.0), reward(t), t.components["crossed"])
+            economy = max(economy, t.components["economy"])
+    check("a still machine earns nothing on any crossing (reward or graded approach)",
+          max(worst.values()) <= 0.05,
+          ", ".join(f"{k} {v:.3f}" for k, v in worst.items()))
+    check("and the energy-economy term pays it nothing (it read 1.000 still)",
+          economy == 0.0, f"{economy:.3f}")
+
+    env = TriphibianEnv(build(BODY_PLANS["beetle"]()), seed=0)
+    ctrl = Controller(params=env.cpg.base)
+    hold_n = max(int(round(T.HOLD_SECONDS / env.timestep)), 1)
+
+    def scripted(hook):
+        """Run ``hook(env, k)`` after every physics step of the next crossing."""
+        orig, k = env.step, [0]
+
+        def step(angles):
+            ok = orig(angles)
+            k[0] += 1
+            hook(env, k[0])
+            return ok
+        env.step = step
+        return lambda: env.__dict__.pop("step", None)
+
+    def hover_then(release_at):
+        z = {}
+
+        def hook(e, k):
+            z.setdefault("z0", float(e.data.qpos[2]))
+            if k <= release_at:
+                e.data.qpos[2], e.data.qvel[2] = z["z0"], 0.0
+                e._mj.mj_forward(e.model, e.data)
+        return hook
+
+    undo = scripted(hover_then(hold_n))
+    good = T.run_transition(env, "air_to_water", ctrl)
+    undo()
+    check("hovering through the hold and then going in is a crossing",
+          good.crossed and good.hold > 0.9 and good.components["crossed"] > 0.9,
+          f"crossed {good.crossed}, hold {good.hold:.2f}, {good.failure or 'ok'}")
+    undo = scripted(hover_then(hold_n // 3))
+    early = T.run_transition(env, "air_to_water", ctrl)
+    undo()
+    check("going in before the command is not",
+          not early.crossed and "hold" in early.failure,
+          f"crossed {early.crossed}, hold {early.hold:.2f}, {early.failure}")
+
+    def ashore_at(when):
+        def hook(e, k):
+            if k == when:
+                e.data.qvel[:] = 0.0
+                e.data.qpos[2] = e._clear_of_terrain(12.0, 0.0, 1.0, gap=0.02)
+                e._mj.mj_forward(e.model, e.data)
+        return hook
+
+    undo = scripted(ashore_at(hold_n + 5))
+    land = T.run_transition(env, "water_to_land", ctrl)
+    undo()
+    check("getting ashore after the command is a crossing",
+          land.crossed and land.started_in == "water",
+          f"crossed {land.crossed}, started in {land.started_in}, {land.failure or 'ok'}")
+    undo = scripted(ashore_at(5))
+    rushed = T.run_transition(env, "water_to_land", ctrl)
+    undo()
+    check("and getting ashore during the hold is not",
+          not rushed.crossed, f"crossed {rushed.crossed}, {rushed.failure}")
+
+    def ashore_then_back(e, k):
+        ashore_at(hold_n + 5)(e, k)
+        if k == hold_n + 400:
+            e.data.qvel[:] = 0.0
+            e.data.qpos[0], e.data.qpos[2] = 2.0, -0.5
+            e._mj.mj_forward(e.model, e.data)
+    undo = scripted(ashore_then_back)
+    passed = T.run_transition(env, "water_to_land", ctrl)
+    undo()
+    check("nor is reaching land and being back in the water at the end",
+          not passed.crossed, f"crossed {passed.crossed}, {passed.failure}")
+
+    T._place_for(env, "water_to_land")
+    check("water_to_land starts with the root under water",
+          T.medium_of(env, T.GROUND_TOL) is Domain.WATER and env.depth() > 0.0,
+          f"depth {env.depth():+.2f} at x {env.root_pos()[0]:.1f}")
+    orig_place = T._place_for
+    try:
+        def on_the_beach(e, kind, back=0.0):
+            orig_place(e, kind, back)
+            e.data.qpos[2] = e._clear_of_terrain(12.0, 0.0, 1.0, gap=0.02)
+            e._mj.mj_forward(e.model, e.data)
+        T._place_for = on_the_beach
+        dry = T.run_transition(env, "water_to_land", ctrl)
+    finally:
+        T._place_for = orig_place
+    check("and a water_to_land that starts on the beach measures nothing",
+          not dry.crossed and dry.failure == "did not start in water",
+          f"crossed {dry.crossed}, {dry.failure}")
+
+    tr = T.CrossingTracker(env, "air_to_water")
+    check("the controller is told to stay, then to go",
+          tr.commanded(0) is Domain.AIR and tr.commanded(hold_n - 1) is Domain.AIR
+          and tr.commanded(hold_n) is Domain.WATER)
+
+
 def test_an_attempted_takeoff_outscores_never_leaving_the_ground() -> None:
     """Getting partway off the ground must be worth more than not trying.
 
@@ -1360,10 +1496,30 @@ def test_an_attempted_takeoff_outscores_never_leaving_the_ground() -> None:
     from dytiscidae.envs.transitions import TransitionResult, run_transition
     from dytiscidae.envs.triphibian import Domain, TriphibianEnv
 
+    from dytiscidae.envs.transitions import HOLD_SECONDS
+
+    # Since 2026-10-03 a crossing is commanded: the machine must stay on the
+    # ground for HOLD_SECONDS before it is told to go.  The teal's open-loop gait
+    # leaps from t = 0, which is leaving before the command and scores nothing;
+    # so it is pinned where it was placed until the command, the way a
+    # controller that obeyed it would be, and its leap comes after.
     scores = {}
     for name in ("gannet", "teal"):
         env = TriphibianEnv(build(BODY_PLANS[name]()))
         ctrl = Controller(params=env.cpg.base)
+        if name == "teal":
+            orig, k, pose = env.step, [0], {}
+            hold_n = max(int(round(HOLD_SECONDS / env.timestep)), 1)
+
+            def step(angles, env=env, orig=orig, k=k, pose=pose, hold_n=hold_n):
+                pose.setdefault("q", env.data.qpos.copy())
+                ok = orig(angles)
+                k[0] += 1
+                if k[0] <= hold_n:
+                    env.data.qpos[:7], env.data.qvel[:6] = pose["q"][:7], 0.0
+                    env._mj.mj_forward(env.model, env.data)
+                return ok
+            env.step = step
         scores[name] = run_transition(env, "land_to_air", ctrl, duration=6.0)
 
     sit, leap = scores["gannet"], scores["teal"]
@@ -1373,9 +1529,15 @@ def test_an_attempted_takeoff_outscores_never_leaving_the_ground() -> None:
     check("neither of them completes the crossing",
           not sit.crossed and not leap.crossed,
           f"crossed {sit.crossed} / {leap.crossed}")
+    # The margin was 0.1, set when the teal "leapt" 0.52 m.  That was the
+    # transition scatter posing its joints after placement and dropping it from
+    # half a metre (fixed 2026-10-03, ``reseat_after_scatter``); its real leap,
+    # after the command, is 0.11 m and scores 0.073 against 0.000.
     check("yet the leap scores strictly more than sitting still",
-          leap.approach > sit.approach + 0.1,
+          leap.approach > sit.approach + 0.05,
           f"approach {sit.approach:.3f} vs {leap.approach:.3f} -- both were 0.000")
+    check("sitting still earns exactly nothing (the placement gap is not a height)",
+          sit.approach == 0.0, f"{sit.approach:.4f}")
     check("and both stay below what completing the crossing pays",
           max(sit.approach, leap.approach) <= 0.6 + 1e-9,
           f"capped at {max(sit.approach, leap.approach):.3f} against 1.0 for a crossing")
@@ -1383,17 +1545,17 @@ def test_an_attempted_takeoff_outscores_never_leaving_the_ground() -> None:
     # Height alone must not buy it, and neither must hang time: a single
     # ballistic hop that lands at once, and a machine that never quite touches
     # while going nowhere, are both things this should refuse to pay for.
-    hop = TransitionResult(kind="land_to_air")
-    hop.peak_clearance, hop.airborne_fraction = 0.6, 0.02
-    drift = TransitionResult(kind="land_to_air")
-    drift.peak_clearance, drift.airborne_fraction = 0.02, 0.9
+    hop = TransitionResult(kind="land_to_air", hold=1.0)
+    hop.go_peak_clearance, hop.aloft_fraction = 0.6, 0.02
+    drift = TransitionResult(kind="land_to_air", hold=1.0)
+    drift.go_peak_clearance, drift.aloft_fraction = 0.02, 0.9
     from dytiscidae.envs.transitions import _score
 
     for res in (hop, drift):
         _score(TriphibianEnv(build(BODY_PLANS["gannet"]())), res, -1,
                np.array([1.0]), np.array([0.0]), Domain.AIR)
     check("one term alone cannot earn a full approach",
-          max(hop.approach, drift.approach) < 0.35,
+          0.0 < max(hop.approach, drift.approach) < 0.35,
           f"height-only {hop.approach:.3f}, hangtime-only {drift.approach:.3f}, "
           f"both against {leap.approach:.3f} for a real leap")
     check("a completed crossing is still worth exactly one",
@@ -4806,6 +4968,7 @@ def main() -> int:
         test_a_mujoco_auto_reset_ends_the_continuous_mission,
         test_transitions_are_graded_not_pass_fail,
         test_an_attempted_takeoff_outscores_never_leaving_the_ground,
+        test_a_crossing_is_commanded_and_a_still_machine_makes_none,
         test_judge_ladder_is_fixed_and_bar_only_tightens,
         test_auditor_can_invalidate_and_veto,
         test_critic_learns_the_exploit_signature,

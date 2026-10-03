@@ -313,6 +313,17 @@ twin — a passive body does the same thing whatever it is commanded, so it cann
 score on both phases. **When a score pays for doing nothing, first ask whether
 the machine was ever told what to do.**
 
+The eighth, 2026-10-03, was in the crossings: with the actuators held still,
+`air_to_water` paid 0.834 (it fell in, from a placed descent) and
+`water_to_land` 0.865, because the probe started the machine dry on the ramp
+and counted *any* change of wetness, so settling into the water was a
+crossing. These were the learner's two largest rewards. The fix was the same
+shape as water's: a commanded hold-then-go phase and a directional crossing
+(`transitions.CrossingTracker`, ARCH46_SPEC §8). Checking the still machine
+caught two more on the way, a floating body counted as "aloft" and a placement
+gap counted as height. **Run the still-machine check on every score, including
+the ones that look like plain physics.**
+
 And: a quantity that means "I could not measure this" must not share a value with
 a quantity that means "I measured zero". `thrust_margin` returned 0.0 for both and
 the rung above it sat at `>= 0.0`; eight of eighty re-scored elites cleared it

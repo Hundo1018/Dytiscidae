@@ -1126,8 +1126,8 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
     import numpy as _np
 
     from .transitions import (
-        TRANSITION_ENDPOINTS, TransitionResult, _place_for, _score,
-        transition_scatter_seed)
+        TRANSITION_ENDPOINTS, CrossingTracker, TransitionResult, _place_for, _score,
+        reseat_after_scatter, transition_scatter_seed)
     from .triphibian import Domain as _D
 
     k = len(envs)
@@ -1142,6 +1142,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
         # noise at all, to every machine of every generation.  A real arrival
         # carries whatever speed and attitude the previous leg left behind.
         e.scatter(_np.random.default_rng(scatter_seed))
+        reseat_after_scatter(e, kind)
         res[m].survivable_entry_speed = float(e.p.max_entry_speed)
     bf.reset_slam()
 
@@ -1153,8 +1154,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
     bad0 = [int(e.data.warning[e._mj.mjtWarning.mjWARN_BADQACC].number)
             for e in envs]
     energy0 = [float(e.budget.total_j) for e in envs]
-    was_wet = [e.depth() > 0.0 for e in envs]
-    cross_step = [-1] * k
+    tracks = [CrossingTracker(e, kind) for e in envs]
     ups = [[] for _ in range(k)]
     sps = [[] for _ in range(k)]
     slamw = [[] for _ in range(k)]
@@ -1173,7 +1173,8 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
             c = ctrls[m]
             if (bases[m] is not None and i % control_every == 0
                     and (c.policy is not None or shared is not None)):
-                obs = e.observation(target)
+                told = tracks[m].commanded(i)
+                obs = e.observation(told)
                 if not observation_finite(obs):
                     res[m].failure = "diverged"
                     active[m] = False
@@ -1200,7 +1201,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
                         from ..learning.ppo import potential_of
                         collector.record(
                             m, obs, a, logp, val,
-                            potential_of(obs, getattr(target, "value", "transition")))
+                            potential_of(obs, getattr(told, "value", "transition")))
                 cur[m] = bases[m].command_params(
                     c.params, coeffs, e.cpg.n,
                     gain=1.0 if gain is None else gait_gain(gain))
@@ -1235,13 +1236,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
             if len(slamw[m]) == slam_n:
                 res[m].peak_slam = max(res[m].peak_slam,
                                        float(_np.mean(slamw[m])))
-            wet = e.depth() > 0.0
-            if wet != was_wet[m]:
-                if cross_step[m] < 0:
-                    cross_step[m] = i
-                    res[m].peak_entry_speed = max(
-                        res[m].peak_entry_speed, abs(float(e.body_twist()[2])))
-                was_wet[m] = wet
+            tracks[m].observe(e, i)
 
         if not active.any():
             break
@@ -1252,18 +1247,13 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
             e._mj.mjtWarning.mjWARN_BADQACC].number) - bad0[m]
         if r.bad_qacc > 0 and not r.failure:
             r.failure = "unstable"
-        if cross_step[m] < 0 and target is _D.LAND and e._touching_ground():
-            cross_step[m] = max(len(ups[m]) - 1, 0)
-        # Terminal, not peak: a machine that leapt and came down has not crossed.
-        if cross_step[m] < 0 and target is _D.AIR and e.clearance() > 0.5:
-            cross_step[m] = max(len(ups[m]) - 1, 0)
-        r.crossed = cross_step[m] >= 0 and not r.failure
+        cross = tracks[m].finish(e, r, len(ups[m]))
         r.airborne_fraction = airborne[m] / max(len(ups[m]), 1)
         r.energy_j = float(e.budget.total_j - energy0[m])
         r.exit_depth = float(e.depth())
         r.exit_upright = float(ups[m][-1]) if ups[m] else 0.0
         r.exit_speed = float(sps[m][-1]) if sps[m] else 0.0
-        _score(e, r, cross_step[m], _np.array(ups[m]), _np.array(sps[m]), target)
+        _score(e, r, cross, _np.array(ups[m]), _np.array(sps[m]), target)
         if not r.crossed and not r.failure:
             r.failure = "never crossed the boundary"
     return res
