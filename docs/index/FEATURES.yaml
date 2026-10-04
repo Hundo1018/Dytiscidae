@@ -248,8 +248,14 @@ Transitions:
     - envs.transitions.run_transition
     - envs.transitions.TransitionResult
     - envs.transitions.TransitionSet
+    - envs.transitions.CrossingTracker
+    - envs.transitions.ashore
+    - envs.triphibian.TriphibianEnv.held_still_params
   tests:
     - tests.test_search::test_transitions_are_graded_not_pass_fail
+    - tests.test_search::test_a_crossing_is_commanded_and_a_still_machine_makes_none
+    - tests.test_search::test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing
+  note: a crossing is a commanded hold in the start medium, then a directional crossing that must still hold at the end (ARCH46_SPEC §8); since 2026-10-04 an air hold reads energy height, a land arrival must be ashore (dry ground under the root), shore progress counts from the go command, and the still machine (`held_still_params`) stops rotors
 
 ContinuousMission:
   implementation:

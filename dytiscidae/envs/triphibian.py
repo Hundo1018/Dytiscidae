@@ -1347,6 +1347,25 @@ class TriphibianEnv:
                 return True
         return False
 
+    def held_still_params(self) -> CPGParams:
+        """The base gait with every actuator held still: the still machine of
+        CLAUDE.md's lesson.
+
+        Stroke amplitude zero, phase and offset kept -- and every rotor
+        stopped.  A rotor's channel is a *speed* held at its offset (the
+        throttle), not an angle, so zeroing amplitude alone left it spinning:
+        the 2026-10-04 still arm of ``experiments/transition_distance`` did
+        that, and its two ``water_to_air`` "still" crossers (elites 129 and 137,
+        6 and 16 rotors) were rotor-driven.
+        """
+        b = self.cpg.base
+        off = np.asarray(b.offset, float).copy()
+        for k, name in enumerate(self.act_names):
+            if name.endswith("_r"):
+                off[k] = float(self.cpg.lo[k])
+        return CPGParams(amplitude=np.zeros(self.cpg.n), phase=np.asarray(b.phase, float),
+                         offset=off, frequency=float(b.frequency))
+
     def root_pos(self) -> np.ndarray:
         return self.data.xpos[self.root_body].copy()
 

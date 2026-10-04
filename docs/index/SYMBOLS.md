@@ -829,21 +829,23 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `CrossingTracker` | class | 300 | — | What a crossing is, shared by ``run_transition`` and the batched path. |
+| `ashore` | function | 287 | `(env: TriphibianEnv) -> bool` | On land *out of the water*: ``medium_of`` says LAND and the ground under |
+| `CrossingTracker` | class | 325 | — | What a crossing is, shared by ``run_transition`` and the batched path. |
 | `medium_of` | function | 273 | `(env: TriphibianEnv, ground_tol: float=0.0) -> Domain` | Which medium the machine is in: root under water, else on the ground |
-| `reseat_after_scatter` | function | 476 | `(env: TriphibianEnv, kind: str) -> None` | Put a land start back on the ground at the pose ``scatter`` left. |
-| `run_transition` | function | 503 | `(env: TriphibianEnv, kind: str, controller, *, duration: float=6.0, back: float=0.0) -> TransitionResult` | Simulate one crossing and measure it.  ``back``: see ``_place_for``. |
+| `reseat_after_scatter` | function | 565 | `(env: TriphibianEnv, kind: str) -> None` | Put a land start back on the ground at the pose ``scatter`` left. |
+| `run_transition` | function | 592 | `(env: TriphibianEnv, kind: str, controller, *, duration: float=6.0, back: float=0.0) -> TransitionResult` | Simulate one crossing and measure it.  ``back``: see ``_place_for``. |
 | `transition_scatter_seed` | function | 223 | `(kind: str) -> int` | The entry-state draw every machine's ``kind`` crossing starts from. |
 | `TransitionResult` | class | 127 | — | One crossing, measured.  Every field is a raw physical quantity or a |
-| `TransitionSet` | class | 709 | — | All crossings attempted in one evaluation. |
-| `CrossingTracker.__init__` | method | 322 | `(self, env: TriphibianEnv, kind: str)` | — |
-| `CrossingTracker.commanded` | method | 338 | `(self, i: int) -> Domain` | The medium the controller is told about at step ``i``. |
-| `CrossingTracker.finish` | method | 385 | `(self, env: TriphibianEnv, r: TransitionResult, n_steps: int) -> int` | Set ``r.hold``, ``r.started_in``, ``r.crossed``; return the cross step. |
-| `CrossingTracker.hold_score` | method | 374 | `(self) -> float` | — |
-| `CrossingTracker.observe` | method | 342 | `(self, env: TriphibianEnv, i: int) -> None` | — |
+| `TransitionSet` | class | 798 | — | All crossings attempted in one evaluation. |
+| `CrossingTracker.__init__` | method | 365 | `(self, env: TriphibianEnv, kind: str)` | — |
+| `CrossingTracker.commanded` | method | 398 | `(self, i: int) -> Domain` | The medium the controller is told about at step ``i``. |
+| `CrossingTracker.energy_height_loss` | method | 387 | `(self) -> float \| None` | Energy height lost over the hold, metres, from the fitted slope; |
+| `CrossingTracker.finish` | method | 461 | `(self, env: TriphibianEnv, r: TransitionResult, n_steps: int) -> int` | Set ``r.hold``, ``r.started_in``, ``r.crossed``; return the cross step. |
+| `CrossingTracker.hold_score` | method | 447 | `(self) -> float` | — |
+| `CrossingTracker.observe` | method | 402 | `(self, env: TriphibianEnv, i: int) -> None` | — |
 | `TransitionResult.components` | property | 209 | `(self) -> dict[str, float]` | The scored parts, for the judge to weight. |
-| `TransitionSet.component_means` | method | 720 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
-| `TransitionSet.crossed_fraction` | property | 715 | `(self) -> float` | — |
+| `TransitionSet.component_means` | method | 809 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
+| `TransitionSet.crossed_fraction` | property | 804 | `(self) -> float` | — |
 
 ## `envs.triphibian` — `dytiscidae/envs/triphibian.py`
 
@@ -867,29 +869,30 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `SegmentResult.cost_of_transport` | property | 175 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
 | `TriphibianEnv.__init__` | method | 595 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
 | `TriphibianEnv.body_twist` | method | 1325 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
-| `TriphibianEnv.clearance` | method | 1414 | `(self) -> float` | `_clearance_now`, remembered for the state it was computed on. |
-| `TriphibianEnv.clearance_many` | method | 1433 | `(envs, active=None) -> None` | Fill the `clearance` memo of every (active) machine in one array |
-| `TriphibianEnv.depth` | method | 1353 | `(self) -> float` | — |
+| `TriphibianEnv.clearance` | method | 1433 | `(self) -> float` | `_clearance_now`, remembered for the state it was computed on. |
+| `TriphibianEnv.clearance_many` | method | 1452 | `(envs, active=None) -> None` | Fill the `clearance` memo of every (active) machine in one array |
+| `TriphibianEnv.depth` | method | 1372 | `(self) -> float` | — |
 | `TriphibianEnv.flap_travel` | method | 925 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
 | `TriphibianEnv.flies_level` | method | 1074 | `(self) -> bool` | Whether ``level_margin`` clears ``LEVEL_GATE`` (ROADMAP AD). |
-| `TriphibianEnv.ground_height` | method | 1377 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
-| `TriphibianEnv.ground_heights` | method | 1386 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
-| `TriphibianEnv.identify` | method | 2890 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.ground_height` | method | 1396 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
+| `TriphibianEnv.ground_heights` | method | 1405 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
+| `TriphibianEnv.held_still_params` | method | 1350 | `(self) -> CPGParams` | The base gait with every actuator held still: the still machine of |
+| `TriphibianEnv.identify` | method | 2909 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
 | `TriphibianEnv.launch_pitch` | property | 895 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
 | `TriphibianEnv.launch_speed` | property | 863 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
 | `TriphibianEnv.level_margin` | method | 1082 | `(self)` | Can this machine hold height *and* speed, with its own actuators? |
 | `TriphibianEnv.lift_margin` | property | 911 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
-| `TriphibianEnv.morphology_context` | property | 1517 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
-| `TriphibianEnv.observation` | method | 1556 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
+| `TriphibianEnv.morphology_context` | property | 1536 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
+| `TriphibianEnv.observation` | method | 1575 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
 | `TriphibianEnv.reset` | method | 738 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
 | `TriphibianEnv.restore` | method | 1316 | `(self, snap: tuple) -> None` | — |
-| `TriphibianEnv.rollout` | method | 1719 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
-| `TriphibianEnv.root_pos` | method | 1350 | `(self) -> np.ndarray` | — |
+| `TriphibianEnv.rollout` | method | 1738 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
+| `TriphibianEnv.root_pos` | method | 1369 | `(self) -> np.ndarray` | — |
 | `TriphibianEnv.scatter` | method | 771 | `(self, rng, *, strength: float=1.0) -> None` | Widen the initial condition, from a caller-supplied generator. |
-| `TriphibianEnv.servo_command` | method | 1693 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
+| `TriphibianEnv.servo_command` | method | 1712 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
 | `TriphibianEnv.snapshot` | method | 1313 | `(self) -> tuple` | — |
-| `TriphibianEnv.step` | method | 1702 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
-| `TriphibianEnv.task_channels` | method | 1641 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
+| `TriphibianEnv.step` | method | 1721 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
+| `TriphibianEnv.task_channels` | method | 1660 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
 | `TriphibianEnv.thrust_margin` | method | 953 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
 
 ## `evolution.archive` — `dytiscidae/evolution/archive.py`

@@ -1397,22 +1397,37 @@ def test_a_crossing_is_commanded_and_a_still_machine_makes_none() -> None:
         env.step = step
         return lambda: env.__dict__.pop("step", None)
 
-    def hover_then(release_at):
+    def hover_then(release_at, keep_speed=True):
+        """Height held through the hold; with ``keep_speed`` the launch
+        velocity too -- sustained level flight -- and without it the speed
+        bleeds away while the height is held."""
         z = {}
 
         def hook(e, k):
             z.setdefault("z0", float(e.data.qpos[2]))
+            z.setdefault("v0", e.data.qvel[:2].copy())
             if k <= release_at:
                 e.data.qpos[2], e.data.qvel[2] = z["z0"], 0.0
+                if keep_speed:
+                    e.data.qvel[:2] = z["v0"]
                 e._mj.mj_forward(e.model, e.data)
         return hook
 
     undo = scripted(hover_then(hold_n))
     good = T.run_transition(env, "air_to_water", ctrl)
     undo()
-    check("hovering through the hold and then going in is a crossing",
+    check("flying level through the hold and then going in is a crossing",
           good.crossed and good.hold > 0.9 and good.components["crossed"] > 0.9,
           f"crossed {good.crossed}, hold {good.hold:.2f}, {good.failure or 'ok'}")
+    # 2026-10-04: holding in air is holding energy height.  A glider coasting
+    # on its launch speed keeps its height for 1.5 s while the speed goes;
+    # arch46's still gliders did exactly that and then glided into the sea.
+    undo = scripted(hover_then(hold_n, keep_speed=False))
+    coast = T.run_transition(env, "air_to_water", ctrl)
+    undo()
+    check("holding height while the launch speed bleeds away is not a hold",
+          not coast.crossed and coast.hold < T.HOLD_PASS,
+          f"crossed {coast.crossed}, hold {coast.hold:.2f}, {coast.failure}")
     undo = scripted(hover_then(hold_n // 3))
     early = T.run_transition(env, "air_to_water", ctrl)
     undo()
@@ -1452,6 +1467,25 @@ def test_a_crossing_is_commanded_and_a_still_machine_makes_none() -> None:
     check("nor is reaching land and being back in the water at the end",
           not passed.crossed, f"crossed {passed.crossed}, {passed.failure}")
 
+    # 2026-10-04: a probe that aborts holds nothing.  Thrown up the beach and
+    # then flat (what a blow-up looks like: arch46 elite 82 held still jumped
+    # 5 m in 0.03 s and its battery went), it was paid 0.6 x shore progress.
+    orig_step, k = env.step, [0]
+
+    def thrown_then_flat(angles):
+        ok = orig_step(angles)
+        k[0] += 1
+        ashore_at(hold_n + 5)(env, k[0])
+        return ok and k[0] < hold_n + 10
+    env.step = thrown_then_flat
+    try:
+        flat = T.run_transition(env, "water_to_land", ctrl)
+    finally:
+        env.__dict__.pop("step", None)
+    check("a probe that aborts earns no graded approach",
+          not flat.crossed and flat.components["crossed"] == 0.0 and "battery" in flat.failure,
+          f"approach {flat.components['crossed']:.3f}, shore {flat.shore_progress:.2f}, {flat.failure}")
+
     T._place_for(env, "water_to_land")
     check("water_to_land starts with the root under water",
           T.medium_of(env, T.GROUND_TOL) is Domain.WATER and env.depth() > 0.0,
@@ -1474,6 +1508,88 @@ def test_a_crossing_is_commanded_and_a_still_machine_makes_none() -> None:
     check("the controller is told to stay, then to go",
           tr.commanded(0) is Domain.AIR and tr.commanded(hold_n - 1) is Domain.AIR
           and tr.commanded(hold_n) is Domain.WATER)
+
+
+def test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing() -> None:
+    """The ninth instance (2026-10-04, ARCH46_SPEC §8 appended).
+
+    After the 10-03 fix, arch46's elites held still still crossed:
+    ``air_to_water`` 1.8-2.3%, ``water_to_land`` up to 5.0%, ``water_to_air``
+    up to 0.9% (``experiments/transition_distance``).  Traced singly
+    (``experiments/still_leak``), three mechanisms:
+
+    - ``air_to_water``: a glider coasts through the 1.5 s hold on its launch
+      speed -- 0.09-0.32 m of height lost, 3.4-5.7 m of energy height -- and
+      then glides into the sea.  Gate: the air hold reads energy height.
+    - ``water_to_land``: a float whose root rides above the waterline while its
+      hull rests on the *submerged* ramp is LAND by ``medium_of``, 8 m out.
+      Gate: a crossing to land must be ``ashore``.
+    - ``water_to_air``: the still arm was not still -- a rotor's channel is a
+      speed held at its offset, and both crossers had rotors spinning.  Fixed
+      in the still machine (``held_still_params``), not the tracker.
+
+    Each body runs at the start distance it first crossed from.  The fixture is
+    those 24 bodies' genomes (``tests/fixtures/arch46_still_crossers.pkl``,
+    written by ``experiments/still_leak/make_fixture.py``).  So that this test
+    cannot go quiet if physics changes underneath it, it also checks the leak is
+    still *there* with each gate taken out.
+    """
+    print("\ntransitions: arch46's still crossers, held still, cross nothing")
+    import pickle
+
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import transitions as T
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    # A fixture committed with the tests (trusted, like a run's archive .pkl):
+    # the genomes need their classes, which JSON would not carry.
+    fx = Path(__file__).parent / "fixtures" / "arch46_still_crossers.pkl"
+    cases = pickle.loads(fx.read_bytes())
+    built = {}
+
+    def run(case, **patch):
+        key = (case["index"], case["eval_seed"])
+        if key not in built:
+            built[key] = TriphibianEnv(build(case["genome"]), seed=case["eval_seed"])
+        env = built[key]
+        saved = {k: getattr(T, k) if hasattr(T, k) else getattr(T.CrossingTracker, k)
+                 for k in patch}
+        try:
+            for k, v in patch.items():
+                setattr(T if hasattr(T, k) else T.CrossingTracker, k, v)
+            return T.run_transition(env, case["kind"], Controller(params=env.held_still_params()),
+                                    back=case["back"])
+        finally:
+            for k, v in saved.items():
+                setattr(T if hasattr(T, k) else T.CrossingTracker, k, v)
+
+    res = [(c, run(c)) for c in cases]
+    crossed = [f"{c['kind']}#{c['index']}" for c, t in res if t.crossed]
+    graded = max(t.components["crossed"] for _, t in res)
+    check(f"none of the {len(cases)} bodies that crossed held still crosses held still now",
+          not crossed, ", ".join(crossed) or "0 crossed")
+    check("and none earns more than 0.05 of a graded approach",
+          graded <= 0.05, f"max {graded:.3f}")
+
+    gliders = [c for c in cases if c["kind"] == "air_to_water"]
+    off = [run(c, energy_height_loss=lambda self: 0.0) for c in gliders]
+    check("with the hold reading height alone, the still gliders cross again",
+          sum(t.crossed for t in off) >= 3, f"{sum(t.crossed for t in off)} of {len(gliders)}")
+
+    floats = [c for c in cases if c["kind"] == "water_to_land"]
+    off = [run(c, ashore=lambda e: T.medium_of(e) is Domain.LAND) for c in floats]
+    check("with land read as medium_of alone, the still floats cross again",
+          sum(t.crossed for t in off) >= 5, f"{sum(t.crossed for t in off)} of {len(floats)}")
+
+    rotor = next(c for c in cases if c["kind"] == "water_to_air")
+    env = built[(rotor["index"], rotor["eval_seed"])]
+    still = env.held_still_params()
+    spun = [k for k, n in enumerate(env.act_names) if n.endswith("_r")]
+    check("a still machine's rotors are stopped, not left at their throttle",
+          spun and all(still.offset[k] == env.cpg.lo[k] for k in spun)
+          and not np.any(still.amplitude),
+          f"{len(spun)} rotors, offsets {[round(float(still.offset[k]), 2) for k in spun][:4]}")
 
 
 def test_an_attempted_takeoff_outscores_never_leaving_the_ground() -> None:
@@ -5510,6 +5626,7 @@ def main() -> int:
         test_transitions_are_graded_not_pass_fail,
         test_an_attempted_takeoff_outscores_never_leaving_the_ground,
         test_a_crossing_is_commanded_and_a_still_machine_makes_none,
+        test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing,
         test_judge_ladder_is_fixed_and_bar_only_tightens,
         test_auditor_can_invalidate_and_veto,
         test_critic_learns_the_exploit_signature,

@@ -280,6 +280,31 @@ def medium_of(env: TriphibianEnv, ground_tol: float = 0.0) -> Domain:
     return Domain.AIR
 
 
+#: Standard gravity, for the energy height an air hold is scored on.
+_G = 9.81
+
+
+def ashore(env: TriphibianEnv) -> bool:
+    """On land *out of the water*: ``medium_of`` says LAND and the ground under
+    the root is above the local water surface.
+
+    ``medium_of`` reads the root: dry, and touching terrain.  A floating body
+    whose root rides above the waterline while its hull rests on the
+    *submerged* ramp satisfies both, in a metre of water 8 m seaward of the
+    shore.  Measured 2026-10-04 on arch46's elites held still: that is how all
+    still ``water_to_land`` crossings were made (elite 14 at x = -0.15, root
+    9 cm above the surface, lowest geometry 0.91 m under it).  A crossing *to*
+    land asks for this instead (ARCH46_SPEC §8, 2026-10-04).
+    """
+    from ..core.mjcf import beach_surface_z
+
+    if medium_of(env) is not Domain.LAND:
+        return False
+    x, y, _ = env.root_pos()
+    ground = beach_surface_z(float(x))
+    return float(env.medium.depth(np.array([[x, y, ground]]), env.data.time)[0]) <= 0.0
+
+
 def _rock_gap(env: TriphibianEnv) -> float:
     """Lowest machine geometry above the beach ramp, metres, at the current pose.
 
@@ -317,6 +342,24 @@ class CrossingTracker:
     - only then does it observe the target, and only a change *into* the target
       medium after that counts, and only if it is still there at the end.
       ``land_to_air`` and ``water_to_air`` keep their terminal clearance test.
+
+    And since 2026-10-04 (the ninth instance of the lesson in CLAUDE.md), two
+    gates on what "held" and "arrived" mean, because arch46's elites held still
+    still crossed (``experiments/still_leak``):
+
+    - holding in air is holding *energy* height, ``z + |v|^2 / 2g``, as well as
+      height.  A glider launched at speed coasts through a 1.5 s hold on its
+      launch energy: held still, it lost 0.11 m of height and 5.5 m of energy
+      height, then glided into the sea, and that was every still
+      ``air_to_water`` crossing.  An unpowered body cannot hold its mechanical
+      energy -- drag only takes it -- so no still machine passes this, and a
+      machine that sustains flight does.  Read as a least-squares slope over
+      the hold, so a stroke's oscillation of the root's speed averages out.
+    - a crossing to land must be ``ashore``: on the ground with the ground
+      under it above the water, not a float resting on the submerged ramp.
+    - the graded shore progress counts only what was made after the command.
+    - a probe that aborted (battery flat, diverged, unstable) holds nothing,
+      so it earns no graded approach.
     """
 
     def __init__(self, env: TriphibianEnv, kind: str):
@@ -325,6 +368,7 @@ class CrossingTracker:
         self.started_in = medium_of(env, GROUND_TOL)
         self.z0 = float(env.root_pos()[2])
         self.x0 = float(env.root_pos()[0])
+        self.x_go = self.x0
         self.z_min = self.z0
         self.in_start = 0
         self.held_steps = 0
@@ -334,6 +378,22 @@ class CrossingTracker:
         self.go_steps = 0
         self.aloft_steps = 0
         self.go_peak = 0.0
+        # Least-squares sums of energy height against time over an air hold:
+        # n, sum t, sum t^2, sum e, sum t e.  ``None`` where it cannot be read
+        # (no free root): an unmeasured hold is not a held one.
+        self._e = [0, 0.0, 0.0, 0.0, 0.0] if env.model.nv >= 6 else None
+        self._dt = float(env.timestep)
+
+    def energy_height_loss(self) -> float | None:
+        """Energy height lost over the hold, metres, from the fitted slope;
+        ``None`` if it could not be measured."""
+        if self._e is None or self._e[0] < 2:
+            return None
+        n, st, stt, se, ste = self._e
+        den = n * stt - st * st
+        if den <= 0.0:
+            return None
+        return float(-(n * ste - st * se) / den * self.hold_steps * self._dt)
 
     def commanded(self, i: int) -> Domain:
         """The medium the controller is told about at step ``i``."""
@@ -343,10 +403,22 @@ class CrossingTracker:
         m = medium_of(env)
         if i < self.hold_steps:
             self.held_steps += 1
+            # Where the go command finds it: shore progress counts from here.
+            self.x_go = float(env.root_pos()[0])
             if self.start is Domain.AIR:
                 if m is Domain.AIR:
                     self.in_start += 1
-                    self.z_min = min(self.z_min, float(env.root_pos()[2]))
+                    z = float(env.root_pos()[2])
+                    self.z_min = min(self.z_min, z)
+                    if self._e is not None:
+                        v = env.data.qvel[:3]
+                        e, t = z + float(v @ v) / (2.0 * _G), i * self._dt
+                        a = self._e
+                        a[0] += 1
+                        a[1] += t
+                        a[2] += t * t
+                        a[3] += e
+                        a[4] += t * e
                 else:
                     self.left_early = True
             elif self.start is Domain.WATER:
@@ -367,7 +439,8 @@ class CrossingTracker:
         self.go_peak = max(self.go_peak, cl)
         if cl > AIRBORNE_GAP:
             self.aloft_steps += 1
-        if self.cross_step < 0 and self.target is not Domain.AIR and m is self.target:
+        if (self.cross_step < 0 and self.target is not Domain.AIR and m is self.target
+                and (self.target is not Domain.LAND or ashore(env))):
             self.cross_step = i
             self.entry_speed = abs(float(env.body_twist()[2]))
 
@@ -376,7 +449,10 @@ class CrossingTracker:
             return 0.0
         stayed = self.in_start / self.held_steps
         if self.start is Domain.AIR:
-            loss = self.z0 - self.z_min
+            e_loss = self.energy_height_loss()
+            if e_loss is None:
+                return 0.0
+            loss = max(self.z0 - self.z_min, e_loss)
             height = float(np.clip((HOLD_ALT_ZERO - loss) / (HOLD_ALT_ZERO - HOLD_ALT_FULL),
                                    0.0, 1.0))
             return float(stayed * height)
@@ -384,19 +460,32 @@ class CrossingTracker:
 
     def finish(self, env: TriphibianEnv, r: TransitionResult, n_steps: int) -> int:
         """Set ``r.hold``, ``r.started_in``, ``r.crossed``; return the cross step."""
-        r.hold = self.hold_score()
+        # A probe that did not run to the end -- battery flat, diverged, or a
+        # MuJoCo auto-reset -- measured no hold, so its graded approach (which
+        # the hold scales) is nothing.  Measured 2026-10-04: arch46 elite 82
+        # held still blew up at 1.95 s (x 0.56 -> 5.81 m in 0.03 s, battery
+        # flat) and was paid 0.54 of a graded water_to_land; diverged and
+        # unstable water_to_air probes were paid 0.33-0.54.
+        aborted = bool(r.failure)
+        r.hold = 0.0 if aborted else self.hold_score()
         r.started_in = self.started_in.value
         r.aloft_fraction = self.aloft_steps / max(self.go_steps, 1)
         r.go_peak_clearance = self.go_peak
         if self.target is Domain.LAND and SHORE_X > self.x0:
+            # Progress made after the command, over the whole start-to-shore
+            # distance.  From the start it paid a still amphibian 0.136 of a
+            # graded approach for capsizing 0.66 m shoreward *during the hold*
+            # (arch46 elite 129, 2026-10-04); drift while told to stay is not
+            # going, and is not paid as going.
             r.shore_progress = float(np.clip(
-                (float(env.root_pos()[0]) - self.x0) / (SHORE_X - self.x0), 0.0, 1.0))
+                (float(env.root_pos()[0]) - self.x_go) / (SHORE_X - self.x0), 0.0, 1.0))
         cross = self.cross_step
         if self.target is Domain.AIR:
             # Terminal, not peak: a machine that leapt and came down has not
             # crossed.
             cross = max(n_steps - 1, 0) if env.clearance() > 0.5 else -1
-        elif cross >= 0 and medium_of(env) is not self.target:
+        elif cross >= 0 and (medium_of(env) is not self.target
+                             or (self.target is Domain.LAND and not ashore(env))):
             # Held: it has to be there at the end, not have passed through.
             cross = -1
         if cross >= 0:

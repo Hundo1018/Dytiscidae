@@ -2899,9 +2899,53 @@ real fix to rotor cost. State, updated as each lands:
 | AM | **noise floor measured, one part built** (2026-10-03): floor on rotor-bearing elites 1.2e-9 (bar 1e-5), unused because every change is bit-identical. `clearance` (18% of a shard's profile, read up to 4x a step on an unmoved state) is memoised per state and filled per batch in one pass (`clearance_many`): profile 4.36 -> 1.77 s, wall on/off 0.87-1.08 (mean 0.93), inside load noise on the rotor batch. Not done: damping projection (7%, batching breaks bit-identity), inflow (~7%), CPG (1.6%), entrainment (3.4%). Mutations `clearance-batch-first-slice`, `clearance-memo-keyed-on-time`. |
 | island | **built 2026-10-03, unrun: `triphibian`, the eighth island.** Why: in arch46's 7,804 Tier-1 evaluations the weakest medium is 0 in 98.2%, c2 (the second-best) in 77.6%, and no evaluation clears 0.15 in all three; `generalist` scores `mission_fraction` (zero for 98.8%) and its curriculum stages 0-3 pay the best one or two media. Objective: `triphibian_score` = harmonic mean of `c_i + e` minus `e`, `e` = 0.006: any machine missing a medium scores < 0.012, any machine with all three >= 0.012 scores >= 0.012, the score is strictly increasing in every medium (so it still ranks c2 where c3 = 0), and it carries no energy, transition or take-off factor. The geometric mean was rejected: it puts air 0.9 + water 0.9 + land 0 (0.164) above 0.1 in all three. Ladder (`Curriculum(weakest=True)`): stage 0 reads c2 (bar 0.055 = p95 of c2; p90 is 0.020 and a still machine reaches 0.0199), stage 1 reads c3 (bar 0.012 = p95 of c3 among the 396 evaluations past stage 0), stages 2-3 read the crossings gated on c3, and each stage holds at 0.4 of its own bar. Still machine (`experiments/triphibian_still`, 7 plans x 2 seeds, real Tier-1 path): max island score 0.0081, max c2 0.0199, max c3 0.0000, 0 promotions. A one-medium machine (arch45's fitness-1.0 design, 0/0.337/0.003) scores 0.0047; two perfect media and no third 0.0118; 0.1 in all three 0.100. Routing: specialist pairs stay with their pair islands, and each pair island's champion is crossed with the specialist of its missing medium and sent to `triphibian` (`TRIPLE_HOME`, 3 crosses per migration). On resume an island the checkpoint lacks starts empty and is offered the archipelago's best elites by its own objective as immigrants (`Archipelago.colonists`). The generation report gains `weakest_best` and `three_media` from this island's archive. Tests: `test_the_triphibian_island_pays_the_weakest_medium`, `test_a_still_machine_climbs_nothing_on_the_triphibian_island`, `test_a_pair_cross_reaches_the_triphibian_island`, `test_the_triphibian_island_joins_a_resumed_run`; mutations `triphibian-island-pays-the-best-medium`, `triphibian-ladder-reads-the-best-medium`, `triphibian-curriculum-is-the-shared-ladder`. Not comparable: a run with eight islands visits each 1/8 of generations, not 1/7. |
 | R | **read 1 (2026-10-03), the shared policy's weight**: arch46's 218 elites re-scored paired, with minus without the network that scored them (`experiments/shared_policy_value`): land +0.0247 (t 3.50, 69 better / 46 worse), water +0.0126 (t 2.59), air +0.0061 (t 1.69), mission 0; median delta 0 in every medium; the land island holds ~62% of the land delta. An upper bound (elites were selected with the network). **Read 2, the sweep**: `runs/r_{ent0.01,ent0.1,ent0,off}`, 60 gens each at seed 20261003, batch 16, 6 s segments, refine 0; arm 1 at `be3dbe0`, the rest at `6989c7b` (= `be3dbe0` + the bit-identical rotor change, same results, 0.73x the wall). Pending. `--shared-ent-coef` exists; the `ppo` event carries `log_std` |
-| Y/O | **measured 2026-10-04, the curriculum cannot start** (`experiments/transition_distance`, arch46's 218 elites, current crossings): elites cross 0-2.3% at back 0 (air_to_water 1.4% flat over 0-8 m, water_to_air 0, water_to_land 2.3 / 0.9 / 1.4 / 2.3 / 0.5 / 0% at 0/0.5/1/2/4/8 m, land_to_water 0), against `advance_share` 0.5; a 200 window holds 3-5 crossings. **Still machines cross at or above the elite rate** (air_to_water 1.8-2.3%, water_to_land up to 5.0%, 5 of 8 still crossers at 0 m are aerial_diver bodies): the 10-03 fix cut the leak from 0.83-0.87 to ~0.02-0.05, not to 0, so these cells are not evidence of skill. Air competence falls as the launch is lowered (elite mean 0.0123 at 30 m, 0.0017 at 4 m; share >= 0.1 4.1% -> 0.5%), so the downward launch step would remove the only air signal. Next: close the still-machine crossings, then re-measure; the typed numbers stay, unreachable rather than wrong |
+| Y/O | **measured 2026-10-04, the curriculum cannot start** (`experiments/transition_distance`, arch46's 218 elites, current crossings): elites cross 0-2.3% at back 0 (air_to_water 1.4% flat over 0-8 m, water_to_air 0, water_to_land 2.3 / 0.9 / 1.4 / 2.3 / 0.5 / 0% at 0/0.5/1/2/4/8 m, land_to_water 0), against `advance_share` 0.5; a 200 window holds 3-5 crossings. **Still machines cross at or above the elite rate** (air_to_water 1.8-2.3%, water_to_land up to 5.0%, 5 of 8 still crossers at 0 m are aerial_diver bodies): the 10-03 fix cut the leak from 0.83-0.87 to ~0.02-0.05, not to 0, so these cells are not evidence of skill. Air competence falls as the launch is lowered (elite mean 0.0123 at 30 m, 0.0017 at 4 m; share >= 0.1 4.1% -> 0.5%), so the downward launch step would remove the only air signal. Next: close the still-machine crossings, then re-measure; the typed numbers stay, unreachable rather than wrong. **2026-10-04, still crossings closed** (the ninth instance; section below): with the air hold on energy height, land arrivals required `ashore`, shore progress counted from the command, aborted probes holding nothing, and rotors stopped in the still machine, still machines cross **0 of 218** in every kind at 0 m and 0 of 29 former crossers at 0-8 m (were 5 / 1 / 8 of 218 at 0 m). Elites at 0 m: 0 of 218 (were 3 `air_to_water`, 5 `water_to_land`), all of them still-machine crossings. One real crossing remains: elite 159, `water_to_land` from 2 m, not made by its still or rotors-on twin. The curriculum still cannot start (0 at back 0 against `advance_share` 0.5), and now for the right reason. Transition scores are not comparable across this change |
 | N | **built, off by default, 2026-10-03**: `--shared-learner ppo\|grpo\|ppo+grpo` (default `ppo`), `--grpo-bodies 4`, `--grpo-group 4`; switched on only if R says the shared policy carries weight. Off is bit-identical to the old update (weights and report equal against `main`'s `ppo.py`); generation 0's archive is equal with it on and off (`test_grpo_rollouts_never_reach_the_archive`); mutations `grpo-*` caught 7/7 (re-run independently) |
 | 6 | ray entry: whole `test_physics.py` at `be3dbe0` (kernel linked), 0 `[fail]`, `all physics checks passed` with no skip, `test_entry_shock_is_hydrodynamic_not_a_speed_limit` included. Mutations: all 117 in `tools/mutate.py` re-run at `be3dbe0` (52 name a `test_search` function, not 18): **caught 116/117**; the survivor `audit-perturbs-another-seed` is a fixture hole -- the test sets the audited elite's `eval_seed` to 0, so re-running at seed 0 is the same experiment. **Fixed 2026-10-04**: the fixture audits at seed 5 (the gannet's mission base is nonzero at seeds 0 and 5, zero at 1, 2, 3, 7); the test passes and the mutation now reads `retained 2.8731`, caught 1/1, so **117/117** |
+
+### 2026-10-04 — still machines that still crossed (the ninth instance)
+
+`experiments/transition_distance` found arch46's elites held still crossing at or
+above the elite rate under the 10-03 `CrossingTracker`. Traced singly
+(`experiments/still_leak/`), the mechanisms were:
+
+- `air_to_water`: gliders coast through the 1.5 s height hold on their launch
+  speed. They lost 0.09-0.32 m of height and 3.4-5.7 m of energy height, then
+  glided in.
+- `water_to_land`: a float with its root 0.09 m above the water and its hull on
+  the submerged ramp is LAND by `medium_of`, 8 m out.
+- `water_to_air`: the still arm left rotors at throttle (a rotor's channel is a
+  speed held at its offset).
+
+The gates, in `transitions.CrossingTracker`, so both paths:
+
+- the air hold reads `max(height, energy height)` lost;
+- a land arrival must be `ashore` (dry ramp under the root);
+- shore progress counts from the go command (a capsize during the hold paid
+  0.136);
+- an aborted probe holds nothing (a blow-up paid 0.543).
+
+`TriphibianEnv.held_still_params` stops rotors. Tests:
+`test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing` (24 bodies, a
+fixture of their genomes) and two new checks in
+`test_a_crossing_is_commanded_and_a_still_machine_makes_none`. Mutations
+`crossing-air-hold-reads-height-only`, `crossing-land-is-any-ground-contact`,
+`crossing-shore-progress-counts-the-hold`, `crossing-aborted-probe-keeps-its-hold`
+and `still-machine-leaves-rotors-spinning` are all caught.
+
+Re-measured: still machines cross 0 everywhere, elites 0 at 0 m, and one real
+crossing remains (elite 159, `water_to_land` at 2 m).
+
+Left open, both in ARCH46_SPEC §8:
+
+- **Open-loop rotors still cross.** Rotors at throttle with amplitude zero cross
+  `water_to_air` (elites 129, 137) and `water_to_land` (129, 146). They ignore
+  the command and reach the interface after the hold. Closing it needs a station
+  gate on the hold.
+- **Graded `water_to_land` pays a still glide.** A sinking glide that drifts
+  shoreward earns up to 0.145 for a still body.
+
+**Transition scores are not comparable across 2026-10-04.**
 
 ## 2026-09-23..26 — AB-AF executed, every open fluid item closed, and a rotor control
 

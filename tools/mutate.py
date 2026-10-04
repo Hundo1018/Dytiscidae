@@ -1026,8 +1026,8 @@ MUTATIONS: tuple = (
     Mutation(
         id="crossing-passes-through-and-counts",
         path="dytiscidae/envs/transitions.py",
-        find="        elif cross >= 0 and medium_of(env) is not self.target:",
-        replace="        elif False:",
+        find="        elif cross >= 0 and (medium_of(env) is not self.target",
+        replace="        elif False and (medium_of(env) is not self.target",
         defect="reaching the target and leaving it again counts as a crossing",
         suites=("test_search::test_a_crossing_is_commanded_and_a_still_machine_makes_none",),
         item="ARCH46 8"),
@@ -1070,6 +1070,52 @@ MUTATIONS: tuple = (
         replace="        env.data.qpos[2] = env._clear_of_terrain(8.0 - back, 0.0, 0.0, gap=0.02)\n",
         defect="the old placement: the machine starts dry on the ramp and is credited for settling in",
         suites=("test_search::test_a_crossing_is_commanded_and_a_still_machine_makes_none",),
+        item="ARCH46 8"),
+    # --- the ninth instance: still crossings left after 10-03 (2026-10-04) ---
+    Mutation(
+        id="crossing-air-hold-reads-height-only",
+        path="dytiscidae/envs/transitions.py",
+        find="            loss = max(self.z0 - self.z_min, e_loss)\n",
+        replace="            loss = self.z0 - self.z_min\n",
+        defect="a glider coasting on its launch speed holds height for 1.5 s and then "
+               "glides in: arch46's still gliders cross air_to_water again",
+        suites=("test_search::test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing",),
+        item="ARCH46 8"),
+    Mutation(
+        id="crossing-land-is-any-ground-contact",
+        path="dytiscidae/envs/transitions.py",
+        find="    if medium_of(env) is not Domain.LAND:\n        return False\n",
+        replace="    if medium_of(env) is Domain.LAND:\n        return True\n",
+        defect="a float whose root rides above the waterline while its hull rests on the "
+               "submerged ramp is on land: arch46's still floats cross water_to_land",
+        suites=("test_search::test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing",),
+        item="ARCH46 8"),
+    Mutation(
+        id="crossing-shore-progress-counts-the-hold",
+        path="dytiscidae/envs/transitions.py",
+        find="                (float(env.root_pos()[0]) - self.x_go) / (SHORE_X - self.x0), 0.0, 1.0))",
+        replace="                (float(env.root_pos()[0]) - self.x0) / (SHORE_X - self.x0), 0.0, 1.0))",
+        defect="drift during the hold is paid as going: a still amphibian capsizing "
+               "shoreward earns 0.136 of a graded water_to_land",
+        suites=("test_search::test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing",),
+        item="ARCH46 8"),
+    Mutation(
+        id="crossing-aborted-probe-keeps-its-hold",
+        path="dytiscidae/envs/transitions.py",
+        find="        r.hold = 0.0 if aborted else self.hold_score()\n",
+        replace="        r.hold = self.hold_score()\n",
+        defect="a probe that blew up or went flat keeps its hold, so its graded approach "
+               "pays the jump: 0.54 to arch46 elite 82 held still",
+        suites=("test_search::test_a_crossing_is_commanded_and_a_still_machine_makes_none",),
+        item="ARCH46 8"),
+    Mutation(
+        id="still-machine-leaves-rotors-spinning",
+        path="dytiscidae/envs/triphibian.py",
+        find="                off[k] = float(self.cpg.lo[k])\n",
+        replace="                pass\n",
+        defect="the still machine keeps its rotors at their throttle (the 2026-10-04 "
+               "still arm): two water_to_air 'still' crossers were rotor-driven",
+        suites=("test_search::test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing",),
         item="ARCH46 8"),
     Mutation(
         id="refit-trigger-reads-a-stale-alias",

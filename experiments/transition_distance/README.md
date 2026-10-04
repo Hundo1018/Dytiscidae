@@ -189,3 +189,41 @@ being asked to. Specifically, in order:
 Re-run: `experiments/transition_distance/run.py` command in §5 (4.2 h on one
 process; `--n 60` gives a stratified 60 in about a quarter of that).
 
+
+**13 After the still-crossing gates (2026-10-04, `experiments/still_leak/`).**
+Subset, not the 4.2 h grid. All 218 elites at back 0 in all four kinds
+(`results_gated_back0.json`, 2154 s), and the 29 bodies that crossed in any arm
+of §8 at every back in the three kinds that had crossings
+(`results_gated_crossers.json`, 1547 s). No air cells. Three arms: elite; still
+(`held_still_params`, rotors stopped); `rotors_on`, which is §8's still arm
+(amplitude zero, rotors left at throttle).
+
+    --backs 0 --arms elite,still,rotors_on --no-air
+    --indices 6,8,11,14,18,24,25,28,33,39,48,50,52,65,72,75,112,116,129,135,137,146,159,177,180,183,186,194,199 \
+        --backs 0,0.5,1,2,4,8 --kinds air_to_water,water_to_air,water_to_land --arms elite,still,rotors_on --no-air
+
+Crossings at back 0, n = 218 (before = §8):
+
+| kind | elite before / after | still before / after | rotors_on after | elite hold-pass after |
+|---|---|---|---|---|
+| air_to_water | 3 / **0** | 5 / **0** | 0 | 0.000 (was 0.037) |
+| water_to_air | 0 / 0 | 1 / **0** | 1 (elite 129) | 0.844 |
+| water_to_land | 5 / **0** | 8 / **0** | 1 (elite 129) | 0.775 |
+| land_to_water | 0 / 0 | 0 / 0 | 0 | 0.876 |
+
+The 29 former crossers at 0-8 m: still 0 in every cell. Elite: one crossing,
+**elite 159 (amphibian), `water_to_land` at 2 m**, which neither its still nor
+its rotors-on arm makes. That is the one commanded crossing in the archive.
+`rotors_on`: elite 129 `water_to_air` at 0/0.5/1 m and `water_to_land` at 0 m,
+elite 146 `water_to_land` at 0.5/1 m, elite 137 `water_to_air` at 1 m. These are
+open-loop thrust crossings, not still ones (ARCH46_SPEC §8, open).
+
+Mean graded approach at back 0, elite / still: `water_to_land` 0.0093 / 0.0034
+(were 0.041 / 0.053), `water_to_air` 0.0034 / 0.000 (were 0.013 / 0.011). The
+largest still value is 0.083 at 0 m and 0.145 at 8 m (elite 18: it glides 2.8 m
+shoreward while sinking 4.6 m). Hold-pass falls in the water kinds because an
+aborted probe (5-15% of cells, battery flat or diverged) now holds nothing.
+
+The curriculum still cannot start: elites cross 0 of 218 at back 0. With still
+machines at 0, a crossing rate is now evidence of skill, and §12.4's
+`advance_share` rule applies to it once a run produces one.

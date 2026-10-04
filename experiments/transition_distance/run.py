@@ -37,7 +37,12 @@ MEDIA = ("air", "water", "land")
 
 
 def still_params(env):
-    """The base gait with every amplitude zeroed (experiments/still_transitions)."""
+    """The base gait with every amplitude zeroed (experiments/still_transitions).
+
+    **Rotors keep spinning** at their throttle: a rotor's channel is a speed held
+    at its offset.  This was the "still" arm of the 2026-10-04 run; it is kept as
+    the ``rotors_on`` arm, and the still arm is now ``env.held_still_params()``.
+    """
     from dytiscidae.control.cpg import CPGParams
     b = env.cpg.base
     return CPGParams(amplitude=np.zeros(env.cpg.n), phase=np.asarray(b.phase, float),
@@ -50,7 +55,18 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--n", type=int, default=0, help="0 = every elite, else a stratified n")
     ap.add_argument("--max-groups", type=int, default=0)
+    # Subsetting (2026-10-04 re-measure): which elites, kinds, distances and arms;
+    # and whether to run the air-by-height cells at all.
+    ap.add_argument("--indices", default="", help="comma-separated elite indices; empty = all")
+    ap.add_argument("--kinds", default=",".join(KINDS))
+    ap.add_argument("--backs", default=",".join(str(b) for b in BACKS))
+    ap.add_argument("--arms", default="elite,still",
+                    help="elite, still (every actuator still, rotors stopped), rotors_on")
+    ap.add_argument("--no-air", action="store_true")
     args = ap.parse_args()
+    kinds = tuple(k for k in args.kinds.split(",") if k)
+    backs = tuple(float(b) for b in args.backs.split(",") if b)
+    want_arms = tuple(a for a in args.arms.split(",") if a)
 
     sys.path.insert(0, "experiments/shared_policy_value")
     from rescore import load_elites, plain_controller, stratified
@@ -69,13 +85,16 @@ def main():
     seg = float((run_provenance(run).get("config") or {}).get("segment_seconds") or 8.0)
     elites = load_elites(run)
     pick = stratified(elites, args.n) if args.n else list(range(len(elites)))
+    if args.indices:
+        pick = [int(i) for i in args.indices.split(",")]
     groups = collections.defaultdict(list)
     for i in pick:
         m = elites[i].meta or {}
         groups[(int(m.get("gen") or 0), int(m.get("eval_seed") or 0))].append(i)
     keys = sorted(groups)[: args.max_groups or None]
     print(f"{len(elites)} elites, measuring {sum(len(groups[k]) for k in keys)} in {len(keys)} "
-          f"groups; kinds {KINDS}, back {BACKS}, heights {HEIGHTS}", flush=True)
+          f"groups; kinds {kinds}, back {backs}, arms {want_arms}, "
+          f"heights {() if args.no_air else HEIGHTS}", flush=True)
 
     trows, arows, t0 = [], [], time.time()
     for gi, key in enumerate(keys):
@@ -88,13 +107,16 @@ def main():
             like = like or sh
         _, net = next(iter(control_laws(elites[idx[0]], run, like)))
         envs = [TriphibianEnv(p, seed=key[1]) for p in phenos]
-        stills = [Controller(params=still_params(e), policy=None, bases=c.bases)
+        stills = [Controller(params=e.held_still_params(), policy=None, bases=c.bases)
                   for e, c in zip(envs, ctrls)]
+        spun = [Controller(params=still_params(e), policy=None, bases=c.bases)
+                for e, c in zip(envs, ctrls)]
         bf = BatchedFluid(envs)
-        arms = (("elite", ctrls, net), ("still", stills, None))
+        arms = tuple(a for a in (("elite", ctrls, net), ("still", stills, None),
+                                 ("rotors_on", spun, None)) if a[0] in want_arms)
 
-        for kind in KINDS:
-            for back in BACKS:
+        for kind in kinds:
+            for back in backs:
                 for arm, cs, sh in arms:
                     trs = run_transition_batch(envs, bf, kind, cs, shared=sh, back=back)
                     for slot, i in enumerate(idx):
@@ -109,7 +131,7 @@ def main():
         dom = Domain.AIR
         scatter_seed = _scatter_seed(key[1], dom)
         task = schedule_for(dom, np.random.default_rng(task_seed(scatter_seed)))
-        for h in HEIGHTS:
+        for h in (() if args.no_air else HEIGHTS):
             for arm, cs, sh in arms:
                 for e in envs:
                     e.air_launch_height = None if h >= 30.0 else float(h)
@@ -135,10 +157,10 @@ def main():
         return float(np.mean([f(r) for r in rows])) if rows else float("nan")
 
     table = {}
-    for kind in KINDS:
-        for back in BACKS:
+    for kind in kinds:
+        for back in backs:
             cell = {}
-            for arm in ("elite", "still"):
+            for arm in want_arms:
                 rs = [r for r in trows if r["kind"] == kind and r["back"] == back and r["arm"] == arm]
                 cell[arm] = {"n": len(rs),
                              "crossed": share(rs, lambda r: r["crossed"]),
@@ -150,9 +172,9 @@ def main():
                              "failed": share(rs, lambda r: bool(r["failure"]))}
             table[f"{kind}|{back}"] = cell
     air = {}
-    for h in HEIGHTS:
+    for h in (() if args.no_air else HEIGHTS):
         cell = {}
-        for arm in ("elite", "still"):
+        for arm in want_arms:
             rs = [r for r in arows if r["height"] == h and r["arm"] == arm]
             c = np.array([r["competence"] for r in rs])
             cell[arm] = {"n": len(rs), "mean": float(c.mean()), "share_ge_0.1": float((c >= 0.1).mean()),
@@ -162,19 +184,20 @@ def main():
     repro = {"n": len(ref), "within_0.005": int(sum(abs(r["competence"] - r["recorded"]) <= 0.005
                                                      for r in ref))}
     out = {"run": str(run), "segment_seconds": seg, "elites": len({r["index"] for r in trows}),
-           "of_archive": len(elites), "backs": BACKS, "heights": HEIGHTS,
+           "of_archive": len(elites), "backs": backs, "kinds": kinds, "arms": want_arms,
+           "heights": () if args.no_air else HEIGHTS,
            "wall_s": time.time() - t0, "transitions": table, "air_by_height": air,
            "air_30m_reproduces_recorded": repro, "transition_rows": trows, "air_rows": arows}
     Path(args.out).write_text(json.dumps(out, indent=1))
 
-    print(f"{'kind':14s} {'back':>4s}  elite crossed / hold / n     still crossed / hold")
-    for kind in KINDS:
-        for back in BACKS:
+    print(f"{'kind':14s} {'back':>4s}  " + "   ".join(f"{a} crossed (n) / hold-pass" for a in want_arms))
+    for kind in kinds:
+        for back in backs:
             c = table[f"{kind}|{back}"]
-            print(f"{kind:14s} {back:4.1f}  {c['elite']['crossed']:.3f} / {c['elite']['hold_pass']:.3f} "
-                  f"/ {c['elite']['n']:3d}        {c['still']['crossed']:.3f} / {c['still']['hold_pass']:.3f}"
-                  f"   right-medium start {c['elite']['started_in_right_medium']:.2f}")
-    for h in HEIGHTS:
+            print(f"{kind:14s} {back:4.1f}  " + "   ".join(
+                f"{c[a]['crossed']:.3f} ({round(c[a]['crossed'] * c[a]['n'])}/{c[a]['n']}) / "
+                f"{c[a]['hold_pass']:.3f}" for a in want_arms))
+    for h in (() if args.no_air else HEIGHTS):
         a = air[str(h)]
         print(f"air launch {h:4.0f} m  elite mean {a['elite']['mean']:.3f} (>=0.1: {a['elite']['share_ge_0.1']:.3f})"
               f"   still mean {a['still']['mean']:.3f} (>=0.1: {a['still']['share_ge_0.1']:.3f})")

@@ -358,6 +358,70 @@ Fixes, cheapest first:
 This is a selection change, so it goes to the user rather than into the
 measurement bundle.
 
+### 2026-10-04 — what the 10-03 fix left: the ninth instance
+
+`experiments/transition_distance` ran arch46's 218 elites held still through
+`run_transition_batch` and found the 10-03 tracker still paying them:
+`air_to_water` 5 of 218 at 0 m (1.8-2.3% over 0-8 m), `water_to_land` 8 (up to
+5.0%), `water_to_air` 1 (up to 0.9%), at or above the elite rate in every cell.
+Traced singly on the numpy path (`experiments/still_leak/`), three mechanisms:
+
+- **`air_to_water`: coasting passes the hold.** The hold read height alone.
+  Gliders launched at speed keep it for 1.5 s while the speed goes: elite 194
+  lost 0.11 m of height and 5.71 m of energy height (`z + v²/2g`, fitted slope)
+  in the hold, then glided into the sea at 2.79 s. The four no-rotor crossers
+  lost 3.4-5.7 m of energy height. **Gate:** the air hold reads
+  `max(height lost, energy height lost)` on the same 0.5 / 1.5 m band. An
+  unpowered body cannot hold mechanical energy, and a machine that sustains
+  flight can; it is the in-trial form of `level_margin`'s "height *and* speed"
+  (ROADMAP AD). A machine that holds height while braking to a hover now fails
+  the hold; none exists in arch46.
+- **`water_to_land`: a float on the submerged ramp was "LAND".** `medium_of`
+  says LAND for a dry root touching terrain. Elite 14 floated up with its root
+  0.09 m above the surface and its hull on the ramp 0.91 m under water, 8.15 m
+  seaward of the shoreline, and that counted. **Gate:** a land arrival must be
+  `transitions.ashore`: LAND, and the ramp under the root above the water.
+- **`water_to_air`: the still arm was not still.** Both crossers (elites 129, 137)
+  have rotors, and a rotor's CPG channel is a speed held at its offset, so
+  zeroing amplitude left them at throttle. **Fix in the still machine, not the
+  tracker:** `TriphibianEnv.held_still_params` stops rotors. With rotors stopped
+  neither crosses.
+
+Two more, found by running the still check on the graded approach, which feeds
+the same transition factor:
+
+- Shore progress was measured from the start, so drift during the hold paid:
+  elite 129 capsized 0.66 m shoreward in the hold for 0.136. It now counts from
+  the go command.
+- An aborted probe kept its hold, so a blow-up was paid as progress: elite 82
+  held still jumped 5.25 m in 0.03 s, its battery went flat, and it earned 0.543;
+  diverged or unstable `water_to_air` probes earned 0.33-0.54. A probe that
+  aborted (battery flat, diverged, unstable) now has hold 0.
+
+**Measured after** (`experiments/transition_distance/results_gated_*.json`; the
+crossings at 0 m on all 218, and at every distance on the 29 bodies that crossed
+in any arm before). Still machines cross **0** in every kind at every distance,
+and so do the elites at 0 m. The one remaining elite crossing is **elite 159
+(amphibian), `water_to_land` from 2 m back**, which neither its still nor its
+rotors-on twin makes: a real commanded crossing. Open-loop rotors (`rotors_on`,
+amplitude zero, rotors at throttle) still cross: elite 129 `water_to_air` at 0,
+0.5 and 1 m and `water_to_land` at 0 m, elite 146 `water_to_land` at 0.5 and 1 m,
+elite 137 `water_to_air` at 1 m. They ignore the command and get past the hold
+because they start far enough out that steady thrust takes longer than 1.5 s to
+reach the interface. This is not a still machine. Closing it would take a
+station gate: a hold that pays nothing for approaching the interface during the
+hold (in water: depth risen, or x gained toward the shore, on the 0.5 / 1.5 m
+band). Not built. Also not closed: the graded `water_to_land` approach pays a
+still body up to **0.145** (elite 18 at 8 m back pitches down and glides 2.8 m
+shoreward while sinking 4.6 m). It reads x alone, and tasks.py's policy
+("progress may be passive") covers it. But the score is then not evidence of
+skill.
+
+**Not comparable:** every transition score, `mission_fraction`'s transition
+factor, curriculum crossing stages and PPO's transition tags differ across this
+change. Air hold-pass shares in particular fall to zero for arch46 (0.037 →
+0.000 among the elites, once aborted probes stop counting).
+
 ## The bundle for arch46
 
 Bundle §1 + §2 + §3. Each one changes what the run *measures*, not what it
