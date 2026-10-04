@@ -193,6 +193,48 @@ is `test_search` is evidence only if its failing check was named and it ran
 under 900 s *without* the batched tests -- i.e. a catch by an unbatched check.
 Re-run them.
 
+**Re-run, 2026-09-30.** All 17 mutations that still named the whole
+`test_search` suite now name the one function that catches them
+(`suites=("test_search::<function>",)`, run by `mutate.py`'s `module::function`
+driver), and each was run on its own, on a tree at `main` `1fd0a24`, with the
+kernel linked in. Every one prints `caught 1/1` with a named `[FAIL]` check; no
+survivor, none caught only by the whole suite, no timeout. Each function was
+also run on the unmutated tree first and passes with no `[fail]` and no
+`[skip]`, so a catch is a check that fails on the mutant and not on the code.
+
+| mutation | catching function in `tests/test_search.py` | time | failing check |
+|---|---|---|---|
+| gait-drops-phase-and-rest | `test_the_gait_operator_moves_every_coordinate_at_once` | 0.3 s | every actuated part's amplitude, phase and rest offset (phase 0/90, rest 0/90) |
+| gait-touches-one-part | same | 0.2 s | same (amp 30/90, phase 30/90, rest 30/90) |
+| continuous-mission-ignores-auto-reset | `test_a_mujoco_auto_reset_ends_the_continuous_mission` | 2.1 s | an auto-reset mid-mission fails it, as 'unstable' (survived=True) |
+| island-best-reads-the-best-domain | `test_an_islands_best_is_judged_on_its_own_domains` | 0.2 s | an amphibian that cannot walk scores nothing on the amphibian island (0.463 vs 0.354) |
+| island-archive-read-through-the-merge | `test_one_islands_archive_is_read_alone_not_through_the_merge` | 0.2 s | read alone, the island keeps every elite it filed |
+| curriculum-reads-every-medium | `test_a_specialist_islands_curriculum_reads_only_its_own_medium` | 0.3 s | restricted, stage 0 reads air and nothing else (0.9) |
+| bandit-without-an-exploration-floor | `test_no_operator_can_go_dormant_under_the_structural_tilt` | 0.8 s | every operator makes at least 1% of children (phase_gradient 0.0%) |
+| checkpoint-asks-git-at-every-write | `test_a_checkpoint_names_the_commit_the_process_started_from` | 0.2 s | a checkpoint written after a mid-run commit still names the launch commit |
+| stale-kernel-used-anyway | `test_a_kernel_older_than_its_source_is_not_usable` | 0.3 s | a stale kernel is not usable, and says so |
+| evaluators-ask-different-tasks | `test_the_two_evaluation_paths_score_the_same_machine_the_same` | 95.4 s | beetle: land and air agree to floating-point between the paths (worst 2.63 on land.cmd_heading) |
+| pool-drops-the-shared-policy-from-rescores | `test_sharding_a_generation_does_not_change_a_score` | 180.1 s | a re-score in three shards drives the shared policy as one shard does (max difference 0.054) |
+| film-ignores-the-evaluation-seed | `test_a_film_reproduces_the_scored_experiment` | 296.8 s | water: the film reproduces the recorded competence (recorded 0.0, film 0.082) |
+| refit-gate-never-keeps | `test_a_refit_that_changes_nothing_can_be_skipped` | 0.2 s | with it on, identical axes are kept and nothing is re-binned |
+| batched-fluid-diagnostics-stay-default | `test_the_batched_path_tells_the_policy_it_is_wet` | 3.4 s | beetle: submerged in water reads submerged, not 0.0 |
+| stage-one-reads-gross-measurements | `test_a_specialist_islands_curriculum_reads_only_its_own_medium` | 0.2 s | stage 1 reads only the island's own directed measure (0.200 vs 1.000) |
+| caller-moves-state-under-launch | `test_the_early_fluid_launch_changes_nothing` | 32.4 s | every measurement bit-identical with the launch early and in place (346 numbers moved) |
+| nan-observation-reaches-policy | `test_a_nan_observation_fails_the_rollout_not_the_batch` | 10.5 s | a NaN observation does not raise out of the batch (ValueError from the policy) |
+
+Two things the pass found. **`gait-touches-one-part` was not applying**: its
+`find` text still had `rng.uniform(1.5, 8.0)` and `mut_gait` has drawn from 1.5-12
+Hz since 2026-09-23 (ROADMAP AC), so the harness reported `MISAPPLIED`, a broken
+measurement rather than a catch. The text is updated and it applies. **The first
+function picked for `stage-one-reads-gross-measurements`,
+`test_curriculum_and_islands_give_gradient_where_the_mission_gives_none`, did not
+catch it**: the mutation ran to completion with no failing check, a survivor of
+that function and not of the suite. The mutation edits `stage_score`'s stage-1
+directed measure, and the check on it lives one function over, in the island
+curriculum test, which does catch it. The suite as a whole was never run against
+this mutation. Speed: the seventeen now take about 10 minutes in total against
+17 x 25 minutes.
+
 # The checklist, item by item
 
 ## A. Completeness

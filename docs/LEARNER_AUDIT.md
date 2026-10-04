@@ -209,6 +209,31 @@ number. The cheapest concrete step when GRPO is actually written is to give
 roughly fifteen lines, and best done with the second implementation in hand so
 the seam is shaped by two cases rather than one.
 
+**2026-10-03: GRPO built, off by default (roadmap N).** The second
+implementation now exists, so the seam is shaped by two cases, and it came out
+smaller than a `learner` injection point: `SearchConfig.shared_learner`
+(`"ppo"` | `"grpo"` | `"ppo+grpo"`, default `"ppo"`), `ppo_update(...,
+group_buffer=None)`, and one stage in the generation loop
+(`evolution.loop._grpo_rollouts`). Two call sites did not need to be routed
+through a protocol because GRPO does not replace PPO's update; it adds rows with
+a different advantage to the same clipped-surrogate pass. Decisions, each in
+`learning/grpo.py`'s docstring with the alternative it rejects: group =
+(body, segment kind); advantage `(R - mean)/(std + 0.05)` broadcast over the
+trajectory's steps; no potential shaping (it telescopes to a constant shared by
+the group and cancels); no value loss on group rows, entropy bonus kept; group
+rows share minibatches with the ordinary rows in **one** update, because a second
+update would run its importance ratios under an observation normaliser the first
+had already moved; ordinary advantages are still standardised among themselves
+and group advantages are not touched by that standardisation; a group that is
+unusable (one member, a non-finite reward, no group id) is dropped and counted in
+the `ppo` event, never zero-filled. With `shared_learner="ppo"` the update is
+bit-identical to `main` before this change (weights and report compared:
+`np.array_equal` True, report dict `==` True, same key order), and the GRPO
+rollouts are learning-only: `test_grpo_rollouts_never_reach_the_archive` holds
+generation 0's archive, evaluation counts and curator counts equal between GRPO
+on and off at one seed. Whether to switch it on is a separate measurement (item
+R: does the shared policy carry weight at all).
+
 ---
 
 # Part 2 — test coverage
@@ -369,8 +394,9 @@ of environments, and each shard is a complete batched evaluation.
 PPO only. Ratio, clip, GAE, entropy and value loss are all covered above; the
 value loss is clipped against the old estimate, which `test_an_empty_generation`
 exercises for finiteness and the reference-GAE check exercises for its inputs.
-DQN, SAC, A2C and TD3 are **N/A** — none is implemented, and roadmap item N
-(GRPO) is the only planned second algorithm.
+DQN, SAC, A2C and TD3 are **N/A** — none is implemented. Roadmap item N (GRPO)
+was built on 2026-10-03 as `learning/grpo.py`, off by default (`shared_learner`
+defaults to `"ppo"`); see Part 1's note on the learner seam.
 
 ## 11. Regression
 

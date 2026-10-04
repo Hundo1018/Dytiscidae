@@ -61,6 +61,12 @@ from .triphibian import Domain, TriphibianEnv
 #: Which crossings the seeds can and cannot make, measured against the six body
 #: plans with no controller, so that the next person starts from the answer.
 #:
+#: **Superseded 2026-10-03** (ARCH46_SPEC §8): the first two rows were passive.
+#: `air_to_water` was a fall and `water_to_land` was credited for settling
+#: *into* the water.  With the hold-then-go command and directional crossings,
+#: no seed plan with no controller makes any crossing, and a still machine
+#: earns at most 0.013 of a graded approach.
+#:
 #:     air_to_water    all six      falling into the sea is easy
 #:     water_to_land   five of six  the ramp is reachable from x = 8
 #:     land_to_air     none         nothing gets off the ground
@@ -125,9 +131,22 @@ class TransitionResult:
     kind: str
     crossed: bool = False
     failure: str = ""
+    #: How far back from the interface this probe started, metres (Y/O).
+    start_back: float = 0.0
     #: MuJoCo bad-qacc events during the crossing; same auto-reset channel the
     #: segment rollouts guard against (see SegmentResult.bad_qacc).
     bad_qacc: int = 0
+    #: How well the machine stayed where it was told to during the hold phase,
+    #: in [0, 1] (``CrossingTracker``).  The crossing counts only at
+    #: ``HOLD_PASS`` or above, and the graded ``approach`` is scaled by it.
+    hold: float = 0.0
+    #: Share of the way from the start to the shoreline (SHORE_X) covered by the
+    #: end, for a land target; graded like ``approach`` for an air target.
+    shore_progress: float = 0.0
+    #: The medium the placement actually started the machine in.  A probe that
+    #: does not start in its start medium measures nothing (water_to_land did
+    #: not, until 2026-10-03).
+    started_in: str = ""
 
     # Raw measurements, kept so the record survives any change to the scoring.
     peak_entry_speed: float = 0.0
@@ -147,6 +166,16 @@ class TransitionResult:
     #: episode it spent with no ground contact at all.  Raw, always recorded.
     peak_clearance: float = 0.0
     airborne_fraction: float = 0.0
+    #: Share of the go phase spent clear of whatever is underneath -- the water
+    #: surface or the ground -- by more than AIRBORNE_GAP.  What the graded
+    #: approach to an air target reads.  ``airborne_fraction`` counts steps with
+    #: no contact at all, which a body floating in water satisfies every step:
+    #: it paid a still machine 0.300 on ``water_to_air`` until 2026-10-03.
+    aloft_fraction: float = 0.0
+    #: Highest clearance reached in the go phase.  ``peak_clearance`` covers the
+    #: whole episode including where the probe *put* the machine, and the 5 cm
+    #: placement gap alone paid a sitting gannet 0.031 of a takeoff.
+    go_peak_clearance: float = 0.0
 
     #: How much of the crossing happened, in [0, 1], and 1.0 exactly when
     #: ``crossed`` is true.  This is what the fitness gate reads.
@@ -191,19 +220,312 @@ class TransitionResult:
         }
 
 
-def _place_for(env: TriphibianEnv, kind: str) -> None:
-    """Put the machine where the crossing begins."""
+def transition_scatter_seed(kind: str) -> int:
+    """The entry-state draw every machine's ``kind`` crossing starts from.
+
+    Stable across processes -- an index into a fixed list, never ``hash(str)``
+    -- and shared by both evaluation paths.  Until 2026-09-30 only the batched
+    path scattered a crossing's entry state; ``run_transition`` started every
+    machine from the bare placement, so Tier-2, every film and every offline
+    probe measured a different crossing from the one the search scored (peak
+    entry speed differed by up to 7.3 m/s on the seed plans).
+    """
+    kinds = ("air_to_water", "water_to_air", "water_to_land", "land_to_air",
+             "land_to_water", "air_to_land")
+    return (0x9E3779B9 * (kinds.index(kind) + 1 if kind in kinds else 7)) & 0x7FFFFFFF
+
+
+#: ``air_to_water`` starts level at the air launch speed this high over the sea,
+#: and this far out (6 s at 30 m/s from here is still 20 m short of the beach).
+AIR_TO_WATER_HEIGHT = 4.0  # m
+AIR_TO_WATER_X = -200.0  # m
+
+#: ``water_to_land`` starts with the root this deep, at the most shoreward x
+#: where the machine fits above the ramp, beginning here (shore is at x ~ 8).
+WATER_START_DEPTH = 0.15  # m
+WATER_TO_LAND_X = 6.0  # m
+#: Where the ramp meets the still waterline (``ground_height`` is 0.02 at 8).
+SHORE_X = 8.0  # m
+
+#: Every crossing is two commanded phases (ARCH46_SPEC §8): for HOLD_SECONDS the
+#: controller observes the start medium and must stay in it, then it observes
+#: the target and must cross.  A passive body does the same thing whatever it is
+#: commanded, so it cannot both hold and then go.
+HOLD_SECONDS = 1.5
+#: The hold score a crossing needs in order to count at all.
+HOLD_PASS = 0.5
+#: Holding in air is holding height (``tasks.py``: "almost nothing here can
+#: hover"): full marks for losing at most HOLD_ALT_FULL over the hold, nothing
+#: at HOLD_ALT_ZERO.  Measured 2026-10-03, launched level at trim with the
+#: actuators still, the seed plans lose 2.6 to 9.5 m in 1.5 s.
+HOLD_ALT_FULL = 0.5  # m
+HOLD_ALT_ZERO = 1.5  # m
+
+
+#: How close to the ground counts as on it when classifying the start and the
+#: land hold: every placement leaves a few centimetres so the machine does not
+#: start inside the terrain.
+GROUND_TOL = 0.10  # m
+#: Clear of the water surface or the ground by more than this counts as aloft.
+AIRBORNE_GAP = 0.05  # m
+
+
+def medium_of(env: TriphibianEnv, ground_tol: float = 0.0) -> Domain:
+    """Which medium the machine is in: root under water, else on the ground
+    (or within ``ground_tol`` of it) with the root dry, else in the air."""
+    if env.depth() > 0.0:
+        return Domain.WATER
+    if env._touching_ground() or (ground_tol > 0.0 and env.clearance() <= ground_tol):
+        return Domain.LAND
+    return Domain.AIR
+
+
+#: Standard gravity, for the energy height an air hold is scored on.
+_G = 9.81
+
+
+def ashore(env: TriphibianEnv) -> bool:
+    """On land *out of the water*: ``medium_of`` says LAND and the ground under
+    the root is above the local water surface.
+
+    ``medium_of`` reads the root: dry, and touching terrain.  A floating body
+    whose root rides above the waterline while its hull rests on the
+    *submerged* ramp satisfies both, in a metre of water 8 m seaward of the
+    shore.  Measured 2026-10-04 on arch46's elites held still: that is how all
+    still ``water_to_land`` crossings were made (elite 14 at x = -0.15, root
+    9 cm above the surface, lowest geometry 0.91 m under it).  A crossing *to*
+    land asks for this instead (ARCH46_SPEC §8, 2026-10-04).
+    """
+    from ..core.mjcf import beach_surface_z
+
+    if medium_of(env) is not Domain.LAND:
+        return False
+    x, y, _ = env.root_pos()
+    ground = beach_surface_z(float(x))
+    return float(env.medium.depth(np.array([[x, y, ground]]), env.data.time)[0]) <= 0.0
+
+
+def _rock_gap(env: TriphibianEnv) -> float:
+    """Lowest machine geometry above the beach ramp, metres, at the current pose.
+
+    Not ``clearance``: that is height above whatever is underneath, which over
+    the sea is the water surface, so a submerged start never "clears" it.
+    """
+    from ..core.mjcf import beach_surface_z
+
+    g = env._machine_geoms
+    aabb = env.model.geom_aabb.reshape(-1, 6)[g]
+    R = env.data.geom_xmat[g].reshape(-1, 3, 3)
+    centre_z = env.data.geom_xpos[g][:, 2] + np.einsum("nij,nj->ni", R, aabb[:, :3])[:, 2]
+    bottom = centre_z - np.einsum("nj,nj->n", np.abs(R[:, 2, :]), aabb[:, 3:])
+    rock = np.array([beach_surface_z(float(x)) for x in env.data.geom_xpos[g][:, 0]])
+    return float(np.min(bottom - rock))
+
+
+class CrossingTracker:
+    """What a crossing is, shared by ``run_transition`` and the batched path.
+
+    Until 2026-10-03 each path kept its own copy of "a crossing happened": the
+    first step at which the root's wetness differed from the start's, in either
+    direction, or touching ground at the end for a land target.  So
+    ``water_to_land``, which started the machine dry on the ramp, credited a
+    still machine for settling *into* the water, and ``air_to_water`` paid a
+    body for falling.  Measured with the actuators held still over 7 plans x 2
+    seeds: 0.834 against the base gait's 0.693, and 0.865 against 0.861.
+
+    Now:
+
+    - it must start in the start medium (``started_in``), or nothing counts;
+    - the first HOLD_SECONDS are a *hold* phase: the controller observes the
+      start medium (``commanded``) and is scored on staying in it -- holding
+      height, in air;
+    - only then does it observe the target, and only a change *into* the target
+      medium after that counts, and only if it is still there at the end.
+      ``land_to_air`` and ``water_to_air`` keep their terminal clearance test.
+
+    And since 2026-10-04 (the ninth instance of the lesson in CLAUDE.md), two
+    gates on what "held" and "arrived" mean, because arch46's elites held still
+    still crossed (``experiments/still_leak``):
+
+    - holding in air is holding *energy* height, ``z + |v|^2 / 2g``, as well as
+      height.  A glider launched at speed coasts through a 1.5 s hold on its
+      launch energy: held still, it lost 0.11 m of height and 5.5 m of energy
+      height, then glided into the sea, and that was every still
+      ``air_to_water`` crossing.  An unpowered body cannot hold its mechanical
+      energy -- drag only takes it -- so no still machine passes this, and a
+      machine that sustains flight does.  Read as a least-squares slope over
+      the hold, so a stroke's oscillation of the root's speed averages out.
+    - a crossing to land must be ``ashore``: on the ground with the ground
+      under it above the water, not a float resting on the submerged ramp.
+    - the graded shore progress counts only what was made after the command.
+    - a probe that aborted (battery flat, diverged, unstable) holds nothing,
+      so it earns no graded approach.
+    """
+
+    def __init__(self, env: TriphibianEnv, kind: str):
+        self.start, self.target = TRANSITION_ENDPOINTS[kind]
+        self.hold_steps = max(int(round(HOLD_SECONDS / env.timestep)), 1)
+        self.started_in = medium_of(env, GROUND_TOL)
+        self.z0 = float(env.root_pos()[2])
+        self.x0 = float(env.root_pos()[0])
+        self.x_go = self.x0
+        self.z_min = self.z0
+        self.in_start = 0
+        self.held_steps = 0
+        self.left_early = False
+        self.cross_step = -1
+        self.entry_speed = 0.0
+        self.go_steps = 0
+        self.aloft_steps = 0
+        self.go_peak = 0.0
+        # Least-squares sums of energy height against time over an air hold:
+        # n, sum t, sum t^2, sum e, sum t e.  ``None`` where it cannot be read
+        # (no free root): an unmeasured hold is not a held one.
+        self._e = [0, 0.0, 0.0, 0.0, 0.0] if env.model.nv >= 6 else None
+        self._dt = float(env.timestep)
+
+    def energy_height_loss(self) -> float | None:
+        """Energy height lost over the hold, metres, from the fitted slope;
+        ``None`` if it could not be measured."""
+        if self._e is None or self._e[0] < 2:
+            return None
+        n, st, stt, se, ste = self._e
+        den = n * stt - st * st
+        if den <= 0.0:
+            return None
+        return float(-(n * ste - st * se) / den * self.hold_steps * self._dt)
+
+    def commanded(self, i: int) -> Domain:
+        """The medium the controller is told about at step ``i``."""
+        return self.start if i < self.hold_steps else self.target
+
+    def observe(self, env: TriphibianEnv, i: int) -> None:
+        m = medium_of(env)
+        if i < self.hold_steps:
+            self.held_steps += 1
+            # Where the go command finds it: shore progress counts from here.
+            self.x_go = float(env.root_pos()[0])
+            if self.start is Domain.AIR:
+                if m is Domain.AIR:
+                    self.in_start += 1
+                    z = float(env.root_pos()[2])
+                    self.z_min = min(self.z_min, z)
+                    if self._e is not None:
+                        v = env.data.qvel[:3]
+                        e, t = z + float(v @ v) / (2.0 * _G), i * self._dt
+                        a = self._e
+                        a[0] += 1
+                        a[1] += t
+                        a[2] += t * t
+                        a[3] += e
+                        a[4] += t * e
+                else:
+                    self.left_early = True
+            elif self.start is Domain.WATER:
+                # Bobbing at the surface is still in the water; on land, or
+                # clear of it by half a metre, is not.
+                if m is not Domain.LAND and env.clearance() <= 0.5:
+                    self.in_start += 1
+                else:
+                    self.left_early = True
+            else:
+                if medium_of(env, GROUND_TOL) is Domain.LAND:
+                    self.in_start += 1
+                elif env.clearance() > 0.5 or m is Domain.WATER:
+                    self.left_early = True
+            return
+        self.go_steps += 1
+        cl = float(env.clearance())
+        self.go_peak = max(self.go_peak, cl)
+        if cl > AIRBORNE_GAP:
+            self.aloft_steps += 1
+        if (self.cross_step < 0 and self.target is not Domain.AIR and m is self.target
+                and (self.target is not Domain.LAND or ashore(env))):
+            self.cross_step = i
+            self.entry_speed = abs(float(env.body_twist()[2]))
+
+    def hold_score(self) -> float:
+        if self.started_in is not self.start or self.left_early or not self.held_steps:
+            return 0.0
+        stayed = self.in_start / self.held_steps
+        if self.start is Domain.AIR:
+            e_loss = self.energy_height_loss()
+            if e_loss is None:
+                return 0.0
+            loss = max(self.z0 - self.z_min, e_loss)
+            height = float(np.clip((HOLD_ALT_ZERO - loss) / (HOLD_ALT_ZERO - HOLD_ALT_FULL),
+                                   0.0, 1.0))
+            return float(stayed * height)
+        return float(stayed)
+
+    def finish(self, env: TriphibianEnv, r: TransitionResult, n_steps: int) -> int:
+        """Set ``r.hold``, ``r.started_in``, ``r.crossed``; return the cross step."""
+        # A probe that did not run to the end -- battery flat, diverged, or a
+        # MuJoCo auto-reset -- measured no hold, so its graded approach (which
+        # the hold scales) is nothing.  Measured 2026-10-04: arch46 elite 82
+        # held still blew up at 1.95 s (x 0.56 -> 5.81 m in 0.03 s, battery
+        # flat) and was paid 0.54 of a graded water_to_land; diverged and
+        # unstable water_to_air probes were paid 0.33-0.54.
+        aborted = bool(r.failure)
+        r.hold = 0.0 if aborted else self.hold_score()
+        r.started_in = self.started_in.value
+        r.aloft_fraction = self.aloft_steps / max(self.go_steps, 1)
+        r.go_peak_clearance = self.go_peak
+        if self.target is Domain.LAND and SHORE_X > self.x0:
+            # Progress made after the command, over the whole start-to-shore
+            # distance.  From the start it paid a still amphibian 0.136 of a
+            # graded approach for capsizing 0.66 m shoreward *during the hold*
+            # (arch46 elite 129, 2026-10-04); drift while told to stay is not
+            # going, and is not paid as going.
+            r.shore_progress = float(np.clip(
+                (float(env.root_pos()[0]) - self.x_go) / (SHORE_X - self.x0), 0.0, 1.0))
+        cross = self.cross_step
+        if self.target is Domain.AIR:
+            # Terminal, not peak: a machine that leapt and came down has not
+            # crossed.
+            cross = max(n_steps - 1, 0) if env.clearance() > 0.5 else -1
+        elif cross >= 0 and (medium_of(env) is not self.target
+                             or (self.target is Domain.LAND and not ashore(env))):
+            # Held: it has to be there at the end, not have passed through.
+            cross = -1
+        if cross >= 0:
+            r.peak_entry_speed = max(r.peak_entry_speed, self.entry_speed)
+        r.crossed = cross >= 0 and not r.failure and r.hold >= HOLD_PASS
+        if not r.failure:
+            if self.started_in is not self.start:
+                r.failure = f"did not start in {self.start.value}"
+            elif cross >= 0 and r.hold < HOLD_PASS:
+                r.failure = "did not hold before the command to cross"
+        return cross if r.crossed else -1
+
+
+def _place_for(env: TriphibianEnv, kind: str, back: float = 0.0) -> None:
+    """Put the machine where the crossing begins.
+
+    ``back`` moves the start away from the interface, metres (ROADMAP Y/O):
+    higher over the sea, deeper under it, further seaward of the ramp, further
+    up the beach.  ``land_to_air`` has no interface to step back from and
+    ignores it.  0 is the placement every run before Y/O used.
+    """
     start, _ = TRANSITION_ENDPOINTS[kind]
     env.reset(start, randomise=False)
     if env.model.nq < 7:
         return
+    back = max(float(back), 0.0)
     if kind == "air_to_water":
-        # Committed descent from low altitude: the machine has to arrive at the
-        # surface, not decide whether to.
-        env.data.qpos[2] = 2.5
-        env.data.qvel[2] = -1.5
+        # Level, at the air segment's launch speed, AIR_TO_WATER_HEIGHT over the
+        # sea, and far enough out that 6 s at 30 m/s is still over water.  It
+        # used to be a committed descent from 2.5 m at -1.5 m/s -- "the machine
+        # has to arrive at the surface, not decide whether to" -- and a machine
+        # with its actuators held still crossed 100% of the time and scored
+        # 0.834 against the base gait's 0.693 (2026-10-03).  Now it must hold
+        # height until told to go (``CrossingTracker``), which no passive body
+        # can: launched level at trim, every seed plan held still loses at
+        # least 2.6 m in the 1.5 s hold.
+        env.data.qpos[0] = AIR_TO_WATER_X
+        env.data.qpos[2] = AIR_TO_WATER_HEIGHT + back
     elif kind == "water_to_air":
-        env.data.qpos[2] = -2.0
+        env.data.qpos[2] = -2.0 - back
     elif kind == "water_to_land":
         # Floating just above the submerged part of the ramp, a few metres
         # seaward of the shoreline: a machine that has swum up to the beach and
@@ -214,11 +536,57 @@ def _place_for(env: TriphibianEnv, kind: str) -> None:
         # depth this close in.  That is the same mistake that made the land
         # domain unreachable for the whole project, so the height comes from the
         # terrain here too rather than from a constant.
-        x = 8.0
-        env.data.qpos[2] = env._clear_of_terrain(x, 0.0, 0.0, gap=0.02)
+        #
+        # And *in* the water: the root submerged.  Until 2026-10-03 the height
+        # put the machine's lowest geometry 0.02 m above the ramp at x = 8, which
+        # for a tall body is standing in 20 cm of water with its root dry -- on
+        # land already -- and a still machine was credited with the crossing for
+        # settling back in.  So start where the root fits under
+        # WATER_START_DEPTH without touching the ramp, walking seaward from
+        # WATER_TO_LAND_X until it does: a deeper hull starts further out.
+        x = WATER_TO_LAND_X
+        while x > WATER_TO_LAND_X - 12.0:
+            env.data.qpos[0], env.data.qpos[2] = x, -WATER_START_DEPTH
+            env._mj.mj_forward(env.model, env.data)
+            if _rock_gap(env) >= 0.05:
+                break
+            x -= 0.5
+        env.data.qpos[0] = x - back
+        env.data.qpos[2] = -WATER_START_DEPTH
     elif kind == "land_to_water":
-        env.data.qpos[0] = 14.0
+        env.data.qpos[0] = 14.0 + back
+        if back > 0.0:
+            # Up the beach the ground is higher; set down on it, not in it.
+            env.data.qpos[2] = env._clear_of_terrain(14.0 + back, 0.0,
+                                                     float(env.data.qpos[2]))
     env._mj.mj_forward(env.model, env.data)
+
+
+def reseat_after_scatter(env: TriphibianEnv, kind: str) -> None:
+    """Put a land start back on the ground at the pose ``scatter`` left.
+
+    ``scatter`` sets every actuated joint to the gait's pose at a random phase,
+    after ``_place_for`` placed the machine with its joints at zero.  For the
+    teal that left the lowest geometry 0.5 m off the ground, so every
+    ``land_to_air`` began with a half-metre drop -- which the probe read as a
+    leap -- and the start was not on land at all.  A submerged start next to
+    the ramp has the opposite problem: the ray's scattered pose put its lowest
+    geometry 8 cm into the ramp, so it is stepped seaward until it clears.
+    Called by both paths.
+    """
+    if env.model.nq < 7:
+        return
+    start, _ = TRANSITION_ENDPOINTS[kind]
+    q = env.data.qpos
+    if start is Domain.LAND:
+        q[2] = env._clear_of_terrain(float(q[0]), float(q[1]), float(q[2]), gap=0.02)
+        env._mj.mj_forward(env.model, env.data)
+    elif kind == "water_to_land":
+        for _ in range(40):
+            if _rock_gap(env) >= 0.02:
+                break
+            q[0] -= 0.25
+            env._mj.mj_forward(env.model, env.data)
 
 
 def run_transition(
@@ -227,15 +595,20 @@ def run_transition(
     controller,
     *,
     duration: float = 6.0,
+    back: float = 0.0,
 ) -> TransitionResult:
-    """Simulate one crossing and measure it."""
-    r = TransitionResult(kind=kind, duration=duration)
+    """Simulate one crossing and measure it.  ``back``: see ``_place_for``."""
+    r = TransitionResult(kind=kind, duration=duration, start_back=float(back))
     if kind not in TRANSITION_ENDPOINTS:
         r.failure = f"unknown transition {kind}"
         return r
 
     _, target = TRANSITION_ENDPOINTS[kind]
-    _place_for(env, kind)
+    _place_for(env, kind, back)
+    # The same entry-state draw the batched path makes (see
+    # ``transition_scatter_seed``).
+    env.scatter(np.random.default_rng(transition_scatter_seed(kind)))
+    reseat_after_scatter(env, kind)
     r.survivable_entry_speed = float(env.p.max_entry_speed)
 
     basis = controller.basis_for(Domain.WATER if "water" in kind else Domain.AIR)
@@ -244,8 +617,7 @@ def run_transition(
     cur = controller.params
 
     energy0 = float(env.budget.total_j)
-    was_wet = env.depth() > 0.0
-    cross_step = -1
+    track = CrossingTracker(env, kind)
     uprights: list[float] = []
     speeds: list[float] = []
     slam_window: list[float] = []
@@ -257,7 +629,7 @@ def run_transition(
         if controller.policy is not None and basis is not None and i % control_every == 0:
             cur, _, _g = basis.command_policy(
                 controller.params,
-                controller.policy.act(env.observation(target)),
+                controller.policy.act(env.observation(track.commanded(i))),
                 env.cpg.n,
                 controller.policy,
             )
@@ -295,24 +667,10 @@ def run_transition(
         if len(slam_window) == slam_n:
             r.peak_slam = max(r.peak_slam, float(np.mean(slam_window)))
 
-        wet = env.depth() > 0.0
-        if wet != was_wet:
-            if cross_step < 0:
-                cross_step = i
-                # Vertical speed at the moment of crossing is what the hull sees.
-                r.peak_entry_speed = max(
-                    r.peak_entry_speed, abs(float(env.body_twist()[2]))
-                )
-            was_wet = wet
+        # Vertical speed at the moment of crossing is what the hull sees.
+        track.observe(env, i)
 
-    # For a land crossing there is no waterline to cross, so use ground contact.
-    if cross_step < 0 and target is Domain.LAND:
-        if env._touching_ground():
-            cross_step = max(len(uprights) - 1, 0)
-    if cross_step < 0 and target is Domain.AIR and env.clearance() > 0.5:
-        cross_step = max(len(uprights) - 1, 0)
-
-    r.crossed = cross_step >= 0 and not r.failure
+    cross_step = track.finish(env, r, len(uprights))
     r.airborne_fraction = airborne_steps / max(len(uprights), 1)
     r.energy_j = float(env.budget.total_j - energy0)
     r.exit_depth = float(env.depth())
@@ -352,11 +710,19 @@ def _score(
         # scales the whole transition score rather than adding to it: a leap
         # cannot out-earn a flight, it can only stop being worth zero.
         if target is Domain.AIR:
-            height = float(np.clip(r.peak_clearance / 0.5, 0.0, 1.0))
-            aloft = float(np.clip(r.airborne_fraction, 0.0, 1.0))
-            r.approach = float(0.6 * np.clip(0.5 * height + 0.5 * aloft, 0.0, 1.0))
+            height = float(np.clip(r.go_peak_clearance / 0.5, 0.0, 1.0))
+            aloft = float(np.clip(r.aloft_fraction, 0.0, 1.0))
+            r.approach = float(0.6 * np.clip(0.5 * height + 0.5 * aloft, 0.0, 1.0)
+                               * r.hold)
+        elif target is Domain.LAND:
+            # The same reason for a land target: from the start to the shore is
+            # 3 to 7.5 m, more than one mutation of swimming speed covers in the
+            # go phase, so the distance closed is graded, scaled by the hold and
+            # capped below a completed crossing.
+            r.approach = float(0.6 * r.shore_progress * r.hold)
         return
-    r.approach = 1.0
+    # 1.0 for a crossing that held perfectly first; never below HOLD_PASS.
+    r.approach = float(r.hold)
 
     # --- shock ------------------------------------------------------------
     # The *hydrodynamic* slam load, not the speed of the machine's centre.

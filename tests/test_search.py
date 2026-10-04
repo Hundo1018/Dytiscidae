@@ -1340,6 +1340,258 @@ def test_transitions_are_graded_not_pass_fail() -> None:
           two <= one, f"{one:.2f} -> {two:.2f} after adding a second crossing")
 
 
+def test_a_crossing_is_commanded_and_a_still_machine_makes_none() -> None:
+    """ARCH46_SPEC §8: a crossing pays only for doing what the machine was told.
+
+    Measured 2026-10-03 with the actuators held still, 7 plans x 2 seeds: the
+    old probes paid a still machine 0.834 on ``air_to_water`` (it fell in) and
+    0.865 on ``water_to_land`` (it started dry on the ramp, settled into the
+    water, and any change of wetness counted), more than the base gait; and the
+    graded approach paid 0.300 on ``water_to_air`` to a body floating with no
+    contacts.  Now a crossing starts in its start medium, holds there on
+    command for HOLD_SECONDS, and only a change *into* the target afterwards,
+    still held at the end, counts.  The positive controls script the state
+    through the real loop, so the gate is shown to be passable, not a wall.
+    """
+    print("\ntransitions: commanded, directional, and nothing for a still machine")
+    from dytiscidae.control.cpg import CPGParams
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import transitions as T
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    def reward(t):
+        return float(t.crossed) * (0.40 + 0.60 * float(np.mean([
+            t.components[c] for c in ("shock", "control", "settle", "economy", "exit_state")])))
+
+    worst, economy = {}, 0.0
+    for plan in ("beetle", "gannet"):
+        env = TriphibianEnv(build(BODY_PLANS[plan]()), seed=0)
+        b = env.cpg.base
+        still = CPGParams(amplitude=np.zeros(env.cpg.n), phase=np.asarray(b.phase, float),
+                          offset=np.asarray(b.offset, float), frequency=float(b.frequency))
+        for kind in ("air_to_water", "water_to_air", "water_to_land", "land_to_air"):
+            t = T.run_transition(env, kind, Controller(params=still))
+            worst[kind] = max(worst.get(kind, 0.0), reward(t), t.components["crossed"])
+            economy = max(economy, t.components["economy"])
+    check("a still machine earns nothing on any crossing (reward or graded approach)",
+          max(worst.values()) <= 0.05,
+          ", ".join(f"{k} {v:.3f}" for k, v in worst.items()))
+    check("and the energy-economy term pays it nothing (it read 1.000 still)",
+          economy == 0.0, f"{economy:.3f}")
+
+    env = TriphibianEnv(build(BODY_PLANS["beetle"]()), seed=0)
+    ctrl = Controller(params=env.cpg.base)
+    hold_n = max(int(round(T.HOLD_SECONDS / env.timestep)), 1)
+
+    def scripted(hook):
+        """Run ``hook(env, k)`` after every physics step of the next crossing."""
+        orig, k = env.step, [0]
+
+        def step(angles):
+            ok = orig(angles)
+            k[0] += 1
+            hook(env, k[0])
+            return ok
+        env.step = step
+        return lambda: env.__dict__.pop("step", None)
+
+    def hover_then(release_at, keep_speed=True):
+        """Height held through the hold; with ``keep_speed`` the launch
+        velocity too -- sustained level flight -- and without it the speed
+        bleeds away while the height is held."""
+        z = {}
+
+        def hook(e, k):
+            z.setdefault("z0", float(e.data.qpos[2]))
+            z.setdefault("v0", e.data.qvel[:2].copy())
+            if k <= release_at:
+                e.data.qpos[2], e.data.qvel[2] = z["z0"], 0.0
+                if keep_speed:
+                    e.data.qvel[:2] = z["v0"]
+                e._mj.mj_forward(e.model, e.data)
+        return hook
+
+    undo = scripted(hover_then(hold_n))
+    good = T.run_transition(env, "air_to_water", ctrl)
+    undo()
+    check("flying level through the hold and then going in is a crossing",
+          good.crossed and good.hold > 0.9 and good.components["crossed"] > 0.9,
+          f"crossed {good.crossed}, hold {good.hold:.2f}, {good.failure or 'ok'}")
+    # 2026-10-04: holding in air is holding energy height.  A glider coasting
+    # on its launch speed keeps its height for 1.5 s while the speed goes;
+    # arch46's still gliders did exactly that and then glided into the sea.
+    undo = scripted(hover_then(hold_n, keep_speed=False))
+    coast = T.run_transition(env, "air_to_water", ctrl)
+    undo()
+    check("holding height while the launch speed bleeds away is not a hold",
+          not coast.crossed and coast.hold < T.HOLD_PASS,
+          f"crossed {coast.crossed}, hold {coast.hold:.2f}, {coast.failure}")
+    undo = scripted(hover_then(hold_n // 3))
+    early = T.run_transition(env, "air_to_water", ctrl)
+    undo()
+    check("going in before the command is not",
+          not early.crossed and "hold" in early.failure,
+          f"crossed {early.crossed}, hold {early.hold:.2f}, {early.failure}")
+
+    def ashore_at(when):
+        def hook(e, k):
+            if k == when:
+                e.data.qvel[:] = 0.0
+                e.data.qpos[2] = e._clear_of_terrain(12.0, 0.0, 1.0, gap=0.02)
+                e._mj.mj_forward(e.model, e.data)
+        return hook
+
+    undo = scripted(ashore_at(hold_n + 5))
+    land = T.run_transition(env, "water_to_land", ctrl)
+    undo()
+    check("getting ashore after the command is a crossing",
+          land.crossed and land.started_in == "water",
+          f"crossed {land.crossed}, started in {land.started_in}, {land.failure or 'ok'}")
+    undo = scripted(ashore_at(5))
+    rushed = T.run_transition(env, "water_to_land", ctrl)
+    undo()
+    check("and getting ashore during the hold is not",
+          not rushed.crossed, f"crossed {rushed.crossed}, {rushed.failure}")
+
+    def ashore_then_back(e, k):
+        ashore_at(hold_n + 5)(e, k)
+        if k == hold_n + 400:
+            e.data.qvel[:] = 0.0
+            e.data.qpos[0], e.data.qpos[2] = 2.0, -0.5
+            e._mj.mj_forward(e.model, e.data)
+    undo = scripted(ashore_then_back)
+    passed = T.run_transition(env, "water_to_land", ctrl)
+    undo()
+    check("nor is reaching land and being back in the water at the end",
+          not passed.crossed, f"crossed {passed.crossed}, {passed.failure}")
+
+    # 2026-10-04: a probe that aborts holds nothing.  Thrown up the beach and
+    # then flat (what a blow-up looks like: arch46 elite 82 held still jumped
+    # 5 m in 0.03 s and its battery went), it was paid 0.6 x shore progress.
+    orig_step, k = env.step, [0]
+
+    def thrown_then_flat(angles):
+        ok = orig_step(angles)
+        k[0] += 1
+        ashore_at(hold_n + 5)(env, k[0])
+        return ok and k[0] < hold_n + 10
+    env.step = thrown_then_flat
+    try:
+        flat = T.run_transition(env, "water_to_land", ctrl)
+    finally:
+        env.__dict__.pop("step", None)
+    check("a probe that aborts earns no graded approach",
+          not flat.crossed and flat.components["crossed"] == 0.0 and "battery" in flat.failure,
+          f"approach {flat.components['crossed']:.3f}, shore {flat.shore_progress:.2f}, {flat.failure}")
+
+    T._place_for(env, "water_to_land")
+    check("water_to_land starts with the root under water",
+          T.medium_of(env, T.GROUND_TOL) is Domain.WATER and env.depth() > 0.0,
+          f"depth {env.depth():+.2f} at x {env.root_pos()[0]:.1f}")
+    orig_place = T._place_for
+    try:
+        def on_the_beach(e, kind, back=0.0):
+            orig_place(e, kind, back)
+            e.data.qpos[2] = e._clear_of_terrain(12.0, 0.0, 1.0, gap=0.02)
+            e._mj.mj_forward(e.model, e.data)
+        T._place_for = on_the_beach
+        dry = T.run_transition(env, "water_to_land", ctrl)
+    finally:
+        T._place_for = orig_place
+    check("and a water_to_land that starts on the beach measures nothing",
+          not dry.crossed and dry.failure == "did not start in water",
+          f"crossed {dry.crossed}, {dry.failure}")
+
+    tr = T.CrossingTracker(env, "air_to_water")
+    check("the controller is told to stay, then to go",
+          tr.commanded(0) is Domain.AIR and tr.commanded(hold_n - 1) is Domain.AIR
+          and tr.commanded(hold_n) is Domain.WATER)
+
+
+def test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing() -> None:
+    """The ninth instance (2026-10-04, ARCH46_SPEC §8 appended).
+
+    After the 10-03 fix, arch46's elites held still still crossed:
+    ``air_to_water`` 1.8-2.3%, ``water_to_land`` up to 5.0%, ``water_to_air``
+    up to 0.9% (``experiments/transition_distance``).  Traced singly
+    (``experiments/still_leak``), three mechanisms:
+
+    - ``air_to_water``: a glider coasts through the 1.5 s hold on its launch
+      speed -- 0.09-0.32 m of height lost, 3.4-5.7 m of energy height -- and
+      then glides into the sea.  Gate: the air hold reads energy height.
+    - ``water_to_land``: a float whose root rides above the waterline while its
+      hull rests on the *submerged* ramp is LAND by ``medium_of``, 8 m out.
+      Gate: a crossing to land must be ``ashore``.
+    - ``water_to_air``: the still arm was not still -- a rotor's channel is a
+      speed held at its offset, and both crossers had rotors spinning.  Fixed
+      in the still machine (``held_still_params``), not the tracker.
+
+    Each body runs at the start distance it first crossed from.  The fixture is
+    those 24 bodies' genomes (``tests/fixtures/arch46_still_crossers.pkl``,
+    written by ``experiments/still_leak/make_fixture.py``).  So that this test
+    cannot go quiet if physics changes underneath it, it also checks the leak is
+    still *there* with each gate taken out.
+    """
+    print("\ntransitions: arch46's still crossers, held still, cross nothing")
+    import pickle
+
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import transitions as T
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    # A fixture committed with the tests (trusted, like a run's archive .pkl):
+    # the genomes need their classes, which JSON would not carry.
+    fx = Path(__file__).parent / "fixtures" / "arch46_still_crossers.pkl"
+    cases = pickle.loads(fx.read_bytes())
+    built = {}
+
+    def run(case, **patch):
+        key = (case["index"], case["eval_seed"])
+        if key not in built:
+            built[key] = TriphibianEnv(build(case["genome"]), seed=case["eval_seed"])
+        env = built[key]
+        saved = {k: getattr(T, k) if hasattr(T, k) else getattr(T.CrossingTracker, k)
+                 for k in patch}
+        try:
+            for k, v in patch.items():
+                setattr(T if hasattr(T, k) else T.CrossingTracker, k, v)
+            return T.run_transition(env, case["kind"], Controller(params=env.held_still_params()),
+                                    back=case["back"])
+        finally:
+            for k, v in saved.items():
+                setattr(T if hasattr(T, k) else T.CrossingTracker, k, v)
+
+    res = [(c, run(c)) for c in cases]
+    crossed = [f"{c['kind']}#{c['index']}" for c, t in res if t.crossed]
+    graded = max(t.components["crossed"] for _, t in res)
+    check(f"none of the {len(cases)} bodies that crossed held still crosses held still now",
+          not crossed, ", ".join(crossed) or "0 crossed")
+    check("and none earns more than 0.05 of a graded approach",
+          graded <= 0.05, f"max {graded:.3f}")
+
+    gliders = [c for c in cases if c["kind"] == "air_to_water"]
+    off = [run(c, energy_height_loss=lambda self: 0.0) for c in gliders]
+    check("with the hold reading height alone, the still gliders cross again",
+          sum(t.crossed for t in off) >= 3, f"{sum(t.crossed for t in off)} of {len(gliders)}")
+
+    floats = [c for c in cases if c["kind"] == "water_to_land"]
+    off = [run(c, ashore=lambda e: T.medium_of(e) is Domain.LAND) for c in floats]
+    check("with land read as medium_of alone, the still floats cross again",
+          sum(t.crossed for t in off) >= 5, f"{sum(t.crossed for t in off)} of {len(floats)}")
+
+    rotor = next(c for c in cases if c["kind"] == "water_to_air")
+    env = built[(rotor["index"], rotor["eval_seed"])]
+    still = env.held_still_params()
+    spun = [k for k, n in enumerate(env.act_names) if n.endswith("_r")]
+    check("a still machine's rotors are stopped, not left at their throttle",
+          spun and all(still.offset[k] == env.cpg.lo[k] for k in spun)
+          and not np.any(still.amplitude),
+          f"{len(spun)} rotors, offsets {[round(float(still.offset[k]), 2) for k in spun][:4]}")
+
+
 def test_an_attempted_takeoff_outscores_never_leaving_the_ground() -> None:
     """Getting partway off the ground must be worth more than not trying.
 
@@ -1360,10 +1612,30 @@ def test_an_attempted_takeoff_outscores_never_leaving_the_ground() -> None:
     from dytiscidae.envs.transitions import TransitionResult, run_transition
     from dytiscidae.envs.triphibian import Domain, TriphibianEnv
 
+    from dytiscidae.envs.transitions import HOLD_SECONDS
+
+    # Since 2026-10-03 a crossing is commanded: the machine must stay on the
+    # ground for HOLD_SECONDS before it is told to go.  The teal's open-loop gait
+    # leaps from t = 0, which is leaving before the command and scores nothing;
+    # so it is pinned where it was placed until the command, the way a
+    # controller that obeyed it would be, and its leap comes after.
     scores = {}
     for name in ("gannet", "teal"):
         env = TriphibianEnv(build(BODY_PLANS[name]()))
         ctrl = Controller(params=env.cpg.base)
+        if name == "teal":
+            orig, k, pose = env.step, [0], {}
+            hold_n = max(int(round(HOLD_SECONDS / env.timestep)), 1)
+
+            def step(angles, env=env, orig=orig, k=k, pose=pose, hold_n=hold_n):
+                pose.setdefault("q", env.data.qpos.copy())
+                ok = orig(angles)
+                k[0] += 1
+                if k[0] <= hold_n:
+                    env.data.qpos[:7], env.data.qvel[:6] = pose["q"][:7], 0.0
+                    env._mj.mj_forward(env.model, env.data)
+                return ok
+            env.step = step
         scores[name] = run_transition(env, "land_to_air", ctrl, duration=6.0)
 
     sit, leap = scores["gannet"], scores["teal"]
@@ -1373,9 +1645,15 @@ def test_an_attempted_takeoff_outscores_never_leaving_the_ground() -> None:
     check("neither of them completes the crossing",
           not sit.crossed and not leap.crossed,
           f"crossed {sit.crossed} / {leap.crossed}")
+    # The margin was 0.1, set when the teal "leapt" 0.52 m.  That was the
+    # transition scatter posing its joints after placement and dropping it from
+    # half a metre (fixed 2026-10-03, ``reseat_after_scatter``); its real leap,
+    # after the command, is 0.11 m and scores 0.073 against 0.000.
     check("yet the leap scores strictly more than sitting still",
-          leap.approach > sit.approach + 0.1,
+          leap.approach > sit.approach + 0.05,
           f"approach {sit.approach:.3f} vs {leap.approach:.3f} -- both were 0.000")
+    check("sitting still earns exactly nothing (the placement gap is not a height)",
+          sit.approach == 0.0, f"{sit.approach:.4f}")
     check("and both stay below what completing the crossing pays",
           max(sit.approach, leap.approach) <= 0.6 + 1e-9,
           f"capped at {max(sit.approach, leap.approach):.3f} against 1.0 for a crossing")
@@ -1383,17 +1661,17 @@ def test_an_attempted_takeoff_outscores_never_leaving_the_ground() -> None:
     # Height alone must not buy it, and neither must hang time: a single
     # ballistic hop that lands at once, and a machine that never quite touches
     # while going nowhere, are both things this should refuse to pay for.
-    hop = TransitionResult(kind="land_to_air")
-    hop.peak_clearance, hop.airborne_fraction = 0.6, 0.02
-    drift = TransitionResult(kind="land_to_air")
-    drift.peak_clearance, drift.airborne_fraction = 0.02, 0.9
+    hop = TransitionResult(kind="land_to_air", hold=1.0)
+    hop.go_peak_clearance, hop.aloft_fraction = 0.6, 0.02
+    drift = TransitionResult(kind="land_to_air", hold=1.0)
+    drift.go_peak_clearance, drift.aloft_fraction = 0.02, 0.9
     from dytiscidae.envs.transitions import _score
 
     for res in (hop, drift):
         _score(TriphibianEnv(build(BODY_PLANS["gannet"]())), res, -1,
                np.array([1.0]), np.array([0.0]), Domain.AIR)
     check("one term alone cannot earn a full approach",
-          max(hop.approach, drift.approach) < 0.35,
+          0.0 < max(hop.approach, drift.approach) < 0.35,
           f"height-only {hop.approach:.3f}, hangtime-only {drift.approach:.3f}, "
           f"both against {leap.approach:.3f} for a real leap")
     check("a completed crossing is still worth exactly one",
@@ -1438,17 +1716,20 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     # needs the flapping to make net forward force.  Derived, not written out,
     # so inserting another rung moves the expectations instead of breaking them.
     THR = sum(1 for _n, m, _t in LADDER["air"] if m == "thrust_margin")
+    # And the level-flight gate after them (AD): everything above it asks
+    # whether the actuators can hold the machine level on the rig.
+    LEV = sum(1 for _n, m, _t in LADDER["air"] if m == "level_margin")
     flies = {"lift_margin": 1.5}
-    pushes = {**flies, "thrust_margin": 2.0}
+    pushes = {**flies, "thrust_margin": 2.0, "level_margin": 1.0}
     seq = [
         ({**flies, "airborne_fraction": 0.05}, LIFT + 0),
         ({**flies, "airborne_fraction": 0.7, "sink_rate": 6.0}, LIFT + 2),
         ({**flies, "airborne_fraction": 0.7, "sink_rate": 2.0}, LIFT + 3),
         ({**flies, "airborne_fraction": 0.9, "sink_rate": 0.2}, LIFT + 4),
         ({**pushes, "airborne_fraction": 0.9, "sink_rate": 0.2,
-          "station_keeping": 0.8}, LIFT + THR + 5),
+          "station_keeping": 0.8}, LIFT + THR + LEV + 5),
         ({**pushes, "airborne_fraction": 0.95, "sink_rate": -1.0,
-          "station_keeping": 0.8, "turn_response": 0.0}, LIFT + THR + 6),
+          "station_keeping": 0.8, "turn_response": 0.0}, LIFT + THR + LEV + 6),
     ]
     ok = all(rung_reached("air", m) == k for m, k in seq)
     check("the ladder orders capability", ok,
@@ -1483,8 +1764,8 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
           f"rung {rung_reached('air', {**glider, 'thrust_margin': -0.2})} -- "
           f"held station 0.9 and climbed, and cannot make thrust")
     check("and the same episode with thrust goes to the top",
-          rung_reached("air", {**glider, "sink_rate": -1.0,
-                               "thrust_margin": 2.0}) == len(LADDER["air"]),
+          rung_reached("air", {**glider, "sink_rate": -1.0, "thrust_margin": 2.0,
+                               "level_margin": 1.0}) == len(LADDER["air"]),
           "thrust is what separates the two")
     # The probe values are derived from the rungs rather than written out, so
     # re-deriving the thresholds from a new population moves the expectations
@@ -1495,11 +1776,12 @@ def test_judge_ladder_is_fixed_and_bar_only_tightens() -> None:
     probes = [THR_BARS[0] - 0.1] + [b + (THR_BARS[i + 1] - b) / 2
                                     if i + 1 < len(THR_BARS) else b * 2.0
                                     for i, b in enumerate(THR_BARS)]
+    levels = {**glider, "level_margin": 1.0}
     check("the thrust rungs are ordered and sit above holds_height",
-          [rung_reached("air", {**glider, "thrust_margin": v}) for v in probes]
-          == [LIFT + 4, LIFT + 5, LIFT + 6, LIFT + 4 + THR + 1],
+          [rung_reached("air", {**levels, "thrust_margin": v}) for v in probes]
+          == [LIFT + 4, LIFT + 5, LIFT + 6, LIFT + 4 + THR + LEV + 1],
           "margins " + " / ".join(f"{v:+.4f}" for v in probes) + " -> rungs "
-          + " ".join(str(rung_reached("air", {**glider, "thrust_margin": v}))
+          + " ".join(str(rung_reached("air", {**levels, "thrust_margin": v}))
                      for v in probes))
 
     # An archived elite has to carry what it takes to reproduce its own numbers.
@@ -1760,26 +2042,29 @@ def test_critic_learns_the_exploit_signature() -> None:
     c = Critic(min_samples=60, refit_every=20)
 
     def make(kind):
+        """Features, and the expensive tier's (air, water, land)."""
         f = np.zeros(len(CRITIC_FEATURES))
         if kind == "honest":
             f[0] = rng.uniform(0.2, 0.6)
+            f[1:4] = rng.uniform(0.3, 0.8, 3)
             f[8] = rng.uniform(0.3, 2.0)
             f[11] = np.log10(rng.uniform(60, 300))
             f[12] = rng.uniform(3, 12)
-            return f, rng.uniform(0.7, 1.0)
+            return f, np.clip(f[1:4] * rng.uniform(0.85, 1.05), 0, 1)
         # The wingless / battery-death family: looks the same cheaply.
         f[0] = rng.uniform(0.3, 0.7)
+        f[1:4] = rng.uniform(0.3, 0.8, 3)
         f[8] = rng.uniform(-1.0, -0.8)
         f[11] = np.log10(rng.uniform(3000, 500000))
         f[12] = rng.uniform(0.0, 0.3)
-        return f, rng.uniform(0.0, 0.15)
+        return f, f[1:4] * rng.uniform(0.0, 0.15)
 
     check("an unfitted critic abstains entirely",
-          c.discount(make("exploit")[0]) == 1.0 and c.predict(np.zeros(16)) == 1.0)
+          c.discount(make("exploit")[0]) == 1.0 and c.predict(np.zeros(16)) == 0.0)
 
     for i in range(400):
-        f, retained = make("honest" if i % 2 else "exploit")
-        c.label(f, retained)
+        f, expensive = make("honest" if i % 2 else "exploit")
+        c.label(f, expensive)
         if c.due():
             c.fit()
 
@@ -1789,7 +2074,7 @@ def test_critic_learns_the_exploit_signature() -> None:
     honest = np.mean([c.predict(make("honest")[0]) for _ in range(100)])
     exploit = np.mean([c.predict(make("exploit")[0]) for _ in range(100)])
     check("it separates the two families", honest > exploit + 0.3,
-          f"predicts {honest:.2f} retention for honest, {exploit:.2f} for exploits")
+          f"predicts a gap of {honest:+.2f} for honest, {exploit:+.2f} for exploits")
 
     d_honest = np.mean([c.discount(make("honest")[0]) for _ in range(100)])
     d_exploit = np.mean([c.discount(make("exploit")[0]) for _ in range(100)])
@@ -1809,13 +2094,157 @@ def test_critic_learns_the_exploit_signature() -> None:
     check("and it can never raise a score", best <= 1.0 + 1e-9, f"best multiplier x{best:.3f}")
 
     # A critic that has stopped predicting anything must stop mattering.
+    # Uniform cheap scores and expensive outcomes unrelated to them.  The
+    # residual still contains -cheap, and cheap is a feature, so a critic
+    # calibrated on its residual looked 0.70 calibrated here; calibrated on the
+    # expensive outcome, out of fold, it must see nothing.
+    hi = np.zeros(len(CRITIC_FEATURES))
+    hi[:4] = 1.0
     blind = Critic(min_samples=30, refit_every=10)
     for _ in range(200):
-        blind.label(rng.normal(0, 1, len(CRITIC_FEATURES)), float(rng.uniform(0, 1)))
+        f = rng.normal(0, 1, len(CRITIC_FEATURES))
+        f[:4] = rng.uniform(0, 1, 4)
+        blind.label(f, rng.uniform(0, 1, 3))
     blind.fit()
     check("a critic with no signal has no influence",
-          blind.calibration < 0.35 or blind.discount(np.zeros(16)) > 0.9,
-          f"calibration {blind.calibration:.2f}, discount x{blind.discount(np.zeros(16)):.3f}")
+          blind.calibration < 0.2 and blind.discount(hi) > 0.9,
+          f"calibration {blind.calibration:.2f}, discount on a top cheap score "
+          f"x{blind.discount(hi):.3f}")
+
+
+def test_tier2_probe_legs_label_without_scoring() -> None:
+    """The label-only legs reach the critic and nothing else (ARCH46_SPEC §2b).
+
+    Tier-2 stops at the first failed leg, and arch45 failed it in 143 of 147
+    promotions, so most results measured one medium.  One extra leg per medium
+    the mission never reached gives the critic three labels instead of one --
+    and must not move the mission fraction, the energy, the segments or the
+    fitness, or the verification would be measuring a different mission.
+    """
+    print("\ntier-2: probe legs label every medium and score none")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import evaluate_tier2, fitness
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.critic import expensive_outcome
+
+    spec = MissionSpec(cycles=1, seconds_per_domain=24.0)
+    p = build(BODY_PLANS["beetle"]())
+    a = evaluate_tier2(p, spec=spec, seed=0)
+    b = evaluate_tier2(p, spec=spec, seed=0, label_all_media=True)
+    check("the fixture's mission stops early, so there is something to probe",
+          len(a.segments) < 3, f"mission reached {sorted(a.segments)}")
+    check("off by default: no probe legs",
+          not a.probe_segments, str(sorted(a.probe_segments)))
+    check("on: one probe leg in each medium the mission never reached",
+          sorted(b.probe_segments) == sorted({"air", "water", "land"} - set(a.segments)),
+          f"probed {sorted(b.probe_segments)}, mission {sorted(a.segments)}")
+    same = (a.mission_fraction == b.mission_fraction
+            and a.energy_required_wh == b.energy_required_wh
+            and sorted(a.segments) == sorted(b.segments)
+            and all(a.segments[k].competence == b.segments[k].competence
+                    for k in a.segments)
+            and fitness(p, a, spec) == fitness(p, b, spec))
+    check("and the mission, its energy, its segments and its fitness are unchanged",
+          same, f"mission {a.mission_fraction} vs {b.mission_fraction}, "
+                f"fitness {fitness(p, a, spec):.6f} vs {fitness(p, b, spec):.6f}")
+    out = expensive_outcome(b)
+    check("the critic's label covers every medium",
+          bool(np.all(np.isfinite(out))), str(np.round(out, 4).tolist()))
+
+
+def test_critic_learns_from_a_cheap_score_of_zero() -> None:
+    """Every promotion is a label, and an unmeasured medium is not a zero.
+
+    arch45, measured 2026-10-03: 147 promotions, the label was Tier-2/Tier-1
+    mission and a pair was recorded only above 1e-4, so 128 were dropped and the
+    19 kept were all 0.0 -- the critic never fitted.  The label is now each
+    medium's competence residual, which is defined at a cheap score of zero.
+
+    Tier-2 starts in a random medium and stops at the first failed leg, so the
+    media after it were never run.  Scoring those as 0 would teach the critic
+    that Tier-2 destroys competence it never looked at.
+    """
+    print("\ncritic: a zero cheap score teaches, an unmeasured medium does not")
+    import pickle
+    from types import SimpleNamespace
+
+    from dytiscidae.evolution.critic import (CRITIC_FEATURES, CRITIC_TARGETS,
+                                              Critic, expensive_outcome)
+
+    def tier2(exploit="", **comp):
+        return SimpleNamespace(mission_fraction=0.1667, exploit=exploit,
+                               segments={k: SimpleNamespace(competence=v)
+                                         for k, v in comp.items()})
+
+    got = expensive_outcome(tier2(air=0.4, water=0.5, land=0.6))
+    check("the expensive outcome is each medium's competence",
+          CRITIC_TARGETS == ("air", "water", "land") and np.allclose(got, [0.4, 0.5, 0.6]),
+          str(np.round(got, 4).tolist()))
+    got = expensive_outcome(tier2(air=0.35))
+    check("a medium Tier-2 never ran is NaN, not zero",
+          got[0] == 0.35 and np.isnan(got[1]) and np.isnan(got[2]), str(got.tolist()))
+    check("and an exploit retained nothing in any medium",
+          np.allclose(expensive_outcome(tier2("x", air=0.9, water=0.9, land=0.9)), 0.0))
+
+    # The arch45 shape: Tier-1 mission 0, one Tier-2 leg run.
+    f = np.zeros(len(CRITIC_FEATURES))
+    f[1:4] = (0.3, 0.2, 0.5)
+    c = Critic(min_samples=10, refit_every=5)
+    c.observe(f.tolist(), tier2(air=0.35))
+    check("a promotion with a zero cheap mission is labelled", len(c._y) == 1,
+          f"{len(c._y)} labels")
+    y = c._y[0]
+    check("and the label is the residual where measured, NaN elsewhere",
+          abs(y[0] - 0.05) < 1e-9 and np.isnan(y[1]) and np.isnan(y[2]),
+          str(np.round(y, 4).tolist()))
+    c.observe_invalid(f.tolist())
+    check("an invalidated design is labelled as losing every cheap score",
+          np.allclose(c._y[1], [-0.3, -0.2, -0.5]), str(np.round(c._y[1], 4).tolist()))
+
+    # Learnable from partial labels with the cheap mission zero throughout: one
+    # medium measured per promotion, as in arch45, and the bodies with a dead
+    # battery lose that medium at Tier-2.  Unmeasured media scored as zero
+    # would also look "lost" on the honest half and blur the signature.
+    rng = np.random.default_rng(3)
+    c = Critic(min_samples=60, refit_every=30)
+    for i in range(300):
+        f = np.zeros(len(CRITIC_FEATURES))
+        f[1:4] = rng.uniform(0.2, 0.6, 3)
+        good = i % 2 == 0
+        f[8] = rng.uniform(0.5, 2.0) if good else rng.uniform(-1.0, -0.6)
+        e = np.full(3, np.nan)
+        j = rng.integers(3)
+        e[j] = f[1 + j] * (rng.uniform(0.9, 1.1) if good else rng.uniform(0.0, 0.2))
+        c.label(f, e)
+        if c.due():
+            c.fit()
+    check("partial labels with a zero cheap mission still fit and calibrate",
+          c.fitted and c.calibration > 0.5,
+          f"skill {c.calibration:.2f}, by target {c.calibration_by_target}")
+    check("each target fitted only on the rows that measured it",
+          all(70 < v["labels"] < 130 for v in c.calibration_by_target.values()),
+          str({k: v["labels"] for k, v in c.calibration_by_target.items()}))
+
+    # Where Tier-1 already predicts Tier-2 exactly there is nothing to correct,
+    # and a critic must not take credit for the cheap score's own accuracy.
+    echo = Critic(min_samples=30, refit_every=10)
+    for _ in range(200):
+        f = rng.normal(0, 1, len(CRITIC_FEATURES))
+        f[1:4] = rng.uniform(0, 1, 3)
+        echo.label(f, f[1:4])
+    echo.fit()
+    check("a critic adds nothing where the cheap score is already right",
+          echo.calibration < 0.2, f"skill {echo.calibration:.2f}")
+
+    # A critic pickled under the ratio label must not be read as residuals.
+    legacy = Critic()
+    legacy._x, legacy._y = [np.zeros(16)] * 3, [0.0, 0.0, 0.0]
+    legacy._w, legacy._bias = np.zeros(16), 0.0
+    back = pickle.loads(pickle.dumps(legacy))
+    check("legacy ratio labels are dropped on restore, and counted",
+          back._y == [] and not back.fitted and back.dropped_legacy == 3,
+          f"labels {len(back._y)}, dropped {back.dropped_legacy}")
 
 
 def test_one_islands_archive_is_read_alone_not_through_the_merge() -> None:
@@ -2451,13 +2880,17 @@ def test_an_audit_perturbs_the_scored_experiment_and_nothing_else() -> None:
         # The perturbation only runs on a nonzero mission base, and a mission
         # is a needle: the drawn beetle's 0.0009 went to 0.0 when the fluid
         # model was corrected on 2026-09-23 (MATH_AUDIT F-09..F-11).  So the
-        # audited elite is a gannet, whose base is nonzero at seed 0, and that
-        # precondition is what the next check reads.
+        # audited elite is a gannet, whose base is nonzero at seed 5, and that
+        # precondition is what the next check reads.  Not seed 0: until
+        # 2026-10-04 it was 0, so a perturbed re-run at seed 0 -- the defect
+        # this test exists for -- was the same experiment, and the mutation
+        # `audit-perturbs-another-seed` survived.  Probed: the base is nonzero
+        # at seeds 0 and 5 and zero at 1, 2, 3 and 7.
         from dytiscidae.core.bodyplans import BODY_PLANS
         for e in state.archive.cells.values():
             e.genome = BODY_PLANS["gannet"]()
             e.meta["policy"] = None
-            e.meta["eval_seed"] = 0
+            e.meta["eval_seed"] = 5
         state.auditor = Auditor(held_out_seeds=0, perturbations=(("cd_scale", 1.0),))
         loop_mod._audit(state, 1, MissionSpec(), np.random.default_rng(0))
         rep = state.auditor.reports[-1]
@@ -2499,6 +2932,9 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
             n_reference_seeds=2, n_random_seeds=0, islands=("generalist",),
             tier2_every=1, audit_every=999, migrate_every=999,
             checkpoint_every=999, run_dir=tmp, identify_axes_every=999,
+            # Two workers, so the round's refinement batch and its Tier-1.5
+            # and Tier-2 legs (`ActorPool.map`) go through real processes (AL).
+            workers=2, min_shard=1,
             promotion_refine_steps=2), MissionSpec())
         events = [json.loads(l) for l in open(Path(tmp) / "events.jsonl")]
         promotions = [e for e in events if e.get("kind") == "promote"]
@@ -2512,8 +2948,131 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
         check("elites carry policy weights forward",
               len(stored) == len(state.archive.cells) and stored,
               f"{len(stored)} of {len(state.archive.cells)}")
+        # AL: the stage walls are recorded, and a promotion refines from the
+        # basis the elite was scored with instead of re-identifying it.
+        check("each promotion records its refinement, Tier-1.5 and Tier-2 walls",
+              all({"refine_wall", "tier1_5_wall", "tier2_wall", "verify_wall"} <= set(p)
+                  for p in promotions), f"{sorted(promotions[0]) if promotions else []}")
+        import numpy as _np
+
+        from dytiscidae.core.phenotype import build
+        from dytiscidae.evolution import loop as loop_mod
+        elite = next(e for e in state.archive.cells.values()
+                     if e.meta.get("mobility_basis"))
+        rec = elite.meta["mobility_basis"]
+        state.pool = None
+        got = loop_mod._refined_controllers_for(
+            state, [elite], [build(elite.genome)], MissionSpec(),
+            _np.random.default_rng(0))[0]
+        same = (got is not None and set(got.bases or {}) == set(rec) and all(
+            _np.array_equal(got.bases[k].modes, _np.asarray(rec[k]["modes"]))
+            for k in rec))
+        check("promotion drives the recorded basis, not a fresh identification",
+              same, f"media {sorted((got.bases or {}) if got else [])} against {sorted(rec)}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_the_refinement_funnel_refines_only_what_it_selects() -> None:
+    """ROADMAP AK: with a funnel, only the selected candidates enter a step's
+    batch -- that is the saving -- and the others keep their re-scored result."""
+    if needs_batched_evaluator("test_the_refinement_funnel_refines_only_what_it_selects"):
+        return
+    print("\nloop: the refinement funnel")
+    from dytiscidae.control.cpg import Policy
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import MissionSpec, TriphibianEnv
+    from dytiscidae.evolution import loop as loop_mod
+
+    cfg = loop_mod.SearchConfig(segment_seconds=0.5, controller_refine_steps=2)
+    phenos = [build(BODY_PLANS[k]()) for k in ("beetle", "gannet", "teal")]
+    ctrls = []
+    for i, _p in enumerate(phenos):
+        pol = Policy(n_obs=TriphibianEnv.OBS_DIM, n_modes=cfg.n_modes, hidden=0)
+        pol.weights = np.random.default_rng(i).normal(0.0, 0.2, pol.n_weights)
+        ctrls.append(Controller(params=None, policy=pol))
+    spec = MissionSpec()
+    base = loop_mod._batched(None, phenos, spec=spec, controllers=ctrls,
+                             segment_seconds=cfg.segment_seconds,
+                             identify_axes=True, seed=5, n_modes=cfg.n_modes)
+    before = [c.policy for c in ctrls]
+    sizes = []
+    real = loop_mod.batchroll_eval
+
+    def counting(ph, *a, **kw):
+        sizes.append(len(ph))
+        return real(ph, *a, **kw)
+
+    loop_mod.batchroll_eval = counting
+    try:
+        log = {}
+        out = loop_mod._refine_controllers(
+            phenos, ctrls, list(base), cfg, spec=spec, seed=5, log=log,
+            select=lambda slot, r: slot == 1)
+    finally:
+        loop_mod.batchroll_eval = real
+    check("each step's batch holds only the selected candidate",
+          sizes == [1, 1], f"batch sizes {sizes}")
+    check("the funnel is recorded",
+          log.get("funnel") == [1, 3], f"{log.get('funnel')}")
+    check("and the others keep their controller and their result",
+          ctrls[0].policy is before[0] and ctrls[2].policy is before[2]
+          and out[0] is base[0] and out[2] is base[2])
+
+
+def test_the_distance_curriculum_steps_back_only_on_evidence() -> None:
+    """ROADMAP Y/O: a start steps back when enough evaluations crossed from
+    where it is now, evidence from another distance does not count, and the
+    batched evaluator honours what the spec says."""
+    print("\ncurriculum: transition distance")
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.curriculum import DistanceCurriculum
+
+    dc = DistanceCurriculum(window=10, step=0.5, advance_share=0.5,
+                            launch_step=2.0, launch_bar=0.1)
+
+    def result(crossed, back=0.0, air=0.0):
+        return NS(transitions=NS(results={"water_to_air": NS(crossed=crossed, start_back=back)}),
+                  segments={"air": NS(competence=air)})
+
+    for _ in range(10):
+        dc.observe(result(False))
+    check("no step while too few cross", dc.update() == [] and not dc.back)
+    for _ in range(10):
+        dc.observe(result(True, air=0.2))
+    moves = dc.update()
+    check("a step once half the window crossed from here, and the launch steps down",
+          dc.back.get("water_to_air") == 0.5 and dc.launch_height == 28.0,
+          f"{moves}")
+    for _ in range(10):
+        dc.observe(result(True, back=0.0))
+    check("crossings from the old distance are not evidence for the new one",
+          dc.update() == [] and dc.back["water_to_air"] == 0.5)
+    spec = MissionSpec()
+    dc.apply(spec)
+    check("the spec carries the starts to the evaluators",
+          spec.transition_back == {"water_to_air": 0.5} and spec.air_launch_height == 28.0,
+          f"{spec.transition_back}, {spec.air_launch_height}")
+
+    if needs_batched_evaluator("test_the_distance_curriculum_steps_back_only_on_evidence"):
+        return
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.batchroll import evaluate_tier1_batch
+    from dytiscidae.envs.evaluate import evaluate_tier1
+
+    far = MissionSpec(transition_back={"water_to_air": 3.0, "air_to_water": 1.0})
+    ph = build(BODY_PLANS["beetle"]())
+    rb = evaluate_tier1_batch([ph], spec=far, segment_seconds=0.4, seed=4)[0]
+    rn = evaluate_tier1(ph, spec=far, segment_seconds=0.4, seed=4)
+    starts = lambda r: {k: t.start_back for k, t in r.transitions.results.items()}
+    check("both evaluation paths start each probe where the spec says",
+          starts(rb) == starts(rn) and starts(rb)["water_to_air"] == 3.0
+          and starts(rb)["water_to_land"] == 0.0, f"{starts(rb)}")
 
 
 def test_a_shared_command_means_the_same_thing_on_every_body() -> None:
@@ -2697,7 +3256,7 @@ def test_every_path_agrees_on_the_control_law() -> None:
         check(f"{fn.__name__} accepts the shared policy",
               "shared" in inspect.signature(fn).parameters,
               f"parameters: {list(inspect.signature(fn).parameters)}")
-    src = inspect.getsource(loop_mod._refined_controller_for)
+    src = inspect.getsource(loop_mod._refined_controllers_for)
     check("promotion-time refinement passes it on",
           "shared=state.shared" in src)
     check("and Tier-2 verification is given the summed law",
@@ -2742,7 +3301,7 @@ def test_merging_the_rescore_with_the_first_refinement_changes_nothing() -> None
               for _ in range(5)]
     cfg = SimpleNamespace(controller_refine_steps=3, controller_refine_sigma=0.2)
 
-    def run(merge):
+    def run(merge, select=None):
         ctrls = [Controller(params=None, policy=Policy(n_obs=4, n_modes=2))
                  for _ in phenos]
         calls.clear()
@@ -2751,7 +3310,7 @@ def test_merging_the_rescore_with_the_first_refinement_changes_nothing() -> None
         try:
             res = loop_mod._refine_controllers(
                 phenos, ctrls, [MissionResult(tier=1) for _ in phenos], cfg,
-                spec=None, seed=11, shared=object())
+                spec=None, seed=11, shared=object(), select=select)
         finally:
             loop_mod.batchroll_eval, loop_mod.MERGE_FIRST_REFINE = saved
         return ([c.policy.weights.copy() for c in ctrls],
@@ -2767,6 +3326,20 @@ def test_merging_the_rescore_with_the_first_refinement_changes_nothing() -> None
     check(f"one call fewer ({c_split} -> {c_merge})",
           len(c_merge) == len(c_split) - 1 and c_merge[0] == 2 * len(phenos),
           f"split {c_split}, merged {c_merge}")
+
+    # AK's funnel chooses on the re-scored results, so step one cannot be
+    # drawn before the re-score: with a funnel the merge stands aside and the
+    # split order -- re-score, choose, then only the chosen in each step --
+    # is what runs, draw for draw.
+    pick = lambda slot, r: slot % 2 == 0  # noqa: E731
+    w_fs, r_fs, c_fs = run(False, pick)
+    w_fm, r_fm, c_fm = run(True, pick)
+    check("with a funnel the merge changes nothing either",
+          all(np.array_equal(a, b) for a, b in zip(w_fs, w_fm)) and r_fs == r_fm
+          and c_fs == c_fm,
+          f"split {c_fs}, merged {c_fm}")
+    check("and each step's batch holds only the chosen",
+          c_fm == [len(phenos), 3, 3, 3], f"{c_fm}")
 
 
 def _nudged(fn, rel: float = 1e-15, commands: bool = False, seed: int = 20260926):
@@ -2932,6 +3505,19 @@ def test_the_two_evaluation_paths_score_the_same_machine_the_same() -> None:
               f"{n0} measurements, worst absolute difference {w0:.6f}"
               + (f" on {key0}" if key0 else "")
               + f"; bar {bar:.2e} (own noise floor {floor:.2e})")
+        # And the crossings.  Only the batched path used to scatter a
+        # crossing's entry state, so every crossing Tier-2 or a film measured
+        # started somewhere the scored one had not: peak entry speed differed
+        # by up to 7.3 m/s on the seed plans (2026-09-30).
+        tw = max(abs(rb0.transitions.results[k].peak_entry_speed
+                     - rs0.transitions.results[k].peak_entry_speed)
+                 for k in rb0.transitions.results)
+        same_cross = all(rb0.transitions.results[k].crossed
+                         == rs0.transitions.results[k].crossed
+                         for k in rb0.transitions.results)
+        check(f"{plan}: and every crossing starts and ends the same on both paths",
+              same_cross and tw < max(1e-3, 2.0 * floor),
+              f"worst entry-speed difference {tw:.2e}")
 
 
 def test_the_batched_path_tells_the_policy_it_is_wet() -> None:
@@ -3443,7 +4029,10 @@ def test_learned_axes_survive_resume() -> None:
             d.observe(rng.normal(size=16))
         check("the projection fits once fed", d.fit())
         d.refit_every = 1  # the next refit falls due inside the resumed run
-        refits_before = d.refits
+        # Attempts, not refits: from 2026-10-03 the overlap guard (default 0.95)
+        # skips a refit whose axes did not move, and a skipped refit is still
+        # the trigger firing on the restored object.
+        tried_before = d.refits + d.skipped
         latent = [(f"latent{i}", float(lo), float(hi), 8)
                   for i, (lo, hi) in enumerate(d.bounds())]
         n_latent = len(latent)
@@ -3467,9 +4056,11 @@ def test_learned_axes_survive_resume() -> None:
         check("the restored descriptors keep their memory",
               again.descriptors.seen >= d.min_samples,
               f"seen={again.descriptors.seen}")
+        tried = again.descriptors.refits + again.descriptors.skipped
         check("and the refit trigger reads the restored object, not a stale alias",
-              again.descriptors.refits > refits_before,
-              f"refits {refits_before} -> {again.descriptors.refits}")
+              tried > tried_before,
+              f"refits + skipped {tried_before} -> {tried} "
+              f"({again.descriptors.skipped} skipped by the overlap guard)")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -3821,8 +4412,16 @@ def test_every_island_is_reached_by_verification_and_audit() -> None:
     check("and so does the audit",
           "if visits % max(cfg.audit_every, 1) == 0" in src)
 
-    islands, gens = 6, 900
-    for every in (15, 30):
+    import math
+
+    from dytiscidae.evolution.islands import ISLANDS
+    # The archipelago's real size (eight since 2026-10-03), and the six the
+    # aliasing was measured on.  ``gen % every`` aliases only when the cadence
+    # shares a factor with the island count -- 15 and 30 both do with six, only
+    # 30 does with eight -- so the old rule is shown failing where it fails,
+    # and the new rule must reach every island at both sizes.
+    gens = 900
+    for islands, every in ((6, 15), (6, 30), (len(ISLANDS), 15), (len(ISLANDS), 30)):
         old, new = set(), set()
         visits = {}
         fires_old = fires_new = 0
@@ -3836,12 +4435,17 @@ def test_every_island_is_reached_by_verification_and_audit() -> None:
             if v % every == 0:
                 new.add(isl)
                 fires_new += 1
-        check(f"every {every} generations: the old rule reached "
-              f"{len(old)}/{islands} islands",
-              len(old) < islands, f"islands {sorted(old)}")
+        if math.gcd(every, islands) > 1:
+            check(f"every {every} generations: the old rule reached "
+                  f"{len(old)}/{islands} islands",
+                  len(old) < islands, f"islands {sorted(old)}")
         check(f"the new rule reaches all {islands}", len(new) == islands,
               f"islands {sorted(new)}")
-        check("at the same total cost", abs(fires_new - fires_old) <= 1,
+        # Each island fires on its own visit 0, so the new rule can fire at
+        # most once more per island than the old (900 / 8 = 112.5 visits:
+        # 8 islands x ceil(112.5 / 15) = 64 against 60).
+        check("at the same total cost, to one firing per island",
+              abs(fires_new - fires_old) <= islands,
               f"{fires_old} firings before, {fires_new} after")
 
     # And the counters survive an interruption, or a resumed run re-fires
@@ -3875,18 +4479,29 @@ def test_a_long_leg_runs_on_promotion_candidates_only() -> None:
     check("and a missing competence counts as zero, not as absent",
           weakest_domain({"air": 0.5}) in (Domain.WATER, Domain.LAND))
 
+    # ARCH46_SPEC §2a: a long leg in a medium scored 0 cheaply measures 0/0.
+    # arch45 ran one in 124 of 147 promotions.
+    from dytiscidae.envs.evaluate import LEG_COMPETENCE_BAR as bar
+    check("with a floor, the weakest medium the design can do at all",
+          weakest_domain({"air": 0.0, "water": 0.3, "land": 0.6}, floor=bar)
+          is Domain.WATER)
+    check("and the weakest overall when it can do none",
+          weakest_domain({"air": 0.1, "water": 0.0, "land": 0.05}, floor=bar)
+          is Domain.WATER)
+
     seg = evaluate_tier1_5(build(BODY_PLANS["beetle"]()), seconds=2.0,
-                           competences={"air": 0.9, "water": 0.9, "land": 0.0})
-    check("it runs the weakest leg and scores it",
-          seg.domain is Domain.LAND and seg.duration == 2.0,
+                           competences={"air": 0.2, "water": 0.9, "land": 0.0})
+    check("it runs the weakest leg above the bar and scores it",
+          seg.domain is Domain.AIR and seg.duration == 2.0,
           f"{seg.domain.value} for {seg.duration:.0f} s, "
           f"competence {seg.competence:.3f}")
 
     src = inspect.getsource(loop_mod._verify_and_label)
+    job = inspect.getsource(loop_mod._verification_job)
     check("and it runs at promotion, where the cost is per promotion",
-          "_tier1_5(state, elite, p2, ctrl2, spec, rng)" in src)
+          "_verification_job" in src and "_tier1_5(elite, seg, seconds, c)" in src)
     check("before the Tier-2 mission, not instead of it",
-          src.index("_tier1_5(") < src.index("evaluate_tier2("))
+          job.index("evaluate_tier1_5(") < job.index("evaluate_tier2("))
     check("the retention is recorded so the correlation is measurable",
           '"tier1_5_retention"' in inspect.getsource(loop_mod._tier1_5))
 
@@ -3970,6 +4585,38 @@ def test_the_shared_controller_question_is_answered_with_a_number() -> None:
           or D._r2(np.zeros((64, 2)), rng.normal(size=(64, 2))) < 0.2)
 
 
+def test_the_pool_queues_and_balances_by_rotors() -> None:
+    """ROADMAP AJ, 2026-10-03: the default pool is a queue, and balance reads
+    rotors.  A design's wall is +1.6-1.8 s per rotor and nothing per DOF once
+    rotors are in (``experiments/budget_sweetspot/cost_model.py``)."""
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.envs.actors import ActorPool, plan_shards, shard_cost
+    from dytiscidae.evolution.loop import SearchConfig
+
+    def body(rotors, dof):
+        return NS(segments=[NS(rotor=object()) for _ in range(rotors)]
+                  + [NS(rotor=None)], n_actuated=dof)
+
+    heavy, light = body(12, 4), body(0, 20)
+    check("a rotor-heavy body is predicted dearer than a high-DOF one",
+          shard_cost(heavy) > shard_cost(light),
+          f"{shard_cost(heavy):.1f} vs {shard_cost(light):.1f}")
+    phenos = [heavy, body(10, 4)] + [body(0, 20) for _ in range(6)]
+    shards = plan_shards([shard_cost(p) for p in phenos], 4, 2,
+                         per_worker=1.0, balance=True)
+    check("balance puts the two rotor-heavy bodies in different shards",
+          not any(0 in s and 1 in s for s in shards), str(shards))
+    cfg = SearchConfig()
+    check("the default pool is a queue of two shards per worker, min shard 2",
+          cfg.pool_per_worker == 2.0 and cfg.min_shard == 2
+          and ActorPool(1).per_worker == 2.0,
+          f"per_worker {cfg.pool_per_worker}, min_shard {cfg.min_shard}")
+    check("at batch 16 on 4 workers the default plans 8 shards of 2",
+          [len(s) for s in plan_shards([1.0] * 16, 4, cfg.min_shard,
+                                       per_worker=cfg.pool_per_worker)] == [2] * 8)
+
+
 def test_sharding_a_generation_does_not_change_a_score() -> None:
     """Worker processes may only make the search faster, never different.
 
@@ -4000,6 +4647,18 @@ def test_sharding_a_generation_does_not_change_a_score() -> None:
           split(3, 8, 4) == [(0, 3)], f"{split(3, 8, 4)}")
     check("a pool of one runs in this process",
           ActorPool(1)._pool is None)
+    # `map` is how a round's Tier-1.5 and Tier-2 legs reach the workers (AL):
+    # results in the caller's order, from real processes, and nothing re-run
+    # in the parent.
+    import math as _math
+    _mp = ActorPool(2, min_shard=1)
+    try:
+        _got = _mp.map(_math.hypot, [(3.0, 4.0), (5.0, 12.0), (8.0, 15.0)])
+        _retried = getattr(_mp, "retried", 0)
+    finally:
+        _mp.close()
+    check("the pool maps other work over its workers, in order",
+          _got == [5.0, 13.0, 17.0] and _retried == 0, f"{_got}, re-run {_retried}")
 
     plans = list(BODY_PLANS.values())
     phenos = [build(plans[i % len(plans)]()) for i in range(6)]
@@ -4025,6 +4684,34 @@ def test_sharding_a_generation_does_not_change_a_score() -> None:
     check("and their measured mobility comes back with them",
           one[1] == many[1] and one[2] == many[2],
           f"air ranks {one[2]}")
+
+    # `identify_axes` per machine (ROADMAP AN).  The generation used to pass
+    # `any` of its candidates' wishes, so `identify_axes_every > 1` identified
+    # the whole batch whenever one candidate was due.  Only the machines asked
+    # for may come back with bases, in one shard or three.
+    want = [True, False, False, True, False, True]
+
+    def run_some(workers):
+        pool = ActorPool(workers, min_shard=2)
+        ctrls = [Controller(params=None, policy=None) for _ in phenos]
+        try:
+            res = pool.evaluate_tier1(phenos, controllers=ctrls,
+                                      **dict(kw, identify_axes=want))
+        finally:
+            pool.close()
+        return ([bool(c.bases) for c in ctrls], [bool(r.mobility) for r in res],
+                [r.mission_fraction for r in res],
+                getattr(pool, "retried", 0))
+
+    some1, some3 = run_some(1), run_some(3)
+    check("only the machines asked to identify come back with bases",
+          some1[0] == want and some1[1] == want, f"bases {some1[0]} want {want}")
+    # A shard handed the whole list raises in its worker and the pool quietly
+    # re-runs the batch in the parent, which would pass the first half of this.
+    check("and the per-machine request survives sharding, in the workers",
+          some3[0] == want and some3[1] == want and some1[2] == some3[2]
+          and some3[3] == 0,
+          f"bases {some3[0]}, batches re-run in the parent {some3[3]}")
 
     # The shared policy has to cross the process boundary too, and until
     # 2026-09-21 it only did when a rollout *buffer* came with it -- i.e. on the
@@ -4080,6 +4767,40 @@ def test_sharding_a_generation_does_not_change_a_score() -> None:
           f"max difference {max(abs(a - b) for a, b in zip(alone, sharded)):.3g}"
           f"; without the shared policy it would be "
           f"{max(abs(a - b) for a, b in zip(without, sharded)):.3g}")
+
+    # AJ: the *learning* rollout samples, and its noise used to come from
+    # torch's stream seeded per shard, so a machine explored differently in
+    # another shard.  Each machine now has its own stream, keyed by its place in
+    # the generation, so one shard, three in order, and a cost-balanced queue
+    # of three must bank the same trajectories and score the same.
+    from dytiscidae.envs.actors import plan_shards
+    from dytiscidae.learning.ppo import RolloutBuffer
+
+    def learn(workers, **pool_kw):
+        pool = ActorPool(workers, min_shard=2, **pool_kw)
+        ctrls = [Controller(params=None, policy=None, bases=dict(c.bases or {}))
+                 for c in ctrls0]
+        buf = RolloutBuffer()
+        try:
+            res = pool.evaluate_tier1(phenos, controllers=ctrls, shared=net,
+                                      buffer=buf, **rescore)
+        finally:
+            pool.close()
+        acts = sorted(round(float(np.sum(t.act)), 4) for t in buf.trajectories)
+        return [round(float(seg.distance), 9) for r in res
+                for _d, seg in sorted(r.segments.items(), key=lambda kv: str(kv[0]))], acts
+
+    l1, l3 = learn(1), learn(3, per_worker=1.5, balance=True)
+    check("a balanced queue plans more shards than workers, all machines once",
+          sorted(i for s in plan_shards([p.n_actuated for p in phenos], 2, 2,
+                                        per_worker=1.5, balance=True) for i in s)
+          == list(range(len(phenos)))
+          and len(plan_shards([p.n_actuated for p in phenos], 2, 2,
+                              per_worker=1.5, balance=True)) == 3)
+    check("a sampled rollout explores the same in one shard or a queue of three",
+          l1[1] == l3[1] and max(abs(a - b) for a, b in zip(l1[0], l3[0])) < 1e-4,
+          f"{len(l1[1])} trajectories; max distance difference "
+          f"{max(abs(a - b) for a, b in zip(l1[0], l3[0])):.3g}")
 
 
 def test_the_gait_gain_drives_the_same_on_every_path() -> None:
@@ -4449,14 +5170,511 @@ def test_something_asks_a_machine_to_leave_the_ground() -> None:
 
     # And the transition has to be scored, or the objective asks for something
     # the evaluator never computes.
-    import inspect
+    # Asked of what each path returns, not of its source text: the grep this
+    # replaced broke on a reformatted loop header while the loop was intact.
+    from dytiscidae.core.bodyplans import BODY_PLANS as _BP
+    from dytiscidae.core.phenotype import build as _b
+    from dytiscidae.envs import batchroll
+    from dytiscidae.envs.evaluate import evaluate_tier1 as _t1
+    _ph = _b(_BP["beetle"]())
+    check("evaluate scores land_to_air",
+          "land_to_air" in _t1(_ph, segment_seconds=0.2, seed=1).transitions.results)
+    if batchroll.AVAILABLE:
+        check("batchroll scores land_to_air",
+              "land_to_air" in batchroll.evaluate_tier1_batch(
+                  [_ph], segment_seconds=0.2, seed=1)[0].transitions.results)
 
-    from dytiscidae.envs import batchroll, evaluate as _ev
-    for mod in (batchroll, _ev):
-        src = inspect.getsource(mod)
-        check(f"{mod.__name__.split('.')[-1]} scores land_to_air",
-              'for kind in ("air_to_water", "water_to_air", "water_to_land",\n'
-              '                 "land_to_air"):' in src)
+
+def _tri_res(air: float, water: float, land: float, mission: float = 0.0):
+    """A result with three competences and nothing else, for the island tests."""
+    from types import SimpleNamespace as NS
+    return NS(mission_fraction=mission, segments={
+        d: NS(competence=c, measurements={})
+        for d, c in (("air", air), ("water", water), ("land", land))})
+
+
+def test_the_triphibian_island_pays_the_weakest_medium() -> None:
+    """No arch46 evaluation had competence > 0.15 in all three media.
+
+    A fitness-1.0 design at gen >= 800 of arch45 had air 0.000, water 0.337,
+    land 0.003 and mission 0: every island either reads one or two media or,
+    the generalist, reads ``mission_fraction``, which is zero for 98.8% of
+    evaluations.  So nothing paid for the step between "good in two" and "does
+    all three".  The triphibian island's objective and every stage of its
+    curriculum read the weaker media; a still machine, a one-medium machine and
+    a two-medium machine must each be ranked below one that does all three.
+    """
+    print("\nislands: the triphibian island pays the weakest medium")
+    from dytiscidae.evolution.curriculum import (
+        WEAKEST_BARS,
+        Curriculum,
+        stage_score,
+        triphibian_stage_score,
+    )
+    from dytiscidae.evolution.islands import (
+        ISLANDS,
+        TRIPHIBIAN_FLOOR,
+        curriculum_for,
+        island_score,
+        own_domain_score,
+        triphibian_score,
+    )
+
+    spec = ISLANDS.get("triphibian", {})
+    check("a triphibian island reads all three media",
+          set(spec.get("domains", ())) == {"air", "water", "land"}, str(spec))
+
+    b0, b1 = WEAKEST_BARS[0], WEAKEST_BARS[1]
+    # Readings.  ``still`` is the worst still-machine row measured
+    # (experiments/triphibian_still: gannet seed 1 glides in air and floats);
+    # ``still_mean`` is the 14-row mean.  ``one`` is arch45's fitness-1.0 design.
+    rows = {
+        "still": (0.1276, 0.0199, 0.0),
+        "still_mean": (0.0091, 0.0284, 0.0005),
+        "one": (0.0, 0.337, 0.003),
+        "one_strong": (0.0, 0.9, 0.0),
+        "two": (0.9, 0.9, 0.0),
+        "two_perfect": (1.0, 1.0, 0.0),
+        "three_at_bar": (b1, b1, b1),
+        "three": (0.1, 0.1, 0.1),
+    }
+    s = {k: island_score("triphibian", _tri_res(*v)) for k, v in rows.items()}
+    print("    " + "  ".join(f"{k} {v:.4f}" for k, v in s.items()))
+    check("a still machine scores ~0: below the floor any three-medium machine "
+          "at the bar reaches", s["still"] < 2 * TRIPHIBIAN_FLOOR <= s["three_at_bar"] + 1e-12,
+          f"still {s['still']:.4f}, mean still {s['still_mean']:.4f}, "
+          f"three at the bar {s['three_at_bar']:.4f}")
+    missing = [k for k in ("still", "still_mean", "one", "one_strong", "two", "two_perfect")
+               if s[k] >= s["three_at_bar"]]
+    check("every machine missing a medium ranks below all three at the bar",
+          not missing, f"outranking: {missing}")
+    check("two perfect media and nothing in the third lose to 0.1 in all three",
+          s["two_perfect"] < s["three"],
+          f"{s['two_perfect']:.4f} against {s['three']:.4f}")
+    check("the arch45 fitness-1.0 one-medium design scores below a still glider",
+          s["one"] < s["still"], f"{s['one']:.4f} against {s['still']:.4f}")
+    # A gradient where the minimum has none: with the weakest at zero, the
+    # second medium still ranks, and the weakest is worth most at the margin.
+    lo = triphibian_score([0.9, 0.05, 0.0])
+    hi = triphibian_score([0.9, 0.10, 0.0])
+    check("with a zero medium, a better second medium still scores higher",
+          hi > lo, f"{lo:.5f} -> {hi:.5f}")
+    h = 1e-6
+    d_weak = (triphibian_score([0.9, 0.1, h]) - triphibian_score([0.9, 0.1, 0.0])) / h
+    d_second = (triphibian_score([0.9, 0.1 + h, 0.0]) - triphibian_score([0.9, 0.1, 0.0])) / h
+    check("and the weakest medium is worth >100x the second at the margin",
+          d_weak > 100 * d_second, f"{d_weak:.4f} against {d_second:.6f}")
+    check("no energy, transition or take-off factor: a zero mission costs nothing",
+          island_score("triphibian", _tri_res(0.1, 0.1, 0.1, mission=0.0))
+          == island_score("triphibian", _tri_res(0.1, 0.1, 0.1, mission=0.5)))
+    check("a missing segment is a zero medium",
+          island_score("triphibian", NS_two_media()) == triphibian_score([0.5, 0.5, 0.0]))
+    check("the stored-meta score is the same objective",
+          abs(own_domain_score("triphibian", {"air": 0.1, "water": 0.2, "land": 0.05})
+              - triphibian_score([0.1, 0.2, 0.05])) < 1e-12)
+
+    # --- the curriculum reads the weaker media at every stage ------------------
+    st = {k: [triphibian_stage_score(i, v) for i in range(2)] for k, v in rows.items()}
+    check("stage 0 reads the second medium: a one-medium machine cannot pass",
+          st["one"][0] == 0.003 and st["one_strong"][0] == 0.0 and st["one_strong"][0] < b0,
+          f"one {st['one'][0]}, one_strong {st['one_strong'][0]}")
+    check("a still machine cannot pass stage 0 either",
+          st["still"][0] < b0, f"{st['still'][0]:.4f} against bar {b0}")
+    check("stage 1 reads the weakest", st["two"][1] == 0.0 and st["three"][1] == 0.1)
+    gen = dict(domains=tuple(ISLANDS["generalist"]["domains"]),
+               transition_names=tuple(ISLANDS["generalist"]["transitions"]))
+    check("where the shared ladder pays the one-medium design its best medium",
+          stage_score(0, _tri_res(*rows["one"]), **gen) == 0.337
+          and stage_score(0, _tri_res(*rows["one"]), weakest=True, **gen) == 0.003)
+
+    cur = curriculum_for("triphibian")
+    check("the island's curriculum is the weakest-medium ladder",
+          getattr(cur, "weakest", False) and cur.bar(0) == b0 and cur.stage_name(1) == "third")
+    outcome = {}
+    for k in ("still", "still_mean", "one", "one_strong", "two"):
+        cell = (k,)
+        outcome[k] = cur.update(cell, cur.evaluate(cell, _tri_res(*rows[k])))
+    check("still, one-medium and two-medium machines all stay at stage 0",
+          all(v == "held" for v in outcome.values())
+          and all(cur.stage_of((k,)) == 0 for k in outcome), str(outcome))
+    cell = ("three",)
+    up = cur.update(cell, cur.evaluate(cell, _tri_res(*rows["three"])))
+    check("all three media above the bars promotes", up == "promoted"
+          and cur.stage_of(cell) == 1, up)
+    held = cur.update(cell, cur.evaluate(cell, _tri_res(0.1, 0.1, 0.4 * b1 + 1e-4)))
+    dropped = cur.update(cell, cur.evaluate(cell, _tri_res(0.1, 0.1, 0.4 * b1 - 1e-4)))
+    check("the hold line is 0.4 of the stage's own bar, not the stage below's",
+          held == "held" and dropped == "demoted", f"{held}, {dropped}")
+    check("and a cell whose next answer would be demoted is not promoted",
+          cur.update(("edge",), cur.evaluate(("edge",), _tri_res(0.1, 0.1, 0.004)))
+          == "held")
+    rep = cur.report()
+    check("the report names the island's own stages",
+          set(rep["stages"]) <= {"second", "third", "crossing", "chain", "mission"},
+          str(rep["stages"]))
+
+    # A curriculum pickled before the field existed keeps the shared ladder.
+    old = Curriculum()
+    old.__dict__.pop("weakest", None)
+    check("an unpickled pre-triphibian curriculum keeps its ladder",
+          old.bar(0) == 0.25 and old.stage_name(0) == "single"
+          and old.evaluate((0,), _tri_res(*rows["one"])).detail["here"] == 0.337)
+
+
+def NS_two_media():
+    """A result that was never evaluated on land at all."""
+    from types import SimpleNamespace as NS
+    return NS(mission_fraction=0.0, segments={
+        "air": NS(competence=0.5, measurements={}),
+        "water": NS(competence=0.5, measurements={})})
+
+
+def test_a_still_machine_climbs_nothing_on_the_triphibian_island() -> None:
+    """Every body plan held still, on the real Tier-1 path, scored by the island.
+
+    CLAUDE.md: run the still-machine check on every score.  A still machine
+    earns a little in a medium -- measured 2026-10-03, a gannet glides to 0.128
+    in air and a ray reads 0.244 in water with every amplitude at zero -- so the
+    question for an island that pays the weakest medium is whether "a little in
+    two" climbs it.  Seven plans x two seeds, ~8 s each.
+    """
+    print("\nislands: a still machine climbs nothing on the triphibian island")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.envs.evaluate import Controller, evaluate_tier1
+    from dytiscidae.envs.triphibian import TriphibianEnv
+    from dytiscidae.evolution.curriculum import WEAKEST_BARS
+    from dytiscidae.evolution.islands import (
+        TRIPHIBIAN_FLOOR,
+        curriculum_for,
+        island_score,
+    )
+
+    cur = curriculum_for("triphibian")
+    worst_score, worst_c2, worst_c3, promoted, n = 0.0, 0.0, 0.0, 0, 0
+    for plan in BODY_PLANS:
+        p = build(BODY_PLANS[plan]())
+        for seed in (0, 1):
+            b = TriphibianEnv(p, seed=seed).cpg.base
+            still = CPGParams(amplitude=np.zeros_like(np.asarray(b.amplitude, float)),
+                              phase=np.asarray(b.phase, float),
+                              offset=np.asarray(b.offset, float),
+                              frequency=float(b.frequency))
+            r = evaluate_tier1(p, controller=Controller(params=still),
+                               segment_seconds=8.0, seed=seed)
+            c = sorted((float(r.segments[d].competence) if d in r.segments else 0.0
+                        for d in ("air", "water", "land")), reverse=True)
+            worst_score = max(worst_score, island_score("triphibian", r))
+            worst_c2, worst_c3 = max(worst_c2, c[1]), max(worst_c3, c[2])
+            cell = (plan, seed)
+            promoted += cur.update(cell, cur.evaluate(cell, r)) == "promoted"
+            n += 1
+    check(f"held still, {n} evaluations: the island score stays below the "
+          f"three-medium floor", worst_score < 2 * TRIPHIBIAN_FLOOR,
+          f"max {worst_score:.4f} against {2 * TRIPHIBIAN_FLOOR:.4f}")
+    check("the second medium stays below the stage-0 bar",
+          worst_c2 < WEAKEST_BARS[0], f"max c2 {worst_c2:.4f} against {WEAKEST_BARS[0]}")
+    check("the weakest stays below the stage-1 bar",
+          worst_c3 < WEAKEST_BARS[1], f"max c3 {worst_c3:.4f} against {WEAKEST_BARS[1]}")
+    check("and no still machine is promoted", promoted == 0, f"{promoted} of {n}")
+
+
+def test_a_pair_cross_reaches_the_triphibian_island() -> None:
+    """The third medium arrives by crossing, and an empty island is colonised.
+
+    Specialist pairs go to their pair islands (``HYBRID_HOME``); a pair
+    island's champion crossed with the specialist of its missing medium goes to
+    the triphibian island (``TRIPLE_HOME``).  And a run resumed from a
+    checkpoint written before the island existed has it empty: it is offered
+    the archipelago's elites its own objective rates highest.
+    """
+    print("\nislands: a pair cross reaches the triphibian island")
+    from dytiscidae.evolution.islands import ISLANDS, TRIPLE_HOME, Archipelago
+
+    axes = [("m", 0.0, 1.0, 4), ("d", 0.0, 1.0, 4)]
+
+    def archipelago():
+        arch = Archipelago(migrate_every=1, n_migrants=1)
+        for name in ISLANDS:
+            a = Archive(list(axes))
+            arch.register(name, a, Curator(a, seed=0))
+        return arch
+
+    arch = archipelago()
+    for name in ("air", "water", "land", "amphibian", "aerial_diver", "land_air"):
+        arch.archives[name].add(name, 0.9, np.array([0.5, 0.5]), {}, tier=1)
+    moved = arch.migrate(1, np.random.default_rng(0),
+                         crossover=lambda a, b, r: f"{a}+{b}")
+    hyb = [m for m in moved if m["kind"] == "hybrid"]
+    tri = sorted(m["origin"] for m in hyb if m["island"] == "triphibian")
+    check("each pair island's champion is crossed with its missing specialist",
+          tri == sorted(f"{p}x{s}" for p, (s, _) in TRIPLE_HOME.items()), str(tri))
+    check("and each cross carries all three media's parents",
+          all({"air", "water", "land"} <= set(m["genome"].replace("amphibian", "water+land")
+                                              .replace("aerial_diver", "air+water")
+                                              .replace("land_air", "land+air").split("+"))
+              for m in hyb if m["island"] == "triphibian"))
+    check("specialist pairs still go to their pair islands",
+          sorted(m["island"] for m in hyb if m["island"] != "triphibian")
+          == ["aerial_diver", "amphibian", "land_air"])
+
+    arch = archipelago()
+    arch.archives["water"].add("swimmer", 0.9, np.array([0.1, 0.1]),
+                               {"air": 0.0, "water": 0.9, "land": 0.0}, tier=1)
+    arch.archives["amphibian"].add("amphib", 0.5, np.array([0.5, 0.5]),
+                                   {"air": 0.0, "water": 0.4, "land": 0.3}, tier=1)
+    arch.archives["generalist"].add("allround", 0.1, np.array([0.9, 0.9]),
+                                    {"air": 0.05, "water": 0.05, "land": 0.05}, tier=1)
+    col = arch.colonists("triphibian", 2)
+    check("an empty island is offered the elites its own objective ranks highest",
+          [c["genome"] for c in col] == ["allround", "amphib"]
+          and all(c["island"] == "triphibian" for c in col),
+          str([(c["genome"], c["origin"]) for c in col]))
+    check("and an island with cells is offered none",
+          arch.colonists("water", 2) == [])
+
+
+def test_the_triphibian_island_joins_a_resumed_run() -> None:
+    """A checkpoint written before the island existed resumes, and the island fills.
+
+    arch47 or any run checkpointed before 2026-10-03 has seven archives.  A
+    resume with eight must keep the seven and start the eighth empty -- then
+    fill it, from colonists, not from nothing.
+    """
+    if needs_batched_evaluator("test_the_triphibian_island_joins_a_resumed_run"):
+        return
+    print("\nloop: the triphibian island joins a resumed run")
+    import json
+    import shutil
+    import tempfile
+
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+
+    tmp = tempfile.mkdtemp(prefix="dyt-tri-resume-")
+    try:
+        base = dict(batch=1, seed=5, segment_seconds=1.0, n_reference_seeds=1,
+                    n_random_seeds=0, tier2_every=999, audit_every=999,
+                    migrate_every=999, checkpoint_every=1, run_dir=tmp,
+                    identify_axes_every=999)
+        first = run_search(SearchConfig(generations=2, islands=("water", "generalist"),
+                                        **base), MissionSpec())
+        before = {n: len(a.cells) for n, a in first.archipelago.archives.items()}
+        check("the old run has no triphibian archive",
+              not (Path(tmp) / "archive_triphibian.pkl").exists()
+              and all(before.values()), str(before))
+        again = run_search(SearchConfig(generations=5, resume=True,
+                                        islands=("water", "triphibian", "generalist"),
+                                        **base), MissionSpec())
+        after = {n: len(a.cells) for n, a in again.archipelago.archives.items()}
+        check("the old islands come back", all(after[n] >= before[n] for n in before),
+              f"{before} -> {after}")
+        events = [json.loads(line) for line in
+                  (Path(tmp) / "events.jsonl").read_text().splitlines() if line.strip()]
+        col = [e for e in events if e.get("kind") == "colonise"]
+        check("the new island started empty and was colonised",
+              len(col) == 1 and col[0]["island"] == "triphibian", str(col))
+        check("and it fills", after.get("triphibian", 0) >= 1, str(after))
+        tri = again.curricula["triphibian"]
+        check("with the weakest-medium ladder", getattr(tri, "weakest", False))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_grpo_rollouts_never_reach_the_archive() -> None:
+    """GRPO adds learning data and nothing else: no score, no elite, no evaluation count.
+
+    Two tiny searches at one seed, one with ``shared_learner="ppo"`` and one
+    with ``"ppo+grpo"``.  The statement, and why it is the defensible one:
+
+    * Generation 0 is scored before the policy has been updated, and GRPO
+      draws no number from any stream the run owns, so **everything placed in
+      generation 0 is identical** between the two -- every island's cells,
+      their fitnesses and genome ids, ``state.evaluated``, the curators'
+      counts, and the descriptor and judge sample counts that every committed
+      placement moves.  Captured at the moment verification would start, which is after
+      the update (so the policy has by then diverged) and before anything
+      scores with the updated policy.
+    * The GRPO rollouts did run (a ``grpo`` record in ``stages``, ``grpo_*`` in
+      ``ppo``) and **did change the learner** (the weights differ), so the
+      equality above is not the equality of two runs that did the same thing.
+    * The off run's telemetry carries no GRPO key at all.
+    """
+    if needs_batched_evaluator("test_grpo_rollouts_never_reach_the_archive"):
+        return
+    print("\ngrpo: learning-only rollouts leave the archive alone")
+    import json
+    import shutil
+    import tempfile
+
+    import numpy as np
+
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution import loop
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.learning.ppo import AVAILABLE
+
+    if not AVAILABLE:
+        skip("GRPO against the archive", "torch is not importable here")
+        return
+
+    def signature(state):
+        return {
+            "evaluated": state.evaluated,
+            "tier0_rejected": state.tier0_rejected,
+            # Everything a committed placement feeds: the descriptor fit's
+            # sample buffer and the judge's ratchets.  A rollout filed through
+            # ``_place`` that lost to the incumbent changes no cell, but it
+            # still moves these.
+            "descriptor_samples": (len(state.descriptors._buffer)
+                                   if state.descriptors is not None else None),
+            "judge_seen": sum(len(r._seen)
+                              for r in state.judge.ratchets.values()),
+            "islands": {
+                name: {
+                    "cells": sorted(
+                        (tuple(int(i) for i in cell), round(float(e.fitness), 12),
+                         str(e.genome.genome_id))
+                        for cell, e in arch.cells.items()),
+                    "evaluations": state.archipelago.curators[name].evaluations,
+                } for name, arch in state.archipelago.archives.items()},
+        }
+
+    real_verify, real_audit = loop._verify_and_label, loop._audit
+    taken: dict = {}
+
+    def run(learner: str):
+        tmp = tempfile.mkdtemp(prefix=f"dyt-grpo-{learner.replace('+', '-')}-")
+
+        def grab(state, gen, spec, rng):
+            taken["sig"] = signature(state)
+            taken["w"] = np.concatenate([
+                v.detach().cpu().numpy().ravel()
+                for v in state.shared.parameters()])
+
+        loop._verify_and_label = grab
+        loop._audit = lambda *a, **k: []
+        try:
+            cfg = SearchConfig(
+                generations=1, batch=4, workers=1, min_shard=2, seed=5,
+                segment_seconds=1.0, n_reference_seeds=4, n_random_seeds=0,
+                islands=("generalist",), tier2_every=999, audit_every=999,
+                migrate_every=999, checkpoint_every=999, run_dir=tmp,
+                use_shared_policy=True, promotion_refine_steps=0,
+                controller_refine_steps=0, shared_learner=learner,
+                grpo_bodies=2, grpo_group=2)
+            run_search(cfg, MissionSpec())
+        finally:
+            loop._verify_and_label, loop._audit = real_verify, real_audit
+        events = [json.loads(l) for l in open(Path(tmp) / "events.jsonl")]
+        return tmp, dict(taken), events
+
+    tmp_a = tmp_b = None
+    try:
+        tmp_a, off, ev_off = run("ppo")
+        tmp_b, on, ev_on = run("ppo+grpo")
+
+        check("generation 0 places the same elites with GRPO on as off",
+              on["sig"] == off["sig"],
+              f"{sum(len(i['cells']) for i in on['sig']['islands'].values())} vs "
+              f"{sum(len(i['cells']) for i in off['sig']['islands'].values())} "
+              f"cells; evaluated {on['sig']['evaluated']} vs {off['sig']['evaluated']}")
+        check("and the search was not empty, or that would be vacuous",
+              off["sig"]["evaluated"] >= 1 and any(
+                  i["cells"] for i in off["sig"]["islands"].values()),
+              f"{off['sig']['evaluated']} evaluated")
+        d = float(np.linalg.norm(on["w"] - off["w"]))
+        check("while the shared policy did learn something different",
+              d > 1e-6, f"||dW|| = {d:.3e}")
+
+        stages = [e for e in ev_on if e.get("kind") == "stages" and e.get("grpo")]
+        g = stages[0]["grpo"] if stages else {}
+        check("the GRPO stage ran and recorded its wall and size",
+              bool(g) and g.get("rollouts") == g.get("bodies", 0) * 2
+              and g.get("wall", 0) > 0 and g.get("bodies", 0) >= 1,
+              f"{g.get('bodies')} bodies x 2 = {g.get('rollouts')} rollouts "
+              f"in {g.get('wall')} s")
+        ppo = [e for e in ev_on if e.get("kind") == "ppo"]
+        check("the ppo event reports the groups it trained on",
+              bool(ppo) and ppo[0].get("grpo_groups", 0) >= 1
+              and ppo[0].get("grpo_transitions", 0) > 0
+              and not ppo[0].get("skipped"),     # telemetry writes bool as 0/1
+              f"{ppo[0].get('grpo_groups')} groups, "
+              f"{ppo[0].get('grpo_transitions')} rows" if ppo else "no ppo event")
+        check("the off run's telemetry has no GRPO key at all",
+              not any(e.get("grpo") for e in ev_off if e.get("kind") == "stages")
+              and not any(k.startswith("grpo") for e in ev_off
+                          if e.get("kind") == "ppo" for k in e),
+              "stages and ppo events scanned")
+    finally:
+        for t in (tmp_a, tmp_b):
+            if t:
+                shutil.rmtree(t, ignore_errors=True)
+
+
+def test_grpo_group_ids_survive_the_shard_split() -> None:
+    """A group split across two shards is still one group when the buffer is read.
+
+    The pool slices ``streams`` and ``identify_axes`` per shard; ``groups``
+    has to travel the same way, or the trajectories of one body come back
+    ungrouped (and ``learning.grpo`` drops them, counted).  The pool's worker
+    processes are replaced by an inline executor so the shard split, the
+    payload slicing and ``_run_shard`` all run, in this process.
+    """
+    if needs_batched_evaluator("test_grpo_group_ids_survive_the_shard_split"):
+        return
+    print("\ngrpo: group ids cross the pool")
+    from concurrent.futures import Future
+
+    import torch
+
+    from dytiscidae.core.bodyplans import beetle
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.actors import ActorPool
+    from dytiscidae.envs.batchroll import evaluate_tier1_batch
+    from dytiscidae.envs.triphibian import TriphibianEnv
+    from dytiscidae.learning.grpo import GroupRolloutBuffer
+    from dytiscidae.learning.ppo import AVAILABLE, SharedPolicy
+
+    if not AVAILABLE:
+        skip("group ids across the pool", "torch is not importable here")
+        return
+
+    class _Inline:
+        def submit(self, fn, *args):
+            f = Future()
+            f.set_result(fn(*args))
+            return f
+
+    torch.manual_seed(2)
+    shared = SharedPolicy(TriphibianEnv.OBS_DIM, 6, hidden=16)
+    phenos = [build(beetle()) for _ in range(4)]
+    groups, streams = [0, 0, 1, 1], [100, 101, 102, 103]
+    # Identified: the shared policy commands a body twist, which only a
+    # measured mobility basis can deliver, so a machine without one banks no
+    # trajectory at all.
+    kw = dict(segment_seconds=0.4, identify_axes=True, seed=3,
+              streams=streams, groups=groups)
+
+    ref = GroupRolloutBuffer()
+    evaluate_tier1_batch(phenos, shared=shared, buffer=ref, **kw)
+
+    pool = ActorPool(2, min_shard=2, per_worker=1.0)
+    real, pool._pool = pool._pool, _Inline()
+    try:
+        got = GroupRolloutBuffer()
+        pool.evaluate_tier1(phenos, shared=shared, buffer=got, **kw)
+    finally:
+        real.shutdown(wait=False, cancel_futures=True)
+    sharded = bool(pool.shard_log) and len(pool.shard_log[0]["walls"]) == 2
+    s_ref, s_got = ref.stats(), got.stats()
+    check("the call really was split into two shards", sharded,
+          str(pool.shard_log[-1]["sizes"]) if pool.shard_log else "no sharded call")
+    check("every trajectory arrives grouped, as in the unsplit call",
+          s_got["grpo_dropped"]["ungrouped"] == 0
+          and s_got["grpo_groups"] == s_ref["grpo_groups"] > 0
+          and s_got["grpo_bodies"] == s_ref["grpo_bodies"] == 2,
+          f"{s_got['grpo_groups']} groups over {s_got['grpo_bodies']} bodies "
+          f"(unsplit {s_ref['grpo_groups']}), dropped {s_got['grpo_dropped']}")
 
 
 def main() -> int:
@@ -4486,9 +5704,13 @@ def main() -> int:
         test_a_mujoco_auto_reset_ends_the_continuous_mission,
         test_transitions_are_graded_not_pass_fail,
         test_an_attempted_takeoff_outscores_never_leaving_the_ground,
+        test_a_crossing_is_commanded_and_a_still_machine_makes_none,
+        test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing,
         test_judge_ladder_is_fixed_and_bar_only_tightens,
         test_auditor_can_invalidate_and_veto,
         test_critic_learns_the_exploit_signature,
+        test_tier2_probe_legs_label_without_scoring,
+        test_critic_learns_from_a_cheap_score_of_zero,
         test_a_specialist_islands_curriculum_reads_only_its_own_medium,
         test_an_islands_best_is_judged_on_its_own_domains,
         test_one_islands_archive_is_read_alone_not_through_the_merge,
@@ -4500,6 +5722,8 @@ def main() -> int:
         test_the_headline_is_the_mission,
         test_an_audit_perturbs_the_scored_experiment_and_nothing_else,
         test_promotion_spends_refinement_and_keeps_what_it_buys,
+        test_the_refinement_funnel_refines_only_what_it_selects,
+        test_the_distance_curriculum_steps_back_only_on_evidence,
         test_a_shared_command_means_the_same_thing_on_every_body,
         test_the_identification_width_reaches_the_policy,
         test_the_search_is_pointed_at_the_mission_and_compounds,
@@ -4520,11 +5744,18 @@ def main() -> int:
         test_every_island_is_reached_by_verification_and_audit,
         test_a_long_leg_runs_on_promotion_candidates_only,
         test_the_shared_controller_question_is_answered_with_a_number,
+        test_the_pool_queues_and_balances_by_rotors,
         test_sharding_a_generation_does_not_change_a_score,
         test_the_gait_gain_drives_the_same_on_every_path,
         test_a_nan_observation_fails_the_rollout_not_the_batch,
         test_the_early_fluid_launch_changes_nothing,
         test_structure_can_be_recombined_and_duplicated,
+        test_grpo_rollouts_never_reach_the_archive,
+        test_grpo_group_ids_survive_the_shard_split,
+        test_the_triphibian_island_pays_the_weakest_medium,
+        test_a_still_machine_climbs_nothing_on_the_triphibian_island,
+        test_a_pair_cross_reaches_the_triphibian_island,
+        test_the_triphibian_island_joins_a_resumed_run,
     ])
     return report("all search-machinery checks passed")
 

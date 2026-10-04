@@ -1,7 +1,7 @@
 # Dytiscidae — project operating notes
 
 Generative design + control search for triphibian flapping-wing machines.
-MAP-Elites over six islands, MuJoCo rigid bodies plus this project's own
+MAP-Elites over eight islands, MuJoCo rigid bodies plus this project's own
 quasi-steady fluid solver (`docs/model_validity.md`: not CFD), and a shared PPO
 policy the search keeps for its variation operator.
 
@@ -12,12 +12,14 @@ item. Read it before proposing anything.
 
 1. `git status` and `git log --oneline -5`.
 2. Read the dated "Revised …" paragraphs at the top of `docs/ROADMAP.md`. They
-   name the current work list (newest first) and the comparability boundaries.
-   Before proposing any threshold, read §"What is set by measurement, and what
-   is typed".
+   name the current work list (newest first; as of 2026-10-03 it is
+   §"arch45 — the work list", ranked) and the comparability boundaries. Before
+   proposing any threshold, read §"What is set by measurement, and what is
+   typed".
 3. The latest run's configuration and pre-registered reads are in
-   `runs/<run>_notes.md` (arch43, arch44 as of 2026-09-27). `runs/` is
-   gitignored: in a fresh container it does not exist, see `docs/PORTING.md`.
+   `runs/<run>_notes.md` (the latest finished run with notes is arch44:
+   `runs/arch44_notes.md`). `runs/` is gitignored: in a fresh container it does
+   not exist, see `docs/PORTING.md`.
 4. Run the canary (below).
 
 ## Tests
@@ -125,7 +127,7 @@ python -m dytiscidae.ops.run experiment new --name archNN --trainer search \
     --steps 900 --seed 20260901 --hypothesis "..." \
     --set batch=16 --set segment_seconds=8 --set controller_refine_steps=2 \
     --set use_shared_policy=true
-python -m dytiscidae.ops.run job start  --experiment archNN --workers 4 --min-shard 4
+python -m dytiscidae.ops.run job start  --experiment archNN --workers 4 --min-shard 2
 python -m dytiscidae.ops.run job status <job-id>      # progress, eta, what is at risk
 python -m dytiscidae.ops.run job pause  <job-id>      # honoured at the next generation
 python -m dytiscidae.ops.run job resume <job-id>      # refuses without a checkpoint
@@ -136,7 +138,7 @@ python -m dytiscidae.ops.run job resume <job-id>      # refuses without a checkp
 ```bash
 systemd-run --user --unit archNN --same-dir bash -c \
   '.venv/bin/python -u -m dytiscidae.ops.run search \
-     --generations 900 --batch 16 --workers 4 --min-shard 4 \
+     --generations 900 --batch 16 --workers 4 \
      --segment-seconds 8 --refine-steps 2 --shared-policy \
      --memory-ceiling-mb <MB> --seed 20260901 --run runs/archNN \
      > runs/archNN.log 2>&1 < /dev/null'
@@ -148,19 +150,28 @@ systemd-run --user --unit archNN --same-dir bash -c \
 - `--memory-ceiling-mb` stops cleanly with a checkpoint when parent plus workers
   pass it (0 = off). arch35 lost 405 generations to an OOM kill it could have
   resumed from.
-- **Pool shape: 4 workers, `--min-shard 4`.** Swept on the real evaluation path
-  (4×4 31.7 s, 1×16 72.2 s, 2×8 47.6 s, 8×2 51.8 s, 16×1 93.3 s). A wall-time
-  model predicted 16×1 would win; it lost by 3x. Sweep pool shape, never model
-  it. Re-swept 2026-09-27 under full load: 8×2 was faster (64.3 s vs 74.6 s),
-  but worker count is bounded by memory before cores, so 4×4 stays.
-- `--min-shard` now defaults to 4 everywhere. The old default of 8 made
-  `split() = max(1, min(workers, n // min_shard))` return one shard after a
-  single Tier-0 rejection at batch 16 (`15 // 8 = 1`), and the pool silently
-  ran in the parent. Do not raise it.
+- **Pool shape: a queue by default since 2026-10-03, `--min-shard 2
+  --pool-per-worker 2`, 8 shards of 2 pulled by 4 workers.** On random bodies
+  4 shards of 4 were the optimum, swept on the real evaluation path (4×4 31.7 s,
+  1×16 72.2 s, 2×8 47.6 s, 8×2 51.8 s, **16×1 93.3 s — slower than a single
+  process**); re-swept 2026-09-27 under full load, 8×2 was faster (64.3 s vs
+  74.6 s), but worker count is bounded by memory before cores, so 4 workers
+  stay. On late, rotor-heavy bodies a design's cost is heavy-tailed (+1.6–1.8 s
+  per rotor) and the queue takes 0.875× the 4×4 wall, faster on 3/3 batches
+  (`experiments/budget_sweetspot/`). Sweep pool shape, never model it: a
+  wall-time model predicted 16×1 would win and it lost by 3x.
+- `--min-shard` defaults to 2 (with `--pool-per-worker 2`). The old default of
+  8 made `split() = max(1, min(workers, n // min_shard))` return one shard after
+  a single Tier-0 rejection at batch 16 (`15 // 8 = 1`), and the pool silently
+  ran in the parent with the workers idle; two generations in three ran that way
+  before it was found. Do not raise it.
 - Cost per generation moves with every physics change; read it from the run's
-  `generations.jsonl`. Last measured (2026-09-27): main evaluation 42.6 s at
-  4×4; arch44 gen 0 took 486 s. Generations 0–5 are a one-time six-island
-  verification burst and are several times slower than steady state.
+  `generations.jsonl` (its `cost` field breaks it down by phase,
+  `GenerationCost`). Measured 2026-09-27: main evaluation 42.6 s at 4×4; arch44
+  gen 0 took 486 s. Measured 2026-10-03: a generation costs ~110 s early and
+  ~225 s late in a run, because rotors accumulate. Generations 0–7 are a
+  one-time eight-island verification burst (~300 s each) and are several times
+  slower than steady state. Not a regression.
 
 **Post-run runs by itself** when a search finishes (direct or job): chart report,
 then films (`dytiscidae/viz/film.py`) into `runs/<run>/media/`, embedded in
@@ -271,9 +282,10 @@ Each rule below was paid for by a score that rewarded the wrong thing.
    0.4091) because `scatter` pushed every land segment at 0.54 m/s.
 2. **Fix it with a gate, not a coefficient.** Water paid a still machine 0.422
    (air 0.002, land 0.006) because `0.2 * submerged + 0.2 * upright` was added.
-   A passive twin subtracted out worked but cost 38% of every generation and
-   refused to score a glide. The replacement: state multiplies instead of adds,
-   motion terms are gated.
+   A passive twin subtracted out (2026-09-20) worked but cost 38% of every
+   generation and refused to score a glide. The replacement (the user,
+   2026-09-21): state multiplies instead of adds, motion terms are gated on
+   `max(headway, depth_station_keeping)`.
 3. **Tell the machine what to do.** A gate that blends two purposes still fights
    itself (`corr = -0.264`). Each segment is now two commanded phases the
    controller can see, each scored on its own purpose (`envs/tasks.py`). A still
@@ -285,6 +297,27 @@ Each rule below was paid for by a score that rewarded the wrong thing.
    nothing; a missing metric stops `rung_reached` where it is.
 5. **Set thresholds from the measured distribution.** `moves` at 0.1 m/s left
    61.6% of arch34 below it with nowhere to stand.
+6. **Run the still-machine check on every score, including the ones that look
+   like plain physics.** 2026-10-03, the crossings: with the actuators held
+   still, `air_to_water` paid 0.834 (it fell in, from a placed descent) and
+   `water_to_land` 0.865, because the probe started the machine dry on the ramp
+   and counted *any* change of wetness, so settling into the water was a
+   crossing. These were the learner's two largest rewards. The fix had rule 3's
+   shape: a commanded hold-then-go phase and a directional crossing
+   (`transitions.CrossingTracker`, ARCH46_SPEC §8). Checking the still machine
+   caught two more on the way, a floating body counted as "aloft" and a
+   placement gap counted as height.
+7. **A still machine must be still in every actuator kind, and a hold must read
+   the quantity a passive body spends, not the one it keeps.** 2026-10-04, what
+   rule 6's fix left: still machines still crossed 2-5% of the time, at or above
+   the elites' own rate. A glider coasting at 20 m/s held its *height* through
+   the hold while losing 3-6 m of *energy* height; a body floating over the
+   submerged ramp counted as "on land"; and the "still" arm left rotors at
+   throttle, because a rotor's channel is a speed held at its offset and zeroing
+   amplitude does not stop it. Gated (`CrossingTracker`, and
+   `TriphibianEnv.held_still_params`): still machines now cross 0 of 218 in
+   every kind, and so do the elites, bar one. The crossings the elites had were
+   the same leak.
 
 ## Where things are
 
@@ -306,4 +339,4 @@ Each rule below was paid for by a score that rewarded the wrong thing.
 | `runs/<run>/checkpoint.npz`, `.json` | network, Adam moments, rng state, best elites, the commit that wrote it |
 | `runs/<run>_notes.md` | a run's configuration and findings |
 | `.claude/skills/training-report/` | regenerates the report for any run |
-| `.claude/agents/` | explorer, mutator, assumption-breaker, adversary, judge, historian |
+| `.claude/agents/` | six roles: explorer, mutator, assumption-breaker, adversary, judge, historian |

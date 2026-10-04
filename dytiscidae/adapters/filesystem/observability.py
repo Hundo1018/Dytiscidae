@@ -17,7 +17,7 @@ between having the data and not.
 The control file is the one piece of the design that carries a visible cost.  A
 pause reaches a running worker at its next checkpoint boundary, which for this
 project's search is up to one generation: ~74 s in steady state, ~300 s during
-the opening six-island verification burst.  ``ports/control.py`` sets out why a
+the opening eight-island verification burst.  ``ports/control.py`` sets out why a
 file beat both a signal and a broker here.
 """
 

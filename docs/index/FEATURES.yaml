@@ -69,6 +69,20 @@ AdvantageAndReturn:
     - tests.test_ppo::test_the_discount_behaves_at_both_ends
   note: GAE, with a zero terminal bootstrap because a segment ends when it ends
 
+GroupRelativeAdvantage:
+  implementation:
+    - learning.grpo.group_advantages
+    - learning.grpo.GroupRolloutBuffer
+    - learning.ppo.ppo_update
+    - evolution.loop.SearchConfig
+  tests:
+    - tests.test_ppo::test_group_advantages_are_relative_to_their_own_group
+    - tests.test_ppo::test_a_grpo_update_moves_toward_the_better_action
+    - tests.test_ppo::test_group_rows_are_not_renormalised_with_the_batch
+    - tests.test_ppo::test_the_ppo_path_is_bit_identical_without_a_group_buffer
+    - tests.test_search::test_grpo_rollouts_never_reach_the_archive
+  note: GRPO for the shared policy (ROADMAP N), off by default (shared_learner="ppo"); learning-only rollouts of a few bodies, advantage relative to the body's own group
+
 RewardShaping:
   implementation:
     - learning.ppo.potential_of
@@ -194,6 +208,8 @@ BatchedEvaluation:
     - envs.batchroll.run_transition_batch
     - envs.batchroll.observation_finite
     - physics.energy.BatchedPower
+    - physics.rotor.RotorBatch
+    - envs.triphibian.TriphibianEnv.clearance_many
     - envs.kernel.freshness
     - envs.kernel.write_manifest
     - envs.kernel.source_hashes
@@ -205,6 +221,8 @@ BatchedEvaluation:
     - tests.test_search::test_a_nan_observation_fails_the_rollout_not_the_batch
     - tests.test_search::test_the_early_fluid_launch_changes_nothing
     - tests.test_physics::test_the_batched_power_budget_is_the_power_budget
+    - tests.test_physics::test_the_rotor_batch_is_the_per_rotor_loop
+    - tests.test_physics::test_the_clearance_of_a_batch_is_each_machines_own
   note: the path the search scores with; not interchangeable with evaluate_tier1. Since 2026-09-27 one fused device step per timestep, launched as soon as mj_step is done and read from pinned memory, and the energy model for the whole batch in one pass -- all bit-identical to the unfused path (experiments/perf/NOTES.md); DYTISCIDAE_KERNEL_DIR points a process at a staged kernel build
 
 Vectorisation:
@@ -238,8 +256,14 @@ Transitions:
     - envs.transitions.run_transition
     - envs.transitions.TransitionResult
     - envs.transitions.TransitionSet
+    - envs.transitions.CrossingTracker
+    - envs.transitions.ashore
+    - envs.triphibian.TriphibianEnv.held_still_params
   tests:
     - tests.test_search::test_transitions_are_graded_not_pass_fail
+    - tests.test_search::test_a_crossing_is_commanded_and_a_still_machine_makes_none
+    - tests.test_search::test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing
+  note: a crossing is a commanded hold in the start medium, then a directional crossing that must still hold at the end (ARCH46_SPEC §8); since 2026-10-04 an air hold reads energy height, a land arrival must be ashore (dry ground under the root), shore progress counts from the go command, and the still machine (`held_still_params`) stops rotors
 
 ContinuousMission:
   implementation:
@@ -286,8 +310,14 @@ Islands:
     - evolution.islands.island_score
     - evolution.islands.own_domain_score
     - evolution.islands.curriculum_for
+    - evolution.islands.triphibian_score
+    - evolution.islands.Archipelago.colonists
   tests:
     - tests.test_search::test_the_island_objective_takes_its_weight_back
+    - tests.test_search::test_the_triphibian_island_pays_the_weakest_medium
+    - tests.test_search::test_a_still_machine_climbs_nothing_on_the_triphibian_island
+    - tests.test_search::test_a_pair_cross_reaches_the_triphibian_island
+    - tests.test_search::test_the_triphibian_island_joins_a_resumed_run
     - tests.test_search::test_every_island_is_reached_by_verification_and_audit
     - tests.test_search::test_an_islands_best_is_judged_on_its_own_domains
     - tests.test_search::test_one_islands_archive_is_read_alone_not_through_the_merge
@@ -307,8 +337,10 @@ Curriculum:
   implementation:
     - evolution.curriculum.Curriculum
     - evolution.curriculum.stage_score
+    - evolution.curriculum.triphibian_stage_score
   tests:
     - tests.test_search::test_curriculum_and_islands_give_gradient_where_the_mission_gives_none
+    - tests.test_search::test_the_triphibian_island_pays_the_weakest_medium
 
 Judge:
   implementation:
@@ -330,8 +362,11 @@ Critic:
   implementation:
     - evolution.critic.Critic
     - evolution.critic.critic_features
+    - evolution.critic.expensive_outcome
   tests:
     - tests.test_search::test_critic_learns_the_exploit_signature
+    - tests.test_search::test_critic_learns_from_a_cheap_score_of_zero
+    - tests.test_search::test_tier2_probe_legs_label_without_scoring
 
 Scout:
   implementation:
@@ -416,10 +451,12 @@ ImplicitAeroDamping:
     - physics.fluid.ImplicitAeroDamping
     - physics.fluid.strip_damping
     - physics.fluid.finish_bodies
+    - physics.fluid.entrainment_reaction
   tests:
     - tests.test_physics::test_lift_and_drag_are_integrated_implicitly
     - tests.test_physics::test_the_limiter_and_the_weight_cancellation
-  note: lift and drag damping split into MuJoCo's implicit dof_damping (F-03); per-machine limiter (F-04); entrained weight at the CoM (F-14)
+    - tests.test_physics::test_entry_shock_is_hydrodynamic_not_a_speed_limit
+  note: lift and drag damping split into MuJoCo's implicit dof_damping (F-03), refreshed when a strip crosses the surface (AK); per-machine limiter (F-04); entrained weight at the CoM (F-14); -dm/dt v reaction to added mass that grows (AK)
 
 UnsteadyFlow:
   implementation:
@@ -440,6 +477,9 @@ Rotor:
     - physics.rotor.bemt
     - physics.rotor.rotor_table
     - physics.rotor.rotor_forces
+    - physics.rotor.rotor_forces_many
+    - physics.rotor.bemt_many
+    - physics.rotor.RotorBatch
     - physics.rotor.RotorSet
     - envs.triphibian.rotor_lift_ratio
     - core.bodyplans.quad
@@ -447,6 +487,7 @@ Rotor:
   tests:
     - tests.test_physics::test_the_rotor_model_matches_a_measured_propeller
     - tests.test_physics::test_the_rotor_table_is_the_rotor_model
+    - tests.test_physics::test_the_rotor_batch_is_the_per_rotor_loop
     - tests.test_physics::test_the_search_can_build_rotorcraft
   note: blade-element momentum propellers, the comparison to flapping, evolvable since 2026-09-26 (mut_rotor, ROADMAP AI); checked against UIUC APC 10x4.7 (experiments/rotor); the reference quad flies the real air segment (experiments/rotor/fly.py)
 

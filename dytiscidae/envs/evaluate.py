@@ -303,6 +303,7 @@ def evaluate_tier1(
         r.notes.append(f"compile failed: {type(exc).__name__}: {exc}")
         r.wall_time = time.time() - t0
         return r
+    env.air_launch_height = spec.air_launch_height
 
     ctrl = controller or Controller(params=env.cpg.base)
     if ctrl.params is None:  # see batchroll: the rhythm belongs to the body
@@ -369,7 +370,8 @@ def evaluate_tier1(
     mark = step_mark(env)
     for kind in ("air_to_water", "water_to_air", "water_to_land",
                  "land_to_air"):
-        tr = run_transition(env, kind, ctrl)
+        tr = run_transition(env, kind, ctrl,
+                            back=float((spec.transition_back or {}).get(kind, 0.0)))
         r.transitions.results[kind] = tr
         r.transition_ok[kind] = tr.crossed
         if tr.failure:
@@ -395,19 +397,34 @@ def evaluate_tier1(
 # --------------------------------------------------------------------------
 
 
-def weakest_domain(competences: dict) -> Domain:
+#: The competence below which a Tier-2 leg counts as failed and the mission
+#: stops.  Also the bar a medium must clear for Tier-1.5 to have anything to
+#: measure the retention *of* -- one number for "can do this medium at all".
+LEG_COMPETENCE_BAR = 0.15
+
+
+def weakest_domain(competences: dict, floor: float | None = None) -> Domain:
     """The domain a design is worst at, which is the one the mission turns on.
 
     ``mission_fraction`` is ``min(competence)**0.5 * mean(competence) * ...``,
     so the minimum is the binding term twice over.  If a cheap score is going to
     fail to survive a long leg anywhere, this is where.
+
+    ``floor``: when given, the weakest among the domains *above* it, falling
+    back to the weakest overall when none is.  A long leg in a medium the design scored 0 in
+    cheaply measures a retention of 0/0 -- arch45, 124 of 147 promotions.
     """
-    best = None
-    for dom in DOMAIN_CYCLE:
-        v = float(competences.get(dom.value, 0.0) or 0.0)
-        if best is None or v < best[1]:
-            best = (dom, v)
-    return best[0] if best else Domain.AIR
+    def pick(cands):
+        best = None
+        for dom in cands:
+            v = float(competences.get(dom.value, 0.0) or 0.0)
+            if best is None or v < best[1]:
+                best = (dom, v)
+        return best[0] if best else None
+
+    above = [] if floor is None else [
+        d for d in DOMAIN_CYCLE if float(competences.get(d.value, 0.0) or 0.0) > floor]
+    return pick(above) or pick(DOMAIN_CYCLE) or Domain.AIR
 
 
 def evaluate_tier1_5(
@@ -436,7 +453,8 @@ def evaluate_tier1_5(
     promotions rather than with population: at most three promotions per
     verification round against a batch of sixteen candidates per generation.
 
-    One leg, not three, and it is the weakest one -- see ``weakest_domain``.
+    One leg, not three, and it is the weakest one the design can do at all --
+    see ``weakest_domain`` and ``LEG_COMPETENCE_BAR``.
 
     Returns the scored segment.  Comparing its competence against the Tier-1
     competence for the same domain is the retention number this exists to make
@@ -446,7 +464,7 @@ def evaluate_tier1_5(
     if not p.segments:
         return SegmentResult(domain=Domain.AIR, duration=seconds,
                              survived=False, failure="empty phenotype")
-    dom = domain or weakest_domain(competences or {})
+    dom = domain or weakest_domain(competences or {}, floor=LEG_COMPETENCE_BAR)
     try:
         env = TriphibianEnv(p, seed=seed, sea_state=sea_state)
     except Exception as exc:
@@ -479,6 +497,7 @@ def evaluate_tier2(
     time_compression: float = 12.0,
     sea_state=None,
     tier1: MissionResult | None = None,
+    label_all_media: bool = False,
 ) -> MissionResult:
     """The real mission schedule, with disturbances and a random start domain.
 
@@ -489,6 +508,13 @@ def evaluate_tier2(
     the slow dynamics (thermal drift, wave beat frequencies) but not in the
     budget.  Setting it to 1.0 runs the mission honestly, and the orchestrator
     does exactly that for final candidates.
+
+    ``label_all_media``: after the mission, run one leg in each medium it never
+    reached (it stops at the first failed leg) and keep them in
+    ``probe_segments``, never in ``segments``.  They change nothing the mission
+    reports -- not its fraction, its energy, or anything ``fitness`` reads -- and
+    exist so the critic gets a label per medium: arch45 failed the first leg in
+    143 of 147 promotions, so most Tier-2 results measured one medium.
     """
     spec = spec or MissionSpec()
     t0 = time.time()
@@ -546,7 +572,7 @@ def evaluate_tier2(
         totals.setdefault(dom.value, []).append(seg)
         # Charge energy for the *real* leg duration, not the compressed one.
         energy_j += seg.mean_power * spec.seconds_per_domain
-        if seg.competence < 0.15 or not seg.survived:
+        if seg.competence < LEG_COMPETENCE_BAR or not seg.survived:
             r.notes.append(f"leg {leg_i} ({dom.value}) failed: {seg.failure or 'incompetent'}")
             break
         completed += 1
@@ -569,6 +595,15 @@ def evaluate_tier2(
             max_actuator_overload=max(s.max_actuator_overload for s in segs),
         )
         r.segments[k] = merged
+
+    if label_all_media:
+        for dom in DOMAIN_CYCLE:
+            if dom.value in r.segments:
+                continue
+            env.reset(dom)
+            r.probe_segments[dom.value] = env.rollout(
+                leg_seconds, params=ctrl.params, policy=ctrl.policy,
+                basis=ctrl.basis_for(dom), domain=dom)
 
     r.energy_required_wh = energy_j / 3600.0 + sum(
         transition_energy(p.mass, kind) for kind in spec.transitions

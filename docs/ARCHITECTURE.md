@@ -14,7 +14,7 @@ it says so.
 
 ## Why this shape, for this project
 
-Dytiscidae is a generative design search: MAP-Elites over six islands, MuJoCo
+Dytiscidae is a generative design search: MAP-Elites over eight islands, MuJoCo
 rigid bodies with this project's own quasi-steady fluid solver, and a shared PPO
 policy. A run is **900 generations, ~74 s each in steady state, about 21 hours**,
 in a container that can be reclaimed without warning.
@@ -196,7 +196,7 @@ Four properties of this diagram are load-bearing.
 **`PAUSING` and `CANCELLING` are states, not instants.** The request is made by
 one process and honoured by another, at the trainer's next safe boundary — for
 this project's search, up to one generation: ~74 s in steady state and ~300 s
-during the opening six-island verification burst. Collapsing request and
+during the opening eight-island verification burst. Collapsing request and
 acknowledgement into one transition means the caller cannot tell "asked to stop"
 from "stopped", and the only remaining way to find out is to look for a process.
 **The PID-hunting in `CLAUDE.md` is a workaround for a state that was never

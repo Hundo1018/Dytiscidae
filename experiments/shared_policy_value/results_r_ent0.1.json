@@ -1,0 +1,4115 @@
+{
+ "run": "/home/hundo/Projects/Dytiscidae/dytiscidae/runs/r_ent0.1",
+ "segment_seconds": 6.0,
+ "tolerance": 0.005,
+ "elites": 164,
+ "of_archive": 164,
+ "wall_s": 1673.7336478233337,
+ "summary_with_minus_without": {
+  "air": {
+   "n": 164,
+   "mean_delta": -0.0014570720656112343,
+   "se": 0.0033955240702175666,
+   "t": -0.42911551662712055,
+   "ci95": [
+    -0.008384695698958491,
+    0.005233539109798336
+   ],
+   "fraction_better": 0.03048780487804878,
+   "cohens_dz": -0.03350829225821505,
+   "mean_with": 0.0049061020171937385,
+   "mean_without": 0.006363174082804973,
+   "n_improved": 5,
+   "n_worse": 9,
+   "n_changed_over_0.01": 7,
+   "max_abs_delta": 0.3971668971343296
+  },
+  "water": {
+   "n": 164,
+   "mean_delta": -0.00011703541538947223,
+   "se": 0.002991258121053868,
+   "t": -0.0391258161793937,
+   "ci95": [
+    -0.006234133520469563,
+    0.005479229657963171
+   ],
+   "fraction_better": 0.3231707317073171,
+   "cohens_dz": -0.0030552129498490014,
+   "mean_with": 0.06348244808366141,
+   "mean_without": 0.06359948349905088,
+   "n_improved": 53,
+   "n_worse": 59,
+   "n_changed_over_0.01": 47,
+   "max_abs_delta": 0.29299436758271824
+  },
+  "land": {
+   "n": 164,
+   "mean_delta": 0.005537434238812628,
+   "se": 0.00671941063615086,
+   "t": 0.8240952277899012,
+   "ci95": [
+    -0.007378180076998473,
+    0.01862837525634717
+   ],
+   "fraction_better": 0.35365853658536583,
+   "cohens_dz": 0.0643510259391983,
+   "mean_with": 0.06969272583884432,
+   "mean_without": 0.0641552916000317,
+   "n_improved": 56,
+   "n_worse": 45,
+   "n_changed_over_0.01": 65,
+   "max_abs_delta": 0.507078819954879
+  },
+  "mission_fraction": {
+   "n": 164,
+   "mean_delta": -3.425791832253301e-07,
+   "se": 1.909541357080665e-07,
+   "t": -1.7940390866897495,
+   "ci95": [
+    -7.664179093211726e-07,
+    -3.3364265574539777e-08
+   ],
+   "fraction_better": 0.0,
+   "cohens_dz": -0.14009091657176861,
+   "mean_with": 4.310927762702066e-07,
+   "mean_without": 7.736719594955368e-07,
+   "n_improved": 0,
+   "n_worse": 5,
+   "n_changed_over_0.01": 0,
+   "max_abs_delta": 2.5675007420922316e-05
+  }
+ },
+ "reproduction_of_recorded": {
+  "air": {
+   "n": 164,
+   "within_tol": 164,
+   "max_abs_gap": 0.0004954790731184524
+  },
+  "water": {
+   "n": 164,
+   "within_tol": 164,
+   "max_abs_gap": 0.004119666778683834
+  },
+  "land": {
+   "n": 164,
+   "within_tol": 145,
+   "max_abs_gap": 0.23972950066042392
+  }
+ },
+ "summary_on_reproducing_elites": {
+  "n": 145,
+  "air": {
+   "mean_delta": -0.0016475507678721335,
+   "se": 0.0038417163323569946,
+   "t": -0.4288579960981444,
+   "n_improved": 5
+  },
+  "water": {
+   "mean_delta": 0.0012328155872032883,
+   "se": 0.0032621581786494544,
+   "t": 0.3779141046169866,
+   "n_improved": 45
+  },
+  "land": {
+   "mean_delta": -0.0009742485820664504,
+   "se": 0.005095076905562217,
+   "t": -0.1912137147533295,
+   "n_improved": 43
+  },
+  "mission_fraction": {
+   "mean_delta": -3.5450610098632837e-07,
+   "se": 2.1363053087705074e-07,
+   "t": -1.6594355663065534,
+   "n_improved": 0
+  }
+ },
+ "by_island_mean_delta": {
+  "aerial_diver": {
+   "n": 20,
+   "air": 0.0004106784359373672,
+   "water": -0.009036641854684613,
+   "land": 0.0143642256795392,
+   "mission_fraction": 0.0
+  },
+  "air": {
+   "n": 23,
+   "air": -0.018715561780281383,
+   "water": 0.0015181084797532835,
+   "land": -0.004156641906577812,
+   "mission_fraction": -1.2352555303493294e-06
+  },
+  "amphibian": {
+   "n": 26,
+   "air": -0.0026003958000448664,
+   "water": 0.009771739734502953,
+   "land": 0.0063836572642581284,
+   "mission_fraction": -1.838308233052506e-07
+  },
+  "generalist": {
+   "n": 20,
+   "air": 0.0,
+   "water": -0.009274938600872518,
+   "land": -0.01212964681796474,
+   "mission_fraction": 0.0
+  },
+  "land": {
+   "n": 24,
+   "air": 0.010958710412907066,
+   "water": 0.00813464409302276,
+   "land": 0.021520964011454858,
+   "mission_fraction": -6.656419914199831e-07
+  },
+  "land_air": {
+   "n": 27,
+   "air": -0.00044867502374521987,
+   "water": -0.00959841403301337,
+   "land": 0.0016117031928028884,
+   "mission_fraction": -2.598925796630903e-07
+  },
+  "water": {
+   "n": 24,
+   "air": 0.0,
+   "water": 0.0050825747297783995,
+   "land": 0.009710674601406896,
+   "mission_fraction": 0.0
+  }
+ },
+ "rows": [
+  {
+   "index": 4,
+   "gen": 0,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.00522145296269152,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.006820298199550869,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.007,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 87,
+   "gen": 8,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.06327071439442111,
+    "land": 0.11251076439760074,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.06665043061284374,
+    "land": 0.13045279602973034,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.063,
+    "land": 0.113,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 105,
+   "gen": 8,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.17013679440968332,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.16331876286919084,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.17,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 1,
+   "gen": 11,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.12455873800145688,
+    "land": 6.511396916797422e-08,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.12455873800145688,
+    "land": 6.511396916797422e-08,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.125,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 133,
+   "gen": 12,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.28960299708736614,
+    "land": 0.4680193672943695,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.28557040467498745,
+    "land": 0.46426372488865975,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.29,
+    "land": 0.463,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 33,
+   "gen": 13,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.28447508736831284,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.26180801727428515,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.284,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 102,
+   "gen": 13,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.3551267652139585,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.4565114304240182,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.355,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 103,
+   "gen": 13,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.00484978815139131,
+    "land": 0.03851393894638014,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0009611066016202731,
+    "land": 0.004771163109916088,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.004,
+    "land": 0.025,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 42,
+   "gen": 16,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.09565272634317382,
+    "land": 0.18211750215563316,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.03801102141323562,
+    "land": 0.15012183222291353,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.096,
+    "land": 0.182,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 5,
+   "gen": 19,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.022761442124111967,
+    "water": 0.0,
+    "land": 0.46158376451589034,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.013697703713296028,
+    "water": 0.0,
+    "land": 0.46077886920170963,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.023,
+    "water": 0.0,
+    "land": 0.462,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 119,
+   "gen": 19,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.06310000301294888,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.04807050566260027,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.063,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 134,
+   "gen": 19,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0023234843581170857,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.007297491180854804,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.002,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 135,
+   "gen": 19,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.23060392376789957,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.07314575692237701,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.182,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 136,
+   "gen": 19,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.13564562265870514,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.13414755010526488,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.183,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 70,
+   "gen": 20,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.376317272768521,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.3207260035681197,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.376,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 47,
+   "gen": 21,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.17543350796740298,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.20445652495402056,
+    "land": 0.06729553273121851,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.175,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 48,
+   "gen": 21,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.07814249406121344,
+    "water": 0.04176083998443367,
+    "land": 0.048217367322477465,
+    "mission_fraction": 4.539028962765802e-05
+   },
+   "without": {
+    "air": 0.12463267809490412,
+    "water": 0.05231906640657465,
+    "land": 0.047543616405608946,
+    "mission_fraction": 7.106529704858034e-05
+   },
+   "recorded": {
+    "air": 0.078,
+    "water": 0.042,
+    "land": 0.048,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 50,
+   "gen": 21,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0013436591498622882,
+    "water": 0.0005696601042891882,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.3985105562841919,
+    "water": 0.0007272474518141039,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.001,
+    "water": 0.001,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 51,
+   "gen": 21,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.035354449854606236,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.014284044178836572,
+    "water": 0.0,
+    "land": 0.01029419682862715,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.035,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 2,
+   "gen": 22,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.29571977251889836,
+    "land": 0.1734569384771529,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.22851881858111495,
+    "land": 0.0426894200212315,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.296,
+    "land": 0.173,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 75,
+   "gen": 22,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.23037985392224217,
+    "land": 0.24987589120363918,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.25200474919848354,
+    "land": 0.12263097230407233,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.23,
+    "land": 0.25,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 21,
+   "gen": 23,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.2380115074007332,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.007735730141059341,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.243,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 40,
+   "gen": 23,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.005652159945560683,
+    "land": 0.18923023389251067,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.09603636497239793,
+    "water": 0.00626724113616952,
+    "land": 0.1398522613959377,
+    "mission_fraction": 1.5975407794079594e-05
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.006,
+    "land": 0.189,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 118,
+   "gen": 23,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 1.8908719182651702e-79,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.001302924250287783,
+    "land": 6.859342371644582e-53,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.003,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 18,
+   "gen": 24,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.10560647367086948,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.08894103047559883,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.106,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 81,
+   "gen": 24,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.00045386507671729996,
+    "water": 0.013963634688418412,
+    "land": 0.008946733879670574,
+    "mission_fraction": 4.1479515773474363e-07
+   },
+   "without": {
+    "air": 0.0005188224955004326,
+    "water": 0.011019743269764794,
+    "land": 0.26211867860733445,
+    "mission_fraction": 5.194396563671259e-06
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.014,
+    "land": 0.062,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 82,
+   "gen": 24,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.008705267253513269,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.009,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 84,
+   "gen": 24,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.06754533338238339,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 86,
+   "gen": 24,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.018679765171145175,
+    "land": 0.5457295006604239,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.019417169732213295,
+    "land": 0.038650680705544865,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.019,
+    "land": 0.306,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 0,
+   "gen": 25,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.2265276556498353,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.21141087905757655,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.227,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 8,
+   "gen": 25,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 9,
+   "gen": 25,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 10,
+   "gen": 25,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.09026909163789323,
+    "land": 0.1672085528417435,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.08641131952546283,
+    "land": 0.02942831230150503,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.09,
+    "land": 0.091,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 11,
+   "gen": 25,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.16366565059514443,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.21860880085916884,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.164,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 13,
+   "gen": 25,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.1543301797802177,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.11250633737935274,
+    "land": 0.0004008491459273927,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.154,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 89,
+   "gen": 26,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.015337723048286277,
+    "land": 0.031299643740963584,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.020393579286985115,
+    "land": 0.10915042914512119,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.015,
+    "land": 0.031,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 138,
+   "gen": 26,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.007772786915603436,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.003954265219157097,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.008,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 106,
+   "gen": 27,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.10549685406044176,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.109516306324755,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.105,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 53,
+   "gen": 28,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.00027774425320431257,
+    "water": 0.13211966677868384,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.07485416127008658,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.128,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 56,
+   "gen": 28,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.008477463182179653,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.008609552556947134,
+    "land": 0.0020123594633935653,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.008,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 57,
+   "gen": 28,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.015633338316387295,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.01256208960789879,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.016,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 66,
+   "gen": 29,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.10095441990708419,
+    "land": 0.0027509399305463986,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.10043669983401998,
+    "land": 0.06947381996499136,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.101,
+    "land": 0.003,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 137,
+   "gen": 29,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0757923849137653,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.08966416850422393,
+    "land": 2.6376906994090757e-05,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.076,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 154,
+   "gen": 29,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.010286050880134262,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 44,
+   "gen": 30,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.09487196234338177,
+    "water": 0.0,
+    "land": 0.08992909686680288,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.10150218563695573,
+    "water": 0.0,
+    "land": 0.06609985368837182,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.095,
+    "water": 0.0,
+    "land": 0.09,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 78,
+   "gen": 30,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.14692554408389008,
+    "land": 0.021366674468456602,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.13843158447251924,
+    "land": 0.023975949784631283,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.147,
+    "land": 0.033,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 80,
+   "gen": 30,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.09497090899837149,
+    "land": 0.00044896182627919676,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.10079452583897548,
+    "land": 0.00015505384829994073,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.095,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 120,
+   "gen": 30,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.00020666764746470715,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 121,
+   "gen": 30,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.013305408943065433,
+    "land": 3.326275148685275e-05,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.014308603817020382,
+    "land": 6.0868459118384885e-05,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.013,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 124,
+   "gen": 30,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.09677226177837078,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.020421834100431448,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.097,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 125,
+   "gen": 30,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.028263529764714784,
+    "land": 0.00048071917067538317,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.030501432957402205,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.027,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 16,
+   "gen": 31,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.015398808609700623,
+    "land": 0.12722474456149868,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.010511498409886487,
+    "land": 0.01810623558112673,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.015,
+    "land": 0.12,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 26,
+   "gen": 31,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.012424474965471664,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.010831408170352635,
+    "land": 0.03676748064345277,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.012,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 83,
+   "gen": 31,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.00028762665680973505,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 88,
+   "gen": 31,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.22864221825756484,
+    "land": 8.094423955924721e-41,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.06734421364232071,
+    "land": 1.829038785487022e-14,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.229,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 15,
+   "gen": 32,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.17512174486646656,
+    "land": 0.2876103079878256,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.19210093021208885,
+    "land": 0.1382160059004839,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.175,
+    "land": 0.297,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 17,
+   "gen": 32,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.24998748672144908,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.20626705603567141,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.25,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 19,
+   "gen": 32,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.08059677536466868,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.2769472280846473,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.081,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 140,
+   "gen": 33,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.15170696352731908,
+    "land": 0.0005542009562380968,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.16978622360784032,
+    "land": 0.000812227893447585,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.152,
+    "land": 0.001,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 3,
+   "gen": 34,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.03823373498769047,
+    "land": 0.4973976415536394,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.04024147159899888,
+    "land": 0.3992709582247275,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.038,
+    "land": 0.497,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 14,
+   "gen": 34,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.22887493538504866,
+    "land": 0.4576642735830536,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.22187962786659582,
+    "land": 0.43365877864896646,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.229,
+    "land": 0.458,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 107,
+   "gen": 34,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.3665890591942408,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.36924457797141047,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.367,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 109,
+   "gen": 34,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.1747892502984086,
+    "land": 0.047347116864420745,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.23963196501307107,
+    "land": 0.10672598388732553,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.175,
+    "land": 0.047,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 110,
+   "gen": 34,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.17671298488553527,
+    "land": 5.335351732298474e-07,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.1970127158635719,
+    "land": 0.11635414814666718,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.177,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 46,
+   "gen": 35,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0010710309233706564,
+    "land": 0.0835513651930405,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0025954585131514824,
+    "land": 0.09380402885576256,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.001,
+    "land": 0.084,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 59,
+   "gen": 35,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.008763073300348416,
+    "land": 0.021911578248455948,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 60,
+   "gen": 35,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.004319708239656267,
+    "land": 0.09887262034379711,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.005800980428098866,
+    "land": 0.048160313787895155,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.004,
+    "land": 0.099,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 153,
+   "gen": 36,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 155,
+   "gen": 36,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.16372739759561578,
+    "land": 0.0016079308469331161,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.08260192708803608,
+    "land": 0.0010287516551293853,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.164,
+    "land": 0.002,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 156,
+   "gen": 36,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.004016205912538282,
+    "land": 0.23360735520625414,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.3112846624144935,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.004,
+    "land": 0.229,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 122,
+   "gen": 37,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.210756313993245,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.020032272578407367,
+    "land": 1.2638315213292203e-06,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.213,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 126,
+   "gen": 37,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.2391275051713903,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.21627567477089488,
+    "land": 0.04345159191417084,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.239,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 12,
+   "gen": 38,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.24515915131835034,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.2021736204474593,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.245,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 91,
+   "gen": 38,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.1477539032238069,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.04313389069778096,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.148,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 20,
+   "gen": 39,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.32775607104142895,
+    "land": 0.0004424413877182236,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.2783250128161956,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.328,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 22,
+   "gen": 39,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 4.145075708610468e-05,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 6,
+   "gen": 40,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.10320125717649811,
+    "land": 0.403372437264014,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.09802258449161391,
+    "land": 0.29832896640275014,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.103,
+    "land": 0.403,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 141,
+   "gen": 40,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.20071840024040663,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.2008043968750022,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.201,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 142,
+   "gen": 40,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 143,
+   "gen": 40,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 7.559779877443336e-05,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 145,
+   "gen": 40,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.017776900318818963,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.02112055002598029,
+    "water": 0.0,
+    "land": 0.01261605535385562,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.018,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 111,
+   "gen": 41,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.008722205947822949,
+    "land": 0.23928329832242534,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.08939445754057031,
+    "land": 0.3009910465614607,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.009,
+    "land": 0.224,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 112,
+   "gen": 41,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0009315773547294428,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.007102890949283231,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.001,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 61,
+   "gen": 42,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.051944945518112406,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.045442423998116675,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.052,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 62,
+   "gen": 42,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0262192337881875,
+    "land": 0.004077711039362679,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.018593606212785486,
+    "land": 0.0006975778068403008,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.026,
+    "land": 0.007,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 63,
+   "gen": 42,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.12461623101745486,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.1270256616108289,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.125,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 64,
+   "gen": 42,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.007967410100758071,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.005061135538283748,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.008,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 65,
+   "gen": 42,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.08160515278572791,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.059995323285381,
+    "land": 0.028026200634634266,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.084,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 28,
+   "gen": 43,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.30396003281769,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.2564137338578132,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.304,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 54,
+   "gen": 43,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.022456986323899294,
+    "land": 0.1349187597992052,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.030286630134501037,
+    "land": 0.13087635310152257,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.022,
+    "land": 0.135,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 157,
+   "gen": 43,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.018522547783427067,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.02270067202484214,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.019,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 108,
+   "gen": 44,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.1587021694282026,
+    "land": 0.009970499547541641,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.015645321592923093,
+    "land": 0.012957574203285006,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.159,
+    "land": 0.01,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 92,
+   "gen": 45,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.20695071519084504,
+    "land": 0.010182004212839754,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.19628827926345943,
+    "land": 0.17644052223257378,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.207,
+    "land": 0.01,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 93,
+   "gen": 45,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0013611212653224687,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.003417036394156743,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.001,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 55,
+   "gen": 47,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.06357324224143458,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.07734793229606568,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.064,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 67,
+   "gen": 47,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0027221740520868526,
+    "land": 0.44990381886795705,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.005542255159255394,
+    "land": 0.34487502792259006,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.003,
+    "land": 0.45,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 139,
+   "gen": 47,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.1503612079683816,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.11542820277378685,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.15,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 146,
+   "gen": 47,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.16991816463883638,
+    "land": 0.0002055288215479799,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.15693849900602314,
+    "land": 0.0006913939670640092,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.17,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 147,
+   "gen": 47,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0011800878302340627,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0011800878302340627,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.001,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 148,
+   "gen": 47,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.21946013143671306,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.22000962768596627,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.219,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 149,
+   "gen": 47,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0005045209268815476,
+    "water": 0.18451293084384987,
+    "land": 0.001106809564357575,
+    "mission_fraction": 3.4838651274474443e-06
+   },
+   "without": {
+    "air": 0.000561934952838133,
+    "water": 0.1778663121389671,
+    "land": 0.3531502740839038,
+    "mission_fraction": 1.0500964778350882e-05
+   },
+   "recorded": {
+    "air": 0.001,
+    "water": 0.185,
+    "land": 0.001,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 150,
+   "gen": 47,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.07278988616881128,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.04619872862765497,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.073,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 85,
+   "gen": 48,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.18411644718274603,
+    "land": 0.26019055535517044,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.1710403748406734,
+    "land": 0.20504065315116615,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.184,
+    "land": 0.26,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 90,
+   "gen": 48,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.38836520357248794,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.364576326879679,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.388,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 104,
+   "gen": 48,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.4133749155954736,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.38342039248699045,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.413,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 114,
+   "gen": 48,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 3.760351730088113e-20,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.24670903700067068,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 115,
+   "gen": 48,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.23949520252783038,
+    "land": 0.17997534329698217,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.2491158064662393,
+    "land": 0.15337442061296003,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.239,
+    "land": 0.18,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 68,
+   "gen": 49,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0013859762900018352,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 71,
+   "gen": 49,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.1670355668908563,
+    "water": 0.011193057374098076,
+    "land": 0.06461624473077224,
+    "mission_fraction": 2.141026539547368e-05
+   },
+   "without": {
+    "air": 0.17518455659828186,
+    "water": 0.013234649972005833,
+    "land": 0.0634485905432681,
+    "mission_fraction": 2.4146135172585943e-05
+   },
+   "recorded": {
+    "air": 0.167,
+    "water": 0.011,
+    "land": 0.065,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 73,
+   "gen": 49,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.005986934256835088,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.02080226014036289,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.006,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 23,
+   "gen": 50,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.09748437996110622,
+    "land": 0.08371557942226145,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.1459810572555196,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.097,
+    "land": 0.084,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 36,
+   "gen": 50,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.10952666261129022,
+    "land": 0.0013477008739269036,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0662190033658001,
+    "land": 0.0022830997040036243,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.11,
+    "land": 0.001,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 158,
+   "gen": 50,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 159,
+   "gen": 50,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.038538153634831734,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.093,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 160,
+   "gen": 50,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.00012419837906786938,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0001252120553259828,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 161,
+   "gen": 50,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.18436910379241872,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.14827781942238652,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.184,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 24,
+   "gen": 51,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.25167040853862005,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.223,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 43,
+   "gen": 51,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.018824224499817525,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.004033167267097809,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.019,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 79,
+   "gen": 51,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.3952344184891207,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.029558780313379274,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.395,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 127,
+   "gen": 51,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 27,
+   "gen": 52,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.061173518356388346,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.12781202364618358,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.061,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 30,
+   "gen": 52,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.1207858738382364,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.14510902374504742,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.121,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 52,
+   "gen": 52,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.2521606160711766,
+    "land": 0.005627807505680711,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.2719293680853989,
+    "land": 0.007214943081921101,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.252,
+    "land": 0.006,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 58,
+   "gen": 52,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.01813790382829677,
+    "land": 0.12948670364574255,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.01815575297396404,
+    "land": 1.0387672531189757e-07,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.018,
+    "land": 0.024,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 69,
+   "gen": 52,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.01236883562320258,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.011083753532280066,
+    "land": 0.03903719736280924,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.012,
+    "land": 0.051,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 94,
+   "gen": 52,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.034151829435453335,
+    "land": 3.955102876570626e-32,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.03119497305323097,
+    "land": 5.123854397684334e-29,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.034,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 96,
+   "gen": 52,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0005324336888676201,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0005380845359891882,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.001,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 29,
+   "gen": 53,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 31,
+   "gen": 53,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.04520991375856094,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.01883868537955605,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.045,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 32,
+   "gen": 53,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0052172701338301574,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.025664822976599687,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.005,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 34,
+   "gen": 53,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 35,
+   "gen": 53,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.05626735691256448,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.09118231192277763,
+    "land": 0.03654848776488923,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.09,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 37,
+   "gen": 53,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.008620607649817251,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0004070389310699072,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.009,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 38,
+   "gen": 53,
+   "island": "aerial_diver",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0007556116594211765,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 7,
+   "gen": 54,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.007709379628172758,
+    "land": 0.05850972458873389,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.006095359876748674,
+    "land": 0.04241802169930395,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.008,
+    "land": 0.062,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 25,
+   "gen": 54,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.12454872890511175,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.03215519717555584,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.125,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 95,
+   "gen": 54,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 151,
+   "gen": 54,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 9.123122751271832e-06,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.016617677739616903,
+    "land": 1.8035425055633783e-05,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 152,
+   "gen": 54,
+   "island": "land_air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.02037219102754157,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.3133665586102598,
+    "land": 0.028177173144144703,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.02,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 113,
+   "gen": 55,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.027429527806886154,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.023409270047591472,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.027,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 116,
+   "gen": 55,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.05266238210756109,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.08717272112994646,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.053,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 117,
+   "gen": 55,
+   "island": "generalist",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.021955716781994192,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.037321668833790865,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.022,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 45,
+   "gen": 56,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.014438596906883636,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.01424610815633272,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.014,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 72,
+   "gen": 56,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 1.9898816016982772e-08,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 74,
+   "gen": 56,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.02956674565373931,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.03379533018298442,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.03,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 76,
+   "gen": 56,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0017640729766698637,
+    "land": 4.1281543987890605e-15,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0012445680383759723,
+    "land": 1.515419474099632e-20,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.001,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 77,
+   "gen": 56,
+   "island": "air",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 49,
+   "gen": 57,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.05098218077828285,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.04233428732704431,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.051,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 123,
+   "gen": 57,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.18142276240259292,
+    "land": 0.022398437658784354,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.1647974745985061,
+    "land": 0.013857001661419533,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.181,
+    "land": 0.022,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 144,
+   "gen": 57,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.09552969818181409,
+    "land": 0.030868881268623822,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.09895699981581915,
+    "land": 0.025694590143896013,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.096,
+    "land": 0.031,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 162,
+   "gen": 57,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.31256733737378856,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.31347494913691404,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.313,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 163,
+   "gen": 57,
+   "island": "water",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.01055129743298033,
+    "land": 0.0002045845625473881,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.011835067006799756,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.011,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 39,
+   "gen": 58,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.018145696612643522,
+    "land": 0.21506658854959435,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.01782513805872328,
+    "land": 0.4404239718689356,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.018,
+    "land": 0.215,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 128,
+   "gen": 58,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.005383416427725581,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.006054118843908315,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.005,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 129,
+   "gen": 58,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.14853157764504418,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.14944011077953573,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.149,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 130,
+   "gen": 58,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 131,
+   "gen": 58,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.12209004563259303,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.004539214621233344,
+    "land": 0.14209826012622254,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.122,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 132,
+   "gen": 58,
+   "island": "land",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.07866928429798231,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 41,
+   "gen": 59,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.000503709902474833,
+    "land": 0.30353683116505775,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0034584314442524695,
+    "land": 0.677195244404174,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.001,
+    "land": 0.297,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 97,
+   "gen": 59,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.012376802130107908,
+    "land": 0.3544055614417407,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.008636282049307427,
+    "land": 0.1645178025276845,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.012,
+    "land": 0.337,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 98,
+   "gen": 59,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 7.55537489553302e-32,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 3.431193136863612e-19,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 99,
+   "gen": 59,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.1310696425144216,
+    "land": 6.410966247621543e-12,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.1052974250229604,
+    "land": 7.163257307300838e-11,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.131,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 100,
+   "gen": 59,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.08899967287636923,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 1.0331470874993425e-27,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.0,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  },
+  {
+   "index": 101,
+   "gen": 59,
+   "island": "amphibian",
+   "net": "scored",
+   "with": {
+    "air": 0.0,
+    "water": 0.0049266405646572736,
+    "land": 5.544657178905155e-16,
+    "mission_fraction": 0.0
+   },
+   "without": {
+    "air": 0.0,
+    "water": 0.010878306526143234,
+    "land": 1.6910204278789572e-17,
+    "mission_fraction": 0.0
+   },
+   "recorded": {
+    "air": 0.0,
+    "water": 0.005,
+    "land": 0.0,
+    "mission_fraction": 0.0
+   }
+  }
+ ]
+}

@@ -1,9 +1,25 @@
 # Roadmap
 
+**2026-10-03: arch45 finished; read [ARCH46_SPEC.md](ARCH46_SPEC.md) first.**
+arch45's critic never fitted: a `Tier-1 mission > 1e-4` gate dropped 128 of
+147 labels, and every kept label was 0. The critic now learns per-medium
+residuals (built, unrun). The spec ranks the rest of the outside proposal
+(SAIL, Deb, T-DominO, PGA, RUDDER) against arch45's measurements. **Its §8 is
+the largest finding:** `water_to_land` credits a still machine for settling
+*into* the water (any wetness flip counts), `air_to_water` is crossed by
+gravity, and these are the learner's two largest rewards. **Fixed the same day,
+all three steps** (directional, commanded hold-then-go, economy gated); every
+transition score is not comparable across it.
+
 Written 2026-09-03 after arch33, and revised the same day once every phase was
 built. Every item names the measurement that motivates it; nothing here is on
 the list because it seemed like a good idea, and nothing is marked done without
 the number it produced.
+
+**Revised 2026-09-30: the current work list is
+[arch45](#arch45--the-work-list), ranked by build cost first, then loop speed,
+then what it does for the search and the learner.** Everything older is kept for its
+measurements.
 
 Revised 2026-09-19, after arch38 ran. Everything below is kept for the
 measurement that motivated it; **the current work list is
@@ -2194,9 +2210,8 @@ not taken from the headings below (two of which were stale).
 | L aspect ratio | `runs/analysis_L_aspect_ratio.md`: no cost — AR buys static lift (+0.153) that never becomes flight | **closed** |
 | P refit | `runs/analysis_P_refit.md`: each refit erases more than islands grow between refits; subspace overlap now recorded, `descriptor_keep_if_overlap` (default 0) keeps unchanged axes | **done**, flag off |
 | R `shared_ent_coef` | a short sweep, after arch42 (it needs the machine) | queued |
-| N GRPO | held on purpose: arch42 is the first run in which the shared policy is scored at all (item Z), and whether it helps decides whether a better estimator for it is worth building | after arch42's read |
+| N GRPO | held on purpose: arch42 is the first run in which the shared policy is scored at all (item Z), and whether it helps decides whether a better estimator for it is worth building | after arch42's read. **2026-10-03: built, off by default** (`--shared-learner ppo\|grpo\|ppo+grpo`, default `ppo`); see item N below |
 | W, T, V | superseded by X / closed / subsumed | closed |
-| Q triphibian conflict | a written decision for the user: what "a chain of pairs" would change | memo |
 | TEST_AUDIT 7 | 15 mutations are caught only by `test_search`. The 5 for this commit's code are caught by named checks — two of them against their own test function after the full-suite run timed out under four-way contention. The 10 older ones wait for the machine, after arch42 | 5 of 15 |
 
 ### Y / O — what a continuous start would do, measured before building it
@@ -2220,19 +2235,6 @@ it is a curriculum on the thing no score has ever read. The air spawn (O) is the
 same curriculum run the other way: launch height steps down from 30 m.
 Not built: it changes what every transition score means, and the step rule
 needs its own measurement of crossing rates by distance first.
-
-### Q — the decision memo
-
-Measured three ways now: `corr(air, water)` −0.17 by arch37's end; a wing
-costing 2.5x in water what it buys in air; and today, CPPN complexity buying
-air (+0.139) and costing water (−0.280) with part count held fixed. The
-`land_air` island produced arch37's mission-best, and every transition any
-machine makes in a continuous mission is one gravity makes for it. The option
-the project has not tried is to make the mission **a chain of pairs** — separate
-lineages for land↔air and water↔air, each selected on its pair and its
-crossing, with the triphibian as a hand-off between them rather than one body
-asked to be good at three media at once. It changes what the project is for,
-so it stays the user's decision; nothing here acts on it.
 
 ## 2026-09-26, later — AG, AH and AI, and arch43
 
@@ -2423,6 +2425,528 @@ comparison. Identification is 53% of the main evaluation and waits on the
 device more than the rollouts do (7.8%): its steps have little host work to
 hide the launch behind.
 
+## 2026-09-30 — arch44 finished; its pre-registered reads, written up late
+
+arch44 completed 600/600 generations and its postrun (60.6 h, 9343
+evaluations); the reads pre-registered in `runs/arch44_notes.md` were not
+written up when the run finished. Full numbers and method are there; summary:
+
+- **gen 10 cost:** 130 s/gen steady state, in line with arch43's 166 on a
+  busier machine.
+- **gen 50 health:** nothing broken — divergence 0.60%, `level_margin`
+  published on 99.4% of evaluations, water/land scoring normally, air still
+  near-zero (expected this early).
+- **gen 200, AD's threshold:** `level_margin` p50 0.006, p90 0.705, max 1.354,
+  1.39% >= 0.95. Correlation to air competence is weak (+0.11) — clearing the
+  rig check is necessary, not sufficient. **The user set the gate at 0.7
+  (2026-09-30); it is item 4 of the arch45 list.**
+- **gen 200, rotorcraft vs flapping:** no separation yet at gen 200. By the
+  run's end, rotor-carrying archive elites do lead on air (best 0.038 of 228,
+  against 0.002 of 188 non-rotor) — but 0.038 is nowhere near the 0.3 bar for
+  "first evolved machine to fly."
+- **gen 600, mission:** `mission_fraction` 0.001, **transitions 0/2** — the
+  sixth run running at 0/2. Water leg on-task 0.0%. Item Y's diagnosis
+  (nothing in selection asks a design to move between media under its own
+  power) still stands; item O (the air spawn) is unchanged.
+
+Two follow-ups this surfaces: AD's gate (set at 0.7 by the user, 2026-09-30;
+item 1 below), and the rotor-vs-flapping split has no gen-resolved
+data because the run kept no periodic archive snapshots — only the final
+state and per-evaluation events, which undercounts rotor share (inherited
+rotors don't show as a fresh `mut_rotor` operator).
+
+## arch45 — the work list
+
+arch44 ran 600 gens from 2026-09-27 and finished 2026-09-30 (reads in the section above).
+
+**Decisions, 2026-09-30 (the user).** AD's gate is `level_margin >= 0.7`.
+The search keeps building rotorcraft (AI). The mission stays one triphibian
+machine, not a chain of pairs.
+
+**Ranked, 2026-09-30 (the user), by three keys in strict order**: first what it
+costs to build (cheapest first); among equal cost, how much it shortens the
+loop (a generation, and so every future experiment); only then how much it
+helps the search find better mechanisms or the learner learn. An item that only
+measures ranks by what its measurement unlocks. Dependencies are kept: an item
+that needs another's read says so.
+
+| # | item | build cost | loop speed | mechanisms / learning | why here |
+|---|---|---|---|---|---|
+| 1 | **AN** refuse `identify_axes_every > 1` | trivial | none | none | a knob that silently lies; one config check and one mutation |
+| 2 | **Telemetry bundle**: AK stage walls + acceptance, AL stage walls, AJ per-shard wall, periodic archive snapshots | low, no behaviour change | decides 3, 7, 8, 9 | indirect: gen-resolved rotor/flapping split and refinement's real effect | cheapest item that unlocks every speed lever below |
+| 3 | **AK** cut or target `--refine-steps 2` | low once 2 has read (a flag) | **high**: re-score + 2 steps ~ half a shard's generation (estimate) | risk: may cost selection, hence an arm | largest speed lever on the list, and nearly free to try |
+| 4 | **AD** level-margin gate at 0.7 | low: one gate on the flight rungs, one mutation | none | **high**: first selection that reads flight through real actuation | the cheapest direct push toward flight; can share a launch with 1-2 |
+| 5 | **R** `shared_ent_coef` sweep | low | none | learner: the shared policy's value is still unmeasured | a short sweep; decides whether 11 is worth anything |
+| 6 | ray entry under corrected added mass; TEST_AUDIT 7's remaining 10 mutations | low-medium | none | hygiene | when the machine is otherwise idle |
+| 7 | **AM** host-side per-machine loops | medium; needs its own noise floor | ~1/5 of a worker | none | the larger of the two medium-cost speed levers; cannot use the bit-identity gate |
+| 8 | **AL** promotions through the pool, the scored basis reused | medium | <= ~5% | exactness gain: Tier-2 gets the basis Tier-1 was earned with | close if 2 reads < 3% on an idle machine |
+| 9 | **AJ** work stealing | medium-high, and a reproducibility decision | unknown until 2 reads; close under ~10% idle | none | cost is certain, gain is not |
+| 10 | **Y/O** transition-distance curriculum (and the air launch stepped down from 30 m) | high: changes what every transition score means; needs crossing rates by distance first | none | **highest**: six runs at 0/2 transitions, nothing in selection asks for a crossing | the mission's actual wall; after 4 so the two arms do not share their reads |
+| 11 | **N** GRPO for the shared policy | high | negative (G rollouts) | learner, conditional on 5 | only if 5 shows the shared policy carries weight. **Built 2026-10-03, off by default; switching it on is still conditional on 5** |
+
+AH is not listed: probed on the rig, nothing cleared 1, and the search already
+owns the genes (motor mass, spring, compliance, feathering) with AD to select on
+them.
+
+**Status after the 2026-09-30 build pass** (the user: build as much as
+possible, measure only where it cannot be avoided, do not start arch45). Each
+item's own section has the detail and the mutations that hold it.
+
+| # | item | state | what decides the rest |
+|---|---|---|---|
+| 1 | AN | built: identification per candidate | nothing |
+| 2 | telemetry | built; an 8-gen run is identical to `5221fe1` | nothing |
+| 3 | AK | both levers built; the funnel is off | `stages.placement_changed` against `refined`, from the next run |
+| 4 | AD | built and **on**: air scores are not comparable across `5221fe1` | its pre-registered read (share clearing 0.7 by gen 100) |
+| 5 | R | not run: it is a sweep | the sweep; it gates 11 |
+| 6 | ray entry | built: entrainment reacted on both paths, damping refreshed at the surface | none; the mutation re-runs are in their own section |
+| 7 | AM | not built: the gain only exists as a timing | a timing against the path-agreement noise floor |
+| 8 | AL | built: promotions batched from the scored basis, Tier-1.5 and Tier-2 on workers; the audit stays in the parent | the audit's `stage_wall` |
+| 9 | AJ | built: per-machine exploration noise (on), a shard queue and cost balance (off) | `stages.idle` above ~10%, then a sweep |
+| 10 | Y/O | built and off; its step numbers are placeholders | crossing rate by start distance on arch44's elites |
+| 11 | N | not built | 5 |
+
+Found and fixed on the way: until this pass, only the batched path scattered a
+crossing's entry state, so every crossing that Tier-2 or a film measured
+started somewhere the scored one had not (up to 7.3 m/s of entry speed apart
+at `5221fe1`). See the ray-entry notes under AK.
+
+### 1. AN. `identify=any(...)` breaks `identify_axes_every` -- **fixed 2026-09-30, not refused**
+
+**Done.** Refusing `> 1` was not possible: nine sites in `tests/test_search.py`
+pass `identify_axes_every=999` to keep identification off. So the knob now does
+what its name says. `evaluate_tier1_batch(identify_axes=...)` takes one bool or
+one per phenotype and identifies only the machines asked for, and
+`ActorPool.evaluate_tier1` slices the list per shard. A child that is not
+identified drives with the bases its controller arrived with, and a fresh
+controller arrives with none, which is what `identify_axes=False` always meant.
+At the value every run uses (1), the list is all-True and the batch is the same
+as before. Held by the sharding test (bases only where asked, identical in 1 or
+3 shards, no batch re-run in the parent) and by two mutations,
+`identify-one-means-identify-all` and `identify-list-not-sliced-per-shard`.
+Both caught.
+
+Raised 2026-09-30, and true as code: each candidate gets its own
+`identify = (counter % identify_axes_every) == 0`, and the generation then
+passes `identify=any(b[2] for b in built)` to `evaluate_candidates`, so one
+identifying candidate makes the whole batch identify. The knob cannot do what
+its name says for any value above 1.
+
+It has changed nothing so far: `identify_axes_every` is 1 in every run's
+`run_start` config (arch40-arch44, all launches and void launches), where every
+candidate identifies and `any` is the same answer.
+
+**Fix, when anyone wants a value above 1** -- and not before, because that is
+itself a search-design change: identification on the subset (`identify_batch`
+already takes an arbitrary group of environments), and a decision about what a
+non-identified child drives through. Today it would keep its parent's inherited
+bases, which is the exact thing the overwrite in `evaluate_tier1_batch` says
+identification exists to prevent. **Now:** refuse `identify_axes_every > 1` at
+config load, with a mutation that sets it to 2 and expects the refusal, so the
+knob cannot silently lie.
+
+### 2. Telemetry bundle -- **built 2026-09-30**
+
+**Done, no behaviour change, and checked against a baseline run.** Two 8-gen
+searches at seed 7 (batch 8, 2 workers, 2 s segments, refine 2, shared policy)
+were run, one at `5221fe1` and one with this change. Every `generations.jsonl`
+line and every event outside the new fields was identical, across all 8
+generations (241 events). What each generation now writes:
+- a `stages` event: walls of `main`, `rescore` and each refinement step;
+  `accepted` trials per step; `placed`, `refined` (designs a step changed) and
+  `placement_changed`; `shards`, each sharded call's per-shard walls inside the
+  workers; and `idle`, the share of worker time spent waiting on the slowest
+  shard. `placement_changed` comes from a dry run: `_score_candidate(commit=False)`
+  plus `Archive.would_add`. That is the same code `_place` and `Archive.add`
+  run, split out rather than copied (`_verdict`). The only difference is that a
+  dry run's population standings do not yet count the candidate itself.
+- `stage_wall` events for `verify` and `audit`, and `refine_wall`,
+  `tier1_5_wall` and `tier2_wall` on every `promote`.
+- `snapshots/gen{NNNN}_{island}.json`, every island's archive every
+  `snapshot_every` (50) gens, with `n_rotors` on every elite's meta.
+
+What the 8-gen check already showed, as a size and not a result: at 2 s
+segments, refinement accepted **0 of 8 trials in every step of every
+generation**, and two of the six generations ran as one shard (one Tier-0
+rejection at batch 8 gives `7 // 4 = 1`).
+
+The measurement steps of AK (per-stage wall, trials accepted per refinement
+step, placement status before against after refinement via a dry-run `_place`),
+AL (wall of promotion, Tier-1.5, Tier-2 and audit), AJ (per-shard wall in
+`ActorPool`), and an archive snapshot every 50 generations (arch44 could not
+split rotor from flapping by generation without one). The 700-number benchmark
+must not change.
+
+### 3. AK. What `--refine-steps 2` buys has never been measured -- **both levers built 2026-09-30; the read decides which**
+
+**Built.** Cutting is a flag, as it always was (`--refine-steps`). Targeting is
+now one too: `--refine-funnel m` (`controller_refine_funnel`) refines only a
+candidate whose noise-free score, filed dry against the archive, is at least
+`(1 - m)` of its cell's incumbent. An empty cell always qualifies. The other
+candidates leave every step's batch, and that is where the saving comes from.
+Off by default. Held by `test_the_refinement_funnel_refines_only_what_it_selects`
+and the mutation `funnel-refines-everyone` (caught). The read below still
+decides between 0, 1 and the funnel: its numbers are in the `stages` event
+(item 2).
+
+Raised 2026-09-30 by a review that assumed the opposite: that
+refinement runs only at promotion (`controller_refine_steps` defaults to 0,
+`promotion_refine_steps` is 6) and that this was the right design to keep. The
+default is 0, but **every run since arch34 has passed `--refine-steps 2`**
+(`runs/arch34_notes.md` through `runs/arch44`; checked in each `run_start`
+config), so every candidate of every generation gets a noise-free re-score and
+two (1+1)-ES steps after its main evaluation: four batched evaluations of the
+whole batch per generation (`_refine_controllers`, `evolution/loop.py`).
+
+**Its cost, estimated from `experiments/perf/NOTES.md`** (one 4-design shard,
+idle machine): main evaluation with identification ~33 s, a batched evaluation
+without it ~12 s. So a shard's generation is ~33 + 12 + 2 x 12 = ~69 s, of
+which the two refinement steps are ~35% and the re-score ~17%. Estimate, not
+measurement -- the stage walls are not logged.
+
+**Its worth has one measurement**, `docs/CPU_LEGACY.md` §1: three seeds at
+`segment_seconds=0.4`, `steps=4` against `steps=0`, two of three moved. Nothing
+since, and `_refine_controllers` logs neither how many trials were accepted nor
+whether acceptance changed a candidate's placement.
+
+**Order.**
+1. Telemetry, no behaviour change: per generation, the wall of each stage
+   (main, re-score, each refine step), trials accepted per step, and how many
+   candidates' placement status (`new` / `improved` / `rejected`) differs
+   between the pre-refinement and the final score. The second needs a dry-run
+   `_place` against the pre-refinement result; it must not touch the archive.
+2. Read over >= 100 generations of a run. If acceptance at step 2 is small and
+   placement changes are rare, cut to 1 step or 0; if acceptance is
+   concentrated in candidates already close to their cell's incumbent, refine
+   only those (a funnel, placed where the cost is).
+   Either is a search-design change and needs an arm, not a read.
+
+**Pre-registered.** If refinement changes fewer than 5% of placements, it is
+not buying selection and at most one step stays.
+
+### 4. AD. Gate the flight rungs on `level_margin >= 0.7` -- **built 2026-09-30, unrun**
+
+**Built, in both places selection and the record read.** In the air task
+(`_task_scores`), the height term is `(0.55 * flight + 0.25 * glide) / 0.80`.
+Its `flight` part is now paid only when `TriphibianEnv.flies_level()` is true,
+meaning `level_margin >= LEVEL_GATE = 0.7`. A margin the rig could not measure
+fails the gate. The glide part is paid to everyone, so a level trajectory under
+the gate scores 0.312 where it scored 1.000, and a 2 m/s glide scores 0.208
+either way. On the ladder, `flies_level` (`level_margin`, 0.7) sits after
+`pushes_itself`, so it gates `holds_station`, `climbs` and `manoeuvres`.
+Selection reads the task, and the ladder goes into `meta` and the scout's
+`distance_to_next_rung`. **Air competence is not comparable across this
+change**, and the air ladder now has 15 rungs. Held by
+`test_holding_height_is_flight_only_if_the_actuators_can` and two mutations
+(`level-gate-removed-from-the-task`, `-from-the-ladder`). Both caught.
+
+The threshold is the user's (2026-09-30), set from arch44's gen-200
+distribution: p50 0.006, p90 0.705, max 1.354. **At gen 200 about one design
+in ten clears it**, so it must gate the rungs that mean flight, not the whole
+air score -- gating every air rung would be the `moves at 0.1 m/s` wall again,
+with 90% of the population on the floor. A missing `level_margin` (the rig
+could not measure) stops `rung_reached` where it stands; it is not a zero.
+
+**Pre-registered.** The share of evaluations clearing 0.7 rises between gen 50
+and gen 300; the best air competence beats arch44's 0.038 by gen 600. If fewer
+than 2% clear by gen 100 the gate is a wall and is lowered, not waited out.
+Add the mutation that removes the gate and expect a check to fail.
+
+### 5. R. `shared_ent_coef` sweep -- **queued since 2026-09-22**
+
+See R in the arch39 list. Short, needs the machine idle.
+
+### 6. Ray entry under corrected added mass; TEST_AUDIT 7's remaining 10 mutations -- **ray entry built; the mutations re-run 2026-09-30**
+
+The ray half is under AK in the AB-AF list. **The mutation half is closed.**
+The list said 10 older mutations waited for the machine; counted in
+`tools/mutate.py` it was 17 whose `suites` still named the whole `test_search`
+suite (25-40 minutes each). Each now names the one function that catches it,
+and each was run alone, on `main` `1fd0a24` with the kernel linked in: 17 of 17
+print `caught 1/1` with a named `[FAIL]` check, in 0.2 s to 297 s (12 of them
+under 4 s; the three that drive the batched evaluator take 95, 180 and 297 s).
+None survived, none needed the whole suite, none timed out; each function
+passes on the unmutated tree. The table is in `docs/TEST_AUDIT.md` §7.
+
+Found on the way: `gait-touches-one-part` had stopped applying (`mut_gait`'s
+draw moved to 1.5-12 Hz on 2026-09-23) and the harness called it `MISAPPLIED`;
+its text is updated. And one function picked by name did not catch its mutation
+(`stage-one-reads-gross-measurements` against the gradient test), a hole in that
+function, not in the suite; the island-curriculum test holds it.
+
+### 7. AM. Host-side per-machine loops -- **the lever already named above, as an item**
+
+"Not done, measured as the next levers" in "where a worker's time went" is the
+same finding as a review's "a batch step is still a Python loop per
+candidate" (2026-09-30), and it is true: `step_batch` still loops over
+machines for `mj_step`, the observation, the CPG command, clearance and the
+twist recording. Two parts of that review are out of date or impossible. The
+energy model is already one pass for the batch (`BatchedPower`). And `mj_step`
+cannot become a batch operation: the batch is heterogeneous MuJoCo models,
+MJX needs one model, and `mujoco.rollout` takes its applied forces as a
+sequence fixed in advance, where the fluid force depends on each step's state.
+
+**What is left, measured** (py-spy, 2026-09-27): the damping projection 8-9%,
+clearance and twist recording ~8%, inflow ~4%, CPG ~3% of worker time. Worth
+roughly a fifth of a worker, not a multiple. **Constraint:** `reduceat` sums
+are not bit-exact to slice sums, so these steps cannot use the 700-number
+bit-identity benchmark; they need the path-agreement noise floor, and the
+first such step must say what that floor is before it claims anything.
+
+### 8. AL. Promotion, Tier-1.5, Tier-2 and the audit run in the parent with the pool idle -- **promotion and verification built 2026-09-30; the audit stays**
+
+**Built: the round's promotions are refined as one batch through the pool,
+from the basis each elite was scored with** (`_refined_controllers_for`). The
+elite's `mobility_basis` is rebuilt by `MobilityBasis.bases_from_record`, which
+the film's reader (`ops/run.py`) now shares. Only an elite without a recorded
+basis is identified, in the same batch (per machine, AN). With a shared policy,
+the baseline evaluation is skipped: `_refine_controllers` re-scores at the mean
+anyway. `should_promote` is asked again before each Tier-2, so a round that
+spends the budget stops where the one-at-a-time loop did. Held by
+`test_promotion_spends_refinement_and_keeps_what_it_buys` (stage walls present,
+and the refined controller drives the recorded basis) and the mutation
+`promotion-re-identifies` (caught).
+
+**Also built: each elite's Tier-1.5 leg and Tier-2 mission run on a worker**,
+one elite per worker (`_verification_job`, `ActorPool.map`), still on the numpy
+path. Seeds are drawn in the parent in the order the sequential loop drew them
+(Tier-1.5, then Tier-2, elite by elite). The only difference is that an elite
+later skipped by the budget recheck has had its seeds drawn, and its legs run,
+for nothing. The budget, the critic label and the elite's meta stay in the
+parent, in the old order. Each `promote` event gains `verify_wall`, the wall
+of the whole round's legs. Held by the pool's `map` check (order kept, from
+real processes, nothing re-run in the parent) and the mutation
+`pool-map-out-of-order` (caught). **Not moved: the audit.** It re-evaluates
+through a closure the auditor calls several times per elite and mutates the
+archive as it goes. Its wall is its own `stage_wall` event, so whether it is
+worth moving is read, not guessed.
+
+The concrete cost behind "the islands are not parallel" (2026-09-30): the
+islands themselves are not the lever, the idle pool during the parent stages is. `_verify_and_label` and `_audit` (`evolution/loop.py`) run
+one elite at a time in the parent: `_refined_controller_for` calls
+`evaluate_tier1_batch([pheno], ...)` with a batch of one and **no pool**, then
+six refinement steps on that batch of one, then a 60 s Tier-1.5 leg and the
+Tier-2 mission; the audit re-evaluates each elite several times on the numpy
+path. The four workers do nothing meanwhile.
+
+**Measured on arch44 (gens >= 7):** the 35 generations that carry a `promote`
+or `audit` event (the audit gens all coincide with promote gens) took a median
+**405 s** longer than the median plain generation (313 s), 7.5% of the run's
+wall. arch44's timings are confounded by the laptop's other load (see AJ), so
+that is a size, not a number to beat.
+
+**Candidates.**
+- The three promotions of a round refined together through the pool, as one
+  batch of three, instead of three batches of one.
+- **Do not re-identify the promoted elite.** The stored elite "carries weights
+  but not the basis" -- but the basis the elite was *scored* with is already
+  written to its `evaluate` event (`mobility_basis`, both media). Re-measuring
+  it at a fresh seed costs a full identification per promotion and hands
+  Tier-2 a basis the Tier-1 score was not earned with. Keyed by
+  `(genome_id, eval_seed)` this is exact, not a cache approximation.
+- Tier-2 and the audit stay on the numpy path on purpose (verification runs on
+  the half that is verified), so they can go to worker processes but not onto
+  the GPU path.
+
+**Ceiling.** Three promotions spread over four workers recovers at most about
+two thirds of that 7.5%, roughly 5% of a run. Log the stage walls first (same
+telemetry as AK), and close this if the idle-machine share is under 3%.
+
+### 9. AJ. Work stealing across the pool -- **built 2026-09-30, off by default; `idle` decides**
+
+**Built, with the reproducibility decision taken first.** The learning
+rollout's exploration noise now comes from one numpy stream per machine,
+`default_rng([seed, place in the generation, segment])`
+(`evaluate_tier1_batch(streams=...)`, `SharedPolicy.act_many(rngs=...)`), and
+the pool passes every machine its place. So a machine explores identically in
+any shard. Before this, the noise was torch's stream seeded per shard, so pool
+shape changed what the learner saw. That contradicted `_RESOURCE_FIELDS`'
+claim that pool shape "changes the result by nothing". It no longer does, to
+the 1e-7 of the shared network's batch width. `plan_shards` (`envs/actors.py`)
+adds `--pool-per-worker` (more shards than workers; the executor is the queue)
+and `--pool-balance` (machines assigned by predicted cost,
+`35 + 0.9 * DOF` s, longest first). Composition is fixed before anything runs,
+so a run stays reproducible from its seed. Both are off by default, which is
+exactly the old split. Held by the sharding test (a sampled rollout banks the
+same 42 trajectories in one shard and in a balanced queue of three; max
+distance difference 8.6e-8) and two mutations (`exploration-noise-per-shard`,
+0.33; `queue-results-in-shard-order`, 19.6), both caught. **The sweep of
+per-worker and balance against the real path is still to do**, after `idle`
+has read above ~10%.
+
+Raised 2026-09-29 while reading arch44 at gen 402. The pool is CPU-bound in
+the workers, and it wastes part of that on the tail of every generation.
+
+**What was seen.** 130 s of `/proc` jiffies on arch44: while evaluating, each
+busy worker sits at 100% of a core, the parent at 0%, the GPU at 9%, and the
+machine has 20 cores of which the run uses 4. At several instants only 2-3 of 4
+workers were busy: the rest had finished their shard and were waiting on the
+slowest one. Per-design wall (`evaluate` events, `wall`) varies widely inside a
+generation and grows with DOF (about 0.9 s per DOF above a ~35 s floor), so the
+four shards of four are not equal work, and `split()` fixes them before anyone
+knows which is slow.
+
+**What is not known, and must be measured first (no code before this):**
+- the idle fraction: sum over a generation of `(slowest shard - each shard)`
+  as a share of `workers x slowest shard`. Every `evaluate` event has `wall`;
+  the shard's end time is in the parent's `_batched` call. Log per-shard wall
+  in `ActorPool` first, for a few hundred generations of an existing run.
+  If it is under ~10%, close this item.
+- the ceiling. 16x1 took 93.3 s against 4x4's 31.7 s (CLAUDE.md, pool sweep):
+  the lockstep batch amortises the fluid launch, so **the unit stolen cannot be
+  one machine**. The candidates are more shards than workers (say 6 shards of
+  2-3 pulled from a queue by 4 workers) or splitting by predicted cost (DOF)
+  instead of by count. Sweep both against the real evaluation path; do not model
+  it -- a wall-time model was wrong by 3x once already.
+- memory. Worker count is bounded by memory, not cores (8x2 was OOM-killed);
+  a queue keeps 4 workers, so it should not change that, but check RSS.
+
+**Constraints already established.**
+- Scores do not depend on sharding (`envs/actors.py`; `tests/test_search.py`
+  asserts it), except that the *shared policy's sampled exploration* depends on
+  how work was split. A dynamic queue makes the split depend on timing, so a run
+  stops being reproducible from its seed unless each machine's actions are
+  drawn from a per-machine stream. Decide that before building; it is what
+  arch44's "gens 0-39 reproduce arch43" check relies on.
+- `split()` and the `--min-shard` trap (one Tier-0 rejection at batch 16 gives
+  `15 // 8 = 1`) are the same code; a queue removes the trap if done right.
+- Bit-identity gate: the 700-number benchmark
+  (`experiments/perf/reference_df95498.json`) must not change.
+
+**Not the same as the other perf levers** in "where a worker's time went":
+those cut instructions per machine; this recovers wall time the workers spend
+idle. They compose.
+
+**Pre-registered read.** Generation wall at fixed seed, before against after,
+on an idle machine, over at least 30 generations (arch44's per-generation
+timing is confounded by whatever else the laptop is running: 284-384 s/gen at
+gens 250-400 against 86-130 s at gens 7-32). A gain under the run-to-run spread
+is not a gain.
+
+**Two more framings of the same item, raised 2026-09-30.** "Workers are capped
+by `min_shard`" (`k = max(1, min(workers, n // min_shard))`, so at batch 16 any
+`--workers` above 4 adds nothing) and "`batch` is both the evolutionary batch
+and the hardware batch" are both this item. The hardware batch is already the
+shard, not `batch`; what is still coupled is that the shard *count* cannot
+exceed `batch // min_shard`, and a queue of small shards is what removes that.
+One option this adds to the candidates above: pull the next generation's first
+shards into the tail of this one. The next generation visits a different
+island, so its parents do not depend on this generation's placements -- but
+its candidates would be scored with the shared policy *before* this
+generation's PPO update, and the curator's operator credit would lag by one
+generation. Both change the algorithm, not just the schedule; that needs its
+own arm.
+
+### 10. Y/O. Transition-distance curriculum -- **built 2026-09-30, off by default; its step rule is unmeasured**
+
+**Built as a mechanism, with the step rule's numbers as parameters.**
+- **The probe start.** `MissionSpec.transition_back` sets, per transition kind,
+  how far back from its interface the probe starts. `air_to_water` starts
+  higher, `water_to_air` deeper, `water_to_land` further seaward, and
+  `land_to_water` further up the beach, where it is set down on the ground
+  rather than inside it. `land_to_air` has no interface and ignores it.
+- **The air launch (item O).** `MissionSpec.air_launch_height` is the air
+  segment's launch height. `None` is the 30 m spawn.
+- **Both paths read the spec.** `evaluate_tier1_batch` and `evaluate_tier1`
+  honour both fields. Every `TransitionResult` records its `start_back`.
+- **The step rule.** `curriculum.DistanceCurriculum` steps a start back by
+  `step` (0.5 m) once `advance_share` (0.5) of the last `window` (200)
+  evaluations crossed from the current distance. Evidence from any other
+  distance is ignored, and the window clears on a step. The launch steps down
+  by 2 m, to a 4 m floor, when the same share of air segments reach 0.1
+  competence.
+- **In the search.** `--distance-curriculum` turns it on. The curriculum is
+  checkpointed and restored into the spec on resume, every step is published as
+  a `distance_step` event, and the generation report carries its state.
+
+Off by default, so every probe starts where it always has. **The four numbers
+above are placeholders**: the first measurement named below (crossing rate by
+start distance on arch44's elites) is what sets them, before this is turned on
+for a run. Held by `test_a_transition_can_start_back_from_its_interface`
+(physics) and `test_the_distance_curriculum_steps_back_only_on_evidence`
+(search, both paths), and by two mutations, both caught:
+`batched-transition-ignores-its-start` and `distance-counts-other-distances`.
+
+The design is in "Y / O -- what a continuous start would do" (2026-09-22):
+each transition probe's start steps back from the interface as the population
+learns to cross it, and the air launch steps down from 30 m the same way.
+First measurement: crossing rate by start distance on arch44's elites; the
+step rule is set from it. It changes what every transition score means, so
+nothing after it is comparable across it on transitions.
+
+### 11. N. GRPO for the shared policy -- **conditional on 5**
+
+As described under N (arch40 list). Only if R (item 5) shows the shared
+policy carries weight.
+
+**2026-10-03: built, off by default.** The mechanism is done and tested; the
+decision to run it is not. See item N (arch40 list) for what it is, what it
+costs, and the gates that hold it to "changes nothing when off".
+
+---
+
+## 2026-10-03 — the eight-item pass (the user: do not start arch47 yet)
+
+The user's list, in their words: R sweep; AM noise floor and build; AJ on by
+default; Y/O measured; N if it can be done; item 6 tested; one new island that
+covers all three media at once; the queue pool now, and keep looking for the
+real fix to rotor cost. State, updated as each lands:
+
+| item | state |
+|---|---|
+| AJ | **on by default**: `--min-shard 2 --pool-per-worker 2` (8 shards of 2 on 4 workers, the budget sweep's 0.875x). `shard_cost` now reads rotors: on 21 728 evaluations of arch45/46, rotors R^2 0.42/0.25, DOF 0.19/0.07, and DOF's coefficient is -0.03/+0.03 once rotors are in (`experiments/budget_sweetspot/cost_model.py`). Balance stays off until a re-sweep with the rotor cost. Test `test_the_pool_queues_and_balances_by_rotors`, mutation `balance-reads-dof-not-rotors` (caught). |
+| rotor cost | **vectorised, bit-identical** (2026-10-03): `RotorBatch` steps every rotor of a shard as one array computation and `bemt_many` builds a table in one pass. Was 198 us per rotor-step, 82% of a rotor-heavy evaluation's wall, plus ~2.5 s per table; the +1.6 s/rotor slope is the re-score's 10,500 steps x 198 us. Independently re-checked 2026-10-04: `profile_shard` against its base `be3dbe0`, 780 numbers, 0 differ (the checked-in `reference_df95498.json` is stale: 408 of 700 numbers moved since by the ray-entry and crossing changes, so it is replaced by `reference_be3dbe0.json`). Interleaved A/B: per rotor-step 0.120-0.134x, rotor-heavy evaluation 0.180-0.211x (4 arch46 elites, 52 rotors); 747 + 750 + 780 dumped numbers and 32 fixture cases bit-identical (`experiments/perf/NOTES.md`). Mutations `rotor-batch-one-table`, `rotor-table-one-sum` caught. |
+| AM | **noise floor measured, one part built** (2026-10-03): floor on rotor-bearing elites 1.2e-9 (bar 1e-5), unused because every change is bit-identical. `clearance` (18% of a shard's profile, read up to 4x a step on an unmoved state) is memoised per state and filled per batch in one pass (`clearance_many`): profile 4.36 -> 1.77 s, wall on/off 0.87-1.08 (mean 0.93), inside load noise on the rotor batch. Not done: damping projection (7%, batching breaks bit-identity), inflow (~7%), CPG (1.6%), entrainment (3.4%). Mutations `clearance-batch-first-slice`, `clearance-memo-keyed-on-time`. |
+| island | **built 2026-10-03, unrun: `triphibian`, the eighth island.** Why: in arch46's 7,804 Tier-1 evaluations the weakest medium is 0 in 98.2%, c2 (the second-best) in 77.6%, and no evaluation clears 0.15 in all three; `generalist` scores `mission_fraction` (zero for 98.8%) and its curriculum stages 0-3 pay the best one or two media. Objective: `triphibian_score` = harmonic mean of `c_i + e` minus `e`, `e` = 0.006: any machine missing a medium scores < 0.012, any machine with all three >= 0.012 scores >= 0.012, the score is strictly increasing in every medium (so it still ranks c2 where c3 = 0), and it carries no energy, transition or take-off factor. The geometric mean was rejected: it puts air 0.9 + water 0.9 + land 0 (0.164) above 0.1 in all three. Ladder (`Curriculum(weakest=True)`): stage 0 reads c2 (bar 0.055 = p95 of c2; p90 is 0.020 and a still machine reaches 0.0199), stage 1 reads c3 (bar 0.012 = p95 of c3 among the 396 evaluations past stage 0), stages 2-3 read the crossings gated on c3, and each stage holds at 0.4 of its own bar. Still machine (`experiments/triphibian_still`, 7 plans x 2 seeds, real Tier-1 path): max island score 0.0081, max c2 0.0199, max c3 0.0000, 0 promotions. A one-medium machine (arch45's fitness-1.0 design, 0/0.337/0.003) scores 0.0047; two perfect media and no third 0.0118; 0.1 in all three 0.100. Routing: specialist pairs stay with their pair islands, and each pair island's champion is crossed with the specialist of its missing medium and sent to `triphibian` (`TRIPLE_HOME`, 3 crosses per migration). On resume an island the checkpoint lacks starts empty and is offered the archipelago's best elites by its own objective as immigrants (`Archipelago.colonists`). The generation report gains `weakest_best` and `three_media` from this island's archive. Tests: `test_the_triphibian_island_pays_the_weakest_medium`, `test_a_still_machine_climbs_nothing_on_the_triphibian_island`, `test_a_pair_cross_reaches_the_triphibian_island`, `test_the_triphibian_island_joins_a_resumed_run`; mutations `triphibian-island-pays-the-best-medium`, `triphibian-ladder-reads-the-best-medium`, `triphibian-curriculum-is-the-shared-ladder`. Not comparable: a run with eight islands visits each 1/8 of generations, not 1/7. |
+| R | **read 1 (2026-10-03), the shared policy's weight**: arch46's 218 elites re-scored paired, with minus without the network that scored them (`experiments/shared_policy_value`): land +0.0247 (t 3.50, 69 better / 46 worse), water +0.0126 (t 2.59), air +0.0061 (t 1.69), mission 0; median delta 0 in every medium; the land island holds ~62% of the land delta. An upper bound (elites were selected with the network). **Read 2, the sweep**: `runs/r_{ent0.01,ent0.1,ent0,off}`, 60 gens each at seed 20261003, batch 16, 6 s segments, refine 0; arm 1 at `be3dbe0`, the rest at `6989c7b` (= `be3dbe0` + the bit-identical rotor change, same results, 0.73x the wall). **Read 2026-10-04**: the coefficient does what it says to the width (`log_std` over 60 gens: ent0 -0.50->-0.76, ent0.01 -0.50->-0.56, ent0.1 -0.47->-0.17), but nothing it buys shows in competence. Paired with-minus-without per arm: ent0 water +0.0135 (t 2.24), others |t| < 2 (ent0.01 land +0.0144, t 1.98); top-10 competence (air/water/land) ent0 0.19/0.39/0.52, ent0.01 0.29/0.37/0.47, ent0.1 0.21/0.31/0.52, policy off 0.12/0.38/0.55 -- inside one seed's swing (air ±0.1). **Decision: keep 0.01; GRPO (N) stays off**; the shared policy's weight at 60 gens is not distinguishable from zero, and arch46's +0.025 land is the upper bound of a selected population. `--shared-ent-coef` exists; the `ppo` event carries `log_std` |
+| Y/O | **measured 2026-10-04, the curriculum cannot start** (`experiments/transition_distance`, arch46's 218 elites, current crossings): elites cross 0-2.3% at back 0 (air_to_water 1.4% flat over 0-8 m, water_to_air 0, water_to_land 2.3 / 0.9 / 1.4 / 2.3 / 0.5 / 0% at 0/0.5/1/2/4/8 m, land_to_water 0), against `advance_share` 0.5; a 200 window holds 3-5 crossings. **Still machines cross at or above the elite rate** (air_to_water 1.8-2.3%, water_to_land up to 5.0%, 5 of 8 still crossers at 0 m are aerial_diver bodies): the 10-03 fix cut the leak from 0.83-0.87 to ~0.02-0.05, not to 0, so these cells are not evidence of skill. Air competence falls as the launch is lowered (elite mean 0.0123 at 30 m, 0.0017 at 4 m; share >= 0.1 4.1% -> 0.5%), so the downward launch step would remove the only air signal. Next: close the still-machine crossings, then re-measure; the typed numbers stay, unreachable rather than wrong. **2026-10-04, still crossings closed** (the ninth instance; section below): with the air hold on energy height, land arrivals required `ashore`, shore progress counted from the command, aborted probes holding nothing, and rotors stopped in the still machine, still machines cross **0 of 218** in every kind at 0 m and 0 of 29 former crossers at 0-8 m (were 5 / 1 / 8 of 218 at 0 m). Elites at 0 m: 0 of 218 (were 3 `air_to_water`, 5 `water_to_land`), all of them still-machine crossings. One real crossing remains: elite 159, `water_to_land` from 2 m, not made by its still or rotors-on twin. The curriculum still cannot start (0 at back 0 against `advance_share` 0.5), and now for the right reason. Transition scores are not comparable across this change |
+| N | **built, off by default, 2026-10-03**: `--shared-learner ppo\|grpo\|ppo+grpo` (default `ppo`), `--grpo-bodies 4`, `--grpo-group 4`; switched on only if R says the shared policy carries weight. Off is bit-identical to the old update (weights and report equal against `main`'s `ppo.py`); generation 0's archive is equal with it on and off (`test_grpo_rollouts_never_reach_the_archive`); mutations `grpo-*` caught 7/7 (re-run independently) |
+| 6 | ray entry: whole `test_physics.py` at `be3dbe0` (kernel linked), 0 `[fail]`, `all physics checks passed` with no skip, `test_entry_shock_is_hydrodynamic_not_a_speed_limit` included. Mutations: all 117 in `tools/mutate.py` re-run at `be3dbe0` (52 name a `test_search` function, not 18): **caught 116/117**; the survivor `audit-perturbs-another-seed` is a fixture hole -- the test sets the audited elite's `eval_seed` to 0, so re-running at seed 0 is the same experiment. **Fixed 2026-10-04**: the fixture audits at seed 5 (the gannet's mission base is nonzero at seeds 0 and 5, zero at 1, 2, 3, 7); the test passes and the mutation now reads `retained 2.8731`, caught 1/1, so **117/117** |
+
+### 2026-10-04 — still machines that still crossed (the ninth instance)
+
+`experiments/transition_distance` found arch46's elites held still crossing at or
+above the elite rate under the 10-03 `CrossingTracker`. Traced singly
+(`experiments/still_leak/`), the mechanisms were:
+
+- `air_to_water`: gliders coast through the 1.5 s height hold on their launch
+  speed. They lost 0.09-0.32 m of height and 3.4-5.7 m of energy height, then
+  glided in.
+- `water_to_land`: a float with its root 0.09 m above the water and its hull on
+  the submerged ramp is LAND by `medium_of`, 8 m out.
+- `water_to_air`: the still arm left rotors at throttle (a rotor's channel is a
+  speed held at its offset).
+
+The gates, in `transitions.CrossingTracker`, so both paths:
+
+- the air hold reads `max(height, energy height)` lost;
+- a land arrival must be `ashore` (dry ramp under the root);
+- shore progress counts from the go command (a capsize during the hold paid
+  0.136);
+- an aborted probe holds nothing (a blow-up paid 0.543).
+
+`TriphibianEnv.held_still_params` stops rotors. Tests:
+`test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing` (24 bodies, a
+fixture of their genomes) and two new checks in
+`test_a_crossing_is_commanded_and_a_still_machine_makes_none`. Mutations
+`crossing-air-hold-reads-height-only`, `crossing-land-is-any-ground-contact`,
+`crossing-shore-progress-counts-the-hold`, `crossing-aborted-probe-keeps-its-hold`
+and `still-machine-leaves-rotors-spinning` are all caught.
+
+Re-measured: still machines cross 0 everywhere, elites 0 at 0 m, and one real
+crossing remains (elite 159, `water_to_land` at 2 m).
+
+Left open, both in ARCH46_SPEC §8:
+
+- **Open-loop rotors still cross.** Rotors at throttle with amplitude zero cross
+  `water_to_air` (elites 129, 137) and `water_to_land` (129, 146). They ignore
+  the command and reach the interface after the hold. Closing it needs a station
+  gate on the hold.
+- **Graded `water_to_land` pays a still glide.** A sinking glide that drifts
+  shoreward earns up to 0.145 for a still body.
+
+**Transition scores are not comparable across 2026-10-04.**
+
 ## 2026-09-23..26 — AB-AF executed, every open fluid item closed, and a rotor control
 
 The user asked for three things: take the AB-AF list through to verification and
@@ -2564,6 +3088,7 @@ shape across incidence, and CL through the inflow, are. It is gated in
   against flat at the same speed, and nose-first at twice the speed. Flat
   getting worse with speed, the hull limit, and the gannet surviving a 20 m/s
   nose-first entry are all still asserted.
+  (Closed 2026-09-30 by AK: see AK below for what is asserted now.)
 - The audit fixture audits a gannet (its mission base is nonzero).
 - Four tests read new model constants (CL_MAX = CN_LEV/2, the LEV strength
   argument).
@@ -2586,8 +3111,8 @@ This is the second boundary in a week. Nothing has been run since the first.
   - sizing the feathering motor to the pitch load rather than to the stroke
     motor
   - a torque-feasibility term in the gait operators
-- **AI. Should the search build rotorcraft?** The genes exist and no operator
-  touches them. It is a question for the user: the project is about flapping.
+- **AI. Should the search build rotorcraft?** Yes (the user, 2026-09-26, and
+  again 2026-09-30); `mut_rotor` built for arch43.
 - **AJ. Path agreement against the noise floor — done, and the first
   explanation was wrong.** Two checks failed after the fluid work: eel,
   no-identification, 1.5e-5 against a 1e-5 bar; record against film, 2.7%
@@ -2616,9 +3141,70 @@ This is the second boundary in a week. Nothing has been run since the first.
     inflow ran on their 4-step cadence.
   - **A latent mismatch, fixed along the way.** The GPU ran the unsteady history
     even with `FluidSolver.unsteady` off. It now honours the flag.
-- **AK. The ray's entry under the corrected added mass.** Its membranes
-  oscillate through the surface after a nose-first entry, with the joints driven
-  or held.
+- **AK. The ray's entry under the corrected added mass -- done 2026-09-30.**
+  Its membranes oscillated through the surface after a nose-first entry, with
+  the joints driven or held. Two defects, both in `physics/fluid.py`, and
+  neither was the added mass itself. Probes in `experiments/ray_entry/`.
+  - **The mass matrix created momentum.** Added mass is folded into the mass
+    matrix and MuJoCo keeps `qvel` when it changes, which supplies
+    `-m_a dv/dt` and never `-dm/dt v`: every step the entrained mass grew, the
+    water came along at the body's speed with no reaction. Nose-first at
+    8 m/s the hull *accelerated* from 9.2 to 21.9 m/s downward in water while
+    the net fluid force on it pointed up, and the slam peak read 1292 kPa
+    against 760 at 20 m/s. The ray spawned in air flapped itself 4.5 m under.
+    `entrainment_reaction` adds `-max(dm, 0)/dt v` (and the rotational term)
+    at each body's CoM, which conserves momentum exactly and cannot speed a
+    body up. Shed mass is not reacted: the two-sided form ran the eel to
+    1.1e6 m/s. From the water spawn over 6 s, peak speed with/without:
+    beetle 0.43/4.70 m/s, eel 0.63/3.78, ray 0.59/0.63, gannet 0.36/0.36.
+    So most of the beetle's and eel's swimming was this momentum.
+  - **The implicit damping was stale at first contact.** B is refreshed every
+    4 steps and scales with density, so contact could meet up to three steps
+    of water loads with a B formed in air (~1/800). One strut joint took
+    up to 530 N m and gained 100 rad/s in two steps. The entry peak then depended
+    on which step contact fell on: 164-1732 kPa nose-first at 8 m/s as the
+    start height moved 0-6 cm. `ImplicitAeroDamping.due` now also refreshes
+    when a strip is wet, or will be next step, and was dry when B was formed
+    (or the reverse). Held, over one refresh cycle: 279-1307 kPa before,
+    372-418 after. `REFRESH_EVERY = 1` gives the same peaks within 1.5 kPa.
+  - **The two printed orderings are not the ray's.** With both fixed, peak kPa
+    over six start heights (flat 4 / flat 8 / nose 4 / nose 8 / nose 20):
+    driven 157-198 / 257-354 / 202-286 / 174-257 / 244-293, held 130-156 /
+    245-367 / 93-120 / 300-450 / 183-285. At 4 m/s flat beats nose-first in
+    all six driven entries and loses all six held. Nose-first at 8 m/s loses
+    to flat at 4 in 11 of 12. The ray's membranes and struts set its entry
+    load, not its attitude. `test_entry_shock_is_hydrodynamic_not_a_speed_limit`
+    now asserts what holds in every driven draw instead: at 8 m/s nose-first
+    beats flat; flat's load grows 1.48-2.01x from 4 to 8 m/s and nose-first's
+    0.83-1.02x; no entry leaves the machine sinking faster than it hit the
+    water (worst 0.97x, 2.38x without the reaction); and a held entry's peak
+    is within 2x across a refresh cycle. Mutations `entrainment-not-reacted`
+    and `damping-stale-at-the-surface` are each caught 1/1.
+  - **Side effect.** `test_resonance_needs_a_soft_drive`'s ray had been
+    measured 4.5 m under water. At the surface the stiff spring reads 148
+    against 171 W/rad rigid (0.87x, the > 0.8x check holds), and the compliant
+    drive 75.
+  - **Closed on merge, 2026-09-30: the batched path has the reaction too.**
+    `BatchedFluid.finish` calls `entrainment_reaction` after the limiter, as
+    `FluidSolver.apply` does. It uses the machine solver's `_prev_mbody` (so
+    the first step after a reset is skipped on both paths) and the per-body CoM
+    velocities the batch already holds (`vel6`). Mutation
+    `batched-entrainment-unreacted` is caught by the path-agreement test (air
+    `spin_rate` 0.16 apart without it).
+  - **Found while checking that, and fixed: the numpy path never scattered a
+    crossing's entry state.** `run_transition_batch` drew one per kind;
+    `run_transition` started from the bare placement. So every crossing that
+    Tier-2, a film or an offline probe measured started somewhere the scored
+    one had not. The gap predates this session: at `5221fe1` peak entry speed
+    differed by up to 7.3 m/s between the paths on the seed plans. Both paths
+    now draw from `transition_scatter_seed(kind)`, and agree to 4e-12 to 1e-5
+    with the same crossed/not-crossed outcome on every kind. The
+    path-agreement test now asserts it, and mutation
+    `single-path-crossing-unscattered` is caught (11.6 m/s).
+  - **Open. The slam diagnostic stops resolving entry above ~20 m/s.** One
+    step there is 8-12 cm of travel, and a thin strip's density blend crosses
+    in a single step. Nose-first at 23.8 m/s reads 446-1539 kPa as the start
+    height moves 0-8 cm. The survival check stays at 20 m/s for that reason.
 
 ---
 
@@ -2876,8 +3462,6 @@ Then, in this order:
    glide no longer *scores*, which removes the reason the spawn was tolerable.
 6. **R, `shared_ent_coef`**, still the value measured to do nothing, still
    un-swept.
-7. **Q, the triphibian conflict**, unchanged and still written down rather than
-   acted on.
 
 ---
 
@@ -3333,10 +3917,41 @@ and the conditional effect of each before touching either.**
 
 ### N. GRPO for the shared policy
 
-Not implemented — `learning/` holds `ppo.py` and `distill.py` and no GRPO
-anywhere. Right algorithm, still not the binding constraint, and it waits on
-thrust being in the score in a form the search can climb. Partial form when it
-comes: G=4 learning-only rollouts for a few bodies per generation.
+**Built 2026-10-03, off by default** (`learning/grpo.py`;
+`SearchConfig.shared_learner = "ppo"`). Right algorithm, still not the binding
+constraint, and it waits on thrust being in the score in a form the search can
+climb; whether to switch it on is item R's question (does the shared policy
+carry weight at all).
+
+What was built, the partial form: each generation `grpo_bodies` (default 4)
+bodies drawn from those that passed Tier-0, `grpo_group` (default 4) learning-only
+rollouts each, with different exploration streams, on the generation's own
+evaluation seed (so the same scatter and task) and with the controllers the
+bodies were archived with (no identification repeated). One batched call
+through the actor pool. The results are dropped: nothing is scored, placed or
+counted. Advantage = `(R - mean_g)/(std_g + 0.05)` per (body, segment kind),
+broadcast over the trajectory's steps; replaces GAE for these rows. The rows
+share minibatches with the ordinary PPO rows in one `ppo_update` (a second
+update would see an observation normaliser the first had moved). No value loss
+on group rows, entropy bonus kept, no potential shaping (it cancels in a group).
+Unusable groups are dropped and counted in the `ppo` event. Modes:
+`ppo+grpo` adds the rows, `grpo` trains on them alone (the ordinary rollouts
+are still collected under both, because they are the generation's scores).
+
+Cost, measured 2026-10-03 on a loaded machine, 1 worker, `batch=8`,
+`segment_seconds=2.0`, 4 bodies x 4 = 16 rollouts, gens 0/1/2: GRPO stage 48.6 /
+55.2 / 57.8 s against main 135.0 / 100.5 / 108.6 s and re-score 34.2 / 28.6 /
+30.0 s, i.e. 0.29 / 0.43 / 0.42 of (main + re-score). The 16 GRPO machines are
+fixed while main and re-score grow with `batch`, so at `batch=16` the ratio
+should be about half of that (inference, not measured); the brief's estimate was
++15-25% per generation. Recorded per generation in the `stages` event (`grpo`:
+wall, bodies, rollouts, per-shard walls) and in the `ppo` event (`grpo_*`:
+groups, rows, mean within-group reward std per segment kind, zero-variance
+groups, dropped counts). In that tiny run the within-group std was 0.00 for air
+and every crossing and 0.02-0.07 for land and water: a group-relative advantage
+is zero where every attempt earns the same, so **the signal exists only where
+bodies already score**, which is the thing item R's reading should look at
+before switching it on.
 
 ### O. The air spawn — still the largest structural distortion, still no safe fix
 
@@ -3351,23 +3966,6 @@ Still 400 (`evolution/loop.py:181`, CLI `ops/run.py:733`). arch38 made it
 measurable for the first time and measured it: **19.0% median merge loss per
 refit, 11.1–31.2%, over 660 median archipelago cells.** Unfixed, and now with a
 number to judge a change against.
-
-### Q. The triphibian conflict itself
-
-`corr(air, water)` runs +0.04 to −0.17 across arch37's nine bands and a wing
-costs 2.5x more in water than it buys in air. arch38 added a second instance of
-the same shape: a fixed evaluation budget moved to water the moment water had
-somewhere to climb. The `land_air` island — added in arch37, finished second of
-seven, produced that run's mission-best — is evidence that pairs work where the
-whole does not.
-
-**Whether the mission should be a chain of pairs rather than one machine asked to
-be good at three things at once is a change to what this project is for, so it is
-written down and not acted on.** It is now supported by two runs rather than one.
-reproducible from `--seed` at all (‖dW‖ = 7.4 between runs). Full audit in
-`docs/LEARNER_AUDIT.md`.
-
----
 
 ## arch34's phases, kept for the measurements behind them
 

@@ -28,8 +28,8 @@ makes resume, retention and export answerable without knowing the layout.
 
 A step here is a **generation**.  At this project's measured ~74 s per
 generation in steady state, a budget of 900 steps is about 21 hours, and the
-opening six-island verification burst costs ~300 s a generation for the first
-six.  That is why ``TrainerCapabilities.step_unit`` exists.
+opening eight-island verification burst costs ~300 s a generation for the first
+eight.  That is why ``TrainerCapabilities.step_unit`` exists.
 """
 
 from __future__ import annotations
@@ -58,6 +58,8 @@ RESUME_GLOBS = ("archive_*.pkl",)
 _CONFIG_FIELDS = (
     "batch", "segment_seconds", "tier0_gate", "tier2_every", "tier1_5_seconds",
     "identify_axes_every", "controller_refine_steps", "controller_refine_sigma",
+    "controller_refine_funnel", "distance_curriculum", "distance_step",
+    "distance_advance_share", "distance_window",
     "promotion_refine_steps", "mission_weight", "reward_shaping",
     "descriptor_bins", "descriptor_refit_every", "learned_axes",
     "migrate_every", "n_migrants", "use_critic", "critic_refit_every",
@@ -65,15 +67,18 @@ _CONFIG_FIELDS = (
     "judge_quantile", "judge_update_every", "policy_hidden", "n_modes",
     "use_shared_policy", "shared_hidden", "shared_lr", "shared_epochs",
     "shared_target_kl", "shared_ent_coef", "shared_lr_anneal",
-    "shared_minibatch", "audits_per_review", "checkpoint_every",
+    "shared_learner", "grpo_group", "grpo_bodies",
+    "shared_minibatch", "audits_per_review", "checkpoint_every", "snapshot_every",
     "event_sample", "n_reference_seeds", "n_random_seeds", "islands",
+    "descriptor_keep_if_overlap", "tier2_label_all_media",
 )
 #: Accepted from the job's ``resources`` rather than its plan, because they are
 #: properties of the machine and not of the experiment.  This project measured
 #: 4 shards of 4 at 31.7 s against 16x1 at 93.3 s on the same work: pool shape
 #: changes wall time by 3x and the result by nothing, so it must not enter the
 #: plan digest.
-_RESOURCE_FIELDS = ("workers", "min_shard", "memory_ceiling_mb")
+_RESOURCE_FIELDS = ("workers", "min_shard", "pool_per_worker", "pool_balance",
+                    "memory_ceiling_mb")
 
 #: Mission settings, which are a property of the task rather than of the search.
 _SPEC_FIELDS = ("cycles", "seconds_per_domain", "target_depth")
@@ -97,9 +102,9 @@ class SearchTrainer:
             # determinism across a different worker count -- the pool shards the
             # batch, and a different shard layout evaluates in a different order.
             deterministic=True,
-            description="MAP-Elites over six islands with a shared PPO policy; "
+            description="MAP-Elites over eight islands with a shared PPO policy; "
                         "a step is one generation (~74 s measured in steady "
-                        "state, ~300 s for generations 0-5)")
+                        "state, ~300 s for generations 0-7)")
 
     # -- the contract -----------------------------------------------------
 

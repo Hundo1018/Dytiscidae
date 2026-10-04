@@ -72,6 +72,71 @@ STAGES: list[tuple[str, str, float]] = [
 ]
 N_STAGES = len(STAGES)
 
+#: The triphibian island's ladder (``Curriculum(weakest=True)``): same five
+#: stages, but every one of them reads the *weaker* media instead of the best.
+#: On an all-media island ``stage_score`` pays the best medium at stage 0 and the
+#: best two at stage 3, so the 75% of selection the curriculum half carries at
+#: stage 0 went to whatever one medium was cheapest -- the trap the island exists
+#: to get out of.  Order the competences ``c1 >= c2 >= c3``:
+#:
+#: ``second``   c2, the second-best medium: operate in two media.
+#: ``third``    c3, the weakest: operate in all three.
+#: ``crossing`` own crossings' ``crossed * quality``, times ``min(1, c3 / bar1)``.
+#: ``chain``    ``cbrt(c1 c2 c3) * max(crossed, 0.1)``.
+#: ``mission``  ``mission_fraction``, as everywhere.
+WEAKEST_STAGE_NAMES: tuple = ("second", "third", "crossing", "chain", "mission")
+
+#: Bars to leave each stage of the triphibian ladder.  Set from arch46's 7,804
+#: Tier-1 evaluations (``runs/arch46/events.jsonl``, gens 0-499), never from
+#: what the capability ought to look like:
+#:
+#: * ``second`` 0.055 -- p95 of c2.  c2 is 0 in 77.6% of evaluations; its p90 is
+#:   0.020, and a machine with its actuators held still reaches **0.0199**
+#:   (gannet, seed 1: air 0.128 gliding, water 0.020;
+#:   ``experiments/triphibian_still``), so p90 would promote a still machine.
+#:   0.055 is 2.8x that ceiling; 5.1% of evaluations (396) clear it.
+#: * ``third`` 0.012 -- p95 of c3 among the 396 that clear the first bar (the
+#:   population this stage is asked of).  c3 is nonzero there in 11.1%, median
+#:   of the nonzero 0.0115.  A still machine's c3 is 0.0000 in all 14 still
+#:   evaluations (7 plans x 2 seeds).
+#: * ``crossing``, ``chain``, ``mission`` -- the shared ladder's 0.35, 0.30, 0.0,
+#:   because those stages read the same crossing quantities every island's
+#:   stages 2-3 read.  Unmeasured for this island: no arch46 evaluation had all
+#:   three media above 0.15.
+WEAKEST_BARS: tuple = (0.055, 0.012, 0.35, 0.30, 0.0)
+
+
+def triphibian_stage_score(stage: int, comps, crossing: dict | None = None,
+                           mission: float = 0.0) -> float:
+    """What stage ``stage`` of the triphibian ladder reads.
+
+    ``comps`` is the three competences (a sequence, or a dict by medium; a medium
+    with no segment is a zero, not a gap -- a machine that cannot be evaluated in
+    a medium cannot operate in it).  ``crossing`` is ``component_means`` over the
+    island's own crossings.  See ``WEAKEST_STAGE_NAMES`` for the ladder.
+    """
+    vals = list(comps.values()) if isinstance(comps, dict) else list(comps)
+    vals = sorted((float(max(v, 0.0)) for v in vals), reverse=True)
+    vals = (vals + [0.0, 0.0, 0.0])[:3]
+    c1, c2, c3 = vals
+    tc = crossing or {}
+    if stage <= 0:
+        return c2
+    if stage == 1:
+        return c3
+    if stage == 2:
+        if not tc:
+            return 0.0
+        quality = float(np.mean([
+            tc.get("shock", 0.0), tc.get("control", 0.0),
+            tc.get("exit_state", 0.0), tc.get("settle", 0.0),
+        ]))
+        return float(tc.get("crossed", 0.0) * quality
+                     * min(1.0, c3 / WEAKEST_BARS[1]))
+    if stage == 3:
+        return float(np.cbrt(c1 * c2 * c3) * max(float(tc.get("crossed", 0.0)), 0.1))
+    return float(mission)
+
 
 @dataclass(eq=False)
 class StageResult:
@@ -98,7 +163,7 @@ def _own_crossings(transitions, names) -> dict:
 
 
 def stage_score(stage: int, result, transitions=None, *,
-                domains=None, transition_names=None) -> float:
+                domains=None, transition_names=None, weakest: bool = False) -> float:
     """How well a result answers the question *this* stage asks.
 
     Each stage reads a different projection of the same evaluation, which is
@@ -115,8 +180,26 @@ def stage_score(stage: int, result, transitions=None, *,
     quarters of a specialist island's selection went to whatever medium was
     cheapest.  None means every medium, which is the generalist's own set and
     what a curriculum unpickled from an earlier run keeps.
+
+    ``weakest`` reads the triphibian ladder instead (``triphibian_stage_score``):
+    every stage reads the weaker media, and a medium of ``domains`` with no
+    segment counts as zero.
     """
     segs = getattr(result, "segments", {}) or {}
+    if weakest:
+        own = domains if domains is not None else ("air", "water", "land")
+        comps = {d: float(getattr(segs[d], "competence", 0.0)) if d in segs else 0.0
+                 for d in own}
+        tc = {}
+        if transitions is not None:
+            try:
+                tc = (_own_crossings(transitions, transition_names)
+                      if transition_names is not None
+                      else transitions.component_means())
+            except Exception:
+                tc = {}
+        return triphibian_stage_score(
+            stage, comps, tc, float(getattr(result, "mission_fraction", 0.0)))
     if not segs:
         return 0.0
     if domains is not None:
@@ -222,6 +305,10 @@ class Curriculum:
     #: not change its selection mid-run.  See ``stage_score``.
     domains: tuple | None = None
     transition_names: tuple | None = None
+    #: Read the triphibian ladder (``triphibian_stage_score``) with its own bars
+    #: (``WEAKEST_BARS``).  A curriculum pickled before this field existed reads
+    #: False through ``getattr``, so a resumed island keeps its ladder.
+    weakest: bool = False
 
     #: Recent (island_score, curriculum_score) pairs *per stage*.  Bounded
     #: window: this is a question about the population now, not about the whole
@@ -253,6 +340,17 @@ class Curriculum:
     def stage_of(self, cell) -> int:
         return int(self.stages.get(tuple(cell), 0))
 
+    def bar(self, stage: int) -> float:
+        """The bar to leave ``stage`` on this curriculum's ladder."""
+        s = int(np.clip(stage, 0, N_STAGES - 1))
+        return float(WEAKEST_BARS[s] if getattr(self, "weakest", False)
+                     else STAGES[s][2])
+
+    def stage_name(self, stage: int) -> str:
+        s = int(np.clip(stage, 0, N_STAGES - 1))
+        return (WEAKEST_STAGE_NAMES[s] if getattr(self, "weakest", False)
+                else STAGES[s][0])
+
     def seed_stage(self, cell, stage: int) -> int:
         """Give an unvisited cell the stage its parent had earned.
 
@@ -268,11 +366,16 @@ class Curriculum:
         which is what ``update`` already does.
         """
         key = tuple(cell)
-        if key in self.stages:
-            return int(self.stages[key])
-        s = int(np.clip(stage, 0, N_STAGES - 1))
+        s = self.stage_for(key, stage)
         self.stages[key] = s
         return s
+
+    def stage_for(self, cell, stage: int) -> int:
+        """The stage ``seed_stage`` would give ``cell``, without giving it."""
+        key = tuple(cell)
+        if key in self.stages:
+            return int(self.stages[key])
+        return int(np.clip(stage, 0, N_STAGES - 1))
 
     def observe_blend(self, island_score: float, curriculum_score: float,
                       stage: int = 0, mission: float = 0.0) -> None:
@@ -399,14 +502,20 @@ class Curriculum:
         m = np.array([c for _, _, c in w], float)
         return float(np.mean(m <= float(mission)))
 
-    def evaluate(self, cell, result, transitions=None) -> StageResult:
-        """Score a design at its cell's stage, and at the next one up."""
-        s = self.stage_of(cell)
+    def evaluate(self, cell, result, transitions=None, *,
+                 stage: int | None = None) -> StageResult:
+        """Score a design at its cell's stage, and at the next one up.
+
+        ``stage`` overrides the cell's own, for a dry run on a cell not yet
+        seeded (see ``stage_for``).
+        """
+        s = self.stage_of(cell) if stage is None else int(stage)
         own = dict(domains=getattr(self, "domains", None),
-                   transition_names=getattr(self, "transition_names", None))
+                   transition_names=getattr(self, "transition_names", None),
+                   weakest=getattr(self, "weakest", False))
         here = stage_score(s, result, transitions, **own)
         nxt = stage_score(min(s + 1, N_STAGES - 1), result, transitions, **own)
-        bar = STAGES[s][2]
+        bar = self.bar(s)
         return StageResult(
             stage=s,
             # Always a gradient upward: the next stage's score is visible even
@@ -433,6 +542,25 @@ class Curriculum:
         """
         key = tuple(cell)
         s = self.stage_of(key)
+        if getattr(self, "weakest", False):
+            # The triphibian ladder's stages read quantities on different scales
+            # (c2 against 0.055, c3 against 0.012), so comparing stage s's answer
+            # with stage s-1's bar -- the shared rule below -- would demote a
+            # cell for a c3 under 0.4 x 0.055 = 0.022, above the bar it was
+            # promoted on.  Each stage's hold line is 0.4 of its *own* bar
+            # instead, and promotion asks that the next answer already clears
+            # the next line, so a promoted cell is not demoted on its next visit.
+            nxt, here = sr.detail.get("next", 0.0), sr.detail.get("here", 0.0)
+            if (sr.passed and s < N_STAGES - 1 and nxt > 0.0
+                    and nxt >= 0.4 * self.bar(s + 1)):
+                self.stages[key] = s + 1
+                self.promotions += 1
+                return "promoted"
+            if s > 0 and here < 0.4 * self.bar(s):
+                self.stages[key] = s - 1
+                self.demotions += 1
+                return "demoted"
+            return "held"
         if sr.passed and s < N_STAGES - 1 and sr.detail.get("next", 0.0) > 0.0:
             self.stages[key] = s + 1
             self.promotions += 1
@@ -488,7 +616,7 @@ class Curriculum:
                     "reached": 0, "typical": 0}
         counts = {}
         for s in self.stages.values():
-            counts[STAGES[s][0]] = counts.get(STAGES[s][0], 0) + 1
+            counts[self.stage_name(s)] = counts.get(self.stage_name(s), 0) + 1
         vals = sorted(self.stages.values())
         return {
             "stages": counts,
@@ -512,5 +640,94 @@ class Curriculum:
             "handover_typical": round(self.handover(vals[len(vals) // 2]), 4),
             "handover_mean": round(
                 float(np.mean([self.handover(s) for s in self.stages.values()])), 4),
-            "rank_windows": {STAGES[s][0]: len(w) for s, w in sorted(self._recent.items())},
+            "rank_windows": {self.stage_name(s): len(w) for s, w in sorted(self._recent.items())},
         }
+
+
+# --------------------------------------------------------------------------
+# Distance: how far from an interface a crossing starts (ROADMAP Y/O)
+# --------------------------------------------------------------------------
+
+
+@dataclass(eq=False)
+class DistanceCurriculum:
+    """Move each transition probe's start back as the population crosses it.
+
+    Six runs have scored 0/2 continuous transitions, and a continuous
+    evaluation today would zero every leg after the first for almost everyone
+    (``probe_continuity``: 0 of 90 completed both, 2026-09-22).  So the probe
+    stays, and its start steps back from the interface -- deeper, higher,
+    further seaward or up the beach -- whenever ``advance_share`` of the last
+    ``window`` evaluations crossed from where it is now.  At its start it is
+    today's probe; at ``max_back`` it approaches the continuous mission.  The
+    air launch (item O) is the same rule run the other way: it steps down from
+    30 m by ``launch_step`` whenever ``advance_share`` of the window's air
+    segments reached ``launch_bar`` competence, to ``launch_floor``.
+
+    Every number here is a parameter because none of them has been measured:
+    the step rule needs crossing rates by start distance first (ROADMAP item
+    10).  Off unless the search enables it.
+    """
+
+    kinds: tuple = ("air_to_water", "water_to_air", "water_to_land", "land_to_water")
+    step: float = 0.5
+    advance_share: float = 0.5
+    window: int = 200
+    max_back: float = 20.0
+    launch_height: float = 30.0
+    launch_step: float = 2.0
+    launch_floor: float = 4.0
+    launch_bar: float = 0.1
+    back: dict = field(default_factory=dict)
+    _seen: dict = field(default_factory=dict)
+
+    def observe(self, result) -> None:
+        """Record one Tier-1 result's crossings and its air score."""
+        for kind, tr in (getattr(getattr(result, "transitions", None), "results", {}) or {}).items():
+            if kind in self.kinds and abs(float(getattr(tr, "start_back", 0.0))
+                                          - self.back.get(kind, 0.0)) < 1e-9:
+                self._push(kind, bool(tr.crossed))
+        air = (getattr(result, "segments", {}) or {}).get("air")
+        if air is not None:
+            self._push("air_launch", float(air.competence) >= self.launch_bar)
+
+    def _push(self, key: str, ok: bool) -> None:
+        w = self._seen.setdefault(key, [])
+        w.append(ok)
+        if len(w) > self.window:
+            del w[: len(w) - self.window]
+
+    def update(self) -> list:
+        """Step any start the population has earned.  Returns the moves."""
+        moves = []
+        for key, w in list(self._seen.items()):
+            if len(w) < self.window or sum(w) < self.advance_share * len(w):
+                continue
+            if key == "air_launch":
+                new = max(self.launch_height - self.launch_step, self.launch_floor)
+                if new < self.launch_height:
+                    moves.append({"what": key, "from": self.launch_height, "to": new,
+                                  "share": round(sum(w) / len(w), 3)})
+                    self.launch_height = new
+            else:
+                old = self.back.get(key, 0.0)
+                new = min(old + self.step, self.max_back)
+                if new > old:
+                    moves.append({"what": key, "from": old, "to": new,
+                                  "share": round(sum(w) / len(w), 3)})
+                    self.back[key] = new
+            # Evidence gathered at the old distance says nothing about the new.
+            self._seen[key] = []
+        return moves
+
+    def apply(self, spec) -> None:
+        """Write the current starts into the mission spec the evaluators read."""
+        spec.transition_back = {k: float(v) for k, v in self.back.items() if v > 0.0}
+        spec.air_launch_height = (None if self.launch_height >= 30.0
+                                  else float(self.launch_height))
+
+    def report(self) -> dict:
+        return {"back": {k: round(v, 3) for k, v in sorted(self.back.items())},
+                "launch_height": round(self.launch_height, 3),
+                "window_share": {k: (round(sum(w) / len(w), 3) if w else None)
+                                 for k, w in sorted(self._seen.items())}}

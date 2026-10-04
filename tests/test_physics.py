@@ -1346,12 +1346,15 @@ def test_series_elasticity_needs_a_compliant_drive() -> None:
     very_soft, p_soft, s_soft, e_soft = cost(1.0, 0.05)
 
     # "Little", not "nothing", since the servo feeds its rate forward and since
-    # the implicit damping split: 185 against 209 W/rad (2026-09-26).
+    # the implicit damping split: 185 against 209 W/rad (2026-09-26).  Those
+    # figures came from a ray the missing entrainment reaction had driven
+    # 4.5 m under water after its air spawn (ROADMAP AK); flapping at the
+    # surface it is 148 against 171 (2026-09-30).
     check("a spring under the old hard-wired gain buys little",
           stiff_spring > 0.8 * rigid,
-          f"{stiff_spring:.0f} W/rad against {rigid:.0f} rigid -- it cut power from "
-          f"{p_rigid:.0f} W to {p_stiff:.0f} W only by cutting motion from "
-          f"{s_rigid:.2f} to {s_stiff:.2f} rad")
+          f"{stiff_spring:.0f} W/rad against {rigid:.0f} rigid -- power "
+          f"{p_rigid:.0f} W -> {p_stiff:.0f} W, motion {s_rigid:.2f} -> "
+          f"{s_stiff:.2f} rad")
     # 0.49x on 2026-09-26 (it read 0.79x between the feed-forward and the root
     # being taken out of the damping split).
     check("the same spring with a compliant drive is far cheaper per unit of motion",
@@ -1535,10 +1538,15 @@ def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
           f"{p.slam_pressure_capacity / 1e3:.0f} kPa")
 
     window = max(int(0.010 / env.timestep), 1)
+    # Per entry: (label, sinking speed the step before first wetting, fastest
+    # sinking speed after it), and the peak pressure in kPa.
+    sinking: list[tuple[str, float, float]] = []
+    kpa: dict[tuple, float] = {}
 
-    def enter(pitch_deg: float, speed: float) -> float:
+    def enter(pitch_deg: float, speed: float, dz: float = 0.0,
+              hold: bool = False) -> float:
         env.reset(Domain.AIR, randomise=False)
-        env.data.qpos[:3] = (-8.0, 0.0, 1.2)
+        env.data.qpos[:3] = (-8.0, 0.0, 1.2 + dz)
         a = math.radians(-pitch_deg)
         env.data.qpos[3:7] = (math.cos(a / 2), 0.0, math.sin(a / 2), 0.0)
         env.data.qvel[:] = 0.0
@@ -1546,14 +1554,27 @@ def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
         env.solver.reset()
         mujoco.mj_forward(env.model, env.data)
         w, peak = [], 0.0
+        v_before, v_hit, v_after = -float(env.data.qvel[2]), None, 0.0
         for _ in range(int(1.2 / env.timestep)):
-            env.step(env.cpg.command(env.cpg.base, env.data.time))
+            u = env.cpg.command(env.cpg.base, env.data.time)
+            env.step(np.zeros_like(u) if hold else u)
             w.append(float(env.solver.diag.slam))
             if len(w) > window:
                 w.pop(0)
             if len(w) == window:
                 peak = max(peak, float(np.mean(w)))
+            v = -float(env.data.qvel[2])
+            if v_hit is None:
+                if env.solver.diag.max_submerged > 0.0:
+                    v_hit = v_before
+                else:
+                    v_before = v
+            else:
+                v_after = max(v_after, v)
+        sinking.append((f"{pitch_deg:.0f} deg at {speed:.1f} m/s",
+                        v_hit if v_hit is not None else float("nan"), v_after))
         pressure = peak / max(p.frontal_area, 1e-3)
+        kpa[(pitch_deg, speed, dz, hold)] = pressure / 1e3
         return float(np.clip(1.0 - (pressure / p.slam_pressure_capacity) ** 2, 0.0, 1.0))
 
     flat_slow = enter(0.0, 4.0)
@@ -1577,19 +1598,64 @@ def test_entry_shock_is_hydrodynamic_not_a_speed_limit() -> None:
 
     check("entering flat faster is worse", flat_fast < flat_slow,
           f"{flat_slow:.3f} at 4 m/s -> {flat_fast:.3f} at 8 m/s")
-    # Measured, no longer asserted, for the reason given under the next one
-    # (ROADMAP AK): true for the gannet, not for the ray's membranes under the
-    # corrected added mass.
-    print(f"         [measured] nose-first at 4 m/s scores {nose_slow:.3f} against "
-          f"{flat_slow:.3f} flat (ROADMAP AK)")
-    # Measured, no longer asserted (2026-09-26): "a nose-first entry at twice
-    # the speed beats a flat one at half of it" held under the isotropic wing
-    # added mass and does not under the corrected tensor (F-03) -- the ray's
-    # big membranes, lighter in the water now, oscillate through the surface
-    # after a nose-first entry, joints driven or held (348-1463 kPa against
-    # 250-347 flat).  The cause is identified, not resolved: ROADMAP AK.
-    print(f"         [measured] nose-first at 8 m/s scores {nose_fast:.3f}, "
-          f"flat at 4 m/s scores {flat_slow:.3f} (ROADMAP AK)")
+    # The two orderings this test used to assert -- nose-first beats flat at
+    # the same 4 m/s, and nose-first at 8 m/s beats flat at 4 -- were demoted
+    # to prints on 2026-09-26 (ROADMAP AK).  Two defects stood behind them.
+    #
+    #   * The mass matrix carried the entrained water without its reaction
+    #     (`entrainment_reaction`): every step the added mass grew created
+    #     ``dm v`` of momentum.  Nose-first at 8 m/s, the hull *accelerated*
+    #     to 21.9 m/s downward and peaked at 1292 kPa, above the 760 kPa at
+    #     20 m/s.
+    #   * The implicit damping was formed on its 4-step cadence only, so first
+    #     contact could meet up to three steps of water loads with a B formed
+    #     in air (`ImplicitAeroDamping.due`).  A strut joint was thrown to
+    #     100 rad/s and the peak depended on which step contact fell on.
+    #
+    # With both fixed, peak kPa over six start heights 0-7.5 cm apart, i.e.
+    # over two steps of travel (`experiments/ray_entry/phase.py`):
+    #
+    #                    flat 4    flat 8    nose 4    nose 8    nose 20
+    #   joints driven   157-198   257-354   202-286   174-257   244-293
+    #   joints held     130-156   245-367    93-120   300-450   183-285
+    #
+    # So the orderings are not the ray's, and it is not noise: at 4 m/s flat
+    # beats nose-first in all six driven entries and loses all six held, and
+    # nose-first at 8 m/s loses to flat at 4 in eleven of twelve.  The ray is
+    # not streamlined for entry -- its membranes and struts set the load on
+    # contact, driven or not.  What is true of it, driven, in all six:
+    check("at 8 m/s, nose-first loads the hull less than flat",
+          nose_fast > flat_fast,
+          f"{kpa[(80.0, 8.0, 0.0, False)]:.0f} kPa nose-first against "
+          f"{kpa[(0.0, 8.0, 0.0, False)]:.0f} flat")
+    # ...and the reason the gannet survives: a flat entry's load grows with
+    # speed and a nose-first one's does not (4 -> 8 m/s: flat x1.48-2.01,
+    # nose-first x0.83-1.02 over the six).
+    grow_flat = kpa[(0.0, 8.0, 0.0, False)] / kpa[(0.0, 4.0, 0.0, False)]
+    grow_nose = kpa[(80.0, 8.0, 0.0, False)] / kpa[(80.0, 4.0, 0.0, False)]
+    check("a flat entry's load grows with speed faster than a nose-first one's",
+          grow_flat > 1.3 * grow_nose,
+          f"4 -> 8 m/s: flat x{grow_flat:.2f}, nose-first x{grow_nose:.2f}")
+    # Which step of the damping's cycle contact lands on is an accident of the
+    # start height and must not decide the load.  Four heights 4 cm apart put
+    # contact on each of the four steps (~9.4 m/s at contact).  Held, because
+    # that is where the stale damping bit hardest: 279-1307 kPa (4.7x) on the
+    # cadence alone, 372-418 (1.12x) refreshed at the surface.
+    cycle = []
+    for dz in (0.0, 0.04, 0.08, 0.12):
+        enter(80.0, 8.0, dz, hold=True)
+        cycle.append(kpa[(80.0, 8.0, dz, True)])
+    check("a held nose-first entry loads the hull the same whichever step it lands on",
+          max(cycle) < 2.0 * min(cycle),
+          " / ".join(f"{c:.0f}" for c in cycle) + " kPa over start heights 0-12 cm")
+    # Entering water takes momentum from a machine; nothing about it can give
+    # the machine more.  10% over the speed at contact is room for gravity
+    # (worst 0.97 over the sixty entries of `phase.py`, driven and held; 2.38
+    # without the reaction).
+    worst = max(sinking, key=lambda r: r[2] / max(r[1], 1e-6))
+    check("no entry leaves the machine sinking faster than it hit the water",
+          all(after <= 1.1 * hit for _, hit, after in sinking),
+          f"worst {worst[0]}: {worst[1]:.1f} m/s at contact, {worst[2]:.1f} after")
     check("a flat entry well past the hull limit scores nothing",
           flat_dead == 0.0 and v_dead < 200.0,
           f"{flat_dead:.3f} at {v_dead:.1f} m/s flat, against a slam capacity "
@@ -3602,6 +3668,10 @@ def test_a_drop_and_recovery_is_not_holding_height() -> None:
     from dytiscidae.evolution.curriculum import stage_score
 
     env = TriphibianEnv(build(BODY_PLANS["gannet"]()))
+    # This is about the shape of the trajectory, so the level-flight gate (AD)
+    # is held open; `test_holding_height_is_flight_only_if_the_actuators_can`
+    # is the gate's own test.
+    env.level_margin = lambda: 1.0
     dt = env.timestep
     n = int(8.0 / dt)
     sched = TaskSchedule("air", (Phase(CRUISE, 0.0, heading=0.0, speed=10.0),
@@ -3635,6 +3705,105 @@ def test_a_drop_and_recovery_is_not_holding_height() -> None:
     flew = stage_score(1, result(0.8, 1.0))
     check("stage 1 does not pay air progress made after falling into the sea",
           fell == 0.0 and abs(flew - 0.8) < 1e-12, f"fell {fell}, flew {flew}")
+
+
+def test_holding_height_is_flight_only_if_the_actuators_can() -> None:
+    """ROADMAP AD: the air task's flight term, and the ladder's flight rungs,
+    are gated on `level_margin >= LEVEL_GATE`; the glide term is not."""
+    print("\nair score: the level-flight gate")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.tasks import CRUISE, Phase, TaskSchedule
+    from dytiscidae.envs.triphibian import LEVEL_GATE, Domain, TriphibianEnv
+    from dytiscidae.evolution.judge import LADDER, rung_reached
+
+    env = TriphibianEnv(build(BODY_PLANS["gannet"]()))
+    dt = env.timestep
+    n = int(8.0 / dt)
+    sched = TaskSchedule("air", (Phase(CRUISE, 0.0, heading=0.0, speed=10.0),
+                                 Phase(CRUISE, 0.5, heading=0.0, speed=10.0)))
+    xy = np.zeros((n, 2))
+    xy[:, 0] = 10.0 * dt * np.arange(n)
+    level = np.full(n, 20.0)
+    gliding = 20.0 - 2.0 * dt * np.arange(n)          # 2 m/s down: a glide
+
+    def hold(clr, margin):
+        env.level_margin = lambda: margin
+        env._active_task = sched
+        try:
+            return env._task_scores(Domain.AIR, -clr, clr, xy, n,
+                                    airborne=np.ones(n, bool))["measurements"]["height_hold"]
+        finally:
+            env._active_task = None
+
+    flies, cannot, unmeasured = (hold(level, LEVEL_GATE + 0.1),
+                                 hold(level, LEVEL_GATE - 0.1), hold(level, None))
+    check("holding height pays flight only to a machine whose actuators can hold it",
+          flies > 0.9 and cannot < 0.5 * flies,
+          f"{flies:.3f} over the gate, {cannot:.3f} under it")
+    check("and a margin the rig could not measure does not clear the gate",
+          unmeasured == cannot, f"{unmeasured:.3f} against {cannot:.3f}")
+    g_over, g_under = hold(gliding, LEVEL_GATE + 0.1), hold(gliding, LEVEL_GATE - 0.1)
+    check("a glide still scores under the gate: it is a capability, not flight",
+          g_under > 0.0 and abs(g_over - g_under) < 1e-12,
+          f"{g_under:.3f} under, {g_over:.3f} over")
+
+    names = [r[0] for r in LADDER["air"]]
+    top = {"lift_margin": 5.0, "airborne_fraction": 1.0, "sink_rate": -1.0,
+           "thrust_margin": 1.0, "station_keeping": 1.0, "turn_response": 1.0}
+    check("the air ladder stops at `flies_level` without a level margin",
+          rung_reached("air", top) == names.index("flies_level"),
+          f"rung {rung_reached('air', top)} of {names}")
+    check("and under the gate, and climbs past it over the gate",
+          rung_reached("air", {**top, "level_margin": LEVEL_GATE - 0.01})
+          == names.index("flies_level")
+          and rung_reached("air", {**top, "level_margin": LEVEL_GATE}) == len(names))
+    check("the ladder's rung and the task's gate are the same number",
+          dict((r[0], r[2]) for r in LADDER["air"])["flies_level"] == LEVEL_GATE)
+
+
+def test_a_transition_can_start_back_from_its_interface() -> None:
+    """ROADMAP Y/O: a probe's start steps back from the interface, the air
+    launch steps down, and 0 / None are the placements every run used."""
+    print("\ntransitions: starting back from the interface")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.transitions import _place_for, run_transition
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(BODY_PLANS["beetle"]()), seed=0)
+
+    def at(kind, back):
+        _place_for(env, kind, back)
+        return env.data.qpos[:3].copy(), float(env.clearance())
+
+    (a0, _), (a3, _) = at("air_to_water", 0.0), at("air_to_water", 3.0)
+    (w0, _), (w3, _) = at("water_to_air", 0.0), at("water_to_air", 3.0)
+    (s0, _), (s3, _) = at("water_to_land", 0.0), at("water_to_land", 3.0)
+    (l0, c0), (l3, c3) = at("land_to_water", 0.0), at("land_to_water", 3.0)
+    check("air_to_water starts higher, water_to_air deeper, by the distance asked",
+          abs((a3[2] - a0[2]) - 3.0) < 1e-9 and abs((w0[2] - w3[2]) - 3.0) < 1e-9,
+          f"air {a0[2]:.2f} -> {a3[2]:.2f}, water {w0[2]:.2f} -> {w3[2]:.2f}")
+    check("water_to_land starts further seaward, land_to_water further up the beach",
+          abs((s0[0] - s3[0]) - 3.0) < 1e-9 and abs((l3[0] - l0[0]) - 3.0) < 1e-9,
+          f"x {s0[0]:.2f} -> {s3[0]:.2f}; {l0[0]:.2f} -> {l3[0]:.2f}")
+    check("and up the beach it is set down on the ground, not inside it",
+          c3 > -0.01, f"clearance {c3:.3f} (at the old start {c0:.3f})")
+
+    env.air_launch_height = 12.0
+    env.reset(Domain.AIR, randomise=False)
+    z12 = float(env.data.qpos[2])
+    env.air_launch_height = None
+    env.reset(Domain.AIR, randomise=False)
+    check("the air launch height is honoured, and None is the 30 m spawn",
+          z12 == 12.0 and float(env.data.qpos[2]) == TriphibianEnv.SPAWN[Domain.AIR][2],
+          f"{z12} / {float(env.data.qpos[2])}")
+
+    tr = run_transition(env, "water_to_air", Controller(params=env.cpg.base),
+                        duration=0.2, back=2.0)
+    check("a transition records where it started", tr.start_back == 2.0,
+          f"{tr.start_back}")
 
 
 def test_the_level_margin_measures_what_the_actuators_deliver() -> None:
@@ -3701,6 +3870,181 @@ def test_the_search_can_build_rotorcraft() -> None:
         counts.append(sum(p.rotor_radius > 1e-3 for p in g.parts))
     check("repeated, it both adds and removes", max(counts) > 1 and min(counts) < max(counts),
           f"rotor count ranged {min(counts)}-{max(counts)}")
+
+
+def test_the_rotor_batch_is_the_per_rotor_loop() -> None:
+    """`RotorBatch` steps every rotor of a shard as one array computation
+    (2026-10-03: the per-rotor loop was 198 us a rotor-step, 82% of a
+    rotor-heavy evaluation).  It must be that loop to the bit -- thrust, torque,
+    the damping split and the end-of-step speed -- with a different table per
+    rotor, rotors in air, in water and across the surface, idle ones and
+    reversed ones, on a calm sea and on waves, one machine and two at once."""
+    print("\nrotor: the vectorised rotors are the per-rotor loop")
+    from dytiscidae.core.bodyplans import REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+    from dytiscidae.physics.medium import SeaState
+    from dytiscidae.physics.rotor import RotorBatch, RotorSet, RotorSpec
+
+    rng = np.random.default_rng(11)
+
+    def machine(sea, k0):
+        env = TriphibianEnv(build(REFERENCE_PLANS["quad"]()), seed=0, sea_state=sea)
+        env.reset(Domain.WATER, randomise=False)
+        names = [mujoco.mj_id2name(env.model, mujoco.mjtObj.mjOBJ_BODY, b)
+                 for b in env.rotors.body]
+        # Four different rotors, so a lookup that reads one rotor's table
+        # for another's cannot agree by accident.
+        specs = {nm: RotorSpec(radius=0.08 + 0.03 * ((j + k0) % 4),
+                               pitch=0.06 + 0.025 * ((j + 2 * k0) % 3),
+                               blades=2 + (j % 2), handed=(1 if j % 2 else -1))
+                 for j, nm in enumerate(names)}
+        env.rotors = RotorSet(env.model, specs)
+        return env
+
+    def place(env, depth_of_first):
+        d, m = env.data, env.model
+        d.qpos[3:7] = [math.cos(0.2), math.sin(0.2), 0.0, 0.0]       # rolled 23 deg
+        mujoco.mj_forward(m, d)
+        z = d.xipos[env.rotors.body, 2]
+        d.qpos[2] += -depth_of_first - z[0]
+        d.qvel[:] = rng.normal(0.0, 2.0, m.nv)
+        for j, k in enumerate(env.rotors.dof):
+            d.qvel[k] = (0.0, -450.0, 700.0, 300.0)[j % 4] * (1.0 + 0.1 * rng.random())
+        mujoco.mj_forward(m, d)
+        d.xfrc_applied[:] = rng.normal(0.0, 1.0, d.xfrc_applied.shape)
+        d.qfrc_applied[:] = rng.normal(0.0, 1.0, m.nv)
+
+    def state(env):
+        return (env.data.xfrc_applied.copy(), env.data.qfrc_applied.copy(),
+                env.model.dof_damping.copy())
+
+    def restore(env, s):
+        env.data.xfrc_applied[:], env.data.qfrc_applied[:], env.model.dof_damping[:] = s
+
+    worst, cases, unequal, fracs = 0.0, 0, 0, []
+    for sea in (None, SeaState(amplitude=0.3, period=2.0, wavelength=5.0, direction=0.6)):
+        envs = [machine(sea, 0), machine(sea, 1)]
+        for depth in (0.004, -0.5, 0.3, 0.0):
+            for env in envs:
+                place(env, depth)
+            fracs += [float(f) for env in envs for f in env.medium.properties(
+                env.data.xipos[env.rotors.body], np.full(env.rotors.n, 0.01),
+                env.data.time)[2]]
+            before = [state(e) for e in envs]
+            ref = []
+            for e, s in zip(envs, before):
+                tot = e.rotors.apply_per_rotor(e.model, e.data, e.medium, e.data.time)
+                ref.append((*state(e), e.rotors.last_thrust.copy(),
+                            e.rotors.last_torque.copy(), np.array([tot])))
+                restore(e, s)
+            # One machine at a time (the single path), then both as one batch.
+            one = []
+            for e in envs:
+                tot = e.rotors.apply(e.model, e.data, e.medium, e.data.time)
+                one.append((*state(e), e.rotors.last_thrust.copy(),
+                            e.rotors.last_torque.copy(), np.array([tot])))
+            for e, s in zip(envs, before):
+                restore(e, s)
+            batch = RotorBatch([e.rotors for e in envs])
+            tots = batch.apply([(i, e.model, e.data, e.medium) for i, e in enumerate(envs)],
+                               envs[0].data.time)
+            both = [(*state(e), e.rotors.last_thrust.copy(), e.rotors.last_torque.copy(),
+                     np.array([tots[i]])) for i, e in enumerate(envs)]
+            for got in (one, both):
+                for g, r in zip(got, ref):
+                    cases += 1
+                    for a, b in zip(g, r):
+                        if not np.array_equal(a, b):
+                            unequal += 1
+                            worst = max(worst, float(np.nanmax(np.abs(a - b))))
+            for e, s in zip(envs, before):
+                restore(e, s)
+    fracs = np.array(fracs)
+    check("the fixture has rotors in air, in water and across the surface",
+          (fracs == 0).any() and (fracs == 1).any() and ((fracs > 0) & (fracs < 1)).any(),
+          f"submerged fractions {np.round(np.unique(fracs), 3).tolist()}")
+    check("every force, torque, damping, thrust and total is the loop's to the bit",
+          cases == 32 and unequal == 0,
+          f"{cases} cases, {unequal} arrays differ, worst difference {worst:.3g}")
+    check("and the rotors make force: the comparison is not of zeros",
+          np.abs(ref[0][3]).max() > 0.1 and np.abs(ref[0][4]).max() > 0.0,
+          f"thrusts {np.round(ref[0][3], 3).tolist()}")
+
+    # The tables themselves: `rotor_table` builds its grid through
+    # `bemt_many` (28x faster, 2026-10-03); the grid must be the scalar
+    # loop's, and `bemt_many` must be `bemt` off the grid too, windmilling
+    # and edgewise included.
+    from dytiscidae.physics.medium import AIR, SEAWATER
+    from dytiscidae.physics.rotor import _build_table, bemt, bemt_many
+    sp = RotorSpec(radius=0.09, pitch=0.11, blades=3)
+    same = all(np.array_equal(x, y) for fl in (AIR, SEAWATER)
+               for x, y in zip(_build_table(sp, fl.rho, fl.mu, scalar=True),
+                               _build_table(sp, fl.rho, fl.mu)))
+    om = rng.uniform(50.0, 1500.0, 40) * rng.choice([-1.0, 1.0], 40)
+    vax, vip = rng.normal(0.0, 6.0, 40), np.abs(rng.normal(0.0, 4.0, 40))
+    T, Q = bemt_many(sp, om, vax, vip, SEAWATER.rho, SEAWATER.mu)
+    one = [bemt(sp, o, a, b, SEAWATER.rho, SEAWATER.mu) for o, a, b in zip(om, vax, vip)]
+    check("the lookup tables, and bemt at 40 random points, are the scalar loop's to the bit",
+          same and np.array_equal(T, [x[0] for x in one]) and np.array_equal(Q, [x[1] for x in one]),
+          f"tables {same}, worst thrust difference "
+          f"{np.abs(T - np.array([x[0] for x in one])).max():.3g}")
+
+
+def test_the_clearance_of_a_batch_is_each_machines_own() -> None:
+    """AM, 2026-10-03: `clearance` was 18% of a shard's profile, read up to four
+    times a step on a state that had not moved.  It is now remembered per
+    state, and `clearance_many` fills the memo for a whole batch in one pass.
+    Both must return what `_clearance_now` computes, to the bit, and the memo
+    must never answer for a state it was not computed on."""
+    print("\nclearance: one pass for the batch, a memo per machine")
+    from dytiscidae.core.bodyplans import BODY_PLANS, REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+    from dytiscidae.physics.medium import SeaState
+
+    plans = [BODY_PLANS[k]() for k in ("beetle", "gannet", "teal", "ray")]
+    plans.append(REFERENCE_PLANS["quad"]())
+    unequal, n, seen = 0, 0, []
+    for sea in (None, SeaState(amplitude=0.3, period=2.0, wavelength=5.0)):
+        envs = [TriphibianEnv(build(p), seed=0, sea_state=sea) for p in plans]
+        for dom in (Domain.LAND, Domain.WATER, Domain.AIR):
+            for e in envs:
+                e.reset(dom)
+                e.scatter(np.random.default_rng(5))
+            for step in range(30):
+                for e in envs:
+                    e.step(e.cpg.command(e.cpg.base, e.data.time))
+                if step % 10:
+                    continue
+                for e in envs:
+                    e._clear_memo = None
+                TriphibianEnv.clearance_many(envs)
+                for e in envs:
+                    n += 1
+                    got, want = e.clearance(), e._clearance_now()
+                    seen.append(want)
+                    unequal += int(got != want or np.signbit(got) != np.signbit(want))
+    seen = np.array(seen)
+    check("the batch pass is each machine's own clearance to the bit, waves included",
+          unequal == 0 and n == 90, f"{n} reads, {unequal} differ")
+    check("and the fixture is on the ground, afloat and aloft",
+          (seen < 0.05).any() and (seen > 1.0).any(),
+          f"clearance {seen.min():.3f} to {seen.max():.3f} m")
+    # The memo must not survive a change of state at the same clock: a
+    # restore (identification) or a placement puts a machine back at a time
+    # it has already been at.
+    e = envs[0]
+    e._mj.mj_forward(e.model, e.data)        # the kinematics `restore` leaves
+    snap = e.snapshot()
+    before = e.clearance()
+    e.data.qpos[2] += 0.7
+    e._mj.mj_forward(e.model, e.data)
+    moved = e.clearance()
+    e.restore(snap)
+    check("a memo answers only for the state it was computed on",
+          abs(moved - before - 0.7) < 0.05 and e.clearance() == before,
+          f"{before:.3f} -> {moved:.3f} after lifting 0.7 m, back to {e.clearance():.3f}")
 
 
 def test_a_propeller_can_go_under_water() -> None:
@@ -3823,9 +4167,13 @@ def main() -> int:
         test_the_circulation_has_a_history,
         test_the_model_reproduces_the_robofly,
         test_a_drop_and_recovery_is_not_holding_height,
+        test_holding_height_is_flight_only_if_the_actuators_can,
         test_the_level_margin_measures_what_the_actuators_deliver,
+        test_a_transition_can_start_back_from_its_interface,
         test_the_rotor_table_is_the_rotor_model,
         test_the_search_can_build_rotorcraft,
+        test_the_rotor_batch_is_the_per_rotor_loop,
+        test_the_clearance_of_a_batch_is_each_machines_own,
         test_a_propeller_can_go_under_water,
         test_the_batched_power_budget_is_the_power_budget,
         test_each_phase_is_scored_on_its_own_purpose,

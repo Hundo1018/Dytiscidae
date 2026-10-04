@@ -90,6 +90,17 @@ class MissionSpec:
     #: Reference mass.  Not enforced; recorded so the archive can be read
     #: against the original 15 kg ambition.
     reference_mass: float = 15.0
+    #: How far back from its interface each transition probe starts, metres
+    #: (ROADMAP Y/O).  Empty is 0 for every kind: the probe starts at the
+    #: waterline, the shore or 2.5 m over the sea, as it always has.  Set by the
+    #: search's ``DistanceCurriculum`` as the population learns to cross; at its
+    #: limit a probe is the continuous mission.  See ``transitions._place_for``.
+    transition_back: dict = field(default_factory=dict)
+    #: The air segment's launch height, metres; ``None`` is ``SPAWN`` (30 m).
+    #: The same curriculum run the other way (item O): it steps *down* as the
+    #: population learns to hold height, so a score stops being paid for time
+    #: spent falling from a height nothing climbed to.
+    air_launch_height: float | None = None
 
     @property
     def total_seconds(self) -> float:
@@ -176,6 +187,10 @@ class MissionResult:
     feasible: bool = False
     structural_margin: float = 0.0
     segments: dict[str, SegmentResult] = field(default_factory=dict)
+    #: Tier-2 only: one leg in each medium the mission never reached, run for
+    #: the critic's labels.  Kept apart so nothing that scores ``segments`` --
+    #: the mission fraction, energy, ``fitness`` -- can see them.
+    probe_segments: dict[str, SegmentResult] = field(default_factory=dict)
     transition_ok: dict[str, bool] = field(default_factory=dict)
     #: The graded record of every crossing attempted.  ``transition_ok`` is kept
     #: as the boolean summary because the curator and the telemetry read it, but
@@ -300,6 +315,16 @@ GATED_AIR_CREDIT = 0.05
 #: long enough that a stroke's own heave (a few Hz) averages out, short enough
 #: that a tumble's fall does not.
 HEIGHT_WINDOW = 1.0
+
+#: The level-flight gate (ROADMAP AD): the air task's *flight* term -- holding
+#: height, as distinct from gliding down -- is paid only to a machine whose
+#: actuators can hold it level on the rig, ``level_margin >= LEVEL_GATE``.  Set
+#: by the user 2026-09-30 from arch44's gen-200 distribution (p50 0.006, p90
+#: 0.705, max 1.354): about one design in ten clears it, so it gates the part of
+#: the score that means flight and leaves the glide term to everyone -- gating
+#: all of air would put 90% of the population on the floor, the `moves` wall.
+#: A margin the rig could not measure does not clear it.
+LEVEL_GATE = 0.7
 
 
 def rotor_lift_ratio(p: Phenotype) -> float:
@@ -552,6 +577,10 @@ class TriphibianEnv:
     #: ``None`` means "whatever ``tasks.schedule_for`` gives by default", which
     #: is what probes and tests that call ``rollout`` directly get.
     task: "TaskSchedule | None" = None
+    #: ``MissionSpec.air_launch_height`` for this machine; ``None`` is ``SPAWN``.
+    #: Read by ``reset`` only -- the trim sweep and the level rig keep the
+    #: canonical pose, since they measure the airframe, not the episode.
+    air_launch_height: float | None = None
     #: The schedule in force while a segment is running, and the clock it runs
     #: on.  ``None`` outside a segment -- during a transition, or the continuous
     #: mission's own loop -- so the controller is told no task there, which is
@@ -722,6 +751,8 @@ class TriphibianEnv:
         self.task = None
         self._active_task = None
         x, y, z = self.SPAWN[domain]
+        if domain is Domain.AIR and self.air_launch_height is not None:
+            z = float(self.air_launch_height)
         if randomise:
             x += float(self.rng.normal(0, 0.4))
             y += float(self.rng.normal(0, 0.4))
@@ -1051,6 +1082,14 @@ class TriphibianEnv:
     #: enough for a 1.5 Hz gait's full cycle in the averaging window.
     RIG_SETTLE, RIG_AVERAGE = 0.5, 0.7
 
+    def flies_level(self) -> bool:
+        """Whether ``level_margin`` clears ``LEVEL_GATE`` (ROADMAP AD).
+
+        False when the rig could not measure it: absent is not a pass.
+        """
+        lm = self.level_margin()
+        return lm is not None and np.isfinite(lm) and float(lm) >= LEVEL_GATE
+
     def level_margin(self):
         """Can this machine hold height *and* speed, with its own actuators?
 
@@ -1321,6 +1360,25 @@ class TriphibianEnv:
                 return True
         return False
 
+    def held_still_params(self) -> CPGParams:
+        """The base gait with every actuator held still: the still machine of
+        CLAUDE.md's lesson.
+
+        Stroke amplitude zero, phase and offset kept -- and every rotor
+        stopped.  A rotor's channel is a *speed* held at its offset (the
+        throttle), not an angle, so zeroing amplitude alone left it spinning:
+        the 2026-10-04 still arm of ``experiments/transition_distance`` did
+        that, and its two ``water_to_air`` "still" crossers (elites 129 and 137,
+        6 and 16 rotors) were rotor-driven.
+        """
+        b = self.cpg.base
+        off = np.asarray(b.offset, float).copy()
+        for k, name in enumerate(self.act_names):
+            if name.endswith("_r"):
+                off[k] = float(self.cpg.lo[k])
+        return CPGParams(amplitude=np.zeros(self.cpg.n), phase=np.asarray(b.phase, float),
+                         offset=off, frequency=float(b.frequency))
+
     def root_pos(self) -> np.ndarray:
         return self.data.xpos[self.root_body].copy()
 
@@ -1378,7 +1436,70 @@ class TriphibianEnv:
         beach = np.where((xs >= lo) & (xs <= hi), beach, -np.inf)
         return np.maximum(surface, beach)
 
+    def _clearance_key(self) -> tuple:
+        """Everything `clearance` reads that changes: the clock (waves), and
+        the geoms' and the root's world pose, as bytes, so equality is exact."""
+        d = self.data
+        return (d.time, d.geom_xpos.tobytes(), d.geom_xmat.tobytes(),
+                d.xpos[self.root_body].tobytes())
+
     def clearance(self) -> float:
+        """`_clearance_now`, remembered for the state it was computed on.
+
+        A batched step reads it up to four times per machine (the segment's
+        record, the crossing tracker twice, the transition's peak) on a state
+        that has not moved, at ~60 us a read: 18% of a shard's profile
+        (2026-10-03, AM).  The memo is keyed on every input that changes, so a
+        hit returns the bits a fresh computation would.  `clearance_many`
+        fills it for a whole batch at once.
+        """
+        key = self._clearance_key()
+        memo = getattr(self, "_clear_memo", None)
+        if memo is not None and memo[0] == key:
+            return memo[1]
+        v = self._clearance_now()
+        self._clear_memo = (key, v)
+        return v
+
+    @staticmethod
+    def clearance_many(envs, active=None) -> None:
+        """Fill the `clearance` memo of every (active) machine in one array
+        pass: the per-geom arithmetic of `_clearance_now` on all machines'
+        geoms concatenated, and each machine's minimum over its own slice.
+        Elementwise the same operations, so the same bits
+        (`tests/test_search.py`).  A machine the pass cannot take -- no
+        colliding geoms, waves (whose surface is a dot product whose kernel
+        depends on how many rows it gets), or a clock out of step with the
+        rest -- is computed alone, as before."""
+        batch, solo = [], []
+        for i, e in enumerate(envs):
+            if active is not None and not active[i]:
+                continue
+            ok = (e._machine_geoms.size > 0 and e.medium.sea_state.amplitude <= 0.0
+                  and (not batch or e.data.time == batch[0].data.time))
+            (batch if ok else solo).append(e)
+        for e in solo:
+            e.clearance()
+        if len(batch) < 2:
+            for e in batch:
+                e.clearance()
+            return
+        gs = [e._machine_geoms for e in batch]
+        aabb = np.concatenate([e.model.geom_aabb.reshape(-1, 6)[g] for e, g in zip(batch, gs)])
+        R = np.concatenate([e.data.geom_xmat[g] for e, g in zip(batch, gs)]).reshape(-1, 3, 3)
+        xp = np.concatenate([e.data.geom_xpos[g] for e, g in zip(batch, gs)])
+        centre_local, half = aabb[:, :3], aabb[:, 3:]
+        centre_z = xp[:, 2] + np.einsum("nij,nj->ni", R, centre_local)[:, 2]
+        drop = np.einsum("nj,nj->n", np.abs(R[:, 2, :]), half)
+        bottom = centre_z - drop
+        ground = batch[0].ground_heights(xp[:, 0])
+        diff = bottom - ground
+        at = 0
+        for e, g in zip(batch, gs):
+            e._clear_memo = (e._clearance_key(), float(np.min(diff[at:at + g.size])))
+            at += g.size
+
+    def _clearance_now(self) -> float:
         """Height of the machine above the ground beneath it, metres.
 
         This exists because ``depth`` measures against the waterline, and the
@@ -1892,6 +2013,12 @@ class TriphibianEnv:
                                 drops = (seg_clr[:-win] - seg_clr[win:]) / (win * dt)
                                 sink = max(sink, float(drops.max()))
                             flight = float(np.clip(1.0 - sink / 1.5, 0.0, 1.0))
+                            # A trajectory that holds height is flight only
+                            # when the actuators could have held it (AD); a
+                            # glider launched level at trim sinks slowly for
+                            # a few seconds on its airframe alone.
+                            if not self.flies_level():
+                                flight = 0.0
                             glide = float(np.clip(1.0 - sink / SINK_BALLISTIC, 0.0, 1.0))
                             vert = ((0.55 * flight + 0.25 * glide) / 0.80
                                     * stay / max(hi - lo, 1))

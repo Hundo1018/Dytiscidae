@@ -269,17 +269,17 @@ MUTATIONS: tuple = (
         replace="        pass  # phase and rest left where the parent had them",
         defect="mut_gait degrades to an amplitude-and-frequency move, so two of "
                "the four coordinates the thrust sweep needed never move",
-        suites=("test_search",), item="arch39 S jointness"),
+        suites=("test_search::test_the_gait_operator_moves_every_coordinate_at_once",), item="arch39 S jointness"),
     Mutation(
         id="gait-touches-one-part",
         path="dytiscidae/core/genome.py",
-        find="    g.flap_frequency = float(rng.uniform(1.5, 8.0))\n"
+        find="    g.flap_frequency = float(rng.uniform(1.5, 12.0))\n"
              "    for part in movable:",
-        replace="    g.flap_frequency = float(rng.uniform(1.5, 8.0))\n"
+        replace="    g.flap_frequency = float(rng.uniform(1.5, 12.0))\n"
                 "    for part in movable[:1]:",
         defect="mut_gait resamples one part rather than the actuated set, which "
                "is what mut_stroke already did",
-        suites=("test_search",), item="arch39 S jointness"),
+        suites=("test_search::test_the_gait_operator_moves_every_coordinate_at_once",), item="arch39 S jointness"),
 
     Mutation(
         id="continuous-mission-ignores-auto-reset",
@@ -292,7 +292,7 @@ MUTATIONS: tuple = (
         defect="a MuJoCo auto-reset teleports the machine mid-mission and the "
                "mission carries on across the jump (measured: survived=True, "
                "1500 of 1500 steps after a reset at step 400)",
-        suites=("test_search",), item="QACC auto-reset"),
+        suites=("test_search::test_a_mujoco_auto_reset_ends_the_continuous_mission",), item="QACC auto-reset"),
 
     Mutation(
         id="island-best-reads-the-best-domain",
@@ -303,7 +303,39 @@ MUTATIONS: tuple = (
                 "@dataclass(eq=False)",
         defect="an island's best is judged on its strongest own domain, so a "
                "one-medium specialist wins a pairing island",
-        suites=("test_search",), item="per-island best"),
+        suites=("test_search::test_an_islands_best_is_judged_on_its_own_domains",), item="per-island best"),
+
+    Mutation(
+        id="triphibian-island-pays-the-best-medium",
+        path="dytiscidae/evolution/islands.py",
+        find="    inv = sum(1.0 / (max(float(v), 0.0) + e) for v in vals)\n"
+             "    return float(3.0 / inv - e)",
+        replace="    return float(max(vals))",
+        defect="the triphibian island pays the best medium, so a one-medium "
+               "specialist (arch45's fitness-1.0 design: air 0, water 0.337, "
+               "land 0.003) outranks a machine that does all three",
+        suites=("test_search::test_the_triphibian_island_pays_the_weakest_medium",),
+        item="triphibian island"),
+
+    Mutation(
+        id="triphibian-ladder-reads-the-best-medium",
+        path="dytiscidae/evolution/curriculum.py",
+        find="    if stage <= 0:\n        return c2",
+        replace="    if stage <= 0:\n        return c1",
+        defect="the triphibian island's stage 0 reads the best medium, so 75% of "
+               "its selection (the curriculum half at stage 0) pays a specialist",
+        suites=("test_search::test_the_triphibian_island_pays_the_weakest_medium",),
+        item="triphibian island"),
+
+    Mutation(
+        id="triphibian-curriculum-is-the-shared-ladder",
+        path="dytiscidae/evolution/islands.py",
+        find='                      weakest=spec.get("objective") == "weakest")',
+        replace="                      weakest=False)",
+        defect="the triphibian island is built with the shared ladder, whose "
+               "stages 0-3 pay the best one or two media",
+        suites=("test_search::test_the_triphibian_island_pays_the_weakest_medium",),
+        item="triphibian island"),
 
     Mutation(
         id="island-archive-read-through-the-merge",
@@ -312,7 +344,7 @@ MUTATIONS: tuple = (
         replace="    if False:\n        if island not in names:",
         defect="one island's archive is read through the cross-island merge, so "
                "an elite that lost its cell to another island is never filmed",
-        suites=("test_search",), item="per-island best"),
+        suites=("test_search::test_one_islands_archive_is_read_alone_not_through_the_merge",), item="per-island best"),
 
     Mutation(
         id="curriculum-reads-every-medium",
@@ -321,7 +353,7 @@ MUTATIONS: tuple = (
         replace="    if False:\n        segs = {d: s for d, s in segs.items() if d in domains}",
         defect="a specialist island's curriculum pays for another medium again, "
                "so the air and land islands fill with water machines",
-        suites=("test_search",), item="island purity"),
+        suites=("test_search::test_a_specialist_islands_curriculum_reads_only_its_own_medium",), item="island purity"),
 
     Mutation(
         id="bandit-without-an-exploration-floor",
@@ -330,7 +362,7 @@ MUTATIONS: tuple = (
         replace="                 epsilon: float = 0.0) -> None:",
         defect="the tilted argmax alone decides every slot, so a non-structural "
                "operator with a good mean can go unpicked for 80 generations",
-        suites=("test_search",), item="operator dormancy"),
+        suites=("test_search::test_no_operator_can_go_dormant_under_the_structural_tilt",), item="operator dormancy"),
 
     Mutation(
         id="checkpoint-asks-git-at-every-write",
@@ -339,7 +371,7 @@ MUTATIONS: tuple = (
         replace="",
         defect="each checkpoint names whatever HEAD is when it is written, not "
                "the code the process is running",
-        suites=("test_search",), item="provenance"),
+        suites=("test_search::test_a_checkpoint_names_the_commit_the_process_started_from",), item="provenance"),
 
     Mutation(
         id="stale-kernel-used-anyway",
@@ -348,7 +380,7 @@ MUTATIONS: tuple = (
         replace="",
         defect="a GPU kernel older than its source is used to score anyway, so "
                "the search and every verification run different physics",
-        suites=("test_search",), item="kernel freshness"),
+        suites=("test_search::test_a_kernel_older_than_its_source_is_not_usable",), item="kernel freshness"),
 
     # --- the task: each phase scored on its own purpose (2026-09-21) --------
     Mutation(
@@ -507,7 +539,7 @@ MUTATIONS: tuple = (
         defect="the batched path asks every machine the default task while the "
                "single path asks the drawn one, so the search scores one experiment "
                "and every verification runs another",
-        suites=("test_search",), item="path agreement"),
+        suites=("test_search::test_the_two_evaluation_paths_score_the_same_machine_the_same",), item="path agreement"),
 
     # --- the film is the evaluation (2026-09-21) --------------------------
     Mutation(
@@ -518,7 +550,141 @@ MUTATIONS: tuple = (
         defect="the actor pool ships the shared policy to its workers only with a "
                "rollout buffer, so every re-score and refinement trial -- the "
                "numbers the archive keeps -- is scored without it",
-        suites=("test_search",), item="film = evaluation"),
+        suites=("test_search::test_sharding_a_generation_does_not_change_a_score",), item="film = evaluation"),
+    Mutation(
+        id="level-gate-removed-from-the-task",
+        path="dytiscidae/envs/triphibian.py",
+        find="                            if not self.flies_level():\n"
+             "                                flight = 0.0\n",
+        replace="",
+        defect="the air task pays holding height to any airframe that glides "
+               "level for a few seconds, whatever its actuators deliver (AD)",
+        suites=("test_physics::test_holding_height_is_flight_only_if_the_actuators_can",),
+        item="AD level gate"),
+    Mutation(
+        id="level-gate-removed-from-the-ladder",
+        path="dytiscidae/evolution/judge.py",
+        find='        ("flies_level", "level_margin", 0.7),\n',
+        replace="",
+        defect="the flight rungs read trajectories only, so a glider launched at "
+               "trim climbs them on its airframe (AD)",
+        suites=("test_physics::test_holding_height_is_flight_only_if_the_actuators_can",),
+        item="AD level gate"),
+    Mutation(
+        id="single-path-crossing-unscattered",
+        path="dytiscidae/envs/transitions.py",
+        find="    env.scatter(np.random.default_rng(transition_scatter_seed(kind)))\n",
+        replace="",
+        defect="Tier-2, films and probes start every crossing from the bare "
+               "placement while the search scored a scattered one",
+        suites=("test_search::test_the_two_evaluation_paths_score_the_same_machine_the_same",),
+        item="path agreement"),
+    Mutation(
+        id="batched-entrainment-unreacted",
+        path="dytiscidae/envs/batchroll.py",
+        find="                if sol_i._prev_mbody is not None:\n"
+             "                    entrainment_reaction(",
+        replace="                if False:\n"
+                "                    entrainment_reaction(",
+        defect="the search's path lets entrained water create momentum while "
+               "verification reacts it, so the two score different swimmers (AK)",
+        suites=("test_search::test_the_two_evaluation_paths_score_the_same_machine_the_same",),
+        item="path agreement"),
+    Mutation(
+        id="batched-transition-ignores-its-start",
+        path="dytiscidae/envs/batchroll.py",
+        find="                                   back=float((spec.transition_back or {}).get(kind, 0.0)))",
+        replace="                                   back=0.0)",
+        defect="the path the search scores with starts every probe at the "
+               "interface while verification starts it where the curriculum "
+               "says, so the two score different crossings (Y/O)",
+        suites=("test_search::test_the_distance_curriculum_steps_back_only_on_evidence",),
+        item="Y/O distance"),
+    Mutation(
+        id="distance-counts-other-distances",
+        path="dytiscidae/evolution/curriculum.py",
+        find="            if kind in self.kinds and abs(float(getattr(tr, \"start_back\", 0.0))\n"
+             "                                          - self.back.get(kind, 0.0)) < 1e-9:",
+        replace="            if kind in self.kinds:",
+        defect="crossings made from an easier start count as evidence for the "
+               "harder one, so the start runs away from what anyone can cross (Y/O)",
+        suites=("test_search::test_the_distance_curriculum_steps_back_only_on_evidence",),
+        item="Y/O distance"),
+    Mutation(
+        id="funnel-refines-everyone",
+        path="dytiscidae/evolution/loop.py",
+        find="            if w is None or w.size == 0 or (chosen is not None and not chosen[i]):",
+        replace="            if w is None or w.size == 0:",
+        defect="the refinement funnel is recorded and ignored: every candidate "
+               "still enters every step's batch, so it saves nothing (AK)",
+        suites=("test_search::test_the_refinement_funnel_refines_only_what_it_selects",),
+        item="AK funnel"),
+    Mutation(
+        id="exploration-noise-per-shard",
+        path="dytiscidae/envs/batchroll.py",
+        find="        if shared is None or buffer is None:\n            return None\n",
+        replace="        return None\n",
+        defect="the learning rollout draws its noise from torch's stream seeded "
+               "per shard, so a machine explores differently in another shard "
+               "and the pool's shape changes what the learner sees (AJ)",
+        suites=("test_search::test_sharding_a_generation_does_not_change_a_score",),
+        item="AJ reproducibility"),
+    Mutation(
+        id="balance-reads-dof-not-rotors",
+        path="dytiscidae/envs/actors.py",
+        find="    return 18.0 + 1.7 * rotors\n",
+        replace="    return 35.0 + 0.9 * float(getattr(pheno, \"n_actuated\", 0))\n",
+        defect="the balanced queue predicts a machine's cost from DOF, which "
+               "explains 7-19% of evaluation wall where rotors explain 25-42%, "
+               "so a heavy shard can go last (AJ, 2026-10-03)",
+        suites=("test_search::test_the_pool_queues_and_balances_by_rotors",),
+        item="AJ cost model"),
+    Mutation(
+        id="queue-results-in-shard-order",
+        path="dytiscidae/envs/actors.py",
+        find="            for i, r in zip(idx, res):\n                results[i] = r\n",
+        replace="            for i, r in zip(sorted(range(n))[len([x for x in results if x is not None]):], res):\n"
+                "                results[i] = r\n",
+        defect="results come back in shard order rather than to the machines "
+               "that earned them once shards are not contiguous (AJ)",
+        suites=("test_search::test_sharding_a_generation_does_not_change_a_score",),
+        item="AJ queue"),
+    Mutation(
+        id="pool-map-out-of-order",
+        path="dytiscidae/envs/actors.py",
+        find="            return [f.result() for f in futures]\n        except Exception as exc:",
+        replace="            return [f.result() for f in reversed(futures)]\n        except Exception as exc:",
+        defect="a round's Tier-2 results come back to the wrong elites once they "
+               "run on the workers (AL)",
+        suites=("test_search::test_sharding_a_generation_does_not_change_a_score",),
+        item="AL promotion"),
+    Mutation(
+        id="promotion-re-identifies",
+        path="dytiscidae/evolution/loop.py",
+        find='        bases = MobilityBasis.bases_from_record(elite.meta.get("mobility_basis"))',
+        replace="        bases = {}",
+        defect="a promotion re-identifies the elite at a fresh seed and hands "
+               "Tier-2 a basis its Tier-1 score was not earned with (AL)",
+        suites=("test_search::test_promotion_spends_refinement_and_keeps_what_it_buys",),
+        item="AL promotion"),
+    Mutation(
+        id="identify-one-means-identify-all",
+        path="dytiscidae/envs/batchroll.py",
+        find="        wanted = [i for i in live if identify_axes[i]]",
+        replace="        wanted = list(live) if any(identify_axes) else []",
+        defect="one candidate due for identification identifies the whole batch, so "
+               "identify_axes_every > 1 does not do what its name says (AN)",
+        suites=("test_search::test_sharding_a_generation_does_not_change_a_score",),
+        item="AN identify cadence"),
+    Mutation(
+        id="identify-list-not-sliced-per-shard",
+        path="dytiscidae/envs/actors.py",
+        find='                kw["identify_axes"] = [kwargs["identify_axes"][i] for i in idx]',
+        replace='                kw["identify_axes"] = list(kwargs["identify_axes"])',
+        defect="every shard receives the whole batch's identify list, so shard j "
+               "identifies by shard 0's wishes (AN)",
+        suites=("test_search::test_sharding_a_generation_does_not_change_a_score",),
+        item="AN identify cadence"),
     Mutation(
         id="trim-probes-the-live-state",
         path="dytiscidae/envs/triphibian.py",
@@ -543,7 +709,7 @@ MUTATIONS: tuple = (
         replace="    seed = 0",
         defect="the film re-runs the evaluation from a different initial condition "
                "and stamps it with the recorded score anyway",
-        suites=("test_search",), item="film = evaluation"),
+        suites=("test_search::test_a_film_reproduces_the_scored_experiment",), item="film = evaluation"),
 
     Mutation(
         id="reversal-counts-agreement",
@@ -569,7 +735,7 @@ MUTATIONS: tuple = (
         replace="            if False:",
         defect="the refit gate is configured and never keeps the axes, so every "
                "refit re-bins and merges the archive as before",
-        suites=("test_search",), item="P refit"),
+        suites=("test_search::test_a_refit_that_changes_nothing_can_be_skipped",), item="P refit"),
 
     Mutation(
         id="batched-fluid-diagnostics-stay-default",
@@ -578,7 +744,7 @@ MUTATIONS: tuple = (
         replace="                pass",
         defect="the batched path leaves diag.mean_submerged at 0.0, so the "
                "policy the search scores is told it is dry however deep it is",
-        suites=("test_search",), item="path agreement"),
+        suites=("test_search::test_the_batched_path_tells_the_policy_it_is_wet",), item="path agreement"),
 
     Mutation(
         id="stage-one-reads-gross-measurements",
@@ -588,7 +754,7 @@ MUTATIONS: tuple = (
                 '        for dom, key in (("water", "cruise_progress"),',
         defect="the curriculum's directed stage pays for gliding from the 30 m "
                "launch again, which a machine with its actuators off also does",
-        suites=("test_search",), item="sinking is not a capability"),
+        suites=("test_search::test_a_specialist_islands_curriculum_reads_only_its_own_medium",), item="sinking is not a capability"),
 
     # --- why nothing flew, 2026-09-23 -------------------------------------
     Mutation(
@@ -699,8 +865,8 @@ MUTATIONS: tuple = (
     Mutation(
         id='propellers-one-handed',
         path='dytiscidae/physics/rotor.py',
-        find='            thrust_dir = self.spec[k].handed * sgn * ax',
-        replace='            thrust_dir = sgn * ax',
+        find='        td = (self.handed[rows] * sgn)[:, None] * ax\n',
+        replace='        td = sgn[:, None] * ax\n',
         defect='a mirrored propeller is the same hand: half the rotors push down',
         suites=('test_physics',), item='rotor'),
     Mutation(
@@ -725,6 +891,35 @@ MUTATIONS: tuple = (
         defect="curriculum stage 1 pays the launch's coast after the machine is in the sea",
         suites=('test_physics',), item='AE'),
 
+    # --- the rotor lookup, vectorised, 2026-10-03 ----------------------------
+    Mutation(
+        id='rotor-batch-one-table',
+        path='dytiscidae/physics/rotor.py',
+        find='    r = np.arange(len(om)) if rows is None else rows\n',
+        replace='    r = (np.arange(len(om)) if rows is None else rows)[:1].repeat(len(om))\n',
+        defect="every rotor of a batch is looked up in the first rotor's table",
+        suites=('test_physics::test_the_rotor_batch_is_the_per_rotor_loop',), item='perf'),
+    Mutation(
+        id='rotor-table-one-sum',
+        path='dytiscidae/physics/rotor.py',
+        find='    T = np.array([np.sum(row) for row in dT * dr])\n',
+        replace='    T = np.full(len(om), np.sum(dT * dr) / len(om))\n',
+        defect="the vectorised table build averages thrust over the grid instead of per point",
+        suites=('test_physics::test_the_rotor_batch_is_the_per_rotor_loop',), item='perf'),
+    Mutation(
+        id='clearance-batch-first-slice',
+        path='dytiscidae/envs/triphibian.py',
+        find='            e._clear_memo = (e._clearance_key(), float(np.min(diff[at:at + g.size])))\n',
+        replace='            e._clear_memo = (e._clearance_key(), float(np.min(diff[:g.size])))\n',
+        defect="every machine in a batch is given the first machine's clearance",
+        suites=('test_physics::test_the_clearance_of_a_batch_is_each_machines_own',), item='AM'),
+    Mutation(
+        id='clearance-memo-keyed-on-time',
+        path='dytiscidae/envs/triphibian.py',
+        find='        return (d.time, d.geom_xpos.tobytes(), d.geom_xmat.tobytes(),\n                d.xpos[self.root_body].tobytes())\n',
+        replace='        return (d.time,)\n',
+        defect="the clearance memo answers for a restored or re-placed state at the same clock",
+        suites=('test_physics::test_the_clearance_of_a_batch_is_each_machines_own',), item='AM'),
     # --- the host-side speed-up, 2026-09-27 ----------------------------------
     Mutation(
         id='batched-power-one-sum',
@@ -739,7 +934,7 @@ MUTATIONS: tuple = (
         find='                for i, e in enumerate(envs):\n                    acc[i] += e.body_twist()\n',
         replace='                for i, e in enumerate(envs):\n                    e._mj.mj_forward(e.model, e.data)\n                    acc[i] += e.body_twist()\n',
         defect='a caller refreshes the kinematics between steps, after the early launch read them',
-        suites=('test_search',), item='perf'),
+        suites=('test_search::test_the_early_fluid_launch_changes_nothing',), item='perf'),
     # --- arch43's pool, 2026-09-26 --------------------------------------------
     Mutation(
         id='nan-observation-reaches-policy',
@@ -747,7 +942,7 @@ MUTATIONS: tuple = (
         find='    return bool(np.all(np.isfinite(obs)))\n',
         replace='    return True\n',
         defect='a NaN observation reaches the shared policy and raises out of the batch',
-        suites=('test_search',), item='arch43'),
+        suites=('test_search::test_a_nan_observation_fails_the_rollout_not_the_batch',), item='arch43'),
     # --- AG and AI, 2026-09-26 ---------------------------------------------
     Mutation(
         id='level-rig-spends-battery',
@@ -774,10 +969,32 @@ MUTATIONS: tuple = (
     Mutation(
         id="rotor-thrust-at-start-of-step",
         path="dytiscidae/physics/rotor.py",
-        find="            omega_e = self._end_of_step(model, data, k, omega, Q0)",
-        replace="            omega_e = omega",
+        find="            omega_e = np.where((w_ < 1e-6) | (c < 1e-12), omega, sgn * w2)\n",
+        replace="            omega_e = omega\n",
         defect="rotor thrust is taken at the start-of-step spin, and a propeller entering water is fired out of it",
         suites=("test_physics",), item="rotor in water"),
+    Mutation(
+        id="entrainment-not-reacted",
+        path="dytiscidae/physics/fluid.py",
+        find="            if self._prev_mbody is not None:\n"
+             "                entrainment_reaction(",
+        replace="            if False:\n"
+                "                entrainment_reaction(",
+        defect="added mass grows in the mass matrix with no -dm/dt v reaction, so "
+               "every step of entrainment creates dm v of momentum: the ray "
+               "accelerates to 21.9 m/s after entering at 8 (AK)",
+        suites=("test_physics::test_entry_shock_is_hydrodynamic_not_a_speed_limit",),
+        item="AK water entry"),
+    Mutation(
+        id="damping-stale-at-the-surface",
+        path="dytiscidae/physics/fluid.py",
+        find="        return self._stale or self._count % self.REFRESH_EVERY == 0",
+        replace="        return self._count % self.REFRESH_EVERY == 0",
+        defect="the implicit damping is refreshed on its 4-step cadence only, so "
+               "first contact with water can run three steps of water loads "
+               "against a B formed in air: a strut joint thrown to 100 rad/s (AK)",
+        suites=("test_physics::test_entry_shock_is_hydrodynamic_not_a_speed_limit",),
+        item="AK water entry"),
 
     Mutation(
         id="steps-not-counted",
@@ -809,13 +1026,15 @@ MUTATIONS: tuple = (
         find="            results, first = both[:k], (first[0], first[1], both[k:])\n",
         replace="            results, first = both[k:], (first[0], first[1], both[:k])\n",
         defect="the merged batch hands the trials' scores to the re-score and back",
-        suites=("test_search",), item="merged re-score"),
+        suites=("test_search::test_merging_the_rescore_with_the_first_refinement_changes_nothing",),
+        item="merged re-score"),
 
     Mutation(
         id="mean-not-padded",
         path="dytiscidae/learning/ppo.py",
-        find="MEAN_MIN_ROWS = 4\n",
-        replace="MEAN_MIN_ROWS = 1\n",
+        find="                blocks = [obs[j:j + MEAN_MIN_ROWS]\n"
+             "                          for j in range(0, obs.shape[0], MEAN_MIN_ROWS)]\n",
+        replace="                blocks = [obs]\n",
         defect="a row's action on the mean depends on how many rows share its batch",
         suites=("test_ppo",), item="merged re-score"),
 
@@ -836,6 +1055,255 @@ MUTATIONS: tuple = (
         replace="             \"is in `CLAUDE.md`.\", \"\", \"drifted\"]",
         defect="the committed index stops matching what the source generates",
         suites=("test_index",), item="A/J index gate"),
+    # --- the critic's label and calibration (2026-10-03) ------------------
+    # --- crossings (ARCH46_SPEC §8, 2026-10-03) ------------------------------
+    Mutation(
+        id="crossing-hold-gate-off",
+        path="dytiscidae/envs/transitions.py",
+        find="        r.crossed = cross >= 0 and not r.failure and r.hold >= HOLD_PASS",
+        replace="        r.crossed = cross >= 0 and not r.failure",
+        defect="a crossing made before the command counts: a falling body crosses air_to_water",
+        suites=("test_search::test_a_crossing_is_commanded_and_a_still_machine_makes_none",),
+        item="ARCH46 8"),
+    Mutation(
+        id="crossing-passes-through-and-counts",
+        path="dytiscidae/envs/transitions.py",
+        find="        elif cross >= 0 and (medium_of(env) is not self.target",
+        replace="        elif False and (medium_of(env) is not self.target",
+        defect="reaching the target and leaving it again counts as a crossing",
+        suites=("test_search::test_a_crossing_is_commanded_and_a_still_machine_makes_none",),
+        item="ARCH46 8"),
+    Mutation(
+        id="crossing-told-to-go-from-the-start",
+        path="dytiscidae/envs/transitions.py",
+        find="        return self.start if i < self.hold_steps else self.target",
+        replace="        return self.target",
+        defect="the controller observes the target during the hold, so it is never told to stay",
+        suites=("test_search::test_a_crossing_is_commanded_and_a_still_machine_makes_none",),
+        item="ARCH46 8"),
+    Mutation(
+        id="crossing-aloft-means-no-contact",
+        path="dytiscidae/envs/transitions.py",
+        find="            aloft = float(np.clip(r.aloft_fraction, 0.0, 1.0))",
+        replace="            aloft = float(np.clip(r.airborne_fraction, 0.0, 1.0))",
+        defect="a body floating in water has no contacts and earns 0.300 of water_to_air",
+        suites=("test_search::test_a_crossing_is_commanded_and_a_still_machine_makes_none",),
+        item="ARCH46 8"),
+    Mutation(
+        id="crossing-height-counts-the-placement",
+        path="dytiscidae/envs/transitions.py",
+        find="            height = float(np.clip(r.go_peak_clearance / 0.5, 0.0, 1.0))",
+        replace="            height = float(np.clip(r.peak_clearance / 0.5, 0.0, 1.0))",
+        defect="the placement gap counts as height, paying a sitting machine a takeoff",
+        suites=("test_search::test_an_attempted_takeoff_outscores_never_leaving_the_ground",),
+        item="ARCH46 8"),
+    Mutation(
+        id="crossing-scatter-not-reseated",
+        path="dytiscidae/envs/transitions.py",
+        find="    reseat_after_scatter(env, kind)\n    r.survivable_entry_speed",
+        replace="    r.survivable_entry_speed",
+        defect="scatter poses the joints after placement and drops a land start from 0.5 m",
+        suites=("test_search::test_an_attempted_takeoff_outscores_never_leaving_the_ground",),
+        item="ARCH46 8"),
+    Mutation(
+        id="water_to_land-starts-dry",
+        path="dytiscidae/envs/transitions.py",
+        find="        env.data.qpos[2] = -WATER_START_DEPTH\n",
+        replace="        env.data.qpos[2] = env._clear_of_terrain(8.0 - back, 0.0, 0.0, gap=0.02)\n",
+        defect="the old placement: the machine starts dry on the ramp and is credited for settling in",
+        suites=("test_search::test_a_crossing_is_commanded_and_a_still_machine_makes_none",),
+        item="ARCH46 8"),
+    # --- the ninth instance: still crossings left after 10-03 (2026-10-04) ---
+    Mutation(
+        id="crossing-air-hold-reads-height-only",
+        path="dytiscidae/envs/transitions.py",
+        find="            loss = max(self.z0 - self.z_min, e_loss)\n",
+        replace="            loss = self.z0 - self.z_min\n",
+        defect="a glider coasting on its launch speed holds height for 1.5 s and then "
+               "glides in: arch46's still gliders cross air_to_water again",
+        suites=("test_search::test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing",),
+        item="ARCH46 8"),
+    Mutation(
+        id="crossing-land-is-any-ground-contact",
+        path="dytiscidae/envs/transitions.py",
+        find="    if medium_of(env) is not Domain.LAND:\n        return False\n",
+        replace="    if medium_of(env) is Domain.LAND:\n        return True\n",
+        defect="a float whose root rides above the waterline while its hull rests on the "
+               "submerged ramp is on land: arch46's still floats cross water_to_land",
+        suites=("test_search::test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing",),
+        item="ARCH46 8"),
+    Mutation(
+        id="crossing-shore-progress-counts-the-hold",
+        path="dytiscidae/envs/transitions.py",
+        find="                (float(env.root_pos()[0]) - self.x_go) / (SHORE_X - self.x0), 0.0, 1.0))",
+        replace="                (float(env.root_pos()[0]) - self.x0) / (SHORE_X - self.x0), 0.0, 1.0))",
+        defect="drift during the hold is paid as going: a still amphibian capsizing "
+               "shoreward earns 0.136 of a graded water_to_land",
+        suites=("test_search::test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing",),
+        item="ARCH46 8"),
+    Mutation(
+        id="crossing-aborted-probe-keeps-its-hold",
+        path="dytiscidae/envs/transitions.py",
+        find="        r.hold = 0.0 if aborted else self.hold_score()\n",
+        replace="        r.hold = self.hold_score()\n",
+        defect="a probe that blew up or went flat keeps its hold, so its graded approach "
+               "pays the jump: 0.54 to arch46 elite 82 held still",
+        suites=("test_search::test_a_crossing_is_commanded_and_a_still_machine_makes_none",),
+        item="ARCH46 8"),
+    Mutation(
+        id="still-machine-leaves-rotors-spinning",
+        path="dytiscidae/envs/triphibian.py",
+        find="                off[k] = float(self.cpg.lo[k])\n",
+        replace="                pass\n",
+        defect="the still machine keeps its rotors at their throttle (the 2026-10-04 "
+               "still arm): two water_to_air 'still' crossers were rotor-driven",
+        suites=("test_search::test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing",),
+        item="ARCH46 8"),
+    Mutation(
+        id="refit-trigger-reads-a-stale-alias",
+        path="dytiscidae/evolution/loop.py",
+        find="    start_gen = load_state(state) if getattr(cfg, \"resume\", False) else 0",
+        replace="    _stale = state.descriptors\n"
+                "    start_gen = load_state(state) if getattr(cfg, \"resume\", False) else 0\n"
+                "    if _stale is not None: state.descriptors = _stale",
+        defect="the arch24 resume bug: the refit trigger reads descriptors captured "
+               "before load_state replaced them, so a resumed run never refits",
+        suites=("test_search::test_learned_axes_survive_resume",),
+        item="arch24 resume"),
+    Mutation(
+        id="tier1_5-ignores-the-floor",
+        path="dytiscidae/envs/evaluate.py",
+        find="    dom = domain or weakest_domain(competences or {}, floor=LEG_COMPETENCE_BAR)",
+        replace="    dom = domain or weakest_domain(competences or {})",
+        defect="Tier-1.5 runs a medium the design scored 0 in, so its retention "
+               "is 0/0 -- arch45, 124 of 147 promotions",
+        suites=("test_search::test_a_long_leg_runs_on_promotion_candidates_only",),
+        item="ARCH46 2a"),
+    Mutation(
+        id="tier2-probe-legs-enter-the-mission",
+        path="dytiscidae/envs/evaluate.py",
+        find="            r.probe_segments[dom.value] = env.rollout(",
+        replace="            r.segments[dom.value] = env.rollout(",
+        defect="label-only Tier-2 legs land in segments, which fitness scores",
+        suites=("test_search::test_tier2_probe_legs_label_without_scoring",),
+        item="ARCH46 2b"),
+    Mutation(
+        id="critic-ignores-probe-legs",
+        path="dytiscidae/evolution/critic.py",
+        find="    seg = {**(getattr(result, \"probe_segments\", None) or {}),",
+        replace="    seg = {**({}),",
+        defect="the probe legs run and the critic never reads them",
+        suites=("test_search::test_tier2_probe_legs_label_without_scoring",),
+        item="ARCH46 2b"),
+    Mutation(
+        id="critic-unmeasured-medium-is-zero",
+        path="dytiscidae/evolution/critic.py",
+        find="        [float(seg[k].competence) if k in seg else np.nan for k in CRITIC_TARGETS],",
+        replace="        [float(seg[k].competence) if k in seg else 0.0 for k in CRITIC_TARGETS],",
+        defect="a medium Tier-2 never ran (legs after a failure) is labelled as "
+               "measured zero, teaching that Tier-2 destroys what it never saw",
+        suites=("test_search::test_critic_learns_from_a_cheap_score_of_zero",),
+        item="critic label"),
+    Mutation(
+        id="critic-refuses-a-zero-cheap-score",
+        path="dytiscidae/evolution/critic.py",
+        find="        if features:\n            self.label(np.asarray(features, float), expensive_outcome(result))",
+        replace="        if features and features[0] > 1e-4:\n            self.label(np.asarray(features, float), expensive_outcome(result))",
+        defect="the arch45 gate: promotions with a zero Tier-1 mission are not "
+               "labelled, which dropped 128 of 147 and every Tier-2 success",
+        suites=("test_search::test_critic_learns_from_a_cheap_score_of_zero",), item="critic label"),
+    Mutation(
+        id="critic-exploit-keeps-its-numbers",
+        path="dytiscidae/evolution/critic.py",
+        find="    if result is None or getattr(result, \"exploit\", \"\"):",
+        replace="    if result is None:",
+        defect="a Tier-2 exploit is labelled with the scores it faked",
+        suites=("test_search::test_critic_learns_from_a_cheap_score_of_zero",), item="critic label"),
+    Mutation(
+        id="critic-calibrates-in-sample-on-the-residual",
+        path="dytiscidae/evolution/critic.py",
+        find="            skills[j] = _skill(np.clip(pj, -1.0, 1.0) + cheap, cheap, yj + cheap)",
+        replace="            skills[j] = max(_corr(Zj @ W[:, j] + bias[j], yj), 0.0)",
+        defect="calibration read on the residual, in sample: -cheap is a feature, "
+               "so noise labels look 0.70 calibrated",
+        suites=("test_search::test_critic_learns_the_exploit_signature",), item="critic calibration"),
+    Mutation(
+        id="critic-takes-credit-for-the-cheap-score",
+        path="dytiscidae/evolution/critic.py",
+        find="    return float(np.clip(_corr(predicted, observed) - max(_corr(cheap, observed), 0.0),",
+        replace="    return float(np.clip(_corr(predicted, observed) - 0.0,",
+        defect="calibration counts the cheap score's own accuracy as the critic's skill",
+        suites=("test_search::test_critic_learns_from_a_cheap_score_of_zero",), item="critic calibration"),
+    Mutation(
+        id="critic-can-raise-a-score",
+        path="dytiscidae/evolution/critic.py",
+        find="        shortfall = float(np.clip(-self.predict(features), 0.0, 1.0))",
+        replace="        shortfall = float(np.clip(-self.predict(features), -1.0, 1.0))",
+        defect="a predicted positive gap raises the cheap score: a second objective",
+        suites=("test_search::test_critic_learns_the_exploit_signature",), item="critic bound"),
+
+    # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
+    Mutation(
+        id="grpo-advantage-across-the-whole-batch",
+        path="dytiscidae/learning/grpo.py",
+        find="        members.setdefault(k, []).append(i)",
+        replace="        members.setdefault(0, []).append(i)",
+        defect="the group baseline is the whole batch's mean and spread, so a "
+               "body's luck is back in the advantage and GRPO is a worse PPO",
+        suites=("test_ppo",), item="N group advantage"),
+    Mutation(
+        id="grpo-group-ignores-the-segment-kind",
+        path="dytiscidae/learning/grpo.py",
+        find="            by.setdefault((t.group, t.tag), []).append(t)",
+        replace="            by.setdefault((t.group, \"\"), []).append(t)",
+        defect="a body's water competence is compared with its crossing quality",
+        suites=("test_ppo",), item="N group key"),
+    Mutation(
+        id="grpo-std-floor-removed",
+        path="dytiscidae/learning/grpo.py",
+        find="STD_EPS = 0.05\n\n\ndef group_advantages",
+        replace="STD_EPS = 0.0\n\n\ndef group_advantages",
+        defect="float noise in a group that did nothing is stretched to a unit "
+               "advantage, and a group of identical returns divides 0 by 0",
+        suites=("test_ppo",), item="N group floor"),
+    Mutation(
+        id="grpo-rows-renormalised-with-the-batch",
+        path="dytiscidae/learning/ppo.py",
+        find="            adv = torch.cat([(a_ord - a_ord.mean()) / (a_ord.std() + 1e-8),\n"
+             "                             adv[n_ord:]])",
+        replace="            adv = (adv - adv.mean()) / (adv.std() + 1e-8)",
+        defect="a mixed update standardises the group rows with the ordinary "
+               "ones, adding a different kind of number's mean and scale back",
+        suites=("test_ppo",), item="N mixed batch"),
+    Mutation(
+        id="grpo-rollouts-leak-into-the-archive",
+        path="dytiscidae/evolution/loop.py",
+        find="    del results                      # learning-only: no score leaves this function",
+        replace="    for _k, _r in enumerate(results):\n"
+                "        _ph, _res, _ct = evaluated[chosen[groups[_k]]]\n"
+                "        _place(state, _ph.genome, _ph, _r, _ct, None, [\"grpo\"])",
+        defect="the learning-only rollouts are filed as candidates, so a lucky "
+               "exploration sample can become an elite's score",
+        suites=("test_search::test_grpo_rollouts_never_reach_the_archive",),
+        item="N learning-only"),
+    Mutation(
+        id="grpo-rollouts-count-as-evaluations",
+        path="dytiscidae/evolution/loop.py",
+        find="    del results                      # learning-only: no score leaves this function",
+        replace="    state.evaluated += len(results)",
+        defect="the learning-only rollouts advance the evaluation counter, which "
+               "names genomes and sets the identification cadence",
+        suites=("test_search::test_grpo_rollouts_never_reach_the_archive",),
+        item="N learning-only"),
+    Mutation(
+        id="grpo-pool-drops-the-group-ids",
+        path="dytiscidae/envs/actors.py",
+        find="                kw[\"groups\"] = [kwargs[\"groups\"][i] for i in idx]",
+        replace="                pass",
+        defect="a body split across two shards comes back ungrouped, so its "
+               "trajectories are dropped from GRPO and the stage buys nothing",
+        suites=("test_search::test_grpo_group_ids_survive_the_shard_split",),
+        item="N pool"),
 )
 
 

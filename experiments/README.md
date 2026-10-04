@@ -24,6 +24,7 @@ and the wall time alongside the data.
 | `analytic_vs_numerical` | where a quantity has a closed form, does the code match an independent computation of it? | 18 of 20 agree; hull buckling is 4.8x non-conservative, the lift slope is 11% below the value its docstring names |
 | `added_mass` | does the added mass written into `body_mass` reach the dynamics, and does it know which way the body points? | a jointless machine gets none of it; a wing strip is isotropic, overstating edgewise entrained mass by `(c/t)^2` |
 | `rank_threshold` | is `0.08 * sigma_0` a numerical rank or a guess? | a guess: the identification's own noise floor is `1.13 sigma_0`, and the rank the threshold reports is unanimous across four probe seeds on only 47.6% of bodies |
+| `triphibian_still` | what does the triphibian island read for a machine with its actuators held still? | 7 plans x 2 seeds: island score at most 0.0081 (floor 0.012), second medium at most 0.0199 (bar 0.055), weakest 0.0000 in all 14 (bar 0.012) |
 | `damping_lambda` | is `lam = 0.01 trace(G)/r` the right ridge? | no: out-of-sample error is minimised at 30x that value, and the incumbent is 18.3% worse |
 
 ## Shared modules

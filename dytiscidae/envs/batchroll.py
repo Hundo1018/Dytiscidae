@@ -45,8 +45,8 @@ import numpy as np
 
 from ..physics.energy import BatchedPower
 from ..physics.medium import GRAVITY
-from ..physics.fluid import (INFLOW_AR, InducedFlow, finish_bodies, machine_flow,
-                             slam_mass, strip_damping)
+from ..physics.fluid import (INFLOW_AR, InducedFlow, entrainment_reaction,
+                             finish_bodies, machine_flow, slam_mass, strip_damping)
 from ..control.cpg import TWIST_DIM, gait_gain
 from .triphibian import Domain
 
@@ -336,6 +336,8 @@ class BatchedFluid:
         self._epoch = 0
         self._prev_t = [None] * nm
         self._primed = [False] * nm
+        #: Every machine's rotors as one batch, built on the first step with any.
+        self._rotors = None
 
     def reset_slam(self):
         """Clear the slam history, as `FluidSolver.reset` does.
@@ -501,6 +503,17 @@ class BatchedFluid:
                 sol_i._inflow.tick()
             fb = o["xfrc"][a:b].copy()
             self.clamped[i] = int(finish_bodies(fb, o["fsum_b"][a:b], mb, float(self.limit[i])))
+            # The reaction to entrained added mass, after the limiter, exactly
+            # as `FluidSolver.apply` does it (ROADMAP AK, the ray's entry): the
+            # mass matrix alone creates the momentum of the water a body
+            # entrains.  Its previous mass lives on the machine's own solver,
+            # which `reset` clears, so the first step after a reset is skipped
+            # on both paths.
+            if sol_i.entrainment and not sol_i.quasi_static:
+                if sol_i._prev_mbody is not None:
+                    entrainment_reaction(fb, mb, sol_i._prev_mbody, self.lever2[i],
+                                         self.vel6[a:b], e.model.opt.timestep)
+                sol_i._prev_mbody = np.array(mb, float)
             e.data.xfrc_applied[:] = fb
             # Jet thrust is CPU-side in both paths: a handful of bells per
             # machine against thousands of panels, so it stays out of the
@@ -509,8 +522,10 @@ class BatchedFluid:
             if e.jets.n:
                 e.jets.apply(e.model, e.data, e.solver.medium, t,
                              e.model.opt.timestep)
-            if e.rotors.n:
-                e.rotors.apply(e.model, e.data, e.solver.medium, t)
+            # Rotors come after the jets, as they did; they read nothing the
+            # rest of this loop writes, so every machine's rotors go in one
+            # array computation below (`RotorBatch`, the code the single path
+            # runs for one machine).
             e.model.body_mass[:] = self.dry_mass[i] + mb
             e.model.body_inertia[:] = (
                 self.dry_inertia[i] + (mb * self.lever2[i])[:, None])
@@ -547,6 +562,13 @@ class BatchedFluid:
                 self._primed[i] = True
             self._prev_t[i] = t
         self._prev_ma[:] = m_slam
+        rot = [(i, e.model, e.data, e.solver.medium) for i, e in enumerate(self.envs)
+               if e.rotors.n and (active is None or active[i])]
+        if rot:
+            if self._rotors is None:
+                from ..physics.rotor import RotorBatch
+                self._rotors = RotorBatch([e.rotors for e in self.envs])
+            self._rotors.apply(rot, t)
 
 
 def observation_finite(obs) -> bool:
@@ -694,7 +716,7 @@ def identify_batch(envs, domain, *, probe_time: float = 1.2, n_probes: int = 24,
 
 def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                   domain, control_hz: float = 25.0, policies=None,
-                  bases=None, shared=None, collector=None):
+                  bases=None, shared=None, collector=None, noise_rngs=None):
     """`TriphibianEnv.rollout` for a whole batch, one GPU call per timestep.
 
     Mirrors the single-machine version step for step, including which sample
@@ -752,7 +774,9 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
             if rows:
                 acts, logps, vals = shared.act_many(
                     np.asarray(obs_rows, np.float32),
-                    deterministic=collector is None)
+                    deterministic=collector is None,
+                    rngs=(None if noise_rngs is None
+                          else [noise_rngs[m] for m in rows]))
                 shared_out = {
                     m: (obs_rows[j], acts[j], float(logps[j]), float(vals[j]))
                     for j, m in enumerate(rows)}
@@ -820,6 +844,9 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
         for m in range(k):
             if was[m] and not active[m]:
                 res[m].failure = "battery exhausted"
+        # Every live machine's clearance in one pass; `e.clearance()` below
+        # then reads it from the memo (AM, 2026-10-03).
+        envs[0].clearance_many(envs, active)
 
         for m, e in enumerate(envs):
             if not active[m]:
@@ -837,8 +864,9 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
             R = e.data.xmat[e.root_body].reshape(3, 3)
             r["ups"].append(float(R[2, 2]))
             r["contacts"].append(1.0 if e._touching_ground() else 0.0)
-            r["spins"].append(float(np.linalg.norm(e.body_twist()[3:])))
-            r["vzs"].append(float(e.body_twist()[2]))
+            tw = e.body_twist()                # once: the state has not moved
+            r["spins"].append(float(np.linalg.norm(tw[3:])))
+            r["vzs"].append(float(tw[2]))
             if r["gain"] is not None:
                 r["gains"].append(r["gain"])
             r["xys"].append(pos[:2].copy())
@@ -877,10 +905,31 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
 
 def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                          segment_seconds: float = 10.0,
-                         identify_axes: bool = False, seed: int = 0,
+                         identify_axes=False, seed: int = 0,
                          sea_state=None, perturb: dict | None = None,
-                         shared=None, buffer=None, n_modes: int = 6):
+                         shared=None, buffer=None, n_modes: int = 6,
+                         streams=None, groups=None):
     """`evaluate_tier1` for a whole generation, sharing one GPU pipeline.
+
+    ``identify_axes`` is one bool for the whole batch or one per phenotype.
+    Only the machines asked for are identified; the rest keep whatever bases
+    their controller arrived with (none, for a fresh one).  It used to be one
+    bool, and the generation passed ``any`` of its candidates' wishes, so
+    ``identify_axes_every > 1`` identified every candidate whenever one of
+    them was due (ROADMAP AN).
+
+    ``streams`` names each phenotype's exploration stream, one int each,
+    default its position here.  The actor pool passes each machine's position
+    in the whole generation, so a sampled rollout explores identically however
+    the generation is split into shards (ROADMAP AJ).  Until 2026-09-30 the
+    noise came from torch's global stream, seeded per *shard*, so moving a
+    machine to another shard changed what it explored and therefore what the
+    learner saw.
+
+    ``groups``, one int per phenotype (default none), is stamped on every
+    trajectory the machine banks, so ``learning.grpo`` can tell which rollouts
+    are repeats of one body (ROADMAP N).  It changes nothing about the
+    evaluation itself.
 
     Both the three domain segments and the three transitions are batched. What
     is not, and cannot be, is the mobility identification: it drives each CPG
@@ -916,6 +965,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         try:
             envs[i] = TriphibianEnv(p, seed=seed, sea_state=sea_state,
                                     perturb=perturb)
+            envs[i].air_launch_height = spec.air_launch_height
             live.append(i)
         except Exception as exc:
             r.notes.append(f"compile failed: {type(exc).__name__}: {exc}")
@@ -943,20 +993,27 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     # experiment -- see identify_batch for why that does not prevent batching.
     # It was 26.7% of a generation and the last thing still calling the numpy
     # solver.
-    if identify_axes:
+    if isinstance(identify_axes, (list, tuple)):
+        if len(identify_axes) != k:
+            raise ValueError(f"identify_axes has {len(identify_axes)} entries "
+                             f"for {k} phenotypes")
+        wanted = [i for i in live if identify_axes[i]]
+    else:
+        wanted = list(live) if identify_axes else []
+    if wanted:
         from .triphibian import Domain as _D
-        group = [envs[i] for i in live]
+        group = [envs[i] for i in wanted]
         marks = {i: step_mark(envs[i]) for i in live}
         for dom in (_D.AIR, _D.WATER):
             try:
                 found = identify_batch(group, dom, seed=seed,
                                        max_modes=n_modes)
             except Exception as exc:
-                for i in live:
+                for i in wanted:
                     results[i].notes.append(
                         f"mobility id failed in {dom.value}: {exc}")
                 continue
-            for slot, i in enumerate(live):
+            for slot, i in enumerate(wanted):
                 results[i].mobility[dom.value] = found[slot]
         for i in live:
             record_steps(results[i], "identify", marks[i], envs[i])
@@ -966,7 +1023,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         # and an inherited controller arrives carrying its parent's.  Keeping
         # those would drive a child through its parent's axes, which is
         # precisely the thing the identification exists to prevent.
-        for i in live:
+        for i in wanted:
             ctrls[i].bases = results[i].mobility
 
     # See `evaluate_tier1`: the seed travels with the result so the archive can
@@ -976,6 +1033,20 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
 
     group = [envs[i] for i in live]
     bf = BatchedFluid(group)
+    streams = list(range(k)) if streams is None else [int(x) for x in streams]
+    if len(streams) != k:
+        raise ValueError(f"streams has {len(streams)} entries for {k} phenotypes")
+    if groups is not None and len(groups) != k:
+        raise ValueError(f"groups has {len(groups)} entries for {k} phenotypes")
+    live_groups = None if groups is None else [int(groups[i]) for i in live]
+
+    def _noise(tag: int):
+        # Only a rollout that feeds the learner samples; the rest act at the
+        # mean and need no stream.
+        if shared is None or buffer is None:
+            return None
+        return [np.random.default_rng([int(seed) & 0x7FFFFFFF, streams[i], tag])
+                for i in live]
 
     marks = {i: step_mark(envs[i]) for i in live}
     for dom in DOMAIN_CYCLE:
@@ -1005,7 +1076,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
             group, bf, segment_seconds, [ctrls[i].params for i in live], dom,
             policies=[ctrls[i].policy for i in live],
             bases=[ctrls[i].basis_for(dom) for i in live],
-            shared=shared, collector=collector)
+            shared=shared, collector=collector,
+            noise_rngs=_noise(DOMAIN_CYCLE.index(dom)))
         for slot, i in enumerate(live):
             results[i].segments[dom.value] = segs[slot]
             clamped[i] = clamped[i] or bool(envs[i].solver.diag.clamped)
@@ -1013,7 +1085,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
             # The reward is the segment's own competence -- the number the
             # search selects on -- delivered once, at the end. See ppo.py for
             # why nothing denser is invented here.
-            collector.finish(buffer, [s.competence for s in segs], tag=dom.value)
+            collector.finish(buffer, [s.competence for s in segs], tag=dom.value,
+                             groups=live_groups)
 
     # `land_to_air` was excluded because "nothing gets off the ground"
     # (transitions.py records exactly that for all six seed plans).  Two
@@ -1022,14 +1095,16 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     for i in live:
         record_steps(results[i], "segments", marks[i], envs[i])
     marks = {i: step_mark(envs[i]) for i in live}
-    for kind in ("air_to_water", "water_to_air", "water_to_land",
-                 "land_to_air"):
+    for t_index, kind in enumerate(("air_to_water", "water_to_air",
+                                    "water_to_land", "land_to_air")):
         tcollector = None
         if shared is not None and buffer is not None:
             from ..learning.ppo import SegmentCollector
             tcollector = SegmentCollector(len(group))
         trs = run_transition_batch(group, bf, kind, [ctrls[i] for i in live],
-                                   shared=shared, collector=tcollector)
+                                   shared=shared, collector=tcollector,
+                                   noise_rngs=_noise(100 + t_index),
+                                   back=float((spec.transition_back or {}).get(kind, 0.0)))
         for slot, i in enumerate(live):
             tr = trs[slot]
             results[i].transitions.results[kind] = tr
@@ -1046,7 +1121,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                     t.components.get(c, 0.0)
                     for c in ("shock", "control", "settle",
                               "economy", "exit_state")])))
-                for t in trs], tag=f"transition:{kind}")
+                for t in trs], tag=f"transition:{kind}", groups=live_groups)
 
     for i in live:
         record_steps(results[i], "transitions", marks[i], envs[i])
@@ -1067,7 +1142,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
 
 
 def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
-                         duration: float = 6.0, shared=None, collector=None):
+                         duration: float = 6.0, shared=None, collector=None,
+                         noise_rngs=None, back: float = 0.0):
     """`run_transition` for a whole batch, one GPU call per timestep.
 
     Mirrors the single-machine version exactly, including the two post-loop
@@ -1085,24 +1161,23 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
     import numpy as _np
 
     from .transitions import (
-        TRANSITION_ENDPOINTS, TransitionResult, _place_for, _score)
+        TRANSITION_ENDPOINTS, CrossingTracker, TransitionResult, _place_for, _score,
+        reseat_after_scatter, transition_scatter_seed)
     from .triphibian import Domain as _D
 
     k = len(envs)
     _, target = TRANSITION_ENDPOINTS[kind]
-    res = [TransitionResult(kind=kind, duration=duration) for _ in envs]
+    res = [TransitionResult(kind=kind, duration=duration, start_back=float(back))
+           for _ in envs]
 
-    # Stable across processes: an index into a fixed list, never hash(str).
-    _KINDS = ("air_to_water", "water_to_air", "water_to_land", "land_to_air",
-              "land_to_water", "air_to_land")
-    scatter_seed = (0x9E3779B9 * (_KINDS.index(kind) + 1
-                                  if kind in _KINDS else 7)) & 0x7FFFFFFF
+    scatter_seed = transition_scatter_seed(kind)
     for m, e in enumerate(envs):
-        _place_for(e, kind)
+        _place_for(e, kind, back)
         # Each crossing kind used to present exactly one entry state, with no
         # noise at all, to every machine of every generation.  A real arrival
         # carries whatever speed and attitude the previous leg left behind.
         e.scatter(_np.random.default_rng(scatter_seed))
+        reseat_after_scatter(e, kind)
         res[m].survivable_entry_speed = float(e.p.max_entry_speed)
     bf.reset_slam()
 
@@ -1114,8 +1189,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
     bad0 = [int(e.data.warning[e._mj.mjtWarning.mjWARN_BADQACC].number)
             for e in envs]
     energy0 = [float(e.budget.total_j) for e in envs]
-    was_wet = [e.depth() > 0.0 for e in envs]
-    cross_step = [-1] * k
+    tracks = [CrossingTracker(e, kind) for e in envs]
     ups = [[] for _ in range(k)]
     sps = [[] for _ in range(k)]
     slamw = [[] for _ in range(k)]
@@ -1134,7 +1208,8 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
             c = ctrls[m]
             if (bases[m] is not None and i % control_every == 0
                     and (c.policy is not None or shared is not None)):
-                obs = e.observation(target)
+                told = tracks[m].commanded(i)
+                obs = e.observation(told)
                 if not observation_finite(obs):
                     res[m].failure = "diverged"
                     active[m] = False
@@ -1151,7 +1226,8 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
                         gain = float(own[n_own])
                 if shared is not None:
                     a, logp, val = shared.act(
-                        obs, deterministic=collector is None)
+                        obs, deterministic=collector is None,
+                        rng=None if noise_rngs is None else noise_rngs[m])
                     a_np = _np.asarray(a, float)
                     if len(a_np) > TWIST_DIM:
                         gain = (gain or 0.0) + float(a_np[TWIST_DIM])
@@ -1160,7 +1236,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
                         from ..learning.ppo import potential_of
                         collector.record(
                             m, obs, a, logp, val,
-                            potential_of(obs, getattr(target, "value", "transition")))
+                            potential_of(obs, getattr(told, "value", "transition")))
                 cur[m] = bases[m].command_params(
                     c.params, coeffs, e.cpg.n,
                     gain=1.0 if gain is None else gait_gain(gain))
@@ -1171,6 +1247,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
         for m in range(k):
             if was[m] and not active[m]:
                 res[m].failure = "battery exhausted mid-transition"
+        envs[0].clearance_many(envs, active)
 
         for m, e in enumerate(envs):
             if not active[m]:
@@ -1195,13 +1272,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
             if len(slamw[m]) == slam_n:
                 res[m].peak_slam = max(res[m].peak_slam,
                                        float(_np.mean(slamw[m])))
-            wet = e.depth() > 0.0
-            if wet != was_wet[m]:
-                if cross_step[m] < 0:
-                    cross_step[m] = i
-                    res[m].peak_entry_speed = max(
-                        res[m].peak_entry_speed, abs(float(e.body_twist()[2])))
-                was_wet[m] = wet
+            tracks[m].observe(e, i)
 
         if not active.any():
             break
@@ -1212,18 +1283,13 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
             e._mj.mjtWarning.mjWARN_BADQACC].number) - bad0[m]
         if r.bad_qacc > 0 and not r.failure:
             r.failure = "unstable"
-        if cross_step[m] < 0 and target is _D.LAND and e._touching_ground():
-            cross_step[m] = max(len(ups[m]) - 1, 0)
-        # Terminal, not peak: a machine that leapt and came down has not crossed.
-        if cross_step[m] < 0 and target is _D.AIR and e.clearance() > 0.5:
-            cross_step[m] = max(len(ups[m]) - 1, 0)
-        r.crossed = cross_step[m] >= 0 and not r.failure
+        cross = tracks[m].finish(e, r, len(ups[m]))
         r.airborne_fraction = airborne[m] / max(len(ups[m]), 1)
         r.energy_j = float(e.budget.total_j - energy0[m])
         r.exit_depth = float(e.depth())
         r.exit_upright = float(ups[m][-1]) if ups[m] else 0.0
         r.exit_speed = float(sps[m][-1]) if sps[m] else 0.0
-        _score(e, r, cross_step[m], _np.array(ups[m]), _np.array(sps[m]), target)
+        _score(e, r, cross, _np.array(ups[m]), _np.array(sps[m]), target)
         if not r.crossed and not r.failure:
             r.failure = "never crossed the boundary"
     return res

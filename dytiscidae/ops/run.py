@@ -166,8 +166,13 @@ def cmd_search(args) -> int:
         seed=args.seed,
         workers=args.workers,
         min_shard=args.min_shard,
+        pool_per_worker=args.pool_per_worker,
+        pool_balance=bool(args.pool_balance),
+        controller_refine_funnel=args.refine_funnel,
+        distance_curriculum=bool(args.distance_curriculum),
         action_rate_penalty=args.action_rate_penalty,
         descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
+        tier2_label_all_media=not args.no_tier2_label_all_media,
         gait_gain=bool(args.gait_gain),
         segment_seconds=args.segment_seconds,
         controller_refine_steps=args.refine_steps,
@@ -179,6 +184,10 @@ def cmd_search(args) -> int:
         shared_lr=args.shared_lr,
         shared_epochs=args.shared_epochs,
         shared_target_kl=args.shared_target_kl,
+        shared_ent_coef=args.shared_ent_coef,
+        shared_learner=args.shared_learner,
+        grpo_group=args.grpo_group,
+        grpo_bodies=args.grpo_bodies,
         run_dir=args.run,
         tier2_every=args.tier2_every,
         n_reference_seeds=args.reference_seeds,
@@ -532,17 +541,11 @@ def controller_for_elite(design_dir, elite, p, seed: int, *, log=print):
     # and until `eval_seed` was recorded there was no way to ask for the
     # draw the score used.  So prefer what is stored and fall back to a
     # fresh identification, saying which happened.
-    bases, basis_src = {}, "stored"
+    basis_src = "stored"
     stored = (elite.meta or {}).get("mobility_basis") or {}
-    for dom_name, b in stored.items():
-        try:
-            bases[dom_name] = _Basis(
-                modes=_np.asarray(b["modes"], float),
-                effects=_np.asarray(b["effects"], float),
-                authority=_np.asarray(b["authority"], float),
-                medium=str(b.get("medium") or dom_name))
-        except Exception as exc:                              # noqa: BLE001
-            log(f"  stored basis for {dom_name} unusable: {exc}")
+    bases = _Basis.bases_from_record(stored)
+    for dom_name in sorted(set(stored) - set(bases)):
+        log(f"  stored basis for {dom_name} unusable")
     if not bases:
         basis_src = "re-identified"
         seed = (elite.meta or {}).get("eval_seed")
@@ -837,12 +840,31 @@ def main(argv=None) -> int:
                         "is not worth a batch's fixed cost, so the pool never "
                         "makes more than --batch // --min-shard of them: to "
                         "use more cores, raise --batch.")
-    p.add_argument("--min-shard", type=int, default=4,
+    p.add_argument("--pool-per-worker", type=float, default=2.0,
+                   help="shards per worker; above 1 the pool becomes a queue "
+                        "that hands the next shard to whichever worker is free "
+                        "(ROADMAP AJ). 2 since 2026-10-03: 0.875x the wall of "
+                        "4x4 on rotor-heavy batches; 1 is the pool every run "
+                        "up to arch46 used")
+    p.add_argument("--distance-curriculum", action="store_true",
+                   help="step transition starts back from their interfaces and "
+                        "the air launch down from 30 m as the population learns "
+                        "(ROADMAP Y/O); changes what transition and air scores mean")
+    p.add_argument("--refine-funnel", type=float, default=None,
+                   help="refine only candidates within this fraction of their "
+                        "cell's incumbent (ROADMAP AK); unset refines all")
+    p.add_argument("--pool-balance", action="store_true",
+                   help="assign machines to shards by predicted cost (rotors, "
+                        "envs.actors.shard_cost) "
+                        "rather than by position (ROADMAP AJ)")
+    p.add_argument("--min-shard", type=int, default=2,
                    help="fewest machines a worker is given at once. Measured "
                         "per machine-step: 238 us alone, 149 in a shard of "
                         "four, 105 in eight, 89 in sixteen -- so a smaller "
-                        "shard spends the parallelism it gains. 4 is the swept "
-                        "optimum end to end; 8 collapses the pool to one shard "
+                        "shard spends the parallelism it gains. 4 was the swept "
+                        "optimum on random bodies; 2 with --pool-per-worker 2 "
+                        "is the optimum on rotor-heavy ones; 8 collapses the "
+                        "pool to one shard "
                         "as soon as one machine is rejected at batch 16")
     p.add_argument("--segment-seconds", type=float, default=8.0,
                    help="Tier-1 episode length; the main cost/fidelity dial")
@@ -878,6 +900,24 @@ def main(argv=None) -> int:
                    help="PPO passes over each generation's batch")
     p.add_argument("--shared-target-kl", type=float, default=0.015,
                    help="stop an update once its mean KL exceeds this")
+    p.add_argument("--shared-ent-coef", type=float, default=0.01,
+                   help="entropy bonus of the shared policy (ROADMAP R). Until "
+                        "2026-10-03 there was no flag and direct runs were "
+                        "always 0.01; exploration is not comparable across a "
+                        "change of it")
+    p.add_argument("--shared-learner", default="ppo",
+                   choices=("ppo", "grpo", "ppo+grpo"),
+                   help="estimator for the shared policy (ROADMAP N). ppo is "
+                        "every run to date; ppo+grpo adds --grpo-bodies x "
+                        "--grpo-group learning-only rollouts per generation "
+                        "with group-relative advantages; grpo trains on those "
+                        "alone. Needs --shared-policy. Off by default: built "
+                        "2026-10-03, to be switched on only if the shared "
+                        "policy is measured to carry weight (item R)")
+    p.add_argument("--grpo-group", type=int, default=4,
+                   help="rollouts of one body per group (>= 2)")
+    p.add_argument("--grpo-bodies", type=int, default=4,
+                   help="bodies given a group each generation")
     p.add_argument("--policy-hidden", type=int, default=0,
                    help="hidden units in the policy; 0 is linear (60 weights), "
                         "16 is 308")
@@ -919,7 +959,7 @@ def main(argv=None) -> int:
                         "fraction buying 32%% more competence.")
     p.add_argument("--descriptor-bins", type=int, default=5,
                    help="bins per learned archive axis. Four axes at 8 bins is "
-                        "4096 cells per island, 24,576 across six, against "
+                        "4096 cells per island, 32,768 across eight, against "
                         "arch31's entire budget of 9,620 evaluations -- so "
                         "81.9%% of cells were never improved on. Size the map "
                         "to the budget.")
@@ -931,10 +971,13 @@ def main(argv=None) -> int:
     p.add_argument("--n-modes", type=int, default=6,
                    help="mobility modes identified per body per domain, and "
                         "the width the shared policy commands through")
-    p.add_argument("--descriptor-keep-if-overlap", type=float, default=0.0,
+    p.add_argument("--descriptor-keep-if-overlap", type=float, default=0.95,
                    help="keep the learned axes when a refit would reproduce "
-                        "them (subspace overlap at or above this); 0 = off "
-                        "(ROADMAP item P)")
+                        "them (subspace overlap at or above this); 0 = off, "
+                        "which every run through arch45 used (ARCH46_SPEC §3)")
+    p.add_argument("--no-tier2-label-all-media", action="store_true",
+                   help="do not run the label-only Tier-2 legs in media the "
+                        "mission never reached (ARCH46_SPEC §2b)")
     p.add_argument("--gait-gain", action="store_true",
                    help="give both policies a gait-gain output, a factor on the "
                         "commanded amplitude, so stopping and throttling are "

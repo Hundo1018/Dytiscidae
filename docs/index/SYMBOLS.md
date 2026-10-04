@@ -200,15 +200,15 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Progress` | class | 297 | — | Turns the loop's per-generation callback into job state. |
-| `SearchTrainer` | class | 82 | — | ``ports.Trainer`` over ``evolution.loop.run_search``. |
-| `_Progress.__init__` | method | 305 | `(self, context: TrainingContext, workspace: Path, *, publish_every: int, checkpoint_every: int) -> None` | — |
-| `_Progress.on_generation` | method | 326 | `(self, state, report: Mapping[str, Any]) -> None` | Progress only.  Called *before* the loop writes its checkpoint. |
-| `_Progress.publish` | method | 365 | `(self, step: int, kind: CheckpointKind, *, force: bool=False)` | Copy the run directory's portable checkpoint into the store. |
-| `_Progress.should_stop` | method | 343 | `(self, generation: int, report: Mapping[str, Any])` | Publish if the loop has just checkpointed, then poll the stop flag. |
-| `SearchTrainer.capabilities` | method | 87 | `(self) -> TrainerCapabilities` | — |
-| `SearchTrainer.export` | method | 132 | `(self, record: CheckpointRecord, payload: CheckpointPayload, *, destination: str, fmt: str) -> dict` | Write the portable checkpoint out as files. |
-| `SearchTrainer.train` | method | 106 | `(self, context: TrainingContext) -> TrainingOutcome` | — |
+| `_Progress` | class | 302 | — | Turns the loop's per-generation callback into job state. |
+| `SearchTrainer` | class | 87 | — | ``ports.Trainer`` over ``evolution.loop.run_search``. |
+| `_Progress.__init__` | method | 310 | `(self, context: TrainingContext, workspace: Path, *, publish_every: int, checkpoint_every: int) -> None` | — |
+| `_Progress.on_generation` | method | 331 | `(self, state, report: Mapping[str, Any]) -> None` | Progress only.  Called *before* the loop writes its checkpoint. |
+| `_Progress.publish` | method | 370 | `(self, step: int, kind: CheckpointKind, *, force: bool=False)` | Copy the run directory's portable checkpoint into the store. |
+| `_Progress.should_stop` | method | 348 | `(self, generation: int, report: Mapping[str, Any])` | Publish if the loop has just checkpointed, then poll the stop flag. |
+| `SearchTrainer.capabilities` | method | 92 | `(self) -> TrainerCapabilities` | — |
+| `SearchTrainer.export` | method | 137 | `(self, record: CheckpointRecord, payload: CheckpointPayload, *, destination: str, fmt: str) -> dict` | Write the portable checkpoint out as files. |
+| `SearchTrainer.train` | method | 111 | `(self, context: TrainingContext) -> TrainingOutcome` | — |
 
 ## `adapters.trainers.synthetic` — `dytiscidae/adapters/trainers/synthetic.py`
 
@@ -338,14 +338,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `basis_from_probes` | function | 561 | `(deltas, responses, *, medium: str='air', max_modes: int=6) -> MobilityBasis` | Fit the mobility basis from probe deltas and their measured responses. |
+| `basis_from_probes` | function | 581 | `(deltas, responses, *, medium: str='air', max_modes: int=6) -> MobilityBasis` | Fit the mobility basis from probe deltas and their measured responses. |
 | `CPG` | class | 87 | — | A bank of phase-coupled oscillators, one per actuated joint. |
 | `CPGParams` | class | 46 | — | Open parameters of the pattern generator. |
 | `gait_gain` | function | 194 | `(intent: float) -> float` | The amplitude factor a gain intent asks for. |
-| `identify_mobility` | function | 515 | `(step_fn, reset_fn, n_params: int, *, n_probes: int=24, probe_scale: float=0.35, medium: str='air', rng: np.random.Generator \| None=None, max_modes: int=6) -> MobilityBasis` | Empirically identify a body's control axes. |
+| `identify_mobility` | function | 535 | `(step_fn, reset_fn, n_params: int, *, n_probes: int=24, probe_scale: float=0.35, medium: str='air', rng: np.random.Generator \| None=None, max_modes: int=6) -> MobilityBasis` | Empirically identify a body's control axes. |
 | `MobilityBasis` | class | 234 | — | The control axes a particular body actually has, in a particular medium. |
-| `Policy` | class | 608 | — | Maps observations to intent coefficients in the mobility basis. |
-| `required_probes` | function | 499 | `(n_params: int, *, margin: float=1.5) -> int` | Probes needed for the mobility fit to be determined, with headroom. |
+| `Policy` | class | 628 | — | Maps observations to intent coefficients in the mobility basis. |
+| `required_probes` | function | 519 | `(n_params: int, *, margin: float=1.5) -> int` | Probes needed for the mobility fit to be determined, with headroom. |
 | `split_command` | function | 199 | `(raw, n_modes: int)` | ``(mode coefficients, gain)`` from what a policy returned. |
 | `CPG.__init__` | method | 97 | `(self, n_joints: int, base_frequency: float=2.0, joint_range: np.ndarray \| None=None) -> None` | — |
 | `CPG.command` | method | 143 | `(self, params: CPGParams, t: float) -> np.ndarray` | Target joint angles at time ``t``. |
@@ -356,19 +356,20 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `CPGParams.flat` | method | 61 | `(self) -> np.ndarray` | — |
 | `CPGParams.from_flat` | method | 65 | `(v: np.ndarray, n: int) -> 'CPGParams'` | — |
 | `CPGParams.n` | property | 58 | `(self) -> int` | — |
-| `MobilityBasis.coeffs_for_twist` | method | 464 | `(self, intent: np.ndarray) -> np.ndarray` | Coefficients that best deliver a commanded body twist. |
-| `MobilityBasis.command_params` | method | 377 | `(self, base: CPGParams, coeffs: np.ndarray, n: int, gain: float=1.0) -> CPGParams` | Turn intent coefficients into concrete CPG parameters. |
-| `MobilityBasis.command_policy` | method | 392 | `(self, base: CPGParams, raw, n: int, policy)` | ``(params, mode coefficients, gain or None)`` for what ``policy`` returned. |
-| `MobilityBasis.condition` | property | 316 | `(self) -> float` | `sigma_0 / sigma_r` over the retained modes.  Infinite if any is 0. |
-| `MobilityBasis.control_rank` | property | 291 | `(self) -> int` | How many axes are worth commanding.  An engineering threshold. |
-| `MobilityBasis.describe` | method | 360 | `(self) -> list[str]` | Human-readable names for the discovered axes. |
-| `MobilityBasis.diagnostics` | method | 345 | `(self) -> dict` | Everything a consumer needs to judge this basis, in one call. |
-| `MobilityBasis.numerical_rank` | property | 274 | `(self) -> int` | Rank in the linear-algebra sense: singular values above the level |
-| `MobilityBasis.twist_of` | method | 489 | `(self, coeffs: np.ndarray) -> np.ndarray` | The twist a coefficient vector produces.  The forward model. |
-| `MobilityBasis.underdetermined` | property | 329 | `(self) -> bool` | Whether the fit behind this basis had fewer probes than parameters. |
-| `Policy.act` | method | 652 | `(self, obs: np.ndarray) -> np.ndarray` | — |
-| `Policy.n_out` | property | 641 | `(self) -> int` | — |
-| `Policy.n_weights` | property | 646 | `(self) -> int` | — |
+| `MobilityBasis.bases_from_record` | method | 274 | `(cls, record) -> dict` | ``{medium: MobilityBasis}`` from an elite's ``meta["mobility_basis"]``. |
+| `MobilityBasis.coeffs_for_twist` | method | 484 | `(self, intent: np.ndarray) -> np.ndarray` | Coefficients that best deliver a commanded body twist. |
+| `MobilityBasis.command_params` | method | 397 | `(self, base: CPGParams, coeffs: np.ndarray, n: int, gain: float=1.0) -> CPGParams` | Turn intent coefficients into concrete CPG parameters. |
+| `MobilityBasis.command_policy` | method | 412 | `(self, base: CPGParams, raw, n: int, policy)` | ``(params, mode coefficients, gain or None)`` for what ``policy`` returned. |
+| `MobilityBasis.condition` | property | 336 | `(self) -> float` | `sigma_0 / sigma_r` over the retained modes.  Infinite if any is 0. |
+| `MobilityBasis.control_rank` | property | 311 | `(self) -> int` | How many axes are worth commanding.  An engineering threshold. |
+| `MobilityBasis.describe` | method | 380 | `(self) -> list[str]` | Human-readable names for the discovered axes. |
+| `MobilityBasis.diagnostics` | method | 365 | `(self) -> dict` | Everything a consumer needs to judge this basis, in one call. |
+| `MobilityBasis.numerical_rank` | property | 294 | `(self) -> int` | Rank in the linear-algebra sense: singular values above the level |
+| `MobilityBasis.twist_of` | method | 509 | `(self, coeffs: np.ndarray) -> np.ndarray` | The twist a coefficient vector produces.  The forward model. |
+| `MobilityBasis.underdetermined` | property | 349 | `(self) -> bool` | Whether the fit behind this basis had fewer probes than parameters. |
+| `Policy.act` | method | 672 | `(self, obs: np.ndarray) -> np.ndarray` | — |
+| `Policy.n_out` | property | 661 | `(self) -> int` | — |
+| `Policy.n_weights` | property | 666 | `(self) -> int` | — |
 
 ## `control.train` — `dytiscidae/control/train.py`
 
@@ -689,11 +690,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `ActorPool` | class | 168 | — | A persistent pool of worker processes, each with its own batched evaluator. |
-| `split` | function | 132 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
-| `ActorPool.__init__` | method | 183 | `(self, workers: int=1, *, min_shard: int=4) -> None` | — |
-| `ActorPool.close` | method | 331 | `(self) -> None` | — |
-| `ActorPool.evaluate_tier1` | method | 201 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
+| `ActorPool` | class | 231 | — | A persistent pool of worker processes, each with its own batched evaluator. |
+| `plan_shards` | function | 178 | `(costs, workers: int, min_shard: int, *, per_worker: float=1.0, balance: bool=False) -> list` | Shards as lists of indices, most expensive first (ROADMAP AJ). |
+| `shard_cost` | function | 163 | `(pheno) -> float` | A machine's predicted evaluation wall, for ``plan_shards(balance=True)``. |
+| `split` | function | 136 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
+| `ActorPool.__init__` | method | 246 | `(self, workers: int=1, *, min_shard: int=2, per_worker: float=2.0, balance: bool=False) -> None` | — |
+| `ActorPool.close` | method | 454 | `(self) -> None` | — |
+| `ActorPool.evaluate_tier1` | method | 276 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
+| `ActorPool.map` | method | 385 | `(self, fn, jobs) -> list` | ``[fn(*job) for job in jobs]``, one job per worker at a time. |
 
 ## `envs.batchroll` — `dytiscidae/envs/batchroll.py`
 
@@ -702,19 +706,19 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `BatchedFluid` | class | 220 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 878 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `identify_batch` | function | 619 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `observation_finite` | function | 552 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
-| `rollout_batch` | function | 695 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 1069 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 573 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `evaluate_tier1_batch` | function | 906 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `identify_batch` | function | 641 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `observation_finite` | function | 574 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
+| `rollout_batch` | function | 717 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 1144 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 595 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 95 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
 | `BatchedFluid.__init__` | method | 231 | `(self, envs)` | — |
-| `BatchedFluid.apply` | method | 369 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
-| `BatchedFluid.finish` | method | 450 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
-| `BatchedFluid.launch` | method | 375 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
-| `BatchedFluid.ready` | method | 365 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
-| `BatchedFluid.reset_slam` | method | 340 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
+| `BatchedFluid.apply` | method | 371 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
+| `BatchedFluid.finish` | method | 452 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
+| `BatchedFluid.launch` | method | 377 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
+| `BatchedFluid.ready` | method | 367 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
+| `BatchedFluid.reset_slam` | method | 342 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
@@ -722,20 +726,20 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `behaviour_descriptor` | function | 615 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | — |
+| `behaviour_descriptor` | function | 650 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | — |
 | `Controller` | class | 43 | — | Everything needed to drive one machine: rhythm, axes, and intent. |
-| `dominates` | function | 658 | `(a: np.ndarray, b: np.ndarray) -> bool` | True when ``a`` is at least as good everywhere and better somewhere. |
+| `dominates` | function | 693 | `(a: np.ndarray, b: np.ndarray) -> bool` | True when ``a`` is at least as good everywhere and better somewhere. |
 | `evaluate_tier1` | function | 262 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, segment_seconds: float=10.0, identify_axes: bool=False, seed: int=0, sea_state=None, perturb: dict \| None=None, n_modes: int=6, detail: bool=False, on_step=None) -> MissionResult` | Short dynamic episodes in each domain, plus transitions. |
-| `evaluate_tier1_5` | function | 413 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seconds: float=60.0, seed: int=0, domain: Domain \| None=None, competences: dict \| None=None, sea_state=None) -> SegmentResult` | One long leg, run only on designs the search has decided to promote. |
-| `evaluate_tier2` | function | 473 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seed: int=0, time_compression: float=12.0, sea_state=None, tier1: MissionResult \| None=None) -> MissionResult` | The real mission schedule, with disturbances and a random start domain. |
+| `evaluate_tier1_5` | function | 430 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seconds: float=60.0, seed: int=0, domain: Domain \| None=None, competences: dict \| None=None, sea_state=None) -> SegmentResult` | One long leg, run only on designs the search has decided to promote. |
+| `evaluate_tier2` | function | 491 | `(p: Phenotype, *, spec: MissionSpec \| None=None, controller: Controller \| None=None, seed: int=0, time_compression: float=12.0, sea_state=None, tier1: MissionResult \| None=None, label_all_media: bool=False) -> MissionResult` | The real mission schedule, with disturbances and a random start domain. |
 | `finalise_tier1` | function | 167 | `(r: MissionResult, clamped_any: bool) -> None` | Turn measured segments and transitions into mission_fraction, and flag |
-| `fitness` | function | 664 | `(p: Phenotype, r: MissionResult, spec: MissionSpec \| None=None) -> float` | Scalar quality within a behaviour cell. |
-| `objectives` | function | 641 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | The objective vector used to decide who occupies a cell. |
+| `fitness` | function | 699 | `(p: Phenotype, r: MissionResult, spec: MissionSpec \| None=None) -> float` | Scalar quality within a behaviour cell. |
+| `objectives` | function | 676 | `(p: Phenotype, r: MissionResult) -> np.ndarray` | The objective vector used to decide who occupies a cell. |
 | `record_steps` | function | 155 | `(r: MissionResult, part: str, mark: tuple, env) -> None` | Add the steps ``env`` took since ``mark`` to ``r.steps[part]``. |
 | `SharedController` | class | 112 | `(Controller)` | A controller carrying a `SummedPolicy`, kept pointed at the right basis. |
 | `step_mark` | function | 150 | `(env) -> tuple` | Where an env's step counters stand, for `record_steps`. |
 | `SummedPolicy` | class | 61 | — | The per-candidate policy plus the shared one, as a single policy. |
-| `weakest_domain` | function | 398 | `(competences: dict) -> Domain` | The domain a design is worst at, which is the one the mission turns on. |
+| `weakest_domain` | function | 406 | `(competences: dict, floor: float \| None=None) -> Domain` | The domain a design is worst at, which is the one the mission turns on. |
 | `Controller.basis_for` | method | 50 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
 | `SharedController.basis_for` | method | 122 | `(self, domain: Domain) -> MobilityBasis \| None` | — |
 | `SummedPolicy.act` | method | 83 | `(self, obs) -> np.ndarray` | — |
@@ -827,12 +831,23 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `run_transition` | function | 224 | `(env: TriphibianEnv, kind: str, controller, *, duration: float=6.0) -> TransitionResult` | Simulate one crossing and measure it. |
-| `TransitionResult` | class | 121 | — | One crossing, measured.  Every field is a raw physical quantity or a |
-| `TransitionSet` | class | 432 | — | All crossings attempted in one evaluation. |
-| `TransitionResult.components` | property | 180 | `(self) -> dict[str, float]` | The scored parts, for the judge to weight. |
-| `TransitionSet.component_means` | method | 443 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
-| `TransitionSet.crossed_fraction` | property | 438 | `(self) -> float` | — |
+| `ashore` | function | 287 | `(env: TriphibianEnv) -> bool` | On land *out of the water*: ``medium_of`` says LAND and the ground under |
+| `CrossingTracker` | class | 325 | — | What a crossing is, shared by ``run_transition`` and the batched path. |
+| `medium_of` | function | 273 | `(env: TriphibianEnv, ground_tol: float=0.0) -> Domain` | Which medium the machine is in: root under water, else on the ground |
+| `reseat_after_scatter` | function | 565 | `(env: TriphibianEnv, kind: str) -> None` | Put a land start back on the ground at the pose ``scatter`` left. |
+| `run_transition` | function | 592 | `(env: TriphibianEnv, kind: str, controller, *, duration: float=6.0, back: float=0.0) -> TransitionResult` | Simulate one crossing and measure it.  ``back``: see ``_place_for``. |
+| `transition_scatter_seed` | function | 223 | `(kind: str) -> int` | The entry-state draw every machine's ``kind`` crossing starts from. |
+| `TransitionResult` | class | 127 | — | One crossing, measured.  Every field is a raw physical quantity or a |
+| `TransitionSet` | class | 798 | — | All crossings attempted in one evaluation. |
+| `CrossingTracker.__init__` | method | 365 | `(self, env: TriphibianEnv, kind: str)` | — |
+| `CrossingTracker.commanded` | method | 398 | `(self, i: int) -> Domain` | The medium the controller is told about at step ``i``. |
+| `CrossingTracker.energy_height_loss` | method | 387 | `(self) -> float \| None` | Energy height lost over the hold, metres, from the fitted slope; |
+| `CrossingTracker.finish` | method | 461 | `(self, env: TriphibianEnv, r: TransitionResult, n_steps: int) -> int` | Set ``r.hold``, ``r.started_in``, ``r.crossed``; return the cross step. |
+| `CrossingTracker.hold_score` | method | 447 | `(self) -> float` | — |
+| `CrossingTracker.observe` | method | 402 | `(self, env: TriphibianEnv, i: int) -> None` | — |
+| `TransitionResult.components` | property | 209 | `(self) -> dict[str, float]` | The scored parts, for the judge to weight. |
+| `TransitionSet.component_means` | method | 809 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
+| `TransitionSet.crossed_fraction` | property | 804 | `(self) -> float` | — |
 
 ## `envs.triphibian` — `dytiscidae/envs/triphibian.py`
 
@@ -840,44 +855,47 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `airworthiness` | function | 317 | `(p: Phenotype) -> list[str]` | Which flight gates a design fails, as reasons.  Empty means none. |
-| `command_statistics` | function | 103 | `(commands) -> tuple[float, float] \| None` | How much, and how erratically, a controller's commands move. |
+| `airworthiness` | function | 342 | `(p: Phenotype) -> list[str]` | Which flight gates a design fails, as reasons.  Empty means none. |
+| `command_statistics` | function | 114 | `(commands) -> tuple[float, float] \| None` | How much, and how erratically, a controller's commands move. |
 | `Domain` | class | 66 | `(str, Enum)` | — |
-| `evaluate_tier0` | function | 386 | `(p: Phenotype, spec: MissionSpec \| None=None) -> MissionResult` | Closed-form feasibility and energy budget.  No simulation. |
-| `MissionResult` | class | 172 | — | Aggregate of a whole evaluation, at whatever fidelity produced it. |
+| `evaluate_tier0` | function | 411 | `(p: Phenotype, spec: MissionSpec \| None=None) -> MissionResult` | Closed-form feasibility and energy budget.  No simulation. |
+| `MissionResult` | class | 183 | — | Aggregate of a whole evaluation, at whatever fidelity produced it. |
 | `MissionSpec` | class | 79 | — | The mission the user specified, with every number left adjustable. |
-| `morphology_channels` | function | 464 | `(*, mass: float, density_ratio: float, wing_area: float, span: float, aspect_ratio: float, wing_loading: float, n_actuated: int, battery_wh: float) -> np.ndarray` | The eight body-identity channels, from scalars rather than a phenotype. |
-| `rotor_lift_ratio` | function | 305 | `(p: Phenotype) -> float` | Static thrust of every propeller at top speed, in air, over the weight. |
-| `SegmentResult` | class | 128 | — | What one stretch of operating in one domain produced. |
-| `TriphibianEnv` | class | 494 | — | A compiled machine in the triphibian world, steppable by a controller. |
-| `MissionResult.energy_margin` | property | 215 | `(self) -> float` | — |
-| `MissionSpec.total_seconds` | property | 95 | `(self) -> float` | — |
-| `MissionSpec.transitions` | property | 99 | `(self) -> list[str]` | — |
-| `SegmentResult.cost_of_transport` | property | 164 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
-| `TriphibianEnv.__init__` | method | 572 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
-| `TriphibianEnv.body_twist` | method | 1299 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
-| `TriphibianEnv.clearance` | method | 1381 | `(self) -> float` | Height of the machine above the ground beneath it, metres. |
-| `TriphibianEnv.depth` | method | 1327 | `(self) -> float` | — |
-| `TriphibianEnv.flap_travel` | method | 905 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
-| `TriphibianEnv.ground_height` | method | 1351 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
-| `TriphibianEnv.ground_heights` | method | 1360 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
-| `TriphibianEnv.identify` | method | 2796 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
-| `TriphibianEnv.launch_pitch` | property | 875 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
-| `TriphibianEnv.launch_speed` | property | 843 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
-| `TriphibianEnv.level_margin` | method | 1054 | `(self)` | Can this machine hold height *and* speed, with its own actuators? |
-| `TriphibianEnv.lift_margin` | property | 891 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
-| `TriphibianEnv.morphology_context` | property | 1428 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
-| `TriphibianEnv.observation` | method | 1467 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
-| `TriphibianEnv.reset` | method | 720 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
-| `TriphibianEnv.restore` | method | 1290 | `(self, snap: tuple) -> None` | — |
-| `TriphibianEnv.rollout` | method | 1631 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
-| `TriphibianEnv.root_pos` | method | 1324 | `(self) -> np.ndarray` | — |
-| `TriphibianEnv.scatter` | method | 751 | `(self, rng, *, strength: float=1.0) -> None` | Widen the initial condition, from a caller-supplied generator. |
-| `TriphibianEnv.servo_command` | method | 1604 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
-| `TriphibianEnv.snapshot` | method | 1287 | `(self) -> tuple` | — |
-| `TriphibianEnv.step` | method | 1613 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
-| `TriphibianEnv.task_channels` | method | 1552 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
-| `TriphibianEnv.thrust_margin` | method | 933 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
+| `morphology_channels` | function | 489 | `(*, mass: float, density_ratio: float, wing_area: float, span: float, aspect_ratio: float, wing_loading: float, n_actuated: int, battery_wh: float) -> np.ndarray` | The eight body-identity channels, from scalars rather than a phenotype. |
+| `rotor_lift_ratio` | function | 330 | `(p: Phenotype) -> float` | Static thrust of every propeller at top speed, in air, over the weight. |
+| `SegmentResult` | class | 139 | — | What one stretch of operating in one domain produced. |
+| `TriphibianEnv` | class | 519 | — | A compiled machine in the triphibian world, steppable by a controller. |
+| `MissionResult.energy_margin` | property | 230 | `(self) -> float` | — |
+| `MissionSpec.total_seconds` | property | 106 | `(self) -> float` | — |
+| `MissionSpec.transitions` | property | 110 | `(self) -> list[str]` | — |
+| `SegmentResult.cost_of_transport` | property | 175 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
+| `TriphibianEnv.__init__` | method | 601 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
+| `TriphibianEnv.body_twist` | method | 1338 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
+| `TriphibianEnv.clearance` | method | 1446 | `(self) -> float` | `_clearance_now`, remembered for the state it was computed on. |
+| `TriphibianEnv.clearance_many` | method | 1465 | `(envs, active=None) -> None` | Fill the `clearance` memo of every (active) machine in one array |
+| `TriphibianEnv.depth` | method | 1385 | `(self) -> float` | — |
+| `TriphibianEnv.flap_travel` | method | 936 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
+| `TriphibianEnv.flies_level` | method | 1085 | `(self) -> bool` | Whether ``level_margin`` clears ``LEVEL_GATE`` (ROADMAP AD). |
+| `TriphibianEnv.ground_height` | method | 1409 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
+| `TriphibianEnv.ground_heights` | method | 1418 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
+| `TriphibianEnv.held_still_params` | method | 1363 | `(self) -> CPGParams` | The base gait with every actuator held still: the still machine of |
+| `TriphibianEnv.identify` | method | 2923 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.launch_pitch` | property | 906 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
+| `TriphibianEnv.launch_speed` | property | 874 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
+| `TriphibianEnv.level_margin` | method | 1093 | `(self)` | Can this machine hold height *and* speed, with its own actuators? |
+| `TriphibianEnv.lift_margin` | property | 922 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
+| `TriphibianEnv.morphology_context` | property | 1549 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
+| `TriphibianEnv.observation` | method | 1588 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
+| `TriphibianEnv.reset` | method | 749 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
+| `TriphibianEnv.restore` | method | 1329 | `(self, snap: tuple) -> None` | — |
+| `TriphibianEnv.rollout` | method | 1752 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
+| `TriphibianEnv.root_pos` | method | 1382 | `(self) -> np.ndarray` | — |
+| `TriphibianEnv.scatter` | method | 782 | `(self, rng, *, strength: float=1.0) -> None` | Widen the initial condition, from a caller-supplied generator. |
+| `TriphibianEnv.servo_command` | method | 1725 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
+| `TriphibianEnv.snapshot` | method | 1326 | `(self) -> tuple` | — |
+| `TriphibianEnv.step` | method | 1734 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
+| `TriphibianEnv.task_channels` | method | 1673 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
+| `TriphibianEnv.thrust_margin` | method | 964 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
 
 ## `evolution.archive` — `dytiscidae/evolution/archive.py`
 
@@ -893,17 +911,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `Archive.capacity` | property | 118 | `(self) -> int` | — |
 | `Archive.cell_of` | method | 138 | `(self, descriptor: np.ndarray) -> tuple[int, ...]` | — |
 | `Archive.coverage` | property | 122 | `(self) -> float` | — |
-| `Archive.export_json` | method | 417 | `(self, path: str \| Path) -> None` | Human- and browser-readable dump for the dashboard. |
+| `Archive.export_json` | method | 441 | `(self, path: str \| Path) -> None` | Human- and browser-readable dump for the dashboard. |
 | `Archive.front` | method | 179 | `(self, cell: tuple[int, ...]) -> list['Elite']` | The non-dominated set occupying a cell. |
 | `Archive.front_size` | property | 184 | `(self) -> int` | Total designs held across all cells, fronts included. |
-| `Archive.load` | method | 406 | `(path: str \| Path) -> 'Archive'` | — |
-| `Archive.neighbour_density` | method | 335 | `(self, cell: tuple[int, ...], radius: int=1) -> int` | How crowded the neighbourhood of a cell is. |
-| `Archive.project` | method | 348 | `(self, ax_x: int, ax_y: int) -> tuple[np.ndarray, np.ndarray]` | 2D projection for plotting: max fitness and occupancy per (x, y) bin. |
+| `Archive.load` | method | 430 | `(path: str \| Path) -> 'Archive'` | — |
+| `Archive.neighbour_density` | method | 359 | `(self, cell: tuple[int, ...], radius: int=1) -> int` | How crowded the neighbourhood of a cell is. |
+| `Archive.project` | method | 372 | `(self, ax_x: int, ax_y: int) -> tuple[np.ndarray, np.ndarray]` | 2D projection for plotting: max fitness and occupancy per (x, y) bin. |
 | `Archive.qd_score` | property | 126 | `(self) -> float` | Sum of elite fitnesses: the standard scalar summary of a QD run. |
-| `Archive.rebin` | method | 289 | `(self, axes: list[tuple[str, float, float, int]], reproject) -> dict` | Rebuild the grid under new axes, re-placing every elite. |
-| `Archive.remove` | method | 271 | `(self, cell: tuple[int, ...]) -> bool` | Empty a cell completely. |
-| `Archive.save` | method | 379 | `(self, path: str \| Path) -> None` | Write the archive, atomically. |
-| `Archive.snapshot` | method | 360 | `(self) -> dict` | A JSON-safe summary, recorded once per generation for the dashboard. |
+| `Archive.rebin` | method | 313 | `(self, axes: list[tuple[str, float, float, int]], reproject) -> dict` | Rebuild the grid under new axes, re-placing every elite. |
+| `Archive.remove` | method | 295 | `(self, cell: tuple[int, ...]) -> bool` | Empty a cell completely. |
+| `Archive.save` | method | 403 | `(self, path: str \| Path) -> None` | Write the archive, atomically. |
+| `Archive.snapshot` | method | 384 | `(self) -> dict` | A JSON-safe summary, recorded once per generation for the dashboard. |
+| `Archive.would_add` | method | 237 | `(self, fitness: float, descriptor, objectives=None) -> str` | What ``add`` would return for this candidate, changing nothing. |
 | `Elite.curiosity` | property | 82 | `(self) -> float` | — |
 
 ## `evolution.auditor` — `dytiscidae/evolution/auditor.py`
@@ -944,17 +963,21 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Critic` | class | 119 | — | Predicts how much of a cheap score survives expensive checking. |
-| `critic_features` | function | 84 | `(meta: dict, result) -> np.ndarray` | Assemble the cheap feature vector for one candidate. |
-| `Critic.discount` | method | 231 | `(self, features: np.ndarray) -> float` | Multiplier in [1 - max_discount, 1] to apply to a cheap score. |
-| `Critic.distrusts` | method | 259 | `(self, top: int=3) -> list` | Which measurements the critic has learned to read as warning signs. |
-| `Critic.due` | method | 180 | `(self) -> bool` | — |
-| `Critic.fit` | method | 188 | `(self) -> bool` | — |
-| `Critic.fitted` | property | 177 | `(self) -> bool` | — |
-| `Critic.label` | method | 157 | `(self, features: np.ndarray, retained: float) -> None` | Record one (cheap features, expensive outcome) pair. |
-| `Critic.predict` | method | 221 | `(self, features: np.ndarray) -> float` | Predicted fraction of the cheap score that would survive. |
-| `Critic.report` | method | 274 | `(self) -> dict` | — |
-| `Critic.suspicion` | method | 246 | `(self, features: np.ndarray) -> float` | How badly this design is expected to fail expensive checking. |
+| `Critic` | class | 168 | — | Predicts how far a cheap score moves under expensive checking. |
+| `critic_features` | function | 133 | `(meta: dict, result) -> np.ndarray` | Assemble the cheap feature vector for one candidate. |
+| `expensive_outcome` | function | 115 | `(result) -> np.ndarray` | The expensive tier's values for ``CRITIC_TARGETS``, from a MissionResult. |
+| `Critic.discount` | method | 355 | `(self, features: np.ndarray) -> float` | Multiplier in [1 - max_discount, 1] to apply to a cheap score. |
+| `Critic.distrusts` | method | 384 | `(self, top: int=3) -> list` | Which measurements the critic has learned to read as warning signs. |
+| `Critic.due` | method | 272 | `(self) -> bool` | — |
+| `Critic.fit` | method | 280 | `(self) -> bool` | — |
+| `Critic.fitted` | property | 269 | `(self) -> bool` | — |
+| `Critic.label` | method | 228 | `(self, features: np.ndarray, expensive) -> None` | Record one (cheap features, expensive outcome) pair. |
+| `Critic.observe` | method | 258 | `(self, features, result) -> None` | Label from a Tier-2 result: the one call the verification loop makes. |
+| `Critic.observe_invalid` | method | 263 | `(self, features) -> None` | Label a design the auditor invalidated: nothing survived. |
+| `Critic.predict` | method | 351 | `(self, features: np.ndarray) -> float` | Predicted mean residual: negative means the cheap score overstates. |
+| `Critic.predict_components` | method | 340 | `(self, features: np.ndarray) -> np.ndarray` | Predicted residual, expensive minus cheap, for each target. |
+| `Critic.report` | method | 401 | `(self) -> dict` | — |
+| `Critic.suspicion` | method | 371 | `(self, features: np.ndarray) -> float` | How badly this design is expected to fail expensive checking. |
 
 ## `evolution.curator` — `dytiscidae/evolution/curator.py`
 
@@ -997,20 +1020,29 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Curriculum` | class | 207 | — | Tracks what each lineage is ready to be asked. |
-| `stage_score` | function | 100 | `(stage: int, result, transitions=None, *, domains=None, transition_names=None) -> float` | How well a result answers the question *this* stage asks. |
-| `StageResult` | class | 77 | — | — |
-| `Curriculum.evaluate` | method | 402 | `(self, cell, result, transitions=None) -> StageResult` | Score a design at its cell's stage, and at the next one up. |
-| `Curriculum.forget` | method | 476 | `(self, cell) -> None` | Drop a cell's stage when the cell itself is gone. |
-| `Curriculum.handover` | method | 289 | `(self, stage: int) -> float` | How much weight the island's own objective has earned, in [0, 1]. |
-| `Curriculum.mission_standing` | method | 377 | `(self, mission: float, stage: int=0) -> float` | ``mission_fraction`` as a population quantile, on the same scale. |
-| `Curriculum.observe_blend` | method | 277 | `(self, island_score: float, curriculum_score: float, stage: int=0, mission: float=0.0) -> None` | Record what each half of the blend said about one design. |
-| `Curriculum.rebuild_from` | method | 449 | `(self, archive) -> dict` | Re-key the stage record after the descriptor axes have moved. |
-| `Curriculum.report` | method | 485 | `(self) -> dict` | — |
-| `Curriculum.seed_stage` | method | 256 | `(self, cell, stage: int) -> int` | Give an unvisited cell the stage its parent had earned. |
-| `Curriculum.stage_of` | method | 253 | `(self, cell) -> int` | — |
-| `Curriculum.standing` | method | 336 | `(self, island_score: float, curriculum_score: float, stage: int=0)` | Both halves of the blend as population quantiles in [0, 1]. |
-| `Curriculum.update` | method | 420 | `(self, cell, sr: StageResult) -> str` | Promote or demote the cell.  Returns what happened. |
+| `Curriculum` | class | 290 | — | Tracks what each lineage is ready to be asked. |
+| `DistanceCurriculum` | class | 653 | — | Move each transition probe's start back as the population crosses it. |
+| `stage_score` | function | 165 | `(stage: int, result, transitions=None, *, domains=None, transition_names=None, weakest: bool=False) -> float` | How well a result answers the question *this* stage asks. |
+| `StageResult` | class | 142 | — | — |
+| `triphibian_stage_score` | function | 109 | `(stage: int, comps, crossing: dict \| None=None, mission: float=0.0) -> float` | What stage ``stage`` of the triphibian ladder reads. |
+| `Curriculum.bar` | method | 343 | `(self, stage: int) -> float` | The bar to leave ``stage`` on this curriculum's ladder. |
+| `Curriculum.evaluate` | method | 505 | `(self, cell, result, transitions=None, *, stage: int \| None=None) -> StageResult` | Score a design at its cell's stage, and at the next one up. |
+| `Curriculum.forget` | method | 604 | `(self, cell) -> None` | Drop a cell's stage when the cell itself is gone. |
+| `Curriculum.handover` | method | 392 | `(self, stage: int) -> float` | How much weight the island's own objective has earned, in [0, 1]. |
+| `Curriculum.mission_standing` | method | 480 | `(self, mission: float, stage: int=0) -> float` | ``mission_fraction`` as a population quantile, on the same scale. |
+| `Curriculum.observe_blend` | method | 380 | `(self, island_score: float, curriculum_score: float, stage: int=0, mission: float=0.0) -> None` | Record what each half of the blend said about one design. |
+| `Curriculum.rebuild_from` | method | 577 | `(self, archive) -> dict` | Re-key the stage record after the descriptor axes have moved. |
+| `Curriculum.report` | method | 613 | `(self) -> dict` | — |
+| `Curriculum.seed_stage` | method | 354 | `(self, cell, stage: int) -> int` | Give an unvisited cell the stage its parent had earned. |
+| `Curriculum.stage_for` | method | 373 | `(self, cell, stage: int) -> int` | The stage ``seed_stage`` would give ``cell``, without giving it. |
+| `Curriculum.stage_name` | method | 349 | `(self, stage: int) -> str` | — |
+| `Curriculum.stage_of` | method | 340 | `(self, cell) -> int` | — |
+| `Curriculum.standing` | method | 439 | `(self, island_score: float, curriculum_score: float, stage: int=0)` | Both halves of the blend as population quantiles in [0, 1]. |
+| `Curriculum.update` | method | 529 | `(self, cell, sr: StageResult) -> str` | Promote or demote the cell.  Returns what happened. |
+| `DistanceCurriculum.apply` | method | 723 | `(self, spec) -> None` | Write the current starts into the mission spec the evaluators read. |
+| `DistanceCurriculum.observe` | method | 684 | `(self, result) -> None` | Record one Tier-1 result's crossings and its air score. |
+| `DistanceCurriculum.report` | method | 729 | `(self) -> dict` | — |
+| `DistanceCurriculum.update` | method | 700 | `(self) -> list` | Step any start the population has earned.  Returns the moves. |
 
 ## `evolution.descriptors` — `dytiscidae/evolution/descriptors.py`
 
@@ -1035,16 +1067,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Archipelago` | class | 193 | — | Several archives, evolved in parallel, with migration and hybridisation. |
-| `curriculum_for` | function | 148 | `(island: str)` | A curriculum that asks an island's questions in the island's own media. |
-| `island_score` | function | 109 | `(island: str, result, transitions=None) -> float` | Score a design on one island's own terms. |
-| `own_domain_score` | function | 165 | `(island: str, meta: dict) -> float` | How good a stored elite is at *its island's own* domains, from its meta. |
-| `Archipelago.due` | method | 229 | `(self, generation: int) -> bool` | — |
-| `Archipelago.emigrants` | method | 232 | `(self, name: str) -> list` | The designs this island sends abroad: its best, by its own lights. |
-| `Archipelago.migrate` | method | 240 | `(self, generation: int, rng: np.random.Generator, crossover=None) -> list` | Move genomes between islands and cross specialists. |
-| `Archipelago.names` | property | 220 | `(self) -> list` | — |
-| `Archipelago.register` | method | 223 | `(self, name: str, archive, curator) -> None` | — |
-| `Archipelago.report` | method | 296 | `(self) -> dict` | — |
+| `Archipelago` | class | 275 | — | Several archives, evolved in parallel, with migration and hybridisation. |
+| `curriculum_for` | function | 227 | `(island: str)` | A curriculum that asks an island's questions in the island's own media. |
+| `island_score` | function | 185 | `(island: str, result, transitions=None) -> float` | Score a design on one island's own terms. |
+| `own_domain_score` | function | 245 | `(island: str, meta: dict) -> float` | How good a stored elite is at *its island's own* domains, from its meta. |
+| `triphibian_score` | function | 138 | `(comps, floor: float=TRIPHIBIAN_FLOOR) -> float` | The triphibian island's objective: a soft minimum of the three media. |
+| `Archipelago.colonists` | method | 395 | `(self, name: str, n: int) -> list` | Immigrants for an island that is empty, from every other island. |
+| `Archipelago.due` | method | 311 | `(self, generation: int) -> bool` | — |
+| `Archipelago.emigrants` | method | 314 | `(self, name: str) -> list` | The designs this island sends abroad: its best, by its own lights. |
+| `Archipelago.migrate` | method | 322 | `(self, generation: int, rng: np.random.Generator, crossover=None) -> list` | Move genomes between islands and cross specialists. |
+| `Archipelago.names` | property | 302 | `(self) -> list` | — |
+| `Archipelago.register` | method | 305 | `(self, name: str, archive, curator) -> None` | — |
+| `Archipelago.report` | method | 418 | `(self) -> dict` | — |
 
 ## `evolution.judge` — `dytiscidae/evolution/judge.py`
 
@@ -1052,17 +1086,17 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Judge` | class | 421 | — | Scores a design against a fixed ladder and a ratcheting bar. |
-| `Ratchet` | class | 319 | — | A bar that tracks the population and never moves back down. |
-| `rung_reached` | function | 293 | `(domain: str, measurements: dict[str, float]) -> int` | How many rungs of ``domain``'s ladder these measurements clear. |
-| `Judge.maybe_tighten` | method | 448 | `(self, generation: int) -> list[dict]` | Tighten any bar that the population has outgrown. |
-| `Judge.observe` | method | 441 | `(self, measurements: dict[str, dict[str, float]]) -> None` | Record one design's raw measurements, keyed by domain. |
-| `Judge.report` | method | 489 | `(self) -> dict` | — |
-| `Judge.score` | method | 461 | `(self, domain: str, measurements: dict[str, float]) -> dict` | Score one domain.  Returns rung, within-rung fraction, and total. |
-| `Ratchet.observe` | method | 346 | `(self, value: float) -> None` | — |
-| `Ratchet.rollback` | method | 369 | `(self) -> bool` | Undo the most recent tightening. |
-| `Ratchet.score` | method | 384 | `(self, value: float) -> float` | Fraction of the current bar this value achieves, in [0, 1]. |
-| `Ratchet.update` | method | 352 | `(self, generation: int) -> bool` | Recompute the bar.  Returns True if it tightened. |
+| `Judge` | class | 427 | — | Scores a design against a fixed ladder and a ratcheting bar. |
+| `Ratchet` | class | 325 | — | A bar that tracks the population and never moves back down. |
+| `rung_reached` | function | 299 | `(domain: str, measurements: dict[str, float]) -> int` | How many rungs of ``domain``'s ladder these measurements clear. |
+| `Judge.maybe_tighten` | method | 454 | `(self, generation: int) -> list[dict]` | Tighten any bar that the population has outgrown. |
+| `Judge.observe` | method | 447 | `(self, measurements: dict[str, dict[str, float]]) -> None` | Record one design's raw measurements, keyed by domain. |
+| `Judge.report` | method | 495 | `(self) -> dict` | — |
+| `Judge.score` | method | 467 | `(self, domain: str, measurements: dict[str, float]) -> dict` | Score one domain.  Returns rung, within-rung fraction, and total. |
+| `Ratchet.observe` | method | 352 | `(self, value: float) -> None` | — |
+| `Ratchet.rollback` | method | 375 | `(self) -> bool` | Undo the most recent tightening. |
+| `Ratchet.score` | method | 390 | `(self, value: float) -> float` | Fraction of the current bar this value achieves, in [0, 1]. |
+| `Ratchet.update` | method | 358 | `(self, generation: int) -> bool` | Recompute the bar.  Returns True if it tightened. |
 
 ## `evolution.loop` — `dytiscidae/evolution/loop.py`
 
@@ -1070,25 +1104,25 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 694 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `evaluate_candidate` | function | 343 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 466 | `(genomes, cfg: SearchConfig, *, inherited=None, identify: bool=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 374 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 1714 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 1039 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 1594 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 842 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `evaluate_candidate` | function | 412 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 535 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 443 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2135 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 1369 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2010 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 64 | — | Everything adjustable about a run. |
-| `SearchState` | class | 255 | — | — |
-| `seed_archipelago` | function | 1974 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 391 | `(self)` | — |
-| `GenerationCost.count` | method | 411 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 397 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 404 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 420 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 417 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 312 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 316 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 320 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 321 | — | — |
+| `seed_archipelago` | function | 2399 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `GenerationCost.__init__` | method | 460 | `(self)` | — |
+| `GenerationCost.count` | method | 480 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 466 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 473 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 489 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 486 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 381 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 385 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 389 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1132,36 +1166,50 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `DistillResult.lines` | method | 285 | `(self) -> list` | — |
 | `Teacher.policy` | method | 101 | `(self, n_modes: int) -> Policy` | — |
 
+## `learning.grpo` — `dytiscidae/learning/grpo.py`
+
+> GRPO for the shared policy (ROADMAP item N): group-relative advantages.
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `group_advantages` | function | 79 | `(rewards, keys, eps: float=STD_EPS) -> np.ndarray` | ``(R - mean_g) / (std_g + eps)`` for each element, ``g`` being its key. |
+| `GroupRolloutBuffer` | class | 98 | `(RolloutBuffer)` | Trajectories of repeated rollouts, flattened with group-relative advantages. |
+| `GroupRolloutBuffer.__init__` | method | 107 | `(self)` | — |
+| `GroupRolloutBuffer.advantages` | method | 138 | `(self)` | ``(kept trajectories, advantage per trajectory)``. |
+| `GroupRolloutBuffer.build` | method | 144 | `(self)` | — |
+| `GroupRolloutBuffer.n_transitions` | property | 135 | `(self) -> int` | — |
+| `GroupRolloutBuffer.stats` | method | 161 | `(self) -> dict` | What a later reading needs to tell "no signal" from "no data". |
+
 ## `learning.ppo` — `dytiscidae/learning/ppo.py`
 
 > PPO over a policy shared by every morphology in the search.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `potential_of` | function | 334 | `(obs, domain: str) -> float` | A state's potential, for potential-based reward shaping. |
-| `ppo_update` | function | 478 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None) -> dict` | One PPO update over everything the generation collected. |
-| `RolloutBuffer` | class | 374 | — | Trajectories from a whole generation, flattened into a PPO batch. |
-| `SegmentCollector` | class | 447 | — | Records one segment's decisions, per machine, into trajectories. |
-| `SharedPolicy` | class | 119 | `(nn.Module if AVAILABLE else object)` | A Gaussian policy and a value head, shared by every morphology. |
-| `Trajectory` | class | 310 | — | One segment's worth of decisions from one machine. |
-| `RolloutBuffer.__init__` | method | 388 | `(self, gamma: float=0.99, lam: float=0.95, shaping: float=0.2)` | — |
-| `RolloutBuffer.add` | method | 394 | `(self, traj: Trajectory) -> None` | — |
-| `RolloutBuffer.build` | method | 409 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |
-| `RolloutBuffer.n_transitions` | property | 399 | `(self) -> int` | — |
-| `SegmentCollector.__init__` | method | 455 | `(self, k: int)` | — |
-| `SegmentCollector.finish` | method | 467 | `(self, buffer: RolloutBuffer, rewards, tag: str='') -> None` | Attach each machine's segment competence and bank the trajectory. |
-| `SegmentCollector.record` | method | 459 | `(self, m: int, obs, act, logp, val, phi: float=0.0) -> None` | — |
-| `SharedPolicy.__init__` | method | 127 | `(self, n_obs: int, n_modes: int, hidden: int=64)` | — |
-| `SharedPolicy.act` | method | 295 | `(self, obs_np, *, deterministic: bool=False)` | One decision, numpy in and numpy out, for use inside a rollout. |
-| `SharedPolicy.act_many` | method | 255 | `(self, obs_np, *, deterministic: bool=False)` | One decision per row, in a single forward pass. |
-| `SharedPolicy.entropy` | method | 209 | `(self, obs)` | Differential entropy of this policy at ``obs``, one-sample estimate. |
-| `SharedPolicy.entropy_of` | method | 239 | `(base)` | The estimator above, on an already-computed ``latent`` distribution. |
-| `SharedPolicy.latent` | method | 178 | `(self, obs)` | The pre-squash Gaussian over intent. |
-| `SharedPolicy.log_prob` | method | 197 | `(self, obs, act)` | Log-density of an already-squashed action, with the tanh Jacobian. |
-| `SharedPolicy.log_prob_and_entropy` | method | 246 | `(self, obs, act)` | Both, from one forward pass through the actor trunk. |
-| `SharedPolicy.normalise` | method | 152 | `(self, obs)` | — |
-| `SharedPolicy.observe` | method | 156 | `(self, obs_np) -> None` | Fold a batch of observations into the running statistics. |
-| `SharedPolicy.value` | method | 194 | `(self, obs)` | — |
+| `potential_of` | function | 374 | `(obs, domain: str) -> float` | A state's potential, for potential-based reward shaping. |
+| `ppo_update` | function | 526 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None, group_buffer=None) -> dict` | One PPO update over everything the generation collected. |
+| `RolloutBuffer` | class | 414 | — | Trajectories from a whole generation, flattened into a PPO batch. |
+| `SegmentCollector` | class | 487 | — | Records one segment's decisions, per machine, into trajectories. |
+| `SharedPolicy` | class | 122 | `(nn.Module if AVAILABLE else object)` | A Gaussian policy and a value head, shared by every morphology. |
+| `Trajectory` | class | 346 | — | One segment's worth of decisions from one machine. |
+| `RolloutBuffer.__init__` | method | 428 | `(self, gamma: float=0.99, lam: float=0.95, shaping: float=0.2)` | — |
+| `RolloutBuffer.add` | method | 434 | `(self, traj: Trajectory) -> None` | — |
+| `RolloutBuffer.build` | method | 449 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |
+| `RolloutBuffer.n_transitions` | property | 439 | `(self) -> int` | — |
+| `SegmentCollector.__init__` | method | 495 | `(self, k: int)` | — |
+| `SegmentCollector.finish` | method | 507 | `(self, buffer: RolloutBuffer, rewards, tag: str='', groups=None) -> None` | Attach each machine's segment competence and bank the trajectory. |
+| `SegmentCollector.record` | method | 499 | `(self, m: int, obs, act, logp, val, phi: float=0.0) -> None` | — |
+| `SharedPolicy.__init__` | method | 130 | `(self, n_obs: int, n_modes: int, hidden: int=64)` | — |
+| `SharedPolicy.act` | method | 317 | `(self, obs_np, *, deterministic: bool=False, rng=None)` | One decision, numpy in and numpy out, for use inside a rollout. |
+| `SharedPolicy.act_many` | method | 258 | `(self, obs_np, *, deterministic: bool=False, rngs=None)` | One decision per row, in a single forward pass. |
+| `SharedPolicy.entropy` | method | 212 | `(self, obs)` | Differential entropy of this policy at ``obs``, one-sample estimate. |
+| `SharedPolicy.entropy_of` | method | 242 | `(base)` | The estimator above, on an already-computed ``latent`` distribution. |
+| `SharedPolicy.latent` | method | 181 | `(self, obs)` | The pre-squash Gaussian over intent. |
+| `SharedPolicy.log_prob` | method | 200 | `(self, obs, act)` | Log-density of an already-squashed action, with the tanh Jacobian. |
+| `SharedPolicy.log_prob_and_entropy` | method | 249 | `(self, obs, act)` | Both, from one forward pass through the actor trunk. |
+| `SharedPolicy.normalise` | method | 155 | `(self, obs)` | — |
+| `SharedPolicy.observe` | method | 159 | `(self, obs_np) -> None` | Fold a batch of observations into the running statistics. |
+| `SharedPolicy.value` | method | 197 | `(self, obs)` | — |
 
 ## `ops.checkpoint` — `dytiscidae/ops/checkpoint.py`
 
@@ -1188,23 +1236,23 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 485 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `cmd_cohort` | function | 426 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_dashboard` | function | 761 | `(args) -> int` | — |
-| `cmd_distill` | function | 799 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 314 | `(args) -> int` | — |
-| `cmd_postrun` | function | 281 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 494 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `cmd_cohort` | function | 435 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_dashboard` | function | 764 | `(args) -> int` | — |
+| `cmd_distill` | function | 802 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 323 | `(args) -> int` | — |
+| `cmd_postrun` | function | 290 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 123 | `(args) -> int` | — |
-| `cmd_render` | function | 768 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_render` | function | 771 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
 | `cmd_search` | function | 158 | `(args) -> int` | — |
-| `cmd_showcase` | function | 619 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 321 | `(args) -> int` | — |
-| `cmd_train` | function | 355 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_showcase` | function | 622 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 330 | `(args) -> int` | — |
+| `cmd_train` | function | 364 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 116 | `(args) -> int` | — |
-| `controller_for_elite` | function | 495 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 255 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 504 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 264 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 31 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 816 | `(argv=None) -> int` | — |
+| `main` | function | 819 | `(argv=None) -> int` | — |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`
 
@@ -1261,9 +1309,10 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `drag_coefficient` | function | 327 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, cl: np.ndarray, lev: np.ndarray \| float=0.0) -> np.ndarray` | Skin friction, plus induced drag, plus separated pressure drag. |
-| `finish_bodies` | function | 748 | `(fb: np.ndarray, fsum_b: np.ndarray, m_body: np.ndarray, limit: float) -> bool` | Per-machine limiter and weight cancellation, in place on ``fb`` (nb, 6). |
+| `entrainment_reaction` | function | 815 | `(fb: np.ndarray, m_new: np.ndarray, m_old: np.ndarray, lever2: np.ndarray, vel: np.ndarray, h: float) -> None` | The ``-dm/dt v`` half of ``F = -d(m_a v)/dt``, added in place to ``fb`` |
+| `finish_bodies` | function | 791 | `(fb: np.ndarray, fsum_b: np.ndarray, m_body: np.ndarray, limit: float) -> bool` | Per-machine limiter and weight cancellation, in place on ``fb`` (nb, 6). |
 | `FluidDiagnostics` | class | 361 | — | Per-step aggregates, recorded for observability and for scoring. |
-| `FluidSolver` | class | 772 | — | Applies blade-element fluid loads to a MuJoCo model each step. |
+| `FluidSolver` | class | 851 | — | Applies blade-element fluid loads to a MuJoCo model each step. |
 | `ImplicitAeroDamping` | class | 572 | — | Lift and drag made implicit by splitting their damping off. |
 | `InducedFlow` | class | 460 | — | Momentum-theory downwash of a machine's lifting system, one vector. |
 | `lift_coefficient` | function | 293 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, lev: np.ndarray, alpha_e: np.ndarray \| None=None) -> np.ndarray` | Lift coefficient: attached below stall, separated normal force above. |
@@ -1271,20 +1320,20 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `PanelSet` | class | 94 | — | The fluid-facing discretisation of a machine. |
 | `rossby_lev` | function | 405 | `(U, chord, omega, s_hat)` | LEV strength from the strip's own Rossby number, ``U / (\|w_perp\| c)``. |
 | `skin_friction_cd` | function | 242 | `(re: np.ndarray) -> np.ndarray` | Two-sided skin friction coefficient of a flat plate. |
-| `slam_mass` | function | 734 | `(m_add, rho, chord, dr, is_wing, scale: float=1.0) -> np.ndarray` | The entrained mass the slam diagnostic differences: a wing's *normal* |
-| `strip_damping` | function | 710 | `(q, area, lift, drag, rho, aspect_ratio, is_wing, lift_scale: float=1.0) -> np.ndarray` | Per-strip damping bound ``b_i`` for `ImplicitAeroDamping`, N s/m. |
+| `slam_mass` | function | 777 | `(m_add, rho, chord, dr, is_wing, scale: float=1.0) -> np.ndarray` | The entrained mass the slam diagnostic differences: a wing's *normal* |
+| `strip_damping` | function | 753 | `(q, area, lift, drag, rho, aspect_ratio, is_wing, lift_scale: float=1.0) -> np.ndarray` | Per-strip damping bound ``b_i`` for `ImplicitAeroDamping`, N s/m. |
 | `UnsteadyState` | class | 420 | — | Per-strip history: Wagner lag and chords travelled since reversal. |
-| `FluidSolver.__init__` | method | 783 | `(self, model, panels: PanelSet, medium: MediumField, *, c_rot: float \| None=None, added_mass_scale: float=1.0, cd_scale: float=1.0, lift_scale: float=1.0, disc_span: float \| None=None) -> None` | — |
-| `FluidSolver.apply` | method | 954 | `(self, data, t: float) -> FluidDiagnostics` | Compute and accumulate fluid loads into ``data.xfrc_applied``. |
-| `FluidSolver.instantaneous_power` | method | 1406 | `(self, data) -> float` | Mechanical power the machine is currently putting into the fluid, W. |
-| `FluidSolver.reset` | method | 939 | `(self) -> None` | — |
-| `FluidSolver.steady` | method | 916 | `(self)` | Context for quasi-static probes (trim, lift and thrust margins). |
-| `ImplicitAeroDamping.__init__` | method | 598 | `(self, model) -> None` | — |
-| `ImplicitAeroDamping.apply` | method | 693 | `(self, data, pos: np.ndarray, body_id: np.ndarray, b) -> None` | ``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip -- |
-| `ImplicitAeroDamping.clear` | method | 641 | `(self, data) -> None` | The step's damping with the split off: the dry model's own.  Called |
-| `ImplicitAeroDamping.due` | method | 632 | `(self) -> bool` | Whether this step recomputes B (callers skip forming ``b`` if not). |
-| `ImplicitAeroDamping.projected` | method | 648 | `(self, data, pos, body_id, b) -> np.ndarray` | ``B_k = sum_i b_i \|lin_k + rot_k x r_i\|^2`` over strips on bodies dof |
-| `ImplicitAeroDamping.reset` | method | 636 | `(self) -> None` | — |
+| `FluidSolver.__init__` | method | 862 | `(self, model, panels: PanelSet, medium: MediumField, *, c_rot: float \| None=None, added_mass_scale: float=1.0, cd_scale: float=1.0, lift_scale: float=1.0, disc_span: float \| None=None) -> None` | — |
+| `FluidSolver.apply` | method | 1041 | `(self, data, t: float) -> FluidDiagnostics` | Compute and accumulate fluid loads into ``data.xfrc_applied``. |
+| `FluidSolver.instantaneous_power` | method | 1504 | `(self, data) -> float` | Mechanical power the machine is currently putting into the fluid, W. |
+| `FluidSolver.reset` | method | 1023 | `(self) -> None` | — |
+| `FluidSolver.steady` | method | 1000 | `(self)` | Context for quasi-static probes (trim, lift and thrust margins). |
+| `ImplicitAeroDamping.__init__` | method | 598 | `(self, model, medium=None, half_height=None) -> None` | — |
+| `ImplicitAeroDamping.apply` | method | 719 | `(self, data, pos: np.ndarray, body_id: np.ndarray, b) -> None` | ``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip -- |
+| `ImplicitAeroDamping.clear` | method | 667 | `(self, data) -> None` | The step's damping with the split off: the dry model's own.  Called |
+| `ImplicitAeroDamping.due` | method | 639 | `(self) -> bool` | Whether this step recomputes B (callers skip forming ``b`` if not). |
+| `ImplicitAeroDamping.projected` | method | 674 | `(self, data, pos, body_id, b) -> np.ndarray` | ``B_k = sum_i b_i \|lin_k + rot_k x r_i\|^2`` over strips on bodies dof |
+| `ImplicitAeroDamping.reset` | method | 659 | `(self) -> None` | — |
 | `InducedFlow.__init__` | method | 489 | `(self, span: float) -> None` | — |
 | `InducedFlow.due` | method | 495 | `(self) -> bool` | — |
 | `InducedFlow.reset` | method | 501 | `(self) -> None` | — |
@@ -1350,12 +1399,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `bemt` | function | 80 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, rho: float, mu: float) -> tuple[float, float]` | Thrust (N, along the spin axis) and aerodynamic torque (N m, resisting |
-| `rotor_forces` | function | 183 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, medium_frac: float, air, water) -> tuple[float, float]` | Thrust and torque from the tables, blended across the free surface by |
-| `rotor_table` | function | 143 | `(spec: RotorSpec, rho: float, mu_visc: float)` | ``(CT, CQ)`` over ``TABLE_J x TABLE_MU``, with ``T = rho Om^2 R^4 CT`` |
-| `RotorSet` | class | 208 | — | Every rotor of one machine, applied each step like `JetSet`. |
+| `bemt_many` | function | 130 | `(spec: RotorSpec, omega, v_ax, v_ip, rho: float, mu: float)` | `bemt` at many operating points of one rotor at once: ``omega``, |
+| `rotor_forces` | function | 262 | `(spec: RotorSpec, omega: float, v_ax: float, v_ip: float, medium_frac: float, air, water) -> tuple[float, float]` | Thrust and torque from the tables, blended across the free surface by |
+| `rotor_forces_many` | function | 290 | `(omega, v_ax, v_ip, frac_w, R, R4, tabs, rhos, rows=None)` | `rotor_forces` for many rotors at once, each with its own table. |
+| `rotor_table` | function | 206 | `(spec: RotorSpec, rho: float, mu_visc: float)` | ``(CT, CQ)`` over ``TABLE_J x TABLE_MU``, with ``T = rho Om^2 R^4 CT`` |
+| `RotorBatch` | class | 343 | — | The rotors of several machines, stepped as one array computation. |
+| `RotorSet` | class | 497 | — | Every rotor of one machine, applied each step like `JetSet`. |
 | `RotorSpec` | class | 51 | — | Geometry of one fixed-pitch rotor. |
-| `RotorSet.__init__` | method | 211 | `(self, model, specs: dict) -> None` | ``specs`` maps a rotor body name to its `RotorSpec`. |
-| `RotorSet.apply` | method | 261 | `(self, model, data, medium, t: float) -> float` | Add rotor thrust and aerodynamic torque to ``data.xfrc_applied``. |
+| `RotorBatch.__init__` | method | 354 | `(self, sets) -> None` | — |
+| `RotorBatch.apply` | method | 384 | `(self, items, t: float) -> np.ndarray` | ``items``: ``(index of the set, model, data, medium)`` per machine to |
+| `RotorSet.__init__` | method | 500 | `(self, model, specs: dict) -> None` | ``specs`` maps a rotor body name to its `RotorSpec`. |
+| `RotorSet.apply` | method | 557 | `(self, model, data, medium, t: float) -> float` | Add rotor thrust and aerodynamic torque to ``data.xfrc_applied``. |
+| `RotorSet.apply_per_rotor` | method | 567 | `(self, model, data, medium, t: float) -> float` | The per-rotor loop `RotorBatch` replaced, kept as the readable |
 | `RotorSpec.stations` | method | 71 | `(self)` | — |
 
 ## `physics.structure` — `dytiscidae/physics/structure.py`
