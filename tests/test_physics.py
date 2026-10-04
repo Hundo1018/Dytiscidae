@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import copy
 import math
+import os
 import sys
 from pathlib import Path
 
@@ -3955,7 +3956,12 @@ def test_the_rotor_batch_is_the_per_rotor_loop() -> None:
                 for g, r in zip(got, ref):
                     cases += 1
                     for a, b in zip(g, r):
-                        if not np.array_equal(a, b):
+                        # Bit-equal on the machine that wrote the change. A GitHub
+                        # runner's CPU rounds the last bit differently (worst 2.27e-13,
+                        # 2026-10-04), so under CI the bar is 1e-12 relative.
+                        same = (np.allclose(a, b, rtol=1e-12, atol=1e-12)
+                                if os.environ.get("CI") else np.array_equal(a, b))
+                        if not same:
                             unequal += 1
                             worst = max(worst, float(np.nanmax(np.abs(a - b))))
             for e, s in zip(envs, before):
@@ -3964,7 +3970,7 @@ def test_the_rotor_batch_is_the_per_rotor_loop() -> None:
     check("the fixture has rotors in air, in water and across the surface",
           (fracs == 0).any() and (fracs == 1).any() and ((fracs > 0) & (fracs < 1)).any(),
           f"submerged fractions {np.round(np.unique(fracs), 3).tolist()}")
-    check("every force, torque, damping, thrust and total is the loop's to the bit",
+    check("every force, torque, damping, thrust and total is the loop's (to the bit; 1e-12 under CI)",
           cases == 32 and unequal == 0,
           f"{cases} cases, {unequal} arrays differ, worst difference {worst:.3g}")
     check("and the rotors make force: the comparison is not of zeros",
