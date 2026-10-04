@@ -327,6 +327,17 @@ caught two more on the way, a floating body counted as "aloft" and a placement
 gap counted as height. **Run the still-machine check on every score, including
 the ones that look like plain physics.**
 
+The ninth, 2026-10-04, was what the eighth's fix left: still machines still
+crossed 2-5% of the time, at or above the elites' own rate. A glider coasting at
+20 m/s held its *height* through the hold while losing 3-6 m of *energy* height;
+a body floating over the submerged ramp counted as "on land"; and the "still"
+arm left rotors at throttle, because a rotor's channel is a speed held at its
+offset and zeroing amplitude does not stop it. Gated (`CrossingTracker`, and
+`TriphibianEnv.held_still_params`): still machines now cross 0 of 218 in every
+kind, and so do the elites, bar one. The crossings the elites had were the same
+leak. **A still machine must be still in every actuator kind, and a hold must
+read the quantity a passive body spends, not the one it keeps.**
+
 And: a quantity that means "I could not measure this" must not share a value with
 a quantity that means "I measured zero". `thrust_margin` returned 0.0 for both and
 the rung above it sat at `>= 0.0`; eight of eighty re-scored elites cleared it
