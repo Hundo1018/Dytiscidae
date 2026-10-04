@@ -996,6 +996,48 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_entry_shock_is_hydrodynamic_not_a_speed_limit",),
         item="AK water entry"),
 
+    Mutation(
+        id="steps-not-counted",
+        path="dytiscidae/envs/triphibian.py",
+        find="        self.steps_run += 1\n",
+        replace="",
+        defect="an evaluation reports no physics steps, and a generation's cost cannot be attributed",
+        suites=("test_physics",), item="generation cost"),
+
+    Mutation(
+        id="rig-steps-charged-to-segments",
+        path="dytiscidae/envs/triphibian.py",
+        find="            self.rig_steps += self.steps_run - steps0\n",
+        replace="",
+        defect="level_margin's rig steps are counted as segment steps",
+        suites=("test_physics",), item="generation cost"),
+
+    Mutation(
+        id="cost-untimed-counts-subphases",
+        path="dytiscidae/evolution/loop.py",
+        find='        timed = sum(v for k, v in self.seconds.items() if "." not in k)\n',
+        replace="        timed = sum(self.seconds.values())\n",
+        defect="a sub-phase is subtracted twice and untimed goes negative",
+        suites=("test_physics",), item="generation cost"),
+
+    Mutation(
+        id="merged-rescore-halves-swapped",
+        path="dytiscidae/evolution/loop.py",
+        find="            results, first = both[:k], (first[0], first[1], both[k:])\n",
+        replace="            results, first = both[k:], (first[0], first[1], both[:k])\n",
+        defect="the merged batch hands the trials' scores to the re-score and back",
+        suites=("test_search::test_merging_the_rescore_with_the_first_refinement_changes_nothing",),
+        item="merged re-score"),
+
+    Mutation(
+        id="mean-not-padded",
+        path="dytiscidae/learning/ppo.py",
+        find="                blocks = [obs[j:j + MEAN_MIN_ROWS]\n"
+             "                          for j in range(0, obs.shape[0], MEAN_MIN_ROWS)]\n",
+        replace="                blocks = [obs]\n",
+        defect="a row's action on the mean depends on how many rows share its batch",
+        suites=("test_ppo",), item="merged re-score"),
+
     # --- the job layer ----------------------------------------------------
     Mutation(
         id="job-accepts-any-transition",

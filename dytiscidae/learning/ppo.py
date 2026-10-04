@@ -110,6 +110,15 @@ def _mlp(n_in: int, n_hidden: int, n_out: int, out_gain: float = 1.0):
     )
 
 
+#: The block `SharedPolicy.act_many` computes a deterministic batch in, padded,
+#: so a row's action does not depend on how many rows share it.  The measured
+#: threshold on the machine that set it was 3; one row of margin.  On the
+#: machine of 2026-10-04 (torch 2.13 CPU) padding alone was not enough: batches
+#: of 7-9 and 13-15 rows gave a row other bits than alone (~2e-9), so every
+#: block now has exactly this many rows.
+MEAN_MIN_ROWS = 4
+
+
 class SharedPolicy(nn.Module if AVAILABLE else object):
     """A Gaussian policy and a value head, shared by every morphology.
 
@@ -271,12 +280,37 @@ class SharedPolicy(nn.Module if AVAILABLE else object):
             obs = torch.as_tensor(np.asarray(obs_np, np.float32))
             if obs.ndim == 1:
                 obs = obs.unsqueeze(0)
-            base = self.latent(obs)
-            u = base.mean if deterministic else _draw(base, rngs)
-            a = torch.tanh(u)
-            logp = (base.log_prob(u).sum(-1)
-                    - torch.log1p(-a.pow(2) + 1e-6).sum(-1))
-            v = self.value(obs)
+            # A small batch on the mean is padded to MEAN_MIN_ROWS.  Measured
+            # (experiments/perf/batch_invariance.py, torch 2.14 CPU): a row's
+            # bits are the same in every batch of 3 to 64 rows and differ by
+            # ~3e-9 at 1 and 2, where the matmul takes other paths.  Without
+            # this, a shard whose other machines have stopped -- or a merge of
+            # two evaluations into one batch -- makes a score depend on what
+            # else shared its batch, and a rollout amplifies 1e-9 into percent.
+            #
+            # Padding a small batch was not enough on every machine: on torch
+            # 2.13 CPU, batches of 7-9 and 13-15 rows took other paths too
+            # (tests/test_ppo.py, ~2e-9).  So on the mean every row goes
+            # through in a block of exactly MEAN_MIN_ROWS, the last one padded:
+            # the same shape a row has alone, whatever the batch.
+            n = obs.shape[0]
+            if deterministic:
+                pad = -n % MEAN_MIN_ROWS
+                if pad:
+                    obs = torch.cat([obs, obs[:1].expand(pad, -1)])
+                blocks = [obs[j:j + MEAN_MIN_ROWS]
+                          for j in range(0, obs.shape[0], MEAN_MIN_ROWS)]
+            else:
+                blocks = [obs]
+            parts = []
+            for ob in blocks:
+                base = self.latent(ob)
+                u = base.mean if deterministic else _draw(base, rngs)
+                a = torch.tanh(u)
+                logp = (base.log_prob(u).sum(-1)
+                        - torch.log1p(-a.pow(2) + 1e-6).sum(-1))
+                parts.append((a, logp, self.value(ob)))
+            a, logp, v = (torch.cat([pt[q] for pt in parts])[:n] for q in range(3))
         return (a.numpy().astype(float), logp.numpy().astype(float),
                 v.numpy().astype(float))
 

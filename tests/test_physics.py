@@ -4110,6 +4110,43 @@ def test_the_batched_power_budget_is_the_power_budget() -> None:
           f"{list(active)} vs {alive_ref}")
 
 
+def test_an_evaluation_counts_the_steps_it_took() -> None:
+    """``MissionResult.steps`` is the physics work an evaluation did, by part.
+
+    arch44 ran 120 s a generation for fifty generations and ~320 s after, and
+    nothing it recorded could say which part grew.  A beetle survives every
+    part, so each count equals its schedule exactly: identification is 2 media
+    x 24 probes x 2 signs x 1.2 s, three segments, four 6 s transitions, and
+    the level-flight rig (0.5 s settle + 0.7 s average) apart from all three.
+    """
+    print("\nevaluate: the steps an evaluation took are on its result")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import evaluate_tier1
+    from dytiscidae.envs.triphibian import MissionSpec, TriphibianEnv
+
+    dt, seg = 0.004, 0.8
+    r = evaluate_tier1(build(BODY_PLANS["beetle"]()), spec=MissionSpec(),
+                       segment_seconds=seg, identify_axes=True, seed=5)
+    want = {"identify": 2 * 24 * 2 * int(1.2 / dt),
+            "segments": 3 * int(seg / dt),
+            "transitions": 4 * int(6.0 / dt),
+            "rig": int(TriphibianEnv.RIG_SETTLE / dt) + int(TriphibianEnv.RIG_AVERAGE / dt)}
+    for part, n in want.items():
+        check(f"{part}: {r.steps.get(part)} steps, scheduled {n}",
+              r.steps.get(part) == n)
+
+    from dytiscidae.evolution.loop import GenerationCost
+    c = GenerationCost()
+    c.seconds = {"build": 1.0, "evaluate": 2.0, "evaluate.main": 1.5}
+    c.count("main", [r, r])
+    rep = c.report(wall=4.0)
+    check("untimed is wall minus the undotted phases only "
+          f"({rep['seconds']['untimed']})", rep["seconds"]["untimed"] == 1.0)
+    check("steps are summed over results, per call and part",
+          rep["steps"].get("main.identify") == 2 * want["identify"])
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -4181,6 +4218,7 @@ def main() -> int:
         test_the_air_score_measures_flight,
         test_takeoff_is_measured_where_the_machine_starts_on_the_ground,
         test_depth_is_a_gain_not_a_spawn,
+        test_an_evaluation_counts_the_steps_it_took,
     ])
     return report("all physics checks passed")
 

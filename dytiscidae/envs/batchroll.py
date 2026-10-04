@@ -351,6 +351,10 @@ class BatchedFluid:
         self._prev_ma[:] = 0.0
         self._prev_t = [None] * self.nm
         self._primed = [False] * self.nm
+        for e in self.envs:
+            d = e.solver.diag
+            d.max_submerged = d.max_alpha = d.max_dynamic_pressure = float("nan")
+            d.lift = d.drag = d.buoyancy = float("nan")
         # The unsteady history (Wagner, LEV travel) restarts with the segment,
         # as `FluidSolver.reset` restarts it on the single-machine path.
         self._prev_t_u = None
@@ -537,20 +541,16 @@ class BatchedFluid:
             # the policy conditions its action on it, so a batched and a
             # single-machine run of the *same* policy command different
             # things once either path is actually under water.
-            if pb > pa:
-                e.solver.diag.mean_submerged = float(o["subf"][pa:pb].mean())
-                e.solver.diag.max_submerged = float(o["subf"][pa:pb].max())
-                e.solver.diag.max_alpha = float(np.abs(o["alpha"][pa:pb]).max())
-                e.solver.diag.max_dynamic_pressure = float(o["q"][pa:pb].max())
-            else:
-                e.solver.diag.mean_submerged = 0.0
-                e.solver.diag.max_submerged = 0.0
-                e.solver.diag.max_alpha = 0.0
-                e.solver.diag.max_dynamic_pressure = 0.0
-            e.solver.diag.lift = float(np.abs(o["lift"][pa:pb]).sum())
-            # Bluff drag included, as the single-machine solver's `D` is.
-            e.solver.diag.drag = float(np.abs(o["drag"][pa:pb] + o["d_bluff"][pa:pb]).sum())
-            e.solver.diag.buoyancy = float(o["buoy"][pa:pb].sum())
+            #
+            # Only the fields something on this path reads are refreshed:
+            # `mean_submerged` (the observation), `added_mass` and `slam` (the
+            # transition score).  The other six were refreshed too and read by
+            # nothing, at ~40 us a batched step of host numpy
+            # (experiments/perf/diag_cost.py) -- more than the whole device
+            # round trip.  `reset_slam` sets them to NaN, so a reader added
+            # later gets a value that cannot pass for a measurement.
+            e.solver.diag.mean_submerged = (
+                float(o["subf"][pa:pb].mean()) if pb > pa else 0.0)
             e.solver.diag.added_mass = float(mb.sum())
             if self._primed[i] and self._prev_t[i] is not None:
                 dt = max(t - self._prev_t[i], 1e-6)
@@ -623,6 +623,7 @@ def step_batch(envs, angles_list, bf: BatchedFluid, active=None):
     for i, e in enumerate(envs):
         if active[i]:
             e._mj.mj_step(e.model, e.data)
+            e.steps_run += 1
     if bf.power is None:
         bf.power = BatchedPower(envs)
     bf.power.step(envs, active)
@@ -942,7 +943,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     import time as _time
 
     from .evaluate import (
-        Controller, evaluate_tier0, finalise_tier1, transition_energy)
+        Controller, evaluate_tier0, finalise_tier1, record_steps, step_mark,
+        transition_energy)
     from .triphibian import DOMAIN_CYCLE, MissionResult, MissionSpec, TriphibianEnv
 
     spec = spec or MissionSpec()
@@ -1001,6 +1003,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     if wanted:
         from .triphibian import Domain as _D
         group = [envs[i] for i in wanted]
+        marks = {i: step_mark(envs[i]) for i in live}
         for dom in (_D.AIR, _D.WATER):
             try:
                 found = identify_batch(group, dom, seed=seed,
@@ -1012,6 +1015,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                 continue
             for slot, i in enumerate(wanted):
                 results[i].mobility[dom.value] = found[slot]
+        for i in live:
+            record_steps(results[i], "identify", marks[i], envs[i])
 
         # Overwrite rather than fill-if-empty, and only once both domains are
         # in.  A mobility basis is a property of the body it was measured on,
@@ -1043,6 +1048,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         return [np.random.default_rng([int(seed) & 0x7FFFFFFF, streams[i], tag])
                 for i in live]
 
+    marks = {i: step_mark(envs[i]) for i in live}
     for dom in DOMAIN_CYCLE:
         # One draw per domain, shared by every machine: candidates in a
         # generation must face the same conditions to be comparable with each
@@ -1086,6 +1092,9 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     # (transitions.py records exactly that for all six seed plans).  Two
     # runs of take-off scoring later, 4.0% of arch36 cleared 0.30 m with a
     # lifting surface while holding posture, so the reason is spent.
+    for i in live:
+        record_steps(results[i], "segments", marks[i], envs[i])
+    marks = {i: step_mark(envs[i]) for i in live}
     for t_index, kind in enumerate(("air_to_water", "water_to_air",
                                     "water_to_land", "land_to_air")):
         tcollector = None
@@ -1114,6 +1123,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                               "economy", "exit_state")])))
                 for t in trs], tag=f"transition:{kind}", groups=live_groups)
 
+    for i in live:
+        record_steps(results[i], "transitions", marks[i], envs[i])
     for i in live:
         r, p = results[i], phenos[i]
         cruise_j = sum(s.mean_power * spec.seconds_per_domain * spec.cycles
