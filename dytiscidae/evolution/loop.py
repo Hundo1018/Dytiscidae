@@ -132,7 +132,12 @@ class SearchConfig:
     segment_seconds: float = 8.0
     identify_axes_every: int = 1  # re-identify a child's axes this often
     tier0_gate: float = -0.85  # reject below this structural margin
-    tier2_every: int = 15
+    #: Visits per island between Tier-2 verifications.  With eight islands each
+    #: firing yields three critic labels per island, so 15 gave 24 labels per 120
+    #: generations: arch47 reached the critic's 60-label minimum at gen 243 and
+    #: ended with 120.  5 reaches it by about gen 87 for ~+2 h of verification
+    #: (measured 13 min per round of eight, 2026-10-05).
+    tier2_every: int = 5
     #: Seconds of the single long leg run on promotion candidates before the
     #: Tier-2 mission.  Zero disables it.  See ``envs.evaluate.evaluate_tier1_5``
     #: for why 60 and why only here.
@@ -1782,6 +1787,13 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             telemetry.event({"kind": "descriptor_refit_skipped", "gen": gen,
                              **learned.report()})
         if refitted:
+            def _weakest_medium(e):
+                # Only a design that clears the c3 bar outranks fitness; below
+                # it the tie-break stays fitness, as on every other island.
+                w = min(float((e.meta or {}).get(d) or 0.0)
+                        for d in ("air", "water", "land"))
+                return w if w >= WEAKEST_BARS[1] else 0.0
+
             def _reproject(e, _d=learned):
                 f = e.meta.get("features")
                 return _d.project(np.asarray(f, float)) if f else None
@@ -1799,7 +1811,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             # deferred three times without ever being measured.
             per, totals = {}, {"before": 0, "after": 0, "merged": 0}
             for name, a in archipelago.archives.items():
-                stats = a.rebin(axes, _reproject)
+                stats = a.rebin(axes, _reproject, priority=_weakest_medium)
                 archipelago.curators[name].on_rebin()
                 # The curriculum is keyed by cell too, and nothing was re-keying
                 # it: arch31 finished with 1,040 stage entries against 251 live

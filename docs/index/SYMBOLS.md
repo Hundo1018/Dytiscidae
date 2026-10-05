@@ -911,17 +911,17 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `Archive.capacity` | property | 118 | `(self) -> int` | — |
 | `Archive.cell_of` | method | 138 | `(self, descriptor: np.ndarray) -> tuple[int, ...]` | — |
 | `Archive.coverage` | property | 122 | `(self) -> float` | — |
-| `Archive.export_json` | method | 441 | `(self, path: str \| Path) -> None` | Human- and browser-readable dump for the dashboard. |
+| `Archive.export_json` | method | 450 | `(self, path: str \| Path) -> None` | Human- and browser-readable dump for the dashboard. |
 | `Archive.front` | method | 179 | `(self, cell: tuple[int, ...]) -> list['Elite']` | The non-dominated set occupying a cell. |
 | `Archive.front_size` | property | 184 | `(self) -> int` | Total designs held across all cells, fronts included. |
-| `Archive.load` | method | 430 | `(path: str \| Path) -> 'Archive'` | — |
-| `Archive.neighbour_density` | method | 359 | `(self, cell: tuple[int, ...], radius: int=1) -> int` | How crowded the neighbourhood of a cell is. |
-| `Archive.project` | method | 372 | `(self, ax_x: int, ax_y: int) -> tuple[np.ndarray, np.ndarray]` | 2D projection for plotting: max fitness and occupancy per (x, y) bin. |
+| `Archive.load` | method | 439 | `(path: str \| Path) -> 'Archive'` | — |
+| `Archive.neighbour_density` | method | 368 | `(self, cell: tuple[int, ...], radius: int=1) -> int` | How crowded the neighbourhood of a cell is. |
+| `Archive.project` | method | 381 | `(self, ax_x: int, ax_y: int) -> tuple[np.ndarray, np.ndarray]` | 2D projection for plotting: max fitness and occupancy per (x, y) bin. |
 | `Archive.qd_score` | property | 126 | `(self) -> float` | Sum of elite fitnesses: the standard scalar summary of a QD run. |
-| `Archive.rebin` | method | 313 | `(self, axes: list[tuple[str, float, float, int]], reproject) -> dict` | Rebuild the grid under new axes, re-placing every elite. |
+| `Archive.rebin` | method | 313 | `(self, axes: list[tuple[str, float, float, int]], reproject, priority=None) -> dict` | Rebuild the grid under new axes, re-placing every elite. |
 | `Archive.remove` | method | 295 | `(self, cell: tuple[int, ...]) -> bool` | Empty a cell completely. |
-| `Archive.save` | method | 403 | `(self, path: str \| Path) -> None` | Write the archive, atomically. |
-| `Archive.snapshot` | method | 384 | `(self) -> dict` | A JSON-safe summary, recorded once per generation for the dashboard. |
+| `Archive.save` | method | 412 | `(self, path: str \| Path) -> None` | Write the archive, atomically. |
+| `Archive.snapshot` | method | 393 | `(self) -> dict` | A JSON-safe summary, recorded once per generation for the dashboard. |
 | `Archive.would_add` | method | 237 | `(self, fitness: float, descriptor, objectives=None) -> str` | What ``add`` would return for this candidate, changing nothing. |
 | `Elite.curiosity` | property | 82 | `(self) -> float` | — |
 
@@ -1104,25 +1104,25 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 842 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `evaluate_candidate` | function | 412 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 535 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 443 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2135 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 1369 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2010 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 847 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `evaluate_candidate` | function | 417 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 540 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 448 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2147 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 1374 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2022 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 64 | — | Everything adjustable about a run. |
-| `SearchState` | class | 321 | — | — |
-| `seed_archipelago` | function | 2399 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 460 | `(self)` | — |
-| `GenerationCost.count` | method | 480 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 466 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 473 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 489 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 486 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 381 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 385 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 389 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 326 | — | — |
+| `seed_archipelago` | function | 2411 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `GenerationCost.__init__` | method | 465 | `(self)` | — |
+| `GenerationCost.count` | method | 485 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 471 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 478 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 494 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 491 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 386 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 390 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 394 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 

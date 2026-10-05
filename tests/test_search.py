@@ -779,6 +779,24 @@ def test_learned_descriptors_replace_the_hand_picked_axes() -> None:
     check("re-binning twice through one fit changes nothing", again["merged"] == 0,
           f"{again['merged']} merged on the second pass")
 
+    # A rare design must survive a collision with a fitter neighbour when it
+    # clears the priority bar (arch47 lost its only three-media elite this way).
+    ax = [("a", 0.0, 1.0, 2), ("b", 0.0, 1.0, 2)]
+    pa = Archive(ax)
+    pa.add(genome="rare", fitness=0.1, descriptor=np.array([0.1, 0.1]), meta={"w": 0.2})
+    pa.add(genome="fit", fitness=0.9, descriptor=np.array([0.9, 0.9]), meta={"w": 0.0})
+    to_one_cell = lambda e: np.array([0.1, 0.1])
+    plain = Archive(ax)
+    for e in list(pa.cells.values()):
+        plain.add(genome=e.genome, fitness=e.fitness, descriptor=e.descriptor, meta=e.meta)
+    plain.rebin(ax, to_one_cell)
+    pa.rebin(ax, to_one_cell, priority=lambda e: e.meta["w"])
+    check("rebin without priority keeps the fitter collider",
+          [e.genome for e in plain.cells.values()] == ["fit"])
+    check("rebin with priority keeps the rarer collider over a fitter one",
+          [e.genome for e in pa.cells.values()] == ["rare"],
+          f"kept {[e.genome for e in pa.cells.values()]}")
+
     # The schedule has to fire on the cadence a real run produces.  It used to
     # test ``seen % refit_every == 0``, checked once per generation -- so it only
     # fired if the running total landed exactly on a multiple, and a seeding
@@ -4411,6 +4429,18 @@ def test_every_island_is_reached_by_verification_and_audit() -> None:
           "if visits % max(cfg.tier2_every, 1) == 0" in src)
     check("and so does the audit",
           "if visits % max(cfg.audit_every, 1) == 0" in src)
+
+    # The default cadence has to give the critic its minimum labels early.  Each
+    # island fires on visits 0, N, 2N, ... and a firing labels three media.
+    from dytiscidae.evolution.critic import Critic
+    from dytiscidae.evolution.islands import ISLANDS as _ISL
+    from dytiscidae.evolution.loop import SearchConfig
+
+    n_isl, every = len(_ISL), SearchConfig().tier2_every
+    labels_by_100 = (100 // (every * n_isl) + 1) * n_isl * 3
+    check("the default Tier-2 cadence reaches the critic's minimum labels by gen 100",
+          labels_by_100 >= Critic().min_samples,
+          f"{labels_by_100} labels vs {Critic().min_samples} (tier2_every={every}, {n_isl} islands)")
 
     import math
 
