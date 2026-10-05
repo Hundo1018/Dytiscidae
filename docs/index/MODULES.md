@@ -2,7 +2,7 @@
 
 # Modules
 
-103 modules, 36,998 lines, 1,080 indexed symbols.
+103 modules, 36,999 lines, 1,080 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -42,7 +42,7 @@ is what makes a violation visible while reading.
 | `adapters.filesystem.experiment_store` | ``ExperimentStore`` over a directory of JSON files. | 121 | — | — | `adapters.filesystem._io`, `domain.errors`, `domain.experiment`, `domain.ids` |
 | `adapters.filesystem.job_store` | ``JobStore`` over a directory tree. | 125 | — | — | `adapters.filesystem._io`, `domain.errors`, `domain.ids`, `domain.job`, `domain.state` |
 | `adapters.filesystem.observability` | ``MetricSink``, ``EventLog`` and ``ControlChannel`` over files. | 174 | — | — | `adapters.filesystem._io`, `domain.ids`, `domain.job`, `domain.metrics`, `ports.control` |
-| `adapters.launchers` | ``JobLauncher`` adapters: in-process, and an isolated worker process. | 245 | — | — | `domain.ids`, `ports.launcher` |
+| `adapters.launchers` | ``JobLauncher`` adapters: in-process, and an isolated worker process. | 246 | — | — | `domain.ids`, `ports.launcher` |
 | `adapters.sqlite` | The SQLite DB adapter from the architecture diagram. | 20 | — | — | `adapters.sqlite.store` |
 | `adapters.sqlite.store` | SQLite adapters for ``ExperimentStore`` and ``JobStore``. | 338 | — | — | `domain.errors`, `domain.experiment`, `domain.ids`, `domain.job`, `domain.state` |
 | `adapters.trainers` | The trainer registry: names in, ``Trainer`` implementations out. | 142 | — | — | `adapters.trainers.search`, `adapters.trainers.synthetic`, `ports.trainer` |

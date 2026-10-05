@@ -142,16 +142,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `InlineLauncher` | class | 46 | — | Runs the worker in this process, synchronously. |
-| `SubprocessLauncher` | class | 83 | — | Starts ``python -m dytiscidae.worker`` in its own session. |
-| `InlineLauncher.__init__` | method | 61 | `(self, run_worker) -> None` | — |
-| `InlineLauncher.is_alive` | method | 74 | `(self, handle: WorkerHandle) -> WorkerStatus` | — |
-| `InlineLauncher.launch` | method | 67 | `(self, job_id: JobId, *, workspace: str, env: Mapping[str, str] \| None=None) -> WorkerHandle` | — |
-| `InlineLauncher.terminate` | method | 79 | `(self, handle: WorkerHandle, *, grace_seconds: float=30.0) -> bool` | — |
-| `SubprocessLauncher.__init__` | method | 88 | `(self, *, root: str \| Path, python: str \| None=None, module: str='dytiscidae.worker', extra_args: tuple[str, ...]=(), env: Mapping[str, str] \| None=None, cwd: str \| Path \| None=None) -> None` | — |
-| `SubprocessLauncher.is_alive` | method | 142 | `(self, handle: WorkerHandle) -> WorkerStatus` | — |
-| `SubprocessLauncher.launch` | method | 103 | `(self, job_id: JobId, *, workspace: str, env: Mapping[str, str] \| None=None) -> WorkerHandle` | — |
-| `SubprocessLauncher.terminate` | method | 198 | `(self, handle: WorkerHandle, *, grace_seconds: float=30.0) -> bool` | SIGTERM the worker's process group, then SIGKILL it. |
+| `InlineLauncher` | class | 47 | — | Runs the worker in this process, synchronously. |
+| `SubprocessLauncher` | class | 84 | — | Starts ``python -m dytiscidae.worker`` in its own session. |
+| `InlineLauncher.__init__` | method | 62 | `(self, run_worker) -> None` | — |
+| `InlineLauncher.is_alive` | method | 75 | `(self, handle: WorkerHandle) -> WorkerStatus` | — |
+| `InlineLauncher.launch` | method | 68 | `(self, job_id: JobId, *, workspace: str, env: Mapping[str, str] \| None=None) -> WorkerHandle` | — |
+| `InlineLauncher.terminate` | method | 80 | `(self, handle: WorkerHandle, *, grace_seconds: float=30.0) -> bool` | — |
+| `SubprocessLauncher.__init__` | method | 89 | `(self, *, root: str \| Path, python: str \| None=None, module: str='dytiscidae.worker', extra_args: tuple[str, ...]=(), env: Mapping[str, str] \| None=None, cwd: str \| Path \| None=None) -> None` | — |
+| `SubprocessLauncher.is_alive` | method | 143 | `(self, handle: WorkerHandle) -> WorkerStatus` | — |
+| `SubprocessLauncher.launch` | method | 104 | `(self, job_id: JobId, *, workspace: str, env: Mapping[str, str] \| None=None) -> WorkerHandle` | — |
+| `SubprocessLauncher.terminate` | method | 199 | `(self, handle: WorkerHandle, *, grace_seconds: float=30.0) -> bool` | SIGTERM the worker's process group, then SIGKILL it. |
 
 ## `adapters.sqlite.store` — `dytiscidae/adapters/sqlite/store.py`
 
