@@ -846,8 +846,10 @@ def main(argv=None) -> int:
                         "(ROADMAP AJ). 2 since 2026-10-03: 0.875x the wall of "
                         "4x4 on rotor-heavy batches; 1 is the pool every run "
                         "up to arch46 used")
-    p.add_argument("--distance-curriculum", action="store_true",
-                   help="step transition starts back from their interfaces and "
+    p.add_argument("--distance-curriculum", action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="on by default since 2026-10-05 (--no-distance-curriculum "
+                        "restores the old probes); step transition starts back from their interfaces and "
                         "the air launch down from 30 m as the population learns "
                         "(ROADMAP Y/O); changes what transition and air scores mean")
     p.add_argument("--refine-funnel", type=float, default=None,
