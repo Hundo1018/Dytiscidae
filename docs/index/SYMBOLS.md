@@ -1104,25 +1104,25 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 847 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `evaluate_candidate` | function | 417 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 540 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 448 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2147 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 1374 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2022 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 849 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `evaluate_candidate` | function | 419 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 542 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 450 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2149 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 1376 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2024 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 64 | — | Everything adjustable about a run. |
-| `SearchState` | class | 326 | — | — |
-| `seed_archipelago` | function | 2411 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 465 | `(self)` | — |
-| `GenerationCost.count` | method | 485 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 471 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 478 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 494 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 491 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 386 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 390 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 394 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 328 | — | — |
+| `seed_archipelago` | function | 2413 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `GenerationCost.__init__` | method | 467 | `(self)` | — |
+| `GenerationCost.count` | method | 487 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 473 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 480 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 496 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 493 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 388 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 392 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 396 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1132,23 +1132,23 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 |---|---|---:|---|---|
 | `_Node` | class | 217 | — | — |
 | `MLP` | class | 154 | — | One hidden layer, tanh, Adam.  Small on purpose. |
-| `novelty_of` | function | 476 | `(descriptor, archive, k: int=5) -> float` | Mean distance to the k nearest occupied cells, normalised. |
+| `novelty_of` | function | 498 | `(descriptor, archive, k: int=5) -> float` | Mean distance to the k nearest occupied cells, normalised. |
 | `Scout` | class | 237 | — | Predicts how much better a lineage will get, and protects the ones that |
 | `scout_features` | function | 100 | `(meta: dict, *, novelty: float=0.0, parent_fitness: float \| None=None, mobility=None) -> np.ndarray` | Assemble what was knowable about a design at birth. |
 | `MLP.forward` | method | 179 | `(self, X: np.ndarray) -> tuple` | — |
 | `MLP.predict` | method | 183 | `(self, X: np.ndarray) -> np.ndarray` | — |
 | `MLP.step` | method | 186 | `(self, X: np.ndarray, y: np.ndarray, lr: float=0.01, weight_decay: float=0.0001) -> float` | — |
-| `Scout.due` | method | 323 | `(self) -> bool` | — |
-| `Scout.explains` | method | 416 | `(self, top: int=4) -> list` | Which features drive the prediction, by gradient at the mean design. |
-| `Scout.fit` | method | 328 | `(self, epochs: int=300) -> bool` | — |
-| `Scout.fitted` | property | 361 | `(self) -> bool` | — |
-| `Scout.harvest` | method | 302 | `(self, generation: int) -> int` | Turn matured lineages into training labels. |
-| `Scout.lineage_depth` | method | 440 | `(self, recent: int=400) -> tuple` | How many rounds of selection the newest designs actually carry. |
-| `Scout.potential` | method | 366 | `(self, features: np.ndarray) -> float` | Predicted lift this lineage will achieve, scaled by calibration. |
-| `Scout.record` | method | 272 | `(self, design_id: str, parent_id, generation: int, fitness: float, island: str, features: np.ndarray) -> None` | Note a design's birth and propagate its score up its ancestry. |
-| `Scout.report` | method | 461 | `(self) -> dict` | — |
-| `Scout.reserve_ids` | method | 391 | `(self, elites: list, key=lambda e: e.meta.get('scout_features')) -> set` | Which designs the scout is protecting from pruning. |
-| `Scout.selection_weight` | method | 381 | `(self, features: np.ndarray, strength: float=2.0) -> float` | Multiplier on a design's chance of being bred from. |
+| `Scout.due` | method | 330 | `(self) -> bool` | — |
+| `Scout.explains` | method | 436 | `(self, top: int=4) -> list` | Which features drive the prediction, by gradient at the mean design. |
+| `Scout.fit` | method | 335 | `(self, epochs: int=300) -> bool` | — |
+| `Scout.fitted` | property | 375 | `(self) -> bool` | — |
+| `Scout.harvest` | method | 309 | `(self, generation: int) -> int` | Turn matured lineages into training labels. |
+| `Scout.lineage_depth` | method | 460 | `(self, recent: int=400) -> tuple` | How many rounds of selection the newest designs actually carry. |
+| `Scout.potential` | method | 380 | `(self, features: np.ndarray) -> float` | Predicted lift this lineage will achieve, scaled by skill. |
+| `Scout.record` | method | 279 | `(self, design_id: str, parent_id, generation: int, fitness: float, island: str, features: np.ndarray) -> None` | Note a design's birth and propagate its score up its ancestry. |
+| `Scout.report` | method | 481 | `(self) -> dict` | — |
+| `Scout.reserve_ids` | method | 411 | `(self, elites: list, key=lambda e: e.meta.get('scout_features')) -> set` | Which designs the scout is protecting from pruning. |
+| `Scout.selection_weight` | method | 401 | `(self, features: np.ndarray, strength: float=2.0) -> float` | Multiplier on a design's chance of being bred from. |
 
 ## `learning.distill` — `dytiscidae/learning/distill.py`
 
@@ -1626,16 +1626,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Camera` | class | 126 | — | A follow camera attached to whichever env the evaluation builds. |
+| `_Camera` | class | 132 | — | A follow camera attached to whichever env the evaluation builds. |
 | `code_changed_since` | function | 81 | `(commit: str \| None) -> list[str] \| None` | Source files under ``dytiscidae/`` that differ from ``commit``. |
-| `control_laws` | function | 201 | `(elite, run_dir, shared)` | The control laws the elite's score may have been earned under, best-known first. |
+| `control_laws` | function | 207 | `(elite, run_dir, shared)` | The control laws the elite's score may have been earned under, best-known first. |
 | `current_commit` | function | 73 | `() -> str` | — |
-| `evaluate_on_film` | function | 236 | `(elite, run_dir, *, film: bool=True, width: int=640, height: int=400, fps: int=25, log=print) -> dict` | Re-run the elite's Tier-1 evaluation, filming it, and compare the scores. |
-| `film_run` | function | 365 | `(run_dir, *, by: str='mission', island: str \| None=None, out_dir=None, fps: int=25, panel: int=640, log=print) -> dict` | Film a finished run: evaluated clips, the continuous mission, and both side by side. |
+| `evaluate_on_film` | function | 242 | `(elite, run_dir, *, film: bool=True, width: int=640, height: int=400, fps: int=25, log=print) -> dict` | Re-run the elite's Tier-1 evaluation, filming it, and compare the scores. |
+| `film_run` | function | 371 | `(run_dir, *, by: str='mission', island: str \| None=None, out_dir=None, fps: int=25, panel: int=640, log=print) -> dict` | Film a finished run: evaluated clips, the continuous mission, and both side by side. |
 | `pick_elite` | function | 100 | `(run_dir, *, by: str='mission', island: str \| None=None)` | The elite the film is of, chosen the way ``showcase`` chooses. |
 | `run_provenance` | function | 61 | `(run_dir: Path) -> dict` | The commit and configuration a run's checkpoint recorded, if any. |
-| `_Camera.__init__` | method | 129 | `(self, width: int, height: int, fps: int)` | — |
-| `_Camera.close` | method | 179 | `(self)` | — |
+| `_Camera.__init__` | method | 135 | `(self, width: int, height: int, fps: int)` | — |
+| `_Camera.close` | method | 185 | `(self)` | — |
 
 ## `viz.render` — `dytiscidae/viz/render.py`
 

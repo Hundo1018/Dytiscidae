@@ -2837,7 +2837,9 @@ generation's PPO update, and the curator's operator credit would lag by one
 generation. Both change the algorithm, not just the schedule; that needs its
 own arm.
 
-### 10. Y/O. Transition-distance curriculum -- **built 2026-09-30, off by default; its step rule is unmeasured**
+### 10. Y/O. Transition-distance curriculum -- **built 2026-09-30; ON by default since 2026-10-05; its step rule is unmeasured**
+
+**2026-10-05: turned on by the user's decision, numbers unchanged.** On arch46's elites the crossing share at back 0 is 0% against `advance_share` 0.5, and 4.1% of air segments reach 0.1 competence against the same share for the launch step, so it is expected to hold at back 0 and 30 m: it opens the door and measures, it does not yet apply pressure. `--no-distance-curriculum` restores the old probes. arch47 (curriculum off) is the baseline for the first run with it on.
 
 **Built as a mechanism, with the step rule's numbers as parameters.**
 - **The probe start.** `MissionSpec.transition_back` sets, per transition kind,

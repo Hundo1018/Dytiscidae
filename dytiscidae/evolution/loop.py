@@ -112,12 +112,14 @@ class SearchConfig:
     controller_refine_funnel: float | None = None
     #: ROADMAP Y/O: step each transition probe's start back from its interface,
     #: and the air launch down from 30 m, as the population learns to cross
-    #: and to hold height (``curriculum.DistanceCurriculum``).  Off: every probe
+    #: and to hold height (``curriculum.DistanceCurriculum``).  On by default since
+    #: 2026-10-05 (the user's call); with the measured crossing rates it holds at
+    #: back 0 and a 30 m launch until evidence arrives.  Off: every probe
     #: starts where it always has.  **Changes what every transition and air
     #: score means** from the first step on, and every step is published as a
     #: ``distance_step`` event.  Its numbers are parameters until crossing rates
     #: by distance have been measured.
-    distance_curriculum: bool = False
+    distance_curriculum: bool = True
     distance_step: float = 0.5
     distance_advance_share: float = 0.5
     distance_window: int = 200
