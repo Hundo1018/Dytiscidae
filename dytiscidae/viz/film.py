@@ -106,7 +106,13 @@ def pick_elite(run_dir, *, by: str = "mission", island: str | None = None):
         return None
     pool = list(archive.cells.values())
     if by == "mission":
-        key = lambda e: (e.meta or {}).get("mission_fraction") or 0.0
+        # Ties are the normal case, not the exception: arch47's elites all had
+        # mission 0.0 and ``max`` returned whichever cell came first.  Break
+        # them on the weakest medium, then on fitness.
+        def key(e):
+            meta = e.meta or {}
+            return (meta.get("mission_fraction") or 0.0,
+                    min(float(meta.get(m) or 0.0) for m in MEDIA), e.fitness)
     elif by == "island":
         from ..evolution.islands import own_domain_score
 

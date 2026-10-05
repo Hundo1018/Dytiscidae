@@ -374,6 +374,7 @@ Scout:
     - evolution.scout.novelty_of
   tests:
     - tests.test_search::test_scout_finds_dark_horses_and_may_only_protect
+    - tests.test_search::test_scout_skill_separates_regression_to_the_mean_from_foresight
 
 # --------------------------------------------------------------- the genome
 
