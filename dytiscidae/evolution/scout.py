@@ -267,8 +267,9 @@ class Scout:
     calibration: float = 0.0
     #: Held-out correlation of lift with the design's own score alone (-fitness),
     #: i.e. regression to the mean.  ``calibration`` includes it; ``skill`` is
-    #: what the other features add.  Measured, not gated on (2026-10-05): the
-    #: critic already subtracts its cheap score's correlation, the scout did not.
+    #: what the other features add.  ``potential`` is gated and scaled on it
+    #: since 2026-10-05: the critic already subtracts its cheap score's
+    #: correlation, the scout did not.
     score_only: float = 0.0
     skill: float = 0.0
     protected: int = 0
@@ -377,7 +378,13 @@ class Scout:
     # ------------------------------------------------------------ prediction
 
     def potential(self, features: np.ndarray) -> float:
-        """Predicted lift this lineage will achieve, scaled by calibration.
+        """Predicted lift this lineage will achieve, scaled by skill.
+
+        Gated on ``skill`` (held-out correlation minus the score alone's), not on
+        raw calibration: lift = best descendant - own score is predictable from
+        the score by regression to the mean, so a network that learned only that
+        passed the old 0.1 gate for 400 generations of arch47.  The 0.1 bar is
+        the old typed one, not set from a distribution.
 
         Before the network has learned anything, this falls back to novelty --
         the classic non-learned answer to the same question, and the right prior
@@ -386,10 +393,10 @@ class Scout:
         f = np.asarray(features, float)
         if not np.all(np.isfinite(f)):
             return 0.0
-        if not self.fitted or self.calibration <= 0.1:
+        if not self.fitted or self.skill <= 0.1:
             return float(np.clip(f[1], 0.0, 1.0)) * 0.5  # novelty
         z = (f - self._mean) / self._scale
-        return float(np.clip(self.net.predict(z)[0], 0.0, 2.0)) * self.calibration
+        return float(np.clip(self.net.predict(z)[0], 0.0, 2.0)) * self.skill
 
     def selection_weight(self, features: np.ndarray, strength: float = 2.0) -> float:
         """Multiplier on a design's chance of being bred from.

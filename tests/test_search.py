@@ -4235,6 +4235,15 @@ def test_scout_skill_separates_regression_to_the_mean_from_foresight() -> None:
           f.skill > 0.5, f"skill {f.skill:.2f} (score_only {f.score_only:.2f})")
     check("the report carries both", {"score_only", "skill"} <= set(f.report()))
 
+    # The gate reads skill: the mean-reverting scout falls back to novelty, the
+    # one with real foresight uses its network.
+    probe = np.full(SCOUT_DIM, 0.5)
+    probe[1] = 0.8
+    check("a scout that only learned regression to the mean falls back to novelty",
+          abs(m.potential(probe) - 0.4) < 1e-9, f"{m.potential(probe):.3f} vs novelty prior 0.400")
+    check("a scout with skill uses its network", abs(f.potential(probe) - 0.4) > 1e-3,
+          f"{f.potential(probe):.3f}")
+
 
 def test_scout_finds_dark_horses_and_may_only_protect() -> None:
     """A design that scores badly now but is going somewhere must survive.

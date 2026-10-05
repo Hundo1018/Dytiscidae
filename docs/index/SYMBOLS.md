@@ -1132,23 +1132,23 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 |---|---|---:|---|---|
 | `_Node` | class | 217 | — | — |
 | `MLP` | class | 154 | — | One hidden layer, tanh, Adam.  Small on purpose. |
-| `novelty_of` | function | 491 | `(descriptor, archive, k: int=5) -> float` | Mean distance to the k nearest occupied cells, normalised. |
+| `novelty_of` | function | 498 | `(descriptor, archive, k: int=5) -> float` | Mean distance to the k nearest occupied cells, normalised. |
 | `Scout` | class | 237 | — | Predicts how much better a lineage will get, and protects the ones that |
 | `scout_features` | function | 100 | `(meta: dict, *, novelty: float=0.0, parent_fitness: float \| None=None, mobility=None) -> np.ndarray` | Assemble what was knowable about a design at birth. |
 | `MLP.forward` | method | 179 | `(self, X: np.ndarray) -> tuple` | — |
 | `MLP.predict` | method | 183 | `(self, X: np.ndarray) -> np.ndarray` | — |
 | `MLP.step` | method | 186 | `(self, X: np.ndarray, y: np.ndarray, lr: float=0.01, weight_decay: float=0.0001) -> float` | — |
-| `Scout.due` | method | 329 | `(self) -> bool` | — |
-| `Scout.explains` | method | 429 | `(self, top: int=4) -> list` | Which features drive the prediction, by gradient at the mean design. |
-| `Scout.fit` | method | 334 | `(self, epochs: int=300) -> bool` | — |
-| `Scout.fitted` | property | 374 | `(self) -> bool` | — |
-| `Scout.harvest` | method | 308 | `(self, generation: int) -> int` | Turn matured lineages into training labels. |
-| `Scout.lineage_depth` | method | 453 | `(self, recent: int=400) -> tuple` | How many rounds of selection the newest designs actually carry. |
-| `Scout.potential` | method | 379 | `(self, features: np.ndarray) -> float` | Predicted lift this lineage will achieve, scaled by calibration. |
-| `Scout.record` | method | 278 | `(self, design_id: str, parent_id, generation: int, fitness: float, island: str, features: np.ndarray) -> None` | Note a design's birth and propagate its score up its ancestry. |
-| `Scout.report` | method | 474 | `(self) -> dict` | — |
-| `Scout.reserve_ids` | method | 404 | `(self, elites: list, key=lambda e: e.meta.get('scout_features')) -> set` | Which designs the scout is protecting from pruning. |
-| `Scout.selection_weight` | method | 394 | `(self, features: np.ndarray, strength: float=2.0) -> float` | Multiplier on a design's chance of being bred from. |
+| `Scout.due` | method | 330 | `(self) -> bool` | — |
+| `Scout.explains` | method | 436 | `(self, top: int=4) -> list` | Which features drive the prediction, by gradient at the mean design. |
+| `Scout.fit` | method | 335 | `(self, epochs: int=300) -> bool` | — |
+| `Scout.fitted` | property | 375 | `(self) -> bool` | — |
+| `Scout.harvest` | method | 309 | `(self, generation: int) -> int` | Turn matured lineages into training labels. |
+| `Scout.lineage_depth` | method | 460 | `(self, recent: int=400) -> tuple` | How many rounds of selection the newest designs actually carry. |
+| `Scout.potential` | method | 380 | `(self, features: np.ndarray) -> float` | Predicted lift this lineage will achieve, scaled by skill. |
+| `Scout.record` | method | 279 | `(self, design_id: str, parent_id, generation: int, fitness: float, island: str, features: np.ndarray) -> None` | Note a design's birth and propagate its score up its ancestry. |
+| `Scout.report` | method | 481 | `(self) -> dict` | — |
+| `Scout.reserve_ids` | method | 411 | `(self, elites: list, key=lambda e: e.meta.get('scout_features')) -> set` | Which designs the scout is protecting from pruning. |
+| `Scout.selection_weight` | method | 401 | `(self, features: np.ndarray, strength: float=2.0) -> float` | Multiplier on a design's chance of being bred from. |
 
 ## `learning.distill` — `dytiscidae/learning/distill.py`
 
