@@ -779,6 +779,24 @@ def test_learned_descriptors_replace_the_hand_picked_axes() -> None:
     check("re-binning twice through one fit changes nothing", again["merged"] == 0,
           f"{again['merged']} merged on the second pass")
 
+    # A rare design must survive a collision with a fitter neighbour when it
+    # clears the priority bar (arch47 lost its only three-media elite this way).
+    ax = [("a", 0.0, 1.0, 2), ("b", 0.0, 1.0, 2)]
+    pa = Archive(ax)
+    pa.add(genome="rare", fitness=0.1, descriptor=np.array([0.1, 0.1]), meta={"w": 0.2})
+    pa.add(genome="fit", fitness=0.9, descriptor=np.array([0.9, 0.9]), meta={"w": 0.0})
+    to_one_cell = lambda e: np.array([0.1, 0.1])
+    plain = Archive(ax)
+    for e in list(pa.cells.values()):
+        plain.add(genome=e.genome, fitness=e.fitness, descriptor=e.descriptor, meta=e.meta)
+    plain.rebin(ax, to_one_cell)
+    pa.rebin(ax, to_one_cell, priority=lambda e: e.meta["w"])
+    check("rebin without priority keeps the fitter collider",
+          [e.genome for e in plain.cells.values()] == ["fit"])
+    check("rebin with priority keeps the rarer collider over a fitter one",
+          [e.genome for e in pa.cells.values()] == ["rare"],
+          f"kept {[e.genome for e in pa.cells.values()]}")
+
     # The schedule has to fire on the cadence a real run produces.  It used to
     # test ``seen % refit_every == 0``, checked once per generation -- so it only
     # fired if the running total landed exactly on a multiple, and a seeding

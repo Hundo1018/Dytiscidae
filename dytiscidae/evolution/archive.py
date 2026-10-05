@@ -310,7 +310,8 @@ class Archive:
 
     # ----------------------------------------------------------------- rebin
 
-    def rebin(self, axes: list[tuple[str, float, float, int]], reproject) -> dict:
+    def rebin(self, axes: list[tuple[str, float, float, int]], reproject,
+              priority=None) -> dict:
         """Rebuild the grid under new axes, re-placing every elite.
 
         Needed because the descriptor axes are *learned* and therefore move.  An
@@ -323,8 +324,16 @@ class Archive:
         under the new ones.  That is not a bug to be papered over, it is the
         cost of letting the system decide what "different" means, and the number
         lost is returned so a run can report it rather than quietly shrink.
+
+        ``priority(entry) -> float`` is compared before fitness when two elites
+        collide.  Fitness does not reward being the only design that works in
+        all three media, so a fitness-only tie-break erased arch47's single
+        three-media elite at the gen-543 refit (719 -> 419 cells, ``three_media``
+        1 -> 0 and never back).
         """
         before = len(self.cells)
+        rank = (lambda e: (0.0, e.fitness)) if priority is None else (
+            lambda e: (float(priority(e)), e.fitness))
         old = self.cells
         self.axes = axes
         self.names = [a[0] for a in axes]
@@ -341,7 +350,7 @@ class Archive:
             e.descriptor = np.asarray(d, float)
             e.cell = cell
             cur = self.cells.get(cell)
-            if cur is None or e.fitness > cur.fitness:
+            if cur is None or rank(e) > rank(cur):
                 self.cells[cell] = e
             self.fronts.setdefault(cell, []).append(e)
         # Rebuilding fronts exactly would need a full dominance pass per cell;
