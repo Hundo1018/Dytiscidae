@@ -4173,6 +4173,40 @@ def test_the_loop_wires_every_layer_together() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_scout_skill_separates_regression_to_the_mean_from_foresight() -> None:
+    """``calibration`` includes regression to the mean; ``skill`` removes it.
+
+    arch47's scout ran at calibration 0.34 for 400 generations.  Its features
+    contain the design's own score, so lift = (best descendant - own score) is
+    predictable from the score alone, and the raw correlation cannot say how much
+    of 0.34 was the other sixteen features.
+    """
+    print("\nscout: skill over the score alone")
+    from dytiscidae.evolution.scout import SCOUT_DIM, SCOUT_FEATURES, Scout
+
+    def fitted(kind):
+        rng = np.random.default_rng(1)
+        sc = Scout(min_samples=80, hidden=16, seed=0)
+        for _ in range(600):
+            f = rng.uniform(0.0, 1.0, SCOUT_DIM)
+            if kind == "mean":
+                y = 1.0 - f[0] + rng.normal(0, 0.05)
+            else:
+                y = f[SCOUT_FEATURES.index("authority_max")] + rng.normal(0, 0.05)
+            sc._x.append(f)
+            sc._y.append(float(np.clip(y, 0.0, 2.0)))
+        sc.fit(epochs=600)
+        return sc
+
+    m, f = fitted("mean"), fitted("foresight")
+    check("lift that is only regression to the mean has a high score-only corr",
+          m.score_only > 0.8, f"score_only {m.score_only:.2f}, calibration {m.calibration:.2f}")
+    check("and almost no skill beyond it", m.skill < 0.15, f"skill {m.skill:.2f}")
+    check("lift driven by another feature has real skill",
+          f.skill > 0.5, f"skill {f.skill:.2f} (score_only {f.score_only:.2f})")
+    check("the report carries both", {"score_only", "skill"} <= set(f.report()))
+
+
 def test_scout_finds_dark_horses_and_may_only_protect() -> None:
     """A design that scores badly now but is going somewhere must survive.
 
@@ -5747,6 +5781,7 @@ def main() -> int:
         test_the_island_objective_takes_its_weight_back,
         test_curriculum_and_islands_give_gradient_where_the_mission_gives_none,
         test_scout_finds_dark_horses_and_may_only_protect,
+        test_scout_skill_separates_regression_to_the_mean_from_foresight,
         test_a_run_can_be_picked_up_where_it_stopped,
         test_promotion_needs_a_nonzero_answer_to_the_next_question,
         test_the_headline_is_the_mission,

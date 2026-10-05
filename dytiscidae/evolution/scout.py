@@ -265,6 +265,12 @@ class Scout:
     seen_since_fit: int = 0
     fits: int = 0
     calibration: float = 0.0
+    #: Held-out correlation of lift with the design's own score alone (-fitness),
+    #: i.e. regression to the mean.  ``calibration`` includes it; ``skill`` is
+    #: what the other features add.  Measured, not gated on (2026-10-05): the
+    #: critic already subtracts its cheap score's correlation, the scout did not.
+    score_only: float = 0.0
+    skill: float = 0.0
     protected: int = 0
 
     # ------------------------------------------------------------- recording
@@ -353,6 +359,13 @@ class Scout:
             self.calibration = float(np.clip(np.corrcoef(pred, y[ho])[0, 1], 0.0, 1.0))
         else:
             self.calibration = 0.0
+        fit_col = SCOUT_FEATURES.index("fitness")
+        if float(np.std(X[ho, fit_col])) > 1e-9 and float(np.std(y[ho])) > 1e-9:
+            self.score_only = float(np.clip(
+                np.corrcoef(-X[ho, fit_col], y[ho])[0, 1], 0.0, 1.0))
+        else:
+            self.score_only = 0.0
+        self.skill = self.calibration - self.score_only
         self.fits += 1
         self.seen_since_fit = 0
         return True
@@ -468,6 +481,8 @@ class Scout:
             "depth_max": depth_max,
             "fits": self.fits,
             "calibration": round(self.calibration, 3),
+            "score_only": round(self.score_only, 3),
+            "skill": round(self.skill, 3),
             "protected": self.protected,
             "drivers": self.explains(),
         }
