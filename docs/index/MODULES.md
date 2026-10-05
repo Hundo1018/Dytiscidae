@@ -2,7 +2,7 @@
 
 # Modules
 
-103 modules, 36,981 lines, 1,080 indexed symbols.
+103 modules, 36,987 lines, 1,080 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -172,7 +172,7 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `viz.dashboard` | Generates a self-contained HTML dashboard for a run. | 316 | — | `numpy` | `ops.telemetry` |
-| `viz.film` | Film what was scored, beside what the mission does. | 495 | — | `PIL`, `imageio`, `mujoco`, `numpy`, `torch` | `core.phenotype`, `envs.evaluate`, `envs.triphibian`, `evolution.islands`, `ops.run`, `viz.render`, `viz.showcase` |
+| `viz.film` | Film what was scored, beside what the mission does. | 501 | — | `PIL`, `imageio`, `mujoco`, `numpy`, `torch` | `core.phenotype`, `envs.evaluate`, `envs.triphibian`, `evolution.islands`, `ops.run`, `viz.render`, `viz.showcase` |
 | `viz.render` | Watching the machine: turntables and episode video in each medium. | 548 | — | `PIL`, `imageio`, `matplotlib`, `mujoco`, `numpy` | `core.phenotype`, `envs.triphibian` |
 | `viz.showcase` | The showcase render: one continuous mission, with the flow and the loads on screen. | 335 | — | `PIL`, `imageio`, `mujoco`, `numpy` | `core.phenotype`, `envs.mission`, `envs.triphibian`, `physics.fluid`, `physics.structure`, `physics.wake`, `viz.render` |
 

@@ -1626,16 +1626,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Camera` | class | 126 | — | A follow camera attached to whichever env the evaluation builds. |
+| `_Camera` | class | 132 | — | A follow camera attached to whichever env the evaluation builds. |
 | `code_changed_since` | function | 81 | `(commit: str \| None) -> list[str] \| None` | Source files under ``dytiscidae/`` that differ from ``commit``. |
-| `control_laws` | function | 201 | `(elite, run_dir, shared)` | The control laws the elite's score may have been earned under, best-known first. |
+| `control_laws` | function | 207 | `(elite, run_dir, shared)` | The control laws the elite's score may have been earned under, best-known first. |
 | `current_commit` | function | 73 | `() -> str` | — |
-| `evaluate_on_film` | function | 236 | `(elite, run_dir, *, film: bool=True, width: int=640, height: int=400, fps: int=25, log=print) -> dict` | Re-run the elite's Tier-1 evaluation, filming it, and compare the scores. |
-| `film_run` | function | 365 | `(run_dir, *, by: str='mission', island: str \| None=None, out_dir=None, fps: int=25, panel: int=640, log=print) -> dict` | Film a finished run: evaluated clips, the continuous mission, and both side by side. |
+| `evaluate_on_film` | function | 242 | `(elite, run_dir, *, film: bool=True, width: int=640, height: int=400, fps: int=25, log=print) -> dict` | Re-run the elite's Tier-1 evaluation, filming it, and compare the scores. |
+| `film_run` | function | 371 | `(run_dir, *, by: str='mission', island: str \| None=None, out_dir=None, fps: int=25, panel: int=640, log=print) -> dict` | Film a finished run: evaluated clips, the continuous mission, and both side by side. |
 | `pick_elite` | function | 100 | `(run_dir, *, by: str='mission', island: str \| None=None)` | The elite the film is of, chosen the way ``showcase`` chooses. |
 | `run_provenance` | function | 61 | `(run_dir: Path) -> dict` | The commit and configuration a run's checkpoint recorded, if any. |
-| `_Camera.__init__` | method | 129 | `(self, width: int, height: int, fps: int)` | — |
-| `_Camera.close` | method | 179 | `(self)` | — |
+| `_Camera.__init__` | method | 135 | `(self, width: int, height: int, fps: int)` | — |
+| `_Camera.close` | method | 185 | `(self)` | — |
 
 ## `viz.render` — `dytiscidae/viz/render.py`
 

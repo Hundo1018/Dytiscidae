@@ -4173,6 +4173,35 @@ def test_the_loop_wires_every_layer_together() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_film_pick_breaks_mission_ties_on_the_weakest_medium() -> None:
+    """arch47's elites all had mission 0.0, and ``max`` took the first cell."""
+    print("\nfilm: picking an elite when mission cannot tell them apart")
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.ops import run as run_mod
+    from dytiscidae.viz.film import pick_elite
+
+    def el(name, fit, air, water, land):
+        return NS(genome=name, fitness=fit,
+                  meta={"mission_fraction": 0.0, "air": air, "water": water, "land": land})
+
+    cells = {0: el("first", 0.99, 0.0, 0.0, 0.9), 1: el("balanced", 0.5, 0.1, 0.2, 0.3),
+             2: el("also_zero", 0.7, 0.0, 0.4, 0.4)}
+    real = run_mod.load_run_archive
+    run_mod.load_run_archive = lambda *a, **k: (NS(cells=cells), None)
+    try:
+        got = pick_elite("unused", by="mission").genome
+        with_mission = dict(cells)
+        with_mission[3] = NS(genome="mission", fitness=0.1,
+                             meta={"mission_fraction": 0.05, "air": 0.0, "water": 0.0, "land": 0.0})
+        run_mod.load_run_archive = lambda *a, **k: (NS(cells=with_mission), None)
+        got_m = pick_elite("unused", by="mission").genome
+    finally:
+        run_mod.load_run_archive = real
+    check("with mission tied at zero the weakest medium decides", got == "balanced", got)
+    check("a nonzero mission still outranks it", got_m == "mission", got_m)
+
+
 def test_scout_skill_separates_regression_to_the_mean_from_foresight() -> None:
     """``calibration`` includes regression to the mean; ``skill`` removes it.
 
@@ -5782,6 +5811,7 @@ def main() -> int:
         test_curriculum_and_islands_give_gradient_where_the_mission_gives_none,
         test_scout_finds_dark_horses_and_may_only_protect,
         test_scout_skill_separates_regression_to_the_mean_from_foresight,
+        test_film_pick_breaks_mission_ties_on_the_weakest_medium,
         test_a_run_can_be_picked_up_where_it_stopped,
         test_promotion_needs_a_nonzero_answer_to_the_next_question,
         test_the_headline_is_the_mission,
