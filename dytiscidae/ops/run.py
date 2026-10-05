@@ -922,7 +922,7 @@ def main(argv=None) -> int:
                    help="hidden units in the policy; 0 is linear (60 weights), "
                         "16 is 308")
     p.add_argument("--run", default="runs/latest")
-    p.add_argument("--tier2-every", type=int, default=15)
+    p.add_argument("--tier2-every", type=int, default=5)
     p.add_argument("--reference-seeds", type=int, default=12)
     p.add_argument("--random-seeds", type=int, default=8)
     p.add_argument("--checkpoint-every", type=int, default=20)

@@ -1104,25 +1104,25 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 842 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `evaluate_candidate` | function | 412 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 535 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 443 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2142 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 1369 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2017 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 847 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `evaluate_candidate` | function | 417 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 540 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 448 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2147 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 1374 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2022 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 64 | — | Everything adjustable about a run. |
-| `SearchState` | class | 321 | — | — |
-| `seed_archipelago` | function | 2406 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 460 | `(self)` | — |
-| `GenerationCost.count` | method | 480 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 466 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 473 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 489 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 486 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 381 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 385 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 389 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 326 | — | — |
+| `seed_archipelago` | function | 2411 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `GenerationCost.__init__` | method | 465 | `(self)` | — |
+| `GenerationCost.count` | method | 485 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 471 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 478 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 494 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 491 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 386 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 390 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 394 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 

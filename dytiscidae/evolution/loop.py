@@ -132,7 +132,12 @@ class SearchConfig:
     segment_seconds: float = 8.0
     identify_axes_every: int = 1  # re-identify a child's axes this often
     tier0_gate: float = -0.85  # reject below this structural margin
-    tier2_every: int = 15
+    #: Visits per island between Tier-2 verifications.  With eight islands each
+    #: firing yields three critic labels per island, so 15 gave 24 labels per 120
+    #: generations: arch47 reached the critic's 60-label minimum at gen 243 and
+    #: ended with 120.  5 reaches it by about gen 87 for ~+2 h of verification
+    #: (measured 13 min per round of eight, 2026-10-05).
+    tier2_every: int = 5
     #: Seconds of the single long leg run on promotion candidates before the
     #: Tier-2 mission.  Zero disables it.  See ``envs.evaluate.evaluate_tier1_5``
     #: for why 60 and why only here.

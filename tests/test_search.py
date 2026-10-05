@@ -4430,6 +4430,18 @@ def test_every_island_is_reached_by_verification_and_audit() -> None:
     check("and so does the audit",
           "if visits % max(cfg.audit_every, 1) == 0" in src)
 
+    # The default cadence has to give the critic its minimum labels early.  Each
+    # island fires on visits 0, N, 2N, ... and a firing labels three media.
+    from dytiscidae.evolution.critic import Critic
+    from dytiscidae.evolution.islands import ISLANDS as _ISL
+    from dytiscidae.evolution.loop import SearchConfig
+
+    n_isl, every = len(_ISL), SearchConfig().tier2_every
+    labels_by_100 = (100 // (every * n_isl) + 1) * n_isl * 3
+    check("the default Tier-2 cadence reaches the critic's minimum labels by gen 100",
+          labels_by_100 >= Critic().min_samples,
+          f"{labels_by_100} labels vs {Critic().min_samples} (tier2_every={every}, {n_isl} islands)")
+
     import math
 
     from dytiscidae.evolution.islands import ISLANDS
