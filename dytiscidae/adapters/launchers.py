@@ -36,6 +36,7 @@ import signal
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Mapping
 
@@ -127,7 +128,7 @@ class SubprocessLauncher:
         # Append, so a relaunch after a crash does not erase the log that says
         # why it crashed.
         with open(log_path, "ab") as log:
-            log.write(f"\n=== launch {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(started))} "
+            log.write(f"\n=== launch {datetime.fromtimestamp(started, timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')} "
                       f"{' '.join(argv)}\n".encode())
             log.flush()
             proc = subprocess.Popen(
