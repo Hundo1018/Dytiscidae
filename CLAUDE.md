@@ -12,13 +12,13 @@ item. Read it before proposing anything.
 
 1. `git status` and `git log --oneline -5`.
 2. Read the dated "Revised …" paragraphs at the top of `docs/ROADMAP.md`. They
-   name the current work list (newest first; as of 2026-10-03 it is
-   §"arch45 — the work list", ranked) and the comparability boundaries. Before
+   name the current work list (newest first; as of 2026-10-06 it is
+   §"2026-10-06 — arch48 finished, and the work list", ranked) and the comparability boundaries. Before
    proposing any threshold, read §"What is set by measurement, and what is
    typed".
 3. The latest run's configuration and pre-registered reads are in
-   `runs/<run>_notes.md` (the latest finished run with notes is arch44:
-   `runs/arch44_notes.md`). `runs/` is gitignored: in a fresh container it does
+   `runs/<run>_notes.md` (the latest finished run with notes is arch48:
+   `runs/arch48_notes.md`). `runs/` is gitignored: in a fresh container it does
    not exist, see `docs/PORTING.md`.
 4. Run the canary (below).
 
