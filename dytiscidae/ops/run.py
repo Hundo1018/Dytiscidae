@@ -261,6 +261,25 @@ def cmd_search(args) -> int:
     return 0
 
 
+def child_env() -> dict:
+    """The environment for a child Python: ``os.environ``, passed explicitly.
+
+    Importing the Mojo kernel (``full_pipeline``) calls C ``setenv`` for
+    ``PYTHONEXECUTABLE`` (a pyenv shim), ``PYTHONPATH=":"`` and
+    ``MOJO_PYTHON_LIBRARY``.  ``os.environ`` never sees them, but a child
+    started with ``env=None`` inherits the C environment, and
+    ``PYTHONEXECUTABLE`` turns ``sys.executable`` into the system interpreter
+    with no venv.  Every automatic post-run since at least arch47 died on
+    ``import numpy`` that way.
+    """
+    import os
+
+    env = dict(os.environ)
+    for k in ("PYTHONEXECUTABLE", "MOJO_PYTHON_LIBRARY"):
+        env.pop(k, None)
+    return env
+
+
 def launch_postrun(run_dir, *, timeout: float = 3600.0) -> int:
     """Run ``postrun`` for a finished run, in its own process.
 
@@ -279,6 +298,7 @@ def launch_postrun(run_dir, *, timeout: float = 3600.0) -> int:
         with open(log, "w") as f:
             rc = subprocess.run([sys.executable, "-m", "dytiscidae.ops.run", "postrun",
                                  "--run", str(run_dir)], stdout=f, stderr=subprocess.STDOUT,
+                                env=child_env(),
                                 timeout=timeout).returncode
     except Exception as exc:                                  # noqa: BLE001
         print(f"  post-run failed to start: {exc}", flush=True)
@@ -307,7 +327,8 @@ def cmd_postrun(args) -> int:
     rc = 0
     if report.exists():
         print("== report ==", flush=True)
-        rc |= subprocess.run([sys.executable, str(report), str(run_dir)]).returncode
+        rc |= subprocess.run([sys.executable, str(report), str(run_dir)],
+                             env=child_env()).returncode
     print("== films ==", flush=True)
     from ..viz.film import film_run
 
@@ -316,7 +337,7 @@ def cmd_postrun(args) -> int:
         # Once more, now that the manifest exists, so the report embeds it.
         if report.exists():
             subprocess.run([sys.executable, str(report), str(run_dir)],
-                           stdout=subprocess.DEVNULL)
+                           stdout=subprocess.DEVNULL, env=child_env())
     return rc if manifest else 1
 
 
