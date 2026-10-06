@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -160,6 +161,15 @@ def cmd_search(args) -> int:
     from ..envs.triphibian import MissionSpec
     from ..viz.dashboard import build_dashboard
 
+    shared = args.shared_policy
+    if shared is None:
+        try:
+            import torch  # noqa: F401
+            shared = True
+        except ImportError:
+            shared = False
+            print("[warn] torch not importable: running without the shared "
+                  "policy (pass --no-shared-policy to silence)", file=sys.stderr)
     cfg = SearchConfig(
         generations=args.generations,
         batch=args.batch,
@@ -179,7 +189,7 @@ def cmd_search(args) -> int:
         controller_refine_sigma=args.refine_sigma,
         promotion_refine_steps=args.promotion_refine_steps,
         policy_hidden=args.policy_hidden,
-        use_shared_policy=args.shared_policy,
+        use_shared_policy=bool(shared),
         shared_hidden=args.shared_hidden,
         shared_lr=args.shared_lr,
         shared_epochs=args.shared_epochs,
@@ -837,7 +847,7 @@ def cmd_distill(args) -> int:
     return 0 if res.scores else 1
 
 
-def main(argv=None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="dytiscidae", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -851,11 +861,16 @@ def main(argv=None) -> int:
 
     p = sub.add_parser("search", help="run the design search")
     p.add_argument("--generations", type=int, default=200)
-    p.add_argument("--batch", type=int, default=4)
+    p.add_argument("--batch", type=int, default=16,
+                   help="designs per generation. 16 is what arch34-arch48 ran "
+                        "and what the pool shape was swept at (4x4 31.7 s, "
+                        "8x2 queue 0.875x on rotor-heavy bodies)")
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--workers", type=int, default=1,
-                   help="worker processes stepping machines in parallel. 1 is "
-                        "the single-process path every stored run used. "
+    p.add_argument("--workers", type=int, default=min(4, os.cpu_count() or 1),
+                   help="worker processes stepping machines in parallel; 4 "
+                        "(capped at the core count) because worker count is "
+                        "bounded by memory before cores. 1 is the "
+                        "single-process path. "
                         "Measured: 16 workers of 8 machines return 12.7x the "
                         "throughput of one. A shard smaller than --min-shard "
                         "is not worth a batch's fixed cost, so the pool never "
@@ -891,8 +906,12 @@ def main(argv=None) -> int:
                         "as soon as one machine is rejected at batch 16")
     p.add_argument("--segment-seconds", type=float, default=8.0,
                    help="Tier-1 episode length; the main cost/fidelity dial")
-    p.add_argument("--refine-steps", type=int, default=0,
-                   help="(1+1)-ES steps refining each candidate's policy. Each "
+    p.add_argument("--refine-steps", type=int, default=2,
+                   help="(1+1)-ES steps refining each candidate's policy. "
+                        "Default 2 = what every run since arch34 passed; its "
+                        "benefit over 0 has never been measured (ROADMAP AK, "
+                        "E1), so this is the stored-run setting, not a proven "
+                        "optimum. Each "
                         "step is one more batched Tier-1 for the whole "
                         "generation, so a generation costs (1 + steps) "
                         "evaluations. 0 leaves the policy at its inherited "
@@ -906,8 +925,12 @@ def main(argv=None) -> int:
                         "verification round) rather than by population, so "
                         "unlike --refine-steps it is affordable by default. 0 "
                         "verifies the elite exactly as the archive stored it.")
-    p.add_argument("--shared-policy", action="store_true",
-                   help="train one PPO policy across every morphology, on the "
+    p.add_argument("--shared-policy", action=argparse.BooleanOptionalAction,
+                   default=None,
+                   help="on by default when torch imports (what every run since "
+                        "arch34 used; its worth is unmeasured, ROADMAP E1), "
+                        "--no-shared-policy turns it off. "
+                        "train one PPO policy across every morphology, on the "
                         "transitions the whole generation produces. Coexists "
                         "with --refine-steps: the shared policy generalises, "
                         "the per-candidate (1+1)-ES adapts, the intents are "
@@ -1130,7 +1153,11 @@ def main(argv=None) -> int:
     p.set_defaults(fn=_cli.cmd_checkpoints)
     _cli.build_parsers(sub)
 
-    args = ap.parse_args(argv)
+    return ap
+
+
+def main(argv=None) -> int:
+    args = build_parser().parse_args(argv)
     return args.fn(args)
 
 

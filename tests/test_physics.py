@@ -100,6 +100,33 @@ def test_a_child_python_is_the_venv_after_the_kernel_poisons_the_environment() -
           fixed == sys.prefix, f"{fixed} vs {sys.prefix}")
 
 
+def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
+    """A search launched with no flags used batch 4, one worker, no refinement
+    and no shared policy, while every stored run (arch34-arch48) used batch 16,
+    four workers, ``--refine-steps 2`` and the shared policy.  An outside
+    review read the first as the project's behaviour and concluded the
+    controller was never trained (2026-10-06).  The parser's defaults now are
+    the stored-run configuration."""
+    print("\nops: `search` with no flags is the configuration the runs used")
+    import os
+
+    from dytiscidae.ops.run import build_parser
+
+    a = build_parser().parse_args(["search"])
+    check("batch 16", a.batch == 16, f"{a.batch}")
+    check("workers 4, capped at the core count",
+          a.workers == min(4, os.cpu_count() or 1), f"{a.workers}")
+    check("refine steps 2", a.refine_steps == 2, f"{a.refine_steps}")
+    check("shared policy is decided at run time, not off",
+          a.shared_policy is None, f"{a.shared_policy!r}")
+    check("--no-shared-policy is accepted and false",
+          build_parser().parse_args(["search", "--no-shared-policy"])
+          .shared_policy is False)
+    check("min-shard 2 and pool-per-worker 2 (the queue)",
+          (a.min_shard, a.pool_per_worker) == (2, 2.0),
+          f"{a.min_shard}, {a.pool_per_worker}")
+
+
 def run_all(functions) -> None:
     """Run every test, and never let one of them stop the rest.
 
@@ -4197,6 +4224,7 @@ def main() -> int:
     print("=" * 68)
     run_all([
         test_a_child_python_is_the_venv_after_the_kernel_poisons_the_environment,
+        test_the_search_cli_defaults_are_the_stored_run_configuration,
         test_a_strip_moves_with_its_hinge,
         test_reversed_flow_reverses_the_force,
         test_pitching_nose_up_adds_lift,

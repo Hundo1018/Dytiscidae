@@ -43,15 +43,17 @@ search now scores through a Mojo GPU kernel (`mojo/build/*.so`, a compiled mirro
 of `physics/fluid.py`), and the decisions that were made for the CPU are listed
 in [docs/CPU_LEGACY.md](docs/CPU_LEGACY.md) with their status.
 
-**The controller is trained inside the search, but not by the defaults.**
-`controller_refine_steps` and `--refine-steps` default to 0 (inherit only);
-every run since arch34 passes `--refine-steps 2` (an extra noise-free re-score
-and two (1+1)-ES steps per candidate), promotion refines 6 more steps
-(`promotion_refine_steps`), and `--shared-policy` trains one PPO policy on every
-generation's transitions. A search launched with the Quick-start command below
-gets none of the first and last: pass the flags in
-[CLAUDE.md](CLAUDE.md) §"Running a search". Selection pressure on the controller
-is real but weak, and Tier-1 scores did not predict Tier-2 (see Known limits).
+**The controller is trained inside the search.** `ops.run search` defaults to
+the configuration every run since arch34 used: `--batch 16`, `--workers 4`
+(capped at the core count), `--refine-steps 2` (an extra noise-free re-score and
+two (1+1)-ES steps per candidate), 6 refinement steps at promotion, and the
+shared PPO policy when torch imports (`--no-shared-policy` turns it off). These
+are the *stored-run* settings, not measured optima: batch, workers and the queue
+pool were swept; whether `--refine-steps 2` or the shared policy help has never
+been measured (ROADMAP AK, E1). The library default `SearchConfig.
+controller_refine_steps` is still 0, and so is the job path
+(`ops.run experiment new --set ...`) unless the plan sets it. Tier-1 scores did
+not predict Tier-2 (see Known limits).
 
 ---
 
@@ -63,9 +65,8 @@ pip install -r requirements.txt
 python -m dytiscidae.ops.run verify              # 162 physics checks
 python -m dytiscidae.ops.run reference           # inspect the hand design
 python -m dytiscidae.ops.run search --generations 200 --run runs/first \
-       --batch 16 --workers 4 --refine-steps 2 --shared-policy
-                                       # the configuration stored runs used;
-                                       # full flag set in CLAUDE.md
+                                       # defaults are the stored-run
+                                       # configuration; see CLAUDE.md
 python -m dytiscidae.ops.run dashboard --run runs/first
 python -m dytiscidae.ops.run skills              # train the actuator skills
 python -m dytiscidae.ops.run distill --run runs/first   # is a shared controller reachable?

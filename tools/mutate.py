@@ -516,6 +516,15 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_the_gait_gain_can_stop_a_machine",),
         item="gait gain"),
     Mutation(
+        id="search-cli-refine-default-zero",
+        path="dytiscidae/ops/run.py",
+        find='p.add_argument("--refine-steps", type=int, default=2,',
+        replace='p.add_argument("--refine-steps", type=int, default=0,',
+        defect="a search launched with no flags refines no controller, the "
+               "trap an outside review read as the project's behaviour",
+        suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
+        item="cli defaults"),
+    Mutation(
         id="child-inherits-c-environment",
         path="dytiscidae/ops/run.py",
         find='        env.pop(k, None)\n    return env\n',
