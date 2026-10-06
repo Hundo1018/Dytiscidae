@@ -2711,6 +2711,16 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
                                    "tier2_media": {
                                        k: (None if not np.isfinite(v) else round(float(v), 4))
                                        for k, v in zip(CRITIC_TARGETS, expensive_outcome(r2))},
+                                   # And what Tier-1 said about the same three
+                                   # media, so a promotion carries both sides of
+                                   # the gap without a join against the evaluate
+                                   # events (docs/PAPERS_2610.md §3).  From the
+                                   # meta, not ``c``: a missing medium is None,
+                                   # not a measured zero (CLAUDE.md rule 4).
+                                   "tier1_media": {
+                                       k: (None if elite.meta.get(k) is None
+                                           else round(float(elite.meta[k]), 4))
+                                       for k in CRITIC_TARGETS},
                                    **long_leg, **walls,
                                    "exploit": r2.exploit, "notes": r2.notes[:3]})
             if r2.exploit:
@@ -2774,9 +2784,15 @@ def _audit(state: SearchState, gen: int, spec, rng) -> list:
                 identify_axes=True, seed=seed, perturb=perturb,
             )
 
+        base_result = reevaluate()
+
         class _Cheap:
-            mission_fraction = float(reevaluate().mission_fraction)
-            segments: dict = {}
+            mission_fraction = float(base_result.mission_fraction)
+            # The re-measured segments, so the held-out check can take each
+            # medium's retention (with ``{}`` here it never ran: arch48's
+            # mission was always 0).  No ``mechanical_output_j``, so the energy
+            # check still has nothing to read, as before.
+            segments: dict = dict(base_result.segments)
 
         rep = state.auditor.audit(pheno, _Cheap(), reevaluate=reevaluate, seed=seed0,
                                   name=str(elite.meta.get("body_plan", "?")))

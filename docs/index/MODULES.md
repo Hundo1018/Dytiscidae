@@ -2,7 +2,7 @@
 
 # Modules
 
-103 modules, 37,020 lines, 1,081 indexed symbols.
+104 modules, 37,163 lines, 1,083 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -86,6 +86,7 @@ is what makes a violation visible while reading.
 | `domain.checkpoint` | Checkpoints, described here and stored elsewhere. | 159 | — | — | `domain.ids` |
 | `domain.dataset` | Datasets, meaning the corpus a run starts from. | 110 | — | — | — |
 | `domain.errors` | Domain errors. | 68 | — | — | — |
+| `domain.evidence` | When a pass share is evidence: exact binomial bounds and the no-model verdict. | 105 | — | — | — |
 | `domain.experiment` | ``Experiment``: the record, as distinct from the configuration and the state. | 110 | — | — | `domain.ids`, `domain.plan` |
 | `domain.ids` | Identifiers. | 88 | — | — | — |
 | `domain.job` | ``TrainingJob``: one execution attempt, with a lifecycle. | 407 | — | — | `domain.errors`, `domain.ids`, `domain.plan` |
@@ -112,7 +113,7 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `evolution.archive` | The MAP-Elites archive: a map of what is achievable, not a single winner. | 475 | — | `numpy` | — |
-| `evolution.auditor` | The third party: a check on both the designs and the judge. | 361 | — | `numpy` | — |
+| `evolution.auditor` | The third party: a check on both the designs and the judge. | 404 | — | `numpy` | — |
 | `evolution.cmaes` | CMA-ES for controller weights. | 231 | — | `numpy` | — |
 | `evolution.critic` | The critic: a learned adversary trained to catch what cheap evaluation misses. | 435 | — | `numpy` | — |
 | `evolution.curator` | The curator: active management of the search, not just survival of the fittest. | 784 | — | `numpy` | `core.genome`, `evolution.archive` |
@@ -120,7 +121,7 @@ is what makes a violation visible while reading.
 | `evolution.descriptors` | Learned behaviour descriptors, so the archive axes stop being my guesses. | 253 | — | `numpy` | — |
 | `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 449 | — | `numpy` | `evolution.curriculum` |
 | `evolution.judge` | The judge: a scoring standard that gets stricter as the population improves. | 504 | — | `numpy` | — |
-| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 2791 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.grpo`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
+| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 2807 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.grpo`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
 | `evolution.scout` | The scout: a network that predicts a lineage's potential, not its score. | 515 | — | `numpy` | — |
 
 ## `learning`

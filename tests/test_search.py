@@ -2866,6 +2866,71 @@ def test_the_headline_is_the_mission() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_an_audit_re_measures_each_credited_medium_at_unseen_seeds() -> None:
+    """The held-out check reads per-medium competence, not only the mission.
+
+    It read the mission alone, so with arch48's mission at 0 in every
+    generation no audit re-ran anything and all 32 reported "retained 1.0".
+    A fresh seed took arch48's Tier-1 water passes from 15/16 to 3/16 and land
+    from 13/16 to 0/16 (experiments/tier_gap_ablation; docs/PAPERS_2610.md).
+    """
+    print("\nauditor: held-out seeds re-measure each credited medium")
+    from dytiscidae.evolution.auditor import Auditor
+
+    class Ph:
+        mass, wing_area = 5.0, 0.5
+
+    class Seg:
+        mean_power, duration = 0.0, 1.0      # what the energy check reads
+
+        def __init__(self, c):
+            self.competence = c
+
+    class Res:
+        def __init__(self, mf, **media):
+            self.mission_fraction = mf
+            self.segments = {k: Seg(v) for k, v in media.items()}
+
+    a = Auditor(held_out_seeds=2, perturbations=(("cd_scale", 1.25),))
+    scored = Res(0.0, water=0.30, land=0.02, air=0.20)
+    seen = []
+
+    def lucky(seed=0, perturb=None):
+        seen.append(seed)
+        # Water collapses at an unseen seed; air is not re-run at all.
+        return Res(0.0, water=0.03, land=0.0)
+
+    rep = a.audit(Ph(), scored, reevaluate=lucky, name="lucky")
+    check("a zero-mission design is still re-run at the held-out seeds",
+          sorted(seen) == [100_000, 100_001], f"seeds {seen}")
+    check("water keeps a tenth of its credit, and that is what is recorded",
+          abs(rep.held_out_by_medium.get("water", -1) - 0.1) < 1e-9,
+          f"{rep.held_out_by_medium}")
+    check("a medium below the floor is not a ratio of noise",
+          "land" not in rep.held_out_by_medium)
+    check("a medium the re-run did not measure is missing, not a zero",
+          "air" not in rep.held_out_by_medium)
+    check("the collapse is a note, not an invalidation",
+          not rep.invalid and any(f.check == "held_out_medium" for f in rep.findings),
+          "; ".join(f.detail for f in rep.findings))
+    check("with no mission to divide by, retention is unmeasured (None), not 1.0",
+          rep.retained_fraction is None and rep.summary()["retained"] is None,
+          f"{rep.retained_fraction}")
+
+    def steady(seed=0, perturb=None):
+        return Res(0.0, water=0.30, air=0.20)
+
+    rep2 = a.audit(Ph(), scored, reevaluate=steady, name="steady")
+    check("a design that keeps its credit raises nothing",
+          rep2.held_out_by_medium == {"water": 1.0, "air": 1.0}
+          and not any(f.check == "held_out_medium" for f in rep2.findings),
+          f"{rep2.held_out_by_medium}")
+    r = a.report()
+    check("the report averages retention per medium over the audits that measured it",
+          r["mean_held_out"] == {"water": 0.55, "air": 1.0} and r["mean_retained"] is None,
+          f"{r['mean_held_out']}, {r['mean_retained']}")
+
+
 def test_an_audit_perturbs_the_scored_experiment_and_nothing_else() -> None:
     """The audit's ratio is the perturbation's, not a second experiment's.
 
@@ -2971,6 +3036,18 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
         check("each promotion records its refinement, Tier-1.5 and Tier-2 walls",
               all({"refine_wall", "tier1_5_wall", "tier2_wall", "verify_wall"} <= set(p)
                   for p in promotions), f"{sorted(promotions[0]) if promotions else []}")
+        # Both sides of the Tier-1/Tier-2 gap are on the event: the per-medium
+        # Tier-1 competence the critic's residual is taken against, beside
+        # `tier2_media`, so the gap needs no join against the evaluate events.
+        t1_ok = all(
+            set(p.get("tier1_media") or {}) == {"air", "water", "land"}
+            and all(v is None or (isinstance(v, float) and 0.0 <= v <= 1.0)
+                    for v in p["tier1_media"].values())
+            and any(v is not None for v in p["tier1_media"].values())
+            for p in promotions)
+        check("each promotion records its Tier-1 per-medium competence",
+              bool(promotions) and t1_ok,
+              f"{promotions[0].get('tier1_media') if promotions else None}")
         import numpy as _np
 
         from dytiscidae.core.phenotype import build
@@ -5810,6 +5887,7 @@ def main() -> int:
         test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing,
         test_judge_ladder_is_fixed_and_bar_only_tightens,
         test_auditor_can_invalidate_and_veto,
+        test_an_audit_re_measures_each_credited_medium_at_unseen_seeds,
         test_critic_learns_the_exploit_signature,
         test_tier2_probe_legs_label_without_scoring,
         test_critic_learns_from_a_cheap_score_of_zero,

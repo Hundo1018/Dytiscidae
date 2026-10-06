@@ -291,6 +291,15 @@ BehaviourDescriptors:
   tests:
     - tests.test_search::test_learned_descriptors_replace_the_hand_picked_axes
 
+PassShareEvidence:
+  implementation:
+    - domain.evidence.clopper_pearson
+    - domain.evidence.no_model_verdict
+    - domain.evidence.distinct_share
+  tests:
+    - tests.test_domain::test_a_pass_share_is_evidence_only_through_its_bound
+  note: NeutronGym's admission gate (docs/PAPERS_2610.md §1) -- a bar is certified when the still machines' one-sided 95% Clopper-Pearson upper bound is below the elites' lower bound; driven over every Tier-1 bar by experiments/no_model_gate/run.py
+
 # ---------------------------------------------------------------- the search
 
 QualityDiversity:
@@ -357,6 +366,7 @@ Auditor:
     - evolution.auditor.check_scaling
   tests:
     - tests.test_search::test_auditor_can_invalidate_and_veto
+    - tests.test_search::test_an_audit_re_measures_each_credited_medium_at_unseen_seeds
 
 Critic:
   implementation:

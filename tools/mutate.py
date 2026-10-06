@@ -92,6 +92,63 @@ class Result:
 
 MUTATIONS: tuple = (
 
+    # --- the auditor's held-out check, per medium (2026-10-06) -------------
+    Mutation(
+        id="audit-held-out-reads-only-the-mission",
+        path="dytiscidae/evolution/auditor.py",
+        find="        if base > 1e-6 or media:\n",
+        replace="        if base > 1e-6:\n",
+        defect="the held-out check is skipped whenever the mission is zero -- every "
+               "audit of arch48 -- so a credit earned at one seed is never re-measured",
+        suites=("test_search::test_an_audit_re_measures_each_credited_medium_at_unseen_seeds",),
+        item="winner's curse"),
+    Mutation(
+        id="audit-retained-defaults-to-one",
+        path="dytiscidae/evolution/auditor.py",
+        find="    retained_fraction: float | None = None\n",
+        replace="    retained_fraction: float | None = 1.0\n",
+        defect="an audit that re-measured nothing reports that it kept everything",
+        suites=("test_search::test_an_audit_re_measures_each_credited_medium_at_unseen_seeds",),
+        item="winner's curse"),
+    Mutation(
+        id="audit-missing-medium-reads-zero",
+        path="dytiscidae/evolution/auditor.py",
+        find="                    if k in segs:           # a medium not re-run is not a zero\n"
+             "                        held[k].append(float(segs[k].competence) / media[k])\n",
+        replace="                    held[k].append(float(getattr(segs.get(k), 'competence', 0.0))"
+                " / media[k])\n",
+        defect="a medium the re-run did not measure is counted as a collapse to zero",
+        suites=("test_search::test_an_audit_re_measures_each_credited_medium_at_unseen_seeds",),
+        item="winner's curse"),
+    # --- evidence: when a pass share certifies a bar (2026-10-06) -----------
+    Mutation(
+        id="no-model-verdict-reads-the-share-not-the-bound",
+        path="dytiscidae/domain/evidence.py",
+        find="    if still_hi < elite_lo:\n        return CERTIFIED",
+        replace="    if still_k / max(still_n, 1) < elite_k / elite_n:\n        return CERTIFIED",
+        defect="a bar is certified whenever still machines clear it less often "
+               "than elites in the sample, however few of either were run",
+        suites=("test_domain",), item="no-model gate"),
+    Mutation(
+        id="clopper-pearson-upper-is-two-sided",
+        path="dytiscidae/domain/evidence.py",
+        find="    alpha = 1.0 - confidence\n",
+        replace="    alpha = (1.0 - confidence) / 2\n",
+        defect="the one-sided bound is computed at the two-sided level, so every "
+               "certificate is harder to earn than the stated confidence",
+        suites=("test_domain",), item="no-model gate"),
+
+    # --- promotion telemetry ------------------------------------------------
+    Mutation(
+        id="promote-drops-tier1-media",
+        path="dytiscidae/evolution/loop.py",
+        find='                                   "tier1_media": {\n',
+        replace='                                   "tier1_media_dropped": {\n',
+        defect="the promote event stops carrying the Tier-1 per-medium competence, "
+               "so the Tier-1/Tier-2 gap can only be recovered by a join that "
+               "breaks at every descriptor refit",
+        suites=("test_search::test_promotion_spends_refinement_and_keeps_what_it_buys",), item="tier-gap telemetry"),
+
     # --- the learner's arithmetic -----------------------------------------
     Mutation(
         id="gae-drops-the-recursion",

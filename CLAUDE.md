@@ -12,6 +12,10 @@ item. Read it before proposing anything.
 
 1. `git status` and `git log --oneline -5`.
 2. Read the dated "Revised …" paragraphs at the top of `docs/ROADMAP.md`. They
+   name the current work list (newest first; as of 2026-10-03 it is
+   §"arch45 — the work list", ranked; 2026-10-06 adds docs/PAPERS_2610.md's
+   list, whose item 1 -- Tier-1 credit belongs to one task draw -- comes before
+   anything that reads a Tier-1 score) and the comparability boundaries. Before
    name the current work list (newest first; as of 2026-10-06 it is
    §"2026-10-06 — arch48 finished, and the work list", ranked) and the comparability boundaries. Before
    proposing any threshold, read §"What is set by measurement, and what is
@@ -289,8 +293,11 @@ Each rule below was paid for by a score that rewarded the wrong thing.
 3. **Tell the machine what to do.** A gate that blends two purposes still fights
    itself (`corr = -0.264`). Each segment is now two commanded phases the
    controller can see, each scored on its own purpose (`envs/tasks.py`). A still
-   machine scores ~0.01 in water, because a passive body cannot satisfy two
-   different commands.
+   machine was measured at ~0.01 in water on that day's bodies; on arch48's 200
+   elites it clears water 0.15 in 35 cases against the elites' 45, by a dense
+   body sinking along the drawn heading (`experiments/no_model_gate`,
+   docs/PAPERS_2610.md §1). Re-measure the still machine on the current
+   population, not on a fixture.
 4. **"Could not measure" must not share a value with "measured zero".**
    `thrust_margin` returned 0.0 for both, the rung sat at `>= 0.0`, and 8 of 80
    re-scored elites cleared it while flapping ~1 rad to no effect. Publish

@@ -85,7 +85,14 @@ class Finding:
 class AuditReport:
     design: str = ""
     findings: list = field(default_factory=list)
-    retained_fraction: float = 1.0
+    #: None when nothing was re-measured.  It defaulted to 1.0, and every one
+    #: of arch48's 32 audits reported "retained 1.0" with no re-evaluation run
+    #: (mission was 0, so the ratio was never taken): a measured "kept all of
+    #: it" and "never looked" shared one value (CLAUDE.md rule 4).
+    retained_fraction: float | None = None
+    #: Per medium: competence at the held-out seeds over the scored competence,
+    #: for every medium the design was credited in (``held_out_floor``).
+    held_out_by_medium: dict = field(default_factory=dict)
     checks_run: int = 0
 
     @property
@@ -96,7 +103,9 @@ class AuditReport:
         return {
             "design": self.design,
             "invalid": self.invalid,
-            "retained": round(self.retained_fraction, 3),
+            "retained": (None if self.retained_fraction is None
+                         else round(self.retained_fraction, 3)),
+            "held_out": {k: round(v, 3) for k, v in self.held_out_by_medium.items()},
             "checks": self.checks_run,
             "findings": [
                 {"check": f.check, "severity": f.severity, "detail": f.detail}
@@ -209,6 +218,9 @@ class Auditor:
     perturbations: tuple = (("cd_scale", 1.25), ("added_mass_scale", 0.8),
                             ("lift_scale", 0.85))
     collapse_threshold: float = 0.35
+    #: A medium's held-out retention is taken only where the scored competence
+    #: is at least this; below it the ratio is noise over noise.
+    held_out_floor: float = 0.05
     reports: list = field(default_factory=list)
     invalidated: int = 0
     vetoed_tightenings: int = 0
@@ -242,9 +254,17 @@ class Auditor:
             return rep
 
         base = float(getattr(result, "mission_fraction", 0.0))
-        if base > 1e-6:
-            retained = []
-
+        # Per-medium competence, for the held-out check below.  The mission
+        # alone left it inert: arch48's mission was 0 in every generation, so
+        # no audit re-ran anything, while a fresh seed took Tier-1 water passes
+        # from 15/16 to 3/16 and land from 13/16 to 0/16
+        # (experiments/tier_gap_ablation) -- NeutronGym's winner's curse.
+        media = {k: float(getattr(sg, "competence", 0.0))
+                 for k, sg in (getattr(result, "segments", {}) or {}).items()}
+        media = {k: c for k, c in media.items() if c >= self.held_out_floor}
+        retained = []
+        held: dict = {k: [] for k in media}
+        if base > 1e-6 or media:
             # Held-out seeds: a score that was a measurement of the seed.
             for i in range(self.held_out_seeds):
                 rep.checks_run += 1
@@ -255,8 +275,25 @@ class Auditor:
                         check="held_out", severity="note",
                         detail=f"re-evaluation failed: {type(exc).__name__}: {exc}"))
                     continue
-                retained.append(float(getattr(alt, "mission_fraction", 0.0)) / base)
+                if base > 1e-6:
+                    retained.append(float(getattr(alt, "mission_fraction", 0.0)) / base)
+                segs = getattr(alt, "segments", {}) or {}
+                for k in held:
+                    if k in segs:           # a medium not re-run is not a zero
+                        held[k].append(float(segs[k].competence) / media[k])
+            rep.held_out_by_medium = {k: float(np.mean(v)) for k, v in held.items() if v}
+            for k, keep in rep.held_out_by_medium.items():
+                if keep < self.collapse_threshold:
+                    # A note, not an invalidation: what selection should do
+                    # with it is open (docs/PAPERS_2610.md), and an audit
+                    # that removed elites on it would change the search.
+                    rep.findings.append(Finding(
+                        check="held_out_medium", severity="note",
+                        detail=(f"{k} competence keeps {keep:.0%} of "
+                                f"{media[k]:.3f} at unseen seeds"),
+                        measured=keep, expected=self.collapse_threshold))
 
+        if base > 1e-6:
             # Perturbation: does this design need the model to be exactly right?
             for key, factor in self.perturbations:
                 rep.checks_run += 1
@@ -348,13 +385,19 @@ class Auditor:
 
     def report(self) -> dict:
         recent = self.reports[-50:]
+        # Means over the audits that re-measured something; None when none did.
+        kept = [r.retained_fraction for r in recent if r.retained_fraction is not None]
+        held = {}
+        for k in ("air", "water", "land"):
+            v = [r.held_out_by_medium[k] for r in recent if k in r.held_out_by_medium]
+            if v:
+                held[k] = round(float(np.mean(v)), 3)
         return {
             "audited": len(self.reports),
             "invalidated": self.invalidated,
             "vetoed_tightenings": self.vetoed_tightenings,
-            "mean_retained": round(
-                float(np.mean([r.retained_fraction for r in recent])), 3
-            ) if recent else 1.0,
+            "mean_retained": round(float(np.mean(kept)), 3) if kept else None,
+            "mean_held_out": held,
             "recent_findings": [
                 f.detail for r in recent[-5:] for f in r.findings
             ][:5],
