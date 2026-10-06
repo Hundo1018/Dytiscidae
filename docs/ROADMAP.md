@@ -12,6 +12,12 @@ machines** (45 vs 35 of 200 at 0.15; land does, 45 vs 12). The auditor's held-ou
 check, which should have caught the first, never ran with the mission at zero; it
 now re-measures each medium (a note, not an invalidation). The ranked list is at
 the end of that file.
+**2026-10-06: arch48 finished; the current work list is
+[2026-10-06 — arch48](#2026-10-06--arch48-finished-and-the-work-list), ranked by
+cost, then speed, then learning.** Mission and every crossing stayed at 0 for
+300 generations with the crossing curriculum on. It could not have moved: its
+start rate was already 0 at back 0. The first item is a measurement, not a
+run.
 
 **2026-10-03: arch45 finished; read [ARCH46_SPEC.md](ARCH46_SPEC.md) first.**
 arch45's critic never fitted: a `Tier-1 mission > 1e-4` gate dropped 128 of
@@ -2899,6 +2905,61 @@ decision to run it is not. See item N (arch40 list) for what it is, what it
 costs, and the gates that hold it to "changes nothing when off".
 
 ---
+
+## 2026-10-06 — arch48 finished, and the work list
+
+arch48: 300 gens at commit 98306a9, seed 20261006, `distance_curriculum=1`, all
+else as arch47, 11.9 h. Notes and method: `runs/arch48_notes.md`. No
+pre-registered reads were written before the launch, so everything here is
+description, not a test. One seed per arm: a difference from arch47 is not an
+effect.
+
+| read | arch48 (gens 0–299) | arch47 (gens 0–299) |
+|---|---|---|
+| `mission_best`, transitions crossed | 0, 0 (all 4 kinds, PPO and ladder) | 0, 0 |
+| crossing curriculum | on; `back` never advanced, `window_share` ~0 | off |
+| `weakest_best` max | 0.036 | 0.015 |
+| gens with `three_media` = 1 | 46 (from 254 to the end) | 6 |
+| `domain_best` max air / water / land | 0.553 / 0.482 / 0.676 | 0.510 / 0.487 / 0.887 |
+| qd summed over the last 8 gens (one per island) | 472 | 573 |
+| critic | fitted at gen 83, skill 0.0 in all three media | fitted at gen 243 |
+| divergence | 123 / 32,592 rollouts (0.38%) | 61 / 65,128 over 600 gens |
+| median wall/gen (8–100 / 100–200 / 200–299) | 116 / 123 / 129 s | 108 / 121 s (8–100 / 100–300) |
+
+**The three_media elite is real but thin.** It is one gannet (4.7 kg): air
+0.036, water 0.095, land 0.651, against a bar of 0.012. Its film reproduces all
+three. Held still (`held_still_params`) it scores air 0.0, water 0.068, land
+0.0, so air and land are earned. Water is 72% passive, from cruise *progress*,
+which `_task_scores` allows by design. The still machine scores cruise 0.009 and
+hold 0. In the continuous mission it makes 0/2 transitions: land on-task 98%,
+then never airborne.
+
+**Why the crossing curriculum did nothing.** Y/O was measured on 2026-10-04 at
+0 of 218 elites crossing at back 0, against `advance_share` 0.5. A curriculum
+that advances on success cannot start from a success rate of zero. arch48
+confirms it: the curriculum opened the door and nothing came through. This was
+predictable from the 10-04 measurement and is not new evidence about crossings.
+
+**Air is the binding medium.** In the film elite, `thrust_margin` is 0.0004,
+`level_margin` 0.29 (AD's gate is 0.7), and the air task score is 0.0007. In the
+triphibian elite, air is the weakest of the three. Every crossing except
+`water_to_land` needs a body that can leave a surface under its own power.
+
+**Found on the way (fixed, PR #29).** Automatic post-run had failed since at
+least arch47. Importing the Mojo kernel C-`setenv`s `PYTHONEXECUTABLE` (a pyenv
+shim), so children with `env=None` ran as the system Python. `ops.run.child_env`
+fixes it; test plus mutation `child-inherits-c-environment`. Two runs'
+`post-run exited 1` lines went unread, and nothing checks for that line.
+
+### The work list (cost, then speed, then learning)
+
+| # | item | build cost | loop speed | mechanisms / learning | why here |
+|---|---|---|---|---|---|
+| 1 | **Where crossings fail**: `experiments/transition_distance` on arch48's elites, broken down by failure note (`never crossed the boundary` vs `did not hold before the command`) per kind | none: an existing experiment | none | **highest**: says whether the wall is the hold gate, reaching the interface, or the medium change itself | crossed 0 in arch47 and arch48, the two runs since the 10-03/10-04 crossing fixes; no build should be chosen before this read |
+| 2 | **Post-run is checked**: `job status` and the run log fail loudly on a non-zero `post-run exited`, and the next run's `report.html` is confirmed to appear unaided | trivial | none | hygiene | two runs' reports silently missing |
+| 3 | **Critic skill 0**: why does a fitted critic with 192 labels have no skill? Label distribution per medium, out-of-fold predictions against the cheap score | low: a read on the checkpoint | none | learner: the critic is either uninformative by construction or starved of labels | arch45 never fitted it and arch48 fitted it to nothing; decides whether it stays on |
+| 4 | **Air thrust**: from `level_margin` 0.29 toward AD's 0.7 on the search's own bodies. Re-read the AH probe (torque, 7–12 Hz) against arch48's air elites before building anything | medium; set by 1 and AH | none | **high** for the mission: no air-to-anything crossing exists without it | the binding medium in both elites read |
+| 5 | **The next run**: notes with pre-registered reads before launch, 900 gens read at 500 (`how long to run`), crossing curriculum off unless 1 finds a nonzero start rate | none | — | — | arch48 had neither notes nor the length for `three_media` (born at gen 254) to show anything |
 
 ## 2026-10-03 — the eight-item pass (the user: do not start arch47 yet)
 

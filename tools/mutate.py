@@ -468,6 +468,15 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_the_gait_gain_can_stop_a_machine",),
         item="gait gain"),
     Mutation(
+        id="child-inherits-c-environment",
+        path="dytiscidae/ops/run.py",
+        find='        env.pop(k, None)\n    return env\n',
+        replace='        env.pop(k, None)\n    return None\n',
+        defect="a child Python inherits the kernel's C-level PYTHONEXECUTABLE and "
+               "starts as the system interpreter, so post-run dies on import numpy",
+        suites=("test_physics::test_a_child_python_is_the_venv_after_the_kernel_poisons_the_environment",),
+        item="post-run environment"),
+    Mutation(
         id="single-path-drops-the-gain",
         path="dytiscidae/control/cpg.py",
         find="        return a[:n_modes], gait_gain(a[n_modes])",
