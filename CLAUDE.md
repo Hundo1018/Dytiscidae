@@ -268,6 +268,11 @@ PYTHONPATH=. .venv/bin/python tools/index_gen.py check   # exit 1 on drift
 PYTHONPATH=. .venv/bin/python tests/test_index.py        # FEATURES.yaml resolves
 ```
 
+A change that makes a sentence in `README.md`, `docs/` or this file false edits
+that sentence in the same commit (2026-10-06: a review concluded the controller
+was untrained and the machine CPU-only from README text that had been stale for
+weeks). A quoted number carries its run and date.
+
 `MODULES.md` and `SYMBOLS.md` are generated; never edit them by hand.
 `FEATURES.yaml` is hand-maintained: update it when a feature gains, loses or
 moves an entry point. `test_index.py` fails when it names a missing symbol, when
