@@ -3005,7 +3005,7 @@ by dependency, and the existing arch48 list above (items 1–5) still comes firs
 |---|---|---|
 | B1 | **Make the default match the practice**: `SearchConfig.controller_refine_steps` and `ops.run`'s `--refine-steps` default to what runs use, or the run start refuses and prints the value in effect | grep every `run_start` config in `runs/` (when ported) for a run with `controller_refine_steps=0`; zero hits means the default is only a trap, not a past error. Add a mutation to `tools/mutate.py` |
 | B2 | **One hyperparameter table**: every `SearchConfig` field, its default, the value arch48 used, and whether a measurement or a typed number set it (the existing §"What is set by measurement, and what is typed" is the template) | `test_index.py`-style check that the table names every field of `SearchConfig` |
-| B3 | **README matches CLAUDE.md** on compute: GPU kernel, `--workers`, queue pool, the per-generation cost (110 s early, 225 s late) | read the README and diff against CLAUDE.md "Running a search" |
+| B3 | **README matches CLAUDE.md** on compute: GPU kernel, `--workers`, queue pool, the per-generation cost (110 s early, 225 s late) | **done 2026-10-06**: the README said "4 CPU cores with no accelerator", "controller not trained at all", `--min-shard (8)` and quoted rho +0.077 as current; each was false against the code and is rewritten with the date of the change that made it so. The external review repeated all four, so a stale README is a measured source of wrong conclusions, not a style issue |
 | B4 | **A run is a checked-in config**: `experiment new` already stores one; add a `runs/<run>_config.json` export to the notes template so a second machine can reproduce a launch without the shell history | launch the same config on a second seed set from the export alone |
 
 ### C. Evaluation validity
@@ -3048,6 +3048,19 @@ by dependency, and the existing arch48 list above (items 1–5) still comes firs
   item 3 reads it first.
 * **A larger GPU budget (4–8 GPU-months, >100 GB).** Not supported by any
   measurement here; the pool is bound by memory before cores (CLAUDE.md).
+
+### G. Documents are updated in the same change as the fact
+
+The review's two false headline claims came from README sentences that were true
+once (4 CPU cores, controller default 0, `--min-shard 8`, rho +0.077) and were
+not edited when the code moved. Rule, also in CLAUDE.md: a change that makes a
+sentence in README, ROADMAP, CLAUDE.md or `docs/` false edits that sentence in
+the same commit. A number quoted as current carries its run and date; a number
+that was superseded says so where it is quoted.
+
+| # | item | measurement that decides it |
+|---|---|---|
+| G1 | **Doc-drift check**: a script (`tools/doc_drift.py`) that extracts defaults quoted in README/CLAUDE.md (`--min-shard`, `--refine-steps`, `controller_refine_steps`, `--workers`) and compares them with `SearchConfig` and `ops.run` argparse defaults; exits 1 on mismatch | run it on the pre-fix README: it must report `--min-shard 8` and the "defaults to 0" sentence (mutation: reintroduce each) |
 
 ### Order
 

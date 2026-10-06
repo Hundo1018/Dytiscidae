@@ -38,12 +38,20 @@ genome  ──►  phenotype  ──►  MJCF + panels  ──►  three-tier ev
 * **Everything is observable**: JSONL telemetry, a self-contained HTML
   dashboard, and offscreen video of elites.
 
-Developed and tested on 4 CPU cores with no accelerator. That constraint shaped
-more of the design than it appears to, and it no longer holds — every decision
-that was made for it is listed as outstanding work in
-[docs/CPU_LEGACY.md](docs/CPU_LEGACY.md). The largest is that the controller is
-not trained at all in the loop (`controller_refine_steps` defaults to 0), so the
-runs so far selected bodies on the strength of an untrained controller.
+Built first on 4 CPU cores with no accelerator; that constraint is gone. The
+search now scores through a Mojo GPU kernel (`mojo/build/*.so`, a compiled mirror
+of `physics/fluid.py`), and the decisions that were made for the CPU are listed
+in [docs/CPU_LEGACY.md](docs/CPU_LEGACY.md) with their status.
+
+**The controller is trained inside the search, but not by the defaults.**
+`controller_refine_steps` and `--refine-steps` default to 0 (inherit only);
+every run since arch34 passes `--refine-steps 2` (an extra noise-free re-score
+and two (1+1)-ES steps per candidate), promotion refines 6 more steps
+(`promotion_refine_steps`), and `--shared-policy` trains one PPO policy on every
+generation's transitions. A search launched with the Quick-start command below
+gets none of the first and last: pass the flags in
+[CLAUDE.md](CLAUDE.md) §"Running a search". Selection pressure on the controller
+is real but weak, and Tier-1 scores did not predict Tier-2 (see Known limits).
 
 ---
 
@@ -55,7 +63,9 @@ pip install -r requirements.txt
 python -m dytiscidae.ops.run verify              # 162 physics checks
 python -m dytiscidae.ops.run reference           # inspect the hand design
 python -m dytiscidae.ops.run search --generations 200 --run runs/first \
-       --batch 32 --workers 4          # 2.2x on this machine; see below
+       --batch 16 --workers 4 --refine-steps 2 --shared-policy
+                                       # the configuration stored runs used;
+                                       # full flag set in CLAUDE.md
 python -m dytiscidae.ops.run dashboard --run runs/first
 python -m dytiscidae.ops.run skills              # train the actuator skills
 python -m dytiscidae.ops.run distill --run runs/first   # is a shared controller reachable?
@@ -81,13 +91,14 @@ three times more**. Lengthening it is therefore cheap, and arch34's Tier-1.5
 measurements say an 8 s score does not predict a 60 s one.
 
 `--workers` steps machines in several processes, each with its own GPU pipeline.
-It trades against `--batch`: the pool never makes a shard smaller than
-`--min-shard` (8), because a shard of four costs 149 µs per machine-step against
-89 in a shard of sixteen. On a generation of 32, four workers is 2.18x and eight
-is 2.20x — to use more cores, raise `--batch`. Raw stepping throughput scales
-further than that (12.7x at sixteen workers of eight machines); the difference is
-shard size, not contention. Sharding cannot change a score: the same designs
-score bit-identically at 1, 2, 4 and 8 workers, and a test pins it.
+It trades against `--batch`. **Current default: a queue**, `--min-shard 2
+--pool-per-worker 2`, so a batch of 16 is 8 shards of 2 pulled by 4 workers
+(0.875x the wall of 4 shards of 4 on rotor-heavy bodies; pool shape is swept,
+never modelled: 16 shards of 1 was slower than one process). The older
+`--min-shard 8` text here was superseded: at batch 16 it collapsed the pool to
+one shard after a single Tier-0 rejection. Worker count is bounded by memory
+before cores. Sharding cannot change a score: the same designs score
+bit-identically at 1, 2, 4 and 8 workers, and a test pins it.
 
 ---
 
@@ -330,11 +341,15 @@ Worth knowing before trusting a result:
   wing–wing interaction. Good to maybe ±30% for a flapping wing, which is fine
   for ranking designs and not fine for predicting absolute performance.
 - **Tier-1 extrapolation.** The 45-minute budget comes from a short window. Tier-2
-  checks it, but only for promoted elites, and over arch33's 180 promotions
-  corr(tier1_fraction, tier2_fraction) was +0.077 — the cheap score carried
-  almost no information about the verified one. A 60 s single leg now runs at
-  each promotion (`evaluate_tier1_5`) and reports its retention, which is the
-  measurement that will say whether that has changed.
+  checks it, but only for promoted elites. Over arch33's 180 promotions
+  corr(tier1_fraction, tier2_fraction) was +0.077 (historical; the scoring has
+  changed three times since). On arch48's 121 verified elites Spearman was
+  -0.09 (water) and 0.02 (land); air is undefined because Tier-2 air is 0 for
+  every one. Cause (docs/PAPERS_2610.md): one task draw was shared by 16
+  candidates, so Tier-1 credit measured the draw. Water and land are now scored
+  on an antipodal heading pair; **the correlation after that fix has not been
+  measured yet** (ROADMAP C1). A 60 s single leg runs at each promotion
+  (`evaluate_tier1_5`) and reports its retention.
 - **Air scores before and after 2026-09-03 are different quantities.** The air
   score used to pay 0.25 for being off the ground and 0.2 for the launch
   velocity the environment supplied, and released a design with no trim speed at
