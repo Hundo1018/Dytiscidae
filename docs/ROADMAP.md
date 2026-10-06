@@ -11,7 +11,13 @@ the critic has no skill. **Water competence does not separate elites from still
 machines** (45 vs 35 of 200 at 0.15; land does, 45 vs 12). The auditor's held-out
 check, which should have caught the first, never ran with the mission at zero; it
 now re-measures each medium (a note, not an invalidation). The ranked list is at
-the end of that file.
+the end of that file. **Fixed the same day:** water and land are scored on an
+antipodal pair of headings from one initial state, on the mean signed progress,
+so motion the command did not choose cancels exactly; re-gated on arch48, every
+competence bar is certified or underpowered against still machines and
+unsearched gaits (water >= 0.012: elite 41 / still 2 / base 2, was 121 / 103 /
+112). Water and land competence are not comparable across it.
+
 **2026-10-06: arch48 finished; the current work list is
 [2026-10-06 — arch48](#2026-10-06--arch48-finished-and-the-work-list), ranked by
 cost, then speed, then learning.** Mission and every crossing stayed at 0 for

@@ -26,7 +26,7 @@ import numpy as np
 from ..control.cpg import TWIST_DIM, CPGParams, MobilityBasis, Policy
 from ..core.phenotype import Phenotype
 from ..physics.energy import transition_energy
-from .tasks import schedule_for, task_seed
+from .tasks import PAIRED_MEDIA, antipode, schedule_for, task_seed
 from .transitions import TransitionSet, run_transition
 from .triphibian import (
     DOMAIN_CYCLE,
@@ -36,6 +36,7 @@ from .triphibian import (
     SegmentResult,
     TriphibianEnv,
     evaluate_tier0,
+    pair_partner_of,
 )
 
 
@@ -259,6 +260,50 @@ def _scatter_seed(seed: int, dom) -> int:
             + 0x9E3779B9 * (_CYCLE.index(dom) + 1)) & 0x7FFFFFFF
 
 
+def run_segment(env: TriphibianEnv, dom: Domain, seconds: float, ctrl, *,
+                scatter_seed: int | None = None, task=None,
+                on_step=None) -> SegmentResult:
+    """One scored segment: reset, scatter, task, rollout -- a pair in water and land.
+
+    Water and land are run twice from the same initial state, at the task's
+    heading and at its opposite (``tasks.antipode``), and the second half is
+    scored with the first as its ``pair_partner``.  The environment's own
+    random stream is rewound between the halves, so ``reset`` places the
+    machine identically and the stream leaves the pair exactly where a single
+    segment would have left it.  A first half that fails (diverged, fell
+    apart) is the result: there is nothing to pair it with.
+
+    ``task`` is the schedule to run (``None``: the default for ``dom``).  The
+    one place a Tier-1 segment, Tier-1.5's leg and Tier-2's legs are run, so
+    the three cannot disagree about what a segment is; ``batchroll`` runs the
+    same sequence for a batch.
+    """
+    task = task if task is not None else (
+        schedule_for(dom) if dom.value in PAIRED_MEDIA else None)
+    state = env.rng.bit_generator.state
+
+    def half(t, partner):
+        env.reset(dom)
+        if scatter_seed is not None:
+            env.scatter(np.random.default_rng(scatter_seed))
+        env.task = t
+        env.pair_partner = partner
+        try:
+            return env.rollout(seconds, params=ctrl.params, policy=ctrl.policy,
+                               basis=ctrl.basis_for(dom), domain=dom, on_step=on_step)
+        finally:
+            env.pair_partner = None
+
+    first = half(task, None)
+    if dom.value not in PAIRED_MEDIA or not first.survived:
+        return first
+    after = env.rng.bit_generator.state
+    env.rng.bit_generator.state = state
+    second = half(antipode(task), pair_partner_of(first))
+    env.rng.bit_generator.state = after
+    return second
+
+
 def evaluate_tier1(
     p: Phenotype,
     *,
@@ -333,7 +378,6 @@ def evaluate_tier1(
     clamped_any = False
     mark = step_mark(env)
     for dom in DOMAIN_CYCLE:
-        env.reset(dom)
         # The same initial-condition pipeline the batched evaluator uses, with
         # the same seed derivation, because a score and a verification of that
         # score have to begin from the same state.
@@ -345,17 +389,12 @@ def evaluate_tier1(
         # highest-mission elites, median `land_speed` was 0.470 m/s through the
         # batched path and 0.008 m/s through this one: a factor of sixty, on the
         # same body with the same controller.
-        env.scatter(np.random.default_rng(_scatter_seed(seed, dom)))
-        # What the segment asks, drawn from the same seed the batched path
+        # What the segment asks is drawn from the same seed the batched path
         # uses -- see `batchroll.evaluate_tier1_batch`.
-        env.task = schedule_for(
-            dom, np.random.default_rng(task_seed(_scatter_seed(seed, dom))))
-        seg = env.rollout(
-            segment_seconds,
-            params=ctrl.params,
-            policy=ctrl.policy,
-            basis=ctrl.basis_for(dom),
-            domain=dom,
+        sseed = _scatter_seed(seed, dom)
+        seg = run_segment(
+            env, dom, segment_seconds, ctrl, scatter_seed=sseed,
+            task=schedule_for(dom, np.random.default_rng(task_seed(sseed))),
             on_step=(None if on_step is None
                      else (lambda e, i, _d=dom: on_step(_d, e, i))),
         )
@@ -473,14 +512,7 @@ def evaluate_tier1_5(
     ctrl = controller or Controller(params=env.cpg.base)
     if ctrl.params is None:  # the rhythm belongs to the body
         ctrl.params = env.cpg.base
-    env.reset(dom)
-    return env.rollout(
-        seconds,
-        params=ctrl.params,
-        policy=ctrl.policy,
-        basis=ctrl.basis_for(dom),
-        domain=dom,
-    )
+    return run_segment(env, dom, seconds, ctrl)
 
 
 # --------------------------------------------------------------------------
@@ -555,20 +587,14 @@ def evaluate_tier2(
     completed = 0
     energy_j = 0.0
 
-    env.reset(order[0])
     for leg_i, dom in enumerate(order):
         # Re-place the machine for the new domain: a real transition was scored
         # separately in Tier 1, and repeating all nine of them here would spend
-        # the whole budget on transitions.
-        if leg_i > 0:
-            env.reset(dom)
-        seg = env.rollout(
-            leg_seconds,
-            params=ctrl.params,
-            policy=ctrl.policy,
-            basis=ctrl.basis_for(dom),
-            domain=dom,
-        )
+        # the whole budget on transitions.  The task is drawn, as Tier-1's is:
+        # a verifier fixed at one heading (it was pi/2) has the defect it is
+        # meant to catch -- a design that only goes one way passes or fails it
+        # by where that way points (docs/PAPERS_2610.md §3).
+        seg = run_segment(env, dom, leg_seconds, ctrl, task=schedule_for(dom, rng))
         totals.setdefault(dom.value, []).append(seg)
         # Charge energy for the *real* leg duration, not the compressed one.
         energy_j += seg.mean_power * spec.seconds_per_domain
@@ -593,6 +619,9 @@ def evaluate_tier2(
             max_depth=max(s.max_depth for s in segs),
             peak_slam=max(s.peak_slam for s in segs),
             max_actuator_overload=max(s.max_actuator_overload for s in segs),
+            # The best leg's own measurements, so a reader can see what that
+            # leg was asked (its commanded heading) and what it measured.
+            measurements=dict(best.measurements or {}),
         )
         r.segments[k] = merged
 
@@ -600,10 +629,8 @@ def evaluate_tier2(
         for dom in DOMAIN_CYCLE:
             if dom.value in r.segments:
                 continue
-            env.reset(dom)
-            r.probe_segments[dom.value] = env.rollout(
-                leg_seconds, params=ctrl.params, policy=ctrl.policy,
-                basis=ctrl.basis_for(dom), domain=dom)
+            r.probe_segments[dom.value] = run_segment(
+                env, dom, leg_seconds, ctrl, task=schedule_for(dom, rng))
 
     r.energy_required_wh = energy_j / 3600.0 + sum(
         transition_energy(p.mass, kind) for kind in spec.transitions

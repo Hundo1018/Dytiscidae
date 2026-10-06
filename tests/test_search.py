@@ -1358,6 +1358,99 @@ def test_transitions_are_graded_not_pass_fail() -> None:
           two <= one, f"{one:.2f} -> {two:.2f} after adding a second crossing")
 
 
+def test_the_heading_pair_cancels_what_the_command_did_not_choose() -> None:
+    """Water and land are scored on an antipodal pair of headings (tasks.antipode).
+
+    On arch48 a fresh seed took Tier-1 water passes from 15/16 to 3/16 and land
+    from 13/16 to 0/16: one heading was drawn per generation, elites earned
+    their credit on 1-3 of 8 headings, and a still machine cleared water 0.15 in
+    35 of 200 against the elites' 45 (docs/PAPERS_2610.md).  On the pair, the
+    progress term reads the mean of the two halves' signed speeds along their
+    headings, so any motion the command did not choose cancels exactly.
+    """
+    print("\nthe antipodal heading pair")
+    import math
+    import types
+
+    from dytiscidae.envs.tasks import CRUISE, antipode, schedule_for
+    from dytiscidae.envs.triphibian import TriphibianEnv
+
+    # The arithmetic, on a stand-in for the env (no simulator).
+    def paired(a, b, track=(0.9, 0.7), second=(0.6, 0.2), across=(0.0, 0.0)):
+        me = types.SimpleNamespace(pair_partner={
+            "along": a, "across": across[0], "tracking": track[0], "served": 1.0,
+            "second": second[0]})
+        cruise = {"measured": True, "along": b, "across": across[1],
+                  "tracking": track[1], "served": 1.0}
+        return TriphibianEnv._paired(me, cruise, second[1])
+
+    check("a drift the same way in both halves cancels",
+          paired(0.4, -0.4)[0] == 0.0, f"{paired(0.4, -0.4)}")
+    check("following both commands keeps the progress",
+          abs(paired(0.8, 0.8)[0] - 0.8) < 1e-12, f"{paired(0.8, 0.8)}")
+    check("stopping when it cannot follow earns half",
+          abs(paired(0.8, 0.0)[0] - 0.4) < 1e-12, f"{paired(0.8, 0.0)}")
+    check("tracking is the worse half's, the hold/stop score the mean",
+          paired(0.8, 0.8)[2] == 0.7 and abs(paired(0.8, 0.8)[3] - 0.4) < 1e-12)
+    me = types.SimpleNamespace(pair_partner={"second": 0.5})
+    check("a first half whose cruise was not measured leaves the pair unmeasured",
+          TriphibianEnv._paired(me, {"measured": True, "along": 0.9, "across": 0.0,
+                                     "tracking": 1.0, "served": 1.0}, 0.5)[0] == 0.0)
+    t = schedule_for("water", np.random.default_rng(1))
+    hd = [ph.heading for ph in t.phases if ph.kind == CRUISE][0]
+    ha = [ph.heading for ph in antipode(t).phases if ph.kind == CRUISE][0]
+    check("the antipode turns the cruise heading by pi and nothing else",
+          abs(abs((ha - hd + math.pi) % (2 * math.pi) - math.pi) - math.pi) < 1e-12
+          and [ph.kind for ph in antipode(t).phases] == [ph.kind for ph in t.phases]
+          and [ph.depth for ph in antipode(t).phases] == [ph.depth for ph in t.phases])
+
+    # Through both evaluators: a still machine and an unsearched gait.
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.batchroll import evaluate_tier1_batch
+    from dytiscidae.envs.evaluate import Controller, evaluate_tier1
+
+    ps = [build(BODY_PLANS[n]()) for n in ("eel", "gannet")]
+    for label, make in (("held still", lambda p: Controller(
+            params=TriphibianEnv(p, seed=3).held_still_params())),
+            ("base gait", lambda p: Controller(params=None))):
+        ctrls = [make(p) for p in ps]
+        single = [evaluate_tier1(p, controller=c, segment_seconds=4.0, seed=3,
+                                 identify_axes=False) for p, c in zip(ps, ctrls)]
+        batch = evaluate_tier1_batch(ps, controllers=[make(p) for p in ps],
+                                     segment_seconds=4.0, seed=3)
+        worst = max(abs(r.segments[m].measurements.get("pair_along_mean", 1.0))
+                    for r in single + batch for m in ("water", "land"))
+        check(f"{label}: the pair's mean signed progress is zero on both paths",
+              worst < 1e-12, f"worst |mean| {worst:.2e}")
+        gap = max(abs(a.segments[m].competence - b.segments[m].competence)
+                  for a, b in zip(single, batch) for m in ("water", "land"))
+        check(f"{label}: the two paths agree on the paired score", gap < 1e-9,
+              f"max gap {gap:.2e}")
+
+
+def test_tier2_draws_its_headings() -> None:
+    """A verifier fixed at one heading has the defect it is meant to catch."""
+    print("\nTier-2 draws the task it verifies")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.evaluate import evaluate_tier2
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    p = build(BODY_PLANS["eel"]())
+    spec = MissionSpec(seconds_per_domain=24.0, cycles=1)
+    legs, probes = set(), set()
+    for seed in range(1, 9):
+        r = evaluate_tier2(p, spec=spec, seed=seed, label_all_media=True)
+        for out, segs in ((legs, r.segments), (probes, r.probe_segments)):
+            for m, sg in segs.items():
+                if m in ("water", "land") and "cmd_heading" in sg.measurements:
+                    out.add(round(float(sg.measurements["cmd_heading"]), 6))
+    check("the mission's own legs are asked different headings", len(legs) >= 2,
+          f"{sorted(legs)}")
+    check("and so are the per-medium probes", len(probes) >= 2, f"{sorted(probes)}")
+
+
 def test_a_crossing_is_commanded_and_a_still_machine_makes_none() -> None:
     """ARCH46_SPEC §8: a crossing pays only for doing what the machine was told.
 
@@ -2902,7 +2995,10 @@ def test_an_audit_re_measures_each_credited_medium_at_unseen_seeds() -> None:
 
     rep = a.audit(Ph(), scored, reevaluate=lucky, name="lucky")
     check("a zero-mission design is still re-run at the held-out seeds",
-          sorted(seen) == [100_000, 100_001], f"seeds {seen}")
+          {100_000, 100_001} <= set(seen), f"seeds {seen}")
+    check("and under the perturbed coefficient, at its own seed",
+          seen.count(0) == 1 and abs(rep.perturbed_by_medium.get("water", -1) - 0.1) < 1e-9,
+          f"seeds {seen}, perturbed {rep.perturbed_by_medium}")
     check("water keeps a tenth of its credit, and that is what is recorded",
           abs(rep.held_out_by_medium.get("water", -1) - 0.1) < 1e-9,
           f"{rep.held_out_by_medium}")
@@ -2978,11 +3074,18 @@ def test_an_audit_perturbs_the_scored_experiment_and_nothing_else() -> None:
         loop_mod._audit(state, 1, MissionSpec(), np.random.default_rng(0))
         rep = state.auditor.reports[-1]
         # Two checks need only the result; the third is the perturbation, which
-        # runs only on a base above zero -- without it the 1.0 is a default.
-        check("the perturbation check ran", rep.checks_run == 3, f"{rep.checks_run} checks")
+        # runs on a mission above zero or on any medium the design is credited
+        # in (2026-10-06: since water and land are paired, an open-loop gannet's
+        # mission is 0, and on the mission alone the check never ran -- as it
+        # never ran in arch48).
+        check("the perturbation check ran", rep.checks_run == 3,
+              f"{rep.checks_run} checks, credited {sorted(rep.perturbed_by_medium)}")
+        kept = list(rep.perturbed_by_medium.values()) + (
+            [rep.retained_fraction] if rep.retained_fraction is not None else [])
         check("and a perturbation of x1.0 retains exactly what the scored experiment scored",
-              abs(rep.retained_fraction - 1.0) < 1e-9 and not rep.invalid,
-              f"retained {rep.retained_fraction:.4f}, invalid {rep.invalid}")
+              bool(kept) and all(abs(k - 1.0) < 1e-9 for k in kept) and not rep.invalid,
+              f"per medium {rep.perturbed_by_medium}, mission {rep.retained_fraction}, "
+              f"invalid {rep.invalid}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -3550,8 +3653,15 @@ def test_the_two_evaluation_paths_score_the_same_machine_the_same() -> None:
         # not bit-for-bit; a five-decimal print made it look exact and it is not.
         # 1e-5 is still five orders of magnitude below the defect this exists to
         # catch, which was 0.638 m/s of `land_speed`.
-        w, key, n = worst_of(rb, rs, ("land", "air"))
-        check(f"{plan}: land and air agree to floating-point between the paths",
+        # Air only, since 2026-10-06: land is now an antipodal pair, and the
+        # second half's own rollout picks up the identification residual the
+        # way water always did (eel, seed 7: `command_rate` 3.5e-4 apart with
+        # identification on; at the dithered noise floor with it off).  The
+        # single land segment before it was insensitive by luck of trajectory:
+        # its signed speed differed by 3.6e-5 too, hidden by a progress term
+        # clipped at zero in both paths.
+        w, key, n = worst_of(rb, rs, ("air",))
+        check(f"{plan}: air agrees to floating-point between the paths",
               n > 6 and w < 1e-5,
               f"{n} measurements, worst absolute difference {w:.6f}"
               + (f" on {key}" if key else ""))
@@ -3565,8 +3675,8 @@ def test_the_two_evaluation_paths_score_the_same_machine_the_same() -> None:
         # differently (`bf.reset_slam()` against `solver.reset()`).  Bounded here
         # and recorded in the ROADMAP; the residual is millimetres of depth error
         # and centimetres per second of speed, well under the first water rung.
-        w_w, key_w, n_w = worst_of(rb, rs, ("water",))
-        check(f"{plan}: and water agrees to within the identification's residual",
+        w_w, key_w, n_w = worst_of(rb, rs, ("water", "land"))
+        check(f"{plan}: and water and land agree to within the identification's residual",
               n_w > 2 and w_w < 0.05,
               f"{n_w} measurements, worst absolute difference {w_w:.5f}"
               + (f" on {key_w}" if key_w else ""))
@@ -3588,7 +3698,7 @@ def test_the_two_evaluation_paths_score_the_same_machine_the_same() -> None:
         # chaotic spread (measured 2026-09-26 on the eel, six seeds: 1.0e-4 to
         # 7.2e-4, with one draw reading 2.6e-4 and the paths 7.8e-4).
         floor = 0.0
-        for ds in range(3):
+        for ds in range(5):
             rs1 = _nudged(lambda: evaluate_tier1(
                 build(BODY_PLANS[plan]()), spec=spec,
                 controller=Controller(params=None, policy=pol),
@@ -5884,6 +5994,8 @@ def main() -> int:
         test_transitions_are_graded_not_pass_fail,
         test_an_attempted_takeoff_outscores_never_leaving_the_ground,
         test_a_crossing_is_commanded_and_a_still_machine_makes_none,
+        test_the_heading_pair_cancels_what_the_command_did_not_choose,
+        test_tier2_draws_its_headings,
         test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing,
         test_judge_ladder_is_fixed_and_bar_only_tightens,
         test_auditor_can_invalidate_and_veto,

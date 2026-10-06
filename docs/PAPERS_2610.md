@@ -247,6 +247,69 @@ that the search does not have, and it would be a comparability boundary.
 
 ---
 
+## Fixed, 2026-10-06 (second pass, on the user's "修正")
+
+Items 1, 2 and 4 of the list below are closed by one change; item 3 is
+narrowed. The evidence is in `experiments/heading_pair/README.md`.
+
+**The antipodal heading pair** (`tasks.antipode`, `evaluate.run_segment`, and
+the same sequence in `batchroll.evaluate_tier1_batch`):
+- Water and land are each run twice from one initial state: at the drawn
+  heading and at its opposite. The environment's random stream is rewound
+  between the halves.
+- The cruise term reads the mean of the two halves' signed speeds along their
+  headings. Tracking takes the worse half's, hold/stop the mean of the two.
+- A velocity that does not depend on the command cancels exactly. That covers a
+  dense body sinking along a glide, a body that swims forward without
+  steering, the servo snap and a windmilling rotor.
+- Still machines and open-loop gaits score |mean| <= 2.8e-17 on both paths.
+  An open-loop gait cannot read the command, so it can no longer earn water or
+  land cruise progress.
+- Tier-1.5 and Tier-2 run the same pair. Tier-2 now draws its headings instead
+  of fixing them at π/2.
+- Cost: about +18% physics steps per generation (192k on top of about 1.05M).
+
+**Re-gated on arch48** (the same 200 elites, which were selected under the old
+score):
+
+| bar | before | after |
+|---|---|---|
+| water >= 0.012 (elite / still / base) | 121 / 103 / 112, leak | 41 / 2 / 2, certified against both |
+| water >= 0.15 | 45 / 35 / 42, leak | 2 / 0 / 0, underpowered |
+| land >= 0.15 | 45 / 12 / 29 | 7 / 0 / 0, certified against both |
+
+- Every competence bar, which is what selection pays for, is now certified or
+  underpowered. None leaks.
+- Against the unsearched base gait, nothing was certified before; now every
+  measured competence bar is.
+- 20-23% of the elites keep nonzero water or land competence, so selection
+  still has a gradient to climb.
+
+**The auditor's perturbation check** had the same defect as its held-out check:
+it ran only on a nonzero mission. It now also measures each credited medium,
+as a note.
+
+**Not changed:** the judge's ladder rungs that a passive body can stand on:
+- water depth;
+- land posture;
+- takeoff.
+
+They are telemetry and scout input, not fitness, and redesigning them against a
+commanded difference needs its own measurement. Until then, read their counts
+as state, not capability. Air rungs 1-4 measure the airframe by design.
+
+**Comparability:** water and land competence, mission_fraction, and everything
+that reads them (critic, scout, curriculum, islands) are not comparable across
+this change.
+
+**Pre-registered reads for the next run:**
+1. The auditor's `mean_held_out` per medium is >= 0.5. arch48's elites, at a
+   fresh seed under the old score, would read about 0.2 (3/16 of 15/16).
+2. Tier-1 vs Tier-2 Spearman per medium on `tier1_media` / `tier2_media` is
+   > 0.3 in water and land. It was −0.09 / 0.02.
+3. `experiments/no_model_gate` on that run certifies every competence bar the
+   elites clear in >= 10% of cases.
+
 ## The work list this sets
 
 Ranked by the 2026-09-30 rule: build cost, then loop speed, then what it does

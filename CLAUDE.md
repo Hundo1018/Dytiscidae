@@ -294,10 +294,10 @@ Each rule below was paid for by a score that rewarded the wrong thing.
    itself (`corr = -0.264`). Each segment is now two commanded phases the
    controller can see, each scored on its own purpose (`envs/tasks.py`). A still
    machine was measured at ~0.01 in water on that day's bodies; on arch48's 200
-   elites it clears water 0.15 in 35 cases against the elites' 45, by a dense
+   elites it cleared water 0.15 in 35 cases against the elites' 45, by a dense
    body sinking along the drawn heading (`experiments/no_model_gate`,
-   docs/PAPERS_2610.md §1). Re-measure the still machine on the current
-   population, not on a fixture.
+   docs/PAPERS_2610.md §1) -- closed by rule 8. Re-measure the still machine on
+   the current population, not on a fixture.
 4. **"Could not measure" must not share a value with "measured zero".**
    `thrust_margin` returned 0.0 for both, the rung sat at `>= 0.0`, and 8 of 80
    re-scored elites cleared it while flapping ~1 rad to no effect. Publish
@@ -325,6 +325,17 @@ Each rule below was paid for by a score that rewarded the wrong thing.
    `TriphibianEnv.held_still_params`): still machines now cross 0 of 218 in
    every kind, and so do the elites, bar one. The crossings the elites had were
    the same leak.
+8. **A command must be answerable both ways, and a score must survive a fresh
+   seed.** 2026-10-06 (docs/PAPERS_2610.md): one heading per generation, shared
+   by 16 candidates, made every water and land score a measurement of the draw
+   (a fresh seed took Tier-1 passes 15/16 -> 3/16 in water, 13/16 -> 0/16 on
+   land), and a dense still body cleared water 0.15 as often as the elites by
+   sinking along whichever heading lined up. Water and land are now an
+   antipodal pair (`tasks.antipode`, `evaluate.run_segment`, and the same
+   sequence in `batchroll`): one initial state, the drawn heading and its
+   opposite, progress on the mean signed speed, so motion the command did not
+   choose cancels exactly (still machines and open-loop gaits: |mean| < 1e-12).
+   The auditor's held-out seeds read each medium, not only the mission.
 
 ## Where things are
 

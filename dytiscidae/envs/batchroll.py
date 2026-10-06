@@ -1058,35 +1058,62 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         # score depend on which interpreter ran it.  See TriphibianEnv.scatter
         # for why the canonical pose alone was not a training set.
         from .evaluate import _scatter_seed
-        from .tasks import schedule_for, task_seed
+        from .tasks import PAIRED_MEDIA, antipode, schedule_for, task_seed
+        from .triphibian import pair_partner_of
         scatter_seed = _scatter_seed(seed, dom)
         # The task, drawn the same way and shared the same way: every machine
         # in the generation is asked the same thing.
         task = schedule_for(dom, np.random.default_rng(task_seed(scatter_seed)))
-        for i in live:
-            envs[i].reset(dom)
-            envs[i].scatter(np.random.default_rng(scatter_seed))
-            envs[i].task = task
-        bf.reset_slam()
-        collector = None
-        if shared is not None and buffer is not None:
-            from ..learning.ppo import SegmentCollector
-            collector = SegmentCollector(len(group))
-        segs = rollout_batch(
-            group, bf, segment_seconds, [ctrls[i].params for i in live], dom,
-            policies=[ctrls[i].policy for i in live],
-            bases=[ctrls[i].basis_for(dom) for i in live],
-            shared=shared, collector=collector,
-            noise_rngs=_noise(DOMAIN_CYCLE.index(dom)))
+        # Water and land are an antipodal pair, run exactly as
+        # `evaluate.run_segment` runs it: the same initial state twice (each
+        # machine's own random stream rewound), the second half at the
+        # opposite heading and scored with the first as its partner.
+        rewind = {i: envs[i].rng.bit_generator.state for i in live}
+
+        def _half(t, partners, tag):
+            for slot, i in enumerate(live):
+                envs[i].reset(dom)
+                envs[i].scatter(np.random.default_rng(scatter_seed))
+                envs[i].task = t
+                envs[i].pair_partner = None if partners is None else partners[slot]
+            bf.reset_slam()
+            coll = None
+            if shared is not None and buffer is not None:
+                from ..learning.ppo import SegmentCollector
+                coll = SegmentCollector(len(group))
+            out = rollout_batch(
+                group, bf, segment_seconds, [ctrls[i].params for i in live], dom,
+                policies=[ctrls[i].policy for i in live],
+                bases=[ctrls[i].basis_for(dom) for i in live],
+                shared=shared, collector=coll, noise_rngs=_noise(tag))
+            for i in live:
+                envs[i].pair_partner = None
+            return out, coll
+
+        segs, collector = _half(task, None, DOMAIN_CYCLE.index(dom))
+        collectors = [collector]
+        if dom.value in PAIRED_MEDIA:
+            after = {i: envs[i].rng.bit_generator.state for i in live}
+            for i in live:
+                envs[i].rng.bit_generator.state = rewind[i]
+            second, coll2 = _half(antipode(task), [pair_partner_of(x) for x in segs],
+                                  50 + DOMAIN_CYCLE.index(dom))
+            for i in live:
+                envs[i].rng.bit_generator.state = after[i]
+            # A first half that failed is the result, as in `run_segment`.
+            segs = [b if a.survived else a for a, b in zip(segs, second)]
+            collectors.append(coll2)
         for slot, i in enumerate(live):
             results[i].segments[dom.value] = segs[slot]
             clamped[i] = clamped[i] or bool(envs[i].solver.diag.clamped)
-        if collector is not None:
-            # The reward is the segment's own competence -- the number the
-            # search selects on -- delivered once, at the end. See ppo.py for
-            # why nothing denser is invented here.
-            collector.finish(buffer, [s.competence for s in segs], tag=dom.value,
-                             groups=live_groups)
+        for coll in collectors:
+            if coll is not None:
+                # The reward is the segment's own competence -- the number the
+                # search selects on -- delivered once, at the end, to both
+                # halves of a pair. See ppo.py for why nothing denser is
+                # invented here.
+                coll.finish(buffer, [x.competence for x in segs], tag=dom.value,
+                            groups=live_groups)
 
     # `land_to_air` was excluded because "nothing gets off the ground"
     # (transitions.py records exactly that for all six seed plans).  Two
