@@ -1,0 +1,9779 @@
+{
+ "run": "runs/arch48",
+ "n_elites": 84,
+ "of_archive": 84,
+ "arms": [
+  "elite",
+  "still",
+  "base"
+ ],
+ "wall_s": 975.058920621872,
+ "skipped_no_controller": [],
+ "reproduction": {
+  "air": {
+   "within_0.005": 84,
+   "n": 84
+  },
+  "water": {
+   "within_0.005": 81,
+   "n": 84
+  },
+  "land": {
+   "within_0.005": 74,
+   "n": 84
+  }
+ },
+ "competence_thresholds": {
+  "0.012": "curriculum.WEAKEST_BARS[1] / three_media / TRIPHIBIAN_FLOOR*2",
+  "0.055": "curriculum.WEAKEST_BARS[0]",
+  "0.15": "evaluate.LEG_COMPETENCE_BAR",
+  "0.25": "curriculum.STAGES single",
+  "0.3": "curriculum.STAGES chain / WEAKEST_BARS[3]",
+  "0.35": "curriculum.STAGES directed, crossing / WEAKEST_BARS[2]"
+ },
+ "plan_counts": {
+  "beetle": 34,
+  "gannet": 47,
+  "random": 3
+ },
+ "mean_competence": {
+  "elite": {
+   "air": 0.0008564276846279433,
+   "water": 0.0693138468432669,
+   "land": 0.03931243491296661
+  },
+  "still": {
+   "air": 0.0023236762746342236,
+   "water": 0.07549070283732398,
+   "land": 0.006886941317132037
+  },
+  "base": {
+   "air": 0.002177576348988046,
+   "water": 0.06061524207453406,
+   "land": 0.0394331570022877
+  }
+ },
+ "verdict_counts": {
+  "still": {
+   "leak": 29,
+   "unmeasured": 29,
+   "underpowered": 6,
+   "certified": 4
+  },
+  "base": {
+   "leak": 38,
+   "unmeasured": 29,
+   "underpowered": 1
+  }
+ },
+ "table": [
+  {
+   "bar": "rung:air>=1:makes_lift",
+   "family": "ladder",
+   "threshold": "lift_margin >= 0.1",
+   "source": "judge.LADDER",
+   "elite": [
+    82,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83
+   ],
+   "still": [
+    82,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83
+   ],
+   "base": [
+    82,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83
+   ],
+   "elite_ci": [
+    0.9269437603019091,
+    0.9957531317433763
+   ],
+   "still_ci": [
+    0.9269437603019091,
+    0.9957531317433763
+   ],
+   "base_ci": [
+    0.9269437603019091,
+    0.9957531317433763
+   ],
+   "elite_share": 0.9761904761904762,
+   "still_share": 0.9761904761904762,
+   "base_share": 0.9761904761904762,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    82
+   ],
+   "still_distinct": [
+    3,
+    82
+   ],
+   "base_distinct": [
+    3,
+    82
+   ]
+  },
+  {
+   "bar": "rung:air>=2:carries_a_third",
+   "family": "ladder",
+   "threshold": "lift_margin >= 0.3",
+   "source": "judge.LADDER",
+   "elite": [
+    80,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    23,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83
+   ],
+   "still": [
+    80,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    23,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83
+   ],
+   "base": [
+    80,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    23,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83
+   ],
+   "elite_ci": [
+    0.8943391321206091,
+    0.983573046506772
+   ],
+   "still_ci": [
+    0.8943391321206091,
+    0.983573046506772
+   ],
+   "base_ci": [
+    0.8943391321206091,
+    0.983573046506772
+   ],
+   "elite_share": 0.9523809523809523,
+   "still_share": 0.9523809523809523,
+   "base_share": 0.9523809523809523,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    80
+   ],
+   "still_distinct": [
+    3,
+    80
+   ],
+   "base_distinct": [
+    3,
+    80
+   ]
+  },
+  {
+   "bar": "rung:air>=3:nearly_flies",
+   "family": "ladder",
+   "threshold": "lift_margin >= 0.6",
+   "source": "judge.LADDER",
+   "elite": [
+    61,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    25,
+    26,
+    28,
+    29,
+    31,
+    32,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    50,
+    53,
+    56,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    65,
+    69,
+    70,
+    71,
+    72,
+    74,
+    78,
+    80,
+    81,
+    82,
+    83
+   ],
+   "still": [
+    61,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    25,
+    26,
+    28,
+    29,
+    31,
+    32,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    50,
+    53,
+    56,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    65,
+    69,
+    70,
+    71,
+    72,
+    74,
+    78,
+    80,
+    81,
+    82,
+    83
+   ],
+   "base": [
+    61,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    25,
+    26,
+    28,
+    29,
+    31,
+    32,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    50,
+    53,
+    56,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    65,
+    69,
+    70,
+    71,
+    72,
+    74,
+    78,
+    80,
+    81,
+    82,
+    83
+   ],
+   "elite_ci": [
+    0.6349180606401301,
+    0.8050700166240192
+   ],
+   "still_ci": [
+    0.6349180606401301,
+    0.8050700166240192
+   ],
+   "base_ci": [
+    0.6349180606401301,
+    0.8050700166240192
+   ],
+   "elite_share": 0.7261904761904762,
+   "still_share": 0.7261904761904762,
+   "base_share": 0.7261904761904762,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    61
+   ],
+   "still_distinct": [
+    2,
+    61
+   ],
+   "base_distinct": [
+    2,
+    61
+   ]
+  },
+  {
+   "bar": "rung:air>=4:carries_itself",
+   "family": "ladder",
+   "threshold": "lift_margin >= 1.0",
+   "source": "judge.LADDER",
+   "elite": [
+    59,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    22,
+    25,
+    26,
+    28,
+    29,
+    31,
+    32,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    50,
+    53,
+    56,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    65,
+    69,
+    70,
+    71,
+    72,
+    74,
+    78,
+    81,
+    82,
+    83
+   ],
+   "still": [
+    59,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    22,
+    25,
+    26,
+    28,
+    29,
+    31,
+    32,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    50,
+    53,
+    56,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    65,
+    69,
+    70,
+    71,
+    72,
+    74,
+    78,
+    81,
+    82,
+    83
+   ],
+   "base": [
+    59,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    22,
+    25,
+    26,
+    28,
+    29,
+    31,
+    32,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    50,
+    53,
+    56,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    65,
+    69,
+    70,
+    71,
+    72,
+    74,
+    78,
+    81,
+    82,
+    83
+   ],
+   "elite_ci": [
+    0.6097935413755287,
+    0.7839021594298159
+   ],
+   "still_ci": [
+    0.6097935413755287,
+    0.7839021594298159
+   ],
+   "base_ci": [
+    0.6097935413755287,
+    0.7839021594298159
+   ],
+   "elite_share": 0.7023809523809523,
+   "still_share": 0.7023809523809523,
+   "base_share": 0.7023809523809523,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    59
+   ],
+   "still_distinct": [
+    2,
+    59
+   ],
+   "base_distinct": [
+    2,
+    59
+   ]
+  },
+  {
+   "bar": "rung:air>=5:leaves_surface",
+   "family": "ladder",
+   "threshold": "airborne_fraction >= 0.1",
+   "source": "judge.LADDER",
+   "elite": [
+    44,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    9,
+    10,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    19,
+    25,
+    26,
+    28,
+    29,
+    31,
+    32,
+    34,
+    35,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    46,
+    53,
+    56,
+    57,
+    59,
+    60,
+    62,
+    63,
+    69,
+    70,
+    71,
+    72,
+    74,
+    83
+   ],
+   "still": [
+    39,
+    84
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    10,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    25,
+    26,
+    28,
+    29,
+    31,
+    32,
+    34,
+    35,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    46,
+    56,
+    57,
+    59,
+    60,
+    62,
+    63,
+    69,
+    70,
+    71,
+    83
+   ],
+   "base": [
+    37,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    10,
+    12,
+    14,
+    15,
+    16,
+    17,
+    18,
+    25,
+    26,
+    28,
+    29,
+    31,
+    32,
+    35,
+    36,
+    39,
+    40,
+    41,
+    43,
+    46,
+    53,
+    56,
+    57,
+    59,
+    60,
+    62,
+    69,
+    70,
+    71,
+    72,
+    74
+   ],
+   "elite_ci": [
+    0.42871004099646837,
+    0.6176158378088727
+   ],
+   "still_ci": [
+    0.3709272633664039,
+    0.5595841211432317
+   ],
+   "base_ci": [
+    0.3481644209723169,
+    0.5360223105706263
+   ],
+   "elite_share": 0.5238095238095238,
+   "still_share": 0.4642857142857143,
+   "base_share": 0.44047619047619047,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    44
+   ],
+   "still_distinct": [
+    2,
+    39
+   ],
+   "base_distinct": [
+    2,
+    37
+   ]
+  },
+  {
+   "bar": "rung:air>=6:stays_up",
+   "family": "ladder",
+   "threshold": "airborne_fraction >= 0.6",
+   "source": "judge.LADDER",
+   "elite": [
+    3,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    4,
+    28,
+    57
+   ],
+   "still": [
+    4,
+    84
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    4,
+    25,
+    57,
+    69
+   ],
+   "base": [
+    4,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    4,
+    25,
+    28,
+    57
+   ],
+   "elite_ci": [
+    0.009803903680513676,
+    0.08972245958323322
+   ],
+   "still_ci": [
+    0.01642695349323295,
+    0.10566086787940165
+   ],
+   "base_ci": [
+    0.01642695349323295,
+    0.10566086787940165
+   ],
+   "elite_share": 0.03571428571428571,
+   "still_share": 0.047619047619047616,
+   "base_share": 0.047619047619047616,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    3
+   ],
+   "still_distinct": [
+    2,
+    4
+   ],
+   "base_distinct": [
+    1,
+    4
+   ]
+  },
+  {
+   "bar": "rung:air>=7:glides",
+   "family": "ladder",
+   "threshold": "sink_rate <= 3.0",
+   "source": "judge.LADDER",
+   "elite": [
+    2,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    4,
+    57
+   ],
+   "still": [
+    3,
+    84
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    4,
+    25,
+    57
+   ],
+   "base": [
+    2,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    4,
+    57
+   ],
+   "elite_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "still_ci": [
+    0.009803903680513676,
+    0.08972245958323322
+   ],
+   "base_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "elite_share": 0.023809523809523808,
+   "still_share": 0.03571428571428571,
+   "base_share": 0.023809523809523808,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    2
+   ],
+   "still_distinct": [
+    1,
+    3
+   ],
+   "base_distinct": [
+    1,
+    2
+   ]
+  },
+  {
+   "bar": "rung:air>=8:holds_height",
+   "family": "ladder",
+   "threshold": "sink_rate <= 0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    1,
+    84
+   ],
+   "elite_plans": [
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    4
+   ],
+   "still": [
+    1,
+    84
+   ],
+   "still_plans": [
+    "gannet"
+   ],
+   "still_passed_indices": [
+    4
+   ],
+   "base": [
+    2,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    4,
+    57
+   ],
+   "elite_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "still_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "base_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "elite_share": 0.011904761904761904,
+   "still_share": 0.011904761904761904,
+   "base_share": 0.023809523809523808,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    1
+   ],
+   "still_distinct": [
+    1,
+    1
+   ],
+   "base_distinct": [
+    1,
+    2
+   ]
+  },
+  {
+   "bar": "rung:air>=9:flaps_forward",
+   "family": "ladder",
+   "threshold": "thrust_margin >= 0.002",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:air>=10:makes_thrust",
+   "family": "ladder",
+   "threshold": "thrust_margin >= 0.01",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:air>=11:pushes_itself",
+   "family": "ladder",
+   "threshold": "thrust_margin >= 0.02",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:air>=12:flies_level",
+   "family": "ladder",
+   "threshold": "level_margin >= 0.7",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:air>=13:holds_station",
+   "family": "ladder",
+   "threshold": "station_keeping >= 0.6",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:air>=14:climbs",
+   "family": "ladder",
+   "threshold": "sink_rate <= -0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:air>=15:manoeuvres",
+   "family": "ladder",
+   "threshold": "turn_response >= 0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:water>=1:submerges",
+   "family": "ladder",
+   "threshold": "depth_gain >= 0.25",
+   "source": "judge.LADDER",
+   "elite": [
+    54,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    4,
+    5,
+    7,
+    8,
+    9,
+    11,
+    12,
+    14,
+    19,
+    20,
+    23,
+    25,
+    27,
+    28,
+    30,
+    31,
+    33,
+    35,
+    37,
+    39,
+    40,
+    41,
+    43,
+    44,
+    45,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    56,
+    57,
+    59,
+    60,
+    64,
+    66,
+    67,
+    68,
+    70,
+    71,
+    73,
+    74,
+    75,
+    76,
+    77,
+    79,
+    80,
+    81,
+    82
+   ],
+   "still": [
+    75,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    2,
+    4,
+    5,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    33,
+    34,
+    35,
+    36,
+    37,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83
+   ],
+   "base": [
+    54,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    2,
+    4,
+    5,
+    7,
+    8,
+    9,
+    11,
+    12,
+    14,
+    16,
+    20,
+    23,
+    25,
+    27,
+    28,
+    30,
+    31,
+    33,
+    35,
+    37,
+    39,
+    40,
+    41,
+    43,
+    44,
+    45,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    56,
+    57,
+    59,
+    60,
+    64,
+    66,
+    67,
+    68,
+    70,
+    71,
+    73,
+    74,
+    75,
+    76,
+    77,
+    79,
+    80,
+    81,
+    82
+   ],
+   "elite_ci": [
+    0.5480666579143978,
+    0.7298645474746397
+   ],
+   "still_ci": [
+    0.8204816511662241,
+    0.9429563077010541
+   ],
+   "base_ci": [
+    0.5480666579143978,
+    0.7298645474746397
+   ],
+   "elite_share": 0.6428571428571429,
+   "still_share": 0.8928571428571429,
+   "base_share": 0.6428571428571429,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    54
+   ],
+   "still_distinct": [
+    3,
+    75
+   ],
+   "base_distinct": [
+    3,
+    54
+   ]
+  },
+  {
+   "bar": "rung:water>=2:dives",
+   "family": "ladder",
+   "threshold": "depth_gain >= 2.0",
+   "source": "judge.LADDER",
+   "elite": [
+    34,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    2,
+    5,
+    8,
+    11,
+    12,
+    19,
+    20,
+    23,
+    27,
+    30,
+    33,
+    35,
+    41,
+    43,
+    45,
+    48,
+    49,
+    50,
+    51,
+    52,
+    55,
+    56,
+    60,
+    64,
+    66,
+    67,
+    71,
+    73,
+    75,
+    76,
+    77,
+    79,
+    80,
+    81
+   ],
+   "still": [
+    53,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    0,
+    2,
+    5,
+    7,
+    8,
+    10,
+    11,
+    12,
+    18,
+    19,
+    20,
+    22,
+    23,
+    27,
+    29,
+    30,
+    31,
+    33,
+    34,
+    35,
+    40,
+    41,
+    43,
+    45,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    55,
+    56,
+    59,
+    60,
+    63,
+    64,
+    66,
+    67,
+    68,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83
+   ],
+   "base": [
+    34,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    2,
+    5,
+    8,
+    11,
+    12,
+    20,
+    23,
+    27,
+    30,
+    33,
+    35,
+    41,
+    43,
+    45,
+    48,
+    49,
+    50,
+    51,
+    52,
+    55,
+    56,
+    60,
+    64,
+    66,
+    67,
+    68,
+    71,
+    73,
+    75,
+    76,
+    77,
+    79,
+    80,
+    81
+   ],
+   "elite_ci": [
+    0.3144040333314626,
+    0.5002990910021596
+   ],
+   "still_ci": [
+    0.5358941116930873,
+    0.7188799720725705
+   ],
+   "base_ci": [
+    0.3144040333314626,
+    0.5002990910021596
+   ],
+   "elite_share": 0.40476190476190477,
+   "still_share": 0.6309523809523809,
+   "base_share": 0.40476190476190477,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    34
+   ],
+   "still_distinct": [
+    3,
+    53
+   ],
+   "base_distinct": [
+    3,
+    34
+   ]
+  },
+  {
+   "bar": "rung:water>=3:reaches_depth",
+   "family": "ladder",
+   "threshold": "depth_gain >= 5.0",
+   "source": "judge.LADDER",
+   "elite": [
+    22,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    2,
+    11,
+    20,
+    23,
+    27,
+    30,
+    33,
+    41,
+    43,
+    48,
+    51,
+    52,
+    55,
+    56,
+    60,
+    64,
+    66,
+    67,
+    71,
+    76,
+    77,
+    79
+   ],
+   "still": [
+    30,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    0,
+    2,
+    11,
+    20,
+    23,
+    27,
+    30,
+    33,
+    40,
+    41,
+    43,
+    48,
+    49,
+    51,
+    52,
+    55,
+    56,
+    60,
+    64,
+    66,
+    67,
+    68,
+    70,
+    71,
+    73,
+    76,
+    77,
+    79,
+    80,
+    82
+   ],
+   "base": [
+    22,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    2,
+    11,
+    20,
+    23,
+    27,
+    30,
+    33,
+    41,
+    43,
+    48,
+    51,
+    52,
+    55,
+    56,
+    60,
+    64,
+    66,
+    67,
+    71,
+    76,
+    77,
+    79
+   ],
+   "elite_ci": [
+    0.18445132619896787,
+    0.3524182781361107
+   ],
+   "still_ci": [
+    0.2701354525253773,
+    0.4519333420856242
+   ],
+   "base_ci": [
+    0.18445132619896787,
+    0.3524182781361107
+   ],
+   "elite_share": 0.2619047619047619,
+   "still_share": 0.35714285714285715,
+   "base_share": 0.2619047619047619,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    22
+   ],
+   "still_distinct": [
+    3,
+    30
+   ],
+   "base_distinct": [
+    2,
+    22
+   ]
+  },
+  {
+   "bar": "rung:water>=4:goes_deep",
+   "family": "ladder",
+   "threshold": "depth_gain >= 8.0",
+   "source": "judge.LADDER",
+   "elite": [
+    5,
+    84
+   ],
+   "elite_plans": [
+    "random",
+    "random",
+    "random",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    20,
+    48,
+    52,
+    56,
+    60
+   ],
+   "still": [
+    5,
+    84
+   ],
+   "still_plans": [
+    "random",
+    "random",
+    "random",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    20,
+    48,
+    52,
+    70,
+    80
+   ],
+   "base": [
+    3,
+    84
+   ],
+   "base_plans": [
+    "random",
+    "random",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    48,
+    52,
+    60
+   ],
+   "elite_ci": [
+    0.023744518071346116,
+    0.12108335081255645
+   ],
+   "still_ci": [
+    0.023744518071346116,
+    0.12108335081255645
+   ],
+   "base_ci": [
+    0.009803903680513676,
+    0.08972245958323322
+   ],
+   "elite_share": 0.05952380952380952,
+   "still_share": 0.05952380952380952,
+   "base_share": 0.03571428571428571,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    5
+   ],
+   "still_distinct": [
+    2,
+    5
+   ],
+   "base_distinct": [
+    2,
+    3
+   ]
+  },
+  {
+   "bar": "rung:water>=5:holds_depth",
+   "family": "ladder",
+   "threshold": "hold_error <= 1.0",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:water>=6:manoeuvres",
+   "family": "ladder",
+   "threshold": "cruise_score >= 0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:land>=1:stays_upright",
+   "family": "ladder",
+   "threshold": "upright >= 0.7",
+   "source": "judge.LADDER",
+   "elite": [
+    75,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    16,
+    17,
+    18,
+    19,
+    20,
+    22,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    69,
+    70,
+    71,
+    72,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    83
+   ],
+   "still": [
+    76,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    11,
+    12,
+    13,
+    16,
+    17,
+    18,
+    19,
+    20,
+    22,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83
+   ],
+   "base": [
+    74,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    11,
+    12,
+    13,
+    14,
+    16,
+    17,
+    18,
+    19,
+    20,
+    22,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    69,
+    70,
+    71,
+    72,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83
+   ],
+   "elite_ci": [
+    0.8204816511662241,
+    0.9429563077010541
+   ],
+   "still_ci": [
+    0.8347164210516882,
+    0.9517240600339263
+   ],
+   "base_ci": [
+    0.806438096302637,
+    0.9339702157902761
+   ],
+   "elite_share": 0.8928571428571429,
+   "still_share": 0.9047619047619048,
+   "base_share": 0.8809523809523809,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    75
+   ],
+   "still_distinct": [
+    3,
+    76
+   ],
+   "base_distinct": [
+    3,
+    74
+   ]
+  },
+  {
+   "bar": "rung:land>=2:supports_itself",
+   "family": "ladder",
+   "threshold": "contact_fraction >= 0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    51,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    8,
+    9,
+    11,
+    12,
+    14,
+    18,
+    19,
+    20,
+    24,
+    25,
+    27,
+    28,
+    30,
+    32,
+    33,
+    38,
+    39,
+    41,
+    43,
+    44,
+    45,
+    46,
+    48,
+    50,
+    51,
+    52,
+    54,
+    55,
+    56,
+    57,
+    59,
+    60,
+    61,
+    62,
+    64,
+    66,
+    67,
+    69,
+    71,
+    75,
+    76,
+    77,
+    79,
+    81
+   ],
+   "still": [
+    76,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    11,
+    12,
+    13,
+    16,
+    17,
+    18,
+    19,
+    20,
+    22,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83
+   ],
+   "base": [
+    50,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    8,
+    9,
+    11,
+    12,
+    14,
+    18,
+    19,
+    20,
+    24,
+    25,
+    27,
+    28,
+    30,
+    32,
+    33,
+    38,
+    39,
+    41,
+    43,
+    44,
+    45,
+    46,
+    48,
+    50,
+    51,
+    52,
+    54,
+    55,
+    56,
+    57,
+    59,
+    61,
+    62,
+    64,
+    66,
+    67,
+    69,
+    71,
+    75,
+    76,
+    77,
+    79,
+    81
+   ],
+   "elite_ci": [
+    0.5117121438904924,
+    0.6967446544210445
+   ],
+   "still_ci": [
+    0.8347164210516882,
+    0.9517240600339263
+   ],
+   "base_ci": [
+    0.4997009089978619,
+    0.6855959666685543
+   ],
+   "elite_share": 0.6071428571428571,
+   "still_share": 0.9047619047619048,
+   "base_share": 0.5952380952380952,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    51
+   ],
+   "still_distinct": [
+    3,
+    76
+   ],
+   "base_distinct": [
+    3,
+    50
+   ]
+  },
+  {
+   "bar": "rung:land>=3:stirs",
+   "family": "ladder",
+   "threshold": "land_peak_speed >= 0.08",
+   "source": "judge.LADDER",
+   "elite": [
+    21,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    5,
+    9,
+    11,
+    12,
+    14,
+    24,
+    28,
+    30,
+    32,
+    41,
+    44,
+    52,
+    57,
+    59,
+    60,
+    61,
+    67,
+    79,
+    81
+   ],
+   "still": [
+    23,
+    84
+   ],
+   "still_plans": [
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    5,
+    7,
+    9,
+    11,
+    12,
+    17,
+    22,
+    24,
+    29,
+    30,
+    36,
+    41,
+    44,
+    46,
+    49,
+    52,
+    53,
+    63,
+    67,
+    72,
+    73,
+    79,
+    83
+   ],
+   "base": [
+    19,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    5,
+    9,
+    11,
+    12,
+    14,
+    18,
+    24,
+    28,
+    30,
+    41,
+    46,
+    52,
+    59,
+    61,
+    67,
+    79,
+    81
+   ],
+   "elite_ci": [
+    0.174046918683316,
+    0.339683387004991
+   ],
+   "still_ci": [
+    0.19492998337599832,
+    0.3650819393598903
+   ],
+   "base_ci": [
+    0.1534755548841702,
+    0.3139868591534759
+   ],
+   "elite_share": 0.25,
+   "still_share": 0.27380952380952384,
+   "base_share": 0.2261904761904762,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    21
+   ],
+   "still_distinct": [
+    3,
+    23
+   ],
+   "base_distinct": [
+    3,
+    19
+   ]
+  },
+  {
+   "bar": "rung:land>=4:moves",
+   "family": "ladder",
+   "threshold": "land_speed >= 0.02",
+   "source": "judge.LADDER",
+   "elite": [
+    14,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    5,
+    12,
+    24,
+    28,
+    32,
+    44,
+    57,
+    59,
+    60,
+    61,
+    67,
+    81
+   ],
+   "still": [
+    6,
+    84
+   ],
+   "still_plans": [
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    5,
+    22,
+    49,
+    67,
+    72,
+    73
+   ],
+   "base": [
+    10,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    5,
+    12,
+    18,
+    24,
+    59,
+    61,
+    67,
+    81
+   ],
+   "elite_ci": [
+    0.10366776089747964,
+    0.24821605378601824
+   ],
+   "still_ci": [
+    0.03156237619027458,
+    0.1361128129267743
+   ],
+   "base_ci": [
+    0.06602978420973385,
+    0.1935619036973778
+   ],
+   "elite_share": 0.16666666666666666,
+   "still_share": 0.07142857142857142,
+   "base_share": 0.11904761904761904,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    14
+   ],
+   "still_distinct": [
+    2,
+    6
+   ],
+   "base_distinct": [
+    2,
+    10
+   ]
+  },
+  {
+   "bar": "rung:land>=5:climbs_slope",
+   "family": "ladder",
+   "threshold": "slope_climbed >= 0.05",
+   "source": "judge.LADDER",
+   "elite": [
+    4,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    0,
+    24,
+    32,
+    60
+   ],
+   "still": [
+    1,
+    84
+   ],
+   "still_plans": [
+    "beetle"
+   ],
+   "still_passed_indices": [
+    72
+   ],
+   "base": [
+    2,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    0,
+    24
+   ],
+   "elite_ci": [
+    0.01642695349323295,
+    0.10566086787940165
+   ],
+   "still_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "base_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "elite_share": 0.047619047619047616,
+   "still_share": 0.011904761904761904,
+   "base_share": 0.023809523809523808,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    4
+   ],
+   "still_distinct": [
+    1,
+    1
+   ],
+   "base_distinct": [
+    1,
+    2
+   ]
+  },
+  {
+   "bar": "rung:land>=6:walks",
+   "family": "ladder",
+   "threshold": "walk_progress >= 0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    1,
+    84
+   ],
+   "elite_plans": [
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    60
+   ],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.011904761904761904,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "underpowered",
+   "verdict_base": "underpowered",
+   "elite_distinct": [
+    1,
+    1
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:takeoff>=1:unweights",
+   "family": "ladder",
+   "threshold": "takeoff_height >= 0.02",
+   "source": "judge.LADDER (defined; not judged by _score_candidate)",
+   "elite": [
+    26,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    7,
+    9,
+    13,
+    14,
+    16,
+    17,
+    22,
+    29,
+    34,
+    36,
+    37,
+    42,
+    46,
+    47,
+    53,
+    58,
+    62,
+    63,
+    65,
+    69,
+    70,
+    72,
+    77,
+    78,
+    80,
+    83
+   ],
+   "still": [
+    8,
+    84
+   ],
+   "still_plans": [
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    9,
+    22,
+    46,
+    53,
+    62,
+    69,
+    72,
+    77
+   ],
+   "base": [
+    25,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    7,
+    9,
+    13,
+    14,
+    16,
+    17,
+    22,
+    29,
+    34,
+    36,
+    42,
+    46,
+    47,
+    53,
+    58,
+    62,
+    63,
+    65,
+    69,
+    70,
+    72,
+    77,
+    78,
+    80,
+    83
+   ],
+   "elite_ci": [
+    0.22678178283376899,
+    0.4026720177296571
+   ],
+   "still_ci": [
+    0.04827593996608366,
+    0.1652835789483264
+   ],
+   "base_ci": [
+    0.21609784057020276,
+    0.3902064586244931
+   ],
+   "elite_share": 0.30952380952380953,
+   "still_share": 0.09523809523809523,
+   "base_share": 0.2976190476190476,
+   "verdict_still": "certified",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    26
+   ],
+   "still_distinct": [
+    2,
+    8
+   ],
+   "base_distinct": [
+    2,
+    25
+   ]
+  },
+  {
+   "bar": "rung:takeoff>=2:hops",
+   "family": "ladder",
+   "threshold": "takeoff_height >= 0.1",
+   "source": "judge.LADDER (defined; not judged by _score_candidate)",
+   "elite": [
+    19,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    7,
+    13,
+    14,
+    16,
+    22,
+    29,
+    34,
+    36,
+    37,
+    42,
+    46,
+    47,
+    53,
+    58,
+    63,
+    65,
+    72,
+    80,
+    83
+   ],
+   "still": [
+    3,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "beetle",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    46,
+    53,
+    72
+   ],
+   "base": [
+    14,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    13,
+    14,
+    17,
+    22,
+    29,
+    34,
+    36,
+    46,
+    53,
+    58,
+    63,
+    72,
+    80,
+    83
+   ],
+   "elite_ci": [
+    0.1534755548841702,
+    0.3139868591534759
+   ],
+   "still_ci": [
+    0.009803903680513676,
+    0.08972245958323322
+   ],
+   "base_ci": [
+    0.10366776089747964,
+    0.24821605378601824
+   ],
+   "elite_share": 0.2261904761904762,
+   "still_share": 0.03571428571428571,
+   "base_share": 0.16666666666666666,
+   "verdict_still": "certified",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    19
+   ],
+   "still_distinct": [
+    1,
+    3
+   ],
+   "base_distinct": [
+    2,
+    14
+   ]
+  },
+  {
+   "bar": "rung:takeoff>=3:clears",
+   "family": "ladder",
+   "threshold": "takeoff_height >= 0.3",
+   "source": "judge.LADDER (defined; not judged by _score_candidate)",
+   "elite": [
+    2,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    14,
+    72
+   ],
+   "still": [
+    1,
+    84
+   ],
+   "still_plans": [
+    "beetle"
+   ],
+   "still_passed_indices": [
+    72
+   ],
+   "base": [
+    2,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    14,
+    72
+   ],
+   "elite_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "still_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "base_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "elite_share": 0.023809523809523808,
+   "still_share": 0.011904761904761904,
+   "base_share": 0.023809523809523808,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    2
+   ],
+   "still_distinct": [
+    1,
+    1
+   ],
+   "base_distinct": [
+    2,
+    2
+   ]
+  },
+  {
+   "bar": "rung:takeoff>=4:climbs_out",
+   "family": "ladder",
+   "threshold": "takeoff_height >= 0.8",
+   "source": "judge.LADDER (defined; not judged by _score_candidate)",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=1:crosses",
+   "family": "ladder",
+   "threshold": "crossed_fraction >= 0.34",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=2:stays_controlled",
+   "family": "ladder",
+   "threshold": "control >= 0.2",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=3:arrives_usable",
+   "family": "ladder",
+   "threshold": "exit_state >= 0.3",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=4:arrives_well",
+   "family": "ladder",
+   "threshold": "exit_state >= 0.37",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=5:crosses_three",
+   "family": "ladder",
+   "threshold": "crossed_fraction >= 0.6",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=6:crosses_efficiently",
+   "family": "ladder",
+   "threshold": "economy >= 0.75",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=7:survives_entry",
+   "family": "ladder",
+   "threshold": "shock >= 0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=8:crosses_all",
+   "family": "ladder",
+   "threshold": "crossed_fraction >= 0.99",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:air>=0.012",
+   "family": "competence",
+   "threshold": "competence >= 0.012",
+   "source": "curriculum.WEAKEST_BARS[1] / three_media / TRIPHIBIAN_FLOOR*2",
+   "elite": [
+    2,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    4,
+    28
+   ],
+   "still": [
+    3,
+    84
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    4,
+    25,
+    57
+   ],
+   "base": [
+    2,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    4,
+    57
+   ],
+   "elite_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "still_ci": [
+    0.009803903680513676,
+    0.08972245958323322
+   ],
+   "base_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "elite_share": 0.023809523809523808,
+   "still_share": 0.03571428571428571,
+   "base_share": 0.023809523809523808,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    2
+   ],
+   "still_distinct": [
+    1,
+    3
+   ],
+   "base_distinct": [
+    1,
+    2
+   ]
+  },
+  {
+   "bar": "comp:air>=0.055",
+   "family": "competence",
+   "threshold": "competence >= 0.055",
+   "source": "curriculum.WEAKEST_BARS[0]",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    2,
+    84
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    25,
+    57
+   ],
+   "base": [
+    2,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    4,
+    57
+   ],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "base_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.023809523809523808,
+   "base_share": 0.023809523809523808,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    1,
+    2
+   ],
+   "base_distinct": [
+    1,
+    2
+   ]
+  },
+  {
+   "bar": "comp:air>=0.15",
+   "family": "competence",
+   "threshold": "competence >= 0.15",
+   "source": "evaluate.LEG_COMPETENCE_BAR",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:air>=0.25",
+   "family": "competence",
+   "threshold": "competence >= 0.25",
+   "source": "curriculum.STAGES single",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:air>=0.3",
+   "family": "competence",
+   "threshold": "competence >= 0.3",
+   "source": "curriculum.STAGES chain / WEAKEST_BARS[3]",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:air>=0.35",
+   "family": "competence",
+   "threshold": "competence >= 0.35",
+   "source": "curriculum.STAGES directed, crossing / WEAKEST_BARS[2]",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:water>=0.012",
+   "family": "competence",
+   "threshold": "competence >= 0.012",
+   "source": "curriculum.WEAKEST_BARS[1] / three_media / TRIPHIBIAN_FLOOR*2",
+   "elite": [
+    49,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    5,
+    6,
+    7,
+    8,
+    11,
+    12,
+    13,
+    16,
+    18,
+    19,
+    20,
+    21,
+    24,
+    25,
+    26,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    37,
+    38,
+    39,
+    40,
+    41,
+    44,
+    46,
+    50,
+    51,
+    52,
+    53,
+    59,
+    60,
+    64,
+    65,
+    66,
+    68,
+    71,
+    73,
+    74,
+    75,
+    78,
+    79
+   ],
+   "still": [
+    47,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    2,
+    5,
+    6,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    15,
+    17,
+    24,
+    26,
+    28,
+    30,
+    32,
+    33,
+    35,
+    38,
+    41,
+    44,
+    46,
+    47,
+    50,
+    51,
+    53,
+    54,
+    56,
+    58,
+    59,
+    60,
+    61,
+    63,
+    64,
+    65,
+    66,
+    68,
+    69,
+    70,
+    72,
+    73,
+    74,
+    75,
+    79,
+    80
+   ],
+   "base": [
+    44,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "random",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    2,
+    4,
+    5,
+    6,
+    7,
+    8,
+    11,
+    12,
+    13,
+    15,
+    16,
+    21,
+    24,
+    25,
+    26,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    38,
+    39,
+    41,
+    44,
+    46,
+    48,
+    50,
+    51,
+    53,
+    58,
+    59,
+    64,
+    65,
+    66,
+    73,
+    74,
+    75,
+    78,
+    79
+   ],
+   "elite_ci": [
+    0.4877418240614877,
+    0.6743944223773941
+   ],
+   "still_ci": [
+    0.4639776894293952,
+    0.6518355790277015
+   ],
+   "base_ci": [
+    0.42871004099646837,
+    0.6176158378088727
+   ],
+   "elite_share": 0.5833333333333334,
+   "still_share": 0.5595238095238095,
+   "base_share": 0.5238095238095238,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    49
+   ],
+   "still_distinct": [
+    2,
+    47
+   ],
+   "base_distinct": [
+    3,
+    44
+   ]
+  },
+  {
+   "bar": "comp:water>=0.055",
+   "family": "competence",
+   "threshold": "competence >= 0.055",
+   "source": "curriculum.WEAKEST_BARS[0]",
+   "elite": [
+    34,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    0,
+    5,
+    7,
+    8,
+    11,
+    12,
+    16,
+    19,
+    20,
+    21,
+    24,
+    26,
+    28,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    37,
+    38,
+    41,
+    44,
+    46,
+    50,
+    51,
+    52,
+    59,
+    64,
+    65,
+    66,
+    68,
+    73,
+    79
+   ],
+   "still": [
+    31,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    0,
+    5,
+    10,
+    11,
+    12,
+    13,
+    15,
+    17,
+    28,
+    30,
+    32,
+    33,
+    35,
+    38,
+    41,
+    44,
+    46,
+    47,
+    50,
+    51,
+    54,
+    58,
+    61,
+    64,
+    65,
+    66,
+    69,
+    73,
+    74,
+    79,
+    80
+   ],
+   "base": [
+    26,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    5,
+    7,
+    8,
+    11,
+    12,
+    16,
+    21,
+    28,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    38,
+    41,
+    44,
+    46,
+    50,
+    51,
+    59,
+    64,
+    65,
+    66,
+    74,
+    79
+   ],
+   "elite_ci": [
+    0.3144040333314626,
+    0.5002990910021596
+   ],
+   "still_ci": [
+    0.28112002792744595,
+    0.4641058883069339
+   ],
+   "base_ci": [
+    0.22678178283376899,
+    0.4026720177296571
+   ],
+   "elite_share": 0.40476190476190477,
+   "still_share": 0.36904761904761907,
+   "base_share": 0.30952380952380953,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    34
+   ],
+   "still_distinct": [
+    2,
+    31
+   ],
+   "base_distinct": [
+    2,
+    26
+   ]
+  },
+  {
+   "bar": "comp:water>=0.15",
+   "family": "competence",
+   "threshold": "competence >= 0.15",
+   "source": "evaluate.LEG_COMPETENCE_BAR",
+   "elite": [
+    13,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "random",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    11,
+    20,
+    21,
+    31,
+    35,
+    38,
+    46,
+    50,
+    51,
+    59,
+    64,
+    66,
+    79
+   ],
+   "still": [
+    16,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    0,
+    11,
+    17,
+    32,
+    35,
+    38,
+    50,
+    51,
+    54,
+    58,
+    64,
+    65,
+    66,
+    69,
+    79,
+    80
+   ],
+   "base": [
+    12,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    11,
+    21,
+    35,
+    38,
+    44,
+    46,
+    50,
+    51,
+    59,
+    64,
+    66,
+    79
+   ],
+   "elite_ci": [
+    0.09404048930447559,
+    0.23475080999988918
+   ],
+   "still_ci": [
+    0.12328196792678875,
+    0.2748136609038524
+   ],
+   "base_ci": [
+    0.0845482453915424,
+    0.2211618024656719
+   ],
+   "elite_share": 0.15476190476190477,
+   "still_share": 0.19047619047619047,
+   "base_share": 0.14285714285714285,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    13
+   ],
+   "still_distinct": [
+    2,
+    16
+   ],
+   "base_distinct": [
+    2,
+    12
+   ]
+  },
+  {
+   "bar": "comp:water>=0.25",
+   "family": "competence",
+   "threshold": "competence >= 0.25",
+   "source": "curriculum.STAGES single",
+   "elite": [
+    6,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    11,
+    38,
+    46,
+    50,
+    64,
+    79
+   ],
+   "still": [
+    10,
+    84
+   ],
+   "still_plans": [
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    11,
+    17,
+    35,
+    38,
+    50,
+    51,
+    54,
+    58,
+    64,
+    79
+   ],
+   "base": [
+    6,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    11,
+    38,
+    50,
+    51,
+    64,
+    79
+   ],
+   "elite_ci": [
+    0.03156237619027458,
+    0.1361128129267743
+   ],
+   "still_ci": [
+    0.06602978420973385,
+    0.1935619036973778
+   ],
+   "base_ci": [
+    0.03156237619027458,
+    0.1361128129267743
+   ],
+   "elite_share": 0.07142857142857142,
+   "still_share": 0.11904761904761904,
+   "base_share": 0.07142857142857142,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    6
+   ],
+   "still_distinct": [
+    2,
+    10
+   ],
+   "base_distinct": [
+    1,
+    6
+   ]
+  },
+  {
+   "bar": "comp:water>=0.3",
+   "family": "competence",
+   "threshold": "competence >= 0.3",
+   "source": "curriculum.STAGES chain / WEAKEST_BARS[3]",
+   "elite": [
+    4,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    11,
+    38,
+    50,
+    79
+   ],
+   "still": [
+    5,
+    84
+   ],
+   "still_plans": [
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    11,
+    35,
+    50,
+    64,
+    79
+   ],
+   "base": [
+    5,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    11,
+    38,
+    50,
+    64,
+    79
+   ],
+   "elite_ci": [
+    0.01642695349323295,
+    0.10566086787940165
+   ],
+   "still_ci": [
+    0.023744518071346116,
+    0.12108335081255645
+   ],
+   "base_ci": [
+    0.023744518071346116,
+    0.12108335081255645
+   ],
+   "elite_share": 0.047619047619047616,
+   "still_share": 0.05952380952380952,
+   "base_share": 0.05952380952380952,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    4
+   ],
+   "still_distinct": [
+    2,
+    5
+   ],
+   "base_distinct": [
+    1,
+    5
+   ]
+  },
+  {
+   "bar": "comp:water>=0.35",
+   "family": "competence",
+   "threshold": "competence >= 0.35",
+   "source": "curriculum.STAGES directed, crossing / WEAKEST_BARS[2]",
+   "elite": [
+    2,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    11,
+    50
+   ],
+   "still": [
+    3,
+    84
+   ],
+   "still_plans": [
+    "gannet",
+    "beetle",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    11,
+    35,
+    50
+   ],
+   "base": [
+    2,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    11,
+    50
+   ],
+   "elite_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "still_ci": [
+    0.009803903680513676,
+    0.08972245958323322
+   ],
+   "base_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "elite_share": 0.023809523809523808,
+   "still_share": 0.03571428571428571,
+   "base_share": 0.023809523809523808,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    2
+   ],
+   "still_distinct": [
+    2,
+    3
+   ],
+   "base_distinct": [
+    1,
+    2
+   ]
+  },
+  {
+   "bar": "comp:land>=0.012",
+   "family": "competence",
+   "threshold": "competence >= 0.012",
+   "source": "curriculum.WEAKEST_BARS[1] / three_media / TRIPHIBIAN_FLOOR*2",
+   "elite": [
+    21,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    5,
+    6,
+    8,
+    11,
+    12,
+    18,
+    19,
+    20,
+    25,
+    28,
+    39,
+    46,
+    50,
+    52,
+    54,
+    60,
+    61
+   ],
+   "still": [
+    12,
+    84
+   ],
+   "still_plans": [
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle",
+    "beetle",
+    "beetle",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    0,
+    6,
+    7,
+    11,
+    12,
+    17,
+    34,
+    42,
+    49,
+    65,
+    70,
+    74
+   ],
+   "base": [
+    25,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "beetle",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    11,
+    12,
+    17,
+    18,
+    19,
+    20,
+    25,
+    28,
+    29,
+    39,
+    40,
+    46,
+    50,
+    52,
+    59,
+    60,
+    61,
+    77
+   ],
+   "elite_ci": [
+    0.174046918683316,
+    0.339683387004991
+   ],
+   "still_ci": [
+    0.0845482453915424,
+    0.2211618024656719
+   ],
+   "base_ci": [
+    0.21609784057020276,
+    0.3902064586244931
+   ],
+   "elite_share": 0.25,
+   "still_share": 0.14285714285714285,
+   "base_share": 0.2976190476190476,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    21
+   ],
+   "still_distinct": [
+    2,
+    12
+   ],
+   "base_distinct": [
+    3,
+    25
+   ]
+  },
+  {
+   "bar": "comp:land>=0.055",
+   "family": "competence",
+   "threshold": "competence >= 0.055",
+   "source": "curriculum.WEAKEST_BARS[0]",
+   "elite": [
+    9,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    12,
+    18,
+    28,
+    52,
+    60,
+    61
+   ],
+   "still": [
+    1,
+    84
+   ],
+   "still_plans": [
+    "beetle"
+   ],
+   "still_passed_indices": [
+    17
+   ],
+   "base": [
+    17,
+    84
+   ],
+   "base_plans": [
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "random",
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "beetle",
+    "gannet",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    2,
+    4,
+    12,
+    17,
+    18,
+    20,
+    25,
+    28,
+    29,
+    40,
+    50,
+    52,
+    59,
+    60,
+    61
+   ],
+   "elite_ci": [
+    0.05704369229895562,
+    0.17951834883379142
+   ],
+   "still_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "base_ci": [
+    0.13325068129271483,
+    0.28796162382615265
+   ],
+   "elite_share": 0.10714285714285714,
+   "still_share": 0.011904761904761904,
+   "base_share": 0.20238095238095238,
+   "verdict_still": "certified",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    9
+   ],
+   "still_distinct": [
+    1,
+    1
+   ],
+   "base_distinct": [
+    3,
+    17
+   ]
+  },
+  {
+   "bar": "comp:land>=0.15",
+   "family": "competence",
+   "threshold": "competence >= 0.15",
+   "source": "evaluate.LEG_COMPETENCE_BAR",
+   "elite": [
+    8,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "random",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    1,
+    2,
+    12,
+    18,
+    28,
+    52,
+    60,
+    61
+   ],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    7,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "beetle",
+    "beetle",
+    "gannet",
+    "random",
+    "gannet",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    1,
+    12,
+    17,
+    40,
+    52,
+    60,
+    61
+   ],
+   "elite_ci": [
+    0.04827593996608366,
+    0.1652835789483264
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.039764688756253413,
+    0.15082814005662643
+   ],
+   "elite_share": 0.09523809523809523,
+   "still_share": 0.0,
+   "base_share": 0.08333333333333333,
+   "verdict_still": "certified",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    8
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    3,
+    7
+   ]
+  },
+  {
+   "bar": "comp:land>=0.25",
+   "family": "competence",
+   "threshold": "competence >= 0.25",
+   "source": "curriculum.STAGES single",
+   "elite": [
+    6,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    1,
+    12,
+    18,
+    28,
+    60,
+    61
+   ],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    3,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "beetle",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    1,
+    12,
+    60
+   ],
+   "elite_ci": [
+    0.03156237619027458,
+    0.1361128129267743
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.009803903680513676,
+    0.08972245958323322
+   ],
+   "elite_share": 0.07142857142857142,
+   "still_share": 0.0,
+   "base_share": 0.03571428571428571,
+   "verdict_still": "underpowered",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    6
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    2,
+    3
+   ]
+  },
+  {
+   "bar": "comp:land>=0.3",
+   "family": "competence",
+   "threshold": "competence >= 0.3",
+   "source": "curriculum.STAGES chain / WEAKEST_BARS[3]",
+   "elite": [
+    6,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    1,
+    12,
+    18,
+    28,
+    60,
+    61
+   ],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    3,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "beetle",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    1,
+    12,
+    60
+   ],
+   "elite_ci": [
+    0.03156237619027458,
+    0.1361128129267743
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.009803903680513676,
+    0.08972245958323322
+   ],
+   "elite_share": 0.07142857142857142,
+   "still_share": 0.0,
+   "base_share": 0.03571428571428571,
+   "verdict_still": "underpowered",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    6
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    2,
+    3
+   ]
+  },
+  {
+   "bar": "comp:land>=0.35",
+   "family": "competence",
+   "threshold": "competence >= 0.35",
+   "source": "curriculum.STAGES directed, crossing / WEAKEST_BARS[2]",
+   "elite": [
+    2,
+    84
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    1,
+    28
+   ],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    1,
+    84
+   ],
+   "base_plans": [
+    "gannet"
+   ],
+   "base_passed_indices": [
+    1
+   ],
+   "elite_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "elite_share": 0.023809523809523808,
+   "still_share": 0.0,
+   "base_share": 0.011904761904761904,
+   "verdict_still": "underpowered",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    2
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    1,
+    1
+   ]
+  },
+  {
+   "bar": "weakest:c2>=0.055",
+   "family": "weakest",
+   "threshold": "2nd-best medium >= 0.055",
+   "source": "curriculum.WEAKEST_BARS[0]",
+   "elite": [
+    4,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "beetle",
+    "gannet",
+    "random"
+   ],
+   "elite_passed_indices": [
+    0,
+    12,
+    28,
+    52
+   ],
+   "still": [
+    1,
+    84
+   ],
+   "still_plans": [
+    "beetle"
+   ],
+   "still_passed_indices": [
+    17
+   ],
+   "base": [
+    5,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    4,
+    12,
+    28,
+    50,
+    59
+   ],
+   "elite_ci": [
+    0.01642695349323295,
+    0.10566086787940165
+   ],
+   "still_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "base_ci": [
+    0.023744518071346116,
+    0.12108335081255645
+   ],
+   "elite_share": 0.047619047619047616,
+   "still_share": 0.011904761904761904,
+   "base_share": 0.05952380952380952,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    4
+   ],
+   "still_distinct": [
+    1,
+    1
+   ],
+   "base_distinct": [
+    2,
+    5
+   ]
+  },
+  {
+   "bar": "weakest:c3>=0.012",
+   "family": "weakest",
+   "threshold": "weakest medium >= 0.012 (three_media)",
+   "source": "curriculum.WEAKEST_BARS[1]; loop.py three_media",
+   "elite": [
+    1,
+    84
+   ],
+   "elite_plans": [
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    28
+   ],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    1,
+    84
+   ],
+   "base_plans": [
+    "gannet"
+   ],
+   "base_passed_indices": [
+    4
+   ],
+   "elite_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "elite_share": 0.011904761904761904,
+   "still_share": 0.0,
+   "base_share": 0.011904761904761904,
+   "verdict_still": "underpowered",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    1
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    1,
+    1
+   ]
+  },
+  {
+   "bar": "stage0:pass",
+   "family": "curriculum",
+   "threshold": "stage_score >= island's own bar (std 0.25 / weakest 0.055)",
+   "source": "curriculum.Curriculum.bar via islands.curriculum_for",
+   "elite": [
+    4,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "beetle",
+    "gannet",
+    "random"
+   ],
+   "elite_passed_indices": [
+    0,
+    12,
+    28,
+    52
+   ],
+   "still": [
+    1,
+    84
+   ],
+   "still_plans": [
+    "beetle"
+   ],
+   "still_passed_indices": [
+    17
+   ],
+   "base": [
+    5,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "base_passed_indices": [
+    4,
+    12,
+    28,
+    50,
+    59
+   ],
+   "elite_ci": [
+    0.01642695349323295,
+    0.10566086787940165
+   ],
+   "still_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "base_ci": [
+    0.023744518071346116,
+    0.12108335081255645
+   ],
+   "elite_share": 0.047619047619047616,
+   "still_share": 0.011904761904761904,
+   "base_share": 0.05952380952380952,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    3,
+    4
+   ],
+   "still_distinct": [
+    1,
+    1
+   ],
+   "base_distinct": [
+    2,
+    5
+   ]
+  },
+  {
+   "bar": "stage1:pass",
+   "family": "curriculum",
+   "threshold": "stage_score >= island's own bar (std 0.35 / weakest 0.012)",
+   "source": "curriculum.Curriculum.bar via islands.curriculum_for",
+   "elite": [
+    1,
+    84
+   ],
+   "elite_plans": [
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    28
+   ],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    1,
+    84
+   ],
+   "base_plans": [
+    "gannet"
+   ],
+   "base_passed_indices": [
+    4
+   ],
+   "elite_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0006104480577171522,
+    0.055231521687194626
+   ],
+   "elite_share": 0.011904761904761904,
+   "still_share": 0.0,
+   "base_share": 0.011904761904761904,
+   "verdict_still": "underpowered",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    1
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    1,
+    1
+   ]
+  },
+  {
+   "bar": "stage2:pass",
+   "family": "curriculum",
+   "threshold": "stage_score >= island's own bar (std 0.35 / weakest 0.35)",
+   "source": "curriculum.Curriculum.bar via islands.curriculum_for",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "stage3:pass",
+   "family": "curriculum",
+   "threshold": "stage_score >= island's own bar (std 0.3 / weakest 0.3)",
+   "source": "curriculum.Curriculum.bar via islands.curriculum_for",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "stage4:mission>0",
+   "family": "curriculum",
+   "threshold": "mission_fraction > 0 (stage-4 bar is 0.0)",
+   "source": "curriculum.STAGES mission",
+   "elite": [
+    3,
+    84
+   ],
+   "elite_plans": [
+    "beetle",
+    "gannet",
+    "beetle"
+   ],
+   "elite_passed_indices": [
+    13,
+    28,
+    63
+   ],
+   "still": [
+    5,
+    84
+   ],
+   "still_plans": [
+    "gannet",
+    "beetle",
+    "gannet",
+    "gannet",
+    "beetle"
+   ],
+   "still_passed_indices": [
+    4,
+    13,
+    25,
+    39,
+    69
+   ],
+   "base": [
+    2,
+    84
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    4,
+    25
+   ],
+   "elite_ci": [
+    0.009803903680513676,
+    0.08972245958323322
+   ],
+   "still_ci": [
+    0.023744518071346116,
+    0.12108335081255645
+   ],
+   "base_ci": [
+    0.0042468682566244725,
+    0.07305623969810224
+   ],
+   "elite_share": 0.03571428571428571,
+   "still_share": 0.05952380952380952,
+   "base_share": 0.023809523809523808,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    3
+   ],
+   "still_distinct": [
+    2,
+    5
+   ],
+   "base_distinct": [
+    1,
+    2
+   ]
+  },
+  {
+   "bar": "crossed:air_to_water",
+   "family": "transition",
+   "threshold": "crossed",
+   "source": "transitions.CrossingTracker",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "crossed:water_to_air",
+   "family": "transition",
+   "threshold": "crossed",
+   "source": "transitions.CrossingTracker",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "crossed:water_to_land",
+   "family": "transition",
+   "threshold": "crossed",
+   "source": "transitions.CrossingTracker",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "crossed:land_to_air",
+   "family": "transition",
+   "threshold": "crossed",
+   "source": "transitions.CrossingTracker",
+   "elite": [
+    0,
+    84
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    84
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    84
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "still_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "base_ci": [
+    0.0,
+    0.03503503060494206
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  }
+ ],
+ "per_island": {
+  "triphibian": {
+   "rung:air>=1:makes_lift": {
+    "elite": [
+     82,
+     84
+    ],
+    "still": [
+     82,
+     84
+    ],
+    "base": [
+     82,
+     84
+    ]
+   },
+   "rung:air>=2:carries_a_third": {
+    "elite": [
+     80,
+     84
+    ],
+    "still": [
+     80,
+     84
+    ],
+    "base": [
+     80,
+     84
+    ]
+   },
+   "rung:air>=3:nearly_flies": {
+    "elite": [
+     61,
+     84
+    ],
+    "still": [
+     61,
+     84
+    ],
+    "base": [
+     61,
+     84
+    ]
+   },
+   "rung:air>=4:carries_itself": {
+    "elite": [
+     59,
+     84
+    ],
+    "still": [
+     59,
+     84
+    ],
+    "base": [
+     59,
+     84
+    ]
+   },
+   "rung:air>=5:leaves_surface": {
+    "elite": [
+     44,
+     84
+    ],
+    "still": [
+     39,
+     84
+    ],
+    "base": [
+     37,
+     84
+    ]
+   },
+   "rung:air>=6:stays_up": {
+    "elite": [
+     3,
+     84
+    ],
+    "still": [
+     4,
+     84
+    ],
+    "base": [
+     4,
+     84
+    ]
+   },
+   "rung:air>=7:glides": {
+    "elite": [
+     2,
+     84
+    ],
+    "still": [
+     3,
+     84
+    ],
+    "base": [
+     2,
+     84
+    ]
+   },
+   "rung:air>=8:holds_height": {
+    "elite": [
+     1,
+     84
+    ],
+    "still": [
+     1,
+     84
+    ],
+    "base": [
+     2,
+     84
+    ]
+   },
+   "rung:air>=9:flaps_forward": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:air>=10:makes_thrust": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:air>=11:pushes_itself": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:air>=12:flies_level": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:air>=13:holds_station": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:air>=14:climbs": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:air>=15:manoeuvres": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:water>=1:submerges": {
+    "elite": [
+     54,
+     84
+    ],
+    "still": [
+     75,
+     84
+    ],
+    "base": [
+     54,
+     84
+    ]
+   },
+   "rung:water>=2:dives": {
+    "elite": [
+     34,
+     84
+    ],
+    "still": [
+     53,
+     84
+    ],
+    "base": [
+     34,
+     84
+    ]
+   },
+   "rung:water>=3:reaches_depth": {
+    "elite": [
+     22,
+     84
+    ],
+    "still": [
+     30,
+     84
+    ],
+    "base": [
+     22,
+     84
+    ]
+   },
+   "rung:water>=4:goes_deep": {
+    "elite": [
+     5,
+     84
+    ],
+    "still": [
+     5,
+     84
+    ],
+    "base": [
+     3,
+     84
+    ]
+   },
+   "rung:water>=5:holds_depth": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:water>=6:manoeuvres": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:land>=1:stays_upright": {
+    "elite": [
+     75,
+     84
+    ],
+    "still": [
+     76,
+     84
+    ],
+    "base": [
+     74,
+     84
+    ]
+   },
+   "rung:land>=2:supports_itself": {
+    "elite": [
+     51,
+     84
+    ],
+    "still": [
+     76,
+     84
+    ],
+    "base": [
+     50,
+     84
+    ]
+   },
+   "rung:land>=3:stirs": {
+    "elite": [
+     21,
+     84
+    ],
+    "still": [
+     23,
+     84
+    ],
+    "base": [
+     19,
+     84
+    ]
+   },
+   "rung:land>=4:moves": {
+    "elite": [
+     14,
+     84
+    ],
+    "still": [
+     6,
+     84
+    ],
+    "base": [
+     10,
+     84
+    ]
+   },
+   "rung:land>=5:climbs_slope": {
+    "elite": [
+     4,
+     84
+    ],
+    "still": [
+     1,
+     84
+    ],
+    "base": [
+     2,
+     84
+    ]
+   },
+   "rung:land>=6:walks": {
+    "elite": [
+     1,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:takeoff>=1:unweights": {
+    "elite": [
+     26,
+     84
+    ],
+    "still": [
+     8,
+     84
+    ],
+    "base": [
+     25,
+     84
+    ]
+   },
+   "rung:takeoff>=2:hops": {
+    "elite": [
+     19,
+     84
+    ],
+    "still": [
+     3,
+     84
+    ],
+    "base": [
+     14,
+     84
+    ]
+   },
+   "rung:takeoff>=3:clears": {
+    "elite": [
+     2,
+     84
+    ],
+    "still": [
+     1,
+     84
+    ],
+    "base": [
+     2,
+     84
+    ]
+   },
+   "rung:takeoff>=4:climbs_out": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:transition>=1:crosses": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:transition>=2:stays_controlled": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:transition>=3:arrives_usable": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:transition>=4:arrives_well": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:transition>=5:crosses_three": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:transition>=6:crosses_efficiently": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:transition>=7:survives_entry": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "rung:transition>=8:crosses_all": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "comp:air>=0.012": {
+    "elite": [
+     2,
+     84
+    ],
+    "still": [
+     3,
+     84
+    ],
+    "base": [
+     2,
+     84
+    ]
+   },
+   "comp:air>=0.055": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     2,
+     84
+    ],
+    "base": [
+     2,
+     84
+    ]
+   },
+   "comp:air>=0.15": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "comp:air>=0.25": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "comp:air>=0.3": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "comp:air>=0.35": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "comp:water>=0.012": {
+    "elite": [
+     49,
+     84
+    ],
+    "still": [
+     47,
+     84
+    ],
+    "base": [
+     44,
+     84
+    ]
+   },
+   "comp:water>=0.055": {
+    "elite": [
+     34,
+     84
+    ],
+    "still": [
+     31,
+     84
+    ],
+    "base": [
+     26,
+     84
+    ]
+   },
+   "comp:water>=0.15": {
+    "elite": [
+     13,
+     84
+    ],
+    "still": [
+     16,
+     84
+    ],
+    "base": [
+     12,
+     84
+    ]
+   },
+   "comp:water>=0.25": {
+    "elite": [
+     6,
+     84
+    ],
+    "still": [
+     10,
+     84
+    ],
+    "base": [
+     6,
+     84
+    ]
+   },
+   "comp:water>=0.3": {
+    "elite": [
+     4,
+     84
+    ],
+    "still": [
+     5,
+     84
+    ],
+    "base": [
+     5,
+     84
+    ]
+   },
+   "comp:water>=0.35": {
+    "elite": [
+     2,
+     84
+    ],
+    "still": [
+     3,
+     84
+    ],
+    "base": [
+     2,
+     84
+    ]
+   },
+   "comp:land>=0.012": {
+    "elite": [
+     21,
+     84
+    ],
+    "still": [
+     12,
+     84
+    ],
+    "base": [
+     25,
+     84
+    ]
+   },
+   "comp:land>=0.055": {
+    "elite": [
+     9,
+     84
+    ],
+    "still": [
+     1,
+     84
+    ],
+    "base": [
+     17,
+     84
+    ]
+   },
+   "comp:land>=0.15": {
+    "elite": [
+     8,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     7,
+     84
+    ]
+   },
+   "comp:land>=0.25": {
+    "elite": [
+     6,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     3,
+     84
+    ]
+   },
+   "comp:land>=0.3": {
+    "elite": [
+     6,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     3,
+     84
+    ]
+   },
+   "comp:land>=0.35": {
+    "elite": [
+     2,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     1,
+     84
+    ]
+   },
+   "weakest:c2>=0.055": {
+    "elite": [
+     4,
+     84
+    ],
+    "still": [
+     1,
+     84
+    ],
+    "base": [
+     5,
+     84
+    ]
+   },
+   "weakest:c3>=0.012": {
+    "elite": [
+     1,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     1,
+     84
+    ]
+   },
+   "stage0:pass": {
+    "elite": [
+     4,
+     84
+    ],
+    "still": [
+     1,
+     84
+    ],
+    "base": [
+     5,
+     84
+    ]
+   },
+   "stage1:pass": {
+    "elite": [
+     1,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     1,
+     84
+    ]
+   },
+   "stage2:pass": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "stage3:pass": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "stage4:mission>0": {
+    "elite": [
+     3,
+     84
+    ],
+    "still": [
+     5,
+     84
+    ],
+    "base": [
+     2,
+     84
+    ]
+   },
+   "crossed:air_to_water": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "crossed:water_to_air": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "crossed:water_to_land": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   },
+   "crossed:land_to_air": {
+    "elite": [
+     0,
+     84
+    ],
+    "still": [
+     0,
+     84
+    ],
+    "base": [
+     0,
+     84
+    ]
+   }
+  }
+ }
+}

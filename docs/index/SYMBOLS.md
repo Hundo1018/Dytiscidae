@@ -583,6 +583,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `WorkerFailure` | class | 62 | `(DomainError)` | The training runtime stopped in a way the job has to record. |
 | `IllegalTransition.__init__` | method | 46 | `(self, job_id: str, frm: str, to: str, detail: str='') -> None` | — |
 
+## `domain.evidence` — `dytiscidae/domain/evidence.py`
+
+> When a pass share is evidence: exact binomial bounds and the no-model verdict.
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `clopper_pearson` | function | 60 | `(k: int, n: int, confidence: float=0.95) -> tuple[float, float]` | One-sided exact bounds ``(lower, upper)`` on a binomial share ``k / n``. |
+| `distinct_share` | function | 98 | `(keys) -> tuple[int, int]` | ``(distinct, total)`` among the passes' keys (NeutronGym's concentration). |
+| `no_model_verdict` | function | 80 | `(still_k: int, still_n: int, elite_k: int, elite_n: int, confidence: float=0.95) -> str` | Whether a bar is earned, from how often still machines and elites clear it. |
+
 ## `domain.experiment` — `dytiscidae/domain/experiment.py`
 
 > ``Experiment``: the record, as distinct from the configuration and the state.
@@ -931,16 +941,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Auditor` | class | 191 | — | Re-measures designs under conditions they were not selected on. |
+| `Auditor` | class | 200 | — | Re-measures designs under conditions they were not selected on. |
 | `AuditReport` | class | 85 | — | — |
-| `check_energy_conservation` | function | 113 | `(result) -> Finding \| None` | The fluid must not be a power source. |
-| `check_scaling` | function | 144 | `(phenotype) -> Finding \| None` | Wing loading against mass, compared with the real world. |
+| `check_energy_conservation` | function | 122 | `(result) -> Finding \| None` | The fluid must not be a power source. |
+| `check_scaling` | function | 153 | `(phenotype) -> Finding \| None` | Wing loading against mass, compared with the real world. |
 | `Finding` | class | 74 | — | One thing the auditor objected to. |
-| `Auditor.audit` | method | 218 | `(self, phenotype, result, *, reevaluate=None, name: str='', seed: int=0) -> AuditReport` | Run every check that the available information supports. |
-| `Auditor.report` | method | 349 | `(self) -> dict` | — |
-| `Auditor.review_tightening` | method | 295 | `(self, judge, moves: list, invalid_designs) -> list` | Veto a bar that was moved by evidence that did not hold up. |
-| `AuditReport.invalid` | property | 92 | `(self) -> bool` | — |
-| `AuditReport.summary` | method | 95 | `(self) -> dict` | — |
+| `Auditor.audit` | method | 230 | `(self, phenotype, result, *, reevaluate=None, name: str='', seed: int=0) -> AuditReport` | Run every check that the available information supports. |
+| `Auditor.report` | method | 386 | `(self) -> dict` | — |
+| `Auditor.review_tightening` | method | 332 | `(self, judge, moves: list, invalid_designs) -> list` | Veto a bar that was moved by evidence that did not hold up. |
+| `AuditReport.invalid` | property | 99 | `(self) -> bool` | — |
+| `AuditReport.summary` | method | 102 | `(self) -> dict` | — |
 
 ## `evolution.cmaes` — `dytiscidae/evolution/cmaes.py`
 

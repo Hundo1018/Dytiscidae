@@ -506,6 +506,50 @@ def test_metrics_and_events_carry_what_makes_them_readable() -> None:
     check("it round-trips", JobEvent.from_dict(event.as_dict()) == event)
 
 
+def test_a_pass_share_is_evidence_only_through_its_bound() -> None:
+    """Clopper-Pearson against scipy's beta quantiles, and the no-model verdict.
+
+    Reference values were computed 2026-10-06 with ``scipy.stats.beta.ppf``
+    (0.95 / 0.05 one-sided); scipy is not imported here so the suite stays
+    dependency-free.
+    """
+    print("\n-- pass shares as evidence (NeutronGym's admission gate)")
+    from dytiscidae.domain.evidence import (
+        CERTIFIED, LEAK, UNDERPOWERED, UNMEASURED, clopper_pearson, distinct_share,
+        no_model_verdict)
+    ref = {(0, 218): (0.0, 0.013648), (5, 20): (0.104081, 0.455582),
+           (1, 4): (0.012741, 0.751395), (29, 30): (0.851404, 0.998292),
+           (3, 147): (0.005585, 0.051899), (19, 19): (0.854131, 1.0)}
+    worst = max(abs(a - b) for kn, want in ref.items()
+                for a, b in zip(clopper_pearson(*kn), want))
+    check("bounds match scipy's beta quantiles to 1e-6", worst < 1e-6, f"worst {worst:.2e}")
+    check("0 of 218 has the closed-form upper bound 1 - 0.05**(1/218)",
+          abs(clopper_pearson(0, 218)[1] - (1 - 0.05 ** (1 / 218))) < 1e-9)
+    check("n = 0 knows nothing", clopper_pearson(0, 0) == (0.0, 1.0))
+    lo90, hi90 = clopper_pearson(5, 20, 0.90)
+    check("a lower confidence gives a narrower interval",
+          lo90 > ref[(5, 20)][0] and hi90 < ref[(5, 20)][1])
+    try:
+        clopper_pearson(3, 2)
+        check("k > n is refused", False)
+    except ValueError:
+        check("k > n is refused", True)
+    check("0 of 218 still vs 29 of 30 elites is certified",
+          no_model_verdict(0, 218, 29, 30) == CERTIFIED)
+    check("0 of 12 still is underpowered against 3 of 30 elites, not certified",
+          no_model_verdict(0, 12, 3, 30) == UNDERPOWERED)
+    check("5 of 218 still vs 6 of 30 elites separates (0.048 < 0.091): certified",
+          no_model_verdict(5, 218, 6, 30) == CERTIFIED)
+    check("5 of 40 still vs 6 of 30 elites is a leak",
+          no_model_verdict(5, 40, 6, 30) == LEAK)
+    check("a bar no elite clears is unmeasured, whatever the still machines do",
+          no_model_verdict(0, 218, 0, 30) == UNMEASURED)
+    check("the verdict is strict: equal bounds do not certify",
+          no_model_verdict(1, 4, 1, 4) == LEAK)
+    check("distinct_share counts designs among passes",
+          distinct_share(["a", "b", "a", "a"]) == (2, 4))
+
+
 def main() -> int:
     print("=" * 68)
     print("domain: the lifecycle, the plan, the state and the record")
@@ -522,6 +566,7 @@ def main() -> int:
     test_a_checkpoint_digest_cannot_be_confused_by_its_key_names()
     test_a_dataset_ref_is_a_name_and_a_version()
     test_metrics_and_events_carry_what_makes_them_readable()
+    test_a_pass_share_is_evidence_only_through_its_bound()
 
     print("\n" + "=" * 68)
     if FAILURES:

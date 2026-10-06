@@ -1,5 +1,18 @@
 # Roadmap
 
+**2026-10-06: read [PAPERS_2610.md](PAPERS_2610.md) first.** Three outside papers
+(ReCo, Prospective Hindsight, NeutronGym) were applied to arch48, and two of
+their checks found what this list had not. **Tier-1 water and land credit belongs
+to the generation's task draw:** a fresh seed alone takes Tier-1 passes from 15/16
+to 3/16 (water) and 13/16 to 0/16 (land), because one heading is shared by 16
+candidates and the archive keeps the best of each draw (NeutronGym's winner's
+curse). That is why Tier-1 does not predict Tier-2 (Spearman -0.09 / 0.02) and why
+the critic has no skill. **Water competence does not separate elites from still
+machines** (45 vs 35 of 200 at 0.15; land does, 45 vs 12). The auditor's held-out
+check, which should have caught the first, never ran with the mission at zero; it
+now re-measures each medium (a note, not an invalidation). The ranked list is at
+the end of that file.
+
 **2026-10-03: arch45 finished; read [ARCH46_SPEC.md](ARCH46_SPEC.md) first.**
 arch45's critic never fitted: a `Tier-1 mission > 1e-4` gate dropped 128 of
 147 labels, and every kept label was 0. The critic now learns per-medium
