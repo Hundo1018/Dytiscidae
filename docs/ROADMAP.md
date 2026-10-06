@@ -1,5 +1,14 @@
 # Roadmap
 
+**2026-10-06, later: an outside review was checked claim by claim against the
+repo; the correction plan is
+[external review reconciled](#2026-10-06--external-review-reconciled-with-the-repo-and-the-correction-plan).**
+Two of its headline claims do not hold for the runs that exist (the controller is
+refined: `--refine-steps 2` since arch34, 6 steps at promotion, PPO inside the
+search; the GPU kernel scores the search). It holds on four: the
+`controller_refine_steps` default is a trap (0), no pass/fail bar defines "done",
+one seed per arm, and Tier-1/Tier-2 agreement is unmeasured since the fix.
+
 **2026-10-06: read [PAPERS_2610.md](PAPERS_2610.md) first.** Three outside papers
 (ReCo, Prospective Hindsight, NeutronGym) were applied to arch48, and two of
 their checks found what this list had not. **Tier-1 water and land credit belongs
@@ -2966,6 +2975,87 @@ fixes it; test plus mutation `child-inherits-c-environment`. Two runs'
 | 3 | **Critic skill 0**: why does a fitted critic with 192 labels have no skill? Label distribution per medium, out-of-fold predictions against the cheap score | low: a read on the checkpoint | none | learner: the critic is either uninformative by construction or starved of labels | arch45 never fitted it and arch48 fitted it to nothing; decides whether it stays on |
 | 4 | **Air thrust**: from `level_margin` 0.29 toward AD's 0.7 on the search's own bodies. Re-read the AH probe (torque, 7–12 Hz) against arch48's air elites before building anything | medium; set by 1 and AH | none | **high** for the mission: no air-to-anything crossing exists without it | the binding medium in both elites read |
 | 5 | **The next run**: notes with pre-registered reads before launch, 900 gens read at 500 (`how long to run`), crossing curriculum off unless 1 finds a nonzero start rate | none | — | — | arch48 had neither notes nor the length for `three_media` (born at gen 254) to show anything |
+
+## 2026-10-06 — external review reconciled with the repo, and the correction plan
+
+An outside review (a README-level reading of the project; no run logs, no code
+execution) concluded the project misses its 15 kg / 10 m / 45 min goal because of
+five causes. Each claim was checked against the repo before anything entered the
+plan. Dates and the review's Gantt chart are dropped on purpose; items are ranked
+by dependency, and the existing arch48 list above (items 1–5) still comes first.
+
+### A. Claims checked
+
+| review's claim | repo | verdict |
+|---|---|---|
+| The search does not train the controller (`controller_refine_steps=0`); fitness is an untrained controller | the default is 0 (`evolution/loop.py:154`), but every run since arch34 passes `--refine-steps 2` (AK, line ~2620), promotion refines 6 steps (`_refined_controllers_for`), and the shared PPO policy trains inside the search (`--shared-policy`) | **wrong for the runs that exist.** True of the *default*, which is a trap: a run launched without the flag gets 0. B1 |
+| Tier-1 vs Tier-2 Spearman ≈ +0.077 | arch48 measured -0.09 (water) / 0.02 (land), air undefined (Tier-2 air is 0 for all 121); cause found: one task draw shared by 16 candidates (PAPERS_2610 §1–3) and fixed the same day | **outdated figure, right symptom.** The cause is identified; the post-fix correlation is unmeasured. C1 |
+| Fluid model omits vortices and added-mass tensor | `docs/model_validity.md`: no wake feedback, LEV is an instantaneous fit, 6x6 added mass is reduced to a scalar mass + diagonal inertia; strip and bluff added mass exist | **true, already documented.** Not new |
+| No structural dynamics | `model_validity.md`: "Bodies are rigid in the dynamics. Structural compliance is checked statically" | **true, already documented.** No measurement yet says it limits the search. D1 |
+| No GPU use (README wording) | Mojo GPU kernel scores the search (`mojo/build/*.so`, CLAUDE.md) | **README is stale, if it says so.** B3 |
+| Shared policy does not generalise across bodies | not tested in this review; `docs/LEARNER_AUDIT.md` and arch48's critic (skill 0.0 in all three media) are the repo's evidence | **unverified.** Covered by arch48 item 3 |
+| No hyperparameter documentation | exposed in `SearchConfig` and recorded in each `run_start`; no single table, no sensitivity sweep | **partly true.** B2, E1 |
+| Goal unmet; no quantified success criterion | README §"On the 15 kg target" argues the limit; `mission_best` is 0 in arch47 and arch48; no pass/fail bar for "done" | **true.** A rung ladder exists but no end condition. E2 |
+| One seed per arm, no statistical test | ROADMAP says "One seed per arm: a difference from arch47 is not an effect" | **true, and already acknowledged.** E3 |
+| No issue tracker / PR review record | out of scope for the roadmap | **dropped** |
+
+### B. Configuration and reproducibility
+
+| # | item | measurement that decides it |
+|---|---|---|
+| B1 | **Make the default match the practice**: `SearchConfig.controller_refine_steps` and `ops.run`'s `--refine-steps` default to what runs use, or the run start refuses and prints the value in effect | grep every `run_start` config in `runs/` (when ported) for a run with `controller_refine_steps=0`; zero hits means the default is only a trap, not a past error. Add a mutation to `tools/mutate.py` |
+| B2 | **One hyperparameter table**: every `SearchConfig` field, its default, the value arch48 used, and whether a measurement or a typed number set it (the existing §"What is set by measurement, and what is typed" is the template) | `test_index.py`-style check that the table names every field of `SearchConfig` |
+| B3 | **README matches CLAUDE.md** on compute: GPU kernel, `--workers`, queue pool, the per-generation cost (110 s early, 225 s late) | read the README and diff against CLAUDE.md "Running a search" |
+| B4 | **A run is a checked-in config**: `experiment new` already stores one; add a `runs/<run>_config.json` export to the notes template so a second machine can reproduce a launch without the shell history | launch the same config on a second seed set from the export alone |
+
+### C. Evaluation validity
+
+| # | item | measurement that decides it |
+|---|---|---|
+| C1 | **Re-measure Tier-1 → Tier-2 after the antipodal pair**: Spearman and the Tier-1-pass/Tier-2-fail table (PAPERS_2610 §3) on the next run's verified elites, per medium, with the same 121-elite protocol | the pre-fix numbers are the baseline; a post-fix rho still near 0 means the gap is not only the draw. Pre-register the read in the next run's notes (arch48 item 5) |
+| C2 | **Tier-1 ≈ Tier-2 draw protocol**: Tier-1 scores averaged over ≥2 task draws on a held subset, to put a number on seed variance against between-design variance | variance ratio per medium; if seed variance exceeds the design signal, selection is noise and no later item matters |
+| C3 | **Air is zero in Tier-2 for all 121 elites**: split the air score into its gates (`thrust_margin`, `level_margin`, height) and report which gate is closed for each, before any fluid change | this is arch48 item 4's read; the review's "improve the fluid model" is only justified if a gate is closed *by the model* rather than by the body |
+
+### D. Physics fidelity (build only if a measurement says it limits the search)
+
+| # | item | measurement that decides it |
+|---|---|---|
+| D1 | **Flexibility**: before building a compliant-wing model, measure how much of the rigid-wing thrust a static-deflection correction would remove. `physics` already checks compliance statically; apply that deflection as a pitch lag in the strip model on 20 elites and compare thrust | thrust change under 10% means rigidity is not the wall; over 30% means D1 enters the work list ahead of fluid changes |
+| D2 | **Wake feedback and dynamic LEV**: the two entries in `model_validity.md` "cannot represent". Rank by a reduced-frequency sweep (`derivations/reduced_frequency.md`) on the elites: what fraction of elites has `k > 0.3`, where the model is labelled extrapolating | share of elites in the extrapolating regime; if small, D2 stays documented-only |
+| D3 | **Off-diagonal added mass**: build only if D1/D2 and C3 leave air short; the F-01 and J-01 errors in `model_validity.md` come first because they are measured model *errors*, not omissions | the existing `experiments/added_mass` and `experiments/jet_energy` reproductions |
+
+### E. Experimental design
+
+| # | item | what it adds |
+|---|---|---|
+| E1 | **Ablation arms, one change each**: refine-steps 0 vs 2 vs promotion-only (AK's two levers are built and unread), shared policy on vs off, critic on vs off | AK has no read; one arm per lever on the same seed set |
+| E2 | **A pass/fail definition for "done"**: for each medium and each of the four crossings, the bar, the elite count required, and the held-out seed count. Take the bars from the measured still-machine and unsearched-gait distributions, as the water bar (0.012) was | closes the review's "no quantified success criterion"; reuse the certified/underpowered table from 2026-10-06 |
+| E3 | **Seeds and a test**: ≥5 seeds per arm for the arms that matter (E1), a rank-based test on `weakest_best`, `domain_best` per medium and crossing count, effect sizes reported with the interval. At 12 h per 300 generations a 5-seed arm is 60 h, so run E1 on `segment_seconds`-reduced configs first and confirm one pair at full length | a difference under one seed's spread is not reported as an effect |
+| E4 | **Comparability**: every new arm states which of the boundaries in CLAUDE.md it crosses; across the antipodal-pair boundary, water and land competence are "not comparable" | already a rule; checked at each notes file |
+
+### F. What the review proposed that this plan does not adopt
+
+* **Raising `controller_refine_steps` to 50–100.** AK estimates two steps at
+  ~35% of a shard's generation; 50 steps would cost an order of magnitude more
+  with no measurement that refinement is the limit. E1 reads the existing 0/2/6
+  first.
+* **Optuna/Ray Tune over CMA-ES and PPO.** The binding failures are scores that
+  rewarded the wrong thing (rules 1–8 in CLAUDE.md), not tuned constants.
+  Sweeping a hyperparameter against a score that fails the still-machine check
+  tunes the leak. Revisit after E2.
+* **Domain randomisation / conditional policy for the shared controller.** The
+  critic has skill 0.0; the shared policy's generalisation is unmeasured. Arch48
+  item 3 reads it first.
+* **A larger GPU budget (4–8 GPU-months, >100 GB).** Not supported by any
+  measurement here; the pool is bound by memory before cores (CLAUDE.md).
+
+### Order
+
+1. arch48 items 1–5 (unchanged).
+2. B1–B3 (cheap, remove ways to run the wrong config).
+3. C1 and C2 inside the next run's pre-registered reads; C3 with arch48 item 4.
+4. E2, then E1 and E3.
+5. D1, D2, D3 only on the measurements above.
 
 ## 2026-10-03 — the eight-item pass (the user: do not start arch47 yet)
 
