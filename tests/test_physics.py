@@ -67,6 +67,39 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         FAILURES.append(name)
 
 
+def test_a_child_python_is_the_venv_after_the_kernel_poisons_the_environment() -> None:
+    """Importing the Mojo kernel C-``setenv``s ``PYTHONEXECUTABLE`` (a pyenv
+    shim); ``os.environ`` never sees it, but ``env=None`` children inherit it
+    and start as the system Python, without numpy.  arch47's and arch48's
+    automatic post-runs died on ``import numpy`` that way (2026-10-06).
+    ``child_env`` passes ``os.environ`` explicitly."""
+    print("\nops: a child Python started after the kernel's setenv is still the venv")
+    import ctypes
+    import subprocess
+    import sys
+
+    from dytiscidae.ops.run import child_env
+
+    libc = ctypes.CDLL(None)
+    libc.getenv.restype = ctypes.c_char_p
+    saved = libc.getenv(b"PYTHONEXECUTABLE")
+    libc.setenv(b"PYTHONEXECUTABLE", b"/usr/bin/python3", 1)
+    try:
+        probe = [sys.executable, "-c", "import sys; print(sys.prefix)"]
+        bare = subprocess.run(probe, capture_output=True, text=True).stdout.strip()
+        fixed = subprocess.run(probe, capture_output=True, text=True,
+                               env=child_env()).stdout.strip()
+    finally:
+        if saved is None:
+            libc.unsetenv(b"PYTHONEXECUTABLE")
+        else:
+            libc.setenv(b"PYTHONEXECUTABLE", saved, 1)
+    check("the poisoned environment really leaks (the test is live)",
+          bare != sys.prefix, f"bare child prefix {bare}")
+    check("child_env gives the child this interpreter's prefix",
+          fixed == sys.prefix, f"{fixed} vs {sys.prefix}")
+
+
 def run_all(functions) -> None:
     """Run every test, and never let one of them stop the rest.
 
@@ -4158,6 +4191,7 @@ def main() -> int:
     print("Dytiscidae physics verification")
     print("=" * 68)
     run_all([
+        test_a_child_python_is_the_venv_after_the_kernel_poisons_the_environment,
         test_a_strip_moves_with_its_hinge,
         test_reversed_flow_reverses_the_force,
         test_pitching_nose_up_adds_lift,
