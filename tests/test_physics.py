@@ -3273,8 +3273,11 @@ def test_a_film_is_the_evaluation() -> None:
     check("detail geometry and a per-step hook leave every segment bit-identical",
           same, " ".join(f"{getattr(d, 'value', d)} {plain.segments[d].distance:.6f}/"
                          f"{filmed.segments[d].distance:.6f}" for d in plain.segments))
+    # Five rollouts: air once, water and land as antipodal pairs (rule 8).
+    from dytiscidae.envs.tasks import PAIRED_MEDIA
     check("and the hook was actually called on every step of every segment",
-          calls == 3 * int(2.0 / TriphibianEnv(p).timestep), f"{calls} calls")
+          calls == (3 + len(PAIRED_MEDIA)) * int(2.0 / TriphibianEnv(p).timestep),
+          f"{calls} calls")
 
 
 def _strip_force(wind, alpha_deg, *, camber=0.0, omega_y=0.0):
@@ -4155,7 +4158,8 @@ def test_an_evaluation_counts_the_steps_it_took() -> None:
     arch44 ran 120 s a generation for fifty generations and ~320 s after, and
     nothing it recorded could say which part grew.  A beetle survives every
     part, so each count equals its schedule exactly: identification is 2 media
-    x 24 probes x 2 signs x 1.2 s, three segments, four 6 s transitions, and
+    x 24 probes x 2 signs x 1.2 s, five segment rollouts (water and land are
+    pairs), four 6 s transitions, and
     the level-flight rig (0.5 s settle + 0.7 s average) apart from all three.
     """
     print("\nevaluate: the steps an evaluation took are on its result")
@@ -4168,7 +4172,8 @@ def test_an_evaluation_counts_the_steps_it_took() -> None:
     r = evaluate_tier1(build(BODY_PLANS["beetle"]()), spec=MissionSpec(),
                        segment_seconds=seg, identify_axes=True, seed=5)
     want = {"identify": 2 * 24 * 2 * int(1.2 / dt),
-            "segments": 3 * int(seg / dt),
+            # air once, water and land as antipodal pairs (CLAUDE.md rule 8)
+            "segments": 5 * int(seg / dt),
             "transitions": 4 * int(6.0 / dt),
             "rig": int(TriphibianEnv.RIG_SETTLE / dt) + int(TriphibianEnv.RIG_AVERAGE / dt)}
     for part, n in want.items():

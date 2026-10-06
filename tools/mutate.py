@@ -92,6 +92,45 @@ class Result:
 
 MUTATIONS: tuple = (
 
+    # --- the antipodal heading pair (2026-10-06) ----------------------------
+    Mutation(
+        id="pair-takes-the-better-half",
+        path="dytiscidae/envs/triphibian.py",
+        find="        along = 0.5 * (cruise[\"along\"] + p[\"along\"])\n",
+        replace="        along = max(cruise[\"along\"], p[\"along\"])\n",
+        defect="the pair pays the better of the two headings, so a design that "
+               "goes one way scores whenever either draw points there",
+        suites=("test_search::test_the_heading_pair_cancels_what_the_command_did_not_choose",), item="heading pair"),
+    Mutation(
+        id="antipode-keeps-the-heading",
+        path="dytiscidae/envs/tasks.py",
+        find="        Phase(ph.kind, ph.start, _wrap(ph.heading + math.pi), ph.speed, ph.depth)\n",
+        replace="        Phase(ph.kind, ph.start, ph.heading, ph.speed, ph.depth)\n",
+        defect="the second half repeats the first heading, so nothing cancels",
+        suites=("test_search::test_the_heading_pair_cancels_what_the_command_did_not_choose",), item="heading pair"),
+    Mutation(
+        id="pair-skipped-on-the-batched-path",
+        path="dytiscidae/envs/batchroll.py",
+        find="        if dom.value in PAIRED_MEDIA:\n",
+        replace="        if False:\n",
+        defect="the search scores single headings while every verification scores "
+               "the pair -- the two evaluation paths disagree again",
+        suites=("test_search::test_the_heading_pair_cancels_what_the_command_did_not_choose",), item="heading pair"),
+    Mutation(
+        id="pair-second-half-not-rewound",
+        path="dytiscidae/envs/evaluate.py",
+        find="    env.rng.bit_generator.state = state\n",
+        replace="",
+        defect="the second half starts from another reset draw, so passive motion "
+               "differs between the halves and no longer cancels",
+        suites=("test_search::test_the_heading_pair_cancels_what_the_command_did_not_choose",), item="heading pair"),
+    Mutation(
+        id="tier2-heading-fixed",
+        path="dytiscidae/envs/evaluate.py",
+        find="        seg = run_segment(env, dom, leg_seconds, ctrl, task=schedule_for(dom, rng))\n",
+        replace="        seg = run_segment(env, dom, leg_seconds, ctrl)\n",
+        defect="Tier-2 verifies at one fixed heading, the defect it exists to catch",
+        suites=("test_search::test_tier2_draws_its_headings",), item="heading pair"),
     # --- the auditor's held-out check, per medium (2026-10-06) -------------
     Mutation(
         id="audit-held-out-reads-only-the-mission",
@@ -100,6 +139,15 @@ MUTATIONS: tuple = (
         replace="        if base > 1e-6:\n",
         defect="the held-out check is skipped whenever the mission is zero -- every "
                "audit of arch48 -- so a credit earned at one seed is never re-measured",
+        suites=("test_search::test_an_audit_re_measures_each_credited_medium_at_unseen_seeds",),
+        item="winner's curse"),
+    Mutation(
+        id="audit-perturbation-reads-only-the-mission",
+        path="dytiscidae/evolution/auditor.py",
+        find="        if media or base > 1e-6:\n",
+        replace="        if base > 1e-6:\n",
+        defect="the perturbation check is skipped whenever the mission is zero, so "
+               "a design that needs the model exactly right is never noticed",
         suites=("test_search::test_an_audit_re_measures_each_credited_medium_at_unseen_seeds",),
         item="winner's curse"),
     Mutation(

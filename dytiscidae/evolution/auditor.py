@@ -93,6 +93,8 @@ class AuditReport:
     #: Per medium: competence at the held-out seeds over the scored competence,
     #: for every medium the design was credited in (``held_out_floor``).
     held_out_by_medium: dict = field(default_factory=dict)
+    #: The same, under each perturbed model coefficient (``perturbations``).
+    perturbed_by_medium: dict = field(default_factory=dict)
     checks_run: int = 0
 
     @property
@@ -106,6 +108,7 @@ class AuditReport:
             "retained": (None if self.retained_fraction is None
                          else round(self.retained_fraction, 3)),
             "held_out": {k: round(v, 3) for k, v in self.held_out_by_medium.items()},
+            "perturbed": {k: round(v, 3) for k, v in self.perturbed_by_medium.items()},
             "checks": self.checks_run,
             "findings": [
                 {"check": f.check, "severity": f.severity, "detail": f.detail}
@@ -293,8 +296,12 @@ class Auditor:
                                 f"{media[k]:.3f} at unseen seeds"),
                         measured=keep, expected=self.collapse_threshold))
 
-        if base > 1e-6:
+        if media or base > 1e-6:
             # Perturbation: does this design need the model to be exactly right?
+            # Per medium as well, for the reason the held-out check is: on the
+            # mission alone it never ran in arch48.  A medium's collapse is a
+            # note; only the mission's invalidates, as before.
+            pert: dict = {k: [] for k in media}
             for key, factor in self.perturbations:
                 rep.checks_run += 1
                 try:
@@ -303,6 +310,12 @@ class Auditor:
                     rep.findings.append(Finding(
                         check="perturbation", severity="note",
                         detail=f"{key} x{factor} failed: {type(exc).__name__}: {exc}"))
+                    continue
+                segs = getattr(alt, "segments", {}) or {}
+                for k in pert:
+                    if k in segs:           # a medium not re-run is not a zero
+                        pert[k].append(float(segs[k].competence) / media[k])
+                if base <= 1e-6:
                     continue
                 keep = float(getattr(alt, "mission_fraction", 0.0)) / base
                 retained.append(keep)
@@ -318,9 +331,17 @@ class Auditor:
                         measured=keep,
                         expected=self.collapse_threshold,
                     ))
+            rep.perturbed_by_medium = {k: float(np.mean(v)) for k, v in pert.items() if v}
+            for k, keep in rep.perturbed_by_medium.items():
+                if keep < self.collapse_threshold:
+                    rep.findings.append(Finding(
+                        check="perturbation_medium", severity="note",
+                        detail=(f"{k} competence keeps {keep:.0%} of {media[k]:.3f} "
+                                "under perturbed model coefficients"),
+                        measured=keep, expected=self.collapse_threshold))
 
-            if retained:
-                rep.retained_fraction = float(np.mean(retained))
+        if retained:
+            rep.retained_fraction = float(np.mean(retained))
 
         self.reports.append(rep)
         if rep.invalid:

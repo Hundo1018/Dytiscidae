@@ -577,6 +577,11 @@ class TriphibianEnv:
     #: ``None`` means "whatever ``tasks.schedule_for`` gives by default", which
     #: is what probes and tests that call ``rollout`` directly get.
     task: "TaskSchedule | None" = None
+    #: The first half of an antipodal pair (``tasks.antipode``), when this
+    #: segment is the second: its raw signed progress, tracking and hold/stop
+    #: score, from ``pair_partner_of``.  Set by the evaluator after ``reset``,
+    #: like ``task``; ``None`` scores the segment on its own.
+    pair_partner: dict | None = None
     #: ``MissionSpec.air_launch_height`` for this machine; ``None`` is ``SPAWN``.
     #: Read by ``reset`` only -- the trim sweep and the level rig keep the
     #: canonical pose, since they measure the airframe, not the episode.
@@ -749,6 +754,7 @@ class TriphibianEnv:
     def reset(self, domain: Domain, *, randomise: bool = True) -> None:
         self._mj.mj_resetData(self.model, self.data)
         self.task = None
+        self.pair_partner = None
         self._active_task = None
         x, y, z = self.SPAWN[domain]
         if domain is Domain.AIR and self.air_launch_height is not None:
@@ -1964,6 +1970,10 @@ class TriphibianEnv:
                     # than asked is still forward.
                     along = float(v @ h)
                     across = float(abs(v[0] * h[1] - v[1] * h[0]))
+                    # Signed and symmetric, for the antipodal pair: the same
+                    # velocity reads +a on one heading and -a on the other.
+                    rec["along"] = float(np.clip(along / max(ph.speed, 1e-6), -1.0, 1.0))
+                    rec["across"] = across / max(ph.speed, 1e-6)
                     rec["progress"] = float(np.clip(along / max(ph.speed, 1e-6), 0.0, 1.0)
                                             * math.exp(-(across / max(ph.speed, 1e-6)) ** 2))
                     track = float(np.clip(
@@ -2100,11 +2110,14 @@ class TriphibianEnv:
             # eel, 0.097 averaged over eight draws.  As a product, a still body
             # can never score more than its own passive progress, which the
             # user's rule allows; a rock scores zero.
-            progress = walk.get("progress", 0.0) * walk.get("served", 0.0)
-            task = progress * (0.5 + 0.5 * stop["score"])
+            self._publish_half(m, walk, stop["score"])
+            prog, served, track, second = self._paired(walk, stop["score"])
+            if "pair_along_mean" in walk:
+                m["pair_along_mean"] = walk["pair_along_mean"]
+            task = prog * served * (0.5 + 0.5 * second)
             if walk["measured"]:
-                m["walk_tracking"] = walk["tracking"]
-                m["walk_progress"] = walk["progress"]
+                m["walk_tracking"] = track
+                m["walk_progress"] = prog
             if stop["measured"]:
                 m["stop_score"] = stop["score"]
                 m["stop_drift"] = stop["drift"]
@@ -2113,13 +2126,16 @@ class TriphibianEnv:
         elif domain is Domain.WATER:
             cr = next(r for r in phases if r["kind"] == CRUISE)
             ho = next(r for r in phases if r["kind"] == HOLD)
-            task = (0.5 * cr.get("progress", 0.0) * cr.get("served", 0.0)
-                    + 0.5 * ho["score"])
+            self._publish_half(m, cr, ho["score"])
+            prog, served, track, second = self._paired(cr, ho["score"])
+            if "pair_along_mean" in cr:
+                m["pair_along_mean"] = cr["pair_along_mean"]
+            task = 0.5 * prog * served + 0.5 * second
             if cr["measured"]:
-                m["cruise_tracking"] = cr["tracking"]
-                m["cruise_progress"] = cr["progress"]
+                m["cruise_tracking"] = track
+                m["cruise_progress"] = prog
                 m["cruise_depth_hold"] = cr["vertical"]
-                m["cruise_score"] = cr["score"]
+                m["cruise_score"] = track * cr["vertical"] * served
             if ho["measured"]:
                 # Metres from where it was told to be, *plus* metres it
                 # moved: the ladder's `holds_depth` reads this at 1 m.
@@ -2172,6 +2188,44 @@ class TriphibianEnv:
             m["cmd_speed"] = float(pa.speed)
         m["task_score"] = float(task)
         return {"task": float(task), "phases": phases, "measurements": m}
+
+    @staticmethod
+    def _publish_half(m: dict, cruise: dict, second: float) -> None:
+        """This half's raw cruise and hold/stop numbers, for ``pair_partner_of``."""
+        m["pair_second"] = float(second)
+        if cruise["measured"]:
+            m["pair_along"] = cruise["along"]
+            m["pair_across"] = cruise["across"]
+            m["pair_tracking"] = cruise["tracking"]
+            m["pair_served"] = cruise["served"]
+
+    def _paired(self, cruise: dict, second: float) -> tuple:
+        """``(progress, served, tracking, second)`` for the cruise phase.
+
+        On its own: this half's numbers.  As the second half of an antipodal
+        pair (``pair_partner``): progress on the *mean* of the two halves'
+        signed speeds along their headings, so a velocity the command did not
+        choose cancels (``tasks.antipode``); tracking and served are the worse
+        half's, because following one command is not following both; the hold
+        or stop score is the mean.  A half that was not measured makes the
+        pair's progress unmeasured too -- zero, as an unserved phase is.
+        """
+        p = self.pair_partner
+        if p is None:
+            return (cruise.get("progress", 0.0), cruise.get("served", 0.0),
+                    cruise.get("tracking", 0.0), float(second))
+        second = 0.5 * (float(second) + float(p.get("second", 0.0)))
+        if not cruise["measured"] or "along" not in p:
+            return 0.0, 0.0, 0.0, second
+        along = 0.5 * (cruise["along"] + p["along"])
+        # Unclipped, so a reader can see a cancellation is exact (a still
+        # machine reads 0.0, not merely something clipped to it) and how far
+        # the wrong way an unsteered design goes.
+        cruise["pair_along_mean"] = along
+        across = 0.5 * (cruise["across"] + p["across"])
+        prog = float(np.clip(along, 0.0, 1.0) * math.exp(-across ** 2))
+        return (prog, min(cruise["served"], p["served"]),
+                min(cruise["tracking"], p["tracking"]), second)
 
     def _score_segment(self, domain, res, depths, alts, ups, contacts,
                        clearances=None, *, spins=None, commands=None,
@@ -2958,3 +3012,17 @@ class TriphibianEnv:
             rng=np.random.default_rng(seed),
             max_modes=max_modes,
         )
+
+
+def pair_partner_of(seg: SegmentResult) -> dict:
+    """What the second half of an antipodal pair needs from the first.
+
+    Read from the half's published measurements (``_publish_half``), so the
+    batched and single-machine paths build it the same way.
+    """
+    m = seg.measurements or {}
+    out = {"second": float(m.get("pair_second", 0.0))}
+    if "pair_along" in m:
+        out.update(along=float(m["pair_along"]), across=float(m["pair_across"]),
+                   tracking=float(m["pair_tracking"]), served=float(m["pair_served"]))
+    return out

@@ -231,6 +231,34 @@ def schedule_for(domain, rng=None, *, trim_speed: float = 0.0) -> TaskSchedule:
     return TaskSchedule(key, (_at(first, 0.0), _at(second, 0.5)))
 
 
+#: The media whose segment is scored as an antipodal pair (``antipode``).
+#: Air's headings are relative to the launch -- cruise straight, then a drawn
+#: turn -- so a passive glide does not line up with a drawn world heading there.
+PAIRED_MEDIA: tuple = ("water", "land")
+
+
+def antipode(schedule: TaskSchedule) -> TaskSchedule:
+    """The same script with every cruise heading turned by pi.
+
+    Water and land are scored as a pair: the drawn heading and its opposite,
+    from the same initial state, with the progress term taken on the *mean of
+    the signed* speed along the two headings (``TriphibianEnv.pair_partner``).
+    Any velocity that does not depend on the command -- a dense body sinking
+    along a glide, a body that swims forward and does not steer -- moves the
+    same way in both halves and cancels exactly.
+
+    Measured on arch48 (docs/PAPERS_2610.md §3): a fresh seed took Tier-1 water
+    passes from 15/16 to 3/16 and land from 13/16 to 0/16, because one heading
+    was drawn per generation and the archive kept the best of each draw; in an
+    eight-heading sweep every elite earned its credit on 1-3 headings, and the
+    still machine cleared water 0.15 in 35 of 200 against the elites' 45.
+    """
+    return TaskSchedule(schedule.domain, tuple(
+        Phase(ph.kind, ph.start, _wrap(ph.heading + math.pi), ph.speed, ph.depth)
+        if ph.kind == CRUISE else ph
+        for ph in schedule.phases))
+
+
 def _at(ph: Phase, start: float) -> Phase:
     return Phase(ph.kind, start, ph.heading, ph.speed, ph.depth)
 
