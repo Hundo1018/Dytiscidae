@@ -321,7 +321,8 @@ comparability boundary.
    - Without this, every Tier-1 score in water and land is a measurement of the
      draw. The critic, the scout and the curriculum all learn from it.
    - Cheapest form: an independent draw per candidate. It costs nothing, and
-     stops 16 candidates competing on one heading.
+     stops 16 candidates competing on one heading. **Built 2026-10-08**
+     (`SearchConfig.draw_per_candidate`, ROADMAP M2).
    - Unbiased form: k headings averaged. It costs k×, and the right k is
      unmeasured: sweep it, as the pool shape was swept.
    - Incumbents keep the score of their own lucky draw either way. So pair it

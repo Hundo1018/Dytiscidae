@@ -285,7 +285,7 @@ def run_segment(env: TriphibianEnv, dom: Domain, seconds: float, ctrl, *,
     def half(t, partner):
         env.reset(dom)
         if scatter_seed is not None:
-            env.scatter(np.random.default_rng(scatter_seed))
+            env.scatter(np.random.default_rng(scatter_seed), pose=ctrl.params)
         env.task = t
         env.pair_partner = partner
         try:

@@ -71,13 +71,21 @@ class CPGParams:
             frequency=float(v[3 * n]),
         )
 
-    def clipped(self, lo: np.ndarray, hi: np.ndarray) -> "CPGParams":
-        """Clamp offsets and amplitudes into the joints' physical travel."""
+    def clipped(self, lo: np.ndarray, hi: np.ndarray,
+                margin: np.ndarray | float = 0.05) -> "CPGParams":
+        """Clamp offsets and amplitudes into the joints' physical travel.
+
+        ``margin`` keeps an offset that fraction of the half-span inside a
+        joint's travel, per channel.  A rotor's channel is a speed, not an
+        angle, and has no end stop to keep clear of: with the margin a rotor
+        commanded to stop was held at 2.5% of top speed (27 rad/s on arch48's
+        elite 1), which is what PAPERS_2610 read as a still rotor windmilling.
+        """
         span = 0.5 * (hi - lo)
         mid = 0.5 * (hi + lo)
         # minimum(maximum()) rather than np.clip: bit-identical for lo <= hi,
         # and np.clip's dispatch was 3 s of a 79 s shard evaluation.
-        off = np.minimum(np.maximum(self.offset, lo + 0.05 * span), hi - 0.05 * span)
+        off = np.minimum(np.maximum(self.offset, lo + margin * span), hi - margin * span)
         amp = np.minimum(np.maximum(self.amplitude, 0.0),
                          np.maximum(span - np.abs(off - mid), 1e-3))
         return CPGParams(amp, self.phase, off,
@@ -117,6 +125,10 @@ class CPG:
         #: reports was the same number at the same moment of every episode the
         #: policy ever saw.
         self.phase_offset = 0.0
+        #: Per channel, the share of half-travel an offset keeps clear of the
+        #: end stops (``CPGParams.clipped``).  The owner zeroes it for speed
+        #: channels (rotors), which have no end stop.
+        self.margin = np.full(max(n_joints, 1), 0.05)[:n_joints] if n_joints else np.zeros(0)
         self._clip_src = None
         self._clip = None
         self._continuity_reset()
@@ -146,7 +158,7 @@ class CPG:
         # control decisions, so its clipped form is kept rather than rebuilt
         # each step.  Held by reference (not id), so a new object always misses.
         if params is not self._clip_src:
-            self._clip_src, self._clip = params, params.clipped(self.lo, self.hi)
+            self._clip_src, self._clip = params, params.clipped(self.lo, self.hi, self.margin)
         p = self._clip
         f = float(p.frequency)
         if self._f_last is None or t < self._t_last:

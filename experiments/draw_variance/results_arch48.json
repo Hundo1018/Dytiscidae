@@ -1,0 +1,138 @@
+{
+ "run": "runs/arch48",
+ "n_elites": 200,
+ "of_archive": 200,
+ "k": 6,
+ "wall_s": 5465.964167833328,
+ "skipped": {
+  "no_controller": []
+ },
+ "table": {
+  "air": {
+   "n": 200,
+   "k": 6,
+   "nonzero_any_fresh": 29,
+   "underpowered": false,
+   "mean_s": 0.000841103833811485,
+   "mean_fresh": 0.0007826051801170335,
+   "curse": 0.06954985977101447,
+   "draw_var": 0.0001670770638022896,
+   "design_var": 3.6249056401239444e-05,
+   "R": 4.609142427127478,
+   "R_ci": [
+    1.8499357411802688,
+    13.769152646973378
+   ],
+   "icc1": 0.17828037226576796,
+   "k80": 18.43656970850991,
+   "rank": 0.4112891521738327,
+   "verdict": "draw dominates: sequential evaluation earns a build"
+  },
+  "water": {
+   "n": 200,
+   "k": 6,
+   "nonzero_any_fresh": 177,
+   "underpowered": false,
+   "mean_s": 0.011873452747394077,
+   "mean_fresh": 0.009662065261865582,
+   "curse": 0.18624637100727404,
+   "draw_var": 0.0005509651962234736,
+   "design_var": 0.000183188725041687,
+   "R": 3.007637048066655,
+   "R_ci": [
+    1.6147047680874569,
+    5.755432614958986
+   ],
+   "icc1": 0.24952359407956246,
+   "k80": 12.03054819226662,
+   "rank": 0.3276694112640455,
+   "verdict": "draw dominates: sequential evaluation earns a build"
+  },
+  "land": {
+   "n": 200,
+   "k": 6,
+   "nonzero_any_fresh": 171,
+   "underpowered": false,
+   "mean_s": 0.01877820310680427,
+   "mean_fresh": 0.01478239552819533,
+   "curse": 0.2127896666087855,
+   "draw_var": 0.0013923720543127704,
+   "design_var": 0.0005596940075137495,
+   "R": 2.4877380061614565,
+   "R_ci": [
+    1.4495447804648676,
+    5.151063280318944
+   ],
+   "icc1": 0.2867187839893348,
+   "k80": 9.950952024645826,
+   "rank": 0.2998040276384466,
+   "verdict": "draw dominates: sequential evaluation earns a build"
+  },
+  "island": {
+   "n": 200,
+   "k": 6,
+   "nonzero_any_fresh": 89,
+   "underpowered": false,
+   "mean_s": 0.00034122119564613515,
+   "mean_fresh": 0.0001809751249652907,
+   "curse": 0.469625195402657,
+   "draw_var": 1.7383483670256722e-07,
+   "design_var": 2.0895387136018452e-07,
+   "R": 0.831929246254161,
+   "R_ci": [
+    0.4961110160642283,
+    1.560037118501651
+   ],
+   "icc1": 0.545872610552373,
+   "k80": 3.327716985016644,
+   "rank": 0.5535378828864789,
+   "verdict": "undecided: k80 = 3.3, build nothing"
+  },
+  "stage": {
+   "n": 200,
+   "k": 6,
+   "nonzero_any_fresh": 151,
+   "underpowered": false,
+   "mean_s": 0.02129242904228406,
+   "mean_fresh": 0.014448414186549385,
+   "curse": 0.3214295016385087,
+   "draw_var": 0.0011573883021851901,
+   "design_var": 0.0004896167694764541,
+   "R": 2.3638657299724075,
+   "R_ci": [
+    1.3198258496062016,
+    4.768502990595144
+   ],
+   "icc1": 0.2972770259793344,
+   "k80": 9.45546291988963,
+   "rank": 0.47580841588330475,
+   "verdict": "draw dominates: sequential evaluation earns a build"
+  }
+ },
+ "predictions": {
+  "P1": {
+   "water": true,
+   "land": true
+  },
+  "P2": {
+   "water": false,
+   "land": true
+  },
+  "P3": {
+   "water": true,
+   "land": true
+  },
+  "P4": true
+ },
+ "bad_qacc_rows": 12,
+ "islands": {
+  "triphibian": 32,
+  "land_air": 35,
+  "air": 31,
+  "generalist": 30,
+  "water": 25,
+  "amphibian": 15,
+  "aerial_diver": 16,
+  "land": 16
+ }
+}

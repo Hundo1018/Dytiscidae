@@ -1,5 +1,14 @@
 # Roadmap
 
+**2026-10-08, later: the work list was swept; see
+[the work-list sweep](#2026-10-08-later--the-work-list-sweep).** arch49 (ran
+10-07) had never been read: its held-out retention is below 0.35 in every
+medium and Tier-1→Tier-2 Spearman is 0.17/0.18. C2 measured a single draw's
+reliability at 0.18–0.30 (draw variance 2.5–4.6× design variance). Built: one
+draw per candidate (M2), a still machine that is still, loud post-run, config
+export, the hyperparameter table, placement on several draws (off). arch50
+(M2, refine 0) is running. Seven questions for the user close the section.
+
 **2026-10-08: a MuscleMimic comparison was checked against the code and arch48's
 telemetry; see [the MuscleMimic comparison](#2026-10-08--the-musclemimic-comparison-reconciled-with-the-repo).**
 Its thesis (the evaluation signal, not PPO, is the bottleneck) agrees with
@@ -2933,6 +2942,361 @@ decision to run it is not. See item N (arch40 list) for what it is, what it
 costs, and the gates that hold it to "changes nothing when off".
 
 ---
+
+## 2026-10-08, later — the work-list sweep
+
+The open items of the 10-06 lists (arch48 items 1–5, PAPERS_2610, the external
+review's B–E) and the MuscleMimic list (M1–M6), taken in cost-then-speed order.
+Each entry carries its number; items that need a decision from the user are
+collected at the end of this section, not decided here.
+
+### arch49 — the run nobody read (read 2026-10-08)
+
+arch49 ran 2026-10-07 (300 gens, seed 20261007, arch48's flags, at PR #32's
+antipodal pair; `runs/arch49_notes.md` registered PAPERS_2610 §5's reads). It
+finished with `post-run exited 0` and a `report.html`, which closes the second
+half of arch48 item 2. Its draw was still shared per generation (pre-M2). One
+seed: a difference from arch48 is not an effect, and water and land are not
+comparable with arch48 across the antipodal pair.
+
+| read | arch49 | arch48 |
+|---|---|---|
+| `mission_best`, crossings | 0, 0 in every kind | 0, 0 |
+| gens with `three_media` | **0** | 46 (from 254) |
+| `domain_best` max air / water / land | 0.422 / 0.294 / 0.430 | 0.553 / 0.482 / 0.676 (not comparable on water, land) |
+| `weakest_best` max | 0.001 | 0.036 |
+| median wall/gen (8–99 / 100–199 / 200–299) | 133 / 135 / 143 s | 116 / 122 / 129 s (+18% physics from the pair, as predicted) |
+| divergence | 0.19% | 0.38% |
+
+**Pre-registered reads (PAPERS_2610 §"Pre-registered reads for the next run"):**
+
+1. *Auditor `mean_held_out` per medium ≥ 0.5.* **Failed:** land 0.151 (6
+   audits), air 0.328 (5), water 0.091 (1). Below 0.35 in every medium, which
+   is PAPERS_2610 item 5's confirmation of item 1: Tier-1 credit belongs to the
+   draw, still, after the pair. M2 (one draw per candidate) is the fix that
+   arch49 did not have.
+2. *Tier-1 vs Tier-2 Spearman > 0.3 in water and land.* **Failed:** water
+   0.174, land 0.182 (n = 192 promotions, every leg labelled;
+   `experiments/tier_gap/results_arch49.json`); air 0.403. arch48, same
+   protocol: -0.09 / 0.02. Tier-1 pass, Tier-2 fail at 0.15: water 6/7, land
+   21/23. Better than arch48, short of the bar.
+3. *The no-model gate certifies every bar the elites clear in ≥ 10% of
+   cases.* **Held** (`experiments/no_model_gate/results_arch49.json`, 229
+   elites, the fixed still arm, 5,736 s): the two competence bars cleared by
+   ≥ 10% of elites are certified against both controls: water ≥ 0.012 (elite
+   64 / still 3 / base 13), land ≥ 0.012 (51 / 0 / 0); also water and land ≥
+   0.055 (14 / 0 / 0, 20 / 0 / 0).
+
+**What the gate found besides.** *Air competence leaks*, against the elites:
+a still machine clears air ≥ 0.012 on 11 bodies, the elites on 6; ≥ 0.055, 9
+against 3. All 11 are gannets gliding from the launch; 7 of them clear it held
+still and not under their own gait. On those bodies flapping destroys a glide
+that holding still keeps, and the controller cannot hold still: the gait gain
+(AA, `--gait-gain`) that gives a policy that authority has been off in every
+run since arch42, whose read stopped at gen 50 on the old physics. Curriculum
+stage 1 leaks (elite 15 / still 8 / base 8) and stage 4's `mission > 0` leaks
+(8 / 2 / 1); crossings are now non-zero for elites and zero for still machines
+(air→water 1, water→land 2, land→air 1 of 229: underpowered). The ladder's
+water and land state rungs still leak, as PAPERS_2610 said they would
+(telemetry, not fitness).
+
+**The critic on arch49** (`experiments/critic_skill/results_arch49.json`):
+corr(Tier-1, Tier-2) rose to 0.26 (water) and 0.25 (land), from 0.04 / 0.17;
+the critic's out-of-fold prediction stays at 0.04 / 0.04, so its skill over
+the cheap score is still 0. Air: 6 non-zero labels in 194.
+
+### arch48 item 1 — where crossings fail (read)
+
+From every evaluation's failure notes (arch48: 4,792; arch49: 4,749). The event
+kept only the first three notes, so `land_to_air`, the fourth kind, was mostly
+cut off; it keeps eight from 2026-10-08 (`loop.py`, the `evaluate` event).
+
+| kind | did not hold before the command | never crossed the boundary | battery / diverged / unstable |
+|---|---|---|---|
+| `air_to_water` | 4,295 / 4,103 (90% / 86%) | 459 / 486 | 38 / 147 |
+| `water_to_air` | 0 / 0 | 4,736 / 4,688 (99%) | 56 / 61 |
+| `water_to_land` | 0 / 0 | 4,771 / 4,679 (99%) | 21 / 68 |
+
+(arch48 / arch49.) **The wall is not the hold gate except from the air**, and
+there it is the air wall again: a body that cannot stay up (C3: 73 of 200 stop
+at `stays_up`) cannot hold altitude through the commanded hold. From the water,
+machines hold and then never reach the boundary: neither the surface (to air)
+nor the beach (to land) is reached in 6 s. **Decision:** no crossing build
+before the air and water-cruise items; the crossing curriculum stays off
+(item 5), because its start rate is still 0.
+
+### M2 — one draw per candidate (built)
+
+`evaluate_candidates` drew a seed per candidate and then passed only the first
+one to the batched evaluator, so every candidate in a generation faced one
+scatter and one heading (arch48: one distinct `eval_seed` in 299 of 300
+generations). Now `batchroll.evaluate_tier1_batch` takes one seed per machine
+(environment stream, identification probes, scatter, task), the actor pool
+splits the list with the shards, refinement and the re-score keep each
+candidate's draw, and GRPO's groups use the draw their body was scored on.
+`SearchConfig.draw_per_candidate` (default on; `--no-draw-per-candidate`
+restores the shared draw). The stage event records `draws`, the number of
+distinct draws a generation faced. Held by
+`test_each_candidate_faces_its_own_draw` (a machine in a mixed-seed batch
+scores exactly what it scores alone at its seed, in one process or across
+shards) and four mutations, all caught. **Comparability boundary:** water and
+land competence, and everything that reads them, are not comparable across it.
+
+### C2 / M2 second half — how much of a score is the draw (read)
+
+`experiments/draw_variance` (predictions committed in 1a45e0b before the
+data): arch48's 200 elites, current scoring, each at its recorded draw and six
+fresh draws of its own, 1,400 evaluations, 5,466 s.
+
+| score | R = draw var / design var | 95% CI | one-draw reliability | draws for 0.8 | rank(1 draw, mean of 5) | curse at `s` | verdict |
+|---|---|---|---|---|---|---|---|
+| air | 4.61 | 1.85–13.8 | 0.18 | 18 | 0.41 | 7% | draw dominates |
+| water | 3.01 | 1.61–5.76 | 0.25 | 12 | 0.33 | 19% | draw dominates |
+| land | 2.49 | 1.45–5.15 | 0.29 | 10 | 0.30 | 21% | draw dominates |
+| `stage` | 2.36 | 1.32–4.77 | 0.30 | 9 | 0.48 | 32% | draw dominates |
+| `island` | 0.83 | 0.50–1.56 | 0.55 | 3 | 0.55 | 47% | undecided |
+
+P1 held (R ≥ 1 in water and land), P2 held for land and failed for water
+(curse 0.19 < 0.20), P3 held (rank 0.33 / 0.30 < 0.7), P4 held (`stage` R ≥ 1).
+Air has 29 elites non-zero on some draw, above the 20 floor. This population
+is selected, which narrows design variance, so R is biased upward; but every
+interval's lower end is above 1.3.
+
+**Decision (pre-registered rule): the draw dominates in every medium and in
+`stage`; sequential evaluation earns a build (M3).** One draw ranks a design
+at Spearman 0.30–0.41 against its own five-draw mean. Reaching reliability 0.8
+by plain averaging costs 9–18 draws, so the build is the sequential form:
+score cheaply, re-score only candidates that would displace an incumbent, and
+place on a lower bound. M2 alone (built) removes the best-of-16 on one draw,
+but not this.
+
+### M6 — identification's share of the wall (read)
+
+`experiments/identification_share/run.py`: arch48's 16 latest elites (rotors
+0–13 each), one single-process batch, the scoring network, each elite's own
+draw, timed three times each way on an otherwise idle machine: **130.3 s with
+identification, 55.6 s without; identification is 57% of the batched
+evaluation's wall** (74.7 s). Above the third the rule set, so G stays open as
+a throughput lever. The review's cache is still not valid (bases depend on the
+gait's base as well as the body, and every child carries an operator), so the
+lever is the probe count: `experiments/identification_probes` (pre-registered
+in b80c5a2) asks whether 12 or 8 probes per domain give bases that score the
+same as 24.
+
+**Read** (`experiments/identification_probes/results_arch48.json`, the same
+16 elites, each scored once at its own draw with the bases each probe count
+produced):
+
+| probes per domain | identify wall | mean summed competence | median / max abs change vs 24 |
+|---|---|---|---|
+| 24 | 129.8 s | 0.0239 | — |
+| 12 | 67.8 s | 0.0144 | 0.0049 / 0.046 |
+| 8 | 47.5 s | 0.0264 | 0.0104 / 0.248 |
+
+P1 held only just (median 0.0049 < 0.005), and the decision's second
+condition failed: one elite moved 0.046, past one draw's SD (0.044), and the
+mean fell 40%. **24 probes stay; G is closed for the probe count.** The wall
+identification costs buys bases the scores depend on.
+
+### M3 — placement on more than one draw (built, off; the form is open)
+
+`SearchConfig.placement_draws` / `--placement-draws` (default 1): the
+generation's noise-free re-score scores each candidate at its own draw and
+`n - 1` more (`placement_draw_seed`), and places the median one by summed
+medium competence (`median_draw`). The placed result is a real rollout: its
+`eval_seed` is the draw it came from, so a film reproduces it. Refused with
+refinement on (its trials are scored on one draw); promotions are untouched.
+The stage event records `placement_draws` and the median spread. Held by
+`test_a_candidate_is_placed_on_its_median_draw` and two mutations
+(`placement-keeps-the-best-draw`, `placement-redraws-the-same-seed`), both
+caught. Cost: `n - 1` more re-scores per generation (the re-score was ~41 s of
+a 129 s arch48 generation, so about +80 s at n = 3).
+
+**What the median buys, from C2's rows** (`experiments/draw_variance/median3_arch48.json`):
+Spearman against an independent mean of three other draws.
+
+| score | one draw | median of 3 (by summed competence) | mean of 3 | best of 3, inflation |
+|---|---|---|---|---|
+| air | 0.41 | 0.39 | 0.53 | +319% |
+| water | 0.36 | 0.48 | 0.57 | +113% |
+| land | 0.30 | 0.36 | 0.57 | +55% |
+| `stage` | 0.48 | 0.54 | 0.65 | +61% |
+| `island` | 0.59 | 0.58 | 0.72 | +71% |
+
+The median of three by summed competence is a small gain in water, land and
+`stage` and none in air or `island`, and because it picks the draw by the sum
+it biases single media down (land −57%, air −74% against the reference mean).
+A per-medium mean of three is clearly better (0.53–0.72) but is a result no
+single rollout produced, which collides with the rule that a film must
+reproduce its score. **Not turned on.** The choice (median, mean with a film
+that replays every draw, or common random numbers per cell) is in the
+questions below.
+
+### PAPERS_2610 item 4 — the still machine is still (built)
+
+Two leaks in `held_still_params`, both measured on arch48's elites before the
+fix:
+
+* **The "windmilling" rotor was commanded.** `CPGParams.clipped` keeps every
+  offset 5% of half-travel inside the joint's range. A rotor's channel is a
+  speed from 0 to top speed, so "stop" became 2.5% of top speed: 27.2 rad/s
+  commanded on elite 1, 14.6 rad/s reached in water after 2 s. The 2026-10-04
+  check passed because it read the *commanded* offset, not the speed. Now
+  `CPG.margin` is per channel and 0 for rotor channels (a speed has no end
+  stop).
+* **The servo snap.** `scatter` posed the joints at the body's gait at a random
+  phase; a still machine's gait has no stroke, so the servos snapped the joints
+  to the held offset. `scatter(pose=)` now poses them at the gait the machine
+  will be driven with (`ctrl.params`), in all four call sites (both segment
+  paths, both transition paths). Peak joint rate in the first 0.5 s on elites
+  1 / 0 / 5: 4.06 / 0.80 / 18.96 rad/s before, 1.07 / 0.28 / 0.08 after.
+
+Held by `test_a_still_machine_is_still_from_the_first_step` (reads rotor speed
+and joint rates, not commands) and the mutations
+`rotor-keeps-the-travel-margin` and `scatter-poses-the-body-gait`, both caught.
+**Comparability:** a candidate's own pose is unchanged (its params are its
+gait), but rotors can now be commanded below 2.5% and above 97.5% of top speed
+in the search: rotor bodies are not comparable across this on anything rotor
+thrust touches. Every still-machine read before 2026-10-08 used the leaky arm.
+
+### arch48 item 2 — post-run is checked (built)
+
+`launch_postrun` now treats a non-zero exit, or an exit of 0 without
+`report.html`, as a failure: it prints a `** POST-RUN FAILED **` banner with the
+last lines of `postrun.log` and the command to re-run it, and writes
+`postrun_status.json`. `job status` reads it for a finished search job and
+prints the failure (`ops/postrun_status.py`, stdlib only so the CLI does not
+import numpy). Held by `test_a_failed_postrun_is_loud` and the mutation
+`postrun-failure-is-quiet`. The second half of the item, the next run's report
+appearing unaided, is read when that run finishes.
+
+### arch48 item 3 — why the critic has no skill (read)
+
+`experiments/critic_skill/run.py` on arch48's 192 critic labels
+(`search_state.pkl`):
+
+| medium | Tier-2 non-zero | corr(Tier-1, Tier-2) | corr(critic out-of-fold, Tier-2) | best single feature |
+|---|---|---|---|---|
+| air | 1 / 192 | 0.126 | 0.001 | — |
+| water | 92 / 192 | 0.041 | -0.067 | `log_mass` -0.138 |
+| land | 94 / 192 | 0.165 | 0.034 | `land` 0.165 |
+
+The critic is not broken, it is uninformed. Air has one non-zero label in 192,
+so nothing can be learned there. In water and land the labels vary, but no
+cheap feature correlates with Tier-2 beyond |0.17|, and a ridge fitted on all
+sixteen to Tier-2 directly does no better out of fold (-0.08, 0.13). Every
+feature is a Tier-1 quantity measured on the generation's shared draw, and
+PAPERS_2610 §3 showed that draw carried the Tier-1 credit, so the critic's
+inputs held no information about a design's Tier-2. **Decision:** keep it on;
+it discounts nothing at skill 0. Its read moves to the first run with
+per-candidate draws (M2), beside C1: a skill still at 0 there means the
+features themselves are wrong, not the draw.
+
+### C3 / arch48 item 4 — which air gate is closed (read)
+
+arch48's 200 elites, from the archive's recorded air rungs (air scoring did not
+change across the antipodal pair, so these are current). `air_gates` is empty
+for 154: the airframe is not the stopper for most of the population.
+
+| air rungs cleared | elites | stopped at |
+|---|---|---|
+| 0–3 | 82 | `lift_margin` 0.1 / 0.3 / 0.6 / 1.0 (12 / 14 / 40 / 16) |
+| 4 | 33 | `leaves_surface`, airborne ≥ 0.1 |
+| 5 | 73 | `stays_up`, airborne ≥ 0.6 |
+| 6 | 10 | `glides`, sink < 3 m/s |
+| 7 | 1 | `holds_height`, sink < 0.5 m/s |
+| 8 | 1 | `flaps_forward`, `thrust_margin` ≥ 0.002 |
+
+No elite clears a thrust rung. The largest group (73) carries its weight
+somewhere and leaves the launch, then is down before 60% of the 8 s segment: a
+fall, not a flight. Rungs 1–4 are cleared by still machines as well
+(PAPERS_2610 §4: airframe, not behaviour), so the first rung that measures
+behaviour, `stays_up`, is the binding one, and thrust (item 4's
+`level_margin` 0.29 vs 0.7) sits three rungs above where the population is.
+Air gates with a reason: 35 "no lifting surface", 11 wing loading over 937
+N/m². **Decision:** item 4 (air thrust) is not the next build; nothing reaches
+the rung where thrust is scored. Whether `stays_up` is closed by the body or by
+the model (C3's question) needs D2's reduced-frequency read first; it is below.
+
+### D2 — how much of the population flaps where the model extrapolates (read)
+
+`experiments/reduced_frequency_share/run.py` on arch48's 200 elites: nominal
+`k = pi f c / U` with `c = wing_area / span` and `U` the measured launch (trim)
+speed. 39 have no lifting surface; of the 161 flappers, **55 (34%) are above
+`k = 0.3`**, where `model_validity.md` labels the solver extrapolating (median
+k 0.11, p90 1.50).
+
+| air rungs cleared | k > 0.3 | k ≤ 0.3 | no surface |
+|---|---|---|---|
+| 0–3 (lift) | 25 | 19 | 38 |
+| 4 (leaves) | 9 | 24 | 0 |
+| 5 (stopped at `stays_up`) | 18 | 54 | 1 |
+| 6+ | 3 | 9 | 0 |
+
+34% is not small, so D2 does not stay documented-only by its own rule. But it
+does not explain the air wall: 54 of the 73 elites stopped at `stays_up` flap
+at `k ≤ 0.3`, where the quasi-steady model is in its validated regime. **C3's
+answer:** the binding air gate is closed by the bodies and their control in
+the regime the model handles, not by the model. **Decision:** D2 (wake
+feedback, dynamic LEV) enters the list behind the air items that act in the
+valid regime, as the fidelity item for the third of flappers above k = 0.3; no
+build now.
+
+### E2 — a pass/fail definition of "done" (proposal, for the user)
+
+Proposed, not adopted: it defines what the project is for, so the bars are the
+user's call. Built from what is already certified against still machines and
+unsearched gaits (PAPERS_2610, 2026-10-06 re-gate), and from rule 8 (a score
+must survive a fresh seed).
+
+| level | passes when | today (arch48 elites, current scoring) |
+|---|---|---|
+| L1 medium | each of air, water, land has ≥ 5 distinct elites over a bar certified against both controls, retaining ≥ 50% of it on the auditor's held-out seeds | water ≥ 0.012: 41; land ≥ 0.15: 7; air: no certified behaviour bar (C3: nothing past `stays_up`) |
+| L2 crossing | each of the four crossings is crossed by ≥ 5 elites while still machines cross 0 (`CrossingTracker` gate) | 0 in every kind (arch47, arch48) |
+| L3 mission | one design completes the continuous mission (`mission_fraction > 0` with both transitions, film reproduced) on ≥ 3 of 5 held-out seeds | 0 |
+| L4 target | L3 at 15 kg, 10 m depth, 45 min (README §"On the 15 kg / 10 m / 45 min target") | — |
+
+Each level is read on the auditor's held-out seeds, never on the draw that
+selected the design.
+
+### Items closed or deferred by the reads above
+
+| item | status | why |
+|---|---|---|
+| arch48 item 4, air thrust | deferred | C3: nothing reaches a thrust rung; the binding air gate is `stays_up`, and in gliders holding still beats the gait |
+| D1, flexibility | deferred | its measurement is thrust lost to deflection, and thrust is not where any elite stops (C3) |
+| D3, off-diagonal added mass | deferred | its own condition: only if D1/D2/C3 leave air short of thrust; they leave it short of staying up |
+| G, identification | closed for probe count | M6 found it 57% of the wall; 12 probes moved one elite past one draw's noise and the mean by 40% |
+| B1, `SearchConfig` and job-path defaults | open, for the user | the CLI now matches practice (refine 0 since M1); the dataclass still defaults to batch 4, 1 worker, no shared policy, and changing it changes every plan digest |
+| E1 / E3, multi-seed ablations | open, for the user | ≥ 5 seeds per arm at ~12 h per 300 gens is 60 h per arm; M1 already answered the refine-steps arm offline |
+| PAPERS item 2, water cruise chosen | open, for the user | the 2026-09-21 rule; the antipodal pair cancels motion the command did not choose, so what remains is the rule's wording |
+| PAPERS item 3, leaking bars | partly read | water and land competence certified on arch49; stage 1 and air leak through the same glide (question 1 below); stage 4's `mission > 0` decides nothing measurable (elite missions ≤ 1e-5) |
+| Skill pretraining, learnability score | waiting on M4 | M4 (running) says whether the learner learns a fixed body at all |
+| M5, PPO epochs | waiting on M4 | the harness takes `--epochs`/`--minibatch` (a fixed gradient-step budget is `minibatch = 2048·E/10`) |
+
+### Questions for the user (collected 2026-10-08)
+
+1. **Is a passive glide a capability?** With the still machine fixed, still
+   gannets clear air ≥ 0.012 on 11 bodies against the elites' 6, and pass
+   curriculum stage 1 (8 vs 15). The 2026-09-21 rule says a glide is a
+   capability, and the water/land half of the same question (PAPERS item 2)
+   was answered by the antipodal pair. Keep paying a still glider in air, or
+   score air on a commanded difference too?
+2. **Turn on the gait gain (`--gait-gain`) in arch51?** It gives a policy the
+   authority to stop flapping, which is what those gliders lack; it has been
+   off since arch42, whose read stopped at gen 50 on the old physics.
+3. **M3's form.** Placement on more than one draw is built and off. The median
+   of 3 (built) buys little; a per-medium mean of 3 buys more (Spearman
+   0.53–0.72 against 0.30–0.48 for one draw) but needs the film to replay
+   every draw to stay "a film reproduces its score". Cost either way ≈ +80 s
+   per generation at 3 draws. Which, if any?
+4. **E2's definition of done** (proposal above): adopt, change the bars, or not
+   yet?
+5. **B1:** make `SearchConfig`'s defaults the CLI's (batch 16, 4 workers,
+   shared policy), accepting new plan digests for the job path?
+6. **E1/E3 budget:** run ≥ 5 seeds for the arms that matter (60 h per arm)?
+7. **PRs:** #37 (refine-steps default 0) and #38 (this sweep, stacked on #37)
+   are open; arch50 runs from #38's commit 2b7bb53.
 
 ## 2026-10-08 — the MuscleMimic comparison, reconciled with the repo
 

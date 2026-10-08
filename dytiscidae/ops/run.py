@@ -156,24 +156,11 @@ def cmd_reference(args) -> int:
     return 0
 
 
-def cmd_search(args) -> int:
-    from ..evolution.loop import SearchConfig, run_search
-    from ..envs.triphibian import MissionSpec
-    from ..viz.dashboard import build_dashboard
+def search_config_from_args(args, shared: bool):
+    """The ``SearchConfig`` a ``search`` command line asks for."""
+    from ..evolution.loop import SearchConfig
 
-    shared = args.shared_policy
-    if shared is None:
-        try:
-            import torch  # noqa: F401
-            shared = True
-        except ImportError:
-            shared = False
-            print("[warn] torch not importable: running without the shared "
-                  "policy (pass --no-shared-policy to silence)", file=sys.stderr)
-    if not shared and args.refine_steps <= 0:
-        print("[warn] no shared policy and --refine-steps 0: a candidate whose "
-              "own weights are zero commands nothing", file=sys.stderr)
-    cfg = SearchConfig(
+    return SearchConfig(
         generations=args.generations,
         batch=args.batch,
         seed=args.seed,
@@ -183,6 +170,8 @@ def cmd_search(args) -> int:
         pool_balance=bool(args.pool_balance),
         controller_refine_funnel=args.refine_funnel,
         distance_curriculum=bool(args.distance_curriculum),
+        draw_per_candidate=bool(args.draw_per_candidate),
+        placement_draws=args.placement_draws,
         action_rate_penalty=args.action_rate_penalty,
         descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
         tier2_label_all_media=not args.no_tier2_label_all_media,
@@ -222,6 +211,64 @@ def cmd_search(args) -> int:
         **({"islands": tuple(x.strip() for x in args.islands.split(","))}
            if args.islands else {}),
     )
+
+
+def merge_config_file(cfg, path, shared: bool):
+    """``cfg`` with every field taken from a config export (ROADMAP B4), except
+    those the command line set to something other than its default.
+
+    ``path`` is the JSON ``ops.run config`` writes, or a bare field mapping.
+    Fields the file names that ``SearchConfig`` no longer has are reported and
+    dropped; fields it lacks keep the command line's value.
+    """
+    import dataclasses
+
+    from ..evolution.loop import SearchConfig
+
+    raw = json.loads(Path(path).read_text())
+    raw = raw.get("config", raw)
+    names = {f.name for f in dataclasses.fields(SearchConfig)}
+    default = search_config_from_args(build_parser().parse_args(["search"]), shared)
+    merged = {}
+    for name in names:
+        mine = getattr(cfg, name)
+        if name in raw and mine == getattr(default, name):
+            v = raw[name]
+            merged[name] = tuple(v) if isinstance(v, list) else v
+        else:
+            merged[name] = mine
+    absent = sorted(names - set(raw))
+    if absent:
+        print(f"[warn] {path} predates {absent}: today's defaults are used for "
+              f"them, so this is not the recorded run's configuration there",
+              file=sys.stderr)
+    dropped = sorted(set(raw) - names)
+    if dropped:
+        print(f"[warn] {path}: fields SearchConfig no longer has, ignored: {dropped}",
+              file=sys.stderr)
+    return SearchConfig(**merged)
+
+
+def cmd_search(args) -> int:
+    from ..evolution.loop import SearchConfig, run_search
+    from ..envs.triphibian import MissionSpec
+    from ..viz.dashboard import build_dashboard
+
+    shared = args.shared_policy
+    if shared is None:
+        try:
+            import torch  # noqa: F401
+            shared = True
+        except ImportError:
+            shared = False
+            print("[warn] torch not importable: running without the shared "
+                  "policy (pass --no-shared-policy to silence)", file=sys.stderr)
+    if not shared and args.refine_steps <= 0:
+        print("[warn] no shared policy and --refine-steps 0: a candidate whose "
+              "own weights are zero commands nothing", file=sys.stderr)
+    cfg = search_config_from_args(args, shared)
+    if getattr(args, "config", None):
+        cfg = merge_config_file(cfg, args.config, shared)
     spec = MissionSpec(
         cycles=args.cycles,
         seconds_per_domain=args.seconds_per_domain,
@@ -301,11 +348,20 @@ def launch_postrun(run_dir, *, timeout: float = 3600.0) -> int:
     run is finished and checkpointed by the time this is called.  Blocking, so
     that "the search process has exited" means "the report and the films
     exist", which is what the watcher reads.
+
+    A failure is loud (arch48 item 2): two runs' ``post-run exited 1`` lines
+    went unread and their reports were silently missing.  An exit of 0 without
+    ``report.html`` counts as a failure, the verdict and the log's tail go to
+    ``postrun_status.json``, and ``job status`` prints it.
     """
     import subprocess
     import sys
+    import time as _time
 
-    log = Path(run_dir) / "postrun.log"
+    from .postrun_status import POSTRUN_STATUS
+
+    run_dir = Path(run_dir)
+    log = run_dir / "postrun.log"
     print(f"\npost-run: report and films -> {log}", flush=True)
     try:
         with open(log, "w") as f:
@@ -315,9 +371,30 @@ def launch_postrun(run_dir, *, timeout: float = 3600.0) -> int:
                                 timeout=timeout).returncode
     except Exception as exc:                                  # noqa: BLE001
         print(f"  post-run failed to start: {exc}", flush=True)
-        return 1
+        rc = 1
+    report = (run_dir / "report.html").exists()
+    films = (run_dir / "media" / "film_manifest.json").exists()
+    ok = rc == 0 and report
+    try:
+        tail = log.read_text(errors="replace").splitlines()[-15:]
+    except OSError:
+        tail = []
+    status = {"exit": int(rc), "ok": bool(ok), "report": report, "films": films,
+              "at": _time.strftime("%Y-%m-%dT%H:%M:%S"), "log_tail": tail}
+    try:
+        (run_dir / POSTRUN_STATUS).write_text(json.dumps(status, indent=1))
+    except OSError as exc:
+        print(f"  could not write {POSTRUN_STATUS}: {exc}", flush=True)
     print(f"  post-run exited {rc}", flush=True)
-    return rc
+    if not ok:
+        why = f"exit {rc}" if rc else "exit 0 but no report.html"
+        print(f"\n** POST-RUN FAILED ({why}): no report or films for this run. "
+              f"Re-run by hand: python -m dytiscidae.ops.run postrun --run {run_dir}"
+              f"\n   last lines of {log}:", flush=True)
+        for line in tail:
+            print(f"   | {line}", flush=True)
+        return rc or 1
+    return 0
 
 
 def cmd_postrun(args) -> int:
@@ -352,6 +429,24 @@ def cmd_postrun(args) -> int:
             subprocess.run([sys.executable, str(report), str(run_dir)],
                            stdout=subprocess.DEVNULL, env=child_env())
     return rc if manifest else 1
+
+
+def cmd_config(args) -> int:
+    """Print (or write) the configuration a run recorded, for ``search --config``."""
+    from ..viz.film import run_provenance
+
+    prov = run_provenance(Path(args.run))
+    if not prov.get("config"):
+        print(f"no recorded configuration in {args.run}/checkpoint.json", file=sys.stderr)
+        return 1
+    text = json.dumps({"run": str(args.run), "commit": prov.get("commit"),
+                       "config": prov["config"]}, indent=1, default=str)
+    if args.out:
+        Path(args.out).write_text(text + "\n")
+        print(f"wrote {args.out}")
+    else:
+        print(text)
+    return 0
 
 
 def cmd_film(args) -> int:
@@ -864,6 +959,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("search", help="run the design search")
     p.add_argument("--generations", type=int, default=200)
+    p.add_argument("--config", default="",
+                   help="a config export (`ops.run config --run runs/X --out f.json`): "
+                        "every SearchConfig field from the file, except flags given "
+                        "here with a non-default value")
     p.add_argument("--batch", type=int, default=16,
                    help="designs per generation. 16 is what arch34-arch48 ran "
                         "and what the pool shape was swept at (4x4 31.7 s, "
@@ -885,6 +984,20 @@ def build_parser() -> argparse.ArgumentParser:
                         "(ROADMAP AJ). 2 since 2026-10-03: 0.875x the wall of "
                         "4x4 on rotor-heavy batches; 1 is the pool every run "
                         "up to arch46 used")
+    p.add_argument("--placement-draws", type=int, default=1,
+                   help="draws each candidate is scored at before placement; the "
+                        "median one is placed (ROADMAP M3). 1 (default) is every "
+                        "run to date. C2 measured one draw's reliability at "
+                        "0.18-0.30. Costs (n - 1) more noise-free evaluations of "
+                        "the generation; needs --refine-steps 0")
+    p.add_argument("--draw-per-candidate", action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="each candidate faces its own task draw (heading, "
+                        "scatter), on by default since 2026-10-08 (ROADMAP "
+                        "M2). --no-draw-per-candidate shares the first "
+                        "candidate's draw across the generation, as every run "
+                        "up to arch48 did; water and land scores are not "
+                        "comparable across the two.")
     p.add_argument("--distance-curriculum", action=argparse.BooleanOptionalAction,
                    default=True,
                    help="on by default since 2026-10-05 (--no-distance-curriculum "
@@ -1108,6 +1221,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--by", choices=("fitness", "mission", "island"), default="mission")
     p.add_argument("--island", default=None)
     p.set_defaults(fn=cmd_film)
+
+    p = sub.add_parser("config", help="the configuration a run recorded, as JSON "
+                       "that `search --config` reads (ROADMAP B4)")
+    p.add_argument("--run", required=True)
+    p.add_argument("--out", default="")
+    p.set_defaults(fn=cmd_config)
 
     p = sub.add_parser("postrun", help="the report and films a finished run "
                                        "leaves behind (run automatically)")

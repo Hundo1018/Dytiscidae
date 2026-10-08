@@ -1,0 +1,37 @@
+{
+ "air": {
+  "one": 0.414,
+  "median3": 0.39,
+  "mean3": 0.534,
+  "best3_inflation": 3.194,
+  "median3_bias": -0.742
+ },
+ "water": {
+  "one": 0.363,
+  "median3": 0.479,
+  "mean3": 0.566,
+  "best3_inflation": 1.133,
+  "median3_bias": 0.024
+ },
+ "land": {
+  "one": 0.296,
+  "median3": 0.358,
+  "mean3": 0.572,
+  "best3_inflation": 0.547,
+  "median3_bias": -0.574
+ },
+ "stage": {
+  "one": 0.479,
+  "median3": 0.541,
+  "mean3": 0.654,
+  "best3_inflation": 0.608,
+  "median3_bias": -0.508
+ },
+ "island": {
+  "one": 0.585,
+  "median3": 0.578,
+  "mean3": 0.723,
+  "best3_inflation": 0.713,
+  "median3_bias": -0.153
+ }
+}

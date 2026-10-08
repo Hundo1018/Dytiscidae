@@ -638,9 +638,21 @@ def step_batch(envs, angles_list, bf: BatchedFluid, active=None):
     return active
 
 
+def _per_machine(seed, k: int) -> list[int]:
+    """``seed`` as one int per machine: an int is shared, a sequence is checked."""
+    if isinstance(seed, (list, tuple, np.ndarray)):
+        if len(seed) != k:
+            raise ValueError(f"seed has {len(seed)} entries for {k} machines")
+        return [int(x) for x in seed]
+    return [int(seed)] * k
+
+
 def identify_batch(envs, domain, *, probe_time: float = 1.2, n_probes: int = 24,
-                   seed: int = 0, probe_scale: float = 0.35, max_modes: int = 6):
+                   seed=0, probe_scale: float = 0.35, max_modes: int = 6):
     """`TriphibianEnv.identify` for a whole batch, one GPU call per timestep.
+
+    ``seed`` is one int for the batch or one per environment (ROADMAP M2: each
+    candidate is evaluated on its own draw).
 
     This was the last part of an evaluation still running the numpy solver, and
     it was the largest single cost in a generation: 26.7% of wall clock at batch
@@ -670,8 +682,10 @@ def identify_batch(envs, domain, *, probe_time: float = 1.2, n_probes: int = 24,
     # Per-machine probe directions. Drawn with the same generator call as the
     # unbatched path so a machine identified alone and in a batch gets the same
     # deltas -- otherwise the two paths could not be compared at all.
-    deltas = [np.random.default_rng(seed).normal(
-        0.0, probe_scale, size=(n_probes, e.cpg.n_params)) for e in envs]
+    seeds = _per_machine(seed, k)
+    deltas = [np.random.default_rng(seeds[i]).normal(
+        0.0, probe_scale, size=(n_probes, e.cpg.n_params))
+        for i, e in enumerate(envs)]
     responses = [np.zeros((n_probes, 6)) for _ in envs]
 
     for e in envs:
@@ -905,7 +919,7 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
 
 def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                          segment_seconds: float = 10.0,
-                         identify_axes=False, seed: int = 0,
+                         identify_axes=False, seed=0,
                          sea_state=None, perturb: dict | None = None,
                          shared=None, buffer=None, n_modes: int = 6,
                          streams=None, groups=None):
@@ -937,6 +951,14 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     perturbation is an input to a shared timestep, not a branch in it (see
     `identify_batch`).
 
+    ``seed`` is one int for the whole batch or one per phenotype.  Everything
+    a machine faces -- its environment's stream, its identification probes,
+    its scatter and its task -- comes from its own seed, so each result equals
+    ``evaluate_tier1(seed=its eval_seed)`` whatever shares the batch.  One seed
+    for the batch was the rule until 2026-10-08: 16 candidates competed on one
+    heading and the archive kept the best of each draw (PAPERS_2610 §3, ROADMAP
+    M2).
+
     Falls back to nothing: a phenotype that fails to compile is returned as a
     dead MissionResult in its slot, exactly as the unbatched version does, so
     the caller's indexing is never disturbed.
@@ -951,6 +973,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     spec = spec or MissionSpec()
     t0 = _time.time()
     k = len(phenos)
+    seeds = _per_machine(seed, k)
     results = [MissionResult(tier=1) for _ in range(k)]
     envs, live = [None] * k, []
 
@@ -964,7 +987,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
             r.notes.append("empty phenotype")
             continue
         try:
-            envs[i] = TriphibianEnv(p, seed=seed, sea_state=sea_state,
+            envs[i] = TriphibianEnv(p, seed=seeds[i], sea_state=sea_state,
                                     perturb=perturb)
             envs[i].air_launch_height = spec.air_launch_height
             live.append(i)
@@ -1007,7 +1030,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         marks = {i: step_mark(envs[i]) for i in live}
         for dom in (_D.AIR, _D.WATER):
             try:
-                found = identify_batch(group, dom, seed=seed,
+                found = identify_batch(group, dom, seed=[seeds[i] for i in wanted],
                                        max_modes=n_modes)
             except Exception as exc:
                 for i in wanted:
@@ -1030,7 +1053,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     # See `evaluate_tier1`: the seed travels with the result so the archive can
     # say what experiment produced the number.
     for i in live:
-        results[i].eval_seed = int(seed)
+        results[i].eval_seed = seeds[i]
 
     group = [envs[i] for i in live]
     bf = BatchedFluid(group)
@@ -1046,36 +1069,36 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         # mean and need no stream.
         if shared is None or buffer is None:
             return None
-        return [np.random.default_rng([int(seed) & 0x7FFFFFFF, streams[i], tag])
+        return [np.random.default_rng([seeds[i] & 0x7FFFFFFF, streams[i], tag])
                 for i in live]
 
     marks = {i: step_mark(envs[i]) for i in live}
     for dom in DOMAIN_CYCLE:
-        # One draw per domain, shared by every machine: candidates in a
-        # generation must face the same conditions to be comparable with each
-        # other, and deriving it from the evaluation seed keeps a score
-        # reproducible.  Built from the domain's *index* rather than
-        # ``hash(name)``, which is salted per process and would have made a
-        # score depend on which interpreter ran it.  See TriphibianEnv.scatter
-        # for why the canonical pose alone was not a training set.
+        # One draw per domain per machine, from the machine's own seed, which
+        # keeps a score reproducible.  Built from the domain's *index* rather
+        # than ``hash(name)``, which is salted per process and would have made
+        # a score depend on which interpreter ran it.  See
+        # TriphibianEnv.scatter for why the canonical pose alone was not a
+        # training set.  Machines given the same seed face the same draw.
         from .evaluate import _scatter_seed
         from .tasks import PAIRED_MEDIA, antipode, schedule_for, task_seed
         from .triphibian import pair_partner_of
-        scatter_seed = _scatter_seed(seed, dom)
-        # The task, drawn the same way and shared the same way: every machine
-        # in the generation is asked the same thing.
-        task = schedule_for(dom, np.random.default_rng(task_seed(scatter_seed)))
+        scatter_seeds = {i: _scatter_seed(seeds[i], dom) for i in live}
+        # The task, drawn the same way from each machine's own scatter seed.
+        tasks = {i: schedule_for(dom, np.random.default_rng(task_seed(scatter_seeds[i])))
+                 for i in live}
         # Water and land are an antipodal pair, run exactly as
         # `evaluate.run_segment` runs it: the same initial state twice (each
         # machine's own random stream rewound), the second half at the
         # opposite heading and scored with the first as its partner.
         rewind = {i: envs[i].rng.bit_generator.state for i in live}
 
-        def _half(t, partners, tag):
+        def _half(ts, partners, tag):
             for slot, i in enumerate(live):
                 envs[i].reset(dom)
-                envs[i].scatter(np.random.default_rng(scatter_seed))
-                envs[i].task = t
+                envs[i].scatter(np.random.default_rng(scatter_seeds[i]),
+                                pose=ctrls[i].params)
+                envs[i].task = ts[i]
                 envs[i].pair_partner = None if partners is None else partners[slot]
             bf.reset_slam()
             coll = None
@@ -1091,13 +1114,14 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                 envs[i].pair_partner = None
             return out, coll
 
-        segs, collector = _half(task, None, DOMAIN_CYCLE.index(dom))
+        segs, collector = _half(tasks, None, DOMAIN_CYCLE.index(dom))
         collectors = [collector]
         if dom.value in PAIRED_MEDIA:
             after = {i: envs[i].rng.bit_generator.state for i in live}
             for i in live:
                 envs[i].rng.bit_generator.state = rewind[i]
-            second, coll2 = _half(antipode(task), [pair_partner_of(x) for x in segs],
+            second, coll2 = _half({i: antipode(t) for i, t in tasks.items()},
+                                  [pair_partner_of(x) for x in segs],
                                   50 + DOMAIN_CYCLE.index(dom))
             for i in live:
                 envs[i].rng.bit_generator.state = after[i]
@@ -1204,7 +1228,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
         # Each crossing kind used to present exactly one entry state, with no
         # noise at all, to every machine of every generation.  A real arrival
         # carries whatever speed and attitude the previous leg left behind.
-        e.scatter(_np.random.default_rng(scatter_seed))
+        e.scatter(_np.random.default_rng(scatter_seed), pose=ctrls[m].params)
         reseat_after_scatter(e, kind)
         res[m].survivable_entry_speed = float(e.p.max_entry_speed)
     bf.reset_slam()
