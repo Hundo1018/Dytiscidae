@@ -2972,7 +2972,24 @@ comparable with arch48 across the antipodal pair.
    protocol: -0.09 / 0.02. Tier-1 pass, Tier-2 fail at 0.15: water 6/7, land
    21/23. Better than arch48, short of the bar.
 3. *The no-model gate certifies every bar the elites clear in ≥ 10% of
-   cases.* Run after PAPERS item 4 (the still arm), below.
+   cases.* **Held** (`experiments/no_model_gate/results_arch49.json`, 229
+   elites, the fixed still arm, 5,736 s): the two competence bars cleared by
+   ≥ 10% of elites are certified against both controls: water ≥ 0.012 (elite
+   64 / still 3 / base 13), land ≥ 0.012 (51 / 0 / 0); also water and land ≥
+   0.055 (14 / 0 / 0, 20 / 0 / 0).
+
+**What the gate found besides.** *Air competence leaks*, against the elites:
+a still machine clears air ≥ 0.012 on 11 bodies, the elites on 6; ≥ 0.055, 9
+against 3. All 11 are gannets gliding from the launch; 7 of them clear it held
+still and not under their own gait. On those bodies flapping destroys a glide
+that holding still keeps, and the controller cannot hold still: the gait gain
+(AA, `--gait-gain`) that gives a policy that authority has been off in every
+run since arch42, whose read stopped at gen 50 on the old physics. Curriculum
+stage 1 leaks (elite 15 / still 8 / base 8) and stage 4's `mission > 0` leaks
+(8 / 2 / 1); crossings are now non-zero for elites and zero for still machines
+(air→water 1, water→land 2, land→air 1 of 229: underpowered). The ladder's
+water and land state rungs still leak, as PAPERS_2610 said they would
+(telemetry, not fitness).
 
 **The critic on arch49** (`experiments/critic_skill/results_arch49.json`):
 corr(Tier-1, Tier-2) rose to 0.26 (water) and 0.25 (land), from 0.04 / 0.17;
@@ -3043,6 +3060,34 @@ by plain averaging costs 9–18 draws, so the build is the sequential form:
 score cheaply, re-score only candidates that would displace an incumbent, and
 place on a lower bound. M2 alone (built) removes the best-of-16 on one draw,
 but not this.
+
+### M6 — identification's share of the wall (read)
+
+`experiments/identification_share/run.py`: arch48's 16 latest elites (rotors
+0–13 each), one single-process batch, the scoring network, each elite's own
+draw, timed three times each way on an otherwise idle machine: **130.3 s with
+identification, 55.6 s without; identification is 57% of the batched
+evaluation's wall** (74.7 s). Above the third the rule set, so G stays open as
+a throughput lever. The review's cache is still not valid (bases depend on the
+gait's base as well as the body, and every child carries an operator), so the
+lever is the probe count: `experiments/identification_probes` (pre-registered
+in b80c5a2) asks whether 12 or 8 probes per domain give bases that score the
+same as 24.
+
+**Read** (`experiments/identification_probes/results_arch48.json`, the same
+16 elites, each scored once at its own draw with the bases each probe count
+produced):
+
+| probes per domain | identify wall | mean summed competence | median / max abs change vs 24 |
+|---|---|---|---|
+| 24 | 129.8 s | 0.0239 | — |
+| 12 | 67.8 s | 0.0144 | 0.0049 / 0.046 |
+| 8 | 47.5 s | 0.0264 | 0.0104 / 0.248 |
+
+P1 held only just (median 0.0049 < 0.005), and the decision's second
+condition failed: one elite moved 0.046, past one draw's SD (0.044), and the
+mean fell 40%. **24 probes stay; G is closed for the probe count.** The wall
+identification costs buys bases the scores depend on.
 
 ### M3 — placement on more than one draw (built, off; the form is open)
 
