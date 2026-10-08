@@ -1,0 +1,87 @@
+{
+ "run": "runs/arch48",
+ "labels": 192,
+ "media": {
+  "air": {
+   "n": 192,
+   "tier2_nonzero": 1,
+   "tier2_mean": 8.897357391866693e-05,
+   "tier1_mean": 0.0067247070563818965,
+   "corr_tier1_tier2": 0.126,
+   "corr_critic_oof_tier2": 0.001,
+   "corr_direct_oof_tier2": -0.01,
+   "top_features": [
+    [
+     0.126,
+     "air"
+    ],
+    [
+     0.069,
+     "mission_fraction"
+    ],
+    [
+     -0.068,
+     "land"
+    ],
+    [
+     -0.05,
+     "n_actuated"
+    ]
+   ]
+  },
+  "water": {
+   "n": 192,
+   "tier2_nonzero": 92,
+   "tier2_mean": 0.032180286869732976,
+   "tier1_mean": 0.14789781530563376,
+   "corr_tier1_tier2": 0.041,
+   "corr_critic_oof_tier2": -0.067,
+   "corr_direct_oof_tier2": -0.081,
+   "top_features": [
+    [
+     -0.138,
+     "log_mass"
+    ],
+    [
+     0.08,
+     "energy_margin"
+    ],
+    [
+     -0.075,
+     "actuator_overload"
+    ],
+    [
+     -0.074,
+     "transition_crossed"
+    ]
+   ]
+  },
+  "land": {
+   "n": 192,
+   "tier2_nonzero": 94,
+   "tier2_mean": 0.0438212299479552,
+   "tier1_mean": 0.1825448304558013,
+   "corr_tier1_tier2": 0.165,
+   "corr_critic_oof_tier2": 0.034,
+   "corr_direct_oof_tier2": 0.131,
+   "top_features": [
+    [
+     0.165,
+     "land"
+    ],
+    [
+     -0.118,
+     "energy_margin"
+    ],
+    [
+     -0.104,
+     "water"
+    ],
+    [
+     0.101,
+     "n_actuated"
+    ]
+   ]
+  }
+ }
+}

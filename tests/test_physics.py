@@ -94,10 +94,101 @@ def test_a_child_python_is_the_venv_after_the_kernel_poisons_the_environment() -
             libc.unsetenv(b"PYTHONEXECUTABLE")
         else:
             libc.setenv(b"PYTHONEXECUTABLE", saved, 1)
-    check("the poisoned environment really leaks (the test is live)",
-          bare != sys.prefix, f"bare child prefix {bare}")
+    # The leak is a venv's: a bare interpreter (CI's toolcache Python) has
+    # the same prefix whichever executable it is started as, so there the
+    # first check cannot be live.  Skipped, not passed, and not failed.
+    if sys.prefix == sys.base_prefix:
+        SKIPPED.append("the poisoned-environment liveness check (not in a venv)")
+        print(f"  [skip] the poisoned environment really leaks -- not in a venv "
+              f"(prefix {sys.prefix}), so nothing can leak")
+    else:
+        check("the poisoned environment really leaks (the test is live)",
+              bare != sys.prefix, f"bare child prefix {bare}")
     check("child_env gives the child this interpreter's prefix",
           fixed == sys.prefix, f"{fixed} vs {sys.prefix}")
+
+
+def test_a_config_export_relaunches_the_same_search() -> None:
+    """ROADMAP B4: a run's recorded configuration is a file that relaunches it
+    (``ops.run config`` then ``search --config``), so a second machine needs no
+    shell history.  Every field comes from the file except flags given with a
+    non-default value; a field the file lacks is reported, not guessed."""
+    print("\nops: search --config reproduces the exported configuration")
+    import contextlib
+    import dataclasses
+    import io
+    import json
+    import tempfile
+
+    from dytiscidae.ops.run import build_parser, merge_config_file, search_config_from_args
+
+    src = search_config_from_args(build_parser().parse_args(
+        ["search", "--batch", "8", "--segment-seconds", "5", "--refine-steps", "3",
+         "--no-draw-per-candidate", "--islands", "air,water", "--seed", "11",
+         "--run", "runs/recorded"]), True)
+    exported = {f.name: getattr(src, f.name) for f in dataclasses.fields(src)}
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "c.json"
+        path.write_text(json.dumps({"config": exported}, default=list))
+        a = build_parser().parse_args(["search", "--config", str(path), "--seed", "12"])
+        got = merge_config_file(search_config_from_args(a, True), a.config, True)
+        differ = [f.name for f in dataclasses.fields(got)
+                  if getattr(got, f.name) != getattr(src, f.name)]
+        check("every field comes from the file but the one given on the line "
+              "and where this launch runs",
+              sorted(differ) == ["run_dir", "seed"] and got.seed == 12
+              and got.run_dir == "runs/latest", f"{differ}")
+        b = build_parser().parse_args(["search", "--config", str(path),
+                                       "--no-shared-policy"])
+        off = merge_config_file(search_config_from_args(b, False), b.config, False,
+                                shared_explicit=True)
+        check("an explicit --no-shared-policy beats the file", off.use_shared_policy is False)
+        old = dict(exported)
+        old.pop("draw_per_candidate")
+        path.write_text(json.dumps({"config": old}, default=list))
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            merge_config_file(search_config_from_args(a, True), str(path), True)
+        check("a field the export lacks is reported, not silently defaulted",
+              "draw_per_candidate" in err.getvalue(), err.getvalue()[:160])
+
+
+def test_a_failed_postrun_is_loud() -> None:
+    """arch47 and arch48 finished without a report: post-run died on
+    ``import numpy`` and the only trace was a ``post-run exited 1`` line nobody
+    read (arch48 item 2).  A failure now prints a banner with the log's tail,
+    leaves ``postrun_status.json``, and ``job status`` reads it; an exit of 0
+    with no ``report.html`` is a failure too."""
+    print("\nops: a post-run that leaves no report says so")
+    import contextlib
+    import io
+    import json
+    import tempfile
+
+    from dytiscidae.ops.postrun_status import POSTRUN_STATUS, postrun_verdict
+    from dytiscidae.ops.run import launch_postrun
+
+    with tempfile.TemporaryDirectory() as d:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = launch_postrun(d, timeout=120)
+        text = out.getvalue()
+        st = json.loads((Path(d) / POSTRUN_STATUS).read_text())
+        check("an empty run's post-run returns non-zero", rc != 0, f"rc {rc}")
+        check("and prints a banner a reader cannot miss",
+              "POST-RUN FAILED" in text and "postrun --run" in text, text[-200:])
+        check("the status file records the failure and the log's tail",
+              st["ok"] is False and st["report"] is False and st["log_tail"],
+              f"{ {k: st[k] for k in ('exit', 'ok', 'report')} }")
+        v = postrun_verdict(d)
+        check("job status reads it as a failure", bool(v) and "FAILED" in v, f"{v}")
+        (Path(d) / "report.html").write_text("<html></html>")
+        (Path(d) / POSTRUN_STATUS).write_text(json.dumps(dict(st, ok=True, report=True)))
+        check("a post-run that wrote its report reads as nothing to say",
+              postrun_verdict(d) is None)
+    with tempfile.TemporaryDirectory() as d:
+        check("no status and no report is reported, not assumed fine",
+              bool(postrun_verdict(d)))
 
 
 def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
@@ -172,8 +263,8 @@ def report(label: str) -> int:
     """The summary.  A skip is never folded into the success line."""
     print("\n" + "=" * 68)
     if SKIPPED:
-        print(f"{len(SKIPPED)} SKIPPED — needs the Mojo GPU fluid extension "
-              f"(`cd mojo && pixi run build-all`), not a defect: "
+        print(f"{len(SKIPPED)} SKIPPED — not a defect; a function skip needs the "
+              f"Mojo GPU fluid extension (`cd mojo && pixi run build-all`): "
               f"{', '.join(SKIPPED)}")
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
@@ -3937,6 +4028,55 @@ def test_the_search_can_build_rotorcraft() -> None:
           f"rotor count ranged {min(counts)}-{max(counts)}")
 
 
+def test_a_still_machine_is_still_from_the_first_step() -> None:
+    """PAPERS_2610 item 4: ``held_still_params`` was not quite still.
+
+    Its rotors were commanded to stop, and ``CPGParams.clipped`` raised every
+    offset to 5% of half-travel, so a stopped rotor was held at 2.5% of top
+    speed (27 rad/s on arch48's elite 1), read at the time as windmilling.  And
+    ``scatter`` posed the joints at the body's gait, so the still machine's
+    servos snapped them to the held offset in the first half second (up to 19
+    rad/s on arch48's elites).  An earlier check passed on the *commanded*
+    offset; this one reads the rotor speed and the joint rates the body has."""
+    print("\nenvs: the still machine moves nothing")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.genome import mut_rotor
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    g = BODY_PLANS["beetle"]()
+    mut_rotor(g, np.random.default_rng(3))
+    env = TriphibianEnv(build(g), seed=0)
+    rk = [k for k, n in enumerate(env.act_names) if n.endswith("_r")]
+    still = env.held_still_params()
+    env.reset(Domain.AIR)
+    env.scatter(np.random.default_rng(3), pose=still)
+    for _ in range(int(1.0 / env.timestep)):
+        env.step(env.cpg.command(still, env.data.time))
+    speeds = [abs(float(env.data.qvel[d])) for d in env.rotors.dof]
+    check("a still machine's rotors are stopped after a second in the air",
+          rk and max(speeds) < 0.5, f"{len(rk)} rotors, |omega| {[round(x, 2) for x in speeds]}")
+
+    worst = []
+    for name in ("gannet", "ray", "beetle"):
+        rates = {}
+        for label in ("gait pose", "held pose"):
+            e = TriphibianEnv(build(BODY_PLANS[name]()), seed=1)
+            st = e.held_still_params()
+            e.reset(Domain.WATER)
+            e.scatter(np.random.default_rng(5), pose=None if label == "gait pose" else st)
+            jk = [k for k, n in enumerate(e.act_names) if not n.endswith("_r")]
+            peak = 0.0
+            for _ in range(int(0.5 / e.timestep)):
+                e.step(e.cpg.command(st, e.data.time))
+                peak = max(peak, float(np.abs(e.data.qvel[e._act_vadr[jk]]).max()))
+            rates[label] = peak
+        worst.append((name, round(rates["gait pose"], 2), round(rates["held pose"], 2)))
+    check("posed where it is held, no joint is snapped there in the first 0.5 s",
+          all(h < 0.5 * g_ for _, g_, h in worst if g_ > 0.2),
+          f"peak rad/s (gait pose, held pose): {worst}")
+
+
 def test_the_rotor_batch_is_the_per_rotor_loop() -> None:
     """`RotorBatch` steps every rotor of a shard as one array computation
     (2026-10-03: the per-rotor loop was 198 us a rotor-step, 82% of a
@@ -4226,6 +4366,8 @@ def main() -> int:
     run_all([
         test_a_child_python_is_the_venv_after_the_kernel_poisons_the_environment,
         test_the_search_cli_defaults_are_the_stored_run_configuration,
+        test_a_failed_postrun_is_loud,
+        test_a_config_export_relaunches_the_same_search,
         test_a_strip_moves_with_its_hinge,
         test_reversed_flow_reverses_the_force,
         test_pitching_nose_up_adds_lift,
@@ -4246,6 +4388,7 @@ def main() -> int:
         test_a_transition_can_start_back_from_its_interface,
         test_the_rotor_table_is_the_rotor_model,
         test_the_search_can_build_rotorcraft,
+        test_a_still_machine_is_still_from_the_first_step,
         test_the_rotor_batch_is_the_per_rotor_loop,
         test_the_clearance_of_a_batch_is_each_machines_own,
         test_a_propeller_can_go_under_water,

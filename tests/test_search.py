@@ -4906,6 +4906,150 @@ def test_the_pool_queues_and_balances_by_rotors() -> None:
                                        per_worker=cfg.pool_per_worker)] == [2] * 8)
 
 
+def test_each_candidate_faces_its_own_draw() -> None:
+    """One task draw per candidate, not one per generation (ROADMAP M2).
+
+    Until 2026-10-08 the batched path took ``seeds[passed[0]]`` for the whole
+    generation, so 16 candidates were scored on one heading and one scatter,
+    and the archive kept the best of each draw: a fresh seed took Tier-1 water
+    passes from 15/16 to 3/16 (PAPERS_2610 §3).  The loop already drew one
+    seed per candidate; the batched path discarded all but the first.
+
+    Held here: a batch given one seed per machine returns, for each machine,
+    exactly what that machine scores alone at its seed, in one process or
+    across shards; one shared seed is still what ``seed=int`` means; and
+    ``evaluate_candidates`` stamps each candidate with its own seed, or with
+    the first one when ``draw_per_candidate`` is off.
+    """
+    if needs_batched_evaluator("test_each_candidate_faces_its_own_draw"):
+        return
+    print("\nloop: each candidate is scored on its own task draw")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import batchroll as br
+    from dytiscidae.envs.actors import ActorPool
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.loop import SearchConfig, evaluate_candidates
+
+    plans = list(BODY_PLANS.values())
+    p, q = build(plans[1]()), build(plans[2]())
+    kw = dict(spec=MissionSpec(), segment_seconds=1.0)
+
+    def sig(r):
+        return (r.eval_seed, r.mission_fraction,
+                tuple((d, s.competence, s.distance) for d, s in sorted(r.segments.items())))
+
+    alone = {s: sig(br.evaluate_tier1_batch([body], seed=s, **kw)[0])
+             for body, s in ((p, 3), (q, 4), (p, 5))}
+    check("the precondition: one body at two seeds scores differently",
+          alone[3][1:] != alone[5][1:], f"{alone[3][2]} vs {alone[5][2]}")
+    mixed = [sig(r) for r in br.evaluate_tier1_batch([p, q, p], seed=[3, 4, 5], **kw)]
+    check("a machine in a mixed-seed batch scores what it scores alone at its seed",
+          mixed == [alone[3], alone[4], alone[5]],
+          f"eval seeds {[m[0] for m in mixed]}")
+    shared = [sig(r) for r in br.evaluate_tier1_batch([p, p], seed=7, **kw)]
+    listed = [sig(r) for r in br.evaluate_tier1_batch([p, p], seed=[7, 7], **kw)]
+    check("seed=int still means one draw for the whole batch",
+          shared == listed and shared[0] == shared[1])
+    try:
+        br.evaluate_tier1_batch([p, q], seed=[1, 2, 3], **kw)
+        wrong = None
+    except ValueError as exc:
+        wrong = str(exc)
+    check("a seed list of the wrong length is refused", wrong is not None, f"{wrong}")
+
+    # Across shards: each shard must receive its own machines' seeds.
+    bodies = [p, q, p, q]
+    seeds = [21, 22, 23, 24]
+
+    def pooled(workers):
+        pool = ActorPool(workers, min_shard=2)
+        try:
+            res = pool.evaluate_tier1(
+                bodies, controllers=[Controller(params=None, policy=None) for _ in bodies],
+                identify_axes=True, seed=seeds, n_modes=6, **kw)
+            return [sig(r) for r in res], getattr(pool, "retried", 0)
+        finally:
+            pool.close()
+
+    one, many = pooled(1), pooled(2)
+    check("per-machine seeds survive the shard split, in the workers",
+          one[0] == many[0] and many[1] == 0
+          and [m[0] for m in many[0]] == seeds,
+          f"seeds {[m[0] for m in many[0]]}, re-run in parent {many[1]}")
+
+    from dytiscidae.core.bodyplans import beetle
+    for per, want in ((True, [5, 6]), (False, [5, 5])):
+        cfg = SearchConfig(segment_seconds=0.3, controller_refine_steps=1,
+                           draw_per_candidate=per)
+        log: dict = {}
+        out = evaluate_candidates([beetle(), beetle()], cfg, identify=True,
+                                  spec=MissionSpec(), seeds=[5, 6], log=log)
+        got = [o[1].eval_seed for o in out]
+        check(f"draw_per_candidate={per}: candidates carry seeds {want}",
+              got == want and sorted(set(log.get("seeds", {}).values())) == sorted(set(want)),
+              f"{got}, log {log.get('seeds')}")
+
+
+def test_a_candidate_is_placed_on_its_median_draw() -> None:
+    """ROADMAP M3: with ``placement_draws = 3`` each candidate is scored at its
+    own draw and two more, and the median one (by summed medium competence) is
+    what the archive receives -- a real result whose ``eval_seed`` reproduces
+    it, not the best of three, which is the winner's curse C2 measured."""
+    if needs_batched_evaluator("test_a_candidate_is_placed_on_its_median_draw"):
+        return
+    print("\nloop: a candidate is placed on the median of its draws")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.envs import batchroll as br
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.loop import (SearchConfig, draw_key, evaluate_candidates,
+                                           median_draw, placement_draw_seed)
+
+    class R:
+        def __init__(self, v):
+            self.segments = {"air": type("S", (), {"competence": v})()}
+    picks = [median_draw([R(a), R(b), R(c)]).segments["air"].competence
+             for a, b, c in ((0.1, 0.5, 0.3), (0.9, 0.0, 0.2), (0.0, 0.0, 0.0))]
+    check("the median of three, not the best", picks == [0.3, 0.2, 0.0], f"{picks}")
+    check("of two, the lower", median_draw([R(0.4), R(0.1)]).segments["air"].competence == 0.1)
+    check("extra draws are distinct seeds",
+          len({5, placement_draw_seed(5, 1), placement_draw_seed(5, 2)}) == 3)
+
+    plans = list(BODY_PLANS.values())
+    genomes = [plans[1](), plans[2]()]
+    seeds = [41, 42]
+    cfg = SearchConfig(segment_seconds=1.0, controller_refine_steps=0, placement_draws=3)
+    log: dict = {}
+    out = evaluate_candidates(genomes, cfg, identify=True, spec=MissionSpec(),
+                              seeds=seeds, log=log)
+    ok_all, detail = True, []
+    for (pheno, res, ctrl), s0 in zip(out, seeds):
+        draws = [s0, placement_draw_seed(s0, 1), placement_draw_seed(s0, 2)]
+        alone = [br.evaluate_tier1_batch(
+                     [pheno], spec=MissionSpec(), segment_seconds=1.0, seed=d,
+                     controllers=[Controller(params=ctrl.params, policy=ctrl.policy,
+                                             bases=ctrl.bases)])[0] for d in draws]
+        want = median_draw(alone)
+        ok = (res.eval_seed == want.eval_seed and res.eval_seed in draws
+              and abs(draw_key(res) - draw_key(want)) < 1e-12)
+        ok_all &= ok
+        detail.append((res.eval_seed, [round(draw_key(a), 4) for a in alone]))
+    check("each candidate carries the median draw, reproducible from its eval_seed",
+          ok_all, f"{detail}")
+    check("and the stage log records it",
+          log.get("placement_draws") == 3 and "placement_spread" in log, f"{log.get('placement_draws')}")
+    try:
+        evaluate_candidates(genomes[:1], SearchConfig(segment_seconds=0.3, controller_refine_steps=1,
+                                                      placement_draws=3, use_shared_policy=False),
+                            identify=True, spec=MissionSpec(), seeds=[1])
+        raised = False
+    except ValueError:
+        raised = True
+    check("refinement with several placement draws is refused, not mixed", raised)
+
+
 def test_sharding_a_generation_does_not_change_a_score() -> None:
     """Worker processes may only make the search faster, never different.
 
@@ -6039,6 +6183,8 @@ def main() -> int:
         test_a_long_leg_runs_on_promotion_candidates_only,
         test_the_shared_controller_question_is_answered_with_a_number,
         test_the_pool_queues_and_balances_by_rotors,
+        test_each_candidate_faces_its_own_draw,
+        test_a_candidate_is_placed_on_its_median_draw,
         test_sharding_a_generation_does_not_change_a_score,
         test_the_gait_gain_drives_the_same_on_every_path,
         test_a_nan_observation_fails_the_rollout_not_the_batch,

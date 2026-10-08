@@ -165,12 +165,39 @@ def test_the_feature_grammar_rejects_what_it_does_not_understand() -> None:
               str(got))
 
 
+def test_every_search_config_field_has_a_hyperparameter_row() -> None:
+    """``docs/HYPERPARAMETERS.md`` names every ``SearchConfig`` field once
+    (ROADMAP B2).  Read from the AST, so this suite still needs nothing
+    installed; a field added without a row, or a row for a field that is gone,
+    fails here."""
+    import ast
+    import re
+
+    print("\nhyperparameters: one row per SearchConfig field")
+    tree = ast.parse((ROOT / "dytiscidae" / "evolution" / "loop.py").read_text())
+    cls = next(n for n in tree.body
+               if isinstance(n, ast.ClassDef) and n.name == "SearchConfig")
+    fields = [n.target.id for n in cls.body
+              if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)]
+    doubled = sorted({f for f in fields if fields.count(f) > 1})
+    check("no SearchConfig field is declared twice", not doubled, f"{doubled}")
+    doc = (ROOT / "docs" / "HYPERPARAMETERS.md").read_text()
+    rows = re.findall(r"^\| `([A-Za-z_0-9]+)` \|", doc, flags=re.M)
+    missing = sorted(set(fields) - set(rows))
+    extra = sorted(set(rows) - set(fields))
+    twice = sorted({r for r in rows if rows.count(r) > 1})
+    check("every field has a row", not missing, f"missing {missing}")
+    check("every row is a field", not extra, f"stale {extra}")
+    check("and no field has two rows", not twice, f"{twice}")
+
+
 def main() -> int:
     test_the_generated_index_matches_the_source()
     test_the_generator_is_deterministic()
     test_the_index_agrees_with_the_dependency_rule()
     test_features_resolve_to_things_that_exist()
     test_the_feature_grammar_rejects_what_it_does_not_understand()
+    test_every_search_config_field_has_a_hyperparameter_row()
 
     print("\n" + "=" * 68)
     if FAILURES:

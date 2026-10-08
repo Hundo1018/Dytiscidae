@@ -607,7 +607,8 @@ def run_transition(
     _place_for(env, kind, back)
     # The same entry-state draw the batched path makes (see
     # ``transition_scatter_seed``).
-    env.scatter(np.random.default_rng(transition_scatter_seed(kind)))
+    env.scatter(np.random.default_rng(transition_scatter_seed(kind)),
+                pose=getattr(controller, "params", None))
     reseat_after_scatter(env, kind)
     r.survivable_entry_speed = float(env.p.max_entry_speed)
 

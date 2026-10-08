@@ -348,8 +348,9 @@ Worth knowing before trusting a result:
   -0.09 (water) and 0.02 (land); air is undefined because Tier-2 air is 0 for
   every one. Cause (docs/PAPERS_2610.md): one task draw was shared by 16
   candidates, so Tier-1 credit measured the draw. Water and land are now scored
-  on an antipodal heading pair; **the correlation after that fix has not been
-  measured yet** (ROADMAP C1). A 60 s single leg runs at each promotion
+  on an antipodal heading pair, and since 2026-10-08 each candidate faces its
+  own draw (`--draw-per-candidate`, ROADMAP M2); **the correlation after these
+  fixes has not been measured yet** (ROADMAP C1). A 60 s single leg runs at each promotion
   (`evaluate_tier1_5`) and reports its retention.
 - **Air scores before and after 2026-09-03 are different quantities.** The air
   score used to pay 0.25 for being off the ground and 0.2 for the launch

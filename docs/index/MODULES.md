@@ -2,7 +2,7 @@
 
 # Modules
 
-104 modules, 37,386 lines, 1,088 indexed symbols.
+105 modules, 37,697 lines, 1,095 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -33,7 +33,7 @@ is what makes a violation visible while reading.
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
-| `adapters.cli` | ``python -m dytiscidae.ops.run job …`` -- the driving adapter. | 464 | — | — | `adapters.composition`, `application`, `domain`, `domain.dataset`, `domain.errors` |
+| `adapters.cli` | ``python -m dytiscidae.ops.run job …`` -- the driving adapter. | 470 | — | — | `adapters.composition`, `application`, `domain`, `domain.dataset`, `domain.errors`, `ops.postrun_status` |
 | `adapters.composition` | The composition root: the one place that knows which adapters are real. | 187 | — | — | `adapters.filesystem`, `adapters.launchers`, `adapters.sqlite`, `adapters.trainers`, `application.services`, `ports.clock`, `worker.runtime` |
 | `adapters.filesystem` | Filesystem adapters: the default storage for everything. | 37 | — | — | `adapters.filesystem.checkpoint_store`, `adapters.filesystem.dataset_repository`, `adapters.filesystem.experiment_store`, `adapters.filesystem.job_store`, `adapters.filesystem.observability` |
 | `adapters.filesystem._io` | Shared filesystem mechanics for the storage adapters. | 211 | — | — | — |
@@ -46,7 +46,7 @@ is what makes a violation visible while reading.
 | `adapters.sqlite` | The SQLite DB adapter from the architecture diagram. | 20 | — | — | `adapters.sqlite.store` |
 | `adapters.sqlite.store` | SQLite adapters for ``ExperimentStore`` and ``JobStore``. | 338 | — | — | `domain.errors`, `domain.experiment`, `domain.ids`, `domain.job`, `domain.state` |
 | `adapters.trainers` | The trainer registry: names in, ``Trainer`` implementations out. | 142 | — | — | `adapters.trainers.search`, `adapters.trainers.synthetic`, `ports.trainer` |
-| `adapters.trainers.search` | The real trainer: this project's MAP-Elites design search, behind the port. | 439 | — | `torch` | `domain.checkpoint`, `domain.job`, `envs.triphibian`, `evolution.loop`, `ops`, `ops.checkpoint`, `ops.run`, `ports.trainer` |
+| `adapters.trainers.search` | The real trainer: this project's MAP-Elites design search, behind the port. | 440 | — | `torch` | `domain.checkpoint`, `domain.job`, `envs.triphibian`, `evolution.loop`, `ops`, `ops.checkpoint`, `ops.run`, `ports.trainer` |
 | `adapters.trainers.synthetic` | A trainer that implements the whole contract and computes nothing real. | 209 | — | — | `domain.checkpoint`, `domain.job`, `ports.trainer` |
 
 ## `application`  (inner)
@@ -64,7 +64,7 @@ is what makes a violation visible while reading.
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
-| `control.cpg` | Central pattern generator, and the *discovered* control basis. | 686 | — | `numpy` | — |
+| `control.cpg` | Central pattern generator, and the *discovered* control basis. | 698 | — | `numpy` | — |
 | `control.train` | Learning a controller for one morphology. | 257 | — | `numpy` | `control.cpg`, `envs.evaluate`, `envs.mission`, `envs.triphibian`, `evolution.cmaes`, `physics.wake`, `viz.showcase` |
 
 ## `core`
@@ -98,15 +98,15 @@ is what makes a violation visible while reading.
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
-| `envs.actors` | Several generations' worth of machines, stepped in several processes. | 463 | — | `torch` | `envs`, `envs.batchroll`, `learning.ppo` |
-| `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1323 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor` |
+| `envs.actors` | Several generations' worth of machines, stepped in several processes. | 472 | — | `torch` | `envs`, `envs.batchroll`, `learning.ppo` |
+| `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1347 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor` |
 | `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 753 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 72 | — | — | — |
 | `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 336 | — | `numpy` | `envs.triphibian` |
 | `envs.skills` | The actuator skill bench: learning to operate components, not vehicles. | 655 | — | `numpy` | `evolution.cmaes`, `physics.energy`, `physics.materials`, `physics.medium`, `physics.structure` |
 | `envs.tasks` | What a segment asks the machine to do, phase by phase. | 276 | — | — | — |
-| `envs.transitions` | Crossing between media, scored rather than merely survived. | 822 | — | `numpy` | `core.mjcf`, `envs.triphibian` |
-| `envs.triphibian` | The triphibian mission environment. | 3028 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
+| `envs.transitions` | Crossing between media, scored rather than merely survived. | 823 | — | `numpy` | `core.mjcf`, `envs.triphibian` |
+| `envs.triphibian` | The triphibian mission environment. | 3036 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
 
 ## `evolution`
 
@@ -121,7 +121,7 @@ is what makes a violation visible while reading.
 | `evolution.descriptors` | Learned behaviour descriptors, so the archive axes stop being my guesses. | 253 | — | `numpy` | — |
 | `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 449 | — | `numpy` | `evolution.curriculum` |
 | `evolution.judge` | The judge: a scoring standard that gets stricter as the population improves. | 504 | — | `numpy` | — |
-| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 2807 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.grpo`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
+| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 2894 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.grpo`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
 | `evolution.scout` | The scout: a network that predicts a lineage's potential, not its score. | 515 | — | `numpy` | — |
 
 ## `learning`
@@ -137,7 +137,8 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `ops.checkpoint` | A run's finished state as one portable artefact. | 398 | — | `numpy`, `torch` | `envs.kernel`, `evolution.judge`, `learning`, `learning.ppo` |
-| `ops.run` | Command-line entry point. | 1168 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.islands`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `viz.dashboard`, `viz.film`, `viz.render`, `viz.showcase` |
+| `ops.postrun_status` | What a finished run's post-run left behind, readable without numpy. | 32 | — | — | — |
+| `ops.run` | Command-line entry point. | 1299 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.islands`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.postrun_status`, `viz.dashboard`, `viz.film`, `viz.render`, `viz.showcase` |
 | `ops.telemetry` | Structured telemetry. | 111 | — | `numpy` | — |
 
 ## `physics`
