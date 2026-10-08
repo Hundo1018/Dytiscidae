@@ -45,14 +45,14 @@ in [docs/CPU_LEGACY.md](docs/CPU_LEGACY.md) with their status.
 
 **The controller is trained inside the search.** `ops.run search` defaults to
 the configuration every run since arch34 used: `--batch 16`, `--workers 4`
-(capped at the core count), `--refine-steps 2` (an extra noise-free re-score and
-two (1+1)-ES steps per candidate), 6 refinement steps at promotion, and the
-shared PPO policy when torch imports (`--no-shared-policy` turns it off). These
-are the *stored-run* settings, not measured optima: batch, workers and the queue
-pool were swept; whether `--refine-steps 2` or the shared policy help has never
-been measured (ROADMAP AK, E1). The library default `SearchConfig.
-controller_refine_steps` is still 0, and so is the job path
-(`ops.run experiment new --set ...`) unless the plan sets it. Tier-1 scores did
+(capped at the core count), a noise-free re-score of every candidate, 6
+refinement steps at promotion, and the shared PPO policy when torch imports
+(`--no-shared-policy` turns it off). These are the *stored-run* settings, not
+measured optima: batch, workers and the queue pool were swept; whether the
+shared policy helps has never been measured (ROADMAP E1). Per-candidate
+refinement (`--refine-steps`, 2 in arch34-arch47, 1 in arch48) defaults to 0
+since 2026-10-08: on arch48's elites an accepted step kept 8-23% of its gain at
+a fresh draw and was not separable from a random perturbation (ROADMAP M1). Tier-1 scores did
 not predict Tier-2 (see Known limits).
 
 ---

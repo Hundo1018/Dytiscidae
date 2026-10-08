@@ -3018,7 +3018,7 @@ every base and trial scored at the elite's own draw `s` and a fresh draw `s'`.
 `stage_score` (elite mean 0.021) and not separable from noise; its cost is
 about 20 s of a 129 s generation, and more at the CLI default (`--refine-steps
 2`, best of 3 on one draw, where the same-draw inflation can only grow). By
-cost then speed, the next arm runs `--refine-steps 0`; a criterion switch is
+cost then speed, `--refine-steps` defaults to 0 from this date; a criterion switch is
 not worth building until M4 shows the policy weights can be improved at all.
 Promotion's 6 steps (`--promotion-refine-steps`) are not measured here.
 
