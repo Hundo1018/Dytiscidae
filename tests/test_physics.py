@@ -103,10 +103,11 @@ def test_a_child_python_is_the_venv_after_the_kernel_poisons_the_environment() -
 def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
     """A search launched with no flags used batch 4, one worker, no refinement
     and no shared policy, while every stored run (arch34-arch48) used batch 16,
-    four workers, ``--refine-steps 2`` and the shared policy.  An outside
-    review read the first as the project's behaviour and concluded the
-    controller was never trained (2026-10-06).  The parser's defaults now are
-    the stored-run configuration."""
+    four workers, refinement and the shared policy.  An outside review read the
+    first as the project's behaviour and concluded the controller was never
+    trained (2026-10-06).  The parser's defaults now are the stored-run
+    configuration, except ``--refine-steps``, which is 0 since ROADMAP M1
+    (2026-10-08) measured its gain as draw-selection."""
     print("\nops: `search` with no flags is the configuration the runs used")
     import os
 
@@ -116,7 +117,7 @@ def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
     check("batch 16", a.batch == 16, f"{a.batch}")
     check("workers 4, capped at the core count",
           a.workers == min(4, os.cpu_count() or 1), f"{a.workers}")
-    check("refine steps 2", a.refine_steps == 2, f"{a.refine_steps}")
+    check("refine steps 0 (ROADMAP M1)", a.refine_steps == 0, f"{a.refine_steps}")
     check("shared policy is decided at run time, not off",
           a.shared_policy is None, f"{a.shared_policy!r}")
     check("--no-shared-policy is accepted and false",

@@ -7,7 +7,11 @@ PAPERS_2610. Two findings are new: the (1+1)-ES refinement accepts on
 `mission_fraction`, which was above zero in 7 of arch48's 4,792 evaluations
 (29 acceptances in 300 generations), and it keeps trials scored on the draw it
 reports. PPO's 10 epochs never reached the KL bound (0 of 300 updates), so the
-proposed epoch sweep comes last.
+proposed epoch sweep comes last. **M1 is read (same section, §D):** a
+one-step refinement keeps 8-23% of the gain it reports at a fresh draw and is
+not separable from a random perturbation, so the next arm runs
+`--refine-steps 0`; elites still lose 22-70% of their medium scores at a fresh
+draw under the antipodal scoring, so one draw per candidate (M2) stays first.
 
 **2026-10-06, later: an outside review was checked claim by claim against the
 repo; the correction plan is
@@ -2983,7 +2987,57 @@ These slot beside the 10-06 lists, not ahead of arch48 items 1–3.
 | M5 | **PPO epochs 1/2/4/10**, at a fixed transition and gradient-step budget | low, but an arm per value | not before M4 shows a learning curve to compare; arch48 says the KL bound never bound |
 | M6 | **Identification seconds**, now that it is batched: its share of `evaluate.main` wall at arch48's late bodies. A cache, if any, keys on body plan *and* base gait | trivial read | under a third of main's wall: G is closed as a throughput lever |
 
-### D. Not adopted
+### D. M1 read (2026-10-08, `experiments/refine_criterion/`)
+
+arch48's 200 elites, current code (antipodal pair), shared network, no
+identification; 3 one-step trials per elite (arch48 ran `--refine-steps 1`),
+every base and trial scored at the elite's own draw `s` and a fresh draw `s'`.
+6,266 s wall. Predictions were committed before the data (bba2efd).
+
+| criterion | accepted | gain at `s` (95% CI) | gain at `s'` | all trials at `s'` (control) | retained |
+|---|---|---|---|---|---|
+| `mission` (today) | 2 / 600 | 2e-7 | 0.0 | 1e-8 | 0 |
+| `island` | 107 / 600 | 0.0018 [0.0011, 0.0027] | 0.0004 [0.00005, 0.0008] | 0.00009 | 23% |
+| `stage` | 155 / 600 | 0.045 [0.034, 0.057] | 0.0038 [-0.0020, 0.0094] | -0.0026 | 8.5% |
+
+* **P1 held** (0.3% < 2%): the criterion in use is flat at zero.
+* **P2 failed** for `island` (17.8% < 20%); `stage` 25.8%.
+* **P3 held**: an accepted trial keeps 23% (`island`) and 8.5% (`stage`) of
+  the gain it reports. Refinement as run reports a draw-selected gain 4-12x
+  its real one.
+* **P4, as operationalised in `run.py`** (accepted CI lower bound > control
+  mean): `island` not above, `stage` above, so the pre-registered rule splits:
+  `island` → `--refine-steps 0`; `stage` → switch criterion and report a draw
+  other than the one that chose. **A direct test of the difference**
+  (bootstrap, accepted minus all trials at `s'`, 5,000 resamples, added after
+  the data) includes zero for both: `island` +0.0003 [-0.00005, 0.0007],
+  `stage` +0.0063 [-0.0004, 0.0133]. One-step acceptance is at best marginally
+  better than drawing a perturbation at random.
+
+**Decision.** Refinement's gain, honestly measured, is under 0.01 of
+`stage_score` (elite mean 0.021) and not separable from noise; its cost is
+about 20 s of a 129 s generation, and more at the CLI default (`--refine-steps
+2`, best of 3 on one draw, where the same-draw inflation can only grow). By
+cost then speed, `--refine-steps` defaults to 0 from this date; a criterion switch is
+not worth building until M4 shows the policy weights can be improved at all.
+Promotion's 6 steps (`--promotion-refine-steps`) are not measured here.
+
+**By-product: C2's first read (M2).** Each elite's `base` at `s` against `s'`:
+
+| medium | mean at `s` | mean at `s'` | nonzero s / s' | draw var / design var |
+|---|---|---|---|---|
+| air | 0.00095 | 0.00029 | 12 / 8 | 2.16 |
+| water | 0.0119 | 0.0084 | 87 / 86 | 1.01 |
+| land | 0.0188 | 0.0146 | 89 / 72 | 1.04 |
+
+The winner's curse survives the antipodal pair: elites selected on `s` score
+22% (land), 29% (water) and 70% (air) lower at a fresh draw, under the current
+scoring. The ratio is at or above M2's threshold of 1 in every medium, but this
+is two draws on a selected, range-restricted population (which shrinks design
+variance), so it is a first read, not M2's measurement. M2 (one draw per
+candidate) stays first.
+
+### E. Not adopted
 
 * **A larger policy, or MuscleMimic's scale of parallel environments.** No
   measurement here says either is the limit; the review says the same.

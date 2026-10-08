@@ -533,7 +533,7 @@ would take two MuJoCo generations takes under a second.
 python -m dytiscidae.ops.run experiment new \
     --name arch39 --trainer search --steps 900 --seed 20260901 \
     --hypothesis "thrust_margin flattens the aspect-ratio drift" \
-    --set batch=16 --set segment_seconds=8 --set refine_steps=2 \
+    --set batch=16 --set segment_seconds=8 --set controller_refine_steps=0 \
     --set use_shared_policy=true
 
 # Start it.  --workers 4 --min-shard 4 is the measured optimum; see CLAUDE.md.

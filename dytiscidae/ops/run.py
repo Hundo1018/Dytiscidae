@@ -170,6 +170,9 @@ def cmd_search(args) -> int:
             shared = False
             print("[warn] torch not importable: running without the shared "
                   "policy (pass --no-shared-policy to silence)", file=sys.stderr)
+    if not shared and args.refine_steps <= 0:
+        print("[warn] no shared policy and --refine-steps 0: a candidate whose "
+              "own weights are zero commands nothing", file=sys.stderr)
     cfg = SearchConfig(
         generations=args.generations,
         batch=args.batch,
@@ -906,17 +909,17 @@ def build_parser() -> argparse.ArgumentParser:
                         "as soon as one machine is rejected at batch 16")
     p.add_argument("--segment-seconds", type=float, default=8.0,
                    help="Tier-1 episode length; the main cost/fidelity dial")
-    p.add_argument("--refine-steps", type=int, default=2,
-                   help="(1+1)-ES steps refining each candidate's policy. "
-                        "Default 2 = what every run since arch34 passed; its "
-                        "benefit over 0 has never been measured (ROADMAP AK, "
-                        "E1), so this is the stored-run setting, not a proven "
-                        "optimum. Each "
-                        "step is one more batched Tier-1 for the whole "
-                        "generation, so a generation costs (1 + steps) "
-                        "evaluations. 0 leaves the policy at its inherited "
-                        "weights, which for a fresh candidate means zeros, "
-                        "which command nothing.")
+    p.add_argument("--refine-steps", type=int, default=0,
+                   help="(1+1)-ES steps refining each candidate's own policy "
+                        "on top of the shared one. Default 0 since 2026-10-08 "
+                        "(ROADMAP M1): on arch48's elites an accepted step kept "
+                        "8-23%% of its gain at a fresh draw and was not "
+                        "separable from a random perturbation. Runs arch34-"
+                        "arch47 passed 2, arch48 passed 1. The noise-free "
+                        "re-score still runs at 0 whenever the shared policy "
+                        "is on. Each step is one more batched Tier-1 for the "
+                        "whole generation. Without the shared policy, 0 leaves "
+                        "a fresh candidate's zero weights commanding nothing.")
     p.add_argument("--refine-sigma", type=float, default=0.1,
                    help="perturbation scale on policy weights during refinement")
     p.add_argument("--promotion-refine-steps", type=int, default=6,

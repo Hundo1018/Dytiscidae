@@ -129,7 +129,7 @@ failure is stored with its traceback, SIGTERM becomes a resumable pause.
 ```bash
 python -m dytiscidae.ops.run experiment new --name archNN --trainer search \
     --steps 900 --seed 20260901 --hypothesis "..." \
-    --set batch=16 --set segment_seconds=8 --set controller_refine_steps=2 \
+    --set batch=16 --set segment_seconds=8 --set controller_refine_steps=0 \
     --set use_shared_policy=true
 python -m dytiscidae.ops.run job start  --experiment archNN --workers 4 --min-shard 2
 python -m dytiscidae.ops.run job status <job-id>      # progress, eta, what is at risk
@@ -143,7 +143,7 @@ python -m dytiscidae.ops.run job resume <job-id>      # refuses without a checkp
 systemd-run --user --unit archNN --same-dir bash -c \
   '.venv/bin/python -u -m dytiscidae.ops.run search \
      --generations 900 --batch 16 --workers 4 \
-     --segment-seconds 8 --refine-steps 2 --shared-policy \
+     --segment-seconds 8 --refine-steps 0 --shared-policy \
      --memory-ceiling-mb <MB> --seed 20260901 --run runs/archNN \
      > runs/archNN.log 2>&1 < /dev/null'
 ```

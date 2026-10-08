@@ -1,0 +1,139 @@
+{
+ "run": "runs/arch48",
+ "n_elites": 200,
+ "of_archive": 200,
+ "trials_per_elite": 3,
+ "wall_s": 6266.451496601105,
+ "skipped": {
+  "no_controller": [],
+  "no_own_weights": []
+ },
+ "table": {
+  "mission": {
+   "trials": 600,
+   "accepted": 2,
+   "accept_share": 0.0033333333333333335,
+   "elites_with_an_acceptance": 2,
+   "gain_s": [
+    2.0706967442829863e-07,
+    6.581294821139666e-10,
+    4.134812193744833e-07
+   ],
+   "gain_fresh": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "control_fresh": [
+    1.2060497060405076e-08,
+    -2.5078236462840884e-09,
+    3.974085649106548e-08
+   ],
+   "retained": 0.0,
+   "fresh_gain_positive_share": 0.0
+  },
+  "island": {
+   "trials": 600,
+   "accepted": 107,
+   "accept_share": 0.17833333333333334,
+   "elites_with_an_acceptance": 62,
+   "gain_s": [
+    0.0017689428887452457,
+    0.0011044315268879247,
+    0.0026542977700470256
+   ],
+   "gain_fresh": [
+    0.00040409117248582,
+    4.8207432501717004e-05,
+    0.0007891626091525494
+   ],
+   "control_fresh": [
+    9.1351370781168e-05,
+    1.8733390388995865e-05,
+    0.0001676693015301376
+   ],
+   "retained": 0.22843652842430187,
+   "fresh_gain_positive_share": 0.4766355140186916
+  },
+  "stage": {
+   "trials": 600,
+   "accepted": 155,
+   "accept_share": 0.25833333333333336,
+   "elites_with_an_acceptance": 94,
+   "gain_s": [
+    0.04479980582445589,
+    0.033505473415549984,
+    0.05675892096899995
+   ],
+   "gain_fresh": [
+    0.003814784847913447,
+    -0.0019555810543911423,
+    0.009428930532569508
+   ],
+   "control_fresh": [
+    -0.0025876225528734765,
+    -0.00628524392295213,
+    0.0009972912422829899
+   ],
+   "retained": 0.0851518165695036,
+   "fresh_gain_positive_share": 0.33548387096774196
+  }
+ },
+ "verdicts": {
+  "P1": true,
+  "P2": false,
+  "P3": true,
+  "P4": false,
+  "above_control": {
+   "mission": false,
+   "island": false,
+   "stage": true
+  },
+  "decision": {
+   "island": "selects noise: refine-steps 0",
+   "stage": "switch criterion, report a draw other than the one that chose"
+  }
+ },
+ "seed_spread": {
+  "air": {
+   "n": 200,
+   "mean_s": 0.0009483199032669644,
+   "mean_fresh": 0.0002852828893645721,
+   "draw_var": 1.5858650147077772e-05,
+   "design_var": 7.332139517995925e-06,
+   "nonzero_s": 12,
+   "nonzero_fresh": 8,
+   "ratio_draw_to_design": 2.162895306091008
+  },
+  "water": {
+   "n": 200,
+   "mean_s": 0.011873452747394077,
+   "mean_fresh": 0.008383309946517804,
+   "draw_var": 0.0005103228312518992,
+   "design_var": 0.0005041315907233481,
+   "nonzero_s": 87,
+   "nonzero_fresh": 86,
+   "ratio_draw_to_design": 1.0122810009181684
+  },
+  "land": {
+   "n": 200,
+   "mean_s": 0.01877820310680427,
+   "mean_fresh": 0.01461759528009385,
+   "draw_var": 0.001016361767417897,
+   "design_var": 0.0009746319167577271,
+   "nonzero_s": 89,
+   "nonzero_fresh": 72,
+   "ratio_draw_to_design": 1.0428160107858884
+  }
+ },
+ "islands": {
+  "triphibian": 32,
+  "land_air": 35,
+  "air": 31,
+  "generalist": 30,
+  "water": 25,
+  "amphibian": 15,
+  "aerial_diver": 16,
+  "land": 16
+ }
+}

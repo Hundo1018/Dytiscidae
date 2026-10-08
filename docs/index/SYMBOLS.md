@@ -1249,25 +1249,25 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 525 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `build_parser` | function | 850 | `() -> argparse.ArgumentParser` | — |
-| `child_env` | function | 274 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
-| `cmd_cohort` | function | 466 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_dashboard` | function | 795 | `(args) -> int` | — |
-| `cmd_distill` | function | 833 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 354 | `(args) -> int` | — |
-| `cmd_postrun` | function | 320 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 528 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `build_parser` | function | 853 | `() -> argparse.ArgumentParser` | — |
+| `child_env` | function | 277 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
+| `cmd_cohort` | function | 469 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_dashboard` | function | 798 | `(args) -> int` | — |
+| `cmd_distill` | function | 836 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 357 | `(args) -> int` | — |
+| `cmd_postrun` | function | 323 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 124 | `(args) -> int` | — |
-| `cmd_render` | function | 802 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_render` | function | 805 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
 | `cmd_search` | function | 159 | `(args) -> int` | — |
-| `cmd_showcase` | function | 653 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 361 | `(args) -> int` | — |
-| `cmd_train` | function | 395 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_showcase` | function | 656 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 364 | `(args) -> int` | — |
+| `cmd_train` | function | 398 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 117 | `(args) -> int` | — |
-| `controller_for_elite` | function | 535 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 293 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 538 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 296 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 32 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 1159 | `(argv=None) -> int` | — |
+| `main` | function | 1162 | `(argv=None) -> int` | — |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`
 
