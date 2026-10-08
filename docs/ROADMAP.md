@@ -3070,6 +3070,14 @@ score cheaply, re-score only candidates that would displace an incumbent, and
 place on a lower bound. M2 alone (built) removes the best-of-16 on one draw,
 but not this.
 
+**Replicated on arch49** (`results_arch49.json`, 229 elites selected under the
+current antipodal scoring, 8,654 s): R air 5.76 [2.22, 38.0], water 3.42
+[1.77, 7.87], land 1.83 [1.19, 2.96], `stage` 2.33 [1.52, 4.06], `island`
+1.09 [0.72, 1.63]; one-draw reliability 0.15 / 0.23 / 0.35 / 0.30; curse at
+the recorded draw 52% / 25% / 18% / 31%. Same verdict in every score: the draw
+dominates, on the population the current scoring selected as well as on the
+old one.
+
 ### M6 — identification's share of the wall (read)
 
 `experiments/identification_share/run.py`: arch48's 16 latest elites (rotors
