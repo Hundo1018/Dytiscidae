@@ -77,7 +77,7 @@ def measure(args, rows_path):
     cfg = SearchConfig()
     elites = load_elites(run)
     picks = {}
-    for m in MEDIA:
+    for m in [x for x in args.media.split(",") if x]:
         best = max(range(len(elites)), key=lambda i: float((elites[i].meta or {}).get(m) or 0.0))
         picks[m] = best
     spec = MissionSpec()
@@ -121,8 +121,9 @@ def measure(args, rows_path):
                     shared=pol, buffer=buf, n_modes=n_modes,
                     streams=list(range(args.batch)))
                 info = _ppo.ppo_update(
-                    pol, buf, lr=cfg.shared_lr, epochs=cfg.shared_epochs,
-                    minibatch=cfg.shared_minibatch, target_kl=cfg.shared_target_kl,
+                    pol, buf, lr=cfg.shared_lr, epochs=args.epochs or cfg.shared_epochs,
+                    minibatch=args.minibatch or cfg.shared_minibatch,
+                    target_kl=cfg.shared_target_kl,
                     ent_coef=cfg.shared_ent_coef, lr_fraction=1.0, optimiser=opt, rng=lrng)
                 infos.append({k: (float(v) if isinstance(v, (int, float, np.floating)) else None)
                               for k, v in (info or {}).items()
@@ -147,6 +148,9 @@ def main():
     ap.add_argument("--updates", type=int, default=30)
     ap.add_argument("--every", type=int, default=10)
     ap.add_argument("--batch", type=int, default=8)
+    ap.add_argument("--epochs", type=int, default=0, help="0 = the search's (M5 sweeps it)")
+    ap.add_argument("--minibatch", type=int, default=0, help="0 = the search's")
+    ap.add_argument("--media", default="air,water,land", help="which elites (M5 uses one)")
     ap.add_argument("--from-rows")
     args = ap.parse_args()
     out = Path(args.out)
@@ -154,6 +158,7 @@ def main():
     wall = float("nan") if args.from_rows else measure(args, rows_path)
     rows = [json.loads(ln) for ln in rows_path.read_text().splitlines()]
     result = {"run": args.run, "wall_s": wall, "held_out_draws": HELD_OUT,
+              "epochs": args.epochs, "minibatch": args.minibatch,
               **analyse(rows)}
     out.write_text(json.dumps(result, indent=1))
     print(json.dumps(result, indent=1))

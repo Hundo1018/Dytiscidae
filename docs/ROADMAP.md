@@ -1,5 +1,14 @@
 # Roadmap
 
+**2026-10-08, later: the work list was swept; see
+[the work-list sweep](#2026-10-08-later--the-work-list-sweep).** arch49 (ran
+10-07) had never been read: its held-out retention is below 0.35 in every
+medium and Tier-1→Tier-2 Spearman is 0.17/0.18. C2 measured a single draw's
+reliability at 0.18–0.30 (draw variance 2.5–4.6× design variance). Built: one
+draw per candidate (M2), a still machine that is still, loud post-run, config
+export, the hyperparameter table, placement on several draws (off). arch50
+(M2, refine 0) is running. Seven questions for the user close the section.
+
 **2026-10-08: a MuscleMimic comparison was checked against the code and arch48's
 telemetry; see [the MuscleMimic comparison](#2026-10-08--the-musclemimic-comparison-reconciled-with-the-repo).**
 Its thesis (the evaluation signal, not PPO, is the bottleneck) agrees with
@@ -3249,6 +3258,45 @@ must survive a fresh seed).
 
 Each level is read on the auditor's held-out seeds, never on the draw that
 selected the design.
+
+### Items closed or deferred by the reads above
+
+| item | status | why |
+|---|---|---|
+| arch48 item 4, air thrust | deferred | C3: nothing reaches a thrust rung; the binding air gate is `stays_up`, and in gliders holding still beats the gait |
+| D1, flexibility | deferred | its measurement is thrust lost to deflection, and thrust is not where any elite stops (C3) |
+| D3, off-diagonal added mass | deferred | its own condition: only if D1/D2/C3 leave air short of thrust; they leave it short of staying up |
+| G, identification | closed for probe count | M6 found it 57% of the wall; 12 probes moved one elite past one draw's noise and the mean by 40% |
+| B1, `SearchConfig` and job-path defaults | open, for the user | the CLI now matches practice (refine 0 since M1); the dataclass still defaults to batch 4, 1 worker, no shared policy, and changing it changes every plan digest |
+| E1 / E3, multi-seed ablations | open, for the user | ≥ 5 seeds per arm at ~12 h per 300 gens is 60 h per arm; M1 already answered the refine-steps arm offline |
+| PAPERS item 2, water cruise chosen | open, for the user | the 2026-09-21 rule; the antipodal pair cancels motion the command did not choose, so what remains is the rule's wording |
+| PAPERS item 3, leaking bars | partly read | water and land competence certified on arch49; stage 1 and air leak through the same glide (question 1 below); stage 4's `mission > 0` decides nothing measurable (elite missions ≤ 1e-5) |
+| Skill pretraining, learnability score | waiting on M4 | M4 (running) says whether the learner learns a fixed body at all |
+| M5, PPO epochs | waiting on M4 | the harness takes `--epochs`/`--minibatch` (a fixed gradient-step budget is `minibatch = 2048·E/10`) |
+
+### Questions for the user (collected 2026-10-08)
+
+1. **Is a passive glide a capability?** With the still machine fixed, still
+   gannets clear air ≥ 0.012 on 11 bodies against the elites' 6, and pass
+   curriculum stage 1 (8 vs 15). The 2026-09-21 rule says a glide is a
+   capability, and the water/land half of the same question (PAPERS item 2)
+   was answered by the antipodal pair. Keep paying a still glider in air, or
+   score air on a commanded difference too?
+2. **Turn on the gait gain (`--gait-gain`) in arch51?** It gives a policy the
+   authority to stop flapping, which is what those gliders lack; it has been
+   off since arch42, whose read stopped at gen 50 on the old physics.
+3. **M3's form.** Placement on more than one draw is built and off. The median
+   of 3 (built) buys little; a per-medium mean of 3 buys more (Spearman
+   0.53–0.72 against 0.30–0.48 for one draw) but needs the film to replay
+   every draw to stay "a film reproduces its score". Cost either way ≈ +80 s
+   per generation at 3 draws. Which, if any?
+4. **E2's definition of done** (proposal above): adopt, change the bars, or not
+   yet?
+5. **B1:** make `SearchConfig`'s defaults the CLI's (batch 16, 4 workers,
+   shared policy), accepting new plan digests for the job path?
+6. **E1/E3 budget:** run ≥ 5 seeds for the arms that matter (60 h per arm)?
+7. **PRs:** #37 (refine-steps default 0) and #38 (this sweep, stacked on #37)
+   are open; arch50 runs from #38's commit 2b7bb53.
 
 ## 2026-10-08 — the MuscleMimic comparison, reconciled with the repo
 
