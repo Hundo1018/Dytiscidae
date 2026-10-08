@@ -125,6 +125,21 @@ MUTATIONS: tuple = (
         defect="evaluate_candidates passes one seed for the generation whatever "
                "draw_per_candidate says",
         suites=("test_search::test_each_candidate_faces_its_own_draw",), item="draw per candidate"),
+    Mutation(
+        id="placement-keeps-the-best-draw",
+        path="dytiscidae/evolution/loop.py",
+        find="    return results[order[(len(results) - 1) // 2]]\n",
+        replace="    return results[order[-1]]\n",
+        defect="the archive receives the best of a candidate's draws, the winner's "
+               "curse the median exists to remove",
+        suites=("test_search::test_a_candidate_is_placed_on_its_median_draw",), item="placement draws"),
+    Mutation(
+        id="placement-redraws-the-same-seed",
+        path="dytiscidae/evolution/loop.py",
+        find="    return int(np.random.default_rng([int(seed) & 0x7FFFFFFF, int(j), 0x5D]).integers(1 << 30))\n",
+        replace="    return int(seed)\n",
+        defect="the extra draws repeat the first, so the median is the one draw",
+        suites=("test_search::test_a_candidate_is_placed_on_its_median_draw",), item="placement draws"),
     # --- the still machine is still (PAPERS_2610 item 4, 2026-10-08) -------
     Mutation(
         id="rotor-keeps-the-travel-margin",

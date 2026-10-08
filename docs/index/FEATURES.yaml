@@ -218,6 +218,15 @@ ConfigExport:
     - tests.test_physics::test_a_config_export_relaunches_the_same_search
   note: a run's recorded configuration as JSON (`ops.run config`) relaunches it (`search --config`); flags given with a non-default value win, fields the export lacks are reported (ROADMAP B4)
 
+PlacementDraws:
+  implementation:
+    - evolution.loop.placement_draw_seed
+    - evolution.loop.median_draw
+    - evolution.loop.draw_key
+  tests:
+    - tests.test_search::test_a_candidate_is_placed_on_its_median_draw
+  note: SearchConfig.placement_draws > 1 scores each candidate at its own draw and more, and places the median one (ROADMAP M3); off by default
+
 DrawPerCandidate:
   implementation:
     - evolution.loop.evaluate_candidates

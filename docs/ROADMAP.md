@@ -3044,6 +3044,40 @@ score cheaply, re-score only candidates that would displace an incumbent, and
 place on a lower bound. M2 alone (built) removes the best-of-16 on one draw,
 but not this.
 
+### M3 — placement on more than one draw (built, off; the form is open)
+
+`SearchConfig.placement_draws` / `--placement-draws` (default 1): the
+generation's noise-free re-score scores each candidate at its own draw and
+`n - 1` more (`placement_draw_seed`), and places the median one by summed
+medium competence (`median_draw`). The placed result is a real rollout: its
+`eval_seed` is the draw it came from, so a film reproduces it. Refused with
+refinement on (its trials are scored on one draw); promotions are untouched.
+The stage event records `placement_draws` and the median spread. Held by
+`test_a_candidate_is_placed_on_its_median_draw` and two mutations
+(`placement-keeps-the-best-draw`, `placement-redraws-the-same-seed`), both
+caught. Cost: `n - 1` more re-scores per generation (the re-score was ~41 s of
+a 129 s arch48 generation, so about +80 s at n = 3).
+
+**What the median buys, from C2's rows** (`experiments/draw_variance/median3_arch48.json`):
+Spearman against an independent mean of three other draws.
+
+| score | one draw | median of 3 (by summed competence) | mean of 3 | best of 3, inflation |
+|---|---|---|---|---|
+| air | 0.41 | 0.39 | 0.53 | +319% |
+| water | 0.36 | 0.48 | 0.57 | +113% |
+| land | 0.30 | 0.36 | 0.57 | +55% |
+| `stage` | 0.48 | 0.54 | 0.65 | +61% |
+| `island` | 0.59 | 0.58 | 0.72 | +71% |
+
+The median of three by summed competence is a small gain in water, land and
+`stage` and none in air or `island`, and because it picks the draw by the sum
+it biases single media down (land −57%, air −74% against the reference mean).
+A per-medium mean of three is clearly better (0.53–0.72) but is a result no
+single rollout produced, which collides with the rule that a film must
+reproduce its score. **Not turned on.** The choice (median, mean with a film
+that replays every draw, or common random numbers per cell) is in the
+questions below.
+
 ### PAPERS_2610 item 4 — the still machine is still (built)
 
 Two leaks in `held_still_params`, both measured on arch48's elites before the

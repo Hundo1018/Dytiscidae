@@ -171,6 +171,7 @@ def search_config_from_args(args, shared: bool):
         controller_refine_funnel=args.refine_funnel,
         distance_curriculum=bool(args.distance_curriculum),
         draw_per_candidate=bool(args.draw_per_candidate),
+        placement_draws=args.placement_draws,
         action_rate_penalty=args.action_rate_penalty,
         descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
         tier2_label_all_media=not args.no_tier2_label_all_media,
@@ -983,6 +984,12 @@ def build_parser() -> argparse.ArgumentParser:
                         "(ROADMAP AJ). 2 since 2026-10-03: 0.875x the wall of "
                         "4x4 on rotor-heavy batches; 1 is the pool every run "
                         "up to arch46 used")
+    p.add_argument("--placement-draws", type=int, default=1,
+                   help="draws each candidate is scored at before placement; the "
+                        "median one is placed (ROADMAP M3). 1 (default) is every "
+                        "run to date. C2 measured one draw's reliability at "
+                        "0.18-0.30. Costs (n - 1) more noise-free evaluations of "
+                        "the generation; needs --refine-steps 0")
     p.add_argument("--draw-per-candidate", action=argparse.BooleanOptionalAction,
                    default=True,
                    help="each candidate faces its own task draw (heading, "

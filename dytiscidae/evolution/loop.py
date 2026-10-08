@@ -148,6 +148,10 @@ class SearchConfig:
     #: critic's labels only (``evaluate_tier2(label_all_media=...)``).  Up to
     #: two extra compressed legs per promotion; ARCH46_SPEC §2b.
     tier2_label_all_media: bool = True
+    #: Draws each candidate is scored at before it is placed; the median one
+    #: (by summed medium competence) is placed (ROADMAP M3).  1 = one draw, as
+    #: every run to date.  Not combinable with ``controller_refine_steps``.
+    placement_draws: int = 1
     #: Each candidate is evaluated on its own task draw, not the generation's
     #: (ROADMAP M2, 2026-10-08).  Off reproduces the shared draw of every run
     #: up to arch48; water and land scores are not comparable across it.
@@ -652,7 +656,7 @@ def evaluate_candidates(
         spec=spec, seed=draw, shared=shared, pool=pool, log=log,
         select=(None if select is None
                 else lambda slot, r: select(passed[slot], phenos[passed[slot]], r)),
-        cost=cost)
+        cost=cost, placement=True)
     if log is not None and "pre" in log:
         log["pre"] = {i: log["pre"][slot] for slot, i in enumerate(passed)}
 
@@ -675,7 +679,7 @@ MERGE_FIRST_REFINE = True
 def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
                         steps: int | None = None, shared=None, pool=None,
                         log: dict | None = None, select=None,
-                        cost: GenerationCost | None = None):
+                        cost: GenerationCost | None = None, placement: bool = False):
     """Local search on policy weights, every candidate advanced in one batch.
 
     A (1+1) evolution strategy: perturb, evaluate, keep the perturbation if the
@@ -785,6 +789,16 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
             # whole cost.
             log["rescore_wall"] = round(_time.perf_counter() - t0, 3)
             log["merged_step_one"] = first is not None
+    # ``placement``: these results are what the archive places (the
+    # generation's candidates), not a promotion's refinement.
+    n_draws = int(getattr(cfg, "placement_draws", 1) or 1) if placement else 1
+    if n_draws > 1:
+        if steps > 0:
+            raise ValueError("placement_draws > 1 with controller refinement is not "
+                             "built: refinement's trials are scored on one draw")
+        results = _place_on_median_draw(phenos, ctrls, results, cfg, n_draws,
+                                        spec=spec, seed=seed, shared=shared,
+                                        pool=pool, log=log, cost=cost)
     if log is not None:
         log["pre"] = list(results)
         log.setdefault("step_walls", [])
@@ -841,6 +855,59 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
             log["accepted"].append(accepted)
 
     return results
+
+
+def placement_draw_seed(seed: int, j: int) -> int:
+    """Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``."""
+    return int(np.random.default_rng([int(seed) & 0x7FFFFFFF, int(j), 0x5D]).integers(1 << 30))
+
+
+def draw_key(result) -> float:
+    """What the median draw is chosen on: the summed medium competences."""
+    return float(sum(float(s.competence) for s in (result.segments or {}).values()))
+
+
+def median_draw(results: list):
+    """The result of the median draw by ``draw_key`` (the lower one of two)."""
+    order = sorted(range(len(results)), key=lambda i: (draw_key(results[i]), i))
+    return results[order[(len(results) - 1) // 2]]
+
+
+def _place_on_median_draw(phenos, ctrls, results, cfg, n_draws, *, spec, seed,
+                          shared, pool, log, cost):
+    """Score each candidate at ``n_draws - 1`` more draws of its own and keep
+    the median one (ROADMAP M3, 2026-10-08).
+
+    C2 measured one draw's reliability at 0.18-0.30 on arch48's elites (draw
+    variance 2.5-4.6x design variance), so a design placed on one draw is
+    placed mostly on its luck.  The median of three is a real, reproducible
+    result -- its ``eval_seed`` is the draw it came from, so a film reproduces
+    it -- rather than an average no rollout produced.  Off at
+    ``placement_draws = 1``; the cost is ``n_draws - 1`` more noise-free
+    evaluations of the generation.
+    """
+    import time as _time
+
+    k = len(phenos)
+    base = list(seed) if isinstance(seed, (list, tuple)) else [int(seed)] * k
+    extra = [placement_draw_seed(base[i], j) for j in range(1, n_draws) for i in range(k)]
+    t0 = _time.perf_counter()
+    with _phase(cost, "evaluate.placement_draws"):
+        more = batchroll_eval(phenos * (n_draws - 1), ctrls * (n_draws - 1), cfg,
+                              spec=spec, seed=extra, shared=shared, pool=pool)
+    if cost is not None:
+        cost.count("placement_draws", more)
+    out, spread = [], []
+    for i in range(k):
+        mine = [results[i]] + [more[j * k + i] for j in range(n_draws - 1)]
+        keys = [draw_key(r) for r in mine]
+        spread.append(max(keys) - min(keys))
+        out.append(median_draw(mine))
+    if log is not None:
+        log["placement_draws"] = int(n_draws)
+        log["placement_wall"] = round(_time.perf_counter() - t0, 3)
+        log["placement_spread"] = float(np.median(spread)) if spread else 0.0
+    return out
 
 
 def _copy_policy(policy, weights):
@@ -1375,6 +1442,8 @@ def _stage_event(state: SearchState, gen: int, log: dict, *, refined: int,
         # Distinct task draws the generation's candidates faced: 1 when the
         # draw is shared, the number scored when each has its own (M2).
         "draws": len(set((log.get("seeds") or {}).values())) or None,
+        "placement_draws": log.get("placement_draws"),
+        "placement_spread": log.get("placement_spread"),
         "placed": placed, "refined": refined, "placement_changed": changed,
         "shards": [c["walls"] for c in calls],
         "idle": round(waited / worked, 4) if worked > 0 else None,
