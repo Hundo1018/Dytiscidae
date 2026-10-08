@@ -581,12 +581,13 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_the_gait_gain_can_stop_a_machine",),
         item="gait gain"),
     Mutation(
-        id="search-cli-refine-default-zero",
+        id="search-cli-refine-default-two",
         path="dytiscidae/ops/run.py",
-        find='p.add_argument("--refine-steps", type=int, default=2,',
-        replace='p.add_argument("--refine-steps", type=int, default=0,',
-        defect="a search launched with no flags refines no controller, the "
-               "trap an outside review read as the project's behaviour",
+        find='p.add_argument("--refine-steps", type=int, default=0,',
+        replace='p.add_argument("--refine-steps", type=int, default=2,',
+        defect="a search launched with no flags spends two (1+1)-ES steps per "
+               "candidate selected on the draw they report, the bias ROADMAP M1 "
+               "measured (8-23% of the accepted gain survives a fresh draw)",
         suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
         item="cli defaults"),
     Mutation(
