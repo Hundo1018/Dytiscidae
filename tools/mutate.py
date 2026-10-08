@@ -92,6 +92,39 @@ class Result:
 
 MUTATIONS: tuple = (
 
+    # --- one task draw per candidate (ROADMAP M2, 2026-10-08) --------------
+    Mutation(
+        id="batch-shares-the-first-seed",
+        path="dytiscidae/envs/batchroll.py",
+        find="    seeds = _per_machine(seed, k)\n    results = [MissionResult(tier=1) for _ in range(k)]\n",
+        replace="    seeds = [_per_machine(seed, k)[0]] * k\n    results = [MissionResult(tier=1) for _ in range(k)]\n",
+        defect="the batched path scores every machine on the first machine's draw, "
+               "the generation-wide draw M2 removed",
+        suites=("test_search::test_each_candidate_faces_its_own_draw",), item="draw per candidate"),
+    Mutation(
+        id="scatter-from-the-first-seed",
+        path="dytiscidae/envs/batchroll.py",
+        find="        scatter_seeds = {i: _scatter_seed(seeds[i], dom) for i in live}\n",
+        replace="        scatter_seeds = {i: _scatter_seed(seeds[live[0]], dom) for i in live}\n",
+        defect="each machine is stamped with its own seed but faces the first "
+               "machine's scatter and task, so the stamp does not reproduce the score",
+        suites=("test_search::test_each_candidate_faces_its_own_draw",), item="draw per candidate"),
+    Mutation(
+        id="pool-sends-every-seed-to-every-shard",
+        path="dytiscidae/envs/actors.py",
+        find="                kw[\"seed\"] = [kwargs[\"seed\"][i] for i in idx]\n",
+        replace="                pass\n",
+        defect="a shard receives the whole generation's seed list, raises in the "
+               "worker, and the pool quietly re-runs the batch in the parent",
+        suites=("test_search::test_each_candidate_faces_its_own_draw",), item="draw per candidate"),
+    Mutation(
+        id="loop-shares-the-generation-draw",
+        path="dytiscidae/evolution/loop.py",
+        find="        draw = [int(seeds[i]) for i in passed]\n",
+        replace="        draw = int(seeds[passed[0]])\n",
+        defect="evaluate_candidates passes one seed for the generation whatever "
+               "draw_per_candidate says",
+        suites=("test_search::test_each_candidate_faces_its_own_draw",), item="draw per candidate"),
     # --- the antipodal heading pair (2026-10-06) ----------------------------
     Mutation(
         id="pair-takes-the-better-half",
@@ -524,6 +557,22 @@ MUTATIONS: tuple = (
                "trap an outside review read as the project's behaviour",
         suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
         item="cli defaults"),
+    Mutation(
+        id="config-file-loses-to-cli-defaults",
+        path="dytiscidae/ops/run.py",
+        find="        if name in raw and mine == getattr(default, name):\n",
+        replace="        if False:\n",
+        defect="search --config keeps the command line's defaults, so a relaunch "
+               "from an export silently runs a different configuration",
+        suites=("test_physics::test_a_config_export_relaunches_the_same_search",), item="config export"),
+    Mutation(
+        id="postrun-failure-is-quiet",
+        path="dytiscidae/ops/run.py",
+        find="    ok = rc == 0 and report\n",
+        replace="    ok = True\n",
+        defect="a post-run that leaves no report is recorded as fine, so a run "
+               "ends without films or charts and nothing says so (arch47, arch48)",
+        suites=("test_physics::test_a_failed_postrun_is_loud",), item="post-run"),
     Mutation(
         id="child-inherits-c-environment",
         path="dytiscidae/ops/run.py",

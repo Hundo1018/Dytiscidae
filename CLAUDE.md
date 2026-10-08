@@ -340,7 +340,11 @@ Each rule below was paid for by a score that rewarded the wrong thing.
    sequence in `batchroll`): one initial state, the drawn heading and its
    opposite, progress on the mean signed speed, so motion the command did not
    choose cancels exactly (still machines and open-loop gaits: |mean| < 1e-12).
-   The auditor's held-out seeds read each medium, not only the mission.
+   The auditor's held-out seeds read each medium, not only the mission. Since
+   2026-10-08 each candidate also faces its own draw
+   (`SearchConfig.draw_per_candidate`, ROADMAP M2): the batched path takes one
+   seed per machine, and a result equals what that machine scores alone at its
+   `eval_seed`.
 
 ## Where things are
 

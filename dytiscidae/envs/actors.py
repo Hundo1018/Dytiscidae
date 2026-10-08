@@ -90,6 +90,13 @@ def _init_worker() -> None:
         pass
 
 
+def _first_seed(seed) -> int:
+    """The int a worker seeds torch with: the batch's seed, or its first one."""
+    if isinstance(seed, (list, tuple)):
+        return int(seed[0]) if len(seed) else 0
+    return int(seed)
+
+
 def _run_shard(payload):
     """One shard of a generation, inside a worker.  Returns what the parent needs.
 
@@ -320,7 +327,7 @@ class ActorPool:
                 {k: v.detach().cpu().numpy()
                  for k, v in shared.state_dict().items()},
                 float(getattr(buffer, "shaping", 0.0)) if buffer is not None else 0.0,
-                int(kwargs.get("seed", 0)),
+                _first_seed(kwargs.get("seed", 0)),
                 buffer is not None,
             )
 
@@ -335,6 +342,8 @@ class ActorPool:
                 kw["groups"] = [kwargs["groups"][i] for i in idx]
             if isinstance(kwargs.get("identify_axes"), (list, tuple)):
                 kw["identify_axes"] = [kwargs["identify_axes"][i] for i in idx]
+            if isinstance(kwargs.get("seed"), (list, tuple)):
+                kw["seed"] = [kwargs["seed"][i] for i in idx]
             futures.append(self._pool.submit(
                 _run_shard, ([phenos[i] for i in idx], [ctrls[i] for i in idx],
                              kw, spec, j)))

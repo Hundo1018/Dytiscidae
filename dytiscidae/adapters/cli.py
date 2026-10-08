@@ -252,6 +252,11 @@ def _job_status(app, lab, args) -> int:
     if report.stale:
         print("  ** the job says it is active and the launcher says the worker "
               "is gone. Resume it, or cancel it. **")
+    if job.status.value == "succeeded" and job.plan.trainer == "search" and job.workspace:
+        from ..ops.postrun_status import postrun_verdict
+        verdict = postrun_verdict(job.workspace)
+        if verdict:
+            print(f"  ** {verdict} **")
     if job.failure is not None:
         print(f"  failure     {job.failure.kind}: {job.failure.message}"
               + (f" (at step {job.failure.step})" if job.failure.step is not None

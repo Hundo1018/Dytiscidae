@@ -13,11 +13,11 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `add_arguments` | function | 46 | `(parser) -> None` | Attach the ``job`` and ``experiment`` command groups to ``ops/run.py``. |
-| `build_parsers` | function | 336 | `(subparsers) -> None` | Register ``job`` and ``experiment`` on ``ops/run.py``'s subparser set. |
-| `cmd_checkpoints` | function | 433 | `(args) -> int` | ``run checkpoints <job-id>`` -- what a job has to resume or export from. |
+| `build_parsers` | function | 341 | `(subparsers) -> None` | Register ``job`` and ``experiment`` on ``ops/run.py``'s subparser set. |
+| `cmd_checkpoints` | function | 438 | `(args) -> int` | ``run checkpoints <job-id>`` -- what a job has to resume or export from. |
 | `cmd_experiment` | function | 83 | `(args) -> int` | — |
 | `cmd_job` | function | 139 | `(args) -> int` | — |
-| `default_root` | function | 461 | `() -> str` | — |
+| `default_root` | function | 466 | `() -> str` | — |
 
 ## `adapters.composition` — `dytiscidae/adapters/composition.py`
 
@@ -700,14 +700,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `ActorPool` | class | 231 | — | A persistent pool of worker processes, each with its own batched evaluator. |
-| `plan_shards` | function | 178 | `(costs, workers: int, min_shard: int, *, per_worker: float=1.0, balance: bool=False) -> list` | Shards as lists of indices, most expensive first (ROADMAP AJ). |
-| `shard_cost` | function | 163 | `(pheno) -> float` | A machine's predicted evaluation wall, for ``plan_shards(balance=True)``. |
-| `split` | function | 136 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
-| `ActorPool.__init__` | method | 246 | `(self, workers: int=1, *, min_shard: int=2, per_worker: float=2.0, balance: bool=False) -> None` | — |
-| `ActorPool.close` | method | 454 | `(self) -> None` | — |
-| `ActorPool.evaluate_tier1` | method | 276 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
-| `ActorPool.map` | method | 385 | `(self, fn, jobs) -> list` | ``[fn(*job) for job in jobs]``, one job per worker at a time. |
+| `ActorPool` | class | 238 | — | A persistent pool of worker processes, each with its own batched evaluator. |
+| `plan_shards` | function | 185 | `(costs, workers: int, min_shard: int, *, per_worker: float=1.0, balance: bool=False) -> list` | Shards as lists of indices, most expensive first (ROADMAP AJ). |
+| `shard_cost` | function | 170 | `(pheno) -> float` | A machine's predicted evaluation wall, for ``plan_shards(balance=True)``. |
+| `split` | function | 143 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
+| `ActorPool.__init__` | method | 253 | `(self, workers: int=1, *, min_shard: int=2, per_worker: float=2.0, balance: bool=False) -> None` | — |
+| `ActorPool.close` | method | 463 | `(self) -> None` | — |
+| `ActorPool.evaluate_tier1` | method | 283 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
+| `ActorPool.map` | method | 394 | `(self, fn, jobs) -> list` | ``[fn(*job) for job in jobs]``, one job per worker at a time. |
 
 ## `envs.batchroll` — `dytiscidae/envs/batchroll.py`
 
@@ -716,11 +716,11 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `BatchedFluid` | class | 220 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 906 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed: int=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `identify_batch` | function | 641 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `evaluate_tier1_batch` | function | 920 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `identify_batch` | function | 650 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
 | `observation_finite` | function | 574 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
-| `rollout_batch` | function | 717 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 1172 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `rollout_batch` | function | 731 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 1195 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
 | `step_batch` | function | 595 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 95 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
 | `BatchedFluid.__init__` | method | 231 | `(self, envs)` | — |
@@ -1117,25 +1117,25 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 849 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `evaluate_candidate` | function | 419 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 542 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 450 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2149 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `run_search` | function | 1376 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2024 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 854 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `evaluate_candidate` | function | 409 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 532 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 440 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2159 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `run_search` | function | 1386 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2034 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 64 | — | Everything adjustable about a run. |
-| `SearchState` | class | 328 | — | — |
-| `seed_archipelago` | function | 2413 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 467 | `(self)` | — |
-| `GenerationCost.count` | method | 487 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 473 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 480 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 496 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 493 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 388 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 392 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 396 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 318 | — | — |
+| `seed_archipelago` | function | 2423 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `GenerationCost.__init__` | method | 457 | `(self)` | — |
+| `GenerationCost.count` | method | 477 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 463 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 470 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 486 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 483 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 378 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 382 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 386 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1243,31 +1243,42 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `Checkpoint.rng_state` | method | 343 | `(self) -> dict \| None` | — |
 | `Elite.eval_seed` | property | 304 | `(self)` | — |
 
+## `ops.postrun_status` — `dytiscidae/ops/postrun_status.py`
+
+> What a finished run's post-run left behind, readable without numpy.
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `postrun_verdict` | function | 17 | `(run_dir) -> str \| None` | One line for ``job status`` when post-run failed or never wrote a |
+
 ## `ops.run` — `dytiscidae/ops/run.py`
 
 > Command-line entry point.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 528 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `build_parser` | function | 853 | `() -> argparse.ArgumentParser` | — |
-| `child_env` | function | 277 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
-| `cmd_cohort` | function | 469 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_dashboard` | function | 798 | `(args) -> int` | — |
-| `cmd_distill` | function | 836 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 357 | `(args) -> int` | — |
-| `cmd_postrun` | function | 323 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 622 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `build_parser` | function | 947 | `() -> argparse.ArgumentParser` | — |
+| `child_env` | function | 323 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
+| `cmd_cohort` | function | 563 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_config` | function | 433 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
+| `cmd_dashboard` | function | 892 | `(args) -> int` | — |
+| `cmd_distill` | function | 930 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 451 | `(args) -> int` | — |
+| `cmd_postrun` | function | 399 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 124 | `(args) -> int` | — |
-| `cmd_render` | function | 805 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
-| `cmd_search` | function | 159 | `(args) -> int` | — |
-| `cmd_showcase` | function | 656 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 364 | `(args) -> int` | — |
-| `cmd_train` | function | 398 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_render` | function | 899 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_search` | function | 251 | `(args) -> int` | — |
+| `cmd_showcase` | function | 750 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 458 | `(args) -> int` | — |
+| `cmd_train` | function | 492 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 117 | `(args) -> int` | — |
-| `controller_for_elite` | function | 538 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 296 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 632 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 342 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 32 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 1162 | `(argv=None) -> int` | — |
+| `main` | function | 1274 | `(argv=None) -> int` | — |
+| `merge_config_file` | function | 215 | `(cfg, path, shared: bool)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
+| `search_config_from_args` | function | 159 | `(args, shared: bool)` | The ``SearchConfig`` a ``search`` command line asks for. |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`
 

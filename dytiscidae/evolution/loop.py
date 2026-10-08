@@ -148,6 +148,10 @@ class SearchConfig:
     #: critic's labels only (``evaluate_tier2(label_all_media=...)``).  Up to
     #: two extra compressed legs per promotion; ARCH46_SPEC §2b.
     tier2_label_all_media: bool = True
+    #: Each candidate is evaluated on its own task draw, not the generation's
+    #: (ROADMAP M2, 2026-10-08).  Off reproduces the shared draw of every run
+    #: up to arch48; water and land scores are not comparable across it.
+    draw_per_candidate: bool = True
 
     # Controller refinement.  Each step is one extra batched Tier-1 for the
     # whole generation, so a generation costs (1 + steps) evaluations.
@@ -201,20 +205,6 @@ class SearchConfig:
     #: log-std collapse early and the policy stop exploring while the search is
     #: still handing it new morphologies every generation.
     shared_ent_coef: float = 0.01
-    #: Which estimator trains the shared policy (ROADMAP N).  ``"ppo"`` is
-    #: every run to date.  ``"ppo+grpo"`` adds ``grpo_bodies`` x ``grpo_group``
-    #: learning-only rollouts per generation whose advantage is relative to
-    #: the body's own other attempts; ``"grpo"`` trains on those alone.  The
-    #: ordinary rollouts are still collected under both, because they are the
-    #: generation's scores.  Built 2026-10-03, off by default: whether the
-    #: shared policy carries any weight is item R's question, not this one's.
-    shared_learner: str = "ppo"
-    #: Rollouts of one body per group.  At least 2: a group of one has no mean.
-    grpo_group: int = 4
-    #: Bodies given a group each generation, drawn without replacement from the
-    #: ones that passed Tier-0.  Cost is ``grpo_bodies * grpo_group`` extra
-    #: machines through one batched Tier-1, with no identification.
-    grpo_bodies: int = 4
     #: Which estimator trains the shared policy (ROADMAP N).  ``"ppo"`` is
     #: every run to date.  ``"ppo+grpo"`` adds ``grpo_bodies`` x ``grpo_group``
     #: learning-only rollouts per generation whose advantage is relative to
@@ -623,6 +613,14 @@ def evaluate_candidates(
         policy = _controller_for(phenos[i], genomes[i], cfg, inherited[i])
         ctrls.append(Controller(params=None, policy=policy))
 
+    # Each candidate faces its own draw (ROADMAP M2): one draw shared by the
+    # generation made every water and land score a measurement of that draw,
+    # and the archive kept the best of 16 on it (PAPERS_2610 §3).  Off, the
+    # first candidate's seed is shared, as it was until 2026-10-08.
+    if getattr(cfg, "draw_per_candidate", True):
+        draw = [int(seeds[i]) for i in passed]
+    else:
+        draw = int(seeds[passed[0]])
     t0 = _time.perf_counter()
     with _phase(cost, "evaluate.main"):
         results = _batched(
@@ -638,7 +636,7 @@ def evaluate_candidates(
             controllers=ctrls,
             segment_seconds=cfg.segment_seconds,
             identify_axes=[wants[i] for i in passed],
-            seed=seeds[passed[0]])
+            seed=draw)
     if cost is not None:
         cost.count("main", results)
 
@@ -647,9 +645,11 @@ def evaluate_candidates(
         # The evaluation seed fixes the scatter and the task every machine in
         # the call faced; the GRPO rollouts must face the same (ROADMAP N).
         log["seed"] = int(seeds[passed[0]])
+        log["seeds"] = {i: (draw[slot] if isinstance(draw, list) else draw)
+                        for slot, i in enumerate(passed)}
     results = _refine_controllers(
         [phenos[i] for i in passed], ctrls, results, cfg,
-        spec=spec, seed=seeds[passed[0]], shared=shared, pool=pool, log=log,
+        spec=spec, seed=draw, shared=shared, pool=pool, log=log,
         select=(None if select is None
                 else lambda slot, r: select(passed[slot], phenos[passed[slot]], r)),
         cost=cost)
@@ -730,7 +730,10 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
     # The cost is one batched evaluation per generation, which is why it is
     # spent only when there is a shared policy to be noisy.
     sigma = float(getattr(cfg, "controller_refine_sigma", 0.1))
-    rng = np.random.default_rng(seed ^ 0x9E3779B9)
+    # ``seed`` is one int, or one per candidate (``draw_per_candidate``); each
+    # trial is scored on its candidate's own draw, as the re-score is.
+    per = isinstance(seed, (list, tuple))
+    rng = np.random.default_rng((int(seed[0]) if per else int(seed)) ^ 0x9E3779B9)
     # AK's funnel, decided on the re-scored results; ``None`` refines everyone.
     chosen = None
 
@@ -767,7 +770,8 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
         if first is not None:
             with _phase(cost, "evaluate.rescore_refine"):
                 both = batchroll_eval(phenos + phenos, ctrls + first[0], cfg,
-                                      spec=spec, seed=seed, shared=shared, pool=pool)
+                                      spec=spec, seed=(list(seed) * 2 if per else seed),
+                                      shared=shared, pool=pool)
             results, first = both[:k], (first[0], first[1], both[k:])
         else:
             with _phase(cost, "evaluate.rescore"):
@@ -814,7 +818,8 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
                     idx = [i for i, st in enumerate(sizes) if st is not None]
                     got = batchroll_eval([phenos[i] for i in idx],
                                          [trials[i] for i in idx], cfg, spec=spec,
-                                         seed=seed, shared=shared, pool=pool)
+                                         seed=([seed[i] for i in idx] if per else seed),
+                                         shared=shared, pool=pool)
                     trial_results = [None] * len(trials)
                     for i, r in zip(idx, got):
                         trial_results[i] = r
@@ -1282,8 +1287,8 @@ def _grpo_rollouts(state: SearchState, cfg: SearchConfig, gen: int, evaluated,
 
     The bodies are drawn from a stream derived from ``(seed, gen)`` alone, so
     nothing the run's own streams produce moves when this is on, and a resume
-    redraws the same ones.  They face the generation's evaluation seed, hence
-    its scatter and task; only the exploration noise differs between the
+    redraws the same ones.  Each faces the evaluation seed its body was scored
+    on, hence its scatter and task; only the exploration noise differs between the
     members of a group (``streams``).  Controllers are the ones the bodies were
     archived with, with their measured axes, so no identification is repeated.
     """
@@ -1295,6 +1300,7 @@ def _grpo_rollouts(state: SearchState, cfg: SearchConfig, gen: int, evaluated,
     eligible = [j for j, got in enumerate(evaluated)
                 if got is not None and got[2] is not None]
     seed = stage_log.get("seed")
+    own = stage_log.get("seeds") or {}
     if not eligible or seed is None:
         return None, {"skipped": True,
                        "reason": "no body passed Tier-0 through the batched path"}
@@ -1303,11 +1309,12 @@ def _grpo_rollouts(state: SearchState, cfg: SearchConfig, gen: int, evaluated,
     chosen = sorted(int(j) for j in draw.choice(eligible, size=n_b, replace=False))
 
     G = int(cfg.grpo_group)
-    phenos, ctrls, groups, streams = [], [], [], []
+    phenos, ctrls, groups, streams, draws = [], [], [], [], []
     for b, j in enumerate(chosen):
         pheno, _result, ctrl = evaluated[j]
         for g in range(G):
             phenos.append(pheno)
+            draws.append(int(own.get(j, seed)))
             pol = (None if ctrl.policy is None
                    else _copy_policy(ctrl.policy, ctrl.policy.weights))
             ctrls.append(Controller(params=ctrl.params, policy=pol,
@@ -1323,7 +1330,7 @@ def _grpo_rollouts(state: SearchState, cfg: SearchConfig, gen: int, evaluated,
         pool, phenos, spec=spec, shared=state.shared, buffer=gbuf,
         n_modes=cfg.n_modes, controllers=ctrls,
         segment_seconds=cfg.segment_seconds, identify_axes=False,
-        seed=int(seed), streams=streams, groups=groups)
+        seed=draws, streams=streams, groups=groups)
     wall = round(_time.perf_counter() - t0, 3)
     del results                      # learning-only: no score leaves this function
     calls = []
@@ -1365,6 +1372,9 @@ def _stage_event(state: SearchState, gen: int, log: dict, *, refined: int,
         "merged_step_one": bool(log.get("merged_step_one")),
         "accepted": log.get("accepted", []),
         "funnel": log.get("funnel"),
+        # Distinct task draws the generation's candidates faced: 1 when the
+        # draw is shared, the number scored when each has its own (M2).
+        "draws": len(set((log.get("seeds") or {}).values())) or None,
         "placed": placed, "refined": refined, "placement_changed": changed,
         "shards": [c["walls"] for c in calls],
         "idle": round(waited / worked, 4) if worked > 0 else None,
