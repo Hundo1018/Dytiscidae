@@ -11,19 +11,16 @@ item. Read it before proposing anything.
 ## Session start
 
 1. `git status` and `git log --oneline -5`.
-2. Read the dated "Revised …" paragraphs at the top of `docs/ROADMAP.md`. They
-   name the current work list (newest first; as of 2026-10-03 it is
-   §"arch45 — the work list", ranked; 2026-10-06 adds docs/PAPERS_2610.md's
-   list, whose item 1 -- Tier-1 credit belongs to one task draw -- comes before
-   anything that reads a Tier-1 score) and the comparability boundaries. Before
-   name the current work list (newest first; as of 2026-10-06 it is
-   §"2026-10-06 — arch48 finished, and the work list", ranked) and the comparability boundaries. Before
-   proposing any threshold, read §"What is set by measurement, and what is
-   typed".
+2. Read the dated paragraphs at the top of `docs/ROADMAP.md`. They name the
+   current work list (newest first; as of 2026-10-08 it is §"2026-10-08, later —
+   the work-list sweep", which ends with the open questions for the user) and
+   the comparability boundaries. Before proposing any threshold, read §"What is
+   set by measurement, and what is typed".
 3. The latest run's configuration and pre-registered reads are in
-   `runs/<run>_notes.md` (the latest finished run with notes is arch48:
-   `runs/arch48_notes.md`). `runs/` is gitignored: in a fresh container it does
-   not exist, see `docs/PORTING.md`.
+   `runs/<run>_notes.md` (arch50 is running as of 2026-10-08, launched from the
+   worktree `../arch50-tree` at 2b7bb53: `runs/arch50_notes.md`; the latest
+   finished run is arch49, read in the sweep section). `runs/` is gitignored:
+   in a fresh container it does not exist, see `docs/PORTING.md`.
 4. Run the canary (below).
 
 ## Tests
@@ -151,6 +148,13 @@ systemd-run --user --unit archNN --same-dir bash -c \
 - **Launch with `systemd-run --user`, not `setsid nohup`.** A process started
   from a Claude session stays in that session's cgroup scope, and `setsid` does
   not leave it; arch43 died at gen 39 in that scope's OOM.
+- **Launch from a pinned worktree to keep editing while it runs**
+  (2026-10-08, arch50): `git worktree add --detach ../archNN-tree <commit>`,
+  then `systemd-run` with `--setenv=PYTHONPATH=<tree>`,
+  `--setenv=DYTISCIDAE_KERNEL_DIR=<main>/mojo/build` (`mojo/build` is
+  gitignored), the main `.venv` python and `--run <main>/runs/archNN`. Worker
+  processes import from the tree they were spawned in, so edits to the main
+  tree cannot reach the run.
 - `--memory-ceiling-mb` stops cleanly with a checkpoint when parent plus workers
   pass it (0 = off). arch35 lost 405 generations to an OOM kill it could have
   resumed from.
