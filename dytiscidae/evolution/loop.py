@@ -1216,7 +1216,7 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     state.telemetry.event(
         {"kind": "evaluate", "gen": state.archive.generation, "status": status,
          "fitness": round(fit, 4), "cell": list(cell), "operators": operators,
-         "wall": round(result.wall_time, 2), "notes": result.notes[:3],
+         "wall": round(result.wall_time, 2), "notes": result.notes[:8],
          **{k: v for k, v in meta.items()
             if k not in ("policy", "features", "critic_features", "scout_features")}}
     )

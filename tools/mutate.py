@@ -125,6 +125,23 @@ MUTATIONS: tuple = (
         defect="evaluate_candidates passes one seed for the generation whatever "
                "draw_per_candidate says",
         suites=("test_search::test_each_candidate_faces_its_own_draw",), item="draw per candidate"),
+    # --- the still machine is still (PAPERS_2610 item 4, 2026-10-08) -------
+    Mutation(
+        id="rotor-keeps-the-travel-margin",
+        path="dytiscidae/envs/triphibian.py",
+        find="                self.cpg.margin[k] = 0.0\n",
+        replace="                pass\n",
+        defect="a stopped rotor is clipped to 2.5% of top speed, so the still "
+               "machine's rotors spin",
+        suites=("test_physics::test_a_still_machine_is_still_from_the_first_step",), item="still machine"),
+    Mutation(
+        id="scatter-poses-the-body-gait",
+        path="dytiscidae/envs/triphibian.py",
+        find="                self.cpg.base if pose is None else pose, 0.0)\n",
+        replace="                self.cpg.base, 0.0)\n",
+        defect="the still machine starts at the gait's pose and its servos snap "
+               "the joints to the held offset",
+        suites=("test_physics::test_a_still_machine_is_still_from_the_first_step",), item="still machine"),
     # --- the antipodal heading pair (2026-10-06) ----------------------------
     Mutation(
         id="pair-takes-the-better-half",

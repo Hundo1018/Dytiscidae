@@ -338,38 +338,38 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `basis_from_probes` | function | 581 | `(deltas, responses, *, medium: str='air', max_modes: int=6) -> MobilityBasis` | Fit the mobility basis from probe deltas and their measured responses. |
-| `CPG` | class | 87 | — | A bank of phase-coupled oscillators, one per actuated joint. |
+| `basis_from_probes` | function | 593 | `(deltas, responses, *, medium: str='air', max_modes: int=6) -> MobilityBasis` | Fit the mobility basis from probe deltas and their measured responses. |
+| `CPG` | class | 95 | — | A bank of phase-coupled oscillators, one per actuated joint. |
 | `CPGParams` | class | 46 | — | Open parameters of the pattern generator. |
-| `gait_gain` | function | 194 | `(intent: float) -> float` | The amplitude factor a gain intent asks for. |
-| `identify_mobility` | function | 535 | `(step_fn, reset_fn, n_params: int, *, n_probes: int=24, probe_scale: float=0.35, medium: str='air', rng: np.random.Generator \| None=None, max_modes: int=6) -> MobilityBasis` | Empirically identify a body's control axes. |
-| `MobilityBasis` | class | 234 | — | The control axes a particular body actually has, in a particular medium. |
-| `Policy` | class | 628 | — | Maps observations to intent coefficients in the mobility basis. |
-| `required_probes` | function | 519 | `(n_params: int, *, margin: float=1.5) -> int` | Probes needed for the mobility fit to be determined, with headroom. |
-| `split_command` | function | 199 | `(raw, n_modes: int)` | ``(mode coefficients, gain)`` from what a policy returned. |
-| `CPG.__init__` | method | 97 | `(self, n_joints: int, base_frequency: float=2.0, joint_range: np.ndarray \| None=None) -> None` | — |
-| `CPG.command` | method | 143 | `(self, params: CPGParams, t: float) -> np.ndarray` | Target joint angles at time ``t``. |
-| `CPG.n_params` | property | 167 | `(self) -> int` | — |
-| `CPG.pop_rate` | method | 161 | `(self) -> np.ndarray \| None` | The rate of the last command, once; None if it was already taken. |
-| `CPG.reset` | method | 139 | `(self) -> None` | — |
-| `CPGParams.clipped` | method | 74 | `(self, lo: np.ndarray, hi: np.ndarray) -> 'CPGParams'` | Clamp offsets and amplitudes into the joints' physical travel. |
+| `gait_gain` | function | 206 | `(intent: float) -> float` | The amplitude factor a gain intent asks for. |
+| `identify_mobility` | function | 547 | `(step_fn, reset_fn, n_params: int, *, n_probes: int=24, probe_scale: float=0.35, medium: str='air', rng: np.random.Generator \| None=None, max_modes: int=6) -> MobilityBasis` | Empirically identify a body's control axes. |
+| `MobilityBasis` | class | 246 | — | The control axes a particular body actually has, in a particular medium. |
+| `Policy` | class | 640 | — | Maps observations to intent coefficients in the mobility basis. |
+| `required_probes` | function | 531 | `(n_params: int, *, margin: float=1.5) -> int` | Probes needed for the mobility fit to be determined, with headroom. |
+| `split_command` | function | 211 | `(raw, n_modes: int)` | ``(mode coefficients, gain)`` from what a policy returned. |
+| `CPG.__init__` | method | 105 | `(self, n_joints: int, base_frequency: float=2.0, joint_range: np.ndarray \| None=None) -> None` | — |
+| `CPG.command` | method | 155 | `(self, params: CPGParams, t: float) -> np.ndarray` | Target joint angles at time ``t``. |
+| `CPG.n_params` | property | 179 | `(self) -> int` | — |
+| `CPG.pop_rate` | method | 173 | `(self) -> np.ndarray \| None` | The rate of the last command, once; None if it was already taken. |
+| `CPG.reset` | method | 151 | `(self) -> None` | — |
+| `CPGParams.clipped` | method | 74 | `(self, lo: np.ndarray, hi: np.ndarray, margin: np.ndarray \| float=0.05) -> 'CPGParams'` | Clamp offsets and amplitudes into the joints' physical travel. |
 | `CPGParams.flat` | method | 61 | `(self) -> np.ndarray` | — |
 | `CPGParams.from_flat` | method | 65 | `(v: np.ndarray, n: int) -> 'CPGParams'` | — |
 | `CPGParams.n` | property | 58 | `(self) -> int` | — |
-| `MobilityBasis.bases_from_record` | method | 274 | `(cls, record) -> dict` | ``{medium: MobilityBasis}`` from an elite's ``meta["mobility_basis"]``. |
-| `MobilityBasis.coeffs_for_twist` | method | 484 | `(self, intent: np.ndarray) -> np.ndarray` | Coefficients that best deliver a commanded body twist. |
-| `MobilityBasis.command_params` | method | 397 | `(self, base: CPGParams, coeffs: np.ndarray, n: int, gain: float=1.0) -> CPGParams` | Turn intent coefficients into concrete CPG parameters. |
-| `MobilityBasis.command_policy` | method | 412 | `(self, base: CPGParams, raw, n: int, policy)` | ``(params, mode coefficients, gain or None)`` for what ``policy`` returned. |
-| `MobilityBasis.condition` | property | 336 | `(self) -> float` | `sigma_0 / sigma_r` over the retained modes.  Infinite if any is 0. |
-| `MobilityBasis.control_rank` | property | 311 | `(self) -> int` | How many axes are worth commanding.  An engineering threshold. |
-| `MobilityBasis.describe` | method | 380 | `(self) -> list[str]` | Human-readable names for the discovered axes. |
-| `MobilityBasis.diagnostics` | method | 365 | `(self) -> dict` | Everything a consumer needs to judge this basis, in one call. |
-| `MobilityBasis.numerical_rank` | property | 294 | `(self) -> int` | Rank in the linear-algebra sense: singular values above the level |
-| `MobilityBasis.twist_of` | method | 509 | `(self, coeffs: np.ndarray) -> np.ndarray` | The twist a coefficient vector produces.  The forward model. |
-| `MobilityBasis.underdetermined` | property | 349 | `(self) -> bool` | Whether the fit behind this basis had fewer probes than parameters. |
-| `Policy.act` | method | 672 | `(self, obs: np.ndarray) -> np.ndarray` | — |
-| `Policy.n_out` | property | 661 | `(self) -> int` | — |
-| `Policy.n_weights` | property | 666 | `(self) -> int` | — |
+| `MobilityBasis.bases_from_record` | method | 286 | `(cls, record) -> dict` | ``{medium: MobilityBasis}`` from an elite's ``meta["mobility_basis"]``. |
+| `MobilityBasis.coeffs_for_twist` | method | 496 | `(self, intent: np.ndarray) -> np.ndarray` | Coefficients that best deliver a commanded body twist. |
+| `MobilityBasis.command_params` | method | 409 | `(self, base: CPGParams, coeffs: np.ndarray, n: int, gain: float=1.0) -> CPGParams` | Turn intent coefficients into concrete CPG parameters. |
+| `MobilityBasis.command_policy` | method | 424 | `(self, base: CPGParams, raw, n: int, policy)` | ``(params, mode coefficients, gain or None)`` for what ``policy`` returned. |
+| `MobilityBasis.condition` | property | 348 | `(self) -> float` | `sigma_0 / sigma_r` over the retained modes.  Infinite if any is 0. |
+| `MobilityBasis.control_rank` | property | 323 | `(self) -> int` | How many axes are worth commanding.  An engineering threshold. |
+| `MobilityBasis.describe` | method | 392 | `(self) -> list[str]` | Human-readable names for the discovered axes. |
+| `MobilityBasis.diagnostics` | method | 377 | `(self) -> dict` | Everything a consumer needs to judge this basis, in one call. |
+| `MobilityBasis.numerical_rank` | property | 306 | `(self) -> int` | Rank in the linear-algebra sense: singular values above the level |
+| `MobilityBasis.twist_of` | method | 521 | `(self, coeffs: np.ndarray) -> np.ndarray` | The twist a coefficient vector produces.  The forward model. |
+| `MobilityBasis.underdetermined` | property | 361 | `(self) -> bool` | Whether the fit behind this basis had fewer probes than parameters. |
+| `Policy.act` | method | 684 | `(self, obs: np.ndarray) -> np.ndarray` | — |
+| `Policy.n_out` | property | 673 | `(self) -> int` | — |
+| `Policy.n_weights` | property | 678 | `(self) -> int` | — |
 
 ## `control.train` — `dytiscidae/control/train.py`
 
@@ -720,7 +720,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `identify_batch` | function | 650 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
 | `observation_finite` | function | 574 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
 | `rollout_batch` | function | 731 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 1195 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 1196 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
 | `step_batch` | function | 595 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 95 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
 | `BatchedFluid.__init__` | method | 231 | `(self, envs)` | — |
@@ -850,7 +850,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `run_transition` | function | 592 | `(env: TriphibianEnv, kind: str, controller, *, duration: float=6.0, back: float=0.0) -> TransitionResult` | Simulate one crossing and measure it.  ``back``: see ``_place_for``. |
 | `transition_scatter_seed` | function | 223 | `(kind: str) -> int` | The entry-state draw every machine's ``kind`` crossing starts from. |
 | `TransitionResult` | class | 127 | — | One crossing, measured.  Every field is a raw physical quantity or a |
-| `TransitionSet` | class | 798 | — | All crossings attempted in one evaluation. |
+| `TransitionSet` | class | 799 | — | All crossings attempted in one evaluation. |
 | `CrossingTracker.__init__` | method | 365 | `(self, env: TriphibianEnv, kind: str)` | — |
 | `CrossingTracker.commanded` | method | 398 | `(self, i: int) -> Domain` | The medium the controller is told about at step ``i``. |
 | `CrossingTracker.energy_height_loss` | method | 387 | `(self) -> float \| None` | Energy height lost over the hold, metres, from the fitted slope; |
@@ -858,8 +858,8 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `CrossingTracker.hold_score` | method | 447 | `(self) -> float` | — |
 | `CrossingTracker.observe` | method | 402 | `(self, env: TriphibianEnv, i: int) -> None` | — |
 | `TransitionResult.components` | property | 209 | `(self) -> dict[str, float]` | The scored parts, for the judge to weight. |
-| `TransitionSet.component_means` | method | 809 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
-| `TransitionSet.crossed_fraction` | property | 804 | `(self) -> float` | — |
+| `TransitionSet.component_means` | method | 810 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
+| `TransitionSet.crossed_fraction` | property | 805 | `(self) -> float` | — |
 
 ## `envs.triphibian` — `dytiscidae/envs/triphibian.py`
 
@@ -874,7 +874,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `MissionResult` | class | 183 | — | Aggregate of a whole evaluation, at whatever fidelity produced it. |
 | `MissionSpec` | class | 79 | — | The mission the user specified, with every number left adjustable. |
 | `morphology_channels` | function | 489 | `(*, mass: float, density_ratio: float, wing_area: float, span: float, aspect_ratio: float, wing_loading: float, n_actuated: int, battery_wh: float) -> np.ndarray` | The eight body-identity channels, from scalars rather than a phenotype. |
-| `pair_partner_of` | function | 3017 | `(seg: SegmentResult) -> dict` | What the second half of an antipodal pair needs from the first. |
+| `pair_partner_of` | function | 3025 | `(seg: SegmentResult) -> dict` | What the second half of an antipodal pair needs from the first. |
 | `rotor_lift_ratio` | function | 330 | `(p: Phenotype) -> float` | Static thrust of every propeller at top speed, in air, over the weight. |
 | `SegmentResult` | class | 139 | — | What one stretch of operating in one domain produced. |
 | `TriphibianEnv` | class | 519 | — | A compiled machine in the triphibian world, steppable by a controller. |
@@ -883,32 +883,32 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `MissionSpec.transitions` | property | 110 | `(self) -> list[str]` | — |
 | `SegmentResult.cost_of_transport` | property | 175 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
 | `TriphibianEnv.__init__` | method | 606 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
-| `TriphibianEnv.body_twist` | method | 1344 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
-| `TriphibianEnv.clearance` | method | 1452 | `(self) -> float` | `_clearance_now`, remembered for the state it was computed on. |
-| `TriphibianEnv.clearance_many` | method | 1471 | `(envs, active=None) -> None` | Fill the `clearance` memo of every (active) machine in one array |
-| `TriphibianEnv.depth` | method | 1391 | `(self) -> float` | — |
-| `TriphibianEnv.flap_travel` | method | 942 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
-| `TriphibianEnv.flies_level` | method | 1091 | `(self) -> bool` | Whether ``level_margin`` clears ``LEVEL_GATE`` (ROADMAP AD). |
-| `TriphibianEnv.ground_height` | method | 1415 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
-| `TriphibianEnv.ground_heights` | method | 1424 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
-| `TriphibianEnv.held_still_params` | method | 1369 | `(self) -> CPGParams` | The base gait with every actuator held still: the still machine of |
-| `TriphibianEnv.identify` | method | 2977 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
-| `TriphibianEnv.launch_pitch` | property | 912 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
-| `TriphibianEnv.launch_speed` | property | 880 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
-| `TriphibianEnv.level_margin` | method | 1099 | `(self)` | Can this machine hold height *and* speed, with its own actuators? |
-| `TriphibianEnv.lift_margin` | property | 928 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
-| `TriphibianEnv.morphology_context` | property | 1555 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
-| `TriphibianEnv.observation` | method | 1594 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
-| `TriphibianEnv.reset` | method | 754 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
-| `TriphibianEnv.restore` | method | 1335 | `(self, snap: tuple) -> None` | — |
-| `TriphibianEnv.rollout` | method | 1758 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
-| `TriphibianEnv.root_pos` | method | 1388 | `(self) -> np.ndarray` | — |
-| `TriphibianEnv.scatter` | method | 788 | `(self, rng, *, strength: float=1.0) -> None` | Widen the initial condition, from a caller-supplied generator. |
-| `TriphibianEnv.servo_command` | method | 1731 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
-| `TriphibianEnv.snapshot` | method | 1332 | `(self) -> tuple` | — |
-| `TriphibianEnv.step` | method | 1740 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
-| `TriphibianEnv.task_channels` | method | 1679 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
-| `TriphibianEnv.thrust_margin` | method | 970 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
+| `TriphibianEnv.body_twist` | method | 1352 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
+| `TriphibianEnv.clearance` | method | 1460 | `(self) -> float` | `_clearance_now`, remembered for the state it was computed on. |
+| `TriphibianEnv.clearance_many` | method | 1479 | `(envs, active=None) -> None` | Fill the `clearance` memo of every (active) machine in one array |
+| `TriphibianEnv.depth` | method | 1399 | `(self) -> float` | — |
+| `TriphibianEnv.flap_travel` | method | 950 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
+| `TriphibianEnv.flies_level` | method | 1099 | `(self) -> bool` | Whether ``level_margin`` clears ``LEVEL_GATE`` (ROADMAP AD). |
+| `TriphibianEnv.ground_height` | method | 1423 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
+| `TriphibianEnv.ground_heights` | method | 1432 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
+| `TriphibianEnv.held_still_params` | method | 1377 | `(self) -> CPGParams` | The base gait with every actuator held still: the still machine of |
+| `TriphibianEnv.identify` | method | 2985 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.launch_pitch` | property | 920 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
+| `TriphibianEnv.launch_speed` | property | 888 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
+| `TriphibianEnv.level_margin` | method | 1107 | `(self)` | Can this machine hold height *and* speed, with its own actuators? |
+| `TriphibianEnv.lift_margin` | property | 936 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
+| `TriphibianEnv.morphology_context` | property | 1563 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
+| `TriphibianEnv.observation` | method | 1602 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
+| `TriphibianEnv.reset` | method | 757 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
+| `TriphibianEnv.restore` | method | 1343 | `(self, snap: tuple) -> None` | — |
+| `TriphibianEnv.rollout` | method | 1766 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
+| `TriphibianEnv.root_pos` | method | 1396 | `(self) -> np.ndarray` | — |
+| `TriphibianEnv.scatter` | method | 791 | `(self, rng, *, strength: float=1.0, pose=None) -> None` | Widen the initial condition, from a caller-supplied generator. |
+| `TriphibianEnv.servo_command` | method | 1739 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
+| `TriphibianEnv.snapshot` | method | 1340 | `(self) -> tuple` | — |
+| `TriphibianEnv.step` | method | 1748 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
+| `TriphibianEnv.task_channels` | method | 1687 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
+| `TriphibianEnv.thrust_margin` | method | 978 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
 
 ## `evolution.archive` — `dytiscidae/evolution/archive.py`
 

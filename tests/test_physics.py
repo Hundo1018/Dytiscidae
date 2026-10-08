@@ -4012,6 +4012,55 @@ def test_the_search_can_build_rotorcraft() -> None:
           f"rotor count ranged {min(counts)}-{max(counts)}")
 
 
+def test_a_still_machine_is_still_from_the_first_step() -> None:
+    """PAPERS_2610 item 4: ``held_still_params`` was not quite still.
+
+    Its rotors were commanded to stop, and ``CPGParams.clipped`` raised every
+    offset to 5% of half-travel, so a stopped rotor was held at 2.5% of top
+    speed (27 rad/s on arch48's elite 1), read at the time as windmilling.  And
+    ``scatter`` posed the joints at the body's gait, so the still machine's
+    servos snapped them to the held offset in the first half second (up to 19
+    rad/s on arch48's elites).  An earlier check passed on the *commanded*
+    offset; this one reads the rotor speed and the joint rates the body has."""
+    print("\nenvs: the still machine moves nothing")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.genome import mut_rotor
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    g = BODY_PLANS["beetle"]()
+    mut_rotor(g, np.random.default_rng(3))
+    env = TriphibianEnv(build(g), seed=0)
+    rk = [k for k, n in enumerate(env.act_names) if n.endswith("_r")]
+    still = env.held_still_params()
+    env.reset(Domain.AIR)
+    env.scatter(np.random.default_rng(3), pose=still)
+    for _ in range(int(1.0 / env.timestep)):
+        env.step(env.cpg.command(still, env.data.time))
+    speeds = [abs(float(env.data.qvel[d])) for d in env.rotors.dof]
+    check("a still machine's rotors are stopped after a second in the air",
+          rk and max(speeds) < 0.5, f"{len(rk)} rotors, |omega| {[round(x, 2) for x in speeds]}")
+
+    worst = []
+    for name in ("gannet", "ray", "beetle"):
+        rates = {}
+        for label in ("gait pose", "held pose"):
+            e = TriphibianEnv(build(BODY_PLANS[name]()), seed=1)
+            st = e.held_still_params()
+            e.reset(Domain.WATER)
+            e.scatter(np.random.default_rng(5), pose=None if label == "gait pose" else st)
+            jk = [k for k, n in enumerate(e.act_names) if not n.endswith("_r")]
+            peak = 0.0
+            for _ in range(int(0.5 / e.timestep)):
+                e.step(e.cpg.command(st, e.data.time))
+                peak = max(peak, float(np.abs(e.data.qvel[e._act_vadr[jk]]).max()))
+            rates[label] = peak
+        worst.append((name, round(rates["gait pose"], 2), round(rates["held pose"], 2)))
+    check("posed where it is held, no joint is snapped there in the first 0.5 s",
+          all(h < 0.5 * g_ for _, g_, h in worst if g_ > 0.2),
+          f"peak rad/s (gait pose, held pose): {worst}")
+
+
 def test_the_rotor_batch_is_the_per_rotor_loop() -> None:
     """`RotorBatch` steps every rotor of a shard as one array computation
     (2026-10-03: the per-rotor loop was 198 us a rotor-step, 82% of a
@@ -4323,6 +4372,7 @@ def main() -> int:
         test_a_transition_can_start_back_from_its_interface,
         test_the_rotor_table_is_the_rotor_model,
         test_the_search_can_build_rotorcraft,
+        test_a_still_machine_is_still_from_the_first_step,
         test_the_rotor_batch_is_the_per_rotor_loop,
         test_the_clearance_of_a_batch_is_each_machines_own,
         test_a_propeller_can_go_under_water,

@@ -1096,7 +1096,8 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         def _half(ts, partners, tag):
             for slot, i in enumerate(live):
                 envs[i].reset(dom)
-                envs[i].scatter(np.random.default_rng(scatter_seeds[i]))
+                envs[i].scatter(np.random.default_rng(scatter_seeds[i]),
+                                pose=ctrls[i].params)
                 envs[i].task = ts[i]
                 envs[i].pair_partner = None if partners is None else partners[slot]
             bf.reset_slam()
@@ -1227,7 +1228,7 @@ def run_transition_batch(envs, bf: BatchedFluid, kind: str, ctrls,
         # Each crossing kind used to present exactly one entry state, with no
         # noise at all, to every machine of every generation.  A real arrival
         # carries whatever speed and attitude the previous leg left behind.
-        e.scatter(_np.random.default_rng(scatter_seed))
+        e.scatter(_np.random.default_rng(scatter_seed), pose=ctrls[m].params)
         reseat_after_scatter(e, kind)
         res[m].survivable_entry_speed = float(e.p.max_entry_speed)
     bf.reset_slam()

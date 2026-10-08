@@ -728,6 +728,9 @@ class TriphibianEnv:
             # very long paddle.  Accumulating it down the chain is what makes
             # the wave travel, and the wave is where the thrust comes from.
             ph = seg.part.phase_offset * max(seg.depth, 1) if seg is not None else 0.0
+            if name.endswith("_r"):
+                # A speed has no end stop to keep clear of (``CPG.margin``).
+                self.cpg.margin[k] = 0.0
             if name.endswith("_r") and seg is not None:
                 # A rotor's channel is a speed: steady at the part's throttle,
                 # no stroke.  The policy moves it through the offset.
@@ -785,7 +788,7 @@ class TriphibianEnv:
         self.budget.reset()
         self._mj.mj_forward(self.model, self.data)
 
-    def scatter(self, rng, *, strength: float = 1.0) -> None:
+    def scatter(self, rng, *, strength: float = 1.0, pose=None) -> None:
         """Widen the initial condition, from a caller-supplied generator.
 
         Every rollout the policy learns from used to begin at the same point:
@@ -872,8 +875,13 @@ class TriphibianEnv:
         # phase alone leaves every episode starting from the same joint angles
         # and only diverging afterwards, and it is the angles the observation
         # reports.
+        # ``pose``: the gait the machine is about to be driven with (default
+        # the body's own).  A still machine's gait has no stroke, so its joints
+        # start where they will be held instead of being snapped there by the
+        # servos in the first half second (PAPERS_2610 item 4: 4.4 rad/s).
         if len(self._act_qadr):
-            self.data.qpos[self._act_qadr] = self.cpg.command(self.cpg.base, 0.0)
+            self.data.qpos[self._act_qadr] = self.cpg.command(
+                self.cpg.base if pose is None else pose, 0.0)
         self._mj.mj_forward(self.model, self.data)
 
     @property
