@@ -1424,9 +1424,34 @@ def test_the_heading_pair_cancels_what_the_command_did_not_choose() -> None:
         check(f"{label}: the pair's mean signed progress is zero on both paths",
               worst < 1e-12, f"worst |mean| {worst:.2e}")
         gap = max(abs(a.segments[m].competence - b.segments[m].competence)
-                  for a, b in zip(single, batch) for m in ("water", "land"))
+                  for a, b in zip(single, batch) for m in ("water", "land", "air"))
         check(f"{label}: the two paths agree on the paired score", gap < 1e-9,
               f"max gap {gap:.2e}")
+        # Air, since 2026-10-09: a mirrored pair of turns, and height paying
+        # only as far as the machine turned when told.  Neither a still body
+        # nor an open-loop gait reads the command, so both score zero.
+        air = [r.segments["air"] for r in single + batch if "air" in r.segments]
+        check(f"{label}: air pays nothing for a turn the command did not choose",
+              air and all(x.competence == 0.0 for x in air)
+              and all(x.measurements.get("pair_turn_mean", 0.0) <= 1e-12 for x in air),
+              f"air {[round(x.competence, 4) for x in air]}, turn mean "
+              f"{[round(x.measurements.get('pair_turn_mean', float('nan')), 3) for x in air]}")
+
+    from dytiscidae.envs.tasks import mirror, pair_of
+    from dytiscidae.envs.triphibian import air_task
+    check("air height pays only through the turn",
+          air_task(0.0, 1.0) == 0.0 and air_task(1.0, 0.0) == 0.5
+          and air_task(1.0, 1.0) == 1.0 and air_task(0.4, 1.0) == 0.4,
+          f"{[air_task(*x) for x in ((0, 1), (1, 0), (1, 1), (0.4, 1))]}")
+    ta = schedule_for("air", np.random.default_rng(4))
+    turns = [ph.heading for ph in ta.phases]
+    mturns = [ph.heading for ph in mirror(ta).phases]
+    check("the air pair mirrors the turn and keeps the straight phase",
+          mturns[0] == turns[0] == 0.0 and abs(mturns[1] + turns[1]) < 1e-12
+          and turns[1] != 0.0, f"{turns} -> {mturns}")
+    check("pair_of mirrors air and takes the antipode elsewhere",
+          [ph.heading for ph in pair_of(ta).phases] == mturns
+          and [ph.heading for ph in pair_of(t).phases] == [ph.heading for ph in antipode(t).phases])
 
 
 def test_tier2_draws_its_headings() -> None:

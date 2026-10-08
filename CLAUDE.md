@@ -223,7 +223,9 @@ then films (`dytiscidae/viz/film.py`) into `runs/<run>/media/`, embedded in
 - **Comparability boundaries.** Air scores and `mission_fraction` are not
   comparable across arch33→34, arch34→35, arch36→37 (air ladder 7 → 11 rungs),
   2026-09-20, and arch43 (corrected physics: nothing before it is comparable on
-  air or water forces). The ROADMAP lists each boundary. Write "not comparable";
+  air or water forces); water and land across the antipodal pair (2026-10-06)
+  and the per-candidate draw (2026-10-08); air across the mirrored air pair
+  (2026-10-09). The ROADMAP lists each boundary. Write "not comparable";
   do not quote a shrunken difference.
 - `sink_rate` is the difference of two endpoints of the late airborne window, so
   it reads zero for a machine that drops and comes back. `station_keeping` sees
@@ -348,7 +350,10 @@ Each rule below was paid for by a score that rewarded the wrong thing.
    2026-10-08 each candidate also faces its own draw
    (`SearchConfig.draw_per_candidate`, ROADMAP M2): the batched path takes one
    seed per machine, and a result equals what that machine scores alone at its
-   `eval_seed`.
+   `eval_seed`. Since 2026-10-09 air is paired too (the user): the drawn turn
+   and its mirror (`tasks.mirror`), the turn response on the mean of the two,
+   and height paying only through the turn (`triphibian.air_task`), after the
+   fixed still machine cleared air on 11 arch49 gannets against the elites' 6.
 
 ## Where things are
 

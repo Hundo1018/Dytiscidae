@@ -159,6 +159,22 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_a_still_machine_is_still_from_the_first_step",), item="still machine"),
     # --- the antipodal heading pair (2026-10-06) ----------------------------
     Mutation(
+        id="air-height-adds-to-the-turn",
+        path="dytiscidae/envs/triphibian.py",
+        find="    return float(turn) * (0.5 + 0.5 * float(height))\n",
+        replace="    return 0.5 * float(turn) + 0.5 * float(height)\n",
+        defect="air pays a still glider for the height its airframe keeps, the leak "
+               "the 2026-10-09 rule closed",
+        suites=("test_search::test_the_heading_pair_cancels_what_the_command_did_not_choose",), item="air pair"),
+    Mutation(
+        id="air-pair-turns-the-same-way",
+        path="dytiscidae/envs/tasks.py",
+        find="        Phase(ph.kind, ph.start, _wrap(-ph.heading), ph.speed, ph.depth)\n",
+        replace="        Phase(ph.kind, ph.start, ph.heading, ph.speed, ph.depth)\n",
+        defect="the air pair repeats the turn, so lateral drift toward the drawn "
+               "side does not cancel",
+        suites=("test_search::test_the_heading_pair_cancels_what_the_command_did_not_choose",), item="air pair"),
+    Mutation(
         id="pair-takes-the-better-half",
         path="dytiscidae/envs/triphibian.py",
         find="        along = 0.5 * (cruise[\"along\"] + p[\"along\"])\n",
