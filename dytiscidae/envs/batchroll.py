@@ -931,10 +931,11 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
     are repeats of one body (ROADMAP N).  It changes nothing about the
     evaluation itself.
 
-    Both the three domain segments and the three transitions are batched. What
-    is not, and cannot be, is the mobility identification: it drives each CPG
-    with random perturbations and fits a Jacobian from the result, so every
-    machine is running a different experiment with no shared timestep.
+    The three domain segments, the three transitions and the mobility
+    identification are all batched.  Identification drives each CPG with its
+    own random perturbations and fits a Jacobian from the result; the
+    perturbation is an input to a shared timestep, not a branch in it (see
+    `identify_batch`).
 
     Falls back to nothing: a phenotype that fails to compile is returned as a
     dead MissionResult in its slot, exactly as the unbatched version does, so

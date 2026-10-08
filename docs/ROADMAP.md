@@ -1,5 +1,14 @@
 # Roadmap
 
+**2026-10-08: a MuscleMimic comparison was checked against the code and arch48's
+telemetry; see [the MuscleMimic comparison](#2026-10-08--the-musclemimic-comparison-reconciled-with-the-repo).**
+Its thesis (the evaluation signal, not PPO, is the bottleneck) agrees with
+PAPERS_2610. Two findings are new: the (1+1)-ES refinement accepts on
+`mission_fraction`, which was above zero in 7 of arch48's 4,792 evaluations
+(29 acceptances in 300 generations), and it keeps trials scored on the draw it
+reports. PPO's 10 epochs never reached the KL bound (0 of 300 updates), so the
+proposed epoch sweep comes last.
+
 **2026-10-06, later: an outside review was checked claim by claim against the
 repo; the correction plan is
 [external review reconciled](#2026-10-06--external-review-reconciled-with-the-repo-and-the-correction-plan).**
@@ -2920,6 +2929,68 @@ decision to run it is not. See item N (arch40 list) for what it is, what it
 costs, and the gates that hold it to "changes nothing when off".
 
 ---
+
+## 2026-10-08 — the MuscleMimic comparison, reconciled with the repo
+
+A second outside review compared this project with MuscleMimic (JAX + MuJoCo
+Warp, thousands of parallel environments, PPO on a fixed human body imitating
+reference motion). Its thesis: the bottleneck is not PPO but an evaluation
+signal that morphology search, task sampling and controller learning
+contaminate together, so the evaluation protocol comes before any learner
+change. The thesis agrees with PAPERS_2610 §1–3. Each concrete claim was checked
+against the code and against arch48's own telemetry (`runs/arch48/events.jsonl`,
+`generations.jsonl`); claims about MuscleMimic itself (8192 environments, one
+PPO epoch being better, network depth) were not checked.
+
+### A. Claims checked
+
+| review's claim | repo / arch48 | verdict |
+|---|---|---|
+| 10 PPO epochs over a non-stationary batch go stale; MuscleMimic finds 1 epoch better, so sweep 1/2/4/6 | `shared_epochs=10`, minibatch 2048, `target_kl=0.015` stops the epoch loop (`ppo_update`). arch48, 300 updates: KL median 0.0062 (p90 0.0078, max 0.0091), clipfrac median 0.076, **`stopped_early` 0 of 300**, 90–100 gradient steps each. The `ppo_update` docstring records the opposite failure in arch30: KL 0.0008, the policy "barely being asked to" learn | **no evidence the epochs over-reuse data**: every update ended under half the KL bound. What starves the learner is its reward: over arch48's last 50 updates `reward_by_tag` reads air 0, all four crossings 0, land 0.049, water 0.037. M5 |
+| The shared policy is obs → 64 → 64 → action, ~1,200 parameters | 13,133: actor 6,726, critic 6,401; obs 33 (25 + 8 morphology), action 6 (`TWIST_DIM`) | **figure wrong, conclusion right**: no measurement says width is the limit |
+| Potential-based shaping is in | `ppo.potential_of`, shaping 0.2 in every arch48 update | **true** |
+| Condition the policy as π(a \| s, m, d) | the observation already carries 8 morphology features, the commanded domain (3) and 6 task channels (`TriphibianEnv.OBS_DIM`) | **already built** (task-conditioned since arch41) |
+| Train tasks and selection tasks are the same, so the policy is promoted on the task it just learned | the PPO update runs after the generation is scored, so θ_t is never scored on the draw it trained on. **But the (1+1)-ES refinement does exactly this**: `_refine_controllers` (`evolution/loop.py:675`) scores each trial at the generation's seed, keeps it if `mission_fraction` rose, and the kept result is what the archive receives. That is best-of-(1 + steps) on one draw, the shape of the 63% best-of-five bias the re-score at `loop.py:715` was written to remove | **true, in a different place than claimed.** M1 |
+| One task draw per generation makes Tier-1 a measurement of the draw | PAPERS_2610 §3. The antipodal pair (PR #32) cancels motion the command did not choose; it does **not** give each candidate its own draw: `evaluate_candidates` still passes `seed=seeds[passed[0]]` for the whole batch (`loop.py:641`); arch48 had one distinct `eval_seed` in 299 of 300 generations | **true and still open** (PAPERS_2610 item 1). M2 |
+| Rank elites by a lower confidence bound over repeated draws; evaluate sequentially (2 → 4 → 8) | nothing computes a per-candidate spread. C2 (≥2 draws on a held subset, variance ratio) is the measurement that says whether it is needed | **not present; C2 first.** M2, M3 |
+| Identification is 67% of an evaluation; skip it when the morphology has not changed | item G (arch34). arch48: identification is 460,800 of the main path's 657,584 steps (70%), 44% of all physics steps in a generation. It is batched on the GPU since `identify_batch`, so its share of *seconds* is unmeasured. It perturbs around the gait's base (`e.cpg.base`), so it depends on the gait as well as the body, and in arch48 every child carried at least one operator: reusing a parent's axes is the inherited-bases case AN says identification exists to prevent | **cost confirmed; the cache as proposed is not valid.** M6 |
+| Benchmark the controller on one fixed body before coupling it to evolution | the 09-26 flight audit fixed bodies for a hand-written rotor control; no learning curve of the shared PPO on a fixed body exists | **missing.** M4 |
+| Pretrain primitive skills, then search morphology | not built; no measurement says the shared policy can learn a skill on a body that does not change | **deferred to M4's read** |
+| Score learnability (improvement per 1,000 transitions) | not built. The refinement log has `pre` and post results per candidate, but its criterion reads 0 (M1), so it would measure 0 | **deferred to M1** |
+| The critic has no skill; factorise it after the data is clean | the critic already learns per-medium residuals (ARCH46_SPEC §1); skill 0.0 in all three media in arch48 | **agrees with arch48 item 3**, which reads it first |
+
+### B. What arch48 shows about refinement (found on this check)
+
+The (1+1)-ES accepts a trial only if `mission_fraction` strictly rises
+(`loop.py:829`). In arch48, `mission_fraction` was above zero in **7 of 4,792**
+evaluations (max 0.0001). Across 300 generations refinement accepted **29**
+trials and changed **13** placements (`stages` events). So it climbs a criterion
+that is flat at zero, and on the rare occasion it moves, it selects on the draw
+it is scored on. Its first step rides in the re-score batch
+(`merged_step_one`), so its own wall is small; the re-score itself (median 40.8 s
+of a 129 s generation) is the de-noising AK kept and is not in question.
+
+### C. The work list this adds (cost, then speed, then learning)
+
+These slot beside the 10-06 lists, not ahead of arch48 items 1–3.
+
+| # | item | build cost | measurement that decides it |
+|---|---|---|---|
+| M1 | **Refinement's criterion and its draw.** Replace `mission_fraction` with the score selection pays for, and score accepted trials on a draw other than the one reported (or report the pre-refinement score). A comparability boundary | low | offline on arch48's 200 elites: acceptances under each criterion, and an accepted trial's gain re-measured at a fresh seed. A gain that vanishes at the fresh seed is the same-draw bias, measured |
+| M2 | **One draw per candidate, then C2's variance ratio.** PAPERS_2610 item 1's cheapest form, and the σ an LCB would need | trivial for the draw, low for C2 | seed variance vs between-design variance per medium. Above 1, sequential evaluation (2 → 4 → 8 draws, LCB to place) earns a build; below 1, it does not |
+| M3 | **A fixed selection set (common random numbers), rotated.** Incumbent and challenger face the same draws; at rotation, incumbents are re-scored | medium | only if M2 says seed variance dominates. Overfitting to the fixed set is read by Tier-2's fresh seed, which already exists |
+| M4 | **The shared policy on one fixed body.** One arch48 elite per medium, the shared PPO from scratch, 5 seeds, learning curve against a still machine and the base gait (`experiments/no_model_gate`'s arms) | medium | does the learner learn at all when the body cannot move? No: the learner is the wall and skill pretraining is premature. Yes: the coupling is |
+| M5 | **PPO epochs 1/2/4/10**, at a fixed transition and gradient-step budget | low, but an arm per value | not before M4 shows a learning curve to compare; arch48 says the KL bound never bound |
+| M6 | **Identification seconds**, now that it is batched: its share of `evaluate.main` wall at arch48's late bodies. A cache, if any, keys on body plan *and* base gait | trivial read | under a third of main's wall: G is closed as a throughput lever |
+
+### D. Not adopted
+
+* **A larger policy, or MuscleMimic's scale of parallel environments.** No
+  measurement here says either is the limit; the review says the same.
+* **Skill pretraining and a learnability score, now.** Each waits on a read
+  above (M4, M1).
+* **Fixing evaluation seeds without rotation.** Over 900 generations of ~16
+  candidates, a fixed set is itself selected against; M3 rotates it.
 
 ## 2026-10-06 — arch48 finished, and the work list
 
