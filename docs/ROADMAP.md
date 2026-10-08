@@ -1,5 +1,11 @@
 # Roadmap
 
+**2026-10-09: answers to the sweep's questions, and where the work stopped;
+see [state when stopped](#state-when-stopped-2026-10-09).** Air on a commanded
+difference (answer 1) is built on a branch with four `test_physics` checks
+still failing: under it no arch49 elite keeps air credit, because none turns
+when told. M4 so far: the shared PPO learns a fixed body in water, not in air.
+
 **2026-10-08, later: the work list was swept; see
 [the work-list sweep](#2026-10-08-later--the-work-list-sweep).** arch49 (ran
 10-07) had never been read: its held-out retention is below 0.35 in every
@@ -3267,6 +3273,94 @@ must survive a fresh seed).
 Each level is read on the auditor's held-out seeds, never on the draw that
 selected the design.
 
+### Air on a commanded difference (question 1 → B) — in progress, not merged
+
+Branch `air-commanded-difference` (off `main` at 5554cf0). **Stopped at the
+user's request on 2026-10-09 with four `test_physics` checks failing**; nothing
+of it is on `main`, and arch50 does not use it.
+
+*Built:*
+- `tasks.mirror`: air's second half turns by the drawn angle to the *other*
+  side; the straight phase is the same in both. `tasks.pair_of` dispatches
+  (antipode for water and land, mirror for air), and `PAIRED_MEDIA` gains
+  `"air"`, so both evaluators (`evaluate.run_segment`, `batchroll`) run air
+  as a pair from one initial state.
+- The turn response is published signed and unclipped (`pair_turn`), and the
+  second half scores the mean of the two halves, so a lateral velocity the
+  command did not choose reads with opposite signs and cancels.
+- `triphibian.air_task(turn, height) = turn · (0.5 + 0.5 · height)`, replacing
+  `0.5 · turn + 0.5 · height`: height (a state a glider keeps on its airframe)
+  pays only as far as the machine turned when told.
+- Tests: `test_the_heading_pair_cancels_what_the_command_did_not_choose`
+  extended to air (still machines and base gaits score air 0 on both paths,
+  the paths agree, the mirror flips only the turn, `air_task` arithmetic).
+  Mutations `air-height-adds-to-the-turn` and `air-pair-turns-the-same-way`,
+  both caught.
+
+*The probe on the 13 arch49 gannets the gate flagged* (each at its own draw,
+its own controller and the network that scored it, against held still):
+held still, **0 of 13** clear air ≥ 0.012 (was 11); under their own control,
+**0 of 13** (one at 0.011, recorded scores up to 0.42). Their mean signed turn
+response is negative in 12 of 13 (−0.04 to −0.60): **no elite turns when
+told.** Their old air credit was the glide plus lateral drift that happened to
+lie on the drawn side. The leak is closed, and so, for this population, is
+air's gradient: whatever air credit the search finds after this has to come
+from a policy that reads the turn command.
+
+*Open, before it can merge:*
+1. `test_the_seeds_include_something_that_flies` (3 checks) picks the "best"
+   seed by air score, and every open-loop seed now scores 0 by design (none can
+   read the command). Its purpose is a foothold the archive can climb from,
+   which is now a state measurement (airborne fraction, sink rate), not the
+   score; the test should pick on those. The per-plan measurement it needs was
+   started and stopped with the rest.
+2. A segment step-count check ("segments: 1200 steps, scheduled 1000") does
+   not count air's second half.
+3. The full `test_search.py` has not been run on the change.
+4. The no-model gate under the paired air score was running on arch49
+   (`experiments/no_model_gate/results_arch49_airpair.json`, unit
+   `nmg-arch49-airpair`, at group 36 of 136 when this was written):
+   it says whether any air bar is certified, and how many elites keep air > 0.
+
+**Comparability:** air competence is not comparable across this change.
+
+### M4 — partial (7 of 9 runs; the pre-registered read waits for all 9)
+
+`experiments/fixed_body_learning` (unit `fixed-body`, still running; its
+process loaded the code before the air change, so its air is the old score).
+Held-out competence in the body's own medium at updates 0 / 10 / 20 / 30:
+
+| body | seed | held-out | still / base gait |
+|---|---|---|---|
+| air elite 1 (rotor) | 0 | 0.125 / 0.045 / 0.004 / 0.003 | 0.006 / 0.128 |
+| | 1 | 0.126 / 0.057 / 0.088 / 0.143 | |
+| | 2 | 0.133 / 0.070 / 0.053 / 0.127 | |
+| water elite 152 | 0 | 0.0002 / 0.120 / 0.060 / 0.069 | 0 / 0 |
+| | 1 | 0.0003 / 0.015 / 0.046 / 0.056 | |
+| | 2 | 0.0004 / 0.012 / 0.083 / 0.040 | |
+| land elite 29 | 0 | 0.002 / 0.005 / 0.028 / 0.050 | 0 / 0 |
+| | 1 | 0.006 / 0.008 / 0.003 / 0.001 | |
+| | 2 | running | |
+
+So far: on the **water** body every seed rises from ~0 to 0.04–0.07, more than
+the seeds' spread (0.029), and above both controls, so the shared PPO **does
+learn a fixed body in water** in 240 rollouts. On the **air** body it starts at
+the base gait's score (an untrained policy adds little) and ends where it
+started or below (mean change −0.037): no learning. **Land** is split. With
+water learned, P1 (no learning on at least 2 of 3 bodies) now turns on land's
+third seed. The decision rule is applied when the run finishes
+(`results_arch48.json`).
+
+### State when stopped (2026-10-09)
+
+- arch50 running (unit `arch50`, worktree `../arch50-tree` at 2b7bb53), at gen
+  116 of 900; its pre-registered reads (`runs/arch50_notes.md`) are due at gen
+  300.
+- Still running and writing results: M4 (`fixed-body`), the gate under the
+  paired air score (`nmg-arch49-airpair`).
+- arch51 (not started): arch50's configuration plus `--gait-gain` (question 2)
+  and, once merged, the paired air score.
+
 ### Items closed or deferred by the reads above
 
 | item | status | why |
@@ -3279,10 +3373,17 @@ selected the design.
 | E1 / E3, multi-seed ablations | open, for the user | ≥ 5 seeds per arm at ~12 h per 300 gens is 60 h per arm; M1 already answered the refine-steps arm offline |
 | PAPERS item 2, water cruise chosen | open, for the user | the 2026-09-21 rule; the antipodal pair cancels motion the command did not choose, so what remains is the rule's wording |
 | PAPERS item 3, leaking bars | partly read | water and land competence certified on arch49; stage 1 and air leak through the same glide (question 1 below); stage 4's `mission > 0` decides nothing measurable (elite missions ≤ 1e-5) |
-| Skill pretraining, learnability score | waiting on M4 | M4 (running) says whether the learner learns a fixed body at all |
-| M5, PPO epochs | waiting on M4 | the harness takes `--epochs`/`--minibatch` (a fixed gradient-step budget is `minibatch = 2048·E/10`) |
+| Skill pretraining, learnability score | waiting on M4 | M4 (7 of 9 runs): learns a fixed body in water, not in air, land split |
+| M5, PPO epochs | waiting on M4 | the harness takes `--epochs`/`--minibatch` (a fixed gradient-step budget is `minibatch = 2048·E/10`); if M4 ends with water learned, M5 runs on the water body |
 
 ### Questions for the user (collected 2026-10-08)
+
+**Answered 2026-10-09:** 1 → B (air is scored on a commanded difference too;
+in progress, below), 2 → the gait gain is on in arch51, 3 → M3 stays off,
+7 → merged: #37 into `main`; #38 had merged into `refine-criterion`, so #39
+brought the sweep and the CI fix to `main` (merged 2026-10-08 17:24 UTC, its
+CI green on all three jobs, the first green physics job since 2026-10-06).
+4, 5 and 6 are open.
 
 1. **Is a passive glide a capability?** With the still machine fixed, still
    gannets clear air ≥ 0.012 on 11 bodies against the elites' 6, and pass
