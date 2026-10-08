@@ -252,7 +252,8 @@ def _job_status(app, lab, args) -> int:
     if report.stale:
         print("  ** the job says it is active and the launcher says the worker "
               "is gone. Resume it, or cancel it. **")
-    if job.status.value == "succeeded" and job.plan.trainer == "search" and job.workspace:
+    if (job.status.value == "succeeded" and job.plan.trainer == "search"
+            and job.workspace and bool(job.plan.hyperparameter("postrun", True))):
         from ..ops.postrun_status import postrun_verdict
         verdict = postrun_verdict(job.workspace)
         if verdict:

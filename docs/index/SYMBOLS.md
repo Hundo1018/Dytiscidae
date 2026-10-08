@@ -13,11 +13,11 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `add_arguments` | function | 46 | `(parser) -> None` | Attach the ``job`` and ``experiment`` command groups to ``ops/run.py``. |
-| `build_parsers` | function | 341 | `(subparsers) -> None` | Register ``job`` and ``experiment`` on ``ops/run.py``'s subparser set. |
-| `cmd_checkpoints` | function | 438 | `(args) -> int` | ``run checkpoints <job-id>`` -- what a job has to resume or export from. |
+| `build_parsers` | function | 342 | `(subparsers) -> None` | Register ``job`` and ``experiment`` on ``ops/run.py``'s subparser set. |
+| `cmd_checkpoints` | function | 439 | `(args) -> int` | ``run checkpoints <job-id>`` -- what a job has to resume or export from. |
 | `cmd_experiment` | function | 83 | `(args) -> int` | — |
 | `cmd_job` | function | 139 | `(args) -> int` | — |
-| `default_root` | function | 466 | `() -> str` | — |
+| `default_root` | function | 467 | `() -> str` | — |
 
 ## `adapters.composition` — `dytiscidae/adapters/composition.py`
 
@@ -1117,28 +1117,28 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 921 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `draw_key` | function | 865 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
-| `evaluate_candidate` | function | 413 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 536 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 444 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2228 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `median_draw` | function | 870 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
-| `placement_draw_seed` | function | 860 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
-| `run_search` | function | 1455 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2103 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 929 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `draw_key` | function | 873 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
+| `evaluate_candidate` | function | 421 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 544 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 452 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2236 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `median_draw` | function | 878 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
+| `placement_draw_seed` | function | 868 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
+| `run_search` | function | 1463 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2111 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 64 | — | Everything adjustable about a run. |
-| `SearchState` | class | 322 | — | — |
-| `seed_archipelago` | function | 2492 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 461 | `(self)` | — |
-| `GenerationCost.count` | method | 481 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 467 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 474 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 490 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 487 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 382 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 386 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 390 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 330 | — | — |
+| `seed_archipelago` | function | 2500 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `GenerationCost.__init__` | method | 469 | `(self)` | — |
+| `GenerationCost.count` | method | 489 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 475 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 482 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 498 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 495 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 390 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 394 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 398 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1260,27 +1260,27 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 623 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `build_parser` | function | 948 | `() -> argparse.ArgumentParser` | — |
-| `child_env` | function | 324 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
-| `cmd_cohort` | function | 564 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_config` | function | 434 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
-| `cmd_dashboard` | function | 893 | `(args) -> int` | — |
-| `cmd_distill` | function | 931 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 452 | `(args) -> int` | — |
-| `cmd_postrun` | function | 400 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 635 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `build_parser` | function | 960 | `() -> argparse.ArgumentParser` | — |
+| `child_env` | function | 336 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
+| `cmd_cohort` | function | 576 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_config` | function | 446 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
+| `cmd_dashboard` | function | 905 | `(args) -> int` | — |
+| `cmd_distill` | function | 943 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 464 | `(args) -> int` | — |
+| `cmd_postrun` | function | 412 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 124 | `(args) -> int` | — |
-| `cmd_render` | function | 900 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
-| `cmd_search` | function | 252 | `(args) -> int` | — |
-| `cmd_showcase` | function | 751 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 459 | `(args) -> int` | — |
-| `cmd_train` | function | 493 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_render` | function | 912 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_search` | function | 263 | `(args) -> int` | — |
+| `cmd_showcase` | function | 763 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 471 | `(args) -> int` | — |
+| `cmd_train` | function | 505 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 117 | `(args) -> int` | — |
-| `controller_for_elite` | function | 633 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 343 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 645 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 355 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 32 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 1281 | `(argv=None) -> int` | — |
-| `merge_config_file` | function | 216 | `(cfg, path, shared: bool)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
+| `main` | function | 1293 | `(argv=None) -> int` | — |
+| `merge_config_file` | function | 221 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
 | `search_config_from_args` | function | 159 | `(args, shared: bool)` | The ``SearchConfig`` a ``search`` command line asks for. |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`

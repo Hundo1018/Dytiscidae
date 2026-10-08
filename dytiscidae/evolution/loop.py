@@ -317,6 +317,14 @@ class SearchConfig:
     scout_horizon: int = 40
     scout_reserve: float = 0.15
 
+    def __post_init__(self) -> None:
+        # Refused here, before a launch, rather than inside the first
+        # generation: there the error is caught per generation, every batch is
+        # credited "rejected", and a run of empty archives exits cleanly.
+        if int(self.placement_draws or 1) > 1 and int(self.controller_refine_steps or 0) > 0:
+            raise ValueError("placement_draws > 1 with controller_refine_steps > 0 is "
+                             "not built: refinement's trials are scored on one draw")
+
 
 @dataclass(eq=False)
 class SearchState:

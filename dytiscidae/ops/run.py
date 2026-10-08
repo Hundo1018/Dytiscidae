@@ -213,13 +213,22 @@ def search_config_from_args(args, shared: bool):
     )
 
 
-def merge_config_file(cfg, path, shared: bool):
+#: Where and how this launch runs, never what the export recorded: taking
+#: ``run_dir`` from a file would write into the recorded run's directory.
+_LAUNCH_FIELDS = ("run_dir", "resume")
+
+
+def merge_config_file(cfg, path, shared: bool, shared_explicit: bool = False):
     """``cfg`` with every field taken from a config export (ROADMAP B4), except
-    those the command line set to something other than its default.
+    those the command line set to something other than its default, and the
+    launch's own ``run_dir`` and ``resume``.
 
     ``path`` is the JSON ``ops.run config`` writes, or a bare field mapping.
     Fields the file names that ``SearchConfig`` no longer has are reported and
     dropped; fields it lacks keep the command line's value.
+    ``shared_explicit``: ``--shared-policy``/``--no-shared-policy`` was given,
+    so the command line's ``use_shared_policy`` wins even where it equals the
+    default.
     """
     import dataclasses
 
@@ -232,7 +241,9 @@ def merge_config_file(cfg, path, shared: bool):
     merged = {}
     for name in names:
         mine = getattr(cfg, name)
-        if name in raw and mine == getattr(default, name):
+        keep = (name in _LAUNCH_FIELDS
+                or (name == "use_shared_policy" and shared_explicit))
+        if name in raw and not keep and mine == getattr(default, name):
             v = raw[name]
             merged[name] = tuple(v) if isinstance(v, list) else v
         else:
@@ -268,7 +279,8 @@ def cmd_search(args) -> int:
               "own weights are zero commands nothing", file=sys.stderr)
     cfg = search_config_from_args(args, shared)
     if getattr(args, "config", None):
-        cfg = merge_config_file(cfg, args.config, shared)
+        cfg = merge_config_file(cfg, args.config, shared,
+                                shared_explicit=args.shared_policy is not None)
     spec = MissionSpec(
         cycles=args.cycles,
         seconds_per_domain=args.seconds_per_domain,

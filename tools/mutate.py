@@ -592,10 +592,18 @@ MUTATIONS: tuple = (
     Mutation(
         id="config-file-loses-to-cli-defaults",
         path="dytiscidae/ops/run.py",
-        find="        if name in raw and mine == getattr(default, name):\n",
+        find="        if name in raw and not keep and mine == getattr(default, name):\n",
         replace="        if False:\n",
         defect="search --config keeps the command line's defaults, so a relaunch "
                "from an export silently runs a different configuration",
+        suites=("test_physics::test_a_config_export_relaunches_the_same_search",), item="config export"),
+    Mutation(
+        id="config-file-picks-the-run-dir",
+        path="dytiscidae/ops/run.py",
+        find="        keep = (name in _LAUNCH_FIELDS\n",
+        replace="        keep = (False\n",
+        defect="search --config without --run writes into the recorded run's "
+               "directory, and may inherit its resume flag",
         suites=("test_physics::test_a_config_export_relaunches_the_same_search",), item="config export"),
     Mutation(
         id="postrun-failure-is-quiet",

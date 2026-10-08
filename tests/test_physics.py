@@ -116,7 +116,8 @@ def test_a_config_export_relaunches_the_same_search() -> None:
 
     src = search_config_from_args(build_parser().parse_args(
         ["search", "--batch", "8", "--segment-seconds", "5", "--refine-steps", "3",
-         "--no-draw-per-candidate", "--islands", "air,water", "--seed", "11"]), True)
+         "--no-draw-per-candidate", "--islands", "air,water", "--seed", "11",
+         "--run", "runs/recorded"]), True)
     exported = {f.name: getattr(src, f.name) for f in dataclasses.fields(src)}
     with tempfile.TemporaryDirectory() as d:
         path = Path(d) / "c.json"
@@ -125,8 +126,15 @@ def test_a_config_export_relaunches_the_same_search() -> None:
         got = merge_config_file(search_config_from_args(a, True), a.config, True)
         differ = [f.name for f in dataclasses.fields(got)
                   if getattr(got, f.name) != getattr(src, f.name)]
-        check("every field comes from the file but the one given on the line",
-              differ == ["seed"] and got.seed == 12, f"{differ}")
+        check("every field comes from the file but the one given on the line "
+              "and where this launch runs",
+              sorted(differ) == ["run_dir", "seed"] and got.seed == 12
+              and got.run_dir == "runs/latest", f"{differ}")
+        b = build_parser().parse_args(["search", "--config", str(path),
+                                       "--no-shared-policy"])
+        off = merge_config_file(search_config_from_args(b, False), b.config, False,
+                                shared_explicit=True)
+        check("an explicit --no-shared-policy beats the file", off.use_shared_policy is False)
         old = dict(exported)
         old.pop("draw_per_candidate")
         path.write_text(json.dumps({"config": old}, default=list))
