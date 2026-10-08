@@ -94,8 +94,16 @@ def test_a_child_python_is_the_venv_after_the_kernel_poisons_the_environment() -
             libc.unsetenv(b"PYTHONEXECUTABLE")
         else:
             libc.setenv(b"PYTHONEXECUTABLE", saved, 1)
-    check("the poisoned environment really leaks (the test is live)",
-          bare != sys.prefix, f"bare child prefix {bare}")
+    # The leak is a venv's: a bare interpreter (CI's toolcache Python) has
+    # the same prefix whichever executable it is started as, so there the
+    # first check cannot be live.  Skipped, not passed, and not failed.
+    if sys.prefix == sys.base_prefix:
+        SKIPPED.append("the poisoned-environment liveness check (not in a venv)")
+        print(f"  [skip] the poisoned environment really leaks -- not in a venv "
+              f"(prefix {sys.prefix}), so nothing can leak")
+    else:
+        check("the poisoned environment really leaks (the test is live)",
+              bare != sys.prefix, f"bare child prefix {bare}")
     check("child_env gives the child this interpreter's prefix",
           fixed == sys.prefix, f"{fixed} vs {sys.prefix}")
 
@@ -255,8 +263,8 @@ def report(label: str) -> int:
     """The summary.  A skip is never folded into the success line."""
     print("\n" + "=" * 68)
     if SKIPPED:
-        print(f"{len(SKIPPED)} SKIPPED — needs the Mojo GPU fluid extension "
-              f"(`cd mojo && pixi run build-all`), not a defect: "
+        print(f"{len(SKIPPED)} SKIPPED — not a defect; a function skip needs the "
+              f"Mojo GPU fluid extension (`cd mojo && pixi run build-all`): "
               f"{', '.join(SKIPPED)}")
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
