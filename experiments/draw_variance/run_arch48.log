@@ -1,0 +1,877 @@
+200 elites, measuring 200 in 130 (gen, seed) groups; K=6, segment_seconds 8.0
+group 1/130 gen 22 n=1 wall 27s
+group 2/130 gen 29 n=1 wall 57s
+group 3/130 gen 32 n=1 wall 83s
+group 4/130 gen 39 n=1 wall 118s
+group 5/130 gen 78 n=1 wall 146s
+group 6/130 gen 80 n=1 wall 177s
+group 7/130 gen 81 n=1 wall 209s
+group 8/130 gen 83 n=1 wall 232s
+group 9/130 gen 84 n=1 wall 268s
+group 10/130 gen 86 n=1 wall 295s
+group 11/130 gen 87 n=1 wall 333s
+group 12/130 gen 93 n=4 wall 439s
+group 13/130 gen 96 n=1 wall 473s
+group 14/130 gen 97 n=1 wall 511s
+group 15/130 gen 103 n=1 wall 538s
+group 16/130 gen 105 n=1 wall 567s
+group 17/130 gen 109 n=1 wall 590s
+group 18/130 gen 112 n=1 wall 613s
+group 19/130 gen 117 n=1 wall 661s
+group 20/130 gen 118 n=1 wall 687s
+group 21/130 gen 122 n=1 wall 712s
+group 22/130 gen 123 n=2 wall 758s
+group 23/130 gen 125 n=1 wall 798s
+group 24/130 gen 132 n=1 wall 820s
+group 25/130 gen 133 n=1 wall 844s
+group 26/130 gen 135 n=2 wall 900s
+group 27/130 gen 136 n=1 wall 919s
+/home/hundo/Projects/Dytiscidae/dytiscidae/dytiscidae/physics/fluid.py:810: RuntimeWarning: invalid value encountered in multiply
+  fb *= limit / total
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 1.6440.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 2.2160.
+
+/home/hundo/Projects/Dytiscidae/dytiscidae/dytiscidae/physics/fluid.py:773: RuntimeWarning: overflow encountered in multiply
+  fa = np.sqrt(lift * lift + drag * drag)
+/home/hundo/Projects/Dytiscidae/dytiscidae/dytiscidae/physics/fluid.py:699: RuntimeWarning: invalid value encountered in matmul
+  agg = S @ np.concatenate([b[:, None], b[:, None] * r, b[:, None] * m9], axis=1)
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 6.8960.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/lib/python3.12/site-packages/numpy/_core/_methods.py:49: RuntimeWarning: invalid value encountered in reduce
+  return umr_sum(a, axis, dtype, out, keepdims, initial, where)
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 7.2640.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+/home/hundo/Projects/Dytiscidae/dytiscidae/dytiscidae/physics/fluid.py:708: RuntimeWarning: invalid value encountered in matmul
+  + 2.0 * (B1 @ lxw.T) + B2 @ ww.T)
+/home/hundo/Projects/Dytiscidae/dytiscidae/dytiscidae/physics/fluid.py:707: RuntimeWarning: invalid value encountered in add
+  val = (B0[:, None] * (lin * lin).sum(1)[None, :]
+/home/hundo/Projects/Dytiscidae/dytiscidae/dytiscidae/physics/fluid.py:510: RuntimeWarning: invalid value encountered in divide
+  f = F / T
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 7.2800.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 7.2800.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 1.2880.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 1.9280.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 2.6840.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 4.7200.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.1080.
+
+group 28/130 gen 140 n=1 wall 940s
+group 29/130 gen 142 n=1 wall 966s
+group 30/130 gen 150 n=3 wall 1033s
+group 31/130 gen 152 n=1 wall 1054s
+group 32/130 gen 153 n=1 wall 1085s
+WARNING: Nan, Inf or huge value in QACC at DOF 2. The simulation is unstable. Time = 2.8160.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 1. The simulation is unstable. Time = 3.0160.
+
+group 33/130 gen 155 n=1 wall 1113s
+group 34/130 gen 158 n=1 wall 1141s
+group 35/130 gen 160 n=1 wall 1162s
+group 36/130 gen 161 n=1 wall 1200s
+group 37/130 gen 162 n=1 wall 1221s
+group 38/130 gen 165 n=1 wall 1266s
+group 39/130 gen 166 n=2 wall 1317s
+group 40/130 gen 168 n=2 wall 1359s
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 1.8280.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 1.8600.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 2.0920.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 3.1640.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 1.8280.
+
+group 41/130 gen 169 n=1 wall 1384s
+group 42/130 gen 170 n=2 wall 1445s
+group 43/130 gen 171 n=1 wall 1469s
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.1320.
+
+group 44/130 gen 172 n=1 wall 1506s
+group 45/130 gen 175 n=1 wall 1533s
+group 46/130 gen 176 n=1 wall 1575s
+group 47/130 gen 177 n=2 wall 1627s
+group 48/130 gen 183 n=1 wall 1660s
+group 49/130 gen 184 n=2 wall 1699s
+group 50/130 gen 188 n=1 wall 1724s
+group 51/130 gen 190 n=1 wall 1751s
+group 52/130 gen 191 n=1 wall 1772s
+group 53/130 gen 192 n=1 wall 1800s
+group 54/130 gen 196 n=1 wall 1821s
+group 55/130 gen 197 n=1 wall 1842s
+group 56/130 gen 198 n=1 wall 1865s
+group 57/130 gen 199 n=2 wall 1918s
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 6.0960.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 6.5760.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 6.9880.
+
+group 58/130 gen 200 n=1 wall 1938s
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 7.6000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 1.3520.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 1.8200.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 2.4040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 2.0080.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 5.5960.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 2.6360.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+group 59/130 gen 201 n=1 wall 1965s
+group 60/130 gen 203 n=1 wall 2003s
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 7.1920.
+
+group 61/130 gen 204 n=1 wall 2028s
+group 62/130 gen 205 n=4 wall 2155s
+group 63/130 gen 206 n=2 wall 2199s
+group 64/130 gen 207 n=1 wall 2228s
+group 65/130 gen 208 n=3 wall 2304s
+group 66/130 gen 210 n=3 wall 2408s
+group 67/130 gen 213 n=1 wall 2442s
+group 68/130 gen 214 n=2 wall 2490s
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 3.1640.
+
+group 69/130 gen 216 n=1 wall 2509s
+group 70/130 gen 217 n=1 wall 2539s
+group 71/130 gen 218 n=1 wall 2577s
+group 72/130 gen 219 n=1 wall 2599s
+group 73/130 gen 221 n=2 wall 2655s
+group 74/130 gen 222 n=2 wall 2702s
+group 75/130 gen 223 n=1 wall 2738s
+group 76/130 gen 224 n=2 wall 2779s
+group 77/130 gen 225 n=1 wall 2809s
+group 78/130 gen 228 n=1 wall 2845s
+group 79/130 gen 229 n=1 wall 2884s
+group 80/130 gen 230 n=1 wall 2909s
+group 81/130 gen 231 n=1 wall 2943s
+group 82/130 gen 233 n=3 wall 3036s
+group 83/130 gen 234 n=1 wall 3073s
+WARNING: Nan, Inf or huge value in QACC at DOF 1. The simulation is unstable. Time = 3.8600.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 4. The simulation is unstable. Time = 7.4240.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 4.1280.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 6.1440.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+group 84/130 gen 236 n=1 wall 3091s
+group 85/130 gen 237 n=2 wall 3135s
+group 86/130 gen 238 n=1 wall 3163s
+group 87/130 gen 239 n=3 wall 3235s
+group 88/130 gen 241 n=1 wall 3268s
+group 89/130 gen 242 n=1 wall 3290s
+group 90/130 gen 244 n=1 wall 3329s
+group 91/130 gen 245 n=5 wall 3463s
+group 92/130 gen 247 n=1 wall 3499s
+group 93/130 gen 248 n=3 wall 3561s
+group 94/130 gen 249 n=3 wall 3623s
+group 95/130 gen 250 n=4 wall 3762s
+group 96/130 gen 251 n=1 wall 3785s
+group 97/130 gen 253 n=3 wall 3872s
+group 98/130 gen 254 n=2 wall 3921s
+group 99/130 gen 255 n=2 wall 3981s
+group 100/130 gen 257 n=3 wall 4062s
+group 101/130 gen 258 n=1 wall 4084s
+group 102/130 gen 259 n=1 wall 4126s
+group 103/130 gen 261 n=2 wall 4192s
+group 104/130 gen 262 n=1 wall 4224s
+group 105/130 gen 263 n=2 wall 4295s
+group 106/130 gen 264 n=1 wall 4318s
+group 107/130 gen 265 n=2 wall 4369s
+group 108/130 gen 269 n=1 wall 4390s
+group 109/130 gen 270 n=2 wall 4448s
+group 110/130 gen 272 n=3 wall 4507s
+group 111/130 gen 275 n=2 wall 4554s
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 3.8880.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 4.3720.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 6. The simulation is unstable. Time = 4.3920.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 3. The simulation is unstable. Time = 5.4960.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 6.9440.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 3. The simulation is unstable. Time = 2.6040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 2.6920.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 2. The simulation is unstable. Time = 3.1760.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 4.4240.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 4.7320.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 5.0840.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 3.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 3.4000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 3.4000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 3.4000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 3.4000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 3.4000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 3.4000.
+
+group 112/130 gen 276 n=3 wall 4623s
+group 113/130 gen 278 n=3 wall 4697s
+group 114/130 gen 279 n=4 wall 4797s
+group 115/130 gen 280 n=1 wall 4820s
+group 116/130 gen 281 n=1 wall 4846s
+group 117/130 gen 282 n=1 wall 4880s
+group 118/130 gen 284 n=1 wall 4911s
+group 119/130 gen 285 n=1 wall 4950s
+group 120/130 gen 286 n=1 wall 4976s
+group 121/130 gen 287 n=2 wall 5032s
+group 122/130 gen 288 n=1 wall 5060s
+group 123/130 gen 289 n=1 wall 5090s
+group 124/130 gen 291 n=1 wall 5111s
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 3.5320.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 6.7960.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 0.0040.
+
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0000.
+
+group 125/130 gen 292 n=2 wall 5161s
+group 126/130 gen 293 n=2 wall 5221s
+group 127/130 gen 294 n=2 wall 5273s
+group 128/130 gen 295 n=3 wall 5360s
+group 129/130 gen 296 n=2 wall 5402s
+group 130/130 gen 299 n=3 wall 5466s
+{
+ "run": "runs/arch48",
+ "n_elites": 200,
+ "of_archive": 200,
+ "k": 6,
+ "wall_s": 5465.964167833328,
+ "skipped": {
+  "no_controller": []
+ },
+ "table": {
+  "air": {
+   "n": 200,
+   "k": 6,
+   "nonzero_any_fresh": 29,
+   "underpowered": false,
+   "mean_s": 0.000841103833811485,
+   "mean_fresh": 0.0007826051801170335,
+   "curse": 0.06954985977101447,
+   "draw_var": 0.0001670770638022896,
+   "design_var": 3.6249056401239444e-05,
+   "R": 4.609142427127478,
+   "R_ci": [
+    1.8499357411802688,
+    13.769152646973378
+   ],
+   "icc1": 0.17828037226576796,
+   "k80": 18.43656970850991,
+   "rank": 0.4112891521738327,
+   "verdict": "draw dominates: sequential evaluation earns a build"
+  },
+  "water": {
+   "n": 200,
+   "k": 6,
+   "nonzero_any_fresh": 177,
+   "underpowered": false,
+   "mean_s": 0.011873452747394077,
+   "mean_fresh": 0.009662065261865582,
+   "curse": 0.18624637100727404,
+   "draw_var": 0.0005509651962234736,
+   "design_var": 0.000183188725041687,
+   "R": 3.007637048066655,
+   "R_ci": [
+    1.6147047680874569,
+    5.755432614958986
+   ],
+   "icc1": 0.24952359407956246,
+   "k80": 12.03054819226662,
+   "rank": 0.3276694112640455,
+   "verdict": "draw dominates: sequential evaluation earns a build"
+  },
+  "land": {
+   "n": 200,
+   "k": 6,
+   "nonzero_any_fresh": 171,
+   "underpowered": false,
+   "mean_s": 0.01877820310680427,
+   "mean_fresh": 0.01478239552819533,
+   "curse": 0.2127896666087855,
+   "draw_var": 0.0013923720543127704,
+   "design_var": 0.0005596940075137495,
+   "R": 2.4877380061614565,
+   "R_ci": [
+    1.4495447804648676,
+    5.151063280318944
+   ],
+   "icc1": 0.2867187839893348,
+   "k80": 9.950952024645826,
+   "rank": 0.2998040276384466,
+   "verdict": "draw dominates: sequential evaluation earns a build"
+  },
+  "island": {
+   "n": 200,
+   "k": 6,
+   "nonzero_any_fresh": 89,
+   "underpowered": false,
+   "mean_s": 0.00034122119564613515,
+   "mean_fresh": 0.0001809751249652907,
+   "curse": 0.469625195402657,
+   "draw_var": 1.7383483670256722e-07,
+   "design_var": 2.0895387136018452e-07,
+   "R": 0.831929246254161,
+   "R_ci": [
+    0.4961110160642283,
+    1.560037118501651
+   ],
+   "icc1": 0.545872610552373,
+   "k80": 3.327716985016644,
+   "rank": 0.5535378828864789,
+   "verdict": "undecided: k80 = 3.3, build nothing"
+  },
+  "stage": {
+   "n": 200,
+   "k": 6,
+   "nonzero_any_fresh": 151,
+   "underpowered": false,
+   "mean_s": 0.02129242904228406,
+   "mean_fresh": 0.014448414186549385,
+   "curse": 0.3214295016385087,
+   "draw_var": 0.0011573883021851901,
+   "design_var": 0.0004896167694764541,
+   "R": 2.3638657299724075,
+   "R_ci": [
+    1.3198258496062016,
+    4.768502990595144
+   ],
+   "icc1": 0.2972770259793344,
+   "k80": 9.45546291988963,
+   "rank": 0.47580841588330475,
+   "verdict": "draw dominates: sequential evaluation earns a build"
+  }
+ },
+ "predictions": {
+  "P1": {
+   "water": true,
+   "land": true
+  },
+  "P2": {
+   "water": false,
+   "land": true
+  },
+  "P3": {
+   "water": true,
+   "land": true
+  },
+  "P4": true
+ },
+ "bad_qacc_rows": 12,
+ "islands": {
+  "triphibian": 32,
+  "land_air": 35,
+  "air": 31,
+  "generalist": 30,
+  "water": 25,
+  "amphibian": 15,
+  "aerial_diver": 16,
+  "land": 16
+ }
+}
