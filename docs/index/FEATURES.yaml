@@ -203,12 +203,16 @@ SegmentTasks:
 HeadingPair:
   implementation:
     - envs.tasks.antipode
+    - envs.tasks.mirror
+    - envs.tasks.pair_of
     - envs.evaluate.run_segment
     - envs.triphibian.pair_partner_of
+    - envs.triphibian.air_task
   tests:
     - tests.test_search::test_the_heading_pair_cancels_what_the_command_did_not_choose
     - tests.test_search::test_tier2_draws_its_headings
-  note: water and land are scored on the drawn heading and its opposite from one initial state, progress on the mean signed speed along the two, so motion the command did not choose cancels exactly (docs/PAPERS_2610.md); batchroll.evaluate_tier1_batch runs the same sequence
+    - tests.test_physics::test_air_is_scored_on_a_mirrored_turn
+  note: water and land are scored on the drawn heading and its opposite from one initial state, progress on the mean signed speed along the two, so motion the command did not choose cancels exactly (docs/PAPERS_2610.md); air (since 2026-10-10, the user's answer of 10-09) on the drawn turn and its mirror, the turn response on the mean of the two, and height paying only through the turn (air_task); batchroll.evaluate_tier1_batch runs the same sequence
 
 ConfigExport:
   implementation:

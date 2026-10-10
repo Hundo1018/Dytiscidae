@@ -3833,7 +3833,7 @@ must survive a fresh seed).
 Each level is read on the auditor's held-out seeds, never on the draw that
 selected the design.
 
-### Air on a commanded difference (question 1 → B) — in progress, not merged
+### Air on a commanded difference (question 1 → B) — merged 2026-10-10 (branch `a51-air`), item 4 owed
 
 Branch `air-commanded-difference` (off `main` at 5554cf0). **Stopped at the
 user's request on 2026-10-09 with four `test_physics` checks failing**; nothing
@@ -3883,6 +3883,51 @@ from a policy that reads the turn command.
    it says whether any air bar is certified, and how many elites keep air > 0.
 
 **Comparability:** air competence is not comparable across this change.
+
+*Merged 2026-10-10* onto `failure-theory-1010` as branch `a51-air` (the user:
+fix it and merge it; arch51 carries it). The code merged without conflicts
+beside the ARCH51 lanes.
+- Item 1: `test_the_seeds_include_something_that_flies` now picks and judges
+  the plan on the air segment's state measurements (`airborne_fraction`,
+  `sink_rate`, medians over scatter seeds 0-2), never on the score; a segment
+  that published nothing reads as (0, 99), so "could not measure" cannot pass.
+  Measured, airborne / sink m/s: gannet **1.00 / 1.51**, teal 0.65 / 4.94,
+  beetle 0.44 / 8.79, bat 0.50 / 10.41, ray 0.41 / 13.99, medusa 0.40 / 11.94,
+  eel 0.42 / 9.90 (eel seed 0 published nothing). Bars unchanged (airborne >
+  0.95, sink < 3.0 m/s); the third check is now sink under half the next
+  slowest plan's (1.51 vs 4.94); a fourth check is the negative control, eel
+  and medusa (built not to fly) fail the bar and read `height_hold` 0. With
+  the gannet removed from
+  `BODY_PLANS` the test fails 3 of 4 (teal 0.65 / 4.94 is picked and clears
+  neither bar), so it is a gate. Every open-loop seed scores air 0 (median
+  competence 0.0 on all 7 plans).
+- Item 2: the step count expects six segment rollouts (every medium a pair,
+  each half the full segment), written as a literal; with `"air"` removed from
+  `PAIRED_MEDIA` by hand it fails, `segments: 1000 steps, scheduled 1200`.
+- The air arithmetic (`air_task`, `mirror`, `pair_of`) is also checked without
+  a simulator in `test_physics::test_air_is_scored_on_a_mirrored_turn`, listed
+  first for both air mutations, so they are caught on a machine with no GPU
+  (both caught by it, 0.3-0.4 s).
+- Found on the way: mutation `air-height-counts-floating` (the height term
+  stops asking whether the body is still in the air) **survived** the whole
+  `test_physics` after the merge. Height now pays only through the turn, so an
+  open-loop body scores 0 in air whatever height reads (which check caught it
+  before the merge was not re-measured). The seeds test's
+  negative control now reads `height_hold` directly: under the mutation eel
+  reads 0.15, unmutated 0.0; caught (listed first for that mutation).
+- Item 3 (full `test_search.py`, including the batched-path air checks in
+  `test_the_heading_pair_cancels_what_the_command_did_not_choose`) and item 4
+  (the no-model gate under the paired air score on arch49: whether any air
+  bar is certified, and how many elites keep air > 0) need the GPU and are
+  **still owed**. Item 4, from the `a51-air` tree:
+  `systemd-run --user --unit nmg-arch49-airpair -p MemoryMax=3500M
+  --working-directory=<a51-air> env MUJOCO_GL=disable PYTHONPATH=<a51-air>
+  DYTISCIDAE_KERNEL_DIR=<main>/mojo/build <main>/.venv/bin/python -u
+  experiments/no_model_gate/run.py --run <main>/runs/arch49
+  --out experiments/no_model_gate/results_arch49_airpair.json`.
+
+**Comparability (merge):** air competence is not comparable across this
+change (2026-10-10); arch51 is the first run on it.
 
 ### M4 — partial (7 of 9 runs; the pre-registered read waits for all 9)
 

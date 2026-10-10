@@ -26,7 +26,7 @@ import numpy as np
 from ..control.cpg import TWIST_DIM, CPGParams, MobilityBasis, Policy
 from ..core.phenotype import Phenotype
 from ..physics.energy import transition_energy
-from .tasks import PAIRED_MEDIA, antipode, schedule_for, task_seed
+from .tasks import PAIRED_MEDIA, pair_of, schedule_for, task_seed
 from .transitions import TransitionSet, run_transition
 from .triphibian import (
     DOMAIN_CYCLE,
@@ -299,7 +299,7 @@ def run_segment(env: TriphibianEnv, dom: Domain, seconds: float, ctrl, *,
         return first
     after = env.rng.bit_generator.state
     env.rng.bit_generator.state = state
-    second = half(antipode(task), pair_partner_of(first))
+    second = half(pair_of(task), pair_partner_of(first))
     env.rng.bit_generator.state = after
     return second
 

@@ -224,7 +224,8 @@ then films (`dytiscidae/viz/film.py`) into `runs/<run>/media/`, embedded in
 - **Comparability boundaries.** Air scores and `mission_fraction` are not
   comparable across arch33→34, arch34→35, arch36→37 (air ladder 7 → 11 rungs),
   2026-09-20, and arch43 (corrected physics: nothing before it is comparable on
-  air or water forces). From 2026-10-10 (ARCH51_SPEC N5, arch51 onward) the
+  air or water forces), and air across the mirrored turn pair (merged
+  2026-10-10, arch51 onward). From 2026-10-10 (ARCH51_SPEC N5, arch51 onward) the
   stored `fitness`, `objectives[0]` and everything built on them (`qd_score`,
   parent weight, migrants, promotion and prune order, `best`) are not
   comparable with any earlier run: a design competent in none of its island's
@@ -358,7 +359,10 @@ Each rule below was paid for by a score that rewarded the wrong thing.
    2026-10-08 each candidate also faces its own draw
    (`SearchConfig.draw_per_candidate`, ROADMAP M2): the batched path takes one
    seed per machine, and a result equals what that machine scores alone at its
-   `eval_seed`.
+   `eval_seed`. Since 2026-10-10 air is paired too (the user, 10-09): the drawn turn
+   and its mirror (`tasks.mirror`), the turn response on the mean of the two,
+   and height paying only through the turn (`triphibian.air_task`), after the
+   fixed still machine cleared air on 11 arch49 gannets against the elites' 6.
 
 ## Where things are
 

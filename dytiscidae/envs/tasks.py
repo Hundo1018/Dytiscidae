@@ -231,10 +231,35 @@ def schedule_for(domain, rng=None, *, trim_speed: float = 0.0) -> TaskSchedule:
     return TaskSchedule(key, (_at(first, 0.0), _at(second, 0.5)))
 
 
-#: The media whose segment is scored as an antipodal pair (``antipode``).
-#: Air's headings are relative to the launch -- cruise straight, then a drawn
-#: turn -- so a passive glide does not line up with a drawn world heading there.
-PAIRED_MEDIA: tuple = ("water", "land")
+def mirror(schedule: TaskSchedule) -> TaskSchedule:
+    """The same air script with the drawn turn the other way.
+
+    Air's headings are relative to the launch -- cruise straight, then a turn
+    of 45-90 degrees to a drawn side -- so its pair is the mirror, not the
+    antipode: the straight phase is the same in both halves and the turn goes
+    to opposite sides.  A lateral velocity the command did not choose (a
+    glider slipping to one side) reads toward the commanded side in one half
+    and away from it in the other, and the turn response is taken on the mean
+    of the two, so it cancels.  The user's answer of 2026-10-09: air, too, is
+    scored on a commanded difference, after the fixed still machine cleared air
+    >= 0.012 on 11 arch49 gannets against the elites' 6.
+    """
+    return TaskSchedule(schedule.domain, tuple(
+        Phase(ph.kind, ph.start, _wrap(-ph.heading), ph.speed, ph.depth)
+        if ph.kind == CRUISE else ph
+        for ph in schedule.phases))
+
+
+def pair_of(schedule: TaskSchedule) -> TaskSchedule:
+    """The second half of a paired segment: the antipode in water and on land,
+    the mirror in the air."""
+    return mirror(schedule) if schedule.domain == "air" else antipode(schedule)
+
+
+#: The media whose segment is scored as a pair from one initial state
+#: (``pair_of``): water and land on the antipode of the drawn heading, air on
+#: the mirror of the drawn turn (since 2026-10-10).
+PAIRED_MEDIA: tuple = ("water", "land", "air")
 
 
 def antipode(schedule: TaskSchedule) -> TaskSchedule:

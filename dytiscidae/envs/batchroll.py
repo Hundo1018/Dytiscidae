@@ -1081,7 +1081,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         # TriphibianEnv.scatter for why the canonical pose alone was not a
         # training set.  Machines given the same seed face the same draw.
         from .evaluate import _scatter_seed
-        from .tasks import PAIRED_MEDIA, antipode, schedule_for, task_seed
+        from .tasks import PAIRED_MEDIA, pair_of, schedule_for, task_seed
         from .triphibian import pair_partner_of
         scatter_seeds = {i: _scatter_seed(seeds[i], dom) for i in live}
         # The task, drawn the same way from each machine's own scatter seed.
@@ -1120,7 +1120,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
             after = {i: envs[i].rng.bit_generator.state for i in live}
             for i in live:
                 envs[i].rng.bit_generator.state = rewind[i]
-            second, coll2 = _half({i: antipode(t) for i, t in tasks.items()},
+            second, coll2 = _half({i: pair_of(t) for i, t in tasks.items()},
                                   [pair_partner_of(x) for x in segs],
                                   50 + DOMAIN_CYCLE.index(dom))
             for i in live:
