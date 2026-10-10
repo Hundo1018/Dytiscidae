@@ -1124,8 +1124,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="run without the potential predictor (greedy selection)")
     p.add_argument("--scout-reserve", type=float, default=0.15,
                    help="share of each archive protected on predicted potential")
-    p.add_argument("--mission-weight", type=float, default=0.30,
-                   help="share of the archive's scalar that is the mission "
+    p.add_argument("--mission-weight", type=float, default=0.0,
+                   help="0.30 through arch50; 0.0 from ARCH51_SPEC "
+                        "(mission_fraction is zero for 97-100%% of every "
+                        "window, ROADMAP N2). Share of the archive's scalar "
+                        "that is the mission "
                         "itself, as a population quantile, rather than the "
                         "island/curriculum blend. At 0 -- every run before "
                         "2026-09-01 -- corr(fitness, mission_fraction) "
