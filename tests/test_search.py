@@ -5802,6 +5802,40 @@ def NS_two_media():
         "water": NS(competence=0.5, measurements={})})
 
 
+def test_a_design_competent_in_nothing_its_island_reads_is_below_the_floor() -> None:
+    """ARCH51_SPEC L2: the competence floor reads the island's own media only."""
+    print("\nislands: a design competent in nothing its island reads is below the floor")
+    from dytiscidae.evolution.curriculum import WEAKEST_BARS
+    from dytiscidae.evolution.islands import COMPETENCE_FLOOR, below_competence_floor
+
+    class Seg:
+        def __init__(self, c):
+            self.competence = c
+
+    class Res:
+        def __init__(self, **comps):
+            self.segments = {k: Seg(v) for k, v in comps.items()}
+
+    check("the floor is WEAKEST_BARS[1] in every medium",
+          COMPETENCE_FLOOR == {m: WEAKEST_BARS[1] for m in ("air", "water", "land")},
+          str(COMPETENCE_FLOOR))
+    check("water island: water 0.011 is below the floor",
+          below_competence_floor("water", Res(air=0.0, water=0.011, land=0.0)) is True)
+    check("water island: water 0.012 is at the floor, not below",
+          below_competence_floor("water", Res(air=0.0, water=0.012, land=0.0)) is False)
+    check("water island: water 0.0 with air 0.5 is below (air is not read)",
+          below_competence_floor("water", Res(air=0.5, water=0.0, land=0.0)) is True)
+    check("amphibian: water 0.0, land 0.02 clears",
+          below_competence_floor("amphibian", Res(air=0.0, water=0.0, land=0.02)) is False)
+    for isl in ("triphibian", "generalist"):
+        check(f"{isl}: 0.011 in all three is below",
+              below_competence_floor(isl, Res(air=0.011, water=0.011, land=0.011)) is True)
+        check(f"{isl}: land 0.02 alone clears",
+              below_competence_floor(isl, Res(air=0.0, water=0.0, land=0.02)) is False)
+    check("water island with no water segment is below",
+          below_competence_floor("water", Res(air=0.5, land=0.5)) is True)
+
+
 def test_a_still_machine_climbs_nothing_on_the_triphibian_island() -> None:
     """Every body plan held still, on the real Tier-1 path, scored by the island.
 
@@ -6234,6 +6268,7 @@ def main() -> int:
         test_grpo_rollouts_never_reach_the_archive,
         test_grpo_group_ids_survive_the_shard_split,
         test_the_triphibian_island_pays_the_weakest_medium,
+        test_a_design_competent_in_nothing_its_island_reads_is_below_the_floor,
         test_a_still_machine_climbs_nothing_on_the_triphibian_island,
         test_a_pair_cross_reaches_the_triphibian_island,
         test_the_triphibian_island_joins_a_resumed_run,

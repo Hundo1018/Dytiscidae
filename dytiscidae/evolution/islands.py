@@ -135,6 +135,31 @@ ISLANDS: dict[str, dict] = {
 TRIPHIBIAN_FLOOR: float = WEAKEST_BARS[1] / 2.0
 
 
+#: Competence under which a medium counts as not done (ROADMAP 2026-10-10,
+#: revised T1).  0.012 = curriculum.WEAKEST_BARS[1] = 2 x TRIPHIBIAN_FLOOR.
+#: Certified against held-still machines on arch49 by experiments/no_model_gate
+#: (results_arch49_table.md): water elites 64/229 vs still 3/229, land 51/229
+#: vs 0/229.  NOT certified for air there (elites 6/229 vs still 11/229: a
+#: leak); kept at 0.012 until the paired air score's gate says otherwise.
+COMPETENCE_FLOOR = {"air": WEAKEST_BARS[1], "water": WEAKEST_BARS[1],
+                    "land": WEAKEST_BARS[1]}
+
+
+def island_media(island: str) -> tuple:
+    """The media an island's score reads; every medium for an unknown name."""
+    return tuple(ISLANDS.get(island, {}).get("domains", ("air", "water", "land")))
+
+
+def below_competence_floor(island: str, result) -> bool:
+    """True when the design clears the floor in none of its island's media."""
+    segs = getattr(result, "segments", {}) or {}
+    for d in island_media(island):
+        if (d in segs
+                and float(getattr(segs[d], "competence", 0.0)) >= COMPETENCE_FLOOR[d]):
+            return False
+    return True
+
+
 def triphibian_score(comps, floor: float = TRIPHIBIAN_FLOOR) -> float:
     """The triphibian island's objective: a soft minimum of the three media.
 
