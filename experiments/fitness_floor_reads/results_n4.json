@@ -1,0 +1,1341 @@
+{
+ "arch48": {
+  "islands": {
+   "air": {
+    "saved_generation": 299,
+    "pool": 143,
+    "cells": 90,
+    "json_elites": 90,
+    "tainted": 0,
+    "tier2": 5,
+    "island_median_w": 0.5771896093967485,
+    "p10_w": 0.4776721295170727,
+    "t2_deciles": [
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.4007002308832965,
+    "t2_median_over_island_median": 0.6942263414999615,
+    "t1_median_w": 0.5815151028542584,
+    "t2_median_fitness": 0.10949593074428432,
+    "t1_median_fitness": 0.8037109375,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 88
+   },
+   "water": {
+    "saved_generation": 299,
+    "pool": 131,
+    "cells": 75,
+    "json_elites": 75,
+    "tainted": 0,
+    "tier2": 3,
+    "island_median_w": 0.5598175444657446,
+    "p10_w": 0.4423511099526117,
+    "t2_deciles": [
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.40663610648780457,
+    "t2_median_over_island_median": 0.7263725663972769,
+    "t1_median_w": 0.5632537676945337,
+    "t2_median_fitness": 0.1022072645458053,
+    "t1_median_fitness": 0.7380610251913264,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 73
+   },
+   "land": {
+    "saved_generation": 299,
+    "pool": 117,
+    "cells": 73,
+    "json_elites": 73,
+    "tainted": 0,
+    "tier2": 6,
+    "island_median_w": 0.549780096589018,
+    "p10_w": 0.4209394676846534,
+    "t2_deciles": [
+     1,
+     2,
+     1,
+     3,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 0.6666666666666666,
+    "t2_median_w": 0.3861676363095465,
+    "t2_median_over_island_median": 0.7024038132799517,
+    "t1_median_w": 0.5525244081765736,
+    "t2_median_fitness": 0.10650942610675518,
+    "t1_median_fitness": 0.68876953125,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 68
+   },
+   "amphibian": {
+    "saved_generation": 299,
+    "pool": 127,
+    "cells": 71,
+    "json_elites": 71,
+    "tainted": 0,
+    "tier2": 3,
+    "island_median_w": 0.5661967781190224,
+    "p10_w": 0.4126367737043258,
+    "t2_deciles": [
+     4,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 0.6666666666666666,
+    "t2_median_w": 0.35646471890656295,
+    "t2_median_over_island_median": 0.6295774414167175,
+    "t1_median_w": 0.5672302320752027,
+    "t2_median_fitness": 0.10767746188446037,
+    "t1_median_fitness": 0.752978515625,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 70
+   },
+   "aerial_diver": {
+    "saved_generation": 299,
+    "pool": 136,
+    "cells": 72,
+    "json_elites": 72,
+    "tainted": 0,
+    "tier2": 4,
+    "island_median_w": 0.5464768735804744,
+    "p10_w": 0.4295110468598275,
+    "t2_deciles": [
+     2,
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 0.75,
+    "t2_median_w": 0.3793646603144638,
+    "t2_median_over_island_median": 0.6942007588150909,
+    "t1_median_w": 0.5510828654490851,
+    "t2_median_fitness": 0.07624270575792104,
+    "t1_median_fitness": 0.75576171875,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 69
+   },
+   "land_air": {
+    "saved_generation": 299,
+    "pool": 145,
+    "cells": 84,
+    "json_elites": 84,
+    "tainted": 0,
+    "tier2": 4,
+    "island_median_w": 0.5993662118143963,
+    "p10_w": 0.4551775050929455,
+    "t2_deciles": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.37756023635542985,
+    "t2_median_over_island_median": 0.6299324668510804,
+    "t1_median_w": 0.6033491159710989,
+    "t2_median_fitness": 0.08204158019418294,
+    "t1_median_fitness": 0.8128906249999999,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 82
+   },
+   "triphibian": {
+    "saved_generation": 299,
+    "pool": 135,
+    "cells": 84,
+    "json_elites": 84,
+    "tainted": 0,
+    "tier2": 5,
+    "island_median_w": 0.5912792629544524,
+    "p10_w": 0.45355433626095626,
+    "t2_deciles": [
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.25011583744251586,
+    "t2_median_over_island_median": 0.42300796444772804,
+    "t1_median_w": 0.5962467737450505,
+    "t2_median_fitness": 0.1102859499626968,
+    "t1_median_fitness": 0.77392578125,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 81
+   },
+   "generalist": {
+    "saved_generation": 299,
+    "pool": 116,
+    "cells": 72,
+    "json_elites": 72,
+    "tainted": 0,
+    "tier2": 3,
+    "island_median_w": 0.575900778544963,
+    "p10_w": 0.4257569811669147,
+    "t2_deciles": [
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.3449626173699493,
+    "t2_median_over_island_median": 0.5989966157738345,
+    "t1_median_w": 0.5765957272684257,
+    "t2_median_fitness": 0.12170858698164179,
+    "t1_median_fitness": 0.7887695312499999,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 70
+   }
+  },
+  "islands_with_tier2": [
+   "air",
+   "water",
+   "land",
+   "amphibian",
+   "aerial_diver",
+   "land_air",
+   "triphibian",
+   "generalist"
+  ],
+  "islands_median_t2_in_bottom_decile": [
+   "air",
+   "water",
+   "land",
+   "amphibian",
+   "aerial_diver",
+   "land_air",
+   "triphibian",
+   "generalist"
+  ],
+  "islands_t2_median_above_island_median": [],
+  "migration_replay": [
+   {
+    "gen": 60,
+    "max_tier2_fitness_so_far": 0.2325,
+    "promotions_so_far": 48,
+    "per_island": {
+     "air": {
+      "last_visit_gen": 56,
+      "cells": 43,
+      "qd_score": 30.362,
+      "best": 0.9722,
+      "k_min_above_T": 28
+     },
+     "water": {
+      "last_visit_gen": 57,
+      "cells": 32,
+      "qd_score": 22.591,
+      "best": 0.9901,
+      "k_min_above_T": 20
+     },
+     "land": {
+      "last_visit_gen": 58,
+      "cells": 39,
+      "qd_score": 25.459,
+      "best": 0.9848,
+      "k_min_above_T": 22
+     },
+     "amphibian": {
+      "last_visit_gen": 59,
+      "cells": 43,
+      "qd_score": 32.196,
+      "best": 0.9538,
+      "k_min_above_T": 31
+     },
+     "aerial_diver": {
+      "last_visit_gen": 52,
+      "cells": 32,
+      "qd_score": 20.404,
+      "best": 0.9481,
+      "k_min_above_T": 19
+     },
+     "land_air": {
+      "last_visit_gen": 53,
+      "cells": 52,
+      "qd_score": 38.491,
+      "best": 0.9615,
+      "k_min_above_T": 37
+     },
+     "triphibian": {
+      "last_visit_gen": 54,
+      "cells": 41,
+      "qd_score": 31.107,
+      "best": 0.9972,
+      "k_min_above_T": 29
+     },
+     "generalist": {
+      "last_visit_gen": 55,
+      "cells": 35,
+      "qd_score": 25.08,
+      "best": 0.9534,
+      "k_min_above_T": 24
+     }
+    },
+    "migrations": 16,
+    "hybrids": 6,
+    "all_islands_have_ge2_above_T": true
+   },
+   {
+    "gen": 120,
+    "max_tier2_fitness_so_far": 0.2325,
+    "promotions_so_far": 72,
+    "per_island": {
+     "air": {
+      "last_visit_gen": 112,
+      "cells": 70,
+      "qd_score": 53.351,
+      "best": 0.9495,
+      "k_min_above_T": 52
+     },
+     "water": {
+      "last_visit_gen": 113,
+      "cells": 53,
+      "qd_score": 39.096,
+      "best": 0.9935,
+      "k_min_above_T": 36
+     },
+     "land": {
+      "last_visit_gen": 114,
+      "cells": 46,
+      "qd_score": 32.312,
+      "best": 1.0,
+      "k_min_above_T": 29
+     },
+     "amphibian": {
+      "last_visit_gen": 115,
+      "cells": 58,
+      "qd_score": 43.253,
+      "best": 0.9852,
+      "k_min_above_T": 40
+     },
+     "aerial_diver": {
+      "last_visit_gen": 116,
+      "cells": 69,
+      "qd_score": 50.214,
+      "best": 0.9791,
+      "k_min_above_T": 46
+     },
+     "land_air": {
+      "last_visit_gen": 117,
+      "cells": 79,
+      "qd_score": 60.255,
+      "best": 0.9715,
+      "k_min_above_T": 57
+     },
+     "triphibian": {
+      "last_visit_gen": 118,
+      "cells": 60,
+      "qd_score": 47.353,
+      "best": 0.9863,
+      "k_min_above_T": 45
+     },
+     "generalist": {
+      "last_visit_gen": 119,
+      "cells": 51,
+      "qd_score": 39.863,
+      "best": 1.0,
+      "k_min_above_T": 37
+     }
+    },
+    "migrations": 32,
+    "hybrids": 12,
+    "all_islands_have_ge2_above_T": true
+   },
+   {
+    "gen": 180,
+    "max_tier2_fitness_so_far": 0.2463,
+    "promotions_so_far": 120,
+    "per_island": {
+     "air": {
+      "last_visit_gen": 176,
+      "cells": 55,
+      "qd_score": 40.53,
+      "best": 0.9815,
+      "k_min_above_T": 37
+     },
+     "water": {
+      "last_visit_gen": 177,
+      "cells": 47,
+      "qd_score": 36.203,
+      "best": 0.9937,
+      "k_min_above_T": 33
+     },
+     "land": {
+      "last_visit_gen": 178,
+      "cells": 44,
+      "qd_score": 33.93,
+      "best": 0.997,
+      "k_min_above_T": 31
+     },
+     "amphibian": {
+      "last_visit_gen": 179,
+      "cells": 46,
+      "qd_score": 35.32,
+      "best": 0.9918,
+      "k_min_above_T": 33
+     },
+     "aerial_diver": {
+      "last_visit_gen": 172,
+      "cells": 73,
+      "qd_score": 53.956,
+      "best": 0.9763,
+      "k_min_above_T": 50
+     },
+     "land_air": {
+      "last_visit_gen": 173,
+      "cells": 80,
+      "qd_score": 61.276,
+      "best": 0.9662,
+      "k_min_above_T": 58
+     },
+     "triphibian": {
+      "last_visit_gen": 174,
+      "cells": 50,
+      "qd_score": 38.707,
+      "best": 0.9481,
+      "k_min_above_T": 38
+     },
+     "generalist": {
+      "last_visit_gen": 175,
+      "cells": 41,
+      "qd_score": 33.474,
+      "best": 0.9815,
+      "k_min_above_T": 32
+     }
+    },
+    "migrations": 48,
+    "hybrids": 18,
+    "all_islands_have_ge2_above_T": true
+   },
+   {
+    "gen": 240,
+    "max_tier2_fitness_so_far": 0.2463,
+    "promotions_so_far": 144,
+    "per_island": {
+     "air": {
+      "last_visit_gen": 232,
+      "cells": 76,
+      "qd_score": 59.18,
+      "best": 0.9699,
+      "k_min_above_T": 56
+     },
+     "water": {
+      "last_visit_gen": 233,
+      "cells": 53,
+      "qd_score": 41.296,
+      "best": 0.9714,
+      "k_min_above_T": 39
+     },
+     "land": {
+      "last_visit_gen": 234,
+      "cells": 51,
+      "qd_score": 37.271,
+      "best": 0.9941,
+      "k_min_above_T": 34
+     },
+     "amphibian": {
+      "last_visit_gen": 235,
+      "cells": 56,
+      "qd_score": 41.83,
+      "best": 0.9587,
+      "k_min_above_T": 40
+     },
+     "aerial_diver": {
+      "last_visit_gen": 236,
+      "cells": 60,
+      "qd_score": 43.811,
+      "best": 0.9727,
+      "k_min_above_T": 40
+     },
+     "land_air": {
+      "last_visit_gen": 237,
+      "cells": 68,
+      "qd_score": 54.412,
+      "best": 0.99,
+      "k_min_above_T": 51
+     },
+     "triphibian": {
+      "last_visit_gen": 238,
+      "cells": 65,
+      "qd_score": 50.268,
+      "best": 0.9889,
+      "k_min_above_T": 47
+     },
+     "generalist": {
+      "last_visit_gen": 239,
+      "cells": 57,
+      "qd_score": 43.771,
+      "best": 0.9795,
+      "k_min_above_T": 41
+     }
+    },
+    "migrations": 64,
+    "hybrids": 24,
+    "all_islands_have_ge2_above_T": true
+   }
+  ],
+  "promote_events": 192,
+  "promote_events_with_tier2_fraction_gt0": 9,
+  "max_tier2_fitness_all": 0.2463,
+  "migrant_evaluate_events": 50,
+  "migrant_evaluate_tiers": {
+   "1": 50
+  }
+ },
+ "arch49": {
+  "islands": {
+   "air": {
+    "saved_generation": 299,
+    "pool": 122,
+    "cells": 84,
+    "json_elites": 84,
+    "tainted": 0,
+    "tier2": 8,
+    "island_median_w": 0.5698754364485674,
+    "p10_w": 0.46504318562959523,
+    "t2_deciles": [
+     2,
+     1,
+     1,
+     1,
+     2,
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 0.75,
+    "t2_median_w": 0.4249865996841582,
+    "t2_median_over_island_median": 0.7457534971723847,
+    "t1_median_w": 0.5740699642988003,
+    "t2_median_fitness": 0.07434957331143167,
+    "t1_median_fitness": 0.7912503150201613,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 77
+   },
+   "water": {
+    "saved_generation": 299,
+    "pool": 131,
+    "cells": 87,
+    "json_elites": 87,
+    "tainted": 0,
+    "tier2": 1,
+    "island_median_w": 0.6049979762698712,
+    "p10_w": 0.49592973192109124,
+    "t2_deciles": [
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.41955582195922886,
+    "t2_median_over_island_median": 0.6934830171598422,
+    "t1_median_w": 0.6061968021942488,
+    "t2_median_fitness": 0.009252862196853884,
+    "t1_median_fitness": 0.7395189938129194,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 87
+   },
+   "land": {
+    "saved_generation": 299,
+    "pool": 118,
+    "cells": 75,
+    "json_elites": 75,
+    "tainted": 0,
+    "tier2": 3,
+    "island_median_w": 0.5961560043466418,
+    "p10_w": 0.48287246797096667,
+    "t2_deciles": [
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.2848491243447265,
+    "t2_median_over_island_median": 0.4778097046207013,
+    "t1_median_w": 0.5969689121137435,
+    "t2_median_fitness": 0.11500000000000002,
+    "t1_median_fitness": 0.7624023437499999,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 74
+   },
+   "amphibian": {
+    "saved_generation": 299,
+    "pool": 119,
+    "cells": 81,
+    "json_elites": 81,
+    "tainted": 0,
+    "tier2": 6,
+    "island_median_w": 0.5507470108516421,
+    "p10_w": 0.43302688604113615,
+    "t2_deciles": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.34788624276867375,
+    "t2_median_over_island_median": 0.6316625163897365,
+    "t1_median_w": 0.5566989286044299,
+    "t2_median_fitness": 0.09998148107829538,
+    "t1_median_fitness": 0.778515625,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 77
+   },
+   "aerial_diver": {
+    "saved_generation": 299,
+    "pool": 120,
+    "cells": 71,
+    "json_elites": 71,
+    "tainted": 0,
+    "tier2": 5,
+    "island_median_w": 0.5932024100025046,
+    "p10_w": 0.4726915990838517,
+    "t2_deciles": [
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.39568780138187915,
+    "t2_median_over_island_median": 0.6670367394161606,
+    "t1_median_w": 0.5949965758724423,
+    "t2_median_fitness": 0.10487922946225031,
+    "t1_median_fitness": 0.7953125,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 68
+   },
+   "land_air": {
+    "saved_generation": 299,
+    "pool": 119,
+    "cells": 84,
+    "json_elites": 84,
+    "tainted": 0,
+    "tier2": 3,
+    "island_median_w": 0.5937959036688409,
+    "p10_w": 0.48612333460213025,
+    "t2_deciles": [
+     3,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 0.6666666666666666,
+    "t2_median_w": 0.38144734662774965,
+    "t2_median_over_island_median": 0.6423879724850413,
+    "t1_median_w": 0.5956550461795699,
+    "t2_median_fitness": 0.10521365425650193,
+    "t1_median_fitness": 0.8114529079861111,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 82
+   },
+   "triphibian": {
+    "saved_generation": 299,
+    "pool": 118,
+    "cells": 72,
+    "json_elites": 72,
+    "tainted": 0,
+    "tier2": 1,
+    "island_median_w": 0.595228125438941,
+    "p10_w": 0.49930438728174126,
+    "t2_deciles": [
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.3106501236109287,
+    "t2_median_over_island_median": 0.5219009491223974,
+    "t1_median_w": 0.5956379127106392,
+    "t2_median_fitness": 0.11083323127499903,
+    "t1_median_fitness": 0.8123046875,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 73
+   },
+   "generalist": {
+    "saved_generation": 299,
+    "pool": 143,
+    "cells": 91,
+    "json_elites": 91,
+    "tainted": 0,
+    "tier2": 7,
+    "island_median_w": 0.5910964190543462,
+    "p10_w": 0.48380742924131304,
+    "t2_deciles": [
+     1,
+     1,
+     6,
+     1,
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 0.8571428571428571,
+    "t2_median_w": 0.39309642972286224,
+    "t2_median_over_island_median": 0.665029286341727,
+    "t1_median_w": 0.5959441190208656,
+    "t2_median_fitness": 0.03973562259056055,
+    "t1_median_fitness": 0.8038085937499999,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 86
+   }
+  },
+  "islands_with_tier2": [
+   "air",
+   "water",
+   "land",
+   "amphibian",
+   "aerial_diver",
+   "land_air",
+   "triphibian",
+   "generalist"
+  ],
+  "islands_median_t2_in_bottom_decile": [
+   "air",
+   "water",
+   "land",
+   "amphibian",
+   "aerial_diver",
+   "land_air",
+   "triphibian",
+   "generalist"
+  ],
+  "islands_t2_median_above_island_median": [],
+  "migration_replay": [
+   {
+    "gen": 60,
+    "max_tier2_fitness_so_far": 0.1223,
+    "promotions_so_far": 48,
+    "per_island": {
+     "air": {
+      "last_visit_gen": 56,
+      "cells": 42,
+      "qd_score": 31.499,
+      "best": 0.995,
+      "k_min_above_T": 31
+     },
+     "water": {
+      "last_visit_gen": 57,
+      "cells": 37,
+      "qd_score": 25.36,
+      "best": 0.9932,
+      "k_min_above_T": 24
+     },
+     "land": {
+      "last_visit_gen": 58,
+      "cells": 47,
+      "qd_score": 36.644,
+      "best": 0.9976,
+      "k_min_above_T": 36
+     },
+     "amphibian": {
+      "last_visit_gen": 59,
+      "cells": 40,
+      "qd_score": 29.521,
+      "best": 0.9711,
+      "k_min_above_T": 30
+     },
+     "aerial_diver": {
+      "last_visit_gen": 52,
+      "cells": 32,
+      "qd_score": 22.904,
+      "best": 0.9767,
+      "k_min_above_T": 23
+     },
+     "land_air": {
+      "last_visit_gen": 53,
+      "cells": 41,
+      "qd_score": 30.462,
+      "best": 0.9765,
+      "k_min_above_T": 30
+     },
+     "triphibian": {
+      "last_visit_gen": 54,
+      "cells": 41,
+      "qd_score": 32.417,
+      "best": 0.9779,
+      "k_min_above_T": 33
+     },
+     "generalist": {
+      "last_visit_gen": 55,
+      "cells": 42,
+      "qd_score": 31.431,
+      "best": 0.9723,
+      "k_min_above_T": 31
+     }
+    },
+    "migrations": 16,
+    "hybrids": 6,
+    "all_islands_have_ge2_above_T": true
+   },
+   {
+    "gen": 120,
+    "max_tier2_fitness_so_far": 0.1223,
+    "promotions_so_far": 72,
+    "per_island": {
+     "air": {
+      "last_visit_gen": 112,
+      "cells": 49,
+      "qd_score": 37.017,
+      "best": 0.9436,
+      "k_min_above_T": 38
+     },
+     "water": {
+      "last_visit_gen": 113,
+      "cells": 42,
+      "qd_score": 32.728,
+      "best": 0.9937,
+      "k_min_above_T": 32
+     },
+     "land": {
+      "last_visit_gen": 114,
+      "cells": 46,
+      "qd_score": 35.868,
+      "best": 0.9889,
+      "k_min_above_T": 35
+     },
+     "amphibian": {
+      "last_visit_gen": 115,
+      "cells": 47,
+      "qd_score": 35.181,
+      "best": 0.9569,
+      "k_min_above_T": 36
+     },
+     "aerial_diver": {
+      "last_visit_gen": 116,
+      "cells": 49,
+      "qd_score": 36.257,
+      "best": 0.9926,
+      "k_min_above_T": 35
+     },
+     "land_air": {
+      "last_visit_gen": 117,
+      "cells": 47,
+      "qd_score": 38.628,
+      "best": 0.9935,
+      "k_min_above_T": 38
+     },
+     "triphibian": {
+      "last_visit_gen": 118,
+      "cells": 57,
+      "qd_score": 46.714,
+      "best": 0.9922,
+      "k_min_above_T": 46
+     },
+     "generalist": {
+      "last_visit_gen": 119,
+      "cells": 51,
+      "qd_score": 40.514,
+      "best": 0.984,
+      "k_min_above_T": 40
+     }
+    },
+    "migrations": 32,
+    "hybrids": 12,
+    "all_islands_have_ge2_above_T": true
+   },
+   {
+    "gen": 180,
+    "max_tier2_fitness_so_far": 0.1288,
+    "promotions_so_far": 120,
+    "per_island": {
+     "air": {
+      "last_visit_gen": 176,
+      "cells": 66,
+      "qd_score": 49.999,
+      "best": 0.9593,
+      "k_min_above_T": 50
+     },
+     "water": {
+      "last_visit_gen": 177,
+      "cells": 69,
+      "qd_score": 51.77,
+      "best": 0.9942,
+      "k_min_above_T": 50
+     },
+     "land": {
+      "last_visit_gen": 178,
+      "cells": 61,
+      "qd_score": 46.299,
+      "best": 0.9788,
+      "k_min_above_T": 46
+     },
+     "amphibian": {
+      "last_visit_gen": 179,
+      "cells": 63,
+      "qd_score": 45.436,
+      "best": 0.9489,
+      "k_min_above_T": 46
+     },
+     "aerial_diver": {
+      "last_visit_gen": 172,
+      "cells": 63,
+      "qd_score": 48.337,
+      "best": 1.0,
+      "k_min_above_T": 47
+     },
+     "land_air": {
+      "last_visit_gen": 173,
+      "cells": 62,
+      "qd_score": 49.668,
+      "best": 0.9872,
+      "k_min_above_T": 49
+     },
+     "triphibian": {
+      "last_visit_gen": 174,
+      "cells": 68,
+      "qd_score": 54.512,
+      "best": 0.9837,
+      "k_min_above_T": 54
+     },
+     "generalist": {
+      "last_visit_gen": 175,
+      "cells": 74,
+      "qd_score": 55.658,
+      "best": 0.9844,
+      "k_min_above_T": 54
+     }
+    },
+    "migrations": 48,
+    "hybrids": 18,
+    "all_islands_have_ge2_above_T": true
+   },
+   {
+    "gen": 240,
+    "max_tier2_fitness_so_far": 0.1288,
+    "promotions_so_far": 144,
+    "per_island": {
+     "air": {
+      "last_visit_gen": 232,
+      "cells": 80,
+      "qd_score": 59.369,
+      "best": 0.9689,
+      "k_min_above_T": 59
+     },
+     "water": {
+      "last_visit_gen": 233,
+      "cells": 88,
+      "qd_score": 67.82,
+      "best": 0.9988,
+      "k_min_above_T": 65
+     },
+     "land": {
+      "last_visit_gen": 234,
+      "cells": 77,
+      "qd_score": 58.863,
+      "best": 0.9757,
+      "k_min_above_T": 58
+     },
+     "amphibian": {
+      "last_visit_gen": 235,
+      "cells": 82,
+      "qd_score": 58.49,
+      "best": 0.9619,
+      "k_min_above_T": 58
+     },
+     "aerial_diver": {
+      "last_visit_gen": 236,
+      "cells": 84,
+      "qd_score": 65.087,
+      "best": 0.9896,
+      "k_min_above_T": 64
+     },
+     "land_air": {
+      "last_visit_gen": 237,
+      "cells": 79,
+      "qd_score": 62.716,
+      "best": 0.9785,
+      "k_min_above_T": 62
+     },
+     "triphibian": {
+      "last_visit_gen": 238,
+      "cells": 85,
+      "qd_score": 70.16,
+      "best": 0.9689,
+      "k_min_above_T": 71
+     },
+     "generalist": {
+      "last_visit_gen": 239,
+      "cells": 91,
+      "qd_score": 68.192,
+      "best": 0.976,
+      "k_min_above_T": 67
+     }
+    },
+    "migrations": 64,
+    "hybrids": 24,
+    "all_islands_have_ge2_above_T": true
+   }
+  ],
+  "promote_events": 192,
+  "promote_events_with_tier2_fraction_gt0": 1,
+  "max_tier2_fitness_all": 0.2286,
+  "migrant_evaluate_events": 59,
+  "migrant_evaluate_tiers": {
+   "1": 59
+  }
+ },
+ "arch50": {
+  "islands": {
+   "air": {
+    "saved_generation": 120,
+    "pool": 85,
+    "cells": 67,
+    "json_elites": 67,
+    "tainted": 0,
+    "tier2": 4,
+    "island_median_w": 0.5896522700500628,
+    "p10_w": 0.4374611053461639,
+    "t2_deciles": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.2703081618296527,
+    "t2_median_over_island_median": 0.4584196068755963,
+    "t1_median_w": 0.5952478666871657,
+    "t2_median_fitness": 0.11245561874009417,
+    "t1_median_fitness": 0.7677734375,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 65
+   },
+   "water": {
+    "saved_generation": 120,
+    "pool": 72,
+    "cells": 55,
+    "json_elites": 55,
+    "tainted": 0,
+    "tier2": 6,
+    "island_median_w": 0.5825102212515245,
+    "p10_w": 0.45526932354254895,
+    "t2_deciles": [
+     1,
+     1,
+     2,
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.29335801993675703,
+    "t2_median_over_island_median": 0.5036100813930383,
+    "t1_median_w": 0.5935132214405507,
+    "t2_median_fitness": 0.10297814128384902,
+    "t1_median_fitness": 0.799447601010101,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 52
+   },
+   "land": {
+    "saved_generation": 120,
+    "pool": 76,
+    "cells": 58,
+    "json_elites": 58,
+    "tainted": 0,
+    "tier2": 3,
+    "island_median_w": 0.6096432708985786,
+    "p10_w": 0.4982788048926462,
+    "t2_deciles": [
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.2989381491196646,
+    "t2_median_over_island_median": 0.49034929669451977,
+    "t1_median_w": 0.6144715906793673,
+    "t2_median_fitness": 0.03456233965816138,
+    "t1_median_fitness": 0.7766666666666666,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 57
+   },
+   "amphibian": {
+    "saved_generation": 120,
+    "pool": 78,
+    "cells": 56,
+    "json_elites": 56,
+    "tainted": 0,
+    "tier2": 1,
+    "island_median_w": 0.5926022970652308,
+    "p10_w": 0.48152233208253187,
+    "t2_deciles": [
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.22627783876495355,
+    "t2_median_over_island_median": 0.3818375998296982,
+    "t1_median_w": 0.5927938382510659,
+    "t2_median_fitness": 0.1100864301655254,
+    "t1_median_fitness": 0.7976388888888888,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 56
+   },
+   "aerial_diver": {
+    "saved_generation": 120,
+    "pool": 84,
+    "cells": 64,
+    "json_elites": 64,
+    "tainted": 0,
+    "tier2": 5,
+    "island_median_w": 0.5803147271949514,
+    "p10_w": 0.4342750974616726,
+    "t2_deciles": [
+     2,
+     1,
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 0.8,
+    "t2_median_w": 0.3688160811256257,
+    "t2_median_over_island_median": 0.6355449273334146,
+    "t1_median_w": 0.5932654931509704,
+    "t2_median_fitness": 0.10487922946225031,
+    "t1_median_fitness": 0.8342948717948717,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 60
+   },
+   "land_air": {
+    "saved_generation": 120,
+    "pool": 81,
+    "cells": 60,
+    "json_elites": 60,
+    "tainted": 0,
+    "tier2": 5,
+    "island_median_w": 0.5705095466650247,
+    "p10_w": 0.44404779381919524,
+    "t2_deciles": [
+     2,
+     1,
+     1,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 1.0,
+    "t2_median_w": 0.3280213170815183,
+    "t2_median_over_island_median": 0.574962012465878,
+    "t1_median_w": 0.5820802869401178,
+    "t2_median_fitness": 0.10487922946225031,
+    "t1_median_fitness": 0.7907291666666666,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 59
+   },
+   "triphibian": {
+    "saved_generation": 120,
+    "pool": 95,
+    "cells": 72,
+    "json_elites": 72,
+    "tainted": 0,
+    "tier2": 3,
+    "island_median_w": 0.6213774577396475,
+    "p10_w": 0.5136610225148707,
+    "t2_deciles": [
+     3,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 0.6666666666666666,
+    "t2_median_w": 0.4071361269556386,
+    "t2_median_over_island_median": 0.6552154763332686,
+    "t1_median_w": 0.623880688827884,
+    "t2_median_fitness": 0.09249211625297324,
+    "t1_median_fitness": 0.8330033185840707,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 71
+   },
+   "generalist": {
+    "saved_generation": 120,
+    "pool": 77,
+    "cells": 62,
+    "json_elites": 62,
+    "tainted": 0,
+    "tier2": 3,
+    "island_median_w": 0.6040335483094933,
+    "p10_w": 0.48311225904077526,
+    "t2_deciles": [
+     4,
+     1,
+     1
+    ],
+    "t2_share_bottom_decile": 0.6666666666666666,
+    "t2_median_w": 0.45905808951117827,
+    "t2_median_over_island_median": 0.759987737098283,
+    "t1_median_w": 0.6150828368199459,
+    "t2_median_fitness": 0.10487922946225031,
+    "t1_median_fitness": 0.8297339722405817,
+    "t2_median_decile": 1.0,
+    "t2_min_fitness_rank_among_representatives": 61
+   }
+  },
+  "islands_with_tier2": [
+   "air",
+   "water",
+   "land",
+   "amphibian",
+   "aerial_diver",
+   "land_air",
+   "triphibian",
+   "generalist"
+  ],
+  "islands_median_t2_in_bottom_decile": [
+   "air",
+   "water",
+   "land",
+   "amphibian",
+   "aerial_diver",
+   "land_air",
+   "triphibian",
+   "generalist"
+  ],
+  "islands_t2_median_above_island_median": [],
+  "migration_replay": [
+   {
+    "gen": 60,
+    "max_tier2_fitness_so_far": 0.1217,
+    "promotions_so_far": 48,
+    "per_island": {
+     "air": {
+      "last_visit_gen": 56,
+      "cells": 48,
+      "qd_score": 34.113,
+      "best": 0.9805,
+      "k_min_above_T": 33
+     },
+     "water": {
+      "last_visit_gen": 57,
+      "cells": 41,
+      "qd_score": 30.139,
+      "best": 0.9872,
+      "k_min_above_T": 30
+     },
+     "land": {
+      "last_visit_gen": 58,
+      "cells": 39,
+      "qd_score": 30.436,
+      "best": 0.9804,
+      "k_min_above_T": 30
+     },
+     "amphibian": {
+      "last_visit_gen": 59,
+      "cells": 45,
+      "qd_score": 33.787,
+      "best": 0.9588,
+      "k_min_above_T": 34
+     },
+     "aerial_diver": {
+      "last_visit_gen": 52,
+      "cells": 46,
+      "qd_score": 33.432,
+      "best": 0.9799,
+      "k_min_above_T": 33
+     },
+     "land_air": {
+      "last_visit_gen": 53,
+      "cells": 41,
+      "qd_score": 28.021,
+      "best": 0.9714,
+      "k_min_above_T": 28
+     },
+     "triphibian": {
+      "last_visit_gen": 54,
+      "cells": 48,
+      "qd_score": 36.903,
+      "best": 0.983,
+      "k_min_above_T": 37
+     },
+     "generalist": {
+      "last_visit_gen": 55,
+      "cells": 41,
+      "qd_score": 29.092,
+      "best": 0.986,
+      "k_min_above_T": 28
+     }
+    },
+    "migrations": 16,
+    "hybrids": 6,
+    "all_islands_have_ge2_above_T": true
+   },
+   {
+    "gen": 120,
+    "max_tier2_fitness_so_far": 0.1217,
+    "promotions_so_far": 72,
+    "per_island": {
+     "air": {
+      "last_visit_gen": 112,
+      "cells": 84,
+      "qd_score": 63.153,
+      "best": 0.9542,
+      "k_min_above_T": 64
+     },
+     "water": {
+      "last_visit_gen": 113,
+      "cells": 72,
+      "qd_score": 52.878,
+      "best": 0.9835,
+      "k_min_above_T": 52
+     },
+     "land": {
+      "last_visit_gen": 114,
+      "cells": 76,
+      "qd_score": 58.84,
+      "best": 0.9749,
+      "k_min_above_T": 59
+     },
+     "amphibian": {
+      "last_visit_gen": 115,
+      "cells": 78,
+      "qd_score": 59.531,
+      "best": 0.9905,
+      "k_min_above_T": 58
+     },
+     "aerial_diver": {
+      "last_visit_gen": 116,
+      "cells": 84,
+      "qd_score": 62.844,
+      "best": 0.9865,
+      "k_min_above_T": 61
+     },
+     "land_air": {
+      "last_visit_gen": 117,
+      "cells": 81,
+      "qd_score": 59.237,
+      "best": 0.9955,
+      "k_min_above_T": 57
+     },
+     "triphibian": {
+      "last_visit_gen": 118,
+      "cells": 95,
+      "qd_score": 76.707,
+      "best": 0.9783,
+      "k_min_above_T": 77
+     },
+     "generalist": {
+      "last_visit_gen": 119,
+      "cells": 77,
+      "qd_score": 58.931,
+      "best": 0.986,
+      "k_min_above_T": 58
+     }
+    },
+    "migrations": 32,
+    "hybrids": 12,
+    "all_islands_have_ge2_above_T": true
+   }
+  ],
+  "promote_events": 78,
+  "promote_events_with_tier2_fraction_gt0": 0,
+  "max_tier2_fitness_all": 0.1217,
+  "migrant_evaluate_events": 13,
+  "migrant_evaluate_tiers": {
+   "1": 13
+  }
+ }
+}

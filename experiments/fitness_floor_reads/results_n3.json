@@ -1,0 +1,144 @@
+{
+ "join_key": "row.index == position in list(load_run_archive(runs/arch49).cells.values()); verified on (island, gen, eval_seed) and the three recorded scores (<5e-4)",
+ "rows": 229,
+ "joined_verified": 229,
+ "index_out_of_range": [],
+ "failed_verification": [],
+ "merged_archive_elites": 229,
+ "json_crosscheck_agree(improvements equal in archive_<island>.json, matched on island/gen/seed/scores)": 204,
+ "(island,gen,eval_seed) alone is ambiguous: distinct keys": 227,
+ "archive_json_elites": 645,
+ "media": {
+  "air": {
+   "n_joined": 229,
+   "n_recorded_gt0": 12,
+   "n_fresh_nonzero_any": 47,
+   "mean_recorded": 0.004174672489082969,
+   "mean_fresh": 0.00173906373620139,
+   "spearman(rec-fresh, improvements)": 0.062310777395359646,
+   "spearman_ci95": [
+    -0.058488658146513245,
+    0.17516033598303937
+   ],
+   "partial_spearman_given_recorded_rank": 0.091441749421392,
+   "spearman(rec-fresh, curiosity)": -0.03856782288718621,
+   "spearman(rec-fresh, meta.gen)": -0.02559131683988674,
+   "spearman(retention, improvements) [rec>0]": -0.054135575834128515,
+   "imp0": {
+    "n_all": 146,
+    "n_rec>0": 10,
+    "median_retention": 0.5690736590850942,
+    "q25_q75": [
+     0.00540992362072414,
+     1.5589726608686587
+    ],
+    "pooled_retention": 0.21490402445531223
+   },
+   "imp>=3": {
+    "n_all": 9,
+    "n_rec>0": 0,
+    "median_retention": NaN,
+    "q25_q75": null,
+    "pooled_retention": NaN
+   },
+   "ratio_median_ret(imp>=3 / imp0)": NaN,
+   "ratio_ci95": [
+    NaN,
+    NaN
+   ],
+   "ratio_pooled": NaN
+  },
+  "water": {
+   "n_joined": 229,
+   "n_recorded_gt0": 106,
+   "n_fresh_nonzero_any": 188,
+   "mean_recorded": 0.01327947598253275,
+   "mean_fresh": 0.009635495846057603,
+   "spearman(rec-fresh, improvements)": 0.12318682615066923,
+   "spearman_ci95": [
+    -0.010346706654064437,
+    0.2538442937701223
+   ],
+   "partial_spearman_given_recorded_rank": 0.023839986426229556,
+   "spearman(rec-fresh, curiosity)": 0.003803836949509016,
+   "spearman(rec-fresh, meta.gen)": 0.016079984444254285,
+   "spearman(retention, improvements) [rec>0]": -0.12776172345510775,
+   "imp0": {
+    "n_all": 146,
+    "n_rec>0": 60,
+    "median_retention": 0.37186071954860633,
+    "q25_q75": [
+     0.19283695568860437,
+     1.3158452662377
+    ],
+    "pooled_retention": 0.5242447965263674
+   },
+   "imp>=3": {
+    "n_all": 9,
+    "n_rec>0": 6,
+    "median_retention": 0.2547687007960962,
+    "q25_q75": [
+     0.055655553801388084,
+     0.4363829598605261
+    ],
+    "pooled_retention": 0.1983491733678344
+   },
+   "ratio_median_ret(imp>=3 / imp0)": 0.6851186140481694,
+   "ratio_ci95": [
+    0.0,
+    1.6022381236453893
+   ],
+   "ratio_pooled": 0.37835220241019263
+  },
+  "land": {
+   "n_joined": 229,
+   "n_recorded_gt0": 82,
+   "n_fresh_nonzero_any": 176,
+   "mean_recorded": 0.015868995633187773,
+   "mean_fresh": 0.011983136843799832,
+   "spearman(rec-fresh, improvements)": 0.09411771005693928,
+   "spearman_ci95": [
+    -0.05021598345184482,
+    0.22865360691356804
+   ],
+   "partial_spearman_given_recorded_rank": 0.04906413194895815,
+   "spearman(rec-fresh, curiosity)": -0.1849017445145932,
+   "spearman(rec-fresh, meta.gen)": 0.01841509494324921,
+   "spearman(retention, improvements) [rec>0]": -0.25686621347407396,
+   "imp0": {
+    "n_all": 146,
+    "n_rec>0": 49,
+    "median_retention": 0.40790502577569837,
+    "q25_q75": [
+     0.1569292508053455,
+     1.1138256237592157
+    ],
+    "pooled_retention": 0.6610373716698014
+   },
+   "imp>=3": {
+    "n_all": 9,
+    "n_rec>0": 3,
+    "median_retention": 0.03751629178452763,
+    "q25_q75": [
+     0.01880151339232488,
+     0.9954110428800205
+    ],
+    "pooled_retention": 0.47429282395637895
+   },
+   "ratio_median_ret(imp>=3 / imp0)": 0.09197310504616667,
+   "ratio_ci95": [
+    0.0001409545453453166,
+    6.038425177949674
+   ],
+   "ratio_pooled": 0.7174977456392522
+  }
+ },
+ "improvements_distribution": {
+  "0": 146,
+  "1": 52,
+  "2": 22,
+  "3": 4,
+  "4": 4,
+  "6": 1
+ }
+}

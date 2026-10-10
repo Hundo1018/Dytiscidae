@@ -1,0 +1,302 @@
+{
+ "arch49": {
+  "saved_generation": 299,
+  "evaluated": 4820,
+  "islands": {
+   "air": {
+    "stage0": {
+     "window": 256,
+     "island_score_eq0": 0.96484375,
+     "island_score_le1e-6": 0.9921875,
+     "island_q_of_zero_scorer": 0.96484375,
+     "island_nonzero_n": 9,
+     "island_max": 0.0002728095895417004,
+     "curr_score_eq0": 0.4296875,
+     "curr_q_of_zero_scorer": 0.4296875,
+     "mission_eq0": 0.9921875,
+     "mission_le1e-6": 1.0,
+     "mission_q_of_zero_scorer": 0.9921875,
+     "blend_of_all_zero_scorer": 0.69208984375,
+     "n_negative": 0
+    },
+    "stage1": {
+     "n": 2,
+     "skipped": "< 12 samples"
+    }
+   },
+   "water": {
+    "stage0": {
+     "window": 256,
+     "island_score_eq0": 0.5859375,
+     "island_score_le1e-6": 0.62890625,
+     "island_q_of_zero_scorer": 0.5859375,
+     "island_nonzero_n": 106,
+     "island_max": 0.023924299265317212,
+     "curr_score_eq0": 0.5859375,
+     "curr_q_of_zero_scorer": 0.5859375,
+     "mission_eq0": 0.98828125,
+     "mission_le1e-6": 0.99609375,
+     "mission_q_of_zero_scorer": 0.98828125,
+     "blend_of_all_zero_scorer": 0.7066406249999999,
+     "n_negative": 0
+    }
+   },
+   "land": {
+    "stage0": {
+     "window": 256,
+     "island_score_eq0": 0.60546875,
+     "island_score_le1e-6": 0.6953125,
+     "island_q_of_zero_scorer": 0.60546875,
+     "island_nonzero_n": 101,
+     "island_max": 0.018906244686858305,
+     "curr_score_eq0": 0.60546875,
+     "curr_q_of_zero_scorer": 0.60546875,
+     "mission_eq0": 0.97265625,
+     "mission_le1e-6": 0.98828125,
+     "mission_q_of_zero_scorer": 0.97265625,
+     "blend_of_all_zero_scorer": 0.715625,
+     "n_negative": 0
+    },
+    "stage1": {
+     "n": 4,
+     "skipped": "< 12 samples"
+    }
+   },
+   "amphibian": {
+    "stage0": {
+     "window": 256,
+     "island_score_eq0": 0.85546875,
+     "island_score_le1e-6": 0.87890625,
+     "island_q_of_zero_scorer": 0.85546875,
+     "island_nonzero_n": 37,
+     "island_max": 0.0018315404909040034,
+     "curr_score_eq0": 0.31640625,
+     "curr_q_of_zero_scorer": 0.31640625,
+     "mission_eq0": 0.984375,
+     "mission_le1e-6": 1.0,
+     "mission_q_of_zero_scorer": 0.984375,
+     "blend_of_all_zero_scorer": 0.6111328125,
+     "n_negative": 0
+    }
+   },
+   "aerial_diver": {
+    "stage0": {
+     "window": 256,
+     "island_score_eq0": 0.984375,
+     "island_score_le1e-6": 0.984375,
+     "island_q_of_zero_scorer": 0.984375,
+     "island_nonzero_n": 4,
+     "island_max": 0.00032111667029224156,
+     "curr_score_eq0": 0.375,
+     "curr_q_of_zero_scorer": 0.375,
+     "mission_eq0": 0.9921875,
+     "mission_le1e-6": 0.9921875,
+     "mission_q_of_zero_scorer": 0.9921875,
+     "blend_of_all_zero_scorer": 0.666796875,
+     "n_negative": 0
+    }
+   },
+   "land_air": {
+    "stage0": {
+     "window": 256,
+     "island_score_eq0": 0.9921875,
+     "island_score_le1e-6": 0.9921875,
+     "island_q_of_zero_scorer": 0.9921875,
+     "island_nonzero_n": 2,
+     "island_max": 0.0002829671211851674,
+     "curr_score_eq0": 0.4140625,
+     "curr_q_of_zero_scorer": 0.4140625,
+     "mission_eq0": 0.99609375,
+     "mission_le1e-6": 0.99609375,
+     "mission_q_of_zero_scorer": 0.99609375,
+     "blend_of_all_zero_scorer": 0.68984375,
+     "n_negative": 0
+    },
+    "stage1": {
+     "n": 5,
+     "skipped": "< 12 samples"
+    }
+   },
+   "triphibian": {
+    "stage0": {
+     "window": 256,
+     "island_score_eq0": 0.30078125,
+     "island_score_le1e-6": 0.32421875,
+     "island_q_of_zero_scorer": 0.30078125,
+     "island_nonzero_n": 179,
+     "island_max": 0.010260155844518634,
+     "curr_score_eq0": 0.77734375,
+     "curr_q_of_zero_scorer": 0.77734375,
+     "mission_eq0": 0.98046875,
+     "mission_le1e-6": 0.98828125,
+     "mission_q_of_zero_scorer": 0.98046875,
+     "blend_of_all_zero_scorer": 0.7548828125,
+     "n_negative": 0
+    }
+   },
+   "generalist": {
+    "stage0": {
+     "window": 256,
+     "island_score_eq0": 0.99609375,
+     "island_score_le1e-6": 1.0,
+     "island_q_of_zero_scorer": 0.99609375,
+     "island_nonzero_n": 1,
+     "island_max": 7.3492546715741e-07,
+     "curr_score_eq0": 0.21875,
+     "curr_q_of_zero_scorer": 0.21875,
+     "mission_eq0": 0.99609375,
+     "mission_le1e-6": 1.0,
+     "mission_q_of_zero_scorer": 0.99609375,
+     "blend_of_all_zero_scorer": 0.5879882812499999,
+     "n_negative": 0
+    }
+   }
+  }
+ },
+ "arch50": {
+  "saved_generation": 120,
+  "evaluated": 1956,
+  "islands": {
+   "air": {
+    "stage0": {
+     "window": 256,
+     "island_score_eq0": 0.97265625,
+     "island_score_le1e-6": 0.99609375,
+     "island_q_of_zero_scorer": 0.97265625,
+     "island_nonzero_n": 7,
+     "island_max": 1.2430435898145611e-06,
+     "curr_score_eq0": 0.42578125,
+     "curr_q_of_zero_scorer": 0.42578125,
+     "mission_eq0": 1.0,
+     "mission_le1e-6": 1.0,
+     "mission_q_of_zero_scorer": 1.0,
+     "blend_of_all_zero_scorer": 0.69375,
+     "n_negative": 0
+    }
+   },
+   "water": {
+    "stage0": {
+     "window": 248,
+     "island_score_eq0": 0.4637096774193548,
+     "island_score_le1e-6": 0.5362903225806451,
+     "island_q_of_zero_scorer": 0.4637096774193548,
+     "island_nonzero_n": 133,
+     "island_max": 0.015812955571688374,
+     "curr_score_eq0": 0.4637096774193548,
+     "curr_q_of_zero_scorer": 0.4637096774193548,
+     "mission_eq0": 0.9758064516129032,
+     "mission_le1e-6": 0.9959677419354839,
+     "mission_q_of_zero_scorer": 0.9758064516129032,
+     "blend_of_all_zero_scorer": 0.6173387096774193,
+     "n_negative": 0
+    }
+   },
+   "land": {
+    "stage0": {
+     "window": 248,
+     "island_score_eq0": 0.6008064516129032,
+     "island_score_le1e-6": 0.6975806451612904,
+     "island_q_of_zero_scorer": 0.6008064516129032,
+     "island_nonzero_n": 99,
+     "island_max": 0.024411111082443933,
+     "curr_score_eq0": 0.6008064516129032,
+     "curr_q_of_zero_scorer": 0.6008064516129032,
+     "mission_eq0": 0.9838709677419355,
+     "mission_le1e-6": 1.0,
+     "mission_q_of_zero_scorer": 0.9838709677419355,
+     "blend_of_all_zero_scorer": 0.7157258064516129,
+     "n_negative": 0
+    }
+   },
+   "amphibian": {
+    "stage0": {
+     "window": 249,
+     "island_score_eq0": 0.8072289156626506,
+     "island_score_le1e-6": 0.8353413654618473,
+     "island_q_of_zero_scorer": 0.8072289156626506,
+     "island_nonzero_n": 48,
+     "island_max": 0.0055854706337698495,
+     "curr_score_eq0": 0.2931726907630522,
+     "curr_q_of_zero_scorer": 0.2931726907630522,
+     "mission_eq0": 0.9799196787148594,
+     "mission_le1e-6": 0.9919678714859438,
+     "mission_q_of_zero_scorer": 0.9799196787148594,
+     "blend_of_all_zero_scorer": 0.5891566265060241,
+     "n_negative": 0
+    }
+   },
+   "aerial_diver": {
+    "stage0": {
+     "window": 255,
+     "island_score_eq0": 0.9882352941176471,
+     "island_score_le1e-6": 0.9921568627450981,
+     "island_q_of_zero_scorer": 0.9882352941176471,
+     "island_nonzero_n": 3,
+     "island_max": 3.551667777208389e-05,
+     "curr_score_eq0": 0.2196078431372549,
+     "curr_q_of_zero_scorer": 0.2196078431372549,
+     "mission_eq0": 0.996078431372549,
+     "mission_le1e-6": 1.0,
+     "mission_q_of_zero_scorer": 0.996078431372549,
+     "blend_of_all_zero_scorer": 0.5870588235294117,
+     "n_negative": 0
+    }
+   },
+   "land_air": {
+    "stage0": {
+     "window": 250,
+     "island_score_eq0": 0.984,
+     "island_score_le1e-6": 0.988,
+     "island_q_of_zero_scorer": 0.984,
+     "island_nonzero_n": 4,
+     "island_max": 0.00013095172541326524,
+     "curr_score_eq0": 0.204,
+     "curr_q_of_zero_scorer": 0.204,
+     "mission_eq0": 0.996,
+     "mission_le1e-6": 1.0,
+     "mission_q_of_zero_scorer": 0.996,
+     "blend_of_all_zero_scorer": 0.5781000000000001,
+     "n_negative": 0
+    }
+   },
+   "triphibian": {
+    "stage0": {
+     "window": 254,
+     "island_score_eq0": 0.2559055118110236,
+     "island_score_le1e-6": 0.29133858267716534,
+     "island_q_of_zero_scorer": 0.2559055118110236,
+     "island_nonzero_n": 189,
+     "island_max": 0.010112445225795607,
+     "curr_score_eq0": 0.7874015748031497,
+     "curr_q_of_zero_scorer": 0.7874015748031497,
+     "mission_eq0": 0.984251968503937,
+     "mission_le1e-6": 0.9921259842519685,
+     "mission_q_of_zero_scorer": 0.984251968503937,
+     "blend_of_all_zero_scorer": 0.7534448818897638,
+     "n_negative": 0
+    }
+   },
+   "generalist": {
+    "stage0": {
+     "window": 240,
+     "island_score_eq0": 0.9916666666666667,
+     "island_score_le1e-6": 0.9958333333333333,
+     "island_q_of_zero_scorer": 0.9916666666666667,
+     "island_nonzero_n": 2,
+     "island_max": 1.536846317992267e-05,
+     "curr_score_eq0": 0.10833333333333334,
+     "curr_q_of_zero_scorer": 0.10833333333333334,
+     "mission_eq0": 0.9916666666666667,
+     "mission_le1e-6": 0.9958333333333333,
+     "mission_q_of_zero_scorer": 0.9916666666666667,
+     "blend_of_all_zero_scorer": 0.5279166666666666,
+     "n_negative": 0
+    },
+    "stage1": {
+     "n": 11,
+     "skipped": "< 12 samples"
+    }
+   }
+  }
+ }
+}

@@ -3239,8 +3239,36 @@ versus terminal competence, per tag. *Prediction:* shaping >= 90% in air.
 terminal credit that the learner can see (per-body group baselines are already
 in GRPO, off by default).
 
-**Order.** N2, N3, N4, N10 are minutes on stored data and run first in one
-agent; N1 and N6 are the two probes that decide the shape of the build; N7 is
+**N2, N3, N4 and N10 were read the same day** (`experiments/fitness_floor_reads/run.py`,
+reports in `runs/analysis_1010_failure_theory/N{2,3,4,10}_result.md`, ~7 s on
+stored data). Against the frozen text:
+
+| item | outcome | the deciding numbers |
+|---|---|---|
+| N2 | **refuted in water and land, confirmed in air** | share of the window at exactly zero island score, arch49 / arch50: air 0.965 / 0.973, aerial_diver 0.984 / 0.988, land_air 0.992 / 0.984, generalist 0.996 / 0.992; **water 0.586 / 0.464, land 0.605 / 0.601**, triphibian 0.301 / 0.256, amphibian 0.855 / 0.807. Mission zero share 0.973-1.000 everywhere. A design at zero on all three scores receives `fit` 0.69-0.72 at stage 0 (median stored elite 0.83). |
+| N3 | **refuted** (not the falsifier's reverse: water is above 0.1) | Spearman(recorded - mean fresh, `improvements`): water 0.123 [CI -0.01, 0.25], land 0.094 [-0.05, 0.23], air 0.062; only 9 of 229 elites have `improvements >= 3`, so the retention ratio (0.685 water, 0.092 land) has CIs spanning 1. Mean recorded vs mean fresh over all 229: water 0.0133 vs 0.0096, land 0.0159 vs 0.0120, air 0.0042 vs 0.0017. |
+| N4 | **confirmed** | Tier-2 elites' median parent weight is in the bottom decile in 24 of 24 islands (three runs), never above the island median (ratio 0.38-0.76); 86-90% of individual Tier-2 elites sit in the bottom decile; at every migration at least 19 representatives per island out-rank the best Tier-2 fitness (0.12-0.25), so no Tier-2 elite could be a top-2 migrant. |
+| N10 | **not comparable** | runs log `reward_by_tag` (raw terminal competence per tag, air exactly 0 in 72-73% of PPO events, mean 0.0001-0.0003) and the coefficient 0.2, not the shaping return. Needed: per tag, the shaping return and the scaled terminal reward, both computed in `PPOBuffer.build`; N5's telemetry lane adds them. |
+
+*Belief update.* T1 as written (a `<=` floor that ranks a zero scorer above
+90% of the window) holds in the four islands whose score is air-bound and
+fails in water, land and triphibian, where 40-70% of the window is above
+zero. What those windows show instead: 91% of water and land elites score
+below 0.012, the bar under which the still-machine gate certifies nothing and
+the draw variance is 2-3x the design variance (C2), so the quantile hands the
+full [0,1] scale to differences that are noise. **Revised T1: the rank
+transform gives full scale to sub-noise differences, and in air it also ties
+97% of the population at the top.** The N1 probe still decides whether a still
+machine is non-dominated against incumbents; N5's floor must now be a
+competence floor (standing is 0 below the certified bar, 0.012 or the
+island's own), not merely a strict inequality. T1' is confirmed and N5's
+Tier-2 lane stands. T2's cell-history signature is not visible in this
+population (N3): the draw-variance account alone explains the retention, the
+k-dependence is demoted to "not shown", and N11 keeps its justification from
+the literature, not from N3. What would move T1 back: N1 finding the still
+twin dominated in >= 70% of cells.
+
+**Order.** N2, N3, N4, N10 ran first (above); N1 and N6 are the two probes that decide the shape of the build; N7 is
 a derivation for the user's decision; N5 is the first build and goes to an
 implementation plan (`docs/ARCH51_SPEC.md`), written by a stronger model from
 this section, before any code; N8 and N9 are the throughput questions and run
