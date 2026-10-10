@@ -124,7 +124,7 @@ Ranked by cost first, then speed, then learning (memory: "rank work: cost, then 
 | 3 | P1 stored-basis | reevals at the stored basis; keep the identification record | hours | none | 1, 2, 4, 5 | sonnet |
 | 4 | P2 one-step-es | promotion refinement as one (1+6) step in one batch, plus acceptance telemetry | hours | none | 1-3, 5 | sonnet |
 | 5 | R1 q4-repro | read: why the single path reproduced 31/58 land scores | 1-2 h GPU | none | 1-4 | sonnet |
-| 6 | P3 one-trip | main pass and re-score in one call | 1-2 days | P1 merged | A0 | opus |
+| 6 | ~~P3 one-trip~~ | **withdrawn (§D answer 5)**: A6 runs both kinds of draw in one launch | none | none | none | none |
 | 7 | A0 device-dep | optional dependency, guarded import, skip markers, new suite skeleton | hours | D-M0 read before any install into `.venv` | 1-6 | sonnet |
 | 8 | A1a fluid-kernels | Warp port of the panel pipeline (the Mojo kernel's scope) | days | A0 | A2 | opus |
 | 9 | A1b fluid-scatter | Warp port of `finish()`, jets, rotors, power | days | A1a | A2 | opus |
@@ -133,10 +133,10 @@ Ranked by cost first, then speed, then learning (memory: "rank work: cost, then 
 | 12 | A4a air-water | identification, air and water segments with gravity, divergence counter, still machine | days | A3 | none | opus |
 | 13 | A5 third-path | agreement test against both evaluation paths (air and water) | 1-2 days | A4a | none | opus |
 | 14 | A6 k-draw scoring | K draws, standard error, lower-bound placement, median-draw film, epoch only if D-A5 says so | days | A5, P1 | none | opus |
-| 15 | A4b land-crossings | contacts, land and four transitions on the device | days | A4a, **user decision §D1** | A6 | opus |
+| 15 | A4b land-crossings | contacts, land and four transitions on the device | days | A4a, A6 (the user said yes, §D answer 1) | none | opus |
 | 16 | A7 boundary-docs | ROADMAP, CLAUDE.md, FEATURES, HYPERPARAMETERS | hours | A6 (and A4b if built) | none | sonnet |
 
-Merge order: M1 first, so every later mutation is checked statically. D1, P1, P2 and R1 merge in any order. P3 follows P1, because both edit `evaluate_candidates`. The A lanes merge in the order of the table. Conflicts in `tools/mutate.py`, `tests/test_search.py` and `docs/index/*.md` are trivial when the anchors are kept; re-run `index_gen write` after each merge.
+Merge order: M1 first, so every later mutation is checked statically. D1, P1, P2 and R1 merge in any order. P3 is withdrawn. The A lanes merge in the order of the table. Conflicts in `tools/mutate.py`, `tests/test_search.py` and `docs/index/*.md` are trivial when the anchors are kept; re-run `index_gen write` after each merge.
 
 ---
 
@@ -433,6 +433,8 @@ Frozen prediction: batched reproduces >= 49/58 (85%, the no_model_gate rate) and
 Report: `runs/analysis_1010_failure_theory/R1_result.md`. Predicted 1 h GPU (58 elites, 8 s segments); timeout 3 h; `systemd-run --user --unit r1-q4repro`.
 
 ### P3 — one-trip (envs/batchroll.py; learning/ppo.py; envs/actors.py; evolution/loop.py; tests). Depends on P1. Tier: opus.
+
+**Withdrawn 2026-10-10 (§D answer 5). Do not build. Kept for the record.**
 
 Goal (ROADMAP:4214-4217): the main sampled pass and the noise-free re-score run in one `evaluate_tier1_batch` call per generation, and the placed scores are bit-identical. F1 explains why this is cross-layer.
 
@@ -838,6 +840,35 @@ R1 (§2) and D1 (§2) are reads of the same kind and use the same reporting shap
 4. **The reference engine upgrade to mujoco 3.15** (F6), after D-M0.
 5. **P3 at all**, given that A retires the two-trip structure.
 6. **The `Py_NewRef` fix**, after D1: set `MOJO_PYTHON_LIBRARY` before the first import, or scrub the children's environment.
+
+### §D answers (the user, 2026-10-10; questions 2, 5 and 6 delegated, decided here)
+
+1. **Yes.** A4b is built, after A6, in the order of §1.
+2. **K_m = 50, K_s = 10 for the first device arm** (§3 table: 147 s against
+   arch50's 168 s, a lower bound). Not lower: Q5's K for reliability 0.9 is
+   air 66, water 36, land 18 (ROADMAP:3830), so 50 covers water and land and
+   leaves air at about 0.87. Not higher: (100, 10) is 1.51x the wall before
+   F4's terms and contacts. D-A7 adds the point (64, 10); if it holds within
+   1.5x of its prediction and the wall stays under 1.2x arch50's, K_m becomes
+   64. Whether K is fixed or adaptive per candidate is set with question 3.
+3. Pending: a literature read on noisy quality-diversity placement, then
+   written here.
+4. **Upgrade to mujoco 3.15.** D-M0 still runs before A0, but it no longer
+   gates anything. It measures the boundary, and its result goes into A7's
+   boundary text. If any medium loses more than 10 reproductions, air, water
+   and land become not comparable across the upgrade as well.
+5. **P3 is not built.** It is the hardest lane on today's path (F1: a sampling
+   flag per machine, a basis hand-off inside the call, twins kept in one
+   shard; opus), and A6 retires the two trips anyway: K_m mean draws and K_s
+   sampled draws run in one launch. D-P3 is withdrawn. A6 depends on P1 only.
+6. **Set `MOJO_PYTHON_LIBRARY` before the first import**, to the running
+   interpreter's own libpython (`sysconfig` `LIBDIR`/`LDLIBRARY`), in the one
+   module that imports the extension, without overriding a value the user set.
+   This fixes the parent at the source and every child inherits a correct
+   value. Scrubbing the children's environment would leave the parent's value
+   wrong for whatever it spawns next. This applies only if D1 confirms F10.
+   The fix lane carries a test that a spawned child constructs the extension,
+   and a mutation that deletes the assignment.
 
 ## §E. Non-goals
 
