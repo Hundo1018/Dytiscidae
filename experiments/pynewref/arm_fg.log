@@ -1,0 +1,23 @@
+=== f1_pyenv_path
+PARENT usable (True, '')
+WORKER before import {"PYTHONEXECUTABLE": "/home/hundo/.pyenv/shims/python3", "MOJO_PYTHON_LIBRARY": "/home/hundo/micromamba/lib/libpython3.9.so.1.0", } exe /home/hundo/.pyenv/shims/python3
+WORKER usable (False, 'the extension imports but cannot be constructed: ABORT: oss/modular/mojo/stdlib/std/ffi/__init__.mojo:730:18: symbol not found: Py_NewRef')
+=== f2_venv_path_first
+PARENT usable (True, '')
+WORKER before import {"PYTHONEXECUTABLE": "/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/bin/python3", "MOJO_PYTHON_LIBRARY": "/usr/lib/x86_64-linux-gnu/libpython3.12.so.1.0", } exe /home/hundo/Projects/Dytiscidae/dytiscidae/.venv/bin/python3
+WORKER usable (True, '')
+=== f3_pyenv_path_MOJO_PYTHON_LIBRARY_preset
+PARENT usable (True, '')
+WORKER before import {"PYTHONEXECUTABLE": "/home/hundo/.pyenv/shims/python3", "MOJO_PYTHON_LIBRARY": "/usr/lib/x86_64-linux-gnu/libpython3.12.so.1.0", } exe /home/hundo/.pyenv/shims/python3
+WORKER usable (False, 'the extension imports but cannot be constructed: ABORT: oss/modular/mojo/stdlib/std/ffi/__init__.mojo:730:18: symbol not found: Py_NewRef')
+=== f4_pyenv_path_PYTHONEXECUTABLE_preset
+PARENT usable (True, '')
+WORKER before import {"PYTHONEXECUTABLE": "/home/hundo/.pyenv/shims/python3", "MOJO_PYTHON_LIBRARY": "/home/hundo/micromamba/lib/libpython3.9.so.1.0", } exe /home/hundo/.pyenv/shims/python3
+WORKER usable (False, 'the extension imports but cannot be constructed: ABORT: oss/modular/mojo/stdlib/std/ffi/__init__.mojo:730:18: symbol not found: Py_NewRef')
+=== f5_both_preset
+PARENT usable (True, '')
+WORKER before import {"PYTHONEXECUTABLE": "/home/hundo/.pyenv/shims/python3", "MOJO_PYTHON_LIBRARY": "/usr/lib/x86_64-linux-gnu/libpython3.12.so.1.0", } exe /home/hundo/.pyenv/shims/python3
+WORKER usable (False, 'the extension imports but cannot be constructed: ABORT: oss/modular/mojo/stdlib/std/ffi/__init__.mojo:730:18: symbol not found: Py_NewRef')
+=== g_shim_python_runs_the_probe_directly
+ABORT: oss/modular/mojo/stdlib/std/ffi/__init__.mojo:730:18: symbol not found: Py_NewRef
+timeout: the monitored command dumped core

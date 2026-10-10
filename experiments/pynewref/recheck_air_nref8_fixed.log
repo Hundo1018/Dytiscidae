@@ -1,0 +1,6 @@
+USABLE (True, '')
+  elite seed0 fit=0.0000 seed=485467303 air=0.0 water=0.0 land=0.0 swsp=False
+  elite seed1 fit=0.0000 seed=420078070 air=0.0 water=0.0 land=0.0 swsp=False
+  elite seed3 fit=0.0000 seed=554845546 air=0.0 water=0.0 land=0.0 swsp=False
+DONE n_elites 4
+wall 140

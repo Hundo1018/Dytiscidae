@@ -1,0 +1,11 @@
+Running as unit: run-u31706.service; invocation ID: 8602b88445524a4c8244b62f44792988
+systemd PATH head: PATH=/home/hundo/.local/bin:/home/hundo/.local/bin:/home/hundo/.local/bin:/home/hundo/.pyenv/shims:/home/hundo/.pyenv/bi
+which python3 under that PATH: /home/hundo/.pyenv/shims/python3 Python 3.9.23 
+PARENT usable (True, '')
+WORKER usable (False, 'the extension imports but cannot be constructed: ABORT: oss/modular/mojo/stdlib/std/ffi/__init__.mojo:730:18: symbol not found: Py_NewRef')
+Finished with result: success
+Main processes terminated with: code=exited/status=0
+Service runtime: 2.126s
+CPU time consumed: 5.937s
+Memory peak: 512.0K
+Memory swap peak: 0B
