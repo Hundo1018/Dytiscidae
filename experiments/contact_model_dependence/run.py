@@ -80,9 +80,16 @@ def main():
     ap.add_argument("--n", type=int, default=0, help="first n land-competent elites (smoke)")
     ap.add_argument("--arms", default="hard,x4,x2")
     ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--path", choices=("single", "batched"), default="single",
+                    help="R1 (IMPL_1010_SPEC): single = evaluate.evaluate_tier1 (today's); "
+                         "batched = batchroll.evaluate_tier1_batch at each elite's eval_seed, "
+                         "hard-contact arm only")
     ap.add_argument("--summarise-only", action="store_true",
                     help="re-aggregate <out>.rows.jsonl plus <out stem>_eps.json.rows.jsonl")
     args = ap.parse_args()
+    if args.path == "batched":
+        run_batched(args)
+        return
     if args.summarise_only:
         summarise(Path(str(args.out) + ".rows.jsonl"), Path(args.out), float("nan"))
         return
@@ -164,6 +171,74 @@ def main():
     fh.close()
     ev.TriphibianEnv = Base
     summarise(rows_path, Path(args.out), time.time() - t0, arms)
+
+
+def run_batched(args):
+    """R1: the same elites, hard contact, through the batched evaluator.
+
+    One call per scoring network (the batched path takes one ``shared`` per
+    call), one seed per machine (``seed=[...]``), controllers rebuilt exactly as
+    the single path does (``controller_for_elite``) and split the way
+    ``rescore.plain_controller`` splits them.
+    """
+    import torch
+    torch.set_num_threads(1)
+    from rescore import load_elites, plain_controller
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import batchroll
+    from dytiscidae.viz.film import control_laws, run_provenance
+
+    run = Path(args.run)
+    ok, why = batchroll.usable()
+    assert ok, f"batched evaluator unusable: {why}"
+    cfg = run_provenance(run).get("config") or {}
+    seg = float(cfg.get("segment_seconds") or 8.0)
+    n_modes = int(cfg.get("n_modes") or 6)
+    elites = load_elites(run)
+    pick = [i for i, e in enumerate(elites) if float((e.meta or {}).get("land") or 0.0) >= LAND_MIN]
+    if args.n:
+        pick = pick[: args.n]
+    groups = {}
+    for i in pick:
+        el = elites[i]
+        p = build(el.genome)
+        seed = int((el.meta or {}).get("eval_seed") or 0)
+        c, sh = plain_controller(run, el, p, seed)
+        if c is None:
+            print(f"elite {i}: no controller, skipped", flush=True)
+            continue
+        desc, net = next(iter(control_laws(el, run, sh)))
+        key = (desc, int((el.meta or {}).get("gen") or 0))
+        groups.setdefault(key, []).append((i, p, c, seed, net))
+    rows_path = Path(str(args.out) + ".rows.jsonl")
+    fh = open(rows_path, "w")
+    t0 = time.time()
+    for gi, (key, items) in enumerate(sorted(groups.items(), key=lambda kv: kv[0][1])):
+        res = batchroll.evaluate_tier1_batch(
+            [x[1] for x in items], controllers=[x[2] for x in items], segment_seconds=seg,
+            identify_axes=False, seed=[x[3] for x in items], shared=items[0][4], n_modes=n_modes)
+        for (i, _p, _c, seed, _n), r in zip(items, res):
+            m = elites[i].meta or {}
+            land = r.segments.get("land")
+            meas = dict(getattr(land, "measurements", {}) or {})
+            rec = {"index": int(i), "arm": "hard", "path": "batched", "island": m.get("island"),
+                   "gen": m.get("gen"), "plan": m.get("body_plan"), "seed": seed, "law": key[0],
+                   "recorded_land": float(m["land"]),
+                   "comp": {d: float(r.segments[d].competence) for d in MEDIA if d in r.segments},
+                   "land": {k: float(meas.get(k, float("nan")))
+                            for k in ("land_speed", "contact_fraction", "upright",
+                                      "measured_land_speed", "measured_contact_fraction")},
+                   "bad_qacc": {d: int(r.segments[d].bad_qacc) for d in MEDIA if d in r.segments}}
+            fh.write(json.dumps(rec) + "\n")
+        fh.flush()
+        print(f"group {gi + 1}/{len(groups)} gen {key[1]} n={len(items)} {time.time() - t0:.0f}s", flush=True)
+    fh.close()
+    rows = [json.loads(ln) for ln in rows_path.read_text().splitlines()]
+    k = sum(abs(r["comp"]["land"] - r["recorded_land"]) <= 0.005 for r in rows)
+    out = {"path": "batched", "n": len(rows), "reproduction_hard_within_0.005": {"k": int(k), "n": len(rows)},
+           "wall_s": time.time() - t0}
+    Path(args.out).write_text(json.dumps(out, indent=1))
+    print(json.dumps(out))
 
 
 def summarise(rows_path, out, wall, arms=("hard", "x4", "x2")):
