@@ -3492,7 +3492,14 @@ audited an open-loop gannet by its glide failed for that reason. The auditor
 now reports "not measurable" as a note instead of running nothing (rule 4),
 and the test exercises the ratio through a stub re-evaluation. In arch51 the
 perturbation check therefore reads only policy-driven designs that turn or
-swim on command; until one exists, every audit says "not measurable".
+swim on command; until one exists, every audit says "not measurable". The
+same fix found that the mutation `audit-base-is-the-record` had been
+MISAPPLIED (its target line no longer existed, so `tools/mutate.py` had been
+reporting a gate that tested nothing); re-targeted, it survived on an
+open-loop fixture whose recorded and re-run missions are both 0, and is caught
+now that the fixture records a mission of 0.5. A misapplied mutation is a
+silent hole of the kind docs/TEST_AUDIT.md warns about; `mutate.py` should
+fail loudly on MISAPPLIED (a read item, not done here).
 Two consequences to read in arch51: an island whose every elite is at the
 floor promotes nothing to Tier-2 (and gives the critic no labels) until one
 clears it; and 4 of 16 evaluations per generation are re-evaluations, so
