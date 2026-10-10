@@ -3743,10 +3743,67 @@ Mertan & Cheney: undertrained controllers rank bodies at random). N11 and M3
 are retired. Comparability: every score, the archive and the learner's data
 change; nothing is comparable across it.
 
-### 6. Tooling facts
+### 6. Tooling facts (returned 2026-10-10; `F_on_device_tooling.md`, claims
+tagged primary / secondary / inference; read from installed source where
+possible)
 
-Appended from `runs/analysis_1010_failure_theory/F_on_device_tooling.md` when
-the brief returns.
+- **MJWarp has the hook A needs.** `Model.callback.control` is a Python
+  `f(m, d)` that launches Warp kernels; in the installed mujoco_warp 3.15.0 it
+  runs after `fwd_position` and `fwd_velocity` and before `fwd_actuation` and
+  `fwd_acceleration` (`forward.py:2081`), so it can read xpos, xmat, xipos,
+  cvel and subtree_com and write `d.ctrl`; `fwd_acceleration` then accumulates
+  `d.xfrc_applied` and `d.qfrc_applied`, so a force written there from the
+  callback takes effect (by data flow; the docs list only `ctrl` as its
+  output, and nothing zeroes `xfrc_applied` for you). A callback that only
+  launches kernels should capture into the graph; `wp.capture_while`
+  (warp 1.18, CUDA >= 12.4) can put a whole 2000-step rollout in one graph,
+  which removes the per-step Python launch that N9's 240 us partly is. No
+  published aero or fluid example uses the hook. MJWarp's built-in fluid is
+  a body-level ellipsoid drag, not a panel model.
+- **The MLP and CPG are cheap in Warp**: `examples/tile/example_tile_mlp.py`
+  shows a 4-layer MLP with `wp.tile_matmul`; `wp.tanh` and `wp.atan2` are
+  builtins; 33-64-64-6 is ~6.6k MACs per world per step. Newton's
+  `example_robot_policy.py` runs device-resident policy inference but still
+  calls the policy from Python per control step; no published example has the
+  policy inside the same graph as the physics.
+- **Mojo -> Warp zero copy is raw pointers only.** Mojo `DeviceBuffer` has no
+  DLPack or `__cuda_array_interface__`; `unsafe_ptr()` into
+  `wp.array(ptr=..., copy=False)` is the route; `max.driver.Buffer` on the
+  Python side does carry `__dlpack__` (MAX 26.5/26.6). Stream and context
+  sharing between a Mojo launch and a Warp graph are undocumented. Porting
+  `fluid_gpu.mojo` to Warp removes the question; keeping Mojo means a sync or
+  a shared-stream launch every step.
+- **Heterogeneous bodies are not supported where it matters.** Newton PR
+  #4312 still open ("body counts, joint layouts, and degrees of freedom must
+  still match across worlds"); padding to a superset is documented nowhere;
+  Newton's `SolverKamino` does support heterogeneous worlds with hard NCP
+  contacts but is BETA 1 and "users are discouraged from depending on it". No
+  Newton throughput number exists for <= 20-dof bodies.
+- **A GPU Featherstone from scratch is precedented, its accuracy is not.**
+  Newton `SolverFeatherstone` (CRBA, batched Cholesky, penalty contacts, no
+  joint friction or effort limits), Brax `generalized` (dense M^-1 with
+  MuJoCo-style solref/solimp and a projected-gradient solver), BARD (arXiv
+  2605.31481), GRiD (arXiv 2109.06976); none reports accuracy against MuJoCo
+  on contact trajectories or cost per world-step with contacts; Newton's own
+  PR reports 4-70 mm trajectory divergence from contact selection alone.
+  **Mojo's `atan2` is an external libm call with no GPU path** (`tanh` has a
+  PTX path), so B would carry its own; no Mojo-vs-CUDA benchmark for small
+  kernels exists beyond ORNL arXiv 2509.21039 (parity on memory-bound
+  kernels, gaps on atomics and fast-math).
+
+*What this does to §3.* Option C (raw-pointer interop, undocumented stream
+sharing) is not a shortcut; Option B (Mojo engine) carries the `atan2` gap,
+no heterogeneity precedent with reported accuracy, and the largest build; so
+**Option A, Warp-native, is the lower-risk route**, with the fluid solver
+ported to Warp as a third implementation that the existing numpy/Mojo pair
+cross-checks, and with the whole rollout captured by `wp.capture_while`. T8's
+16x (one launch for all bodies) is then not available; the per-body serial
+launch is A's cost, and Q2 measures it. Newton `SolverKamino` is the one
+supported heterogeneous path and gets a probe only if A's per-body fixed cost
+proves to be the lever (Q7, not yet written). Q2's shape is now concrete: a
+control-callback kernel (CPG + MLP) that also writes a placeholder body force
+into `xfrc_applied`, the rollout under `wp.capture_while`, W = 24 / 100 / 730
+on the N9 fixtures, no host copy per step.
 
 ## 2026-10-08, later — the work-list sweep
 
