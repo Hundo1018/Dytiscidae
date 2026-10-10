@@ -3812,6 +3812,61 @@ control-callback kernel (CPG + MLP) that also writes a placeholder body force
 into `xfrc_applied`, the rollout under `wp.capture_while`, W = 24 / 100 / 730
 on the N9 fixtures, no host copy per step.
 
+### 7. The linear-algebra formulation (the user's question: `max.gpu`,
+TileTensor, "some of this should parallelise as linear algebra")
+
+What in a step is linear algebra, and what is not. A rollout step for W worlds
+of B bodies decomposes into five kinds of work; the first three are dense or
+batched linear algebra, the last two are not.
+
+| work | shape per step | linear algebra? | GPU form |
+|---|---|---|---|
+| control MLP (33-64-64-6) | one GEMM per layer over all worlds: `(W*B) x 33 @ 33 x 64`, `... x 64 @ 64 x 64`, `... x 64 @ 64 x 6` | yes, the cleanest case | three GEMMs; a `TileTensor` tiled matmul or a MAX `matmul` op; ~6.6k MACs per world |
+| mass matrix and its solve (CRBA then `M qacc = tau - bias`) | per world a padded `32 x 32` SPD matrix: build from per-body `6 x 6` spatial inertias (batched small matmuls), then a batched Cholesky and two triangular solves | yes, batched small dense | thread-per-world (a 32x32 Cholesky is ~5k flops: trivial) or a batched routine if the stdlib has one; this is the Brax-generalized / Newton-Featherstone recipe, not ABA's recursion |
+| panel forces to body forces | `(B*6) x P` sparse incidence times `P x 1` panel forces, per world | yes, a sparse (or block-dense) matmul | segmented reduction; the Mojo kernel does it per panel today |
+| panel kinematics and coefficients | per panel: a rotation (3x3 matvec), relative velocity (cross products), `alpha = atan2(...)`, `CL(alpha)`, `CD(alpha)`, stall and LEV branches | the matvecs yes, the coefficients no (elementwise nonlinear with branches) | elementwise kernel, thread-per-panel, as today |
+| kinematic tree recursion (forward kinematics, bias forces, joint limits, soft contacts, integration) | per world, sequential along the tree depth (<= 11 parts), each step a `6 x 6` spatial transform | small matvecs inside a sequential recursion; parallel across worlds, not within one | thread-per-world, as Newton and Brax do |
+
+So the honest statement: **the physics is not one large linear system but
+`W x B` tiny ones plus nonlinear elementwise work**; GEMM-style parallelism
+buys the MLP (three GEMMs instead of 1,600 tiny matvecs) and the mass-matrix
+solve (a batched Cholesky instead of a recursion), and the rest parallelises
+only across worlds and bodies, which is what the thread-per-world kernels in
+Warp, Newton and the project's own fluid kernel already do. The gain of the
+formulation is therefore not a different asymptotic cost but **one launch
+for everything** (T8): a Mojo pipeline that owns the rigid body as well as the
+fluid can batch all bodies and all draws of a generation in one kernel
+sequence, because padding to 32 dof is a layout choice in one's own code and
+not a feature one waits for from an engine. That is Option B's content, and
+the user's framing names its implementation: CRBA + batched Cholesky + soft
+contacts in Mojo (TileTensor for the GEMMs, thread-per-world for the rest),
+beside the existing fluid kernel, with MuJoCo kept as the reference path.
+
+What it costs, against §6: the engine (CRBA, Cholesky, joint limits as
+penalties, soft contacts with the beach and ramp, the servo and rotor
+actuators, the energy model), its validation against MuJoCo body by body
+(T9: contacts are the physics that changes), and Mojo's gaps (`atan2` has no
+GPU path and would be hand-written; `tanh` has one; no small-matrix batched
+routines are known in the stdlib, so Cholesky is per thread). The reward:
+T8's single launch, predicted `T_step ~ a + b * (W * B)` with `a` paid once
+per step for the whole generation, against A's `16 * a`.
+
+**Decision rule (pre-registered).** Q2 measures A's step cost; if A at
+W = 100 per body gives a generation at <= 1.5x today's wall (<= ~200 s), A is
+built and B is not, because a 16x saving on a fixed term that is already
+affordable buys nothing the search needs. If A costs > 3x today's wall, B is
+the only route to K = 100 and Q3 is rewritten as the linear-algebra probe:
+**Q3' (Mojo, 3-5 days): CRBA + batched Cholesky for one arch49 12-dof body
+in Mojo, padded to 32 dof, checked against `mj_forward`'s `qacc` on 100
+random states (|diff| < 1e-6 relative, no contacts), then batched to W x B =
+1,600 worlds; prediction: agreement holds and the batched step costs <= 1 ms
+with the MLP as a `TileTensor` GEMM; falsified if > 5 ms or if agreement
+fails on the servo or joint-limit terms.** Between 1.5x and 3x the user
+decides. The Mojo/MAX tooling facts this plan depends on (module names,
+TileTensor status, `atan2`, MAX graph loops, the `Py_NewRef` worker failure)
+are collected in `G_mojo_max_gpu.md` when its brief returns and summarised
+here as §8.
+
 ## 2026-10-08, later — the work-list sweep
 
 The open items of the 10-06 lists (arch48 items 1–5, PAPERS_2610, the external
