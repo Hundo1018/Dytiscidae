@@ -3712,6 +3712,30 @@ hard ones. *Prediction:* land competence moves by < 20% for >= 80% of them.
 *Falsified* if it moves > 50% for a quarter. Says whether B's soft contacts
 are a comparability boundary or a different physics.
 
+*Outcome (2026-10-10, `experiments/contact_model_dependence/`, 58 elites with
+stored land >= 0.012, each at its own `eval_seed`, single path, 2800 s +
+870 s): **REFUTED**, with a caveat that limits what the refutation means.
+Under x4 (`solref[0]` 0.008 -> 0.032, `solimp` 0.5/0.80/0.010; contact
+stiffness 0.074x) 10 of 58 (17.2%) moved < 20% and 40 of 58 (69.0%) moved
+> 50%, median |relative change| 1.00; under x2, 29.3% and 60.3%. But a null
+control the agent added (`solref[0]` x1.01, nothing else) already moves 20 of
+58 (34.5%) by > 50% and leaves only 41.4% within 20%: the per-elite land
+score is hypersensitive to any perturbation of the contact constants, and the
+frozen thresholds cannot be met by physics that is 99% identical. The
+population mean is mild (0.0485 -> 0.0298 at x4, 0.0465 under the null);
+rank agreement Spearman(hard, soft) is 0.71 under the null, 0.23 at x2, 0.18
+at x4. So the read is "land scores are not insensitive to the contact
+constants", not "soft contacts are a different physics"; the two were not
+separated. Crossings carried nothing: `water_to_land` and `land_to_air`
+crossed 0/58 in every arm. Artifact: the single path reproduced the recorded
+land score (within 0.005) for 31 of 58 only, where the batched re-score in
+`experiments/no_model_gate` reproduces 195 of 229; cause not investigated
+(open read). Restricted to the 31 the verdict is the same (x4: 3.2% < 20%,
+87.1% > 50%). For option B this means a soft-contact build is a comparability
+boundary on land in any case, and that land competence per elite is a draw
+of the contact constants as much as of the task; the K-draw score (§5)
+should vary the contact seed too.*
+
 **Q5 (analytic + stored rows, minutes): the K curve on real draws.** From
 `experiments/draw_variance/results_arch49.json` (229 elites x 7 draws), the
 Spearman of a k-draw mean against the held-out mean for k = 1..6, against
