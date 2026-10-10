@@ -77,6 +77,9 @@ class Elite:
     #: whether a challenger takes the cell.  ``fitness`` survives for reporting
     #: and for the curator's parent weighting, where a scalar is unavoidable.
     objectives: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    #: Below the competence floor (ARCH51_SPEC L3): holds a cell only while no
+    #: ranked design is there.  A plain default, so older pickles read False.
+    at_floor: bool = False
 
     @property
     def curiosity(self) -> float:
@@ -193,6 +196,7 @@ class Archive:
         meta: dict | None = None,
         tier: int = 1,
         objectives: np.ndarray | None = None,
+        at_floor: bool = False,
     ) -> str:
         """Insert a candidate.  Returns 'new', 'improved' or 'rejected'.
 
@@ -221,7 +225,7 @@ class Archive:
         cand = Elite(
             genome=genome, fitness=fitness, descriptor=np.asarray(descriptor, float),
             cell=cell, meta=meta or {}, born_at=self.generation, tier=tier,
-            objectives=obj,
+            objectives=obj, at_floor=bool(at_floor),
         )
         if front and self.cells.get(cell) is None:
             # A front with no representative should be impossible, but repairing
@@ -234,7 +238,8 @@ class Archive:
             self.cells[cell] = self._representative(kept)
         return status
 
-    def would_add(self, fitness: float, descriptor, objectives=None) -> str:
+    def would_add(self, fitness: float, descriptor, objectives=None,
+                  at_floor: bool = False) -> str:
         """What ``add`` would return for this candidate, changing nothing.
 
         The same verdict, from the same code (``_verdict``).  AK's dry run: the
@@ -247,7 +252,8 @@ class Archive:
         cell = self.cell_of(descriptor)
         cand = Elite(genome=None, fitness=fitness,
                      descriptor=np.asarray(descriptor, float), cell=cell,
-                     meta={}, born_at=self.generation, objectives=obj)
+                     meta={}, born_at=self.generation, objectives=obj,
+                     at_floor=bool(at_floor))
         return self._verdict(cell, cand)[0]
 
     @staticmethod
@@ -263,6 +269,10 @@ class Archive:
         obj, fitness = cand.objectives, cand.fitness
         if not front:
             return "new", [cand]
+        # F1 (ARCH51_SPEC L3): a design below the competence floor fills an
+        # empty cell and nothing else.
+        if cand.at_floor:
+            return "rejected", None
 
         # Inherit the cell's exploration bookkeeping: it describes the region,
         # not the individual, and resetting it every time an occupant changes
@@ -278,10 +288,11 @@ class Archive:
                 return "improved", [cand]
             return "rejected", None
 
-        if any(self._dominates(e.objectives, obj) for e in front):
+        ranked = [e for e in front if not e.at_floor]
+        if any(self._dominates(e.objectives, obj) for e in ranked):
             return "rejected", None
-
-        kept = [e for e in front if not self._dominates(obj, e.objectives)]
+        # F2: a design above the floor displaces every member below it.
+        kept = [e for e in ranked if not self._dominates(obj, e.objectives)]
         kept.append(cand)
         if len(kept) > self.front_capacity:
             order = np.argsort(-self._crowding(kept))

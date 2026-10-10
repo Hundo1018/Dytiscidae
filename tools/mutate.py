@@ -517,6 +517,24 @@ MUTATIONS: tuple = (
         suites=("test_search::test_one_islands_archive_is_read_alone_not_through_the_merge",), item="per-island best"),
 
     Mutation(
+        id="floor-candidate-joins-the-front",
+        path="dytiscidae/evolution/archive.py",
+        find="        if cand.at_floor:\n            return \"rejected\", None\n",
+        replace="",
+        defect="a design below the competence floor joins a ranked incumbent's "
+               "front on margins alone, so a machine that cannot move holds a cell",
+        suites=("test_search::test_margins_alone_cannot_fill_a_cell",), item="competence floor"),
+
+    Mutation(
+        id="floor-member-survives-a-ranked-entry",
+        path="dytiscidae/evolution/archive.py",
+        find="        kept = [e for e in ranked if not self._dominates(obj, e.objectives)]",
+        replace="        kept = [e for e in front if not self._dominates(obj, e.objectives)]",
+        defect="a ranked design entering a cell leaves the floor members beside "
+               "it, so large margins keep a competence-zero machine in the front",
+        suites=("test_search::test_margins_alone_cannot_fill_a_cell",), item="competence floor"),
+
+    Mutation(
         id="curriculum-reads-every-medium",
         path="dytiscidae/evolution/curriculum.py",
         find="    if domains is not None:\n        segs = {d: s for d, s in segs.items() if d in domains}",
