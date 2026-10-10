@@ -3374,6 +3374,36 @@ is a 24-world identification of one elite, timed, against the current path.
 interop is the cost that decides it. *Falsified* if < 2x. Literature and
 tooling facts are collected in §5 when the brief returns.
 
+*N9 was run the same day* (`experiments/mjwarp_probe/`, scratch venv
+`../mjwarp-venv`: mujoco-warp 3.15.0, warp-lang 1.18.0, mujoco 3.15.0; RTX 3060
+Laptop 6 GB, driver 580.178; report `N9_result.md`). **Outcome: refuted.**
+Rigid-body only, 24 worlds x 2000 steps, median of 3, MJWarp with a captured
+CUDA graph against 24 sequential CPU rollouts in the project's mujoco 3.11
+(one thread): a 12-dof elite in flight **0.68x** (0.537 s vs 0.367 s), with
+contacts 0.85x; an 18-dof rotor elite 1.18x / 1.09x. Without graph capture
+0.04-0.08x (launch-bound, ~5 ms per step). Scaling on the 12-dof body: 1 world
+0.03x, 48 worlds 1.27x, 96 worlds 2.37x; break-even near 39 worlds; a step
+costs ~240 us fixed plus ~1.2 us per world against 7.4 us per world on the
+CPU, so 5x needs ~730 worlds of one body. The identification shape (48 worlds
+x 300 steps, no fluid) is 1.26x. Host copies for ctrl and `xfrc_applied` in
+and xpos/xmat/xipos/cvel out add 113 us per step (+42%) at 24 worlds; the
+Mojo fluid hand-off itself was not measured. Accuracy: qpos within 1.1e-5 of
+CPU over 300 steps (float32). Feasibility: the project's MJCF does not load as
+written, `put_model` rejects the 1 mm `geom margin` (`mjcf.py:193`) under
+MULTICCD and then NATIVECCD on a box-box pair; with the margin zeroed both
+bodies compile and step, rotors and velocity servos included, but a zero
+margin changes the contact physics the search scores. Per-world body mass and
+inertia are supported (the added-mass write at `batchroll.py:529-531` needs
+them); MJWarp's default `njmax` 64 overflowed on landing (512 used).
+*Belief update:* on this machine MJWarp does not accelerate the loop's
+same-body work at the world counts the loop has (24 identification probes, a
+handful of draws, 16 PPO rollouts); it would need hundreds of worlds of one
+body, and the fluid hand-off and the contact margin are unresolved on top.
+The 2026-08 finding stands and is now measured on the current engine. What
+would move it: a workload of >= 100 draws per body (a different search
+design), or a GPU where the fixed per-step cost is far below 240 us. The user
+asked the question; the answer is no, with these numbers.
+
 **N10 (read, minutes, if logged): T6.** `reward_by_tag` or the PPO buffer's
 return decomposition for arch49/50: the share of |return| that is shaping
 versus terminal competence, per tag. *Prediction:* shaping >= 90% in air.
