@@ -262,6 +262,48 @@ MUTATIONS: tuple = (
                "breaks at every descriptor refit",
         suites=("test_search::test_promotion_spends_refinement_and_keeps_what_it_buys",), item="tier-gap telemetry"),
 
+    Mutation(
+        id="score-ignores-the-competence-floor",
+        path="dytiscidae/evolution/loop.py",
+        find="    floored = below_competence_floor(state.island, result)\n",
+        replace="    floored = False\n",
+        defect="a design competent in none of its island's media is ranked like "
+               "any other, so a machine that does nothing stands where the "
+               "window puts it",
+        suites=("test_search::test_the_scalar_stands_at_zero_below_the_competence_floor",), item="blend wiring"),
+    Mutation(
+        id="mission-weight-back-in-the-blend",
+        path="dytiscidae/evolution/loop.py",
+        find="    mission_weight: float = 0.0\n",
+        replace="    mission_weight: float = 0.30\n",
+        defect="0.3 of the scalar is a term that is zero for 97-100% of every "
+               "island's window",
+        suites=("test_search::test_the_scalar_stands_at_zero_below_the_competence_floor",), item="blend wiring"),
+    Mutation(
+        id="place-forgets-the-floor",
+        path="dytiscidae/evolution/loop.py",
+        find='objectives=obj, at_floor=sc["at_floor"])',
+        replace="objectives=obj)",
+        defect="the archive is never told a design is at the floor, so it "
+               "displaces a ranked incumbent on the strength of a tie",
+        suites=("test_search::test_the_scalar_stands_at_zero_below_the_competence_floor",), item="blend wiring"),
+    Mutation(
+        id="dry-run-forgets-the-floor",
+        path="dytiscidae/evolution/loop.py",
+        find='sc["obj"], at_floor=sc["at_floor"])',
+        replace='sc["obj"])',
+        defect="the refinement funnel's dry status calls a floored design a "
+               "replacement the real placement then refuses",
+        suites=("test_search::test_the_scalar_stands_at_zero_below_the_competence_floor",), item="blend wiring"),
+    Mutation(
+        id="verify-offers-verified-designs",
+        path="dytiscidae/evolution/loop.py",
+        find="    for elite in curator.promotion_candidates(3):",
+        replace="    for elite in sorted(archive.cells.values(), key=lambda e: -e.fitness)[:3]:",
+        defect="the verification round takes the top three by fitness, so two "
+               "verified elites at the top leave it one design to try",
+        suites=("test_search::test_verification_offers_designs_not_yet_verified",), item="blend wiring"),
+
     # --- the learner's arithmetic -----------------------------------------
     Mutation(
         id="gae-drops-the-recursion",
@@ -580,6 +622,16 @@ MUTATIONS: tuple = (
         defect="a raw score of zero stands at 0.5 while the stage window is "
                "young, so doing nothing is paid the median early in a run",
         suites=("test_search::test_a_score_of_zero_stands_at_zero",), item="floor rank"),
+
+    Mutation(
+        id="standing-ranks-against-the-floor",
+        path="dytiscidae/evolution/curriculum.py",
+        find="        return [e for e in w if not (len(e) > 3 and e[3])]",
+        replace="        return list(w)",
+        defect="the quantile is taken over the whole window, so with most of it "
+               "at the floor every competent design stands at 0.95-1.0 and the "
+               "scalar separates them by 0.05",
+        suites=("test_search::test_standing_ranks_only_against_designs_above_the_floor",), item="floor rank"),
 
     Mutation(
         id="bandit-without-an-exploration-floor",

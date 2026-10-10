@@ -2784,6 +2784,54 @@ def test_a_score_of_zero_stands_at_zero() -> None:
           f"standing(0.02, 0.02, 1)[0]={ties.standing(0.02, 0.02, 1)[0]} (want 0.5)")
 
 
+def test_standing_ranks_only_against_designs_above_the_floor() -> None:
+    """A window mostly at the floor must not hand every competent design 0.99.
+
+    ARCH51_SPEC §D' item 2: with the whole window the competent designs sit at
+    0.9-1.0 and the scalar separates them by 0.1, so ``standing`` ranks against
+    the entries not at the competence floor and falls back to 0.5 (zero: 0)
+    when fewer than 12 of those remain.
+    """
+    print("\ncurriculum: standing ranks against the designs above the floor")
+    from dytiscidae.evolution.curriculum import Curriculum
+
+    c = Curriculum()
+    for _ in range(200):
+        c.observe_blend(0.0005, 0.001, 0, 0.0005, at_floor=True)
+    for k in range(1, 13):
+        c.observe_blend(0.01 * k, 0.02 * k, 0, 0.03 * k)
+    # The design holding the second-best ranked score (k = 11): 10 of the 12
+    # ranked entries lie strictly below it.
+    got = c.standing(0.01 * 11, 0.02 * 11, 0)
+    wholly = c.standing(0.01 * 11, 0.02 * 11, 0, floor_only=False)
+    mis = c.mission_standing(0.03 * 11, 0)
+    want = 10 / 12
+    check("the second-best ranked design stands at 10/12 of the ranked entries",
+          abs(got[0] - want) < 1e-12 and abs(got[1] - want) < 1e-12
+          and abs(mis - want) < 1e-12,
+          f"standing={got}, mission_standing={mis}, want {want:.4f}")
+    check("and against the whole window it would stand above 0.95",
+          wholly[0] > 0.95, f"standing(floor_only=False)={wholly}")
+
+    thin = Curriculum()
+    for _ in range(200):
+        thin.observe_blend(0.0005, 0.001, 0, 0.0005, at_floor=True)
+    for k in range(1, 12):
+        thin.observe_blend(0.01 * k, 0.02 * k, 0, 0.03 * k)
+    check("fewer than 12 ranked entries: a non-zero score stands at 0.5, zero at 0",
+          thin.standing(0.01 * 11, 0.02 * 11, 0) == (0.5, 0.5)
+          and thin.standing(0.0, 0.0, 0) == (0.0, 0.0)
+          and thin.mission_standing(0.03 * 11, 0) == 0.5
+          and thin.mission_standing(0.0, 0) == 0.0,
+          f"{thin.standing(0.01 * 11, 0.02 * 11, 0)}, {thin.standing(0.0, 0.0, 0)}")
+
+    old = Curriculum()
+    old._recent[0] = [(0.01 * k, 0.02 * k, 0.03 * k) for k in range(1, 14)]
+    check("a window of 3-tuples from an old checkpoint reads as not at the floor",
+          old.standing(0.065, 0.13, 0)[0] == 6 / 13,
+          f"{old.standing(0.065, 0.13, 0)}")
+
+
 def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> None:
     """A design that is good at one thing must be distinguishable from a design
     that is good at nothing.
@@ -3271,6 +3319,19 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
         events = [json.loads(l) for l in open(Path(tmp) / "events.jsonl")]
         promotions = [e for e in events if e.get("kind") == "promote"]
         errors = [e for e in events if e.get("kind") == "error"]
+        # ARCH51_SPEC L5: a design competent in none of its island's media
+        # stands at 0, so `top = 0` and nothing promotes.  If this test stops
+        # promoting, this line says whether the seeds cleared the floor at this
+        # `segment_seconds`; raise `segment_seconds` (or change `islands`) to the
+        # smallest setting where one does, and record the measurement here.
+        from dytiscidae.evolution.islands import COMPETENCE_FLOOR
+        best_own = max((max(float(e.meta.get(d, 0.0) or 0.0) for d in COMPETENCE_FLOOR)
+                        for e in state.archive.cells.values()), default=0.0)
+        print(f"  seeds' best own-medium competence {best_own:.4f} "
+              f"(floor {COMPETENCE_FLOOR['water']})")
+        check("a seed clears the competence floor, so there is something to promote",
+              best_own >= COMPETENCE_FLOOR["water"],
+              f"best own-medium competence {best_own:.4f}")
         check("verification still promotes", len(promotions) >= 1,
               f"{len(promotions)} promotions")
         check("and refinement at promotion raises no errors", not errors,
@@ -3315,6 +3376,118 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
               same, f"media {sorted((got.bases or {}) if got else [])} against {sorted(rec)}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _floor_state(loop):
+    """A ``SearchState`` stand-in for the scalar's tests: the real archive,
+    curriculum, judge and curator, with the physics-side features stubbed."""
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.evolution.islands import curriculum_for as island_curriculum
+    from dytiscidae.evolution.judge import Judge
+
+    archive = Archive([("x", 0, 1, 5), ("y", 0, 1, 5)])
+    events: list = []
+    tel = NS(event=lambda d: events.append(d), exploit=lambda d: events.append(d))
+    state = NS(config=loop.SearchConfig(), descriptors=None,
+               judge=Judge(quantile=0.9, update_every=50), island="water",
+               archive=archive, curriculum=island_curriculum("water"),
+               critic=None, curator=Curator(archive, seed=0), telemetry=tel,
+               scout=None, shared=None, tier0_rejected=0)
+    return state, events
+
+
+def _floor_result(water):
+    from types import SimpleNamespace as NS
+    seg = NS(competence=float(water), measurements={}, score=float(water))
+    return NS(segments={"water": seg}, mission_fraction=0.0, feasible=True,
+              transitions=None, tier=1, exploit="", wall_time=0.0, notes=[],
+              eval_seed=0, mobility=0.0)
+
+
+def test_the_scalar_stands_at_zero_below_the_competence_floor() -> None:
+    """ARCH51_SPEC L5: a design competent in none of its island's media stands
+    at 0 on every half, is flagged ``at_floor``, and fills only an empty cell."""
+    print("\nloop: the scalar stands at zero below the competence floor")
+    from dytiscidae.evolution import loop
+
+    saved = {k: getattr(loop, k) for k in (
+        "episode_features", "behaviour_descriptor", "objectives",
+        "_meta_light", "critic_features", "_meta")}
+    loop.episode_features = lambda r, p: np.zeros(16)
+    loop.behaviour_descriptor = lambda p, r: np.array([0.5, 0.5])
+    loop.objectives = lambda p, r: np.array([0.0, 3.0, 2.0])
+    loop._meta_light = lambda p, r: {}
+    loop.critic_features = lambda m, r: np.zeros(4)
+    loop._meta = lambda p, r, c: {"air": 0.0, "water": r.segments["water"].competence,
+                                  "land": 0.0}
+    try:
+        state, events = _floor_state(loop)
+        for _ in range(40):
+            state.curriculum.observe_blend(0.0, 0.0, 0)
+        for k in range(1, 25):
+            state.curriculum.observe_blend(0.001 * k, 0.002 * k, 0)
+
+        low = loop._score_candidate(state, None, _floor_result(0.005), None, commit=False)
+        check("(a) a design under the floor is flagged and stands at zero",
+              low["at_floor"] is True and low["isl_q"] == 0.0 and low["cur_q"] == 0.0
+              and low["fit"] == 0.0 and low["obj"][0] == 0.0,
+              f"at_floor={low['at_floor']} isl_q={low['isl_q']} cur_q={low['cur_q']} "
+              f"fit={low['fit']} obj0={low['obj'][0]}")
+
+        hi = loop._score_candidate(state, None, _floor_result(0.2), None, commit=False)
+        blend = hi["w"] * hi["isl_q"] + (1.0 - hi["w"]) * hi["cur_q"]
+        check("(b) a competent design is not flagged, the mission weight is 0, "
+              "and the blend is the two standings",
+              hi["at_floor"] is False and hi["mw"] == 0.0
+              and abs(hi["base"] - blend) < 1e-12 and hi["base"] > 0.5,
+              f"at_floor={hi['at_floor']} mw={hi['mw']} base={hi['base']:.4f} "
+              f"blend={blend:.4f}")
+
+        cell = state.archive.cell_of(np.array([0.5, 0.5]))
+        state.archive.add("incumbent", 0.3, np.array([0.5, 0.5]), {},
+                          objectives=np.array([0.3, 1.0, 1.0]))
+        check("the incumbent holds the cell", cell in state.archive.cells)
+        placed = loop._place(state, "g", None, _floor_result(0.005), None, None, ["scale"])
+        dry = loop._dry_status(state, None, _floor_result(0.005), None)
+        check("(c) a floored design does not displace a ranked incumbent, wet or dry",
+              placed == "rejected" and dry == "rejected"
+              and [e.genome for e in state.archive.front(cell)] == ["incumbent"],
+              f"placed={placed} dry={dry} "
+              f"front={[e.genome for e in state.archive.front(cell)]}")
+    finally:
+        for k, v in saved.items():
+            setattr(loop, k, v)
+
+
+def test_verification_offers_designs_not_yet_verified() -> None:
+    """ARCH51_SPEC L5: the verification round walks ``promotion_candidates``,
+    so two verified elites at the top do not leave it one design to try."""
+    print("\nloop: verification offers designs not yet verified")
+    from dytiscidae.evolution import loop
+
+    state, events = _floor_state(loop)
+    cur = state.curator
+    for g, fit, bd in (("a", 0.9, (0.1, 0.1)), ("b", 0.8, (0.1, 0.4)),
+                       ("c", 0.7, (0.1, 0.6)), ("d", 0.6, (0.4, 0.1)),
+                       ("e", 0.5, (0.4, 0.4))):
+        state.archive.add(g, fit, np.array(bd), {"feasible": True})
+    cur.evaluations = 1000
+    for g in ("a", "b"):
+        cur.record_promotion(next(e for e in state.archive.cells.values()
+                                  if e.genome == g), 0.1)
+    saved = loop.build
+
+    def boom(g):
+        raise RuntimeError(f"built {g}")
+    loop.build = boom
+    try:
+        loop._verify_and_label(state, 0, None, np.random.default_rng(0))
+    finally:
+        loop.build = saved
+    tried = {e["error"].split("built ")[-1] for e in events if e.get("kind") == "error"}
+    check("the round tries exactly the unverified designs c, d and e",
+          tried == {"c", "d", "e"}, f"tried {sorted(tried)}")
 
 
 def test_the_refinement_funnel_refines_only_what_it_selects() -> None:
@@ -6334,6 +6507,7 @@ def main() -> int:
         test_one_islands_archive_is_read_alone_not_through_the_merge,
         test_the_island_objective_takes_its_weight_back,
         test_a_score_of_zero_stands_at_zero,
+        test_standing_ranks_only_against_designs_above_the_floor,
         test_curriculum_and_islands_give_gradient_where_the_mission_gives_none,
         test_scout_finds_dark_horses_and_may_only_protect,
         test_scout_skill_separates_regression_to_the_mean_from_foresight,
@@ -6343,6 +6517,8 @@ def main() -> int:
         test_the_headline_is_the_mission,
         test_an_audit_perturbs_the_scored_experiment_and_nothing_else,
         test_promotion_spends_refinement_and_keeps_what_it_buys,
+        test_the_scalar_stands_at_zero_below_the_competence_floor,
+        test_verification_offers_designs_not_yet_verified,
         test_the_refinement_funnel_refines_only_what_it_selects,
         test_the_distance_curriculum_steps_back_only_on_evidence,
         test_a_shared_command_means_the_same_thing_on_every_body,
