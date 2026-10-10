@@ -3398,6 +3398,14 @@ the competence floor stands at 0, ranking is among designs above the floor,
 `mission_weight` is 0.0, Tier-2 flags instead of capping; with
 `--reeval-per-generation > 0` an elite's recorded scores are its median
 draw's. Per-medium competences, `mission_fraction` and coverage are unchanged.
+The GPU gate found one latent defect the floor exposed: seeds were scored
+*without* the shared policy and stamped `scored_with_shared_policy` anyway,
+so a film of a seed elite drove it with a controller that never produced its
+record (`land.command_reversal` 0 recorded, 0.52 on film); with every elite at
+`fitness` 0 the film test's `pick_elite` returned a seed and caught it. Seeds
+are now scored with the shared policy like every child (mutation
+`seeds-scored-without-the-shared-policy`). Every archive before this held its
+seed elites' scores from a different controller than the one the film replays.
 Two consequences to read in arch51: an island whose every elite is at the
 floor promotes nothing to Tier-2 (and gives the critic no labels) until one
 clears it; and 4 of 16 evaluations per generation are re-evaluations, so
