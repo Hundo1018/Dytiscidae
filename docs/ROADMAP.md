@@ -1,5 +1,17 @@
 # Roadmap
 
+**2026-10-10: a theory of why the search does not progress, with its
+predictions, before any measurement; see
+[why the search does not progress](#2026-10-10--why-the-search-does-not-progress-a-theory-its-predictions-and-the-list).**
+Read from the code and the stored archives: 91% of arch49's and arch50's
+elites have own-medium competence below 0.012 at a median `fitness` of 0.81,
+and the scalar was at 0.995 in arch48's first fifty generations. The fitness
+is a blend of `mean(window <= x)` quantiles, so a design that scores zero
+stands at the share of the window that also scored zero (0.91-0.99), and
+Tier-2 caps the three best designs of an island to ~0.1. Six mechanisms, ten
+pre-registered reads and builds (N1-N10); the first build is the fitness floor
+(N5), and arch51 waits for it.
+
 **2026-10-09: answers to the sweep's questions, and where the work stopped;
 see [state when stopped](#state-when-stopped-2026-10-09).** Air on a commanded
 difference (answer 1) is built on a branch with four `test_physics` checks
@@ -2948,6 +2960,298 @@ decision to run it is not. See item N (arch40 list) for what it is, what it
 costs, and the gates that hold it to "changes nothing when off".
 
 ---
+
+## 2026-10-10 — why the search does not progress: a theory, its predictions, and the list
+
+Asked by the user: find why training fails or falls short, from theory first,
+trusting neither the repo's claims nor its fixed ideas; write theory and
+predictions here before anything is measured, and fix directions here before
+anything is built. Three readers went to the code (not the docs) and one to the
+stored telemetry of arch48, arch49 and arch50; their reports are
+`runs/analysis_1010_failure_theory/{A_selection_code_truth,B_controller_ppo_code_truth,C_telemetry,D_claims_ledger}.md`
+(gitignored with `runs/`; the numbers used here are quoted below). Everything in
+§1 is read from records that already existed; nothing in §4 has been measured.
+
+### 0. The question, and the decision that hangs on it
+
+Twenty-odd arms since arch29 have left the mission at 0, the best air score of
+any elite at 0.42-0.55, and water and land below 0.3 since the antipodal pair.
+Each arm has fixed a measurement leak and each has been read as "the search is
+not yet reaching it". The question here is different: **does the selection
+machinery, as written, prefer a competent machine to an incompetent one at
+all?** If it does not, no scoring fix that leaves the machinery alone can move
+the archive, and the next arm (arch51) would be wasted. Two answers are
+imaginable: the machinery ranks competence and is starved of signal by noise and
+budget (then throughput and re-evaluation are the work), or it does not rank
+competence (then the fitness floor is the work, and comes first).
+
+### 1. What is established, from the code and the stored archives
+
+Read 2026-10-10 from `runs/arch{48,49,50}/archive_*.json` and
+`generations.jsonl`; the code lines are at commit 3d639e8.
+
+| fact | arch48 | arch49 | arch50 (gen 120) |
+|---|---|---|---|
+| elites in the eight archives | 621 | 645 | 494 |
+| median elite `fitness` (meta) | 0.809 | 0.828 | 0.836 |
+| elites whose own-medium competence is < 0.012 | 82% | 91% | 91% |
+| median `fitness` of those | 0.785 | 0.810 | 0.822 |
+| Spearman(`fitness`, own-medium competence) | 0.27 | 0.30 | 0.30 |
+| median / max evaluated `fitness`, gens 0-49 | 0.675 / 0.995 | 0.776 / 1.000 | 0.759 / 1.000 |
+| elites inserted in the last 50 gens | 37% | 45% | 52% |
+| Tier-2 promotions with any completed leg | 9 / 192 | 1 / 192 | 0 / 78 |
+| `fitness` of Tier-2 elites vs Tier-1 elites (median) | 0.109 vs 0.800 | 0.095 vs 0.817 | 0.105 vs 0.829 |
+| evaluations with water > 0.15 / land > 0.15 (last 50 gens) | 8.6% / 8.8% | 0.5% / 0.9% | 0.3% / 1.7% |
+
+The elites are not competent and the scalar does not know it. A design on the
+air island with air 0.000, water 0.003 and land 0.000 carries `fitness` 0.945
+(arch49, `archive_air.json`). The scalar was at its ceiling before selection had
+done anything: 0.995 in arch48's first fifty generations, which are random
+bodies and their first mutants.
+
+What the code does (A §1-3, B §1-5; the docs say otherwise in five places,
+listed in A's last section):
+
+1. **The fitness scalar is a blend of three population quantiles**, each
+   `mean(window <= x)` over the island's last 256 evaluations at the cell's
+   stage (`curriculum.py:472-478, 503`; `loop.py:1164-1168`): island score,
+   curriculum score and Tier-1 `mission_fraction`, weighted
+   `0.7 * (w * isl_q + (1 - w) * cur_q) + 0.3 * mis_q`. The window includes the
+   candidate itself.
+2. **A cell is decided by Pareto dominance** on
+   `[blend, structural_margin, energy_margin]` (`archive.py:257-293`), front
+   capacity 4, equal vectors non-dominated. The scalar `fitness` never enters
+   replacement; it weights parent choice (0.35 of the weight), migration,
+   promotion and pruning.
+3. **Tier-2 caps `fitness` to `min(fitness, f2)`**, where `f2` is on a different
+   scale (mission completion plus at most 0.3 of tie-breakers,
+   `curator.py:400-406`, `evaluate.py:726-753`). Zero completed legs gives
+   `f2 <= 0.2`.
+4. The judge's rung ladder enters no score (`loop.py:1231-1232`); the shared
+   PPO policy is the controller inside every evaluation and proposes nothing
+   (`batchroll.py:839`; the "variation operator" sentence in CLAUDE.md is
+   wrong); the auditor's only invalidating check is skipped when base mission
+   `<= 1e-6` (`auditor.py:318-319`), which is 98.8% of evaluations, so it has
+   invalidated 2 designs in three runs; `held_still_params` is never called in
+   the search (B §6).
+5. The rotor channel's offset is a speed in rad/s inside a basis identified
+   with probes of sigma 0.35 (`cpg.py:553`), and the shared policy's 6-D twist
+   reaches the gait only through that basis; the gait gain is off (B §1, [INF]
+   until §4 N6 measures it).
+
+### 2. The theory: six mechanisms, ranked by how much of §1 each explains
+
+**T1. The quantile floor: selection has no gradient on competence, by
+construction.** With `<=`, a design that scores zero stands at the share of
+the window that also scored zero. In every medium that share is 0.91-0.99
+(§1), so an incompetent design's island quantile is 0.91-0.99 and the island's
+best is 1.00: the whole competent range of the island half is 0.01-0.09 of the
+scale, and the mission quantile is 0.99 for everyone. This is why `fitness`
+is 0.8 at gen 0 and 0.8 at gen 300, why 91% of elites are incompetent at 0.81,
+and why Spearman against competence is 0.3. Dominance then decides cells
+mostly on `structural_margin` and `energy_margin`, which are properties of the
+body at rest, and equal blends join the front as "improved": hence 45-52%
+turnover with no competence change. The mechanism predicts something the
+observation did not put in: **a still machine, scored through
+`_score_candidate` against a run's final windows, stands near the top of every
+island, and its dominance vector (high margins, blend ~0.9) is non-dominated
+against most incumbents.** This is rule 1 of "Designing a measurement" applied
+to the fitness itself, which no still-machine probe has done; they all read
+competences, which were gated, and left the scalar that selects.
+
+**T1'. Tier-2 inverts selection at the top.** The three best designs of an
+island by `fitness` are promoted; with zero completed legs their scalar falls
+to ~0.1 (§1, 0.095-0.109 against 0.80-0.83), below every unpromoted elite.
+Parent weight carries 0.35 of normalised fitness, migration takes the top two
+by `fitness`, and pruning removes the lowest: the search's own best designs
+become its least likely parents and are never migrated. Since Tier-2 has
+completed a leg in 10 of 462 promotions over three runs, this is the rule, not
+an edge case.
+
+**T2. Each cell keeps its luckiest draw, and one draw per candidate (M2) does
+not change that.** C2 measured draw variance at 2.5-4.6x design variance
+(one-draw reliability 0.18-0.30). A cell visited by k candidates keeps the
+maximum of k noisy draws; its stored score is inflated by about
+`sigma_draw * E[max of k standard normals]`, i.e. 0.56 / 0.85 / 1.03 sigma at
+k = 2 / 3 / 4, and the incumbent is never re-measured (`archive.py:257-293`).
+M2 removes the best-of-16 on a shared draw; it leaves the best-of-k over the
+cell's history. The mechanism predicts a dependence the draw-variance account
+alone does not: **held-out retention falls with the number of contested
+insertions a cell has seen** (`improvements`), and is lowest where the
+archive is densest.
+
+**T3. The controller cannot express what the tasks ask of it.** (a) The only
+bodies that fly in this model are rotorcraft (0.963-0.987 under a hand
+controller, 2026-09-26); a rotor's channel is reached only through a basis
+whose probes are sized for angles (sigma 0.35 against a top speed of
+150/R rad/s), so the class of design that can fly is the class the controller
+cannot steer. (b) Air on a commanded difference (the 10-09 branch) needs a
+policy that turns on command at 25 Hz through a 6-D twist with authority 0.5 of
+reach; whether the identified bases have yaw authority at all is unmeasured.
+(c) A glider needs its gait stopped; the gait gain is off (arch51 turns it on).
+
+**T4. Flapping flight is infeasible in the model under the actuator limits, so
+land→air and the mission are unreachable by any flapper.** Measured
+2026-09-26: level flight needs margin 1.0, the best feathering gait reaches
+0.42 with joints free, motors torque-limited 60% of the time; the best flapper
+ever scored 0.378. The mission needs land→air. With T3(a), **no design class
+in the genome can both fly and be controlled**, and mission = 0 for twenty runs
+is the correct answer to the question as posed, not a search failure. This is
+the one mechanism whose fix is a decision (rotor-assisted flight as the
+accepted answer, or a different actuator spec), not a build.
+
+**T5. Budget: ~600 evaluations per island per run at reliability 0.25 is ~150
+informative samples for a 625-cell archive.** MAP-Elites literature spends
+10^5-10^6 evaluations; the lineage depth at gen 121 is 5. At this budget the
+archive's growth should be indistinguishable from random sampling of the
+genome prior, and if it is, throughput outranks every scoring change: the
+identification step is 57% of the wall (M6) and is 24 probes of the *same*
+body, the one shape of work a batched rigid-body engine does best (§5, MJWarp).
+
+**T6. PPO learns the shaping potential, not competence.** The per-step reward
+is `0.2 * (gamma * Phi(s') - Phi(s))` and the terminal reward is competence
+over its tag's std (`ppo.py:442-466`); competence is zero for >95% of
+rollouts, so the return is the potential. Phi in water is `-|depth error|`,
+which is the hold task, and M4 learns a fixed body in water; Phi in air is
+altitude plus upright, which is not the turn, and M4 learns nothing in air.
+The learner is working on the reward it was given.
+
+**Rivals kept.** *Instrument error*: the `fitness` field in the archives is
+the quantile blend as designed, and the competence fields are the raw scores
+in [0,1]; the decoupling in §1 is between two correctly recorded quantities.
+*Nothing happened*: every arm is one seed, so differences between arms are
+reads, not effects; T1 is a statement about code, not about a run, and its
+test (N1) does not compare runs. *The user's prior (noise and the draw)*: T2
+keeps it and says what M2 leaves behind.
+
+### 3. What this overturns in the repo's own account
+
+- "Selection still has a gradient (20-23% of elites nonzero)" (PAPERS_2610,
+  reasoned, not measured): T1 says the gradient is 0.01-0.09 of the scale and
+  that zero scorers are ranked above 90% of the population.
+- The ladder, the critic, the auditor, M3's form, E2's bars: all act on or
+  read a scalar that does not rank competence. Fixing them first repeats the
+  pattern of arch38 (a term with nothing reachable above its floor).
+- "The shared PPO is the variation operator" (CLAUDE.md): it is the controller.
+- "stage0/1" in the log is the curriculum stage, not Tier-2.
+
+### 4. Pre-registered reads and builds, in cost-then-speed-then-learning order
+
+Each item names its prediction with a number and what falsifies it. Reads
+N1-N4 need no new arm; they run on arch49's stored elites and windows. Nothing
+below is measured yet; a result is appended under the item when it arrives,
+with the frozen text left as written.
+
+**N1 (read, ~1 h GPU or numpy): the inert probe of the fitness itself.** For
+each of arch49's 229 elites, build its still twin (`held_still_params`) and
+score both through `_score_candidate(commit=False)` against the run's final
+curriculum windows (restored from `search_state.pkl`), on the elite's own
+`eval_seed`. Report per island: the twin's `fit`, `isl_q`, `mis_q`, and
+whether its dominance vector is non-dominated against the incumbent's front.
+*Prediction (T1):* median twin `fit` >= 0.80 in every island; the twin is
+non-dominated or dominating in >= 60% of cells. *Falsified* if median twin
+`fit` < 0.5 in any specialist island, or non-dominated in < 30% of cells. If
+confirmed, every archive since the quantile blend was introduced is a sample
+of bodies with good margins, and §1's Spearman 0.3 is the ceiling.
+
+**N2 (read, minutes): the floor in the windows.** From `search_state.pkl`, the
+share of each island's window at exactly zero island score, and the quantile a
+zero scorer receives. *Prediction:* >= 0.90 in air, water and land islands.
+*Falsified* below 0.7.
+
+**N3 (read, minutes, existing rows): T2's signature.** Join
+`experiments/draw_variance/results_arch49.json` (229 elites, recorded score and
+six fresh draws) to the archive's `improvements`. *Prediction:* Spearman
+between (recorded - mean fresh) and `improvements` > 0.15 in each of water and
+land; elites with `improvements >= 3` retain < 70% of what elites with 0
+retain. *Falsified* if both are within [-0.1, 0.1].
+
+**N4 (read, minutes): T1'.** From the three runs' promote events and archives,
+the parent-selection weight of Tier-2 elites against Tier-1 elites of the same
+island (`curator.select_parent`'s formula on stored fields). *Prediction:*
+Tier-2 elites sit in the bottom decile of weight in >= 80% of islands; none
+was ever chosen as a migrant. *Falsified* if their median weight is above the
+island median.
+
+**N5 (build, after N1-N2 read as predicted): a floor that ranks.** The
+direction, for the implementation plan to make exact: a design at zero
+competence stands at zero (strict `<`, and the mission term dropped from the
+blend while `mission_fraction` is zero for 98.8% of evaluations, it decides
+nothing and costs 0.3 of the scale); the dominance tie among zero blends is
+broken toward the incumbent, so margins alone cannot fill a cell; Tier-2's cap
+is replaced by a flag the curator reads (a Tier-2 failure must not make the
+best design the worst parent). *Prediction for the first arm with it:*
+evaluated `fitness` median in gens 0-49 < 0.3 (was 0.68-0.78); share of elites
+with own-medium competence >= 0.012 rises from 9% to >= 40% by gen 150;
+Spearman(`fitness`, own competence) over the archive >= 0.7 (was 0.3).
+*Falsified* if any of the three misses. Each change carries a mutation in
+`tools/mutate.py`.
+
+**N6 (probe, ~30 min): rotor authority through the basis (T3a).** On arch49's
+rotor elites: the component of each identified mode on `_r` channels, scaled
+by top speed; then a hand PD hover law applied (i) through
+`coeffs_for_twist` and (ii) directly to `ctrl`. *Prediction:* (i) scores air
+< 0.3 while (ii) scores >= 0.8 on the same body and seed, and the basis moves
+rotor speed by < 5% of top speed per unit coefficient. *Falsified* if (i) >=
+0.6. If confirmed, the controller is the gate on the only flying class, and
+the direction is a rotor channel the twist reaches directly (speed as a
+fraction of top speed, outside the identified basis).
+
+**N7 (derivation, no run): the flapping power and torque bound (T4).** A
+document under `derivations/`: for the genome's ranges of mass, wing area and
+actuator torque/speed, the ratio of available stroke power to the induced plus
+profile power of level flight, and the frequency at which the motor's torque
+binds. *Prediction:* ratio < 1 for every flapper plan at every frequency the
+spar allows; the 0.42 margin of 2026-09-26 is reproduced within 30%.
+*Falsified* if any plan's ratio exceeds 1 inside the allowed frequency band.
+If confirmed, the decision goes to the user: accept rotor-assisted flight as
+the design answer (and then N6's direction is the enabling build), or change
+the actuator specification.
+
+**N8 (control run, ~40 min GPU): random sampling against the archive (T5).**
+300 bodies from the genome prior, scored through the current scorer at their
+own draws, binned by arch49's final descriptor axes. *Prediction:* coverage
+and summed competence within 15% of arch49's gen-37 island archives (the same
+evaluation count per island). *Falsified* if arch49 leads by > 30%. If
+confirmed, selection has not yet contributed and throughput (N9) comes before
+any further scoring work beyond N5.
+
+**N9 (probe, <= 10 lines first, per the probe-before-build rule): MuJoCo Warp
+for the same-body work.** The user asked whether MJWarp (GPU-batched MuJoCo,
+many worlds of one model) can accelerate the loop. The theory of where it fits:
+heterogeneous bodies are one model each and do not batch (the 2026-08 finding
+stands), but three of the loop's costs are *the same body many times*:
+identification (24 probes per domain per body, 57% of the wall), placement on
+several draws (M3, off because it costs `n - 1` re-scores), and the PPO
+rollouts that T6 says need more samples per body. Those are MJWarp's shape.
+Open before anything is built: whether the project's fluid forces (the Mojo
+GPU kernel) can be applied per world without a host round trip, and what a
+16-world step costs against 16 CPU steps on one of arch49's bodies. The probe
+is a 24-world identification of one elite, timed, against the current path.
+*Prediction:* the rigid-body part is >= 5x faster at 24 worlds; the fluid
+interop is the cost that decides it. *Falsified* if < 2x. Literature and
+tooling facts are collected in §5 when the brief returns.
+
+**N10 (read, minutes, if logged): T6.** `reward_by_tag` or the PPO buffer's
+return decomposition for arch49/50: the share of |return| that is shaping
+versus terminal competence, per tag. *Prediction:* shaping >= 90% in air.
+*Falsified* below 60%. The direction, once N5 gives competence a rank, is
+terminal credit that the learner can see (per-body group baselines are already
+in GRPO, off by default).
+
+**Order.** N2, N3, N4, N10 are minutes on stored data and run first in one
+agent; N1 and N6 are the two probes that decide the shape of the build; N7 is
+a derivation for the user's decision; N5 is the first build and goes to an
+implementation plan (`docs/ARCH51_SPEC.md`), written by a stronger model from
+this section, before any code; N8 and N9 are the throughput questions and run
+while N5 is built. arch51 does not start until N5 is built and its mutations
+caught. The expensive measurements report in the fixed format of
+`runs/analysis_1010_failure_theory/REPORT_FORMAT.md`, so that a smaller model
+can run them and the numbers land in this section unchanged.
+
+### 5. Literature and tooling brief
+
+Appended when `runs/analysis_1010_failure_theory/E_literature.md` returns.
 
 ## 2026-10-08, later — the work-list sweep
 

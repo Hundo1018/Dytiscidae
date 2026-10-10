@@ -3,7 +3,8 @@
 Generative design + control search for triphibian flapping-wing machines.
 MAP-Elites over eight islands, MuJoCo rigid bodies plus this project's own
 quasi-steady fluid solver (`docs/model_validity.md`: not CFD), and a shared PPO
-policy the search keeps for its variation operator.
+policy that is the controller inside every evaluation (it proposes no
+variation; `batchroll.py:839`, ROADMAP 2026-10-10 §1).
 
 `docs/ROADMAP.md` is the work list and carries the measurement behind every
 item. Read it before proposing anything.
