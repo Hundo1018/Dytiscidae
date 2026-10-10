@@ -3701,6 +3701,20 @@ are a comparability boundary or a different physics.
 Spearman of a k-draw mean against the held-out mean for k = 1..6, against
 `K / (K + R)`. *Prediction:* within 0.1 of the formula. Sets K for the design.
 
+*Q5 was read the same day* (`experiments/draw_variance/k_curve.py`, arch49's
+229 elites x 6 fresh draws, all C(6,k) subsets; report `Q5_result.md`).
+**Outcome: refuted on rank, held on value.** Spearman between a k-draw mean
+and the (6-k)-draw mean sits below `sqrt(rel_k rel_{6-k})` in all 15 cells,
+by 0.15-0.24 in air and 0.12-0.18 in land (water within 0.08); Pearson on the
+same pairs matches the formula within 0.02 in water and land. The scores are
+zero-heavy and heavy-tailed (air: 182 of 229 elites have six zero draws and
+are excluded), so the formula is fair for a design that places on the mean and
+optimistic for anything that ranks. R on the included elites: air 7.3, water
+4.0, land 2.0. **K for reliability 0.9: air 66, water 36, land 18** (0.8:
+29 / 16 / 8; 0.95: 139 / 75 / 38); air's R has a wide interval (file CI
+2.2-38). For §5, K = 30-100 stands, with the mean, not the rank, as the
+placed quantity.
+
 **Q6 (interop, hours): Mojo -> Warp zero copy.** A Mojo `DeviceBuffer`
 exposed to Python and wrapped by `wp.from_dlpack` or `wp.array(ptr=...)`,
 written by a Mojo kernel and read by a Warp kernel on one stream, 1e6 floats,
