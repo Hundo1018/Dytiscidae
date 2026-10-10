@@ -3572,6 +3572,159 @@ with the M4 harness before an arm, freeze it for the arm, fine-tune between
 arms; the search then ranks bodies under one controller (Strgar & Kriegman's
 order). Its pre-registered read is written when M4's nine runs are in.
 
+## 2026-10-10, later — an evaluation that never leaves the device: theory, options, probes
+
+The user, after N9: find the design in which each body is scored on >= 100
+draws (re-evaluation and PPO rollouts in hundreds), with the fluid solver and
+the control law inside the device kernel so a rollout never returns to the
+host; Mojo is a candidate. Nothing below is measured; the probes come first.
+
+### 0. The question and the decision
+
+N9 said MJWarp does not pay at this loop's world counts. The question here is
+different: **is a whole rollout, on device, cheap enough per extra draw that
+the search can afford to score every candidate on a hundred draws and so
+remove the noise that T2 and C2 measured (one-draw reliability 0.15-0.35)?**
+Two answers are imaginable: the per-step cost on device is nearly fixed, so a
+hundred draws cost about what one costs today and the redesign is worth
+weeks; or the per-draw marginal cost stays within a small factor of the
+host's and nothing changes. The decision is which of three architectures to
+build, or none.
+
+### 1. What is known about where a step's time goes
+
+- The current batched path is dispatch-bound on the host, not GPU-bound
+  (`experiments/perf/NOTES.md`, 2026-09-27): one worker's shard of 4 designs
+  spent 62% in identification, 64% (cumulative) in the fluid's host-side
+  numpy, 18% in the GPU round trip (338 us per call, later 89 us), 4% in
+  `mj_step`; the GPU sat at 5%. After the fusions, 4 designs without
+  identification take ~12.2 s for ~40,000 design-steps: **~0.3 ms per
+  design-step, ~0.8 ms with identification.**
+- N9 (2026-10-10): an MJWarp rigid-body step costs ~240 us fixed plus ~1.2 us
+  per world, graph-captured; host copies of ctrl, `xfrc_applied`, xpos, xmat,
+  xipos and cvel add 113 us per step at 24 worlds.
+- The Mojo fluid kernel already batches panels across heterogeneous bodies
+  (memory, 2026-08; `mojo/src/fluid_gpu.mojo`); its cost at 190 panels was 89
+  us per call and its marginal cost per panel beyond that is unmeasured
+  (5% GPU busy says it is small).
+- Draw noise (C2, arch48 and arch49): draw variance over design variance R =
+  4.6-5.8 (air), 3.0-3.4 (water), 1.8-2.5 (land). With a mean over K draws,
+  reliability is `K / (K + R)`: K = 1 gives 0.15-0.35; K = 10 gives 0.63-0.85;
+  **K = 100 gives 0.95-0.98**; K = 30 gives 0.84-0.94.
+- arch49's 645 elites: dof median 12, p90 30, max 53; parts median 5, max 11;
+  191 carry rotors (max 21). A padded-superset body of 32 dof covers 90%.
+- Per generation today: 16 candidates x (1 air + 2 water + 2 land halves + 4
+  transitions) segments, ~110-175 s wall; identification is 24 probes per
+  domain per body.
+
+### 2. The theory
+
+**T7. On device, a rollout's step cost is nearly fixed, so draws are nearly
+free up to the hundreds.** Model: `T_step(W) = a + b * W` for W worlds of one
+body. From N9, rigid `a` ~ 240 us, `b` ~ 1.2 us; a fluid kernel adds its own
+launch (~90 us today) and a per-panel marginal cost `b_f` per world (a 12-dof
+body has ~50 panels; unmeasured, predicted <= 0.5 us per world); a fused CPG +
+2x64 MLP per world adds `b_c` (predicted <= 0.3 us per world). Prediction:
+**`a` <= 0.5 ms and `b` <= 2 us**, so W = 100 draws of one body cost <= 0.7 ms
+per step, about 2x today's single-draw design-step with identification, and
+W = 1000 cost <= 2.5 ms. *Falsified* if a fused step measures `a` > 1 ms or
+`b` > 5 us at W = 100-1000. If T7 holds, a generation that scores every
+candidate on 100 draws costs about today's wall, reliability rises from
+0.15-0.35 to 0.95-0.98, and the Extract-ME re-evaluation (N11) and the median
+placement (M3) become unnecessary: the archive stores a mean with a confidence
+interval and the film replays the named median draw.
+
+**T8. The fixed cost is paid per launch, so the architecture that puts the
+whole generation in one launch wins by the number of bodies.** Option A pays
+`a` once per body per step (16 launches); option B pays it once per step for
+all bodies and all draws. The difference is 16x on the fixed term: at W = 100
+per body, A ~ 16 x 0.7 ms = 11 ms per step (~110 s per generation, today's
+wall), B ~ 0.5 + 1600 x 0.002 ~ 3.7 ms per step (~37 s per generation).
+
+**T9. The physics that changes is contacts, and only land and the crossings
+read them.** Air and water segments touch nothing; land and the two
+water-land crossings read the beach and the ramp. Any engine that is not
+MuJoCo's constraint solver changes those scores; the "two evaluation paths"
+rule (`test_search` asserts their agreement) is the shape of the check, with
+MuJoCo kept as the reference path for Tier-2, films and verification.
+
+### 3. The three architectures, and what each costs to find out
+
+| | A. Warp-native | B. Mojo-native | C. Hybrid |
+|---|---|---|---|
+| rigid body | MJWarp, one `Model` per body, W worlds | own Featherstone ABA in Mojo, padded to 32 dof, soft contacts, all bodies x draws in one launch | MJWarp |
+| fluid | `physics/fluid.py` ported to Warp (a third implementation) | the existing Mojo kernel | the existing Mojo kernel through zero-copy interop (untested anywhere, E §Q6) |
+| control | Warp kernel (CPG + MLP) via MJWarp's control callback | Mojo, in the same launch | Warp kernel |
+| heterogeneity | serial over bodies (16 launches) | one launch | serial over bodies |
+| blockers known today | `geom margin` 1 mm rejected by MULTICCD/NATIVECCD (N9); contact physics changes if zeroed; MJWarp `njmax` | the largest build: contacts, joint limits, verification against MuJoCo per body; Mojo GPU maturity (atan2 linking 2026-08; the `Py_NewRef` worker symptom today) | interop stream ordering; same margin blocker as A |
+| predicted step at W = 100 per body, 16 bodies | ~11 ms | ~4 ms | ~11 ms + copy |
+| build size | weeks (fluid port) | weeks to months (engine) | days if interop works, else = A |
+
+### 4. Probes, in cost order (each <= a day; nothing is built before them)
+
+**Q1 (GPU, ~10 min): the fluid kernel's marginal cost.** Time
+`FullPipeline.step` (the Mojo kernel, as the batched path calls it) at 190,
+5,000 and 50,000 panels built from copies of one arch49 body, back to back,
+graph-free as today. *Prediction (T7):* <= 0.5 us per panel marginal above
+the ~90 us launch, so 50,000 panels (1,000 worlds of a 50-panel body) cost
+<= 25 ms per step. *Falsified* above 2 us per panel. Decides whether the fluid
+side can carry hundreds of draws at all; if it cannot, none of A, B, C pays.
+
+**Q2 (GPU, Warp, ~1 day): the fused rigid + control step.** In the scratch
+venv from N9: an MJWarp step with a user control kernel evaluating a
+33-64-64-6 tanh MLP plus a CPG per world and a user passive-force kernel
+writing a body-frame force per body (a placeholder for the fluid), inside the
+captured graph, no host copy per step; W = 24 / 100 / 730 on the N9 fixtures
+(margin zeroed, `njmax` 512). *Prediction:* `a` <= 0.5 ms, `b` <= 2 us per
+world. *Falsified* if `a` > 1 ms or `b` > 5 us. Gives A's and C's step cost
+without the fluid port. Waits on F (tooling brief) for the callback API.
+
+**Q3 (CPU then GPU, 2-3 days): Featherstone for one body in Mojo.** An
+articulated-body algorithm for one arch49 12-dof elite (hinges and the
+rotor's velocity servo, no contacts), checked against `mj_forward`'s `qacc`
+on 100 random states (|diff| < 1e-6 relative), then batched on the GPU at
+W = 1,600 padded to 32 dof. *Prediction:* agreement holds and the batched
+step costs <= 1 ms. *Falsified* if agreement fails on joint limits or the
+servo, or the step costs > 5 ms. This is B's feasibility; run only if Q1 and
+Q2 say the fixed cost is the lever (T7 holds) and Q2's A-cost is not already
+enough.
+
+**Q4 (CPU, hours, stored elites): how much of land and the crossings is the
+contact model.** Re-score arch49's 51 land-competent elites under MuJoCo with
+softened contacts (`solref` time constant x4, `solimp` widened) and under
+hard ones. *Prediction:* land competence moves by < 20% for >= 80% of them.
+*Falsified* if it moves > 50% for a quarter. Says whether B's soft contacts
+are a comparability boundary or a different physics.
+
+**Q5 (analytic + stored rows, minutes): the K curve on real draws.** From
+`experiments/draw_variance/results_arch49.json` (229 elites x 7 draws), the
+Spearman of a k-draw mean against the held-out mean for k = 1..6, against
+`K / (K + R)`. *Prediction:* within 0.1 of the formula. Sets K for the design.
+
+**Q6 (interop, hours): Mojo -> Warp zero copy.** A Mojo `DeviceBuffer`
+exposed to Python and wrapped by `wp.from_dlpack` or `wp.array(ptr=...)`,
+written by a Mojo kernel and read by a Warp kernel on one stream, 1e6 floats,
+checksum equal, no host copy (measure with `nvidia-smi`'s PCIe counters or a
+timing that does not scale with size). *Prediction:* it works or fails on the
+first try; there is no partial outcome. Decides C.
+
+### 5. What the search becomes if T7 holds (for the plan, not yet decided)
+
+Score = mean over K draws (K from Q5; 30-100), stored with its standard
+error; a candidate enters a cell when its lower bound beats the incumbent's
+(the rule N11 was built toward); the film replays the median draw by name.
+Identification's 24 probes are worlds in the same launch. PPO sees K rollouts
+per body per generation (1.5k decisions today per body, 150k at K = 100),
+which is the budget the co-design literature spends (DERL 5M steps per body;
+Mertan & Cheney: undertrained controllers rank bodies at random). N11 and M3
+are retired. Comparability: every score, the archive and the learner's data
+change; nothing is comparable across it.
+
+### 6. Tooling facts
+
+Appended from `runs/analysis_1010_failure_theory/F_on_device_tooling.md` when
+the brief returns.
+
 ## 2026-10-08, later — the work-list sweep
 
 The open items of the 10-06 lists (arch48 items 1–5, PAPERS_2610, the external
