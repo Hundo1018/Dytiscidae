@@ -1546,6 +1546,24 @@ MUTATIONS: tuple = (
                "ones, adding a different kind of number's mean and scale back",
         suites=("test_ppo",), item="N mixed batch"),
     Mutation(
+        id="return-split-drops-the-discount",
+        path="dytiscidae/learning/ppo.py",
+        find="            p[2] += float(disc @ term)\n",
+        replace="            p[2] += float(term.sum())\n",
+        defect="the terminal part of the reported return is undiscounted, so the "
+               "shaping share N10 reads is computed against the wrong denominator",
+        suites=("test_ppo::test_the_return_splits_into_shaping_and_terminal",),
+        item="N10 return split"),
+    Mutation(
+        id="return-split-omits-shaping",
+        path="dytiscidae/learning/ppo.py",
+        find="            shp = rew - term\n",
+        replace="            shp = np.zeros(n)\n",
+        defect="the reported shaping part is always zero, so N10 would read the "
+               "learner as pure competence whatever the shaping does",
+        suites=("test_ppo::test_the_return_splits_into_shaping_and_terminal",),
+        item="N10 return split"),
+    Mutation(
         id="grpo-rollouts-leak-into-the-archive",
         path="dytiscidae/evolution/loop.py",
         find="    del results                      # learning-only: no score leaves this function",
