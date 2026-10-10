@@ -80,6 +80,7 @@ Four tools, none needs a GPU:
 
 ```bash
 PYTHONPATH=. .venv/bin/python tools/mutate.py            # break the code on purpose
+PYTHONPATH=. .venv/bin/python tools/mutate.py --check    # static: each mutation applies once, names a test (runs inside test_index)
 PYTHONPATH=. .venv/bin/python tools/suite_probe.py --all # what can run at all
 PYTHONPATH=. .venv/bin/python tools/assertion_audit.py   # assertions that cannot fail
 PYTHONPATH=. .venv/bin/python tools/coverage_report.py   # lines nothing touches

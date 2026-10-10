@@ -4614,6 +4614,60 @@ def test_a_film_reproduces_the_scored_experiment() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_seeds_are_scored_with_the_shared_policy() -> None:
+    """``seed_archipelago`` hands the shared policy to the evaluator (IMPL_1010 M1).
+
+    2026-10-10: seeds were scored without it but stamped
+    ``scored_with_shared_policy``, so a seed elite's film drove a controller
+    that never produced its record.  The commit that fixed it added a mutation
+    and no test, and the mutation was then MISAPPLIED for a day.  This reads the
+    argument the real ``seed_archipelago`` passes, with the evaluator swapped for
+    a probe, so it needs no MuJoCo and no GPU.
+    """
+    print("\nseeds: scored with the shared policy")
+    import shutil
+    import tempfile
+
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution import loop as _loop
+
+    class _Stop(Exception):
+        pass
+
+    seen: dict = {}
+    tmp = tempfile.mkdtemp(prefix="dyt-seedpol-")
+    orig_seed, orig_eval = _loop.seed_archipelago, _loop.evaluate_candidates
+
+    def probe(genomes, cfg, **kw):
+        seen["shared"] = kw.get("shared")
+        raise _Stop
+
+    def seed_then_stop(state, spec):
+        seen["state_shared"] = state.shared
+        _loop.evaluate_candidates = probe
+        try:
+            orig_seed(state, spec)
+        finally:
+            _loop.evaluate_candidates = orig_eval
+        raise _Stop
+
+    _loop.seed_archipelago = seed_then_stop
+    try:
+        _loop.run_search(_loop.SearchConfig(
+            generations=1, batch=1, seed=3, run_dir=tmp, workers=1,
+            islands=("generalist",), use_shared_policy=True), MissionSpec())
+    except _Stop:
+        pass
+    finally:
+        _loop.seed_archipelago, _loop.evaluate_candidates = orig_seed, orig_eval
+        shutil.rmtree(tmp, ignore_errors=True)
+    check("the seeds were scored by a run that has a shared policy",
+          seen.get("state_shared") is not None and "shared" in seen)
+    check("and the evaluator was handed that policy",
+          seen.get("shared") is not None and seen.get("shared") is seen.get("state_shared"),
+          type(seen.get('shared')).__name__)
+
+
 def test_a_kernel_older_than_its_source_is_not_usable() -> None:
     """The GPU kernel is a compiled mirror of the numpy solver; nothing compared them.
 
@@ -6958,6 +7012,7 @@ def main() -> int:
         test_the_shared_policy_survives_a_resume,
         test_the_batched_path_tells_the_policy_it_is_wet,
         test_a_film_reproduces_the_scored_experiment,
+        test_seeds_are_scored_with_the_shared_policy,
         test_a_kernel_older_than_its_source_is_not_usable,
         test_a_checkpoint_names_the_commit_the_process_started_from,
         test_a_finished_run_is_a_checkpoint,

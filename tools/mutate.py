@@ -324,12 +324,14 @@ MUTATIONS: tuple = (
     Mutation(
         id="seeds-scored-without-the-shared-policy",
         path="dytiscidae/evolution/loop.py",
-        find="            shared=state.shared, pool=state.pool)",
-        replace="            pool=state.pool)",
+        find="            seeds, cfg, identify=True, spec=spec, seeds=seed_seeds,\n"
+             "            shared=state.shared, pool=state.pool)",
+        replace="            seeds, cfg, identify=True, spec=spec, seeds=seed_seeds,\n"
+                "            pool=state.pool)",
         defect="the seeds are scored without the shared policy but stamped "
                "scored_with_shared_policy, so the film drives a seed elite with "
                "a controller that never produced its record (2026-10-10)",
-        suites=("test_search::test_a_film_reproduces_the_scored_experiment",), item="blend wiring"),
+        suites=("test_search::test_seeds_are_scored_with_the_shared_policy",), item="blend wiring"),
     Mutation(
         id="reeval-reuses-the-stored-seed",
         path="dytiscidae/evolution/loop.py",
@@ -955,8 +957,8 @@ MUTATIONS: tuple = (
     Mutation(
         id="turn-ignores-airborne",
         path="dytiscidae/envs/triphibian.py",
-        find="                        * min(a.get(\"airborne\", 1.0), b.get(\"airborne\", 1.0)))",
-        replace="                        * 1.0)",
+        find="                factor = _served(a, b) * min(a.get(\"airborne\", 1.0), b.get(\"airborne\", 1.0))",
+        replace="                factor = _served(a, b) * 1.0",
         defect="a turn is scored whether or not the machine is still in the air",
         suites=("test_physics",), item="task response"),
     Mutation(
@@ -981,8 +983,8 @@ MUTATIONS: tuple = (
     Mutation(
         id="land-stop-adds-to-the-walk",
         path="dytiscidae/envs/triphibian.py",
-        find="            task = progress * (0.5 + 0.5 * stop[\"score\"])",
-        replace="            task = 0.5 * progress + 0.5 * stop[\"score\"]",
+        find="            task = prog * served * (0.5 + 0.5 * second)",
+        replace="            task = 0.5 * prog + 0.5 * second",
         defect="stopping on land adds to the walk instead of qualifying it, and a "
                "rock -- which stops perfectly -- scores half",
         suites=("test_physics",), item="task land"),
@@ -998,8 +1000,9 @@ MUTATIONS: tuple = (
     Mutation(
         id="evaluators-ask-different-tasks",
         path="dytiscidae/envs/batchroll.py",
-        find="        task = schedule_for(dom, np.random.default_rng(task_seed(scatter_seed)))",
-        replace="        task = schedule_for(dom)",
+        find="        tasks = {i: schedule_for(dom, np.random.default_rng(task_seed(scatter_seeds[i])))\n"
+             "                 for i in live}\n",
+        replace="        tasks = {i: schedule_for(dom) for i in live}\n",
         defect="the batched path asks every machine the default task while the "
                "single path asks the drawn one, so the search scores one experiment "
                "and every verification runs another",
@@ -1037,7 +1040,8 @@ MUTATIONS: tuple = (
     Mutation(
         id="single-path-crossing-unscattered",
         path="dytiscidae/envs/transitions.py",
-        find="    env.scatter(np.random.default_rng(transition_scatter_seed(kind)))\n",
+        find="    env.scatter(np.random.default_rng(transition_scatter_seed(kind)),\n"
+             "                pose=getattr(controller, \"params\", None))\n",
         replace="",
         defect="Tier-2, films and probes start every crossing from the bare "
                "placement while the search scored a scattered one",
@@ -1204,8 +1208,8 @@ MUTATIONS: tuple = (
     Mutation(
         id="batched-fluid-diagnostics-stay-default",
         path="dytiscidae/envs/batchroll.py",
-        find='                e.solver.diag.mean_submerged = float(o["subf"][pa:pb].mean())',
-        replace="                pass",
+        find='                float(o["subf"][pa:pb].mean()) if pb > pa else 0.0)\n',
+        replace="                0.0)\n",
         defect="the batched path leaves diag.mean_submerged at 0.0, so the "
                "policy the search scores is told it is dry however deep it is",
         suites=("test_search::test_the_batched_path_tells_the_policy_it_is_wet",), item="path agreement"),
@@ -1493,6 +1497,33 @@ MUTATIONS: tuple = (
         suites=("test_search::test_merging_the_rescore_with_the_first_refinement_changes_nothing",),
         item="merged re-score"),
 
+    # --- the harness itself (IMPL_1010 M1) ---------------------------------
+    Mutation(
+        id="static-check-ignores-missing-text",
+        path="tools/mutate.py",
+        find="        if n != 1:\n            out.append((m.id, f\"the target text appears",
+        replace="        if n > 1:\n            out.append((m.id, f\"the target text appears",
+        defect="the static check passes a mutation whose target text is gone",
+        suites=("test_index::test_every_mutation_applies_exactly_once",),
+        item="harness"),
+    Mutation(
+        id="static-check-ignores-missing-tests",
+        path="tools/mutate.py",
+        find="            if defs[module] is None or "
+             "(func and func not in defs[module]):",
+        replace="            if defs[module] is None:",
+        defect="the static check passes a mutation that names a test function that does not exist",
+        suites=("test_index::test_every_mutation_applies_exactly_once",),
+        item="harness"),
+    Mutation(
+        id="skipped-function-reads-survived",
+        path="tools/mutate.py",
+        find="    if rc == 3:\n        return \"NOT RUN\"\n",
+        replace="",
+        defect="a named function that skipped is read as a mutant that survived",
+        suites=("test_index::test_every_mutation_applies_exactly_once",),
+        item="harness"),
+
     Mutation(
         id="mean-not-padded",
         path="dytiscidae/learning/ppo.py",
@@ -1646,8 +1677,8 @@ MUTATIONS: tuple = (
     Mutation(
         id="tier2-probe-legs-enter-the-mission",
         path="dytiscidae/envs/evaluate.py",
-        find="            r.probe_segments[dom.value] = env.rollout(",
-        replace="            r.segments[dom.value] = env.rollout(",
+        find="            r.probe_segments[dom.value] = run_segment(",
+        replace="            r.segments[dom.value] = run_segment(",
         defect="label-only Tier-2 legs land in segments, which fitness scores",
         suites=("test_search::test_tier2_probe_legs_label_without_scoring",),
         item="ARCH46 2b"),
@@ -1833,6 +1864,35 @@ def apply_mutation(tree: Path, m: Mutation) -> str:
     return ""
 
 
+def static_problems(mutations=None, root: Path = ROOT) -> list:
+    """(id, problem) for every mutation that cannot apply exactly once or names no test."""
+    import ast
+    out, defs = [], {}
+    for m in (MUTATIONS if mutations is None else mutations):
+        p = root / m.path
+        n = p.read_text(encoding="utf-8").count(m.find) if p.exists() else -1
+        if n != 1:
+            out.append((m.id, f"the target text appears {n} times in {m.path}, expected 1"))
+        for suite in m.suites:
+            module, _, func = suite.partition("::")
+            f = root / "tests" / f"{module}.py"
+            if module not in defs:
+                defs[module] = ({d.name for d in ast.parse(f.read_text(encoding="utf-8")).body
+                                 if isinstance(d, ast.FunctionDef)} if f.exists() else None)
+            if defs[module] is None or (func and func not in defs[module]):
+                out.append((m.id, f"names {suite}, which does not exist"))
+    return out
+
+
+def suite_status(rc: int, out: str) -> str:
+    """What one suite run says about a mutant: caught, passed, NOT RUN or TIMEOUT."""
+    if rc == 124 and out.startswith("timed out"):
+        return "TIMEOUT"
+    if rc == 3:
+        return "NOT RUN"
+    return "caught" if rc != 0 else "passed"
+
+
 #: Driver for ``module::function``.  The suites keep their failures in a module
 #: -level ``FAILURES`` list and print through ``check``, so one function can be
 #: run on its own by importing the module and reading that list afterwards.
@@ -1847,6 +1907,7 @@ spec = importlib.util.spec_from_file_location(
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 before = len(getattr(mod, "FAILURES", []))
+skipped0 = len(getattr(mod, "SKIPPED", []))
 try:
     getattr(mod, "{func}")()
 except Exception:
@@ -1856,6 +1917,9 @@ fails = getattr(mod, "FAILURES", [])[before:]
 if fails:
     print("[FAIL] " + "; ".join(fails))
     raise SystemExit(1)
+if len(getattr(mod, "SKIPPED", [])) > skipped0:
+    print("[NOT RUN] " + "; ".join(getattr(mod, "SKIPPED", [])[skipped0:]))
+    raise SystemExit(3)
 raise SystemExit(0)
 """
 
@@ -1907,14 +1971,15 @@ def evaluate(m: Mutation, workdir: Path) -> Result:
     for suite in m.suites:
         rc, out = run_suite(tree, suite)
         # A suite that ran out of time failed nothing: it is evidence of
-        # neither outcome.  It used to fall through to "caught", and with the
-        # kernel linked in, `test_search` outlasted the old 900 s limit on
-        # every mutant -- three batched-path mutations were reported caught at
-        # 900.2 s, 900.1 s and 900.2 s with no failing check between them.
-        if rc == 124 and out.startswith("timed out"):
+        # neither outcome.  A function that skipped (rc 3) never ran.
+        st = suite_status(rc, out)
+        if st == "TIMEOUT":
             return Result(m, "TIMEOUT", by=suite, detail=out,
                           seconds=time.time() - t0)
-        if rc != 0:
+        if st == "NOT RUN":
+            return Result(m, "NOT RUN", by=suite, detail=out.strip()[-160:],
+                          seconds=time.time() - t0)
+        if st == "caught":
             fails = failing_checks(out)
             detail = fails[0] if fails else out.strip().splitlines()[-1][:160]
             return Result(m, "caught", by=suite, detail=detail,
@@ -1929,9 +1994,17 @@ def main(argv=None) -> int:
     ap.add_argument("--only", default="", help="run mutations whose id contains this")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--json", default="", help="write results here")
+    ap.add_argument("--check", action="store_true",
+                    help="static check only: every mutation applies once and names a test")
     args = ap.parse_args(argv)
 
     chosen = [m for m in MUTATIONS if args.only in m.id]
+    if args.check:
+        problems = static_problems(chosen)
+        for mid, why in problems:
+            print(f"  {mid}: {why}")
+        print(f"static check: {len(chosen)} mutations, {len(problems)} problems")
+        return 1 if problems else 0
     if args.list:
         for m in chosen:
             print(f"{m.id:42} {m.path:34} {m.item}")
@@ -1949,7 +2022,7 @@ def main(argv=None) -> int:
             results.append(r)
             mark = {"caught": "caught  ", "SURVIVED": "SURVIVED",
                     "MISAPPLIED": "MISAPPLD", "ERROR": "ERROR   ",
-                    "TIMEOUT": "TIMEOUT "}[r.status]
+                    "TIMEOUT": "TIMEOUT ", "NOT RUN": "NOT RUN "}[r.status]
             where = f" by {r.by}" if r.by else ""
             print(f"  [{mark}] {m.id:42} {r.seconds:5.1f}s{where}")
             if r.status == "caught":
@@ -1963,7 +2036,7 @@ def main(argv=None) -> int:
 
     caught = sum(1 for r in results if r.status == "caught")
     survived = [r for r in results if r.status == "SURVIVED"]
-    bad = [r for r in results if r.status in ("MISAPPLIED", "ERROR", "TIMEOUT")]
+    bad = [r for r in results if r.status in ("MISAPPLIED", "ERROR", "TIMEOUT", "NOT RUN")]
 
     print("\n" + "=" * 70)
     print(f"caught {caught}/{len(results)}"

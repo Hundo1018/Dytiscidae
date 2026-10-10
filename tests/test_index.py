@@ -191,6 +191,39 @@ def test_every_search_config_field_has_a_hyperparameter_row() -> None:
     check("and no field has two rows", not twice, f"{twice}")
 
 
+def test_every_mutation_applies_exactly_once() -> None:
+    """``tools/mutate.py --check`` as a gate (IMPL_1010 M1): every mutation's
+    target text appears once in its file and every suite it names exists.  Seven
+    of 195 did not at 63b7ace and nothing noticed."""
+    import importlib.util
+
+    print("\nmutations: each applies exactly once and names a test")
+    spec = importlib.util.spec_from_file_location("mutate_under_test", ROOT / "tools" / "mutate.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["mutate_under_test"] = mod   # @dataclass needs the module registered
+    spec.loader.exec_module(mod)
+
+    problems = mod.static_problems()
+    check("every mutation applies exactly once and names a test", not problems,
+          "; ".join(f"{i}: {why}" for i, why in problems)[:600])
+
+    gone = mod.static_problems([mod.Mutation(
+        id="x", path="tools/mutate.py", find="NO-SUCH-TEXT-1010", replace="", defect="",
+        suites=("test_index::test_every_mutation_applies_exactly_once",))])
+    check("a mutation whose text is gone is reported",
+          len(gone) == 1 and "appears 0 times" in gone[0][1], str(gone))
+
+    nofunc = mod.static_problems([mod.Mutation(
+        id="y", path="tools/mutate.py", find="def static_problems(", replace="", defect="",
+        suites=("test_index::no_such_function_1010",))])
+    check("a mutation naming a missing test is reported",
+          len(nofunc) == 1 and "does not exist" in nofunc[0][1], str(nofunc))
+
+    check("rc 3 reads NOT RUN, rc 1 caught, rc 0 passed",
+          (mod.suite_status(3, ""), mod.suite_status(1, ""), mod.suite_status(0, ""))
+          == ("NOT RUN", "caught", "passed"))
+
+
 def main() -> int:
     test_the_generated_index_matches_the_source()
     test_the_generator_is_deterministic()
@@ -198,6 +231,7 @@ def main() -> int:
     test_features_resolve_to_things_that_exist()
     test_the_feature_grammar_rejects_what_it_does_not_understand()
     test_every_search_config_field_has_a_hyperparameter_row()
+    test_every_mutation_applies_exactly_once()
 
     print("\n" + "=" * 68)
     if FAILURES:
