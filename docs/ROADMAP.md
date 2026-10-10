@@ -3197,6 +3197,27 @@ rotor speed by < 5% of top speed per unit coefficient. *Falsified* if (i) >=
 the direction is a rotor channel the twist reaches directly (speed as a
 fraction of top speed, outside the identified basis).
 
+*N6 was run the same day* (`experiments/rotor_authority/run.py`, 191 rotor
+elites scanned, 24 lift-tested bodies rolled out, numpy path, 8 min; report
+`N6_result.md`). **Outcome: neither.** Clause 3 held hard: the identified
+bases move rotor speed by 0.0003 of top speed per unit coefficient (median,
+IQR 0.0002-0.0003, p90 0.0004, air and water alike; 191 of 191 below 0.05),
+so the twist cannot reach a rotor. But the comparison the item rested on did
+not exist: the hand hover law that flies the reference quadrotor at 0.816
+through the *direct* channel flew 0 of 24 arch49 rotor bodies (median 0.000;
+one body 0.446, one 0.011), and 153 of 191 rotor elites cannot lift their own
+weight with their upward-pointing rotors at top speed (upward thrust over
+weight median 0.15; half the rotors on the "eel" bodies point down and cannot
+reverse). *Belief update:* T3(a)'s premise, "the only bodies that fly are
+rotorcraft", is true of the hand-built quadrotor and false of the archive:
+the search has accumulated rotors (generation cost doubled with them,
+2026-10-03) on bodies that cannot fly with them, which is what T1 predicts
+when nothing in the scalar pays for lift. The rotor channel's unreachability
+is confirmed and still needs the direct mapping once something selects for
+flight; it is not the binding gate today. What would move this back: a
+rotor elite under N5's selection that lifts its weight and still scores 0
+through the twist.
+
 **N7 (derivation, no run): the flapping power and torque bound (T4).** A
 document under `derivations/`: for the genome's ranges of mass, wing area and
 actuator torque/speed, the ratio of available stroke power to the induced plus
