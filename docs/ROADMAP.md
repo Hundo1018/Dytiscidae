@@ -8,9 +8,20 @@ elites have own-medium competence below 0.012 at a median `fitness` of 0.81,
 and the scalar was at 0.995 in arch48's first fifty generations. The fitness
 is a blend of `mean(window <= x)` quantiles, so a design that scores zero
 stands at the share of the window that also scored zero (0.91-0.99), and
-Tier-2 caps the three best designs of an island to ~0.1. Six mechanisms, ten
-pre-registered reads and builds (N1-N10); the first build is the fitness floor
-(N5), and arch51 waits for it.
+Tier-2 caps the three best designs of an island to ~0.1. Six mechanisms, fifteen
+pre-registered items (N1-N15). **Read the same day:** N1 neither (a still
+twin stands at 0.71 and is non-dominated in 81% of cells), N2 refuted in
+water/land (the floor is a competence floor, not an inequality), N3 refuted,
+N4 confirmed (Tier-2 inverts selection, 24/24 islands), N6 neither (rotor
+elites cannot lift themselves), N7 refuted (power is 3.6-28x sufficient), N8
+neither against the archive (300 random bodies beat arch49's gen-150 archive
+1.35x on coverage, 1.94x on competence), N9 refuted (MJWarp 0.68x at 24
+worlds), N13 refuted the other way, N14 neither. **Built and merged** on
+`failure-theory-1010` (`docs/ARCH51_SPEC.md`): N5 the competence floor, N11
+Extract-ME re-evaluation, N10's telemetry, the paired air score (the user,
+10-09/10-10), seeds scored with the shared policy; full canary green, 27
+mutations caught. arch51 = N5 + N11 + paired air, the user's decision; its
+notes are `runs/arch51_notes.md`.
 
 **2026-10-09: answers to the sweep's questions, and where the work stopped;
 see [state when stopped](#state-when-stopped-2026-10-09).** Air on a commanded
