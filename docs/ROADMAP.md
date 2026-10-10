@@ -3721,6 +3721,57 @@ captured graph, no host copy per step; W = 24 / 100 / 730 on the N9 fixtures
 world. *Falsified* if `a` > 1 ms or `b` > 5 us. Gives A's and C's step cost
 without the fluid port. Waits on F (tooling brief) for the callback API.
 
+*Outcome (2026-10-10, `experiments/mjwarp_fused_step/run.py`, mujoco-warp
+3.15.0 / warp-lang 1.18.0 in the scratch venv, commit ef32a04, 1,523 s; both
+N9 fixtures, gravity off, no contacts, 2,000-step replays x 3, graph-captured;
+`wp.capture_while` refused the body ("Conditional body graph contains an
+unsupported operation (memory allocation)"), so the rollout is one unrolled
+2,000-step graph, and the per-step graph is reported beside it): **CONFIRMED**
+in every cell. With the control callback (33-64-64-6 tanh MLP as a tile
+kernel plus a CPG, writing `ctrl` and `xfrc_applied` inside the graph):
+median body `a` = 0.361 ms, `b` = 0.306 us per world (R^2 0.988); rotor body
+`a` = 0.379 ms, `b` = 0.487 us (R^2 0.9999); W = 24 / 100 / 730 cost 356 /
+405 / 583 us per step (median body) and 389 / 430 / 735 (rotor). The callback
+itself costs 0.09-0.12 ms fixed and 0.01-0.04 us per world. Every correctness
+check held (controls finite and different across worlds, forces nonzero,
+`qpos` finite everywhere). Spread: the three replays of a cell differ by <= 3
+us.*
+
+*The decision rule, applied.* Per-step cost of a generation at K draws per
+body, from Q1's and Q2's fits (median body, 126 panels, 16 bodies, 16,000
+steps per generation of segments and transitions; identification probes are
+extra worlds and do not add steps; no contacts):
+
+| K | worlds | A, fluid as a kernel in the same graph | A, fluid as today's separate launch | B, one launch for everything |
+|---|---|---|---|---|
+| 1 | 16 | 94 s (0.56x arch50's 168 s) | 124 s | 9 s |
+| 10 | 160 | 107 s (0.64x) | 137 s | 23 s |
+| 30 | 480 | 137 s (0.82x) | 167 s | 53 s |
+| 50 | 800 | 167 s (1.00x) | 197 s (1.17x) | 83 s |
+| 100 | 1,600 | **242 s (1.44x)** | 272 s (1.62x) | 157 s (0.94x) |
+
+A at K = 100 is 1.44x today's wall with the fluid in the graph, which the
+rule reads as "build A, not B"; 1.62x with the fluid launched separately,
+which falls in the band the rule leaves to the user. **What the numbers
+changed in the theory:** the per-world cost is the fluid, not the rigid body
+(5.5 us per world for 126 panels against 0.3 us for the dynamics), so T8's
+"16x on the fixed term" is 16x on a term that is 15% of the step at K = 100;
+B's whole advantage over A is 1.5x at K = 100 (157 s against 242 s), and
+W* = c0 / c1 = (0.36 + 0.12 ms) / 5.8 us ~ 80 worlds, not 200 (T11's
+figure, corrected here). An engine rewrite for 1.5x is not the trade §7
+contemplated; it was written against a 16x. Recommendation: **build A**; set
+K from the wall budget (K ~ 50 holds today's wall, K = 100 costs 1.44-1.62x
+of it) rather than from Q5 alone; Q3' is not run. The lever that remains is
+the fluid kernel's 0.044 us per panel (Q1), which is the same whether the
+rigid body is Warp's or Mojo's. Caveats carried into A's spec: Q2 has no
+contacts and no gravity (land and the crossings add constraint solves whose
+cost T9 owns), the fixtures are 12-dof bodies with 126 panels (a rotor-heavy
+body costs 1.6x per world in Q2), the fused-fluid column needs either Q6's
+interop or a Warp port of `fluid.py`, and `capture_while` is not available
+for the rollout loop in warp-lang 1.18.0 (an unrolled graph of 2,000 steps
+captured in Q2; a segment's 16,000 steps would be 8 such graphs or a
+host-driven loop of per-step graphs at +12 us per step, the per-step column).*
+
 **Q3 (CPU then GPU, 2-3 days): Featherstone for one body in Mojo.** An
 articulated-body algorithm for one arch49 12-dof elite (hinges and the
 rotor's velocity servo, no contacts), checked against `mj_forward`'s `qacc`
@@ -4061,8 +4112,10 @@ or generations can add to that today.
 
 **T11 (on the device: the order is the prerequisite).** A fused step costs
 `c0 + c1 W` for W worlds (N9: c0 ~ 240 us, c1 ~ 1.2 us; Q2 re-measures both on
-this project's bodies). Below W* = c0/c1 ~ 200 worlds a launch is
-dispatch-bound and a world costs almost nothing; today's loop offers 16-20
+this project's bodies). Below W* = c0/c1 a launch is dispatch-bound and a world costs almost
+nothing (written as ~200 worlds from N9's rigid-body figures; Q1 + Q2 put it
+at ~80 once the fluid's 5.5 us per world is counted, see the on-device
+section's Q2 outcome); today's loop offers 16-20
 worlds per launch and would leave the device ~90% idle. T8's prize (one launch
 for all bodies x draws) therefore requires a loop that *has* hundreds to
 thousands of worlds ready at once: all eight islands bred in one epoch (8 x 16

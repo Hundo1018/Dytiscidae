@@ -167,7 +167,7 @@ def child_main(a):
 
     def warp_ctx_info():
         d = wp.get_device(dev)
-        info = {"name": d.name, "arch": getattr(d, "arch", None)}
+        info = {"device_name": d.name, "arch": getattr(d, "arch", None)}
         try:
             info["warp_ctx"] = int(d.context) if d.context is not None else 0
         except Exception as e:  # noqa: BLE001
