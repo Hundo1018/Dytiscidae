@@ -411,6 +411,36 @@ def test_curator_quarantines_repeat_exploits() -> None:
           c.select_parent() is None)
 
 
+def test_a_tier2_failure_does_not_make_the_best_design_the_worst_parent() -> None:
+    print("\ncurator: a Tier-2 outcome is a flag, not a cap on fitness")
+    from dytiscidae.evolution.islands import Archipelago
+    a = Archive([("m", 0.0, 1.0, 4), ("d", 0.0, 1.0, 4)])
+    c = Curator(a, seed=0)
+    for g, fit, bd in (("g9", 0.9, (0.1, 0.1)), ("g8", 0.8, (0.1, 0.4)),
+                       ("g7", 0.7, (0.1, 0.6)), ("g6", 0.6, (0.4, 0.1)),
+                       ("g5", 0.5, (0.4, 0.4))):
+        a.add(g, fit, np.array(bd), {"feasible": True})
+    check("five cells are filled", len(a.cells) == 5, f"{len(a.cells)}")
+    best = a.best
+    c.record_promotion(best, 0.1)
+    check("the best design keeps its fitness", best.fitness == 0.9, f"{best.fitness}")
+    check("and is marked verified", best.tier == 2, f"tier={best.tier}")
+    check("the Tier-2 outcome is stored beside it",
+          best.meta.get("tier2_fitness") == 0.1, f"{best.meta.get('tier2_fitness')}")
+    check("with the generation it was read at",
+          best.meta.get("tier2_gen") == a.generation, f"{best.meta.get('tier2_gen')}")
+    check("the archive's best is still that design", a.best is best)
+    check("a verified design is not promoted again", c.should_promote(best) is False)
+    arch = Archipelago(migrate_every=1, n_migrants=2)
+    arch.register("water", a, c)
+    check("migration still sends the best design first",
+          arch.emigrants("water")[0] is best.genome)
+    second = next(e for e in a.cells.values() if e.fitness == 0.8)
+    c.record_promotion(second, 0.2)
+    pool = [e.fitness for e in c.promotion_candidates(3)]
+    check("the promotion pool skips verified designs", pool == [0.7, 0.6, 0.5], f"{pool}")
+
+
 def test_cmaes_optimises_a_known_function() -> None:
     """Sanity: CMA-ES must solve a shifted sphere and an ill-conditioned ellipse."""
     print("\ncmaes: convergence")
@@ -6196,6 +6226,7 @@ def main() -> int:
         test_no_operator_can_go_dormant_under_the_structural_tilt,
         test_curator_regimes_respond_to_the_run,
         test_curator_quarantines_repeat_exploits,
+        test_a_tier2_failure_does_not_make_the_best_design_the_worst_parent,
         test_cmaes_optimises_a_known_function,
         test_cppn_fields_are_deterministic_and_bounded,
         test_the_gait_operator_moves_every_coordinate_at_once,

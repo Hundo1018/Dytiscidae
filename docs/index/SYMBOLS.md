@@ -1003,23 +1003,24 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `OperatorStats` | class | 57 | — | Running record for one mutation operator. |
 | `Regime` | class | 175 | — | The curator's read on what the run is currently doing. |
 | `Curator.__init__` | method | 197 | `(self, archive: Archive, *, seed: int=0, tier2_budget_fraction: float=0.08, crowding_limit: int=14) -> None` | — |
-| `Curator.check_famine` | method | 608 | `(self) -> list[str]` | Detect domains no design in the archive can perform, and act. |
+| `Curator.check_famine` | method | 622 | `(self) -> list[str]` | Detect domains no design in the archive can perform, and act. |
 | `Curator.choose_operators` | method | 245 | `(self) -> list[str]` | — |
-| `Curator.cohort_report` | method | 741 | `(self, cohort: list[Elite]) -> list[dict]` | A compact, printable description of an approved cohort. |
+| `Curator.cohort_report` | method | 755 | `(self, cohort: list[Elite]) -> list[dict]` | A compact, printable description of an approved cohort. |
 | `Curator.credit` | method | 254 | `(self, operators: list[str], status: str, gain: float) -> None` | Pay an operator for the improvement it produced. |
-| `Curator.domain_bests` | method | 557 | `(self) -> dict[str, float]` | Best competence any elite achieves in each domain. |
-| `Curator.generation_report` | method | 763 | `(self) -> dict` | — |
+| `Curator.domain_bests` | method | 571 | `(self) -> dict[str, float]` | Best competence any elite achieves in each domain. |
+| `Curator.generation_report` | method | 777 | `(self) -> dict` | — |
 | `Curator.note_offspring` | method | 360 | `(self, parent: Elite \| None, status: str) -> None` | — |
-| `Curator.observe_domains` | method | 567 | `(self, meta: dict) -> None` | Record one evaluation's per-domain competences. |
-| `Curator.on_rebin` | method | 389 | `(self) -> None` | Forget everything keyed by cell coordinate. |
-| `Curator.plateau_p` | method | 585 | `(self, domain: str) -> float` | How surprising the current drought is, if the search were still |
-| `Curator.prune` | method | 489 | `(self, max_prunes: int=3) -> int` | Drop marginal elites from over-dense regions. |
-| `Curator.quarantine` | method | 410 | `(self, descriptor: np.ndarray, reason: str, genome=None) -> None` | Record an exploit and taint the region it came from. |
-| `Curator.record_promotion` | method | 400 | `(self, elite: Elite, tier2_fitness: float) -> None` | — |
-| `Curator.select_cohort` | method | 695 | `(self, n: int \| None=None, *, require_feasible: bool=True, require_verified: bool=False) -> list[Elite]` | Approve a cohort to carry into the next round. |
+| `Curator.observe_domains` | method | 581 | `(self, meta: dict) -> None` | Record one evaluation's per-domain competences. |
+| `Curator.on_rebin` | method | 394 | `(self) -> None` | Forget everything keyed by cell coordinate. |
+| `Curator.plateau_p` | method | 599 | `(self, domain: str) -> float` | How surprising the current drought is, if the search were still |
+| `Curator.promotion_candidates` | method | 389 | `(self, k: int=3) -> list[Elite]` | The top ``k`` representatives by ``fitness`` not yet verified (tier < 2). |
+| `Curator.prune` | method | 503 | `(self, max_prunes: int=3) -> int` | Drop marginal elites from over-dense regions. |
+| `Curator.quarantine` | method | 424 | `(self, descriptor: np.ndarray, reason: str, genome=None) -> None` | Record an exploit and taint the region it came from. |
+| `Curator.record_promotion` | method | 405 | `(self, elite: Elite, tier2_fitness: float) -> None` | Mark ``elite`` verified and store the Tier-2 outcome beside its score. |
+| `Curator.select_cohort` | method | 709 | `(self, n: int \| None=None, *, require_feasible: bool=True, require_verified: bool=False) -> list[Elite]` | Approve a cohort to carry into the next round. |
 | `Curator.select_parent` | method | 292 | `(self) -> Elite \| None` | Pick who to breed from, weighting four independent signals. |
 | `Curator.should_promote` | method | 369 | `(self, elite: Elite) -> bool` | Whether this elite has earned a high-fidelity re-evaluation. |
-| `Curator.update_regime` | method | 435 | `(self) -> Regime` | Classify the run and set search pressure accordingly. |
+| `Curator.update_regime` | method | 449 | `(self) -> Regime` | Classify the run and set search pressure accordingly. |
 | `OperatorBandit.__init__` | method | 87 | `(self, names: list[str] \| None=None, c: float=0.6, epsilon: float=0.2) -> None` | — |
 | `OperatorBandit.report` | method | 163 | `(self) -> list[dict]` | — |
 | `OperatorBandit.select` | method | 113 | `(self, rng: np.random.Generator, *, structural_bias: float=1.0, exclude: tuple=()) -> str` | Pick an operator by UCB, tilted by the current structural appetite. |
