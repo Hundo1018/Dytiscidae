@@ -3249,9 +3249,79 @@ caught. The expensive measurements report in the fixed format of
 `runs/analysis_1010_failure_theory/REPORT_FORMAT.md`, so that a smaller model
 can run them and the numbers land in this section unchanged.
 
-### 5. Literature and tooling brief
+### 5. Literature and tooling brief (returned 2026-10-10)
 
-Appended when `runs/analysis_1010_failure_theory/E_literature.md` returns.
+`runs/analysis_1010_failure_theory/E_literature.md`, 248 lines, every claim
+tagged primary-read / abstract-only / inference. What bears on the theory:
+
+- **T2 is the known failure mode of elitist MAP-Elites, and the literature's
+  cheapest fix is budget-neutral.** Flageat & Cully, "Uncertain
+  Quality-Diversity" (arXiv 2302.00463): under noise MAP-Elites "keeps lucky
+  evaluations", and on Walker MAP-Elites with *random* replacement beat it on
+  corrected QD-score (p < 1e-2). Flageat & Cully 2020 (arXiv 2006.14253): at
+  one sample per offspring fewer than 20% of elites were in the right cell on
+  re-evaluation. Extract-ME (Flageat, Huber, Helenon, Doncieux, Cully 2025,
+  arXiv 2502.06585): a fixed 25% of each generation's evaluations re-evaluate
+  randomly chosen archive elites at fresh draws, a depth-8 buffer per cell, the
+  representative read from the buffer; at equal budget it matched or beat
+  archive-sampling, deep-grid and ME-sampling on every task and beat all on Ant
+  (p < 1e-3). No paper tests reliability below 0.3 or 600 evaluations per
+  island; the method is the closest evidence, not a guarantee. This becomes
+  **N11** below.
+- **T5 and T6 have direct measurements elsewhere.** Mertan & Cheney (arXiv
+  2508.17464, v2 2026-08, Artificial Life): with undertrained controllers the
+  ranking among the top 5% and 1% of bodies correlates ~0 with the final
+  ranking, "the selection between top-ranked individuals would be random".
+  Song et al. (arXiv 2608.23100): premature fitness favours fast learners;
+  learning speed and true potential are orthogonal across 250 elites
+  (Spearman 0.05); with one shared policy this reads as a bias toward bodies
+  the policy already handles. Strgar & Kriegman (arXiv 2502.10862, abstract):
+  jointly training a universal controller while evolving bodies collapses
+  diversity toward shapes the controller can steer; they pretrain first and
+  fine-tune between rounds. Per-body budgets in the field: DERL 5M steps per
+  body, MetaMorph 1e8 steps over 100 bodies; this loop gives a body ~1.5k
+  decisions per generation.
+- **The 8 morphology scalars have no precedent.** Every shared controller
+  that worked (MetaMorph, arXiv 2203.11931) fed per-limb tokens; MetaMorph's
+  no-morphology ablation fails outright; no paper tested a few per-body
+  scalars. The brief found nothing that says eight scalars suffice.
+- **MJWarp, for N9: heterogeneous bodies do not batch, the same body does.**
+  Official docs: one `Model`, `make_data(nworld=N)`; body, joint and DoF
+  counts must match across worlds (Newton has the same limit, PR #4312 open
+  2026-09-27). `Data.xfrc_applied` is a `(nworld, nbody, 6)` Warp device
+  array that a Warp kernel can write, so per-world external forces need no
+  host round trip; handing a Mojo-allocated buffer to Warp is tested nowhere
+  the brief found; `.numpy()` is a copy. No published benchmark at 16-1000
+  worlds; a single world is slower than CPU MuJoCo; "~60 DoF" single-mechanism
+  scaling is listed as open. The 2026-08 finding stands and N9's shape is
+  confirmed: identification, placement draws and PPO rollouts of *one* body.
+  A superset-topology workaround (pad every body to the maximum part count and
+  zero the rest) would be a genome redesign and is not proposed.
+- **For N7:** no published measurement that flapping flight is infeasible
+  under a torque cap, only scaling arguments; the derivation is new work.
+- **For N6:** Lambert et al. (RA-L 2019, arXiv 1901.03737) learned hover at
+  25 Hz and 50 Hz with no notable difference at equal data, so the 25 Hz
+  decision rate is not the stopper; N6 isolates the basis.
+- No direct fixed-versus-fresh-seed comparison exists for MAP-Elites (N11
+  uses fresh draws); no ladder-specific ablation against shaping or Go-Explore
+  exists (and this ladder is not in fitness anyway, §1 item 4).
+
+**N11 (build, after N5, before N8/N9 are read): Extract-ME-style
+re-evaluation of the archive (T2).** Each generation, 4 of the 16 evaluations
+go to randomly chosen elites of the visited island, at fresh draws (not the
+stored `eval_seed`); each cell keeps a depth buffer of its evaluations and the
+representative's score is the buffer's median; a film reproduces the median
+draw. *Prediction for the first arm with N5 + N11:* auditor held-out retention
+>= 0.5 in every medium (arch49: 0.09-0.33) at the same wall per generation;
+Tier-1→Tier-2 Spearman >= 0.3 (arch49: 0.17/0.18). *Falsified* if retention
+stays below 0.35 in any medium. Comparability: archive scores are not
+comparable across it (a median of draws, not a draw).
+
+**N12 (direction, after M4 finishes; not scheduled): a pretrained, frozen
+shared policy per arm (T5, T6).** Train the shared policy on a fixed body set
+with the M4 harness before an arm, freeze it for the arm, fine-tune between
+arms; the search then ranks bodies under one controller (Strgar & Kriegman's
+order). Its pre-registered read is written when M4's nine runs are in.
 
 ## 2026-10-08, later — the work-list sweep
 
