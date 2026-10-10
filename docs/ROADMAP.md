@@ -23,6 +23,16 @@ Extract-ME re-evaluation, N10's telemetry, the paired air score (the user,
 mutations caught. arch51 = N5 + N11 + paired air, the user's decision; its
 notes are `runs/arch51_notes.md`.
 
+**2026-10-10, last: the implementation roadmap is `docs/IMPL_1010_SPEC.md`.**
+Q6 and Q8 were read (both refuted; A takes a Warp port of `fluid.py`, B on MAX
+is closed). The spec turns P1-P3 and option A into sixteen lanes with
+machine gates and thirteen deferred measurements. Its §0 lists thirteen places
+where this roadmap and the code disagree, among them: P3 is not the move
+`MERGE_FIRST_REFINE` made, fluid forces written from `callback.control` reach
+the mass matrix a step late, Q1/Q2 leave the host-side fluid finish out, and
+identification is 96 worlds per body, not 24. Six questions for the user
+close it (§D).
+
 **2026-10-10, later still: the order of the loop; see
 [what can share a launch](#2026-10-10-later-still--the-order-of-the-loop-what-can-share-a-launch-and-what-cannot).**
 Rollouts are 98.3% of arch50's wall and the search's decisions 1.7%, so order
