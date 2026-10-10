@@ -3867,6 +3867,70 @@ TileTensor status, `atan2`, MAX graph loops, the `Py_NewRef` worker failure)
 are collected in `G_mojo_max_gpu.md` when its brief returns and summarised
 here as §8.
 
+### 8. Mojo and MAX, as installed and as of nightly (read and run 2026-10-10;
+`G_mojo_max_gpu.md`)
+
+Installed: Mojo 1.0.0b3.dev2026080106, max 26.5.0.dev2026080106; upstream
+stable v1.1.0 (2026-09-17), nightly 1.2.0.dev2026100905. The GPU was idle
+for the probes below.
+
+- **Module path.** `std.gpu` and `max.gpu` both work on the installed build
+  (`from max.gpu.host import DeviceContext` compiled and ran); the project
+  imports `std.gpu` everywhere (`fluid_gpu.mojo:25-26`,
+  `full_pipeline.mojo:24-25`); v1.1.0 says `max.gpu` mirrors `std.gpu` and
+  `std.gpu` becomes private. New code imports `max.gpu`.
+- **TileTensor** is a new type beside `LayoutTensor`, not a rename, and does
+  not yet implement all of `LayoutTensor`'s features; the official tiled
+  shared-memory matmul uses `TileTensor.tile`, SHARED `stack_allocation`,
+  `barrier`, `copy_dram_to_sram` and `layout.tensor_core.TensorCore`
+  (`max/examples/custom_ops/kernels/matrix_multiplication.mojo`). The only
+  library batched routine is `linalg/bmm.mojo`; **there is no Cholesky or
+  triangular solve** in max/kernels, so a 32x32 solve is per-thread code. The
+  project's kernels use raw pointers and `global_idx.x`, no shared memory or
+  tensor cores; only `gpu_probe.mojo` touches TileTensor.
+- **MAX graph has the loop.** `ops.matmul` is batched; `ops.while_loop`,
+  `cond`, `custom`, `inplace_custom`, `buffer_load/store` exist; no solve,
+  Cholesky or inverse op. **Measured here: a 2000-iteration `while_loop` of a
+  4096 x (6 x 6) f32 batched matmul ran fully on device in 101.8 ms, 50.9 us
+  per iteration** (18 s compile); per-execute cost with device-resident
+  buffers 23.7 us for a trivial graph, 60.9 us for the bmm; results matched
+  numpy exactly. A custom Mojo op inside the loop is untested. For T7 this is
+  the number that matters: a MAX-graph step's fixed cost is ~5x below MJWarp's
+  240 us, so B's `a` may be ~0.05-0.1 ms rather than 0.24.
+- **Transcendentals on the 3060, installed build:** f32 sin, cos, tanh, exp,
+  sqrt work; f64 tanh, exp, sqrt work (exp off by ~5e-13); f64 sin and cos
+  fail ("not supported on NVIDIA GPU"); `atan` and `atan2` fail in f32 and f64
+  ("libm operations are only available on CPU targets"); no nightly note
+  through 2026-10-09 mentions a fix. **The project already carries its own**
+  (`mojo/src/mathx.mojo`: `atan2f`, `atan2d`, `sind`, `cosd`, `expd`), so §7's
+  "atan2 gap" is closed in-project and is not a B risk.
+- **Python interop.** Device buffers persist across Python calls (`GpuFluid`
+  in `fluid_state.mojo:36-60`, `FullPipeline` in `full_pipeline.mojo:190, 335,
+  575`); numpy arrives as an int64 descriptor of addresses
+  (`fluid_state.mojo:73-76`), results copy back to host. The `Py_NewRef` abort
+  seen in today's worker processes matches no upstream issue (only modular
+  #6833, a refcount leak whose text shows `PythonObject` calling
+  `cpy.Py_NewRef`) and did not reproduce when `FullPipeline(64, 64, 4)` was
+  constructed in a `multiprocessing` spawn child with torch and mujoco
+  imported, so it depends on how the process is launched; still undiagnosed.
+
+*What this does to §3 and §7.* Two of B's three risks shrink: `atan2` is
+already solved in `mathx.mojo`, and the per-step fixed cost of a MAX-graph
+loop is measured at ~51 us against MJWarp's ~240 us, so B's single launch
+would carry both T8's 16x on the fixed term and a 5x smaller fixed term. The
+remaining risk is the engine itself and its validation (T9), unchanged. The
+§7 decision rule stands, with one more probe before Q3':
+
+**Q8 (MAX graph, ~half a day): a custom Mojo op inside `ops.while_loop`.**
+The existing fluid kernel (or a stub of its shape: a thread-per-panel kernel
+over a `(W*B, panels)` buffer) registered as a MAX custom op and called once
+per iteration of a 2000-step `while_loop` beside a `(W*B) x 33 @ 33 x 64`
+matmul, buffers device-resident; W*B = 1,600. *Prediction:* <= 150 us per
+iteration (fixed ~50 us plus the two ops). *Falsified* above 500 us, or if a
+custom op cannot be placed inside the loop. If Q8 holds and Q2 says A is
+> 3x today's wall, B is built on MAX graph + Mojo custom ops rather than on
+hand-launched kernels.
+
 ## 2026-10-08, later — the work-list sweep
 
 The open items of the 10-06 lists (arch48 items 1–5, PAPERS_2610, the external
