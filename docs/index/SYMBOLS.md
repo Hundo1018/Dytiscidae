@@ -1203,18 +1203,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `potential_of` | function | 374 | `(obs, domain: str) -> float` | A state's potential, for potential-based reward shaping. |
-| `ppo_update` | function | 526 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None, group_buffer=None) -> dict` | One PPO update over everything the generation collected. |
+| `ppo_update` | function | 547 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None, group_buffer=None) -> dict` | One PPO update over everything the generation collected. |
 | `RolloutBuffer` | class | 414 | — | Trajectories from a whole generation, flattened into a PPO batch. |
-| `SegmentCollector` | class | 487 | — | Records one segment's decisions, per machine, into trajectories. |
+| `SegmentCollector` | class | 508 | — | Records one segment's decisions, per machine, into trajectories. |
 | `SharedPolicy` | class | 122 | `(nn.Module if AVAILABLE else object)` | A Gaussian policy and a value head, shared by every morphology. |
 | `Trajectory` | class | 346 | — | One segment's worth of decisions from one machine. |
 | `RolloutBuffer.__init__` | method | 428 | `(self, gamma: float=0.99, lam: float=0.95, shaping: float=0.2)` | — |
-| `RolloutBuffer.add` | method | 434 | `(self, traj: Trajectory) -> None` | — |
-| `RolloutBuffer.build` | method | 449 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |
-| `RolloutBuffer.n_transitions` | property | 439 | `(self) -> int` | — |
-| `SegmentCollector.__init__` | method | 495 | `(self, k: int)` | — |
-| `SegmentCollector.finish` | method | 507 | `(self, buffer: RolloutBuffer, rewards, tag: str='', groups=None) -> None` | Attach each machine's segment competence and bank the trajectory. |
-| `SegmentCollector.record` | method | 499 | `(self, m: int, obs, act, logp, val, phi: float=0.0) -> None` | — |
+| `RolloutBuffer.add` | method | 439 | `(self, traj: Trajectory) -> None` | — |
+| `RolloutBuffer.build` | method | 454 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |
+| `RolloutBuffer.n_transitions` | property | 444 | `(self) -> int` | — |
+| `SegmentCollector.__init__` | method | 516 | `(self, k: int)` | — |
+| `SegmentCollector.finish` | method | 528 | `(self, buffer: RolloutBuffer, rewards, tag: str='', groups=None) -> None` | Attach each machine's segment competence and bank the trajectory. |
+| `SegmentCollector.record` | method | 520 | `(self, m: int, obs, act, logp, val, phi: float=0.0) -> None` | — |
 | `SharedPolicy.__init__` | method | 130 | `(self, n_obs: int, n_modes: int, hidden: int=64)` | — |
 | `SharedPolicy.act` | method | 317 | `(self, obs_np, *, deterministic: bool=False, rng=None)` | One decision, numpy in and numpy out, for use inside a rollout. |
 | `SharedPolicy.act_many` | method | 258 | `(self, obs_np, *, deterministic: bool=False, rngs=None)` | One decision per row, in a single forward pass. |

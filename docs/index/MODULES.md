@@ -2,7 +2,7 @@
 
 # Modules
 
-105 modules, 37,697 lines, 1,095 indexed symbols.
+105 modules, 37,724 lines, 1,095 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -130,7 +130,7 @@ is what makes a violation visible while reading.
 |---|---|---:|---|---|---|
 | `learning.distill` | Can one morphology-conditioned network represent the per-body optima? | 437 | — | `numpy`, `torch` | `control.cpg`, `envs.triphibian` |
 | `learning.grpo` | GRPO for the shared policy (ROADMAP item N): group-relative advantages. | 192 | — | `numpy` | `learning.ppo` |
-| `learning.ppo` | PPO over a policy shared by every morphology in the search. | 797 | — | `numpy`, `torch` | — |
+| `learning.ppo` | PPO over a policy shared by every morphology in the search. | 824 | — | `numpy`, `torch` | — |
 
 ## `ops`
 

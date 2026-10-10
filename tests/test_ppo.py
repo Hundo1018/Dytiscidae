@@ -396,6 +396,76 @@ def test_potential_shaping_telescopes_to_nothing() -> None:
           f"max |A| = {np.abs(adv_off).max():.2e}")
 
 
+def test_the_return_splits_into_shaping_and_terminal() -> None:
+    """``decomposition`` reports the discounted return as shaping + terminal.
+
+    ROADMAP N10 asks how much of the learner's return is the potential shaping
+    and how much is the competence.  The split is read off ``build``, so it has
+    to add up to the return, match a from-scratch sum, telescope on the shaping
+    side, and discount the terminal reward by its position (``gamma^(n-1)``).
+    One tag's terminals are spread more than 0.05 apart and the other's less, so
+    both the standard deviation and the floor are exercised.
+    """
+    print("\nbuffer: the return split")
+    gamma, shaping = 0.99, 0.2
+    runs = {
+        "a": [([0.5, -0.1, 0.9, 0.3], 0.40), ([1.1, 0.2, -0.6], 0.80)],
+        "b": [([0.2, 0.7, 0.1, -0.3, 0.8], 0.10), ([0.6, 0.4], 0.12)],
+    }
+    buf = RolloutBuffer(gamma=gamma, lam=0.95, shaping=shaping)
+    for tag, trajs in runs.items():
+        for phi, term in trajs:
+            buf.add(_fabricate([0.0] * len(phi), term, phi=phi, tag=tag))
+    buf.build()
+    dec = buf.decomposition
+    check("both tags are reported", sorted(dec) == ["a", "b"], str(sorted(dec)))
+    for tag, trajs in runs.items():
+        terms = [t for _p, t in trajs]
+        scale = max(float(np.std(terms)), 0.05)
+        want_ret, want_shp, want_trm = [], [], []
+        for phi, term in trajs:
+            n = len(phi)
+            ph = np.asarray(phi, float)
+            nxt = np.concatenate([ph[1:], [0.0]])
+            rew = shaping * (gamma * nxt - ph)
+            rew[-1] += term / scale
+            want_ret.append(sum(gamma ** i * rew[i] for i in range(n)))
+            want_shp.append(-shaping * ph[0])
+            want_trm.append(gamma ** (n - 1) * term / scale)
+        d = dec[tag]
+        check(f"{tag}: n counts the trajectories", d["n"] == len(trajs), str(d["n"]))
+        check(f"{tag}: shaping + terminal equals the return",
+              abs(d["shaping_return"] + d["terminal_return"] - d["return"]) < 1e-12,
+              f"{d['shaping_return']:+.12f} + {d['terminal_return']:+.12f} "
+              f"vs {d['return']:+.12f}")
+        check(f"{tag}: the return equals a from-scratch discounted sum",
+              abs(d["return"] - float(np.mean(want_ret))) < 1e-10,
+              f"{d['return']:+.12f} vs {float(np.mean(want_ret)):+.12f}")
+        check(f"{tag}: the shaping part telescopes to -0.2 * Phi(s_0)",
+              abs(d["shaping_return"] - float(np.mean(want_shp))) < 1e-10,
+              f"{d['shaping_return']:+.12f} vs {float(np.mean(want_shp)):+.12f}")
+        check(f"{tag}: the terminal part is gamma^(n-1) * terminal / scale",
+              abs(d["terminal_return"] - float(np.mean(want_trm))) < 1e-10,
+              f"{d['terminal_return']:+.12f} vs {float(np.mean(want_trm)):+.12f}")
+        check(f"{tag}: the absolute parts are at least the signed ones",
+              d["abs_shaping"] >= abs(d["shaping_return"]) - 1e-12
+              and d["abs_terminal"] >= abs(d["terminal_return"]) - 1e-12,
+              f"{d['abs_shaping']:.6f}, {d['abs_terminal']:.6f}")
+
+    import torch
+    torch.manual_seed(5)
+    pol = SharedPolicy(N_OBS, N_MODES, hidden=16)
+    info = ppo_update(pol, buf, epochs=1, minibatch=8,
+                      rng=np.random.default_rng(0))
+    check("ppo_update reports the split for both tags",
+          sorted(info.get("return_by_tag", {})) == ["a", "b"]
+          and info["return_by_tag"]["a"]["n"] == 2,
+          str(info.get("return_by_tag")))
+    skipped = ppo_update(pol, RolloutBuffer())
+    check("and an empty generation reports an empty split",
+          skipped.get("return_by_tag") == {}, str(skipped))
+
+
 def test_terminal_rewards_are_scaled_within_their_own_kind() -> None:
     """Water competence averaged 0.635 against 0.089 on land; unscaled, water wins.
 
@@ -1408,6 +1478,7 @@ def main() -> int:
     test_the_discount_behaves_at_both_ends()
     test_one_trajectory_never_bootstraps_off_another()
     test_potential_shaping_telescopes_to_nothing()
+    test_the_return_splits_into_shaping_and_terminal()
     test_terminal_rewards_are_scaled_within_their_own_kind()
 
     test_an_empty_generation_is_skipped_not_crashed_on()
