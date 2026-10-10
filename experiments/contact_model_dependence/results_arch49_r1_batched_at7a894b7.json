@@ -1,0 +1,9 @@
+{
+ "path": "batched",
+ "n": 58,
+ "reproduction_hard_within_0.005": {
+  "k": 33,
+  "n": 58
+ },
+ "wall_s": 438.8416476249695
+}
