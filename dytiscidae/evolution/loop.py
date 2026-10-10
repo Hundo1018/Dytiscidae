@@ -53,9 +53,10 @@ from .archive import Archive
 from .auditor import Auditor
 from .critic import CRITIC_TARGETS, Critic, critic_features, expensive_outcome
 from .curator import Curator
-from .curriculum import STAGES, WEAKEST_BARS, Curriculum
+from .curriculum import STAGES, WEAKEST_BARS, ZERO_SCORE, Curriculum
 from .descriptors import LearnedDescriptors, episode_features
-from .islands import ISLANDS, Archipelago, curriculum_for, island_score
+from .islands import (ISLANDS, Archipelago, below_competence_floor,
+                      curriculum_for, island_score)
 from .judge import Judge
 from .scout import Scout, novelty_of, scout_features
 
@@ -160,13 +161,18 @@ class SearchConfig:
     # Controller refinement.  Each step is one extra batched Tier-1 for the
     # whole generation, so a generation costs (1 + steps) evaluations.
     controller_refine_steps: int = 0  # (1+1)-ES steps per candidate; 0 = inherit only
+    #: 0.30 from 2026-09-01 through arch50; 0.0 from ARCH51_SPEC:
+    #: ``mission_fraction`` is zero for 97-100% of every island's window
+    #: (ROADMAP N2), so the term decided nothing and cost 0.3 of the scale.  The
+    #: field stays for resumes and the job path.
+    #:
     #: Share of the archive's scalar that is the mission itself, as a
     #: population quantile, rather than the island/curriculum blend.  Measured
     #: over arch31: at 0.0 (which is what every run before 2026-09-01 was)
     #: corr(archive fitness, mission_fraction) = 0.159 and the search traded
     #: 36% of its energy fraction for 32% more competence, because energy is a
     #: factor of the mission and appeared nowhere in the score.
-    mission_weight: float = 0.30
+    mission_weight: float = 0.0
     #: Weight on the potential-based shaping term in the PPO reward.  Zero
     #: reproduces the terminal-only reward every run before 2026-09-01 used.
     #: Shaping of this form cannot change what is optimal (Ng, Harada & Russell
@@ -1143,9 +1149,14 @@ def _score_candidate(state: SearchState, pheno, result, parent, *,
     # the search is looking for a triphibian again by the end, so the weight has
     # to move.  A fixed 0.5 left the air island selecting 96% on a score that
     # does not read air.
+    # A design competent in none of its island's media stands at 0 on every
+    # half and is flagged for the archive (ROADMAP N5; ARCH51_SPEC L5).  Asked
+    # before the window is fed: the window ranks only the designs above it.
+    floored = below_competence_floor(state.island, result)
     if commit:
         state.curriculum.observe_blend(base, sr.score, sr.stage,
-                                       float(result.mission_fraction))
+                                       float(result.mission_fraction),
+                                       at_floor=bool(floored))
     # Blend the two halves as population standings, not raw scores.  They are
     # not on the same scale -- measured over arch30 the island half spans 0.0437
     # p10-p90 and the curriculum half 0.5092 -- so a convex combination of the
@@ -1154,6 +1165,8 @@ def _score_candidate(state: SearchState, pheno, result, parent, *,
     isl_q, cur_q = state.curriculum.standing(base, sr.score, sr.stage)
     mis_q = state.curriculum.mission_standing(result.mission_fraction, sr.stage)
     w = state.curriculum.handover(sr.stage)
+    if floored:
+        isl_q, cur_q, mis_q = 0.0, 0.0, 0.0
     # Three quantiles, not two.  The first two answer "how well did this design
     # answer the question its cell was asked"; the third answers "how much of
     # the mission did it actually do", and measurement says those are nearly
@@ -1163,6 +1176,7 @@ def _score_candidate(state: SearchState, pheno, result, parent, *,
     # mission the score could not see.  See Curriculum.mission_standing.
     mw = float(np.clip(getattr(state.config, "mission_weight", 0.30), 0.0, 1.0))
     base = float((1.0 - mw) * (w * isl_q + (1.0 - w) * cur_q) + mw * mis_q)
+    at_floor = bool(floored or base <= ZERO_SCORE)
     cfeat = critic_features(_meta_light(pheno, result), result)
     discount = state.critic.discount(cfeat) if state.critic is not None else 1.0
     fit = float(base * discount)
@@ -1171,7 +1185,7 @@ def _score_candidate(state: SearchState, pheno, result, parent, *,
     # dominance vector, so an island's Pareto front is a front over *its* task.
     obj[0] = float(base if result.feasible else -0.5 + 0.5 * base)
 
-    return {"feats": feats, "bd": bd, "judged": judged, "tset": tset, "tmeas": tmeas, "cell": cell, "sr": sr, "isl_q": isl_q, "cur_q": cur_q, "mis_q": mis_q, "w": w, "mw": mw, "base": base, "cfeat": cfeat, "discount": discount, "fit": fit, "obj": obj}
+    return {"feats": feats, "bd": bd, "judged": judged, "tset": tset, "tmeas": tmeas, "cell": cell, "sr": sr, "isl_q": isl_q, "cur_q": cur_q, "mis_q": mis_q, "w": w, "mw": mw, "base": base, "at_floor": at_floor, "cfeat": cfeat, "discount": discount, "fit": fit, "obj": obj}
 
 
 def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -> str:
@@ -1246,6 +1260,7 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
         "island_q": round(isl_q, 4), "curriculum_q": round(cur_q, 4),
         "mission_q": round(mis_q, 4), "handover": round(w, 4),
         "mission_weight": round(mw, 4), "blend": round(base, 4),
+        "at_floor": bool(sc["at_floor"]),
     }
 
     # What was knowable about this design at birth, for the scout.  Novelty is
@@ -1267,7 +1282,7 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
         )
         meta["scout_features"] = [float(x) for x in sfeat]
 
-    status = state.archive.add(genome, fit, bd, meta, tier=result.tier, objectives=obj)
+    status = state.archive.add(genome, fit, bd, meta, tier=result.tier, objectives=obj, at_floor=sc["at_floor"])
     state.curriculum.update(cell, sr)
 
     if state.scout is not None:
@@ -1308,7 +1323,7 @@ def _dry_status(state: SearchState, pheno, result, parent) -> str:
     if result.exploit:
         return "exploit"
     sc = _score_candidate(state, pheno, result, parent, commit=False)
-    return state.archive.would_add(sc["fit"], sc["bd"], sc["obj"])
+    return state.archive.would_add(sc["fit"], sc["bd"], sc["obj"], at_floor=sc["at_floor"])
 
 
 def _funnel(state: SearchState, parents):
@@ -2712,7 +2727,7 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
     cfg = state.config
     archive, curator = state.archive, state.curator
     chosen, phenos = [], []
-    for elite in sorted(archive.cells.values(), key=lambda e: -e.fitness)[:3]:
+    for elite in curator.promotion_candidates(3):
         if not curator.should_promote(elite):
             continue
         try:

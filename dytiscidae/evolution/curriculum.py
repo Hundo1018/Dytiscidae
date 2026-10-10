@@ -392,14 +392,20 @@ class Curriculum:
         return int(np.clip(stage, 0, N_STAGES - 1))
 
     def observe_blend(self, island_score: float, curriculum_score: float,
-                      stage: int = 0, mission: float = 0.0) -> None:
+                      stage: int = 0, mission: float = 0.0,
+                      at_floor: bool = False) -> None:
         """Record what each half of the blend said about one design.
 
         Filed under the stage the design was asked about, because that is the
-        only population it is comparable with.
+        only population it is comparable with.  ``at_floor`` marks a design
+        competent in none of its island's media (ARCH51_SPEC §D' item 2):
+        ``standing`` ranks only against the entries that are not.  A window
+        from a checkpoint older than this holds 3-tuples, read as not at the
+        floor.
         """
         w = self._recent.setdefault(int(stage), [])
-        w.append((float(island_score), float(curriculum_score), float(mission)))
+        w.append((float(island_score), float(curriculum_score), float(mission),
+                  bool(at_floor)))
         if len(w) > self.window:
             del w[: len(w) - self.window]
 
@@ -451,7 +457,7 @@ class Curriculum:
         return float(np.clip(max(ramp, self.handover_floor), 0.0, 1.0))
 
     def standing(self, island_score: float, curriculum_score: float,
-                 stage: int = 0):
+                 stage: int = 0, floor_only: bool = True):
         """Both halves of the blend as population quantiles in [0, 1].
 
         The blend is a convex combination, so it compares the two halves'
@@ -487,12 +493,27 @@ class Curriculum:
         score and a raw score of zero stands at 0 at any window size: ``<=``
         gave a design at the window's zero mass (0.46-0.99 of it) that mass as
         its standing, so doing nothing scored 0.46-0.99.
-        """
-        w = self._recent.get(int(stage), [])
-        return (_standing([a for a, _, _ in w], island_score, self.min_rank_samples),
-                _standing([b for _, b, _ in w], curriculum_score, self.min_rank_samples))
 
-    def mission_standing(self, mission: float, stage: int = 0) -> float:
+        With ``floor_only`` (the default, ARCH51_SPEC §D' item 2) the window is
+        only the entries not at the competence floor: with the whole window the
+        competent designs sit at 0.9-1.0 and the scalar separates them by 0.1,
+        and the quantile should spend its range on the designs that did
+        something.  Fewer than ``min_rank_samples`` such entries: a non-zero
+        score stands at 0.5, a zero score at 0.
+        """
+        w = self._ranked_window(stage, floor_only)
+        return (_standing([e[0] for e in w], island_score, self.min_rank_samples),
+                _standing([e[1] for e in w], curriculum_score, self.min_rank_samples))
+
+    def _ranked_window(self, stage: int, floor_only: bool) -> list:
+        """The stage's window, without the entries at the floor if asked."""
+        w = self._recent.get(int(stage), [])
+        if not floor_only:
+            return list(w)
+        return [e for e in w if not (len(e) > 3 and e[3])]
+
+    def mission_standing(self, mission: float, stage: int = 0,
+                         floor_only: bool = True) -> float:
         """``mission_fraction`` as a population quantile, on the same scale.
 
         The blend's two halves decide *how well this design answered the
@@ -511,10 +532,11 @@ class Curriculum:
         the battery and the crossings in the proportions the task itself
         defines, rather than in weights someone typed.
 
-        Ranked like ``standing`` (strictly below, zero stands at 0; ROADMAP N2).
+        Ranked like ``standing`` (strictly below, zero stands at 0; ROADMAP N2;
+        against the entries not at the floor when ``floor_only``).
         """
-        w = self._recent.get(int(stage), [])
-        return _standing([c for _, _, c in w], mission, self.min_rank_samples)
+        w = self._ranked_window(stage, floor_only)
+        return _standing([e[2] for e in w], mission, self.min_rank_samples)
 
     def evaluate(self, cell, result, transitions=None, *,
                  stage: int | None = None) -> StageResult:
