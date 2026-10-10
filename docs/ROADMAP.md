@@ -3854,8 +3854,8 @@ are the primary context; memory type device). The wrap is zero copy:
 The two runtimes use different streams (Mojo's handle is reachable only
 through a private module), so a mixed pipeline needs an explicit
 synchronisation or event between them. The headline size, 1e6, never
-finished: the child was killed by signal 9 about 300 s after start, with no
-CUDA error recorded; the cause is not read. What this decides for A: the
+finished: the probe's own 300 s child timeout killed it (reported as
+signal 9), with no CUDA error recorded; why 1e6 took that long is not read. What this decides for A: the
 fused-fluid column of the decision table does not rest on Mojo-Warp interop.
 Putting a Mojo launch inside Warp's captured graph on Warp's stream is not
 shown, so A's spec takes the path that needs no interop, a Warp port of

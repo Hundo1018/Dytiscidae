@@ -1,0 +1,237 @@
+{
+ "verdict": "PARTIAL",
+ "failures": [
+  "child terminated: signal 9"
+ ],
+ "notes": [
+  "wrap-scaling not computed (needs two sizes with timings)"
+ ],
+ "per_size": {
+  "100000": {
+   "n": 100000,
+   "float32_exact": true,
+   "mojo_alloc_fill_s": 0.24613149300421355,
+   "ptr": 129064681603072,
+   "mojo_ctx": 480038080,
+   "mojo_stream": 492360064,
+   "checksum_mojo": 2499975000.0,
+   "expect_mojo": 2499975000.0,
+   "ok_mojo_fill": true,
+   "last_event": "size_done",
+   "device_name": "NVIDIA GeForce RTX 3060 Laptop GPU",
+   "arch": 86,
+   "warp_ctx": 480038080,
+   "warp_stream": 493664400,
+   "cu": {
+    "cuCtxGetCurrent_rc": 0,
+    "current_ctx": 480038080,
+    "owner_ctx_rc": 0,
+    "owner_ctx": 480038080,
+    "memtype_rc": 0,
+    "memtype": 2,
+    "ordinal_rc": 0,
+    "ordinal": 0,
+    "primary_rc": 0,
+    "primary_ctx": 480038080
+   },
+   "wrap_ok": true,
+   "same_stream": false,
+   "ok_warp_reads_mojo": true,
+   "checksum_after_warp1": 2500075000.0,
+   "expect_after_warp1": 2500075000.0,
+   "ok_mojo_sees_warp1": true,
+   "checksum_after_warp2": 2500175000.0,
+   "expect_after_warp2": 2500175000.0,
+   "ok_mojo_sees_warp2": true,
+   "wrap_us_median": 1.837,
+   "wrap_us_p10": 1.59,
+   "wrap_us_p90": 2.04,
+   "h2d_us_median": 1213.605,
+   "h2d_us_min": 343.295,
+   "h2d_us_max": 1256.435,
+   "checksum_final": 2500175000.0,
+   "ok_intact_after_wrappers": true,
+   "checks": {
+    "mojo_fill": true,
+    "warp_reads_mojo": true,
+    "mojo_sees_warp_x1": true,
+    "mojo_sees_warp_x2": true,
+    "intact_after_wrappers": true
+   },
+   "all_ok": true,
+   "ctx_owner_is_warp_ctx": true,
+   "mojo_ctx_is_warp_ctx": true
+  }
+ },
+ "scaling": {},
+ "streams": {
+  "100000": {
+   "mojo": 492360064,
+   "warp": 493664400,
+   "same": false
+  }
+ },
+ "contexts": {
+  "100000": {
+   "mojo_ctx": 480038080,
+   "warp_ctx": 480038080,
+   "owner_ctx": 480038080,
+   "primary_ctx": 480038080,
+   "memtype": 2
+  }
+ },
+ "cuda_error_lines": [],
+ "returncode": -9,
+ "stderr_tail": "TIMEOUT after 300.0s\n",
+ "events": [
+  {
+   "python": "3.12.3",
+   "pid": 2488203,
+   "order": "mojo_first",
+   "sizes": [
+    100000,
+    1000000,
+    10000000
+   ],
+   "event": "start",
+   "t": 1791626876.2392676
+  },
+  {
+   "name": "import_mojo",
+   "ok": true,
+   "event": "stage",
+   "t": 1791626876.4844131
+  },
+  {
+   "name": "import_warp",
+   "ok": true,
+   "warp": "1.18.0",
+   "event": "stage",
+   "t": 1791626876.6888027
+  },
+  {
+   "n": 100000,
+   "float32_exact": true,
+   "mojo_alloc_fill_s": 0.24613149300421355,
+   "ptr": 129064681603072,
+   "mojo_ctx": 480038080,
+   "mojo_stream": 492360064,
+   "checksum_mojo": 2499975000.0,
+   "expect_mojo": 2499975000.0,
+   "ok_mojo_fill": true,
+   "event": "size_mojo",
+   "t": 1791626877.3275754
+  },
+  {
+   "name": "warp_init",
+   "ok": true,
+   "device_name": "NVIDIA GeForce RTX 3060 Laptop GPU",
+   "arch": 86,
+   "warp_ctx": 480038080,
+   "warp_stream": 493664400,
+   "event": "stage",
+   "t": 1791626877.7292352
+  },
+  {
+   "n": 100000,
+   "float32_exact": true,
+   "mojo_alloc_fill_s": 0.24613149300421355,
+   "ptr": 129064681603072,
+   "mojo_ctx": 480038080,
+   "mojo_stream": 492360064,
+   "checksum_mojo": 2499975000.0,
+   "expect_mojo": 2499975000.0,
+   "ok_mojo_fill": true,
+   "device_name": "NVIDIA GeForce RTX 3060 Laptop GPU",
+   "arch": 86,
+   "warp_ctx": 480038080,
+   "warp_stream": 493664400,
+   "cu": {
+    "cuCtxGetCurrent_rc": 0,
+    "current_ctx": 480038080,
+    "owner_ctx_rc": 0,
+    "owner_ctx": 480038080,
+    "memtype_rc": 0,
+    "memtype": 2,
+    "ordinal_rc": 0,
+    "ordinal": 0,
+    "primary_rc": 0,
+    "primary_ctx": 480038080
+   },
+   "wrap_ok": true,
+   "same_stream": false,
+   "ok_warp_reads_mojo": true,
+   "checksum_after_warp1": 2500075000.0,
+   "expect_after_warp1": 2500075000.0,
+   "ok_mojo_sees_warp1": true,
+   "checksum_after_warp2": 2500175000.0,
+   "expect_after_warp2": 2500175000.0,
+   "ok_mojo_sees_warp2": true,
+   "event": "size_checks",
+   "t": 1791626878.1341107
+  },
+  {
+   "n": 100000,
+   "float32_exact": true,
+   "mojo_alloc_fill_s": 0.24613149300421355,
+   "ptr": 129064681603072,
+   "mojo_ctx": 480038080,
+   "mojo_stream": 492360064,
+   "checksum_mojo": 2499975000.0,
+   "expect_mojo": 2499975000.0,
+   "ok_mojo_fill": true,
+   "device_name": "NVIDIA GeForce RTX 3060 Laptop GPU",
+   "arch": 86,
+   "warp_ctx": 480038080,
+   "warp_stream": 493664400,
+   "cu": {
+    "cuCtxGetCurrent_rc": 0,
+    "current_ctx": 480038080,
+    "owner_ctx_rc": 0,
+    "owner_ctx": 480038080,
+    "memtype_rc": 0,
+    "memtype": 2,
+    "ordinal_rc": 0,
+    "ordinal": 0,
+    "primary_rc": 0,
+    "primary_ctx": 480038080
+   },
+   "wrap_ok": true,
+   "same_stream": false,
+   "ok_warp_reads_mojo": true,
+   "checksum_after_warp1": 2500075000.0,
+   "expect_after_warp1": 2500075000.0,
+   "ok_mojo_sees_warp1": true,
+   "checksum_after_warp2": 2500175000.0,
+   "expect_after_warp2": 2500175000.0,
+   "ok_mojo_sees_warp2": true,
+   "wrap_us_median": 1.837,
+   "wrap_us_p10": 1.59,
+   "wrap_us_p90": 2.04,
+   "h2d_us_median": 1213.605,
+   "h2d_us_min": 343.295,
+   "h2d_us_max": 1256.435,
+   "checksum_final": 2500175000.0,
+   "ok_intact_after_wrappers": true,
+   "event": "size_done",
+   "t": 1791626878.1466298
+  }
+ ],
+ "args": {
+  "selftest": false,
+  "sizes": [
+   100000,
+   1000000,
+   10000000
+  ],
+  "reps": 300,
+  "copy_reps": 5,
+  "order": "mojo_first",
+  "build_dir": "/home/hundo/Projects/Dytiscidae/dytiscidae/experiments/mojo_warp_interop/build",
+  "results": "/home/hundo/Projects/Dytiscidae/dytiscidae/experiments/mojo_warp_interop/results_q6.json",
+  "report": "/home/hundo/Projects/Dytiscidae/dytiscidae/runs/analysis_1010_failure_theory/Q6_result.md",
+  "timeout": 300.0,
+  "child": false,
+  "log": null
+ }
+}
