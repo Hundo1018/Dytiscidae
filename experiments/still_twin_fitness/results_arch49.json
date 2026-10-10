@@ -1,0 +1,335 @@
+{
+ "run": "runs/arch49",
+ "package_tree": "/home/hundo/Projects/Dytiscidae/n1-tree",
+ "package_commit": "5cc9db99bfc04078f5c62d41243da955e963b723",
+ "n_elites_in_archive": 229,
+ "n_measured": 229,
+ "skipped_no_controller": [],
+ "wall_s": 2965.0913577079773,
+ "limit": 0,
+ "verdict": {
+  "median_fit_ge_0.80_every_island": false,
+  "nondom_share_pooled": 0.8122270742358079,
+  "nondom_share_ge_0.60": true,
+  "specialist_median_fit": {
+   "air": 0.8951171874999999,
+   "water": 0.7066406249999999,
+   "land": 0.715625
+  },
+  "falsified_by_specialist_median_lt_0.5": false,
+  "falsified_by_nondom_share_lt_0.30": false,
+  "dominated_share_pooled": 0.18777292576419213,
+  "revised_T1_back_if_dominated_ge_0.70": false,
+  "prediction_holds": false,
+  "falsified": false,
+  "outcome": "NEITHER (not confirmed, not falsified)"
+ },
+ "pooled": {
+  "n": 229,
+  "twin_fit_median": 0.7066406249999999,
+  "twin_fit_q25": 0.666796875,
+  "twin_fit_q75": 0.75625,
+  "twin_fit_mean": 0.726036265010917,
+  "twin_fit_sd": 0.11322250853903663,
+  "twin_isl_q_median": 0.96484375,
+  "twin_mis_q_median": 0.9921875,
+  "twin_cur_q_median": 0.57421875,
+  "share_nondom_or_dominating": 0.8122270742358079,
+  "share_dominating": 0.3056768558951965,
+  "share_dominated": 0.18777292576419213,
+  "share_would_add": 0.7991266375545851,
+  "elite_fit_median": 0.86982421875,
+  "elite_fit_q25": 0.7442382812499999,
+  "elite_fit_q75": 0.9420898437499999,
+  "elite_recorded_fit_median": 0.8722656249999999,
+  "twin_over_elite_fit_median": 0.9109617373319544,
+  "reproduction": {
+   "air": [
+    229,
+    229
+   ],
+   "water": [
+    215,
+    229
+   ],
+   "land": [
+    195,
+    229
+   ]
+  }
+ },
+ "per_island": {
+  "aerial_diver": {
+   "n": 28,
+   "twin_fit_median": 0.666796875,
+   "twin_fit_q25": 0.666796875,
+   "twin_fit_q75": 0.7493408203125,
+   "twin_fit_mean": 0.720263671875,
+   "twin_fit_sd": 0.09530667980329913,
+   "twin_isl_q_median": 0.984375,
+   "twin_mis_q_median": 0.9921875,
+   "twin_cur_q_median": 0.375,
+   "share_nondom_or_dominating": 0.8571428571428571,
+   "share_dominating": 0.32142857142857145,
+   "share_dominated": 0.14285714285714285,
+   "share_would_add": 0.7857142857142857,
+   "elite_fit_median": 0.8903320312499999,
+   "elite_fit_q25": 0.846240234375,
+   "elite_fit_q75": 0.9407470703124999,
+   "elite_recorded_fit_median": 0.914575298325422,
+   "twin_over_elite_fit_median": 0.8031262712239416,
+   "reproduction": {
+    "air": [
+     28,
+     28
+    ],
+    "water": [
+     28,
+     28
+    ],
+    "land": [
+     28,
+     28
+    ]
+   }
+  },
+  "air": {
+   "n": 31,
+   "twin_fit_median": 0.8951171874999999,
+   "twin_fit_q25": 0.726953125,
+   "twin_fit_q75": 0.961767578125,
+   "twin_fit_mean": 0.8589749243951613,
+   "twin_fit_sd": 0.11826813855310395,
+   "twin_isl_q_median": 0.96484375,
+   "twin_mis_q_median": 0.9921875,
+   "twin_cur_q_median": 0.81640625,
+   "share_nondom_or_dominating": 0.967741935483871,
+   "share_dominating": 0.5806451612903226,
+   "share_dominated": 0.03225806451612903,
+   "share_would_add": 0.8709677419354839,
+   "elite_fit_median": 0.93818359375,
+   "elite_fit_q25": 0.8048828125,
+   "elite_fit_q75": 0.9638183593749999,
+   "elite_recorded_fit_median": 0.9237304687499999,
+   "twin_over_elite_fit_median": 0.9978654198007726,
+   "reproduction": {
+    "air": [
+     31,
+     31
+    ],
+    "water": [
+     26,
+     31
+    ],
+    "land": [
+     23,
+     31
+    ]
+   }
+  },
+  "amphibian": {
+   "n": 25,
+   "twin_fit_median": 0.6111328125,
+   "twin_fit_q25": 0.6111328125,
+   "twin_fit_q75": 0.61181640625,
+   "twin_fit_mean": 0.6163671875,
+   "twin_fit_sd": 0.024934810840803793,
+   "twin_isl_q_median": 0.85546875,
+   "twin_mis_q_median": 0.984375,
+   "twin_cur_q_median": 0.31640625,
+   "share_nondom_or_dominating": 0.84,
+   "share_dominating": 0.12,
+   "share_dominated": 0.16,
+   "share_would_add": 0.84,
+   "elite_fit_median": 0.83876953125,
+   "elite_fit_q25": 0.6500976562499999,
+   "elite_fit_q75": 0.9536132812499999,
+   "elite_recorded_fit_median": 0.80595703125,
+   "twin_over_elite_fit_median": 0.7544303797468354,
+   "reproduction": {
+    "air": [
+     25,
+     25
+    ],
+    "water": [
+     23,
+     25
+    ],
+    "land": [
+     24,
+     25
+    ]
+   }
+  },
+  "generalist": {
+   "n": 42,
+   "twin_fit_median": 0.591064453125,
+   "twin_fit_q25": 0.5879882812499999,
+   "twin_fit_q75": 0.59619140625,
+   "twin_fit_mean": 0.656884765625,
+   "twin_fit_sd": 0.13161374372784043,
+   "twin_isl_q_median": 0.99609375,
+   "twin_mis_q_median": 0.99609375,
+   "twin_cur_q_median": 0.224609375,
+   "share_nondom_or_dominating": 0.8571428571428571,
+   "share_dominating": 0.2857142857142857,
+   "share_dominated": 0.14285714285714285,
+   "share_would_add": 0.7619047619047619,
+   "elite_fit_median": 0.8402343749999999,
+   "elite_fit_q25": 0.5879882812499999,
+   "elite_fit_q75": 0.9361083984374999,
+   "elite_recorded_fit_median": 0.8385742187499998,
+   "twin_over_elite_fit_median": 0.8724679027880426,
+   "reproduction": {
+    "air": [
+     42,
+     42
+    ],
+    "water": [
+     42,
+     42
+    ],
+    "land": [
+     40,
+     42
+    ]
+   }
+  },
+  "land": {
+   "n": 20,
+   "twin_fit_median": 0.715625,
+   "twin_fit_q25": 0.715625,
+   "twin_fit_q75": 0.715625,
+   "twin_fit_mean": 0.7158984374999998,
+   "twin_fit_sd": 0.0008416228669448391,
+   "twin_isl_q_median": 0.60546875,
+   "twin_mis_q_median": 0.97265625,
+   "twin_cur_q_median": 0.60546875,
+   "share_nondom_or_dominating": 0.45,
+   "share_dominating": 0.1,
+   "share_dominated": 0.55,
+   "share_would_add": 0.7,
+   "elite_fit_median": 0.8946289062499999,
+   "elite_fit_q25": 0.8508056640624999,
+   "elite_fit_q75": 0.94326171875,
+   "elite_recorded_fit_median": 0.9171874999999999,
+   "twin_over_elite_fit_median": 0.7999127114145543,
+   "reproduction": {
+    "air": [
+     20,
+     20
+    ],
+    "water": [
+     19,
+     20
+    ],
+    "land": [
+     12,
+     20
+    ]
+   }
+  },
+  "land_air": {
+   "n": 39,
+   "twin_fit_median": 0.68984375,
+   "twin_fit_q25": 0.68984375,
+   "twin_fit_q75": 0.850830078125,
+   "twin_fit_mean": 0.7625150240384618,
+   "twin_fit_sd": 0.09883112284716579,
+   "twin_isl_q_median": 0.9921875,
+   "twin_mis_q_median": 0.99609375,
+   "twin_cur_q_median": 0.4140625,
+   "share_nondom_or_dominating": 0.8205128205128205,
+   "share_dominating": 0.48717948717948717,
+   "share_dominated": 0.1794871794871795,
+   "share_would_add": 0.7948717948717948,
+   "elite_fit_median": 0.845703125,
+   "elite_fit_q25": 0.68984375,
+   "elite_fit_q75": 0.932861328125,
+   "elite_recorded_fit_median": 0.845703125,
+   "twin_over_elite_fit_median": 1.0,
+   "reproduction": {
+    "air": [
+     39,
+     39
+    ],
+    "water": [
+     36,
+     39
+    ],
+    "land": [
+     32,
+     39
+    ]
+   }
+  },
+  "triphibian": {
+   "n": 23,
+   "twin_fit_median": 0.7555664062499999,
+   "twin_fit_q25": 0.7548828125,
+   "twin_fit_q75": 0.75625,
+   "twin_fit_mean": 0.763947860054348,
+   "twin_fit_sd": 0.027368765383878224,
+   "twin_isl_q_median": 0.3046875,
+   "twin_mis_q_median": 0.98046875,
+   "twin_cur_q_median": 0.77734375,
+   "share_nondom_or_dominating": 0.8260869565217391,
+   "share_dominating": 0.08695652173913043,
+   "share_dominated": 0.17391304347826086,
+   "share_would_add": 0.9130434782608695,
+   "elite_fit_median": 0.8218749999999999,
+   "elite_fit_q25": 0.762744140625,
+   "elite_fit_q75": 0.894970703125,
+   "elite_recorded_fit_median": 0.8167777777777777,
+   "twin_over_elite_fit_median": 0.9293099302717,
+   "reproduction": {
+    "air": [
+     23,
+     23
+    ],
+    "water": [
+     21,
+     23
+    ],
+    "land": [
+     16,
+     23
+    ]
+   }
+  },
+  "water": {
+   "n": 21,
+   "twin_fit_median": 0.7066406249999999,
+   "twin_fit_q25": 0.7066406249999999,
+   "twin_fit_q75": 0.7066406249999999,
+   "twin_fit_mean": 0.70673828125,
+   "twin_fit_sd": 0.0004475171577105361,
+   "twin_isl_q_median": 0.5859375,
+   "twin_mis_q_median": 0.98828125,
+   "twin_cur_q_median": 0.5859375,
+   "share_nondom_or_dominating": 0.7142857142857143,
+   "share_dominating": 0.23809523809523808,
+   "share_dominated": 0.2857142857142857,
+   "share_would_add": 0.7142857142857143,
+   "elite_fit_median": 0.87890625,
+   "elite_fit_q25": 0.7066406249999999,
+   "elite_fit_q75": 0.91923828125,
+   "elite_recorded_fit_median": 0.85546875,
+   "twin_over_elite_fit_median": 0.8039999999999999,
+   "reproduction": {
+    "air": [
+     21,
+     21
+    ],
+    "water": [
+     20,
+     21
+    ],
+    "land": [
+     20,
+     21
+    ]
+   }
+  }
+ }
+}

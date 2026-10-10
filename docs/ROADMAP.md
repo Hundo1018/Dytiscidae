@@ -3154,6 +3154,26 @@ non-dominated or dominating in >= 60% of cells. *Falsified* if median twin
 confirmed, every archive since the quantile blend was introduced is a sample
 of bodies with good margins, and §1's Spearman 0.3 is the ceiling.
 
+*N1 was run the same day* (`experiments/still_twin_fitness/run.py`, 229 elites x
+2 arms at commit 5cc9db9, batched path, the elite's own draw, 2965 s; report
+`N1_result.md`; the elite arm reproduced its recorded competence within 0.005
+in 229 / 215 / 195 of 229 for air / water / land, the same counts as the
+no-model gate). **Outcome: neither.** The twin's median `fit` against the
+final windows: air 0.895, water 0.707, land 0.716, the other islands
+0.59-0.76, pooled 0.707 [IQR 0.667-0.756]; only air reaches the 0.80 clause,
+no specialist island is below the 0.5 falsifier. The twin is non-dominated or
+dominating against the elite's own front in **81.2%** of cells (dominating
+outright in 30.6%; land lowest at 45%, air 96.8%); the 60% clause holds and
+the 30% falsifier is far. Dominated in 18.8%, so the revised T1's "move it
+back" line (>= 70% dominated) is not met either. *Belief update:* a machine
+that does nothing stands at 0.7 of the scale (0.9 in air) and would join four
+of five cells' fronts; the first clause missed because the water and land
+windows are not zero-saturated (N2), which is the revision already made. The
+competence floor (N5) is the right shape: it is the floor, not the inequality,
+that this probe says is missing. Caveats recorded in the report: all twins sit
+at stage 0; the twin lands in a different cell from its elite in 88% of cases,
+so `would_add` at its own cell is also reported.
+
 **N2 (read, minutes): the floor in the windows.** From `search_state.pkl`, the
 share of each island's window at exactly zero island score, and the quantile a
 zero scorer receives. *Prediction:* >= 0.90 in air, water and land islands.
