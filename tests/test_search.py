@@ -3368,24 +3368,74 @@ def test_an_audit_perturbs_the_scored_experiment_and_nothing_else() -> None:
             e.genome = BODY_PLANS["gannet"]()
             e.meta["policy"] = None
             e.meta["eval_seed"] = 5
+            # A recorded score the re-run does not reproduce (another path and
+            # another network earned it): an audit whose base is the record,
+            # not the re-run, divides by this 0.5 and invalidates the design
+            # (mutation `audit-base-is-the-record`).
+            e.meta["mission_fraction"] = 0.5
         state.auditor = Auditor(held_out_seeds=0, perturbations=(("cd_scale", 1.0),))
         loop_mod._audit(state, 1, MissionSpec(), np.random.default_rng(0))
         rep = state.auditor.reports[-1]
-        # Two checks need only the result; the third is the perturbation, which
-        # runs on a mission above zero or on any medium the design is credited
-        # in (2026-10-06: since water and land are paired, an open-loop gannet's
-        # mission is 0, and on the mission alone the check never ran -- as it
-        # never ran in arch48).
-        check("the perturbation check ran", rep.checks_run == 3,
-              f"{rep.checks_run} checks, credited {sorted(rep.perturbed_by_medium)}")
-        kept = list(rep.perturbed_by_medium.values()) + (
-            [rep.retained_fraction] if rep.retained_fraction is not None else [])
-        check("and a perturbation of x1.0 retains exactly what the scored experiment scored",
-              bool(kept) and all(abs(k - 1.0) < 1e-9 for k in kept) and not rep.invalid,
+        # 2026-10-10: this fixture used to be credited in air by its glide.
+        # Since the paired scores (c8c623d: air is a mirrored turn pair; water
+        # and land are antipodal pairs since PR #32) every open-loop design
+        # scores exactly 0 in every medium -- motion the command did not choose
+        # cancels -- so the audit has no credited medium and no mission base,
+        # and the perturbation ratio would be 0/0.  The auditor must say so
+        # (rule 4) instead of running nothing; the ratio itself is exercised
+        # below with a stub that has a credited medium.
+        check("an open-loop gannet is credited nowhere, and the audit says it cannot measure",
+              not rep.perturbation_measurable
+              and not rep.perturbed_by_medium and rep.retained_fraction is None
+              and any(f.check == "perturbation" and f.severity == "note"
+                      and "not measurable" in f.detail for f in rep.findings),
               f"per medium {rep.perturbed_by_medium}, mission {rep.retained_fraction}, "
-              f"invalid {rep.invalid}")
+              f"{[(f.check, f.detail) for f in rep.findings]}")
+        # Two checks need only the result; the third is the perturbation check,
+        # which reports "not measurable" rather than staying silent.
+        check("the perturbation check is counted, and is not an invalidation",
+              rep.checks_run == 3 and not rep.invalid, f"{rep.checks_run} checks")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+    # The ratio, with a credited medium: a stub whose competence is 0.4 * factor
+    # only at the seed the elite was scored at, and 0.1 at any other.
+    from dytiscidae.evolution.auditor import Auditor
+
+    class Ph:
+        mass, wing_area = 5.0, 0.5
+
+    class Seg:
+        mean_power, duration = 0.0, 1.0
+
+        def __init__(self, c):
+            self.competence = c
+
+    class Res:
+        def __init__(self, mf, **media):
+            self.mission_fraction = mf
+            self.segments = {k: Seg(v) for k, v in media.items()}
+
+    eval_seed = 7
+    asked = []
+
+    def stub(seed=0, perturb=None):
+        asked.append(seed)
+        factor = 1.0 if not perturb else float(next(iter(perturb.values())))
+        return Res(0.0, water=0.4 * factor if seed == eval_seed else 0.1)
+
+    scored = Res(0.0, water=0.4)
+    rep = Auditor(held_out_seeds=0, perturbations=(("cd_scale", 1.0),)).audit(
+        Ph(), scored, reevaluate=stub, seed=eval_seed, name="stub")
+    check("a perturbation of x1.0 at the elite's own seed retains exactly 1",
+          rep.perturbed_by_medium == {"water": 1.0} and not rep.invalid
+          and rep.perturbation_measurable and asked == [eval_seed],
+          f"per medium {rep.perturbed_by_medium}, seeds {asked}, invalid {rep.invalid}")
+    rep = Auditor(held_out_seeds=0, perturbations=(("cd_scale", 0.8),)).audit(
+        Ph(), scored, reevaluate=stub, seed=eval_seed, name="stub")
+    check("and a real perturbation retains the ratio the perturbation caused",
+          abs(rep.perturbed_by_medium.get("water", -1) - 0.8) < 1e-9,
+          f"{rep.perturbed_by_medium}")
 
 
 def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:

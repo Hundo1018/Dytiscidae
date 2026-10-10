@@ -948,16 +948,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Auditor` | class | 203 | — | Re-measures designs under conditions they were not selected on. |
+| `Auditor` | class | 208 | — | Re-measures designs under conditions they were not selected on. |
 | `AuditReport` | class | 85 | — | — |
-| `check_energy_conservation` | function | 125 | `(result) -> Finding \| None` | The fluid must not be a power source. |
-| `check_scaling` | function | 156 | `(phenotype) -> Finding \| None` | Wing loading against mass, compared with the real world. |
+| `check_energy_conservation` | function | 130 | `(result) -> Finding \| None` | The fluid must not be a power source. |
+| `check_scaling` | function | 161 | `(phenotype) -> Finding \| None` | Wing loading against mass, compared with the real world. |
 | `Finding` | class | 74 | — | One thing the auditor objected to. |
-| `Auditor.audit` | method | 233 | `(self, phenotype, result, *, reevaluate=None, name: str='', seed: int=0) -> AuditReport` | Run every check that the available information supports. |
-| `Auditor.report` | method | 407 | `(self) -> dict` | — |
-| `Auditor.review_tightening` | method | 353 | `(self, judge, moves: list, invalid_designs) -> list` | Veto a bar that was moved by evidence that did not hold up. |
-| `AuditReport.invalid` | property | 101 | `(self) -> bool` | — |
-| `AuditReport.summary` | method | 104 | `(self) -> dict` | — |
+| `Auditor.audit` | method | 238 | `(self, phenotype, result, *, reevaluate=None, name: str='', seed: int=0) -> AuditReport` | Run every check that the available information supports. |
+| `Auditor.report` | method | 424 | `(self) -> dict` | — |
+| `Auditor.review_tightening` | method | 370 | `(self, judge, moves: list, invalid_designs) -> list` | Veto a bar that was moved by evidence that did not hold up. |
+| `AuditReport.invalid` | property | 105 | `(self) -> bool` | — |
+| `AuditReport.summary` | method | 108 | `(self) -> dict` | — |
 
 ## `evolution.cmaes` — `dytiscidae/evolution/cmaes.py`
 

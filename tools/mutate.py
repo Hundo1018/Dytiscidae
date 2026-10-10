@@ -906,9 +906,22 @@ MUTATIONS: tuple = (
         suites=("test_search::test_an_audit_perturbs_the_scored_experiment_and_nothing_else",),
         item="audit"),
     Mutation(
+        id="audit-silent-when-unmeasurable",
+        path="dytiscidae/evolution/auditor.py",
+        find="            rep.findings.append(Finding(\n"
+             "                check=\"perturbation\", severity=\"note\",\n"
+             "                detail=(\"not measurable:",
+        replace="            [].append(Finding(\n"
+                "                check=\"perturbation\", severity=\"note\",\n"
+                "                detail=(\"not measurable:",
+        defect="a design credited in no medium with mission 0 gets no perturbation "
+               "finding, so a check that could not run looks like one that passed",
+        suites=("test_search::test_an_audit_perturbs_the_scored_experiment_and_nothing_else",),
+        item="audit"),
+    Mutation(
         id="audit-base-is-the-record",
         path="dytiscidae/evolution/loop.py",
-        find="            mission_fraction = float(reevaluate().mission_fraction)",
+        find="            mission_fraction = float(base_result.mission_fraction)",
         replace="            mission_fraction = float(elite.meta.get(\"mission_fraction\", 0.0))",
         defect="the audit divides a re-run by the recorded score, which another path "
                "and another network earned, so the ratio is not the perturbation's",
