@@ -3569,6 +3569,254 @@ def test_verification_offers_designs_not_yet_verified() -> None:
           tried == {"c", "d", "e"}, f"tried {sorted(tried)}")
 
 
+def _reeval_stub_search(loop, tmp, reeval, generations=4, batch=4):
+    """``run_search`` with the physics stubbed out: every candidate comes back
+    from a fake ``evaluate_candidates`` whose result carries the seed it was
+    asked to run at.  Returns ``(state, calls, events)``; ``calls`` is the
+    ``seeds`` list of each evaluation call, in order."""
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    saved = {k: getattr(loop, k) for k in (
+        "episode_features", "behaviour_descriptor", "objectives", "_meta_light",
+        "critic_features", "_meta", "evaluate_candidates", "_verify_and_label", "_audit")}
+    n = {"k": 0}
+    calls: list = []
+
+    def fake_eval(genomes, cfg, *, seeds=None, **kw):
+        calls.append(list(seeds or []))
+        out = []
+        for g, sd in zip(genomes, seeds or [0] * len(genomes)):
+            n["k"] += 1
+            water = 0.2 + 0.001 * (sd % 400)
+            seg = NS(competence=water, measurements={}, score=water, max_depth=0.0,
+                     max_actuator_overload=0.0)
+            res = NS(segments={"water": seg}, mission_fraction=0.0, feasible=True,
+                     transitions=None, tier=1, exploit="", wall_time=0.0, notes=[],
+                     eval_seed=int(sd), mobility={}, diverged_rollouts=0, n_rollouts=1,
+                     energy_margin=0.0, air_gates=[])
+            pheno = NS(report=NS(min_margin=1.0, worst=None, ok=True), genome=g)
+            out.append((pheno, res, None))
+        return out
+
+    loop.episode_features = lambda r, p: np.zeros(16)
+    loop.behaviour_descriptor = lambda p, r: np.array(
+        [(r.eval_seed % 97) / 97.0, (r.eval_seed % 89) / 89.0,
+         (r.eval_seed % 83) / 83.0, (r.eval_seed % 79) / 79.0])
+    loop.objectives = lambda p, r: np.array([0.0, 3.0, 2.0])
+    loop._meta_light = lambda p, r: {}
+    loop.critic_features = lambda m, r: np.zeros(4)
+    loop._meta = lambda p, r, c: {
+        "air": 0.0, "water": r.segments["water"].competence, "land": 0.0,
+        "mission_fraction": 0.0, "energy_margin": 0.0, "tier": 1, "eval_seed": r.eval_seed,
+        "mobility_basis": {}, "policy": None, "mass": 1.0, "feasible": True}
+    loop.evaluate_candidates = fake_eval
+    loop._verify_and_label = lambda *a, **k: None
+    loop._audit = lambda *a, **k: None
+    try:
+        cfg = loop.SearchConfig(
+            generations=generations, batch=batch, workers=0, seed=7,
+            n_reference_seeds=4, n_random_seeds=0, islands=("water",),
+            tier2_every=999, audit_every=999, migrate_every=999,
+            checkpoint_every=999, run_dir=tmp, reeval_per_generation=reeval,
+            reeval_depth=3)
+        state = loop.run_search(cfg, MissionSpec())
+        return state, calls, state.telemetry
+    finally:
+        for k, v in saved.items():
+            setattr(loop, k, v)
+
+
+def _read_events(tmp):
+    import json
+    path = Path(tmp) / "events.jsonl"
+    return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+
+
+def test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu() -> None:
+    """ARCH51_SPEC L9, on a stub evaluator (the physics version,
+    ``test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median``,
+    needs the GPU): the same wiring -- the picks, their seeds, ``_reevaluate``,
+    the window it must not feed, the buffer it keeps -- with each candidate's
+    score a function of the seed it was run at."""
+    print("\nloop: a re-evaluation draws a fresh seed, feeds no window, and is "
+          "kept at its median (stub evaluator)")
+    import shutil
+    import tempfile
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.evolution import loop
+
+    tmp = tempfile.mkdtemp(prefix="dyt-reeval-")
+    try:
+        state, calls, _tel = _reeval_stub_search(loop, tmp, reeval=2)
+        evs = _read_events(tmp)
+        rec = [e for e in evs if e.get("kind") == "reevaluate" and e.get("status") == "recorded"]
+        check("(1) at least two re-evaluations were recorded", len(rec) >= 2,
+              f"{len(rec)} recorded of {sum(1 for e in evs if e.get('kind') == 'reevaluate')}")
+        check("(2) each ran at a seed other than the one that first scored the elite",
+              bool(rec) and all(e["eval_seed"] != e["first_eval_seed"] for e in rec),
+              f"{[(e['eval_seed'], e['first_eval_seed']) for e in rec][:4]}")
+        multi = [e for e in state.archive.cells.values() if len(e.meta.get("draws") or []) >= 2]
+        ok = bool(multi)
+        detail = f"{len(multi)} elites with >= 2 draws"
+        for e in multi:
+            dr = e.meta["draws"]
+            order = sorted(range(len(dr)), key=lambda i: dr[i]["base"])
+            med = dr[order[(len(dr) - 1) // 2]]
+            if not (e.meta.get("eval_seed") == med["meta"].get("eval_seed")
+                    and e.meta.get("water") == med["meta"].get("water")
+                    and e.fitness == med["fit"]
+                    and all(d["meta"].get("eval_seed") is not None for d in dr)
+                    and len(dr) <= 3):
+                ok = False
+                detail = f"elite {e.cell}: eval_seed {e.meta.get('eval_seed')} draws " \
+                         f"{[(d['base'], d['meta'].get('eval_seed')) for d in dr]}"
+        check("(3) an elite's seed, medium score and fitness are its lower-median "
+              "draw's, every draw carries its seed, and the buffer holds at most "
+              "reeval_depth", ok, detail)
+        window = sum(len(w) for w in state.curriculum._recent.values())
+        placed = sum(1 for e in evs if e.get("kind") == "evaluate")
+        check("(4) re-evaluations feed no curriculum window: the window holds "
+              "exactly the placed evaluations", window == placed and placed > 0,
+              f"window {window}, evaluate events {placed}")
+        per_gen = {}
+        for e in evs:
+            if e.get("kind") in ("evaluate", "reevaluate", "tier0_reject") \
+                    and e.get("operators") != ["seed"]:
+                per_gen[e["gen"]] = per_gen.get(e["gen"], 0) + 1
+        check("(6) per generation, placed + re-evaluated + rejected = batch",
+              bool(per_gen) and all(v == 4 for v in per_gen.values()),
+              f"{per_gen}")
+        check("each generation is still one evaluation call of `batch` candidates",
+              all(len(c) == 4 for c in calls[1:]), f"{[len(c) for c in calls]}")
+
+        # The off arm: nothing re-evaluated, no buffer anywhere.
+        tmp0 = tempfile.mkdtemp(prefix="dyt-reeval0-")
+        try:
+            state0, calls0, _ = _reeval_stub_search(loop, tmp0, reeval=0)
+            evs0 = _read_events(tmp0)
+            check("with reeval_per_generation == 0 nothing is re-evaluated and "
+                  "no elite carries a buffer",
+                  not any(e.get("kind") == "reevaluate" for e in evs0)
+                  and not any("draws" in e.meta for e in state0.archive.cells.values()),
+                  f"{sum(1 for e in evs0 if e.get('kind') == 'reevaluate')} events")
+        finally:
+            shutil.rmtree(tmp0, ignore_errors=True)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # An elite with no buffer (a seed elite, an archive from before N11): the
+    # first fresh draw seeds the buffer with the elite's own scored keys, so
+    # when the original is the median they come back.
+    saved = {k: getattr(loop, k) for k in (
+        "episode_features", "behaviour_descriptor", "objectives",
+        "_meta_light", "critic_features", "_meta")}
+    loop.episode_features = lambda r, p: np.zeros(16)
+    loop.behaviour_descriptor = lambda p, r: np.array([0.5, 0.5])
+    loop.objectives = lambda p, r: np.array([0.0, 3.0, 2.0])
+    loop._meta_light = lambda p, r: {}
+    loop.critic_features = lambda m, r: np.zeros(4)
+    loop._meta = lambda p, r, c: {"air": 0.0, "water": r.segments["water"].competence,
+                                  "land": 0.0, "eval_seed": r.eval_seed}
+    try:
+        state, events = _floor_state(loop)
+        for k in range(1, 25):
+            state.curriculum.observe_blend(0.001 * k, 0.002 * k, 0)
+        state.archive.generation = 3
+        state.archive.add("orig", 0.4, np.array([0.5, 0.5]),
+                          {"eval_seed": 111, "gen": 1, "water": 0.1, "policy": [1.0],
+                           "score_parts": {"blend": 0.0}},
+                          objectives=np.array([0.0, 1.0, 1.0]))
+        elite = next(iter(state.archive.cells.values()))
+        res = _floor_result(0.9)
+        res.eval_seed = 222
+        win_before = sum(len(w) for w in state.curriculum._recent.values())
+        out = loop._reevaluate(state, elite, None, res, None)
+        win_after = sum(len(w) for w in state.curriculum._recent.values())
+        check("a re-evaluation of an elite with no buffer is recorded",
+              out == "recorded" and len(elite.meta["draws"]) == 2, f"{out}")
+        check("when the original draw stays the median its seed, medium score and "
+              "policy come back, not an empty meta",
+              elite.meta["eval_seed"] == 111 and elite.meta["water"] == 0.1
+              and elite.meta["policy"] == [1.0] and elite.meta["gen"] == 1
+              and elite.fitness == 0.4,
+              f"seed {elite.meta['eval_seed']} water {elite.meta['water']} "
+              f"policy {elite.meta['policy']} gen {elite.meta['gen']} fit {elite.fitness}")
+        check("and the re-evaluation fed no window", win_before == win_after,
+              f"{win_before} -> {win_after}")
+        # An elite that left the front is an orphan: nothing recorded.
+        state.archive.fronts[elite.cell] = []
+        out = loop._reevaluate(state, elite, None, res, None)
+        check("an elite no longer on its front is an orphan and nothing is recorded",
+              out == "orphan" and len(elite.meta["draws"]) == 2, f"{out}")
+    finally:
+        for k, v in saved.items():
+            setattr(loop, k, v)
+
+
+def test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median() -> None:
+    """ARCH51_SPEC L9 (GPU): a real, sharded search re-runs archived
+    representatives at fresh seeds; the re-runs feed no window, and an elite
+    with several draws is filmed as its lower-median draw."""
+    if needs_batched_evaluator("test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median"):
+        return
+    print("\nloop: an elite is re-measured at fresh draws and kept at its median")
+    import shutil
+    import tempfile
+
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.viz.film import MEDIA, TOLERANCE, evaluate_on_film
+
+    tmp = tempfile.mkdtemp(prefix="dyt-reeval-gpu-")
+    try:
+        cfg = SearchConfig(generations=4, batch=4, workers=2, min_shard=2, seed=5,
+                           segment_seconds=2.0, n_reference_seeds=4, n_random_seeds=0,
+                           islands=("generalist",), tier2_every=999, audit_every=999,
+                           migrate_every=999, checkpoint_every=1, run_dir=tmp,
+                           use_shared_policy=True, promotion_refine_steps=0,
+                           controller_refine_steps=1, reeval_per_generation=2)
+        state = run_search(cfg, MissionSpec())
+        evs = _read_events(tmp)
+        rec = [e for e in evs if e.get("kind") == "reevaluate" and e.get("status") == "recorded"]
+        check("(1) at least two re-evaluations were recorded", len(rec) >= 2,
+              f"{len(rec)} recorded")
+        check("(2) each ran at a seed other than the one that first scored the elite",
+              bool(rec) and all(e["eval_seed"] != e["first_eval_seed"] for e in rec),
+              f"{[(e['eval_seed'], e['first_eval_seed']) for e in rec][:4]}")
+        multi = [e for a in state.archipelago.archives.values()
+                 for e in a.cells.values() if len(e.meta.get("draws") or []) >= 2]
+        ok = bool(multi)
+        for e in multi:
+            dr = e.meta["draws"]
+            order = sorted(range(len(dr)), key=lambda i: dr[i]["base"])
+            ok = ok and e.meta.get("eval_seed") == dr[order[(len(dr) - 1) // 2]]["meta"].get("eval_seed")
+        check("(3) an elite's eval_seed is its lower-median draw's", ok,
+              f"{len(multi)} elites with >= 2 draws")
+        window = sum(len(w) for c in state.curricula.values() for w in c._recent.values())
+        placed = sum(1 for e in evs if e.get("kind") == "evaluate")
+        check("(4) re-evaluations feed no curriculum window",
+              window == placed and window < 256, f"window {window}, evaluate events {placed}")
+        if multi:
+            ev = evaluate_on_film(multi[0], tmp, film=False, log=lambda *a, **k: None)
+            check("(5) the film of an elite with draws reproduces its median draw "
+                  "within TOLERANCE in every medium",
+                  all(ev["media"][m]["match"] for m in MEDIA),
+                  f"{ {m: (ev['media'][m]['recorded'], ev['media'][m]['reproduced']) for m in MEDIA} } "
+                  f"tolerance {TOLERANCE}")
+        per_gen = {}
+        for e in evs:
+            if e.get("kind") in ("evaluate", "reevaluate", "tier0_reject") \
+                    and e.get("operators") != ["seed"]:
+                per_gen[e["gen"]] = per_gen.get(e["gen"], 0) + 1
+        check("(6) per generation, placed + re-evaluated + rejected = batch",
+              bool(per_gen) and all(v == 4 for v in per_gen.values()), f"{per_gen}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_the_refinement_funnel_refines_only_what_it_selects() -> None:
     """ROADMAP AK: with a funnel, only the selected candidates enter a step's
     batch -- that is the saving -- and the others keep their re-scored result."""
@@ -6599,6 +6847,8 @@ def main() -> int:
         test_promotion_spends_refinement_and_keeps_what_it_buys,
         test_the_scalar_stands_at_zero_below_the_competence_floor,
         test_verification_offers_designs_not_yet_verified,
+        test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu,
+        test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median,
         test_the_refinement_funnel_refines_only_what_it_selects,
         test_the_distance_curriculum_steps_back_only_on_evidence,
         test_a_shared_command_means_the_same_thing_on_every_body,

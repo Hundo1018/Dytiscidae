@@ -157,6 +157,12 @@ class SearchConfig:
     #: (ROADMAP M2, 2026-10-08).  Off reproduces the shared draw of every run
     #: up to arch48; water and land scores are not comparable across it.
     draw_per_candidate: bool = True
+    #: Slots of each generation's ``batch`` spent re-running archived
+    #: representatives at a fresh seed (ROADMAP N11).  0 = off, every run to
+    #: arch50; arch51: 4 of batch 16, Extract-ME's 25%.
+    reeval_per_generation: int = 0
+    #: Draws an elite's buffer keeps; its score is the lower median (N11).
+    reeval_depth: int = 8
 
     # Controller refinement.  Each step is one extra batched Tier-1 for the
     # whole generation, so a generation costs (1 + steps) evaluations.
@@ -964,6 +970,23 @@ def _batched(pool, phenos, **kwargs):
     return batchroll.evaluate_tier1_batch(phenos, **kwargs)
 
 
+#: The ``_meta`` keys a draw carries: everything that reads the evaluation
+#: (``result``, ``ctrl``) or the scoring of it, so swapping them together
+#: leaves the elite's record the experiment its score came from (the film reads
+#: ``eval_seed``, ``gen``, the media, the basis and the policy; ROADMAP N11).
+#: Left out: pheno-only keys (mass ... worst_check), ``features`` (a cell is
+#: never re-filed), ``novelty`` and the scout's keys, ``island``, the
+#: promotion and Tier-2 keys, and ``draws`` itself.
+SCORED_KEYS = (
+    "air", "water", "land", "mission_fraction", "energy_margin", "tier",
+    "max_depth", "air_gates", "eval_seed", "gen", "scored_with_shared_policy",
+    "mobility_rank", "mobility_cond", "mobility_underdetermined",
+    "mobility_axes", "mobility_basis", "policy", "objectives", "score_parts",
+    "stage", "stage_name", "rungs", "judged", "ladder_measurements",
+    "critic_discount", "critic_features",
+)
+
+
 def _meta_light(pheno, result) -> dict:
     """The subset of ``_meta`` the critic reads, without the expensive parts."""
     seg = result.segments
@@ -1076,7 +1099,7 @@ def _meta(pheno, result, ctrl) -> dict:
 
 
 def _score_candidate(state: SearchState, pheno, result, parent, *,
-                     commit: bool = True) -> dict:
+                     commit: bool = True, at_cell=None) -> dict:
     """Everything that decides a finished candidate's fitness, and where it goes.
 
     ``_place`` calls this with ``commit=True``, which feeds the descriptors, the
@@ -1126,7 +1149,7 @@ def _score_candidate(state: SearchState, pheno, result, parent, *,
             "transition": tmeas,
         })
 
-    cell = state.archive.cell_of(bd)
+    cell = state.archive.cell_of(bd) if at_cell is None else tuple(at_cell)
     # An unvisited cell starts at the stage its parent had earned, not at zero.
     # 58.9% of arch31's children landed in an empty cell and every one of them
     # was asked the easiest question regardless of what its lineage could
@@ -1282,6 +1305,11 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
         )
         meta["scout_features"] = [float(x) for x in sfeat]
 
+    if int(getattr(cfg, "reeval_per_generation", 0)) > 0:
+        meta["draws"] = [{"base": base, "fit": fit, "obj": [float(x) for x in obj],
+                          "at_floor": bool(sc["at_floor"]),
+                          "meta": {k: meta[k] for k in SCORED_KEYS if k in meta}}]
+
     status = state.archive.add(genome, fit, bd, meta, tier=result.tier, objectives=obj, at_floor=sc["at_floor"])
     state.curriculum.update(cell, sr)
 
@@ -1311,6 +1339,71 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
             if k not in ("policy", "features", "critic_features", "scout_features")}}
     )
     return status
+
+
+def _reevaluate(state, elite, pheno, result, ctrl) -> str:
+    """One more draw of an archived representative (ROADMAP N11).  Feeds no window."""
+    gen = int(state.archive.generation)
+    cell = list(elite.cell)
+    if result.tier == 0 or not any(m is elite for m in state.archive.fronts.get(elite.cell) or []):
+        state.telemetry.event({"kind": "reevaluate", "gen": gen, "island": state.island,
+                               "cell": cell, "status": "orphan"})
+        return "orphan"
+    if result.exploit:
+        state.curator.quarantine(elite.descriptor, result.exploit, elite.genome)
+        state.telemetry.event({"kind": "reevaluate", "gen": gen, "island": state.island,
+                               "cell": cell, "status": "exploit", "reason": result.exploit})
+        return "exploit"
+    sc = _score_candidate(state, pheno, result, elite, commit=False, at_cell=elite.cell)
+    meta = _meta(pheno, result, ctrl)
+    # The keys ``_place`` writes beyond ``_meta``, for the scored subset.
+    meta["gen"] = gen
+    meta["scored_with_shared_policy"] = bool(state.shared is not None)
+    meta["objectives"] = {n: round(float(v), 4) for n, v in zip(OBJECTIVE_NAMES, sc["obj"])}
+    meta["stage"] = sc["sr"].stage
+    meta["stage_name"] = (state.curriculum.stage_name(sc["sr"].stage)
+                          if hasattr(state.curriculum, "stage_name")
+                          else STAGES[sc["sr"].stage][0])
+    meta["rungs"] = {d: j["rung"] for d, j in sc["judged"].items()}
+    meta["judged"] = {d: round(j["total"], 3) for d, j in sc["judged"].items()}
+    meta["ladder_measurements"] = {
+        **{d: dict(getattr(s, "measurements", {}) or {}) for d, s in result.segments.items()},
+        "transition": dict(sc["tmeas"]),
+    }
+    meta["critic_discount"] = round(sc["discount"], 3)
+    meta["critic_features"] = [float(x) for x in sc["cfeat"]]
+    meta["score_parts"] = {
+        "island_q": round(sc["isl_q"], 4), "curriculum_q": round(sc["cur_q"], 4),
+        "mission_q": round(sc["mis_q"], 4), "handover": round(sc["w"], 4),
+        "mission_weight": round(sc["mw"], 4), "blend": round(sc["base"], 4),
+        "at_floor": bool(sc["at_floor"]),
+    }
+    draw = {"base": sc["base"], "fit": sc["fit"], "obj": [float(x) for x in sc["obj"]],
+            "at_floor": bool(sc["at_floor"]), "meta": {k: meta[k] for k in SCORED_KEYS if k in meta}}
+    # The buffer's first entry is the elite's own draw.  ``record_draw`` would
+    # synthesise it with an empty ``meta``, and if it later became the median its
+    # eval_seed, gen, media and policy would not come back; so seed it here with
+    # the scored keys the elite carries now (an archive restored from before N11,
+    # or a seed elite, has no buffer yet).
+    if not elite.meta.get("draws"):
+        elite.meta["draws"] = [{
+            "base": float((elite.meta.get("score_parts") or {}).get("blend", elite.fitness)),
+            "fit": float(elite.fitness),
+            "obj": [float(x) for x in elite.objectives],
+            "at_floor": bool(elite.at_floor),
+            "meta": {k: elite.meta[k] for k in SCORED_KEYS if k in elite.meta}}]
+    first = (elite.meta["draws"][0].get("meta") or {}).get("eval_seed", elite.meta.get("eval_seed"))
+    before = float(elite.fitness)
+    out = state.archive.record_draw(elite, draw)
+    state.telemetry.event({"kind": "reevaluate", "gen": gen, "island": state.island,
+                           "cell": cell, "status": "recorded", "draws": out["n"],
+                           "fitness_before": round(before, 4),
+                           "fitness_after": round(float(elite.fitness), 4),
+                           "eval_seed": meta.get("eval_seed"), "first_eval_seed": first,
+                           "median_eval_seed": elite.meta.get("eval_seed"),
+                           "removed": len(out["removed"]),
+                           **{m: meta.get(m) for m in ("air", "water", "land")}})
+    return "recorded"
 
 
 # --------------------------------------------------------------------------
@@ -1661,6 +1754,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         curator = state.curator
         for a in archipelago.archives.values():
             a.generation = gen
+            a.draw_depth = int(cfg.reeval_depth)
         regime = curator.update_regime()
 
         # The generation's candidates are built first and evaluated together, so
@@ -1677,7 +1771,16 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         # does not care where the phase sits.
         built = []
         counter = state.evaluated
-        for _ in range(cfg.batch):
+        # N11: some slots re-run archived representatives instead of breeding.
+        # Nothing is drawn from ``rng`` when the feature is off, so a run
+        # without it reproduces bit for bit.
+        picks = []
+        if int(cfg.reeval_per_generation) > 0:
+            pool_re = [e for c, e in archive.cells.items() if c not in archive.tainted]
+            n_re = min(int(cfg.reeval_per_generation), len(pool_re), max(int(cfg.batch) - 1, 0))
+            if n_re:
+                picks = [pool_re[i] for i in rng.choice(len(pool_re), size=n_re, replace=False)]
+        for _ in range(cfg.batch - len(picks)):
             # Immigrants and hybrids are evaluated before anything home-grown,
             # because the whole point of moving them is to find out whether they
             # are worth anything under the receiving island's objective.
@@ -1708,6 +1811,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             counter += 1
             built.append((child, inherited, identify, operators, parent,
                           int(rng.integers(1 << 30))))
+        for elite in picks:
+            built.append((elite.genome.copy(), elite.meta.get("policy"), True, ["reeval"], elite, int(rng.integers(1 << 30))))
 
         stage_log: dict = {}
         if state.pool is not None:
@@ -1731,7 +1836,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             telemetry.event({"kind": "error", "gen": gen, "island": state.island,
                              "error": f"{type(exc).__name__}: {exc}"})
             for _c, _i, _id, operators, _p, _s in built:
-                curator.credit(operators, "rejected", 0.0)
+                if operators != ["reeval"]:
+                    curator.credit(operators, "rejected", 0.0)
             evaluated = []
 
         cost.lap("evaluate")
@@ -1741,7 +1847,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         for j, ((child, _inh, _idf, operators, parent, _sd), got) in enumerate(
                 zip(built, evaluated)):
             if got is None:
-                curator.credit(operators, "rejected", 0.0)
+                if operators != ["reeval"]:
+                    curator.credit(operators, "rejected", 0.0)
                 continue
             pheno, result, ctrl = got
             if ctrl is not None:
@@ -1750,6 +1857,9 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             curator.evaluations += 1
             gen_diverged += result.diverged_rollouts
             gen_rollouts += result.n_rollouts
+            if operators == ["reeval"]:
+                _reevaluate(state, parent, pheno, result, ctrl)
+                continue
             # AK: would this design have landed differently without the
             # refinement steps?  Only a design a step changed can differ, and
             # both answers are asked of the archive as it stands now.

@@ -303,6 +303,33 @@ MUTATIONS: tuple = (
         defect="the verification round takes the top three by fitness, so two "
                "verified elites at the top leave it one design to try",
         suites=("test_search::test_verification_offers_designs_not_yet_verified",), item="blend wiring"),
+    Mutation(
+        id="reeval-reuses-the-stored-seed",
+        path="dytiscidae/evolution/loop.py",
+        find='["reeval"], elite, int(rng.integers(1 << 30))))',
+        replace='["reeval"], elite, int(elite.meta.get("eval_seed") or 0)))',
+        defect="a re-evaluation runs at the seed that scored the elite, so it "
+               "measures the same draw again and the median of its draws is one draw",
+        suites=("test_search::test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu",
+                "test_search::test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median"), item="re-evaluation"),
+    Mutation(
+        id="reeval-commits-to-the-window",
+        path="dytiscidae/evolution/loop.py",
+        find="commit=False, at_cell=elite.cell)",
+        replace="commit=True, at_cell=elite.cell)",
+        defect="a re-evaluation feeds the curriculum window, the judge and the "
+               "descriptor buffer, so one design is counted once per re-run",
+        suites=("test_search::test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu",
+                "test_search::test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median"), item="re-evaluation"),
+    Mutation(
+        id="reeval-records-nothing",
+        path="dytiscidae/evolution/loop.py",
+        find="    out = state.archive.record_draw(elite, draw)\n",
+        replace='    out = {"n": 1, "median_base": 0.0, "removed": []}\n',
+        defect="a re-evaluation is run and logged but never reaches the elite's "
+               "buffer, so its score stays the single draw it began with",
+        suites=("test_search::test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu",
+                "test_search::test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median"), item="re-evaluation"),
 
     # --- the learner's arithmetic -----------------------------------------
     Mutation(
