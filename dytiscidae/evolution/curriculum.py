@@ -286,6 +286,20 @@ def stage_score(stage: int, result, transitions=None, *,
     return float(getattr(result, "mission_fraction", 0.0))
 
 
+#: A raw score at or below this is zero (ROADMAP 2026-10-10 N5).
+ZERO_SCORE = 1e-9
+
+
+def _standing(window, x: float, min_n: int) -> float:
+    """``x``'s standing in ``window``: the share strictly below it; 0 at zero."""
+    x = float(x)
+    if x <= ZERO_SCORE:
+        return 0.0
+    if len(window) < min_n:
+        return 0.5
+    return float(np.mean(np.asarray(window, float) < x))
+
+
 @dataclass(eq=False)
 class Curriculum:
     """Tracks what each lineage is ready to be asked.
@@ -468,14 +482,15 @@ class Curriculum:
         populations from different times.  The window is long enough that this
         drifts slowly, and the judge already ratchets population quantiles for
         the same reason, but it is a change in what a stored fitness means.
+
+        Since 2026-10-10 (ROADMAP N2) the rank is the share strictly below the
+        score and a raw score of zero stands at 0 at any window size: ``<=``
+        gave a design at the window's zero mass (0.46-0.99 of it) that mass as
+        its standing, so doing nothing scored 0.46-0.99.
         """
         w = self._recent.get(int(stage), [])
-        if len(w) < self.min_rank_samples:
-            return 0.5, 0.5
-        isl = np.array([a for a, _, _ in w], float)
-        cur = np.array([b for _, b, _ in w], float)
-        return (float(np.mean(isl <= island_score)),
-                float(np.mean(cur <= curriculum_score)))
+        return (_standing([a for a, _, _ in w], island_score, self.min_rank_samples),
+                _standing([b for _, b, _ in w], curriculum_score, self.min_rank_samples))
 
     def mission_standing(self, mission: float, stage: int = 0) -> float:
         """``mission_fraction`` as a population quantile, on the same scale.
@@ -495,12 +510,11 @@ class Curriculum:
         energy_fraction * transition_fraction`` it carries the weakest medium,
         the battery and the crossings in the proportions the task itself
         defines, rather than in weights someone typed.
+
+        Ranked like ``standing`` (strictly below, zero stands at 0; ROADMAP N2).
         """
         w = self._recent.get(int(stage), [])
-        if len(w) < self.min_rank_samples:
-            return 0.5
-        m = np.array([c for _, _, c in w], float)
-        return float(np.mean(m <= float(mission)))
+        return _standing([c for _, _, c in w], mission, self.min_rank_samples)
 
     def evaluate(self, cell, result, transitions=None, *,
                  stage: int | None = None) -> StageResult:

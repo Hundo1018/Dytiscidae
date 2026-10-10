@@ -2638,6 +2638,46 @@ def test_the_island_objective_takes_its_weight_back() -> None:
           "report() carries the weight actually applied, not a field nothing writes")
 
 
+def test_a_score_of_zero_stands_at_zero() -> None:
+    """A raw score of zero ranks 0, and ties rank at the share strictly below.
+
+    ``<=`` gave a design the whole zero mass of its window as its standing:
+    ROADMAP 2026-10-10 N2 measured that mass at 0.46-0.61 in water and land
+    and 0.97 in air, so a machine that did nothing stood at 0.46-0.97.
+    """
+    print("\ncurriculum: a score of zero stands at zero")
+    from dytiscidae.evolution.curriculum import Curriculum
+
+    c = Curriculum()
+    for _ in range(230):
+        c.observe_blend(0.0, 0.0, 0)
+    for k in range(1, 27):
+        c.observe_blend(0.001 * k, 0.002 * k, 0)
+    check("zero stands at 0 in a window that is 90% zero",
+          c.standing(0.0, 0.0, 0) == (0.0, 0.0)
+          and c.mission_standing(0.0, 0) == 0.0,
+          f"standing(0,0)={c.standing(0.0, 0.0, 0)}, "
+          f"mission_standing(0)={c.mission_standing(0.0, 0)}")
+
+    young = Curriculum()
+    for _ in range(5):
+        young.observe_blend(0.1, 0.1, 3)
+    check("zero stands at 0 in a young window; a non-zero score gets 0.5",
+          young.standing(0.0, 0.3, 3) == (0.0, 0.5),
+          f"standing(0.0, 0.3, 3)={young.standing(0.0, 0.3, 3)}")
+
+    ties = Curriculum()
+    for _ in range(32):
+        ties.observe_blend(0.0, 0.0, 1)
+    for _ in range(16):
+        ties.observe_blend(0.02, 0.02, 1)
+    for _ in range(16):
+        ties.observe_blend(0.5, 0.5, 1)
+    check("a tie takes the share strictly below it",
+          ties.standing(0.02, 0.02, 1)[0] == 0.5,
+          f"standing(0.02, 0.02, 1)[0]={ties.standing(0.02, 0.02, 1)[0]} (want 0.5)")
+
+
 def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> None:
     """A design that is good at one thing must be distinguishable from a design
     that is good at nothing.
@@ -6151,6 +6191,7 @@ def main() -> int:
         test_an_islands_best_is_judged_on_its_own_domains,
         test_one_islands_archive_is_read_alone_not_through_the_merge,
         test_the_island_objective_takes_its_weight_back,
+        test_a_score_of_zero_stands_at_zero,
         test_curriculum_and_islands_give_gradient_where_the_mission_gives_none,
         test_scout_finds_dark_horses_and_may_only_protect,
         test_scout_skill_separates_regression_to_the_mean_from_foresight,
