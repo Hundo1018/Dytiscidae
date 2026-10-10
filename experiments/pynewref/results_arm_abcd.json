@@ -1,0 +1,110 @@
+[
+ {
+  "arm": "a",
+  "cenv_after_import": {
+   "PYTHONEXECUTABLE": "/home/hundo/.pyenv/shims/python3",
+   "MOJO_PYTHON_LIBRARY": "/home/hundo/micromamba/lib/libpython3.9.so.1.0"
+  },
+  "rc": 0,
+  "ok": true,
+  "err": "",
+  "path_mode": "pyenv",
+  "wall_s": 0.6,
+  "abort_py_newref": false,
+  "stderr_tail": ""
+ },
+ {
+  "arm": "b",
+  "cenv_after_import": {
+   "PYTHONEXECUTABLE": "/home/hundo/.pyenv/shims/python3",
+   "MOJO_PYTHON_LIBRARY": "/home/hundo/micromamba/lib/libpython3.9.so.1.0"
+  },
+  "rc": 0,
+  "ok": true,
+  "err": "",
+  "path_mode": "pyenv",
+  "wall_s": 0.5,
+  "abort_py_newref": false,
+  "stderr_tail": ""
+ },
+ {
+  "arm": "c",
+  "cenv_after_import": {
+   "PYTHONEXECUTABLE": "/home/hundo/.pyenv/shims/python3",
+   "MOJO_PYTHON_LIBRARY": "/home/hundo/micromamba/lib/libpython3.9.so.1.0"
+  },
+  "rc": 0,
+  "ok": true,
+  "path_mode": "pyenv",
+  "wall_s": 0.5,
+  "abort_py_newref": false,
+  "stderr_tail": ""
+ },
+ {
+  "arm": "d",
+  "cenv_after_import": {
+   "PYTHONEXECUTABLE": "/home/hundo/.pyenv/shims/python3",
+   "MOJO_PYTHON_LIBRARY": "/home/hundo/micromamba/lib/libpython3.9.so.1.0"
+  },
+  "rc": 0,
+  "ok": true,
+  "path_mode": "pyenv",
+  "wall_s": 0.5,
+  "abort_py_newref": false,
+  "stderr_tail": ""
+ },
+ {
+  "arm": "a",
+  "cenv_after_import": {
+   "PYTHONEXECUTABLE": "/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/bin/python3",
+   "MOJO_PYTHON_LIBRARY": "/usr/lib/x86_64-linux-gnu/libpython3.12.so.1.0"
+  },
+  "rc": 0,
+  "ok": true,
+  "err": "",
+  "path_mode": "venv",
+  "wall_s": 0.4,
+  "abort_py_newref": false,
+  "stderr_tail": ""
+ },
+ {
+  "arm": "b",
+  "cenv_after_import": {
+   "PYTHONEXECUTABLE": "/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/bin/python3",
+   "MOJO_PYTHON_LIBRARY": "/usr/lib/x86_64-linux-gnu/libpython3.12.so.1.0"
+  },
+  "rc": 0,
+  "ok": true,
+  "err": "",
+  "path_mode": "venv",
+  "wall_s": 0.5,
+  "abort_py_newref": false,
+  "stderr_tail": ""
+ },
+ {
+  "arm": "c",
+  "cenv_after_import": {
+   "PYTHONEXECUTABLE": "/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/bin/python3",
+   "MOJO_PYTHON_LIBRARY": "/usr/lib/x86_64-linux-gnu/libpython3.12.so.1.0"
+  },
+  "rc": 0,
+  "ok": true,
+  "path_mode": "venv",
+  "wall_s": 0.4,
+  "abort_py_newref": false,
+  "stderr_tail": ""
+ },
+ {
+  "arm": "d",
+  "cenv_after_import": {
+   "PYTHONEXECUTABLE": "/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/bin/python3",
+   "MOJO_PYTHON_LIBRARY": "/usr/lib/x86_64-linux-gnu/libpython3.12.so.1.0"
+  },
+  "rc": 0,
+  "ok": true,
+  "path_mode": "venv",
+  "wall_s": 0.4,
+  "abort_py_newref": false,
+  "stderr_tail": ""
+ }
+]

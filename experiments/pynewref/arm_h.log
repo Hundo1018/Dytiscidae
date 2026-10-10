@@ -1,0 +1,8 @@
+=== h1_pyenv_fix_unsetenv_PYTHONEXECUTABLE
+PARENT usable (True, '')
+WORKER before import {"PYTHONEXECUTABLE": null, "MOJO_PYTHON_LIBRARY": "/home/hundo/micromamba/lib/libpython3.9.so.1.0", } exe /home/hundo/Projects/Dytiscidae/dytiscidae/.venv/bin/python
+WORKER usable (True, '')
+=== h2_pyenv_fix_putenv_PYTHONEXECUTABLE
+PARENT usable (True, '')
+WORKER before import {"PYTHONEXECUTABLE": "/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/bin/python", "MOJO_PYTHON_LIBRARY": "/home/hundo/micromamba/lib/libpython3.9.so.1.0", } exe /home/hundo/Projects/Dytiscidae/dytiscidae/.venv/bin/python
+WORKER usable (True, '')
