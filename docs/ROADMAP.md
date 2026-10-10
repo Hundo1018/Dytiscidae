@@ -3406,6 +3406,21 @@ record (`land.command_reversal` 0 recorded, 0.52 on film); with every elite at
 are now scored with the shared policy like every child (mutation
 `seeds-scored-without-the-shared-policy`). Every archive before this held its
 seed elites' scores from a different controller than the one the film replays.
+Two measurements the gate forced, both recorded here because they bear on
+arch51's first generations: (a) **every seed plan scores exactly 0 in air,
+water and land at its draw** under the current scoring, on the batched path
+(2 plans at 0.5 / 1 / 2 / 4 s on the generalist island; all 8 plans at 8 s on
+the air, water and generalist islands; `runs/promo_floor_trial*.log`), so
+arch51 starts with nothing above the floor and nothing promotable until a
+child clears 0.012 (`test_the_seeds_include_something_that_flies` reads the
+single path and the gannet's glide, which the paired turn has not yet
+touched); (b) in those trials the actor pool's workers failed to construct the
+GPU fluid extension (`symbol not found: Py_NewRef`) and every batch was re-run
+in the parent, which the pool reports and survives but which turns 2 workers
+into 0; the gate chain's own tests under `systemd-run` and this shell both
+showed it in the promotion configuration and not in the film test's. Not
+diagnosed; a read item for the next session (which configuration, which
+process, since when).
 Two consequences to read in arch51: an island whose every elite is at the
 floor promotes nothing to Tier-2 (and gives the critic no labels) until one
 clears it; and 4 of 16 evaluations per generation are re-evaluations, so
