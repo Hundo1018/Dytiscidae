@@ -224,8 +224,17 @@ then films (`dytiscidae/viz/film.py`) into `runs/<run>/media/`, embedded in
 - **Comparability boundaries.** Air scores and `mission_fraction` are not
   comparable across arch33→34, arch34→35, arch36→37 (air ladder 7 → 11 rungs),
   2026-09-20, and arch43 (corrected physics: nothing before it is comparable on
-  air or water forces). The ROADMAP lists each boundary. Write "not comparable";
-  do not quote a shrunken difference.
+  air or water forces). From 2026-10-10 (ARCH51_SPEC N5, arch51 onward) the
+  stored `fitness`, `objectives[0]` and everything built on them (`qd_score`,
+  parent weight, migrants, promotion and prune order, `best`) are not
+  comparable with any earlier run: a design competent in none of its island's
+  media (< 0.012) stands at 0 where it stood at its window's zero share
+  (0.46-0.99), ranking is among designs above that floor, `mission_weight` is
+  0.0 (was 0.30), and Tier-2 no longer caps `fitness`. With
+  `--reeval-per-generation > 0` (N11) an elite's recorded scores are those of
+  its median draw, not one draw. Per-medium competences, `mission_fraction`
+  and coverage are unchanged by both. The ROADMAP lists each boundary. Write
+  "not comparable"; do not quote a shrunken difference.
 - `sink_rate` is the difference of two endpoints of the late airborne window, so
   it reads zero for a machine that drops and comes back. `station_keeping` sees
   the path between; where they disagree, trust `station_keeping` (arch37: 10x

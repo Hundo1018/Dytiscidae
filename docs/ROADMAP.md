@@ -3368,6 +3368,21 @@ k-dependence is demoted to "not shown", and N11 keeps its justification from
 the literature, not from N3. What would move T1 back: N1 finding the still
 twin dominated in >= 70% of cells.
 
+**N5 and N11 are built** (branch `failure-theory-1010`, lanes L1-L11 of
+`docs/ARCH51_SPEC.md`, each with its test and mutations caught; CPU gates
+green on the merged tree, GPU gates below). Comparability boundary, from the
+commit that merges this branch: stored `fitness`, `objectives[0]` and
+everything built on them (`qd_score`, parent weight, migrants, promotion and
+prune order, `best`) are not comparable with any earlier run; a design below
+the competence floor stands at 0, ranking is among designs above the floor,
+`mission_weight` is 0.0, Tier-2 flags instead of capping; with
+`--reeval-per-generation > 0` an elite's recorded scores are its median
+draw's. Per-medium competences, `mission_fraction` and coverage are unchanged.
+Two consequences to read in arch51: an island whose every elite is at the
+floor promotes nothing to Tier-2 (and gives the critic no labels) until one
+clears it; and 4 of 16 evaluations per generation are re-evaluations, so
+offspring per generation fall to 12.
+
 **Order.** N2, N3, N4, N10 ran first (above); N1 and N6 are the two probes that decide the shape of the build; N7 is
 a derivation for the user's decision; N5 is the first build and goes to an
 implementation plan (`docs/ARCH51_SPEC.md`), written by a stronger model from
