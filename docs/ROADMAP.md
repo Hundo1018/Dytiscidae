@@ -23,6 +23,18 @@ Extract-ME re-evaluation, N10's telemetry, the paired air score (the user,
 mutations caught. arch51 = N5 + N11 + paired air, the user's decision; its
 notes are `runs/arch51_notes.md`.
 
+**2026-10-10, later still: the order of the loop; see
+[what can share a launch](#2026-10-10-later-still--the-order-of-the-loop-what-can-share-a-launch-and-what-cannot).**
+Rollouts are 98.3% of arch50's wall and the search's decisions 1.7%, so order
+matters only through how rollouts are grouped. On today's CPU-per-body path
+reordering is worth ~17%, all of it redundancy: reevals re-identify a stored
+basis (and so draw a new basis, not the experiment Q5 measured), promotion
+refinement is six serial launches of three worlds, main and re-score are two
+trips for one batch (P1-P3). Batching islands or generations buys nothing
+there (P4, a null). On the device a launch is dispatch-bound below ~200
+worlds, so the all-island epoch with K draws per body is the prerequisite for
+T8, not an optimisation (T11, P5-P6).
+
 **2026-10-09: answers to the sweep's questions, and where the work stopped;
 see [state when stopped](#state-when-stopped-2026-10-09).** Air on a commanded
 difference (answer 1) is built on a branch with four `test_physics` checks
@@ -3954,6 +3966,178 @@ iteration (fixed ~50 us plus the two ops). *Falsified* above 500 us, or if a
 custom op cannot be placed inside the loop. If Q8 holds and Q2 says A is
 > 3x today's wall, B is built on MAX graph + Mojo custom ops rather than on
 hand-launched kernels.
+
+## 2026-10-10, later still — the order of the loop: what can share a launch, and what cannot
+
+The user's question (10-10): can the loop be reordered so that like work is
+batched (across phases, across islands, across generations), and is there a
+better arrangement? Written before anything is built or timed, from arch50's
+telemetry and the code; the literature is in §4. The on-device section above
+(T7-T9) settles *where* a rollout runs; this one settles *what goes into one
+launch*, and it turns out to be the prerequisite for T8's prize rather than an
+optimisation of today's loop.
+
+### 0. The question and the decision
+
+Does the order of the loop cost wall, and where? Two different answers are
+imaginable: that today's loop leaves a large factor on the table by dispatching
+small batches in many phases (then a scheduler change pays now), or that
+today's wall is per-body CPU work that no batching shortens (then reordering
+pays only once rollouts are on the device, and must be built *as* the device
+path's scheduler). The decision hanging on it: whether the scheduler change is
+built before, with, or after Q2's verdict on option A/B.
+
+### 1. What one generation does now (arch50, 122 generations, medians; `cost` in `generations.jsonl`, `promote` events)
+
+| phase | median s | share of the 168 s median generation | what it is |
+|---|---|---|---|
+| `evaluate.main` | 105.1 | 63% | 16 bodies (20 with N11's reevals) in 8 shards of 2 over 4 workers; per generation 460,800 identification steps, 160,000 segment steps, 96,000 transition steps; the policy is stochastic and fills the PPO buffer (25,473 transitions, 144 trajectories per update) |
+| `evaluate.rescore` | 43.6 | 26% | the same bodies at the same seeds with the policy at its mean; the score the archive places |
+| `tier2` (every 5th generation; 26 rounds) | 166.7 per round, 33 amortised | 20% of an amortised 202 s | per round: promotion refinement 105.0 s (six serial (1+1)-ES steps on up to three designs, each step one pool trip of <= 3 worlds), Tier-1.5 leg 15.2 s, Tier-2 mission 33.2 s (single path, in the pool since AL) |
+| `audit` (every 30th; 8 rounds) | 63.5 per round, 2 amortised | 1% | held-out re-runs of the suspicious |
+| `ppo` | 1.4 | 0.8% | 130 gradient steps on the buffer |
+| `place`, `judge_scout_critic`, `refit`, `migrate`, `report`, `build` | 0.02-0.05 each | < 0.1% | the host-side logic of the search |
+
+Rollouts are 98.3% of the summed wall (evaluate + tier2 + audit over the
+total). Everything the search *decides* costs 1.7%. So the loop's order can
+matter only through how rollouts are grouped, never through overlapping
+decisions with rollouts. Identification is 64% of the main phase's simulator
+steps and was measured at 57% of its wall (M6). In the pool each worker steps
+its 2 bodies in lockstep on the CPU (MuJoCo per body, the numpy/Mojo fluid per
+shard); the GPU sees a batch of 2, and `batchroll`'s own sweep found 4 shards
+of 4 faster than 1 shard of 16 by 2.3x because the per-body CPU work is what
+the wall is.
+
+Three places today's order repeats work or launches small:
+
+- **Reevals re-identify a body that already carries its basis.** N11's reevals
+  are built with `identify=True` (`loop.py`, the `["reeval"]` entry) while
+  promotion refinement reads `mobility_basis` from the elite's record and
+  identifies only elites without one (`_refined_controllers_for`). A reeval
+  therefore pays 28,800 identification steps per body (4 of 20 bodies, 20% of
+  the generation's identification) and, worse, its "fresh draw" perturbs the
+  *basis* as well as the task: the reeval is not the experiment Q5's K curve
+  measured, whose rows (`experiments/no_model_gate`, `identify_axes=False`,
+  stored bases) vary the task only. M6's objection to caching bases (bases
+  depend on the gait's base and every child carries an operator) is about
+  children; an unchanged genome has an unchanged basis.
+- **Promotion refinement is six serial launches of three worlds.** A (1+1)-ES
+  is sequential by construction; the 105 s per round is six pool trips each
+  stepping <= 3 bodies for a full segment. The same budget as one trip of 18
+  worlds (three designs x six perturbations, a (1+6)-ES: accept the best
+  perturbation, else keep) finishes in one segment's wall.
+- **Main and re-score are two trips for the same bodies at the same seeds.**
+  `MERGE_FIRST_REFINE` already proves the move: a machine's score does not
+  depend on what shares its batch (`test_search`), so one trip of 40 worlds
+  returns exactly what two of 20 did. The saving is one pool ramp and wider
+  shards; the per-body work is unchanged.
+
+### 2. The theory
+
+**T10 (today's architecture: order buys little, redundancy buys some).** With
+rollouts stepped per body on the CPU, the wall of a pool trip is max over
+workers of the sum of their bodies' per-step cost x steps; worlds are not free,
+so merging islands or generations into one trip only makes the trip longer in
+proportion. Reordering can pay only by (a) not repeating work (identification
+of a body whose basis is stored), (b) turning serial launches into one (the
+(1+6)-ES), (c) saving ramps (main + re-score in one trip). The sum of the three
+is bounded by (105 x 20/16) x 0.57 x 4/20 + (105 - ~20)/5 + a ramp: roughly
+15 + 17 + 5 = 37 s of a ~215 s amortised generation at 20 built, ~17%. Nothing in the order of islands
+or generations can add to that today.
+
+**T11 (on the device: the order is the prerequisite).** A fused step costs
+`c0 + c1 W` for W worlds (N9: c0 ~ 240 us, c1 ~ 1.2 us; Q2 re-measures both on
+this project's bodies). Below W* = c0/c1 ~ 200 worlds a launch is
+dispatch-bound and a world costs almost nothing; today's loop offers 16-20
+worlds per launch and would leave the device ~90% idle. T8's prize (one launch
+for all bodies x draws) therefore requires a loop that *has* hundreds to
+thousands of worlds ready at once: all eight islands bred in one epoch (8 x 16
+= 128 bodies), K draws per body (Q5: 30-100), the reevals, the promotion
+perturbations, the Tier-2 mission and the audit's held-out seeds as further
+worlds of the same launch, horizons masked. The epoch, not the generation,
+becomes the unit, and the scheduler is part of option A or B, not a later
+optimisation of it.
+
+**T12 (what the epoch costs the search).** Islands are independent except for
+migration (every 60 generations, 2 events in arch50) and the shared policy, so
+breeding all eight per epoch changes the island order from round-robin to
+simultaneous and nothing else in the archives. What changes is the batch per
+selection step (128 vs 16) and PPO's cadence (8x the transitions per update,
+1/8 the updates per evaluation). MAP-Elites' efficiency per evaluation is
+reported to be nearly insensitive to batch size over several orders of
+magnitude (§4), and PPO on thousands of environments with large batches is the
+standard regime on accelerators (§4); the policy here has learned little under
+any cadence (2026-10-10 §1, M4), so its cadence is not where the risk is.
+Asynchronous or steady-state schemes (place each world as it finishes; breed
+the next epoch before this one is placed) are *not* indicated: all worlds in a
+launch finish together, the host work between launches is 1.7% of the wall,
+and asynchrony carries a known bias toward fast-evaluating individuals (§4)
+that a synchronous epoch does not.
+
+### 3. Predictions (frozen 2026-10-10; outcome words per REPORT_FORMAT)
+
+**P1 (stored bases for reevals; build cost hours).** With reevals built
+`identify=False` and their controllers carrying `mobility_basis` from the
+record: `steps.main.identify` falls from 576,000 (20 x 28,800; arch50's 460,800 is
+16 bodies without reevals) to 460,800 per generation at 20 built (exact: 16 x
+28,800); `evaluate.main` falls by 8-14% (M6's 57% x 4/20). The reeval's draw variance falls, because the basis no longer moves:
+*prediction* R (draw var / design var) on reevals of arch49 elites at stored
+bases is below the re-identified value by >= 15% in every medium. *Falsified*
+if the step count does not fall exactly, or if R at stored bases is not lower.
+Comparability: a reeval's recorded score becomes a task draw at a fixed basis,
+which is what the film and Q5 already assume; nothing else moves.
+
+**P2 ((1+6)-ES at promotion; hours).** One pool trip of <= 18 worlds replaces
+six of <= 3: `refine_wall` median 105.0 s -> <= 30 s; the round's `tier2`
+median 166.7 -> <= 95 s; amortised -14 s per generation (-7%). The acceptance
+rate of a refined controller over its parent (promotions whose refined
+`tier1_fraction` beats the unrefined, from the `promote` events) within +-10
+points of arch50's. *Falsified* if `refine_wall` stays above 50 s, or the
+acceptance rate falls by more than 10 points.
+
+**P3 (main + re-score in one trip; hours).** Generation wall -3 to -8% at
+equal results (bit-identical scores, as `test_search` asserts for batch
+independence). *Falsified* if the merged trip of 40 worlds is slower than two
+of 20 (memory per worker) or any score changes.
+
+**P4 (the all-island epoch in today's architecture: a null).** Evaluating 128
+bodies in one trip instead of 16 in eight changes the wall per evaluation by
+less than +-10%. Written so that nobody builds the epoch for speed on the CPU
+path; it is built only as T11's scheduler. *Falsified* either way by a change
+beyond 10%, which would mean the pool's cost is not per body.
+
+**P5 (the epoch on the device; after Q2).** From Q2's measured c0 and c1 the
+wall of one epoch of W = 128 x K worlds is `steps x (c0 + c1 W)`, 16,000 steps
+per 8 s segment pair plus transitions; the table at K = 1, 10, 30, 100 is
+filled in from Q2 and the rule is: the epoch is built when its predicted wall
+at K = 30 is <= 8 x today's generation (<= 1,600 s), which is the same amount
+of search per wall at 30x the draws. *Falsified* if Q2's c1 is above 10 us per
+world (then W* < 25 and the device is not dispatch-bound at today's widths).
+
+**P6 (search efficiency of the epoch; the first on-device arm).** At equal
+evaluations, the epoch arm's coverage and summed competence per island are
+within 10% of a round-robin arm with the same scoring; held-out retention and
+Tier-1->Tier-2 Spearman are not lower. PPO's `return_by_tag` slopes per
+transition are indistinguishable from arch51's form. *Falsified* if coverage
+per evaluation is lower by more than 10% in >= 3 islands.
+
+### 4. Literature
+
+(filled in below when the research agent reports; each claim with its
+citation and number, UNVERIFIED where it could not be confirmed)
+
+### 5. What is built, and in what order (cost, then speed, then learning)
+
+1. P1, now, with arch51's form (it makes N11's reeval the experiment Q5
+   measured; a correctness fix as much as a saving). 2. P2 and P3, now
+   (hours each; -10 to -15% wall on today's path, scores unchanged). 3. P4 is
+   not built; it is a prediction that stops a mistake. 4. The epoch scheduler
+   (T11) is built with option A or B after Q2, under P5's rule, and read by P6
+   in the first on-device arm. Comparability: P1-P3 change no score's
+   definition; the epoch changes the batch and PPO's cadence and is a boundary
+   on `qd_score`-per-generation (one epoch = eight generations of evaluations),
+   not on any per-medium competence.
+
 
 ## 2026-10-08, later — the work-list sweep
 
