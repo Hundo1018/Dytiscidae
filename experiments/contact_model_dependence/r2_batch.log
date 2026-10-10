@@ -1,0 +1,350 @@
+[1/35] elite 18 142s
+[2/35] elite 23 285s
+[3/35] elite 25 424s
+
+
+
+
+[4/35] elite 32 569s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[5/35] elite 34 706s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/home/hundo/Projects/Dytiscidae/impl-r2/dytiscidae/physics/fluid.py:810: RuntimeWarning: invalid value encountered in multiply
+  fb *= limit / total
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[6/35] elite 38 849s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/home/hundo/Projects/Dytiscidae/impl-r2/dytiscidae/physics/fluid.py:773: RuntimeWarning: overflow encountered in multiply
+  fa = np.sqrt(lift * lift + drag * drag)
+/home/hundo/Projects/Dytiscidae/impl-r2/dytiscidae/physics/fluid.py:699: RuntimeWarning: invalid value encountered in matmul
+  agg = S @ np.concatenate([b[:, None], b[:, None] * r, b[:, None] * m9], axis=1)
+
+
+[7/35] elite 49 987s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[8/35] elite 54 1130s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[9/35] elite 56 1268s
+[10/35] elite 72 1403s
+
+
+[11/35] elite 73 1535s
+[12/35] elite 75 1686s
+[13/35] elite 76 1830s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[14/35] elite 80 1972s
+[15/35] elite 83 2124s
+[16/35] elite 86 2261s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[17/35] elite 89 2409s
+[18/35] elite 97 2554s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[19/35] elite 104 2687s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[20/35] elite 107 2843s
+[21/35] elite 111 2988s
+
+
+[22/35] elite 119 3128s
+[23/35] elite 192 3273s
+[24/35] elite 194 3405s
+[25/35] elite 218 3531s
+
+
+
+
+
+
+[26/35] elite 1 3687s
+[27/35] elite 6 3847s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[28/35] elite 14 3987s
+
+
+
+
+
+
+
+
+
+[29/35] elite 22 4113s
+[30/35] elite 29 4251s
+
+
+
+
+[31/35] elite 35 4374s
+[32/35] elite 36 4514s
+[33/35] elite 39 4674s
+
+
+[34/35] elite 41 4832s
+[35/35] elite 51 4971s
