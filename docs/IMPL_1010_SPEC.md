@@ -887,14 +887,24 @@ R1 (§2) and D1 (§2) are reads of the same kind and use the same reporting shap
    flag per machine, a basis hand-off inside the call, twins kept in one
    shard; opus), and A6 retires the two trips anyway: K_m mean draws and K_s
    sampled draws run in one launch. D-P3 is withdrawn. A6 depends on P1 only.
-6. **Set `MOJO_PYTHON_LIBRARY` before the first import**, to the running
-   interpreter's own libpython (`sysconfig` `LIBDIR`/`LDLIBRARY`), in the one
-   module that imports the extension, without overriding a value the user set.
-   This fixes the parent at the source and every child inherits a correct
-   value. Scrubbing the children's environment would leave the parent's value
-   wrong for whatever it spawns next. This applies only if D1 confirms F10.
-   The fix lane carries a test that a spawned child constructs the extension,
-   and a mutation that deletes the assignment.
+6. **Corrected by D1 (2026-10-10, `D1_result.md`): fix `PYTHONEXECUTABLE`,
+   not `MOJO_PYTHON_LIBRARY`.** The first answer set the library and would
+   not have worked (D1 arm f3). The kernel import C-setenvs
+   `PYTHONEXECUTABLE` to whatever `python` is first on PATH, which is a pyenv
+   shim of Python 3.9 under the default PATH and under `systemd-run --user`'s
+   default environment. A spawn worker inherits it, so its `sys.executable`
+   is Python 3.9. Its `usable()` subprocess then aborts on `Py_NewRef`, which
+   exists only from 3.10. The library is irrelevant (arm f5), and Mojo
+   overwrites a preset value (f4), so the fix comes after the first import
+   and before any spawn: `os.environ["PYTHONEXECUTABLE"] = sys.executable` in
+   the one module that imports the extension (D1 arm h2, worker `usable()`
+   True). Lane F1 applies it. Its test checks that a spawned worker's
+   `usable()` is True and that its `sys.executable` is the parent's, and a
+   mutation deletes the assignment. The gate is D1's re-check cell. D1 also
+   confirmed that the seed plans score exactly 0 under the fix, so ROADMAP's
+   measurement (a) stands. Still open: arch50's log has no `Py_NewRef` line
+   although it was launched the same way; its launch environment was not
+   recorded.
 
 ## §E. Non-goals
 
