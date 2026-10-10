@@ -248,6 +248,13 @@ def test_the_plan_translates_into_a_search_config() -> None:
     check("mission settings are routed to the spec, not the config",
           not hasattr(cfg, "cycles"))
 
+    re_plan = _plan(steps=3, reeval_per_generation=4, reeval_depth=6)
+    re_cfg = trainer._config(StubContext(re_plan, workspace), workspace,
+                             resume=False)
+    check("the re-evaluation settings reach the config (ROADMAP N11)",
+          (re_cfg.reeval_per_generation, re_cfg.reeval_depth) == (4, 6),
+          str((re_cfg.reeval_per_generation, re_cfg.reeval_depth)))
+
     # The budget wins over a stray ``generations`` hyperparameter: two places
     # saying how long a run is would eventually disagree.
     both = _plan(steps=5, generations=900)

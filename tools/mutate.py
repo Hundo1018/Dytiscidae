@@ -825,6 +825,16 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_a_child_python_is_the_venv_after_the_kernel_poisons_the_environment",),
         item="post-run environment"),
     Mutation(
+        id="job-path-refuses-reeval",
+        path="dytiscidae/adapters/trainers/search.py",
+        find='"placement_draws", "reeval_per_generation", "reeval_depth",',
+        replace='"placement_draws",',
+        defect="the job path does not list the re-evaluation settings, so a plan "
+               "that sets them is refused as an unknown hyperparameter and the "
+               "arch51 re-evaluation loop cannot be launched as a job",
+        suites=("test_search_adapter::test_the_plan_translates_into_a_search_config",),
+        item="re-evaluation"),
+    Mutation(
         id="single-path-drops-the-gain",
         path="dytiscidae/control/cpg.py",
         find="        return a[:n_modes], gait_gain(a[n_modes])",
