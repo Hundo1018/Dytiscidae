@@ -40,6 +40,7 @@ and grows to about 1.4e-6 in mission_fraction over a full evaluation.
 from __future__ import annotations
 
 import os as _os
+import sys as _sys
 
 import numpy as np
 
@@ -79,6 +80,14 @@ _add_build_dir_to_path()
 try:  # pragma: no cover - depends on a built extension
     import full_pipeline as _fp
     import mujoco as _mj
+    # The import above C-setenvs PYTHONEXECUTABLE to the first ``python`` on
+    # PATH (a pyenv shim of Python 3.9 under the default PATH and under
+    # ``systemd-run --user``).  A spawn worker inherits it, its sys.executable
+    # becomes that shim, and its ``usable()`` probe aborts on ``Py_NewRef``.
+    # Presetting does not help (Mojo overwrites it), so it is fixed here, after
+    # the import and before any spawn.  runs/analysis_1010_failure_theory/
+    # D1_result.md, arm h2; IMPL_1010_SPEC section D answer 6.
+    _os.environ["PYTHONEXECUTABLE"] = _sys.executable
     AVAILABLE = True
     UNAVAILABLE_REASON = ""
 except Exception as exc:  # pragma: no cover
