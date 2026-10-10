@@ -3839,6 +3839,29 @@ checksum equal, no host copy (measure with `nvidia-smi`'s PCIe counters or a
 timing that does not scale with size). *Prediction:* it works or fails on the
 first try; there is no partial outcome. Decides C.
 
+*Outcome (2026-10-10, re-run at 6c24152 after the probe's duplicate-keyword
+crash; `Q6_result.md`, `experiments/mojo_warp_interop/results_q6.json`):
+REFUTED as frozen, because a partial outcome occurred. At 1e5 floats every
+check held: the Mojo fill's checksum, Warp reading Mojo's buffer, Mojo seeing
+Warp's writes after one and two kernels, and the buffer intact after the
+wrappers. One CUDA context is shared (Mojo's, Warp's and the pointer's owner
+are the primary context; memory type device). The wrap is zero copy:
+
+| n | wrap median | wrap p10-p90 | H2D copy median | wrap / H2D |
+|---|---|---|---|---|
+| 100,000 | 1.8 us | 1.6-2.0 us | 1213.6 us | 0.0015 |
+
+The two runtimes use different streams (Mojo's handle is reachable only
+through a private module), so a mixed pipeline needs an explicit
+synchronisation or event between them. The headline size, 1e6, never
+finished: the child was killed by signal 9 about 300 s after start, with no
+CUDA error recorded; the cause is not read. What this decides for A: the
+fused-fluid column of the decision table does not rest on Mojo-Warp interop.
+Putting a Mojo launch inside Warp's captured graph on Warp's stream is not
+shown, so A's spec takes the path that needs no interop, a Warp port of
+`fluid.py` (Q1's cost model is a property of the kernel's arithmetic and is
+carried over as a prediction, not a measurement).*
+
 ### 5. What the search becomes if T7 holds (for the plan, not yet decided)
 
 Score = mean over K draws (K from Q5; 30-100), stored with its standard
@@ -4031,6 +4054,23 @@ iteration (fixed ~50 us plus the two ops). *Falsified* above 500 us, or if a
 custom op cannot be placed inside the loop. If Q8 holds and Q2 says A is
 > 3x today's wall, B is built on MAX graph + Mojo custom ops rather than on
 hand-launched kernels.
+
+*Outcome (2026-10-10, re-run at 6c24152 with `LD_LIBRARY_PATH` pointing at a
+cuBLAS 12 directory; the first run aborted on a missing `cublasCreate_v2`;
+`Q8_result.md`): REFUTED. A custom op can be placed inside the loop, and it
+agrees with numpy to 4.3e-5 on a force scale of 61. The loop is slow even
+without it:
+
+| variant | us per iteration, median | min-max over 5 executes | compile s |
+|---|---|---|---|
+| matmul only | 974.5 | 963.5-976.2 | 1.6 |
+| matmul + functional custom op | 1132.8 | 1127.6-1133.6 | 25.0 |
+| matmul + in-place custom op | 980.4 | 978.4-988.0 | 23.0 |
+
+G's 51 us was a 4096 x 6 x 6 batched matmul; at this shape (1,600 x 33 @ 33
+x 64, loop-carried state) the matmul-only loop costs 974 us per iteration,
+so the "fixed ~50 us" in the prediction was the wrong shape's fixed cost.
+With Q2 already reading "build A", B on MAX graph is closed.*
 
 ## 2026-10-10, later still — the order of the loop: what can share a launch, and what cannot
 
