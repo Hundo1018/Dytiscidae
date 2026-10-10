@@ -555,6 +555,33 @@ MUTATIONS: tuple = (
         suites=("test_search::test_margins_alone_cannot_fill_a_cell",), item="competence floor"),
 
     Mutation(
+        id="representative-is-the-max-draw",
+        path="dytiscidae/evolution/archive.py",
+        find="        med = draws[order[(len(draws) - 1) // 2]]",
+        replace="        med = draws[order[-1]]",
+        defect="an elite's score is its best draw, so re-evaluation can only "
+               "raise it and the winner's curse the buffer exists to remove stays",
+        suites=("test_search::test_a_cells_score_is_the_median_of_its_draws",), item="draw buffer"),
+
+    Mutation(
+        id="draw-buffer-is-unbounded",
+        path="dytiscidae/evolution/archive.py",
+        find="        if len(draws) > d:\n            del draws[: len(draws) - d]\n",
+        replace="",
+        defect="an elite keeps every draw it was ever given, so its checkpoint "
+               "grows with each re-evaluation and a stale draw never ages out",
+        suites=("test_search::test_a_cells_score_is_the_median_of_its_draws",), item="draw buffer"),
+
+    Mutation(
+        id="rescore-leaves-the-front-alone",
+        path="dytiscidae/evolution/archive.py",
+        find="        removed = self._settle(elite.cell)",
+        replace="        removed = []",
+        defect="a re-evaluated score that is now dominated stays in its cell's "
+               "front, so the front is a record of first draws",
+        suites=("test_search::test_a_cells_score_is_the_median_of_its_draws",), item="draw buffer"),
+
+    Mutation(
         id="curriculum-reads-every-medium",
         path="dytiscidae/evolution/curriculum.py",
         find="    if domains is not None:\n        segs = {d: s for d, s in segs.items() if d in domains}",

@@ -1061,6 +1061,85 @@ def test_margins_alone_cannot_fill_a_cell() -> None:
           f"{st}, {st2}")
 
 
+def test_a_cells_score_is_the_median_of_its_draws() -> None:
+    """An elite's score is the lower median of its draws, not its luckiest one.
+
+    ARCH51_SPEC L8 (N11): `Archive.record_draw` keeps up to `draw_depth` draws on
+    the elite, orders them by blend, and swaps the lower-median draw's score,
+    objectives and scored meta in together, then re-settles the cell's front.
+    """
+    print("\narchive: a score is the median of its draws")
+    import json
+    import tempfile
+    from dytiscidae.evolution.archive import Archive
+
+    axes = [("a", 0.0, 1.0, 4), ("b", 0.0, 1.0, 4)]
+    pt = [0.5, 0.5]
+
+    def d(b, s):
+        return {"base": b, "fit": b, "obj": [b, 1, 1], "at_floor": False,
+                "meta": {"eval_seed": s, "water": b}}
+
+    # (a) the first draw was 0.9; two lower ones follow, the median is the 0.5.
+    a = Archive(axes)
+    cell = a.cell_of(pt)
+    a.add("A", 0.9, pt, meta={"eval_seed": 1}, objectives=np.array([0.9, 1.0, 1.0]))
+    A = a.front(cell)[0]
+    a.record_draw(A, d(0.2, 11))
+    info = a.record_draw(A, d(0.5, 12))
+    check("three draws 0.9, 0.2, 0.5 score as the 0.5, with that draw's seed",
+          A.fitness == 0.5 and A.meta["eval_seed"] == 12 and A.objectives[0] == 0.5
+          and info["n"] == 3 and info["median_base"] == 0.5,
+          f"fitness={A.fitness} seed={A.meta.get('eval_seed')} obj0={A.objectives[0]}")
+
+    # (b) with two draws the lower median is an actual draw, not their mean.
+    b = Archive(axes)
+    b.add("B", 0.9, pt, objectives=np.array([0.9, 1.0, 1.0]))
+    B = b.front(cell)[0]
+    b.record_draw(B, d(0.2, 21))
+    check("two draws 0.9 and 0.2 score as the lower one, 0.2",
+          B.fitness == 0.2 and B.meta["eval_seed"] == 21, f"fitness={B.fitness}")
+
+    # (c) the buffer is bounded at draw_depth.
+    for i in range(10):
+        b.record_draw(B, d(0.3 + 0.01 * i, 30 + i))
+    check("after 10 more draws the buffer holds 8", len(B.meta["draws"]) == 8,
+          f"{len(B.meta['draws'])}")
+    b.record_draw(B, d(0.6, 99), depth=3)
+    check("an explicit depth trims to it", len(B.meta["draws"]) == 3,
+          f"{len(B.meta['draws'])}")
+
+    # (d) a re-scored member that is now dominated leaves the front.
+    c = Archive(axes)
+    c.add("A2", 0.9, pt, objectives=np.array([0.9, 1.0, 1.0]))
+    c.add("B", 0.6, pt, objectives=np.array([0.6, 2.0, 2.0]))
+    A2 = next(e for e in c.front(cell) if e.genome == "A2")
+    before = sorted(e.genome for e in c.front(cell))
+    c.record_draw(A2, d(0.5, 41))
+    c.record_draw(A2, d(0.4, 42))
+    check("a front of A2 [.9,1,1] and B [.6,2,2] becomes [B] once A2's median is 0.5",
+          before == ["A2", "B"] and [e.genome for e in c.front(cell)] == ["B"]
+          and c.cells[cell].genome == "B",
+          f"before={before} front={[e.genome for e in c.front(cell)]}")
+
+    # (e) export_json writes each draw as a row, not the weights it carries.
+    e = Archive(axes)
+    e.add("E", 0.9, pt, objectives=np.array([0.9, 1.0, 1.0]))
+    E = e.front(cell)[0]
+    e.record_draw(E, dict(d(0.2, 51), meta={"eval_seed": 51, "gen": 7, "water": 0.2,
+                                              "policy": [0.0] * 4}))
+    with tempfile.TemporaryDirectory() as tmp:
+        e.export_json(f"{tmp}/archive.json")
+        doc = json.loads(open(f"{tmp}/archive.json").read())
+        row = doc["elites"][0]
+    check("export_json writes draws as base/fit/eval_seed/gen/air/water/land rows",
+          len(row["draws"]) == 2 and "draws" not in row["meta"]
+          and "draws" not in doc["summary"]["best_meta"]
+          and row["draws"][1] == {"base": 0.2, "fit": 0.2, "eval_seed": 51, "gen": 7,
+                                  "air": None, "water": 0.2, "land": None},
+          f"{row['draws']}")
+
+
 def test_intervention_is_triggered_by_evidence_not_a_schedule() -> None:
     """When to intervene must come from the data, not from a number I typed.
 
@@ -6313,6 +6392,7 @@ def main() -> int:
         test_learned_descriptors_replace_the_hand_picked_axes,
         test_cells_hold_a_pareto_front_not_a_weighted_sum,
         test_margins_alone_cannot_fill_a_cell,
+        test_a_cells_score_is_the_median_of_its_draws,
         test_intervention_is_triggered_by_evidence_not_a_schedule,
         test_no_dataclass_can_raise_on_equality,
         test_arriving_somewhere_is_not_one_lucky_timestep,

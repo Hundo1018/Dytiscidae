@@ -55,6 +55,14 @@ import numpy as np
 #: all cost evaluations, which is the budget this whole tier cascade exists to
 #: protect.  Tier-2 promotion re-checks elites but on another single sample, so
 #: it confirms rather than averages.  Worth deciding deliberately.
+def _draw_row(dr: dict) -> dict:
+    """A draw as export_json writes it: the score and which draw it was, not the
+    policy weights and basis its ``meta`` carries."""
+    m = dr.get("meta") or {}
+    return {"base": float(dr["base"]), "fit": float(dr["fit"]),
+            **{k: m.get(k) for k in ("eval_seed", "gen", "air", "water", "land")}}
+
+
 @dataclass(eq=False)
 class Elite:
     """One occupant of one cell."""
@@ -156,6 +164,10 @@ class Archive:
     #: purpose: the point is to stop discarding a design because of an exchange
     #: rate I invented, not to turn every cell into an archive of its own.
     front_capacity: int = 4
+
+    #: Draws kept per elite (ARCH51_SPEC L8).  Extract-ME depth 8, arXiv
+    #: 2502.06585; set from ``SearchConfig.reeval_depth``.
+    draw_depth: int = 8
 
     @staticmethod
     def _crowding(front: list["Elite"]) -> np.ndarray:
@@ -319,6 +331,44 @@ class Archive:
         self.fronts.pop(cell, None)
         return had
 
+    def record_draw(self, elite: Elite, draw: dict, depth: int | None = None) -> dict:
+        """One more evaluation of ``elite``; its score becomes its lower-median draw.
+
+        ``draw`` = {"base", "fit", "obj": [3], "at_floor", "meta": {scored keys}}.
+        """
+        draws = elite.meta.get("draws")
+        if not draws:
+            draws = [{"base": float((elite.meta.get("score_parts") or {}).get("blend", elite.fitness)),
+                      "fit": float(elite.fitness),
+                      "obj": [float(x) for x in elite.objectives],
+                      "at_floor": bool(elite.at_floor), "meta": {}}]
+            elite.meta["draws"] = draws
+        draws.append(draw)
+        d = int(depth if depth is not None else self.draw_depth)
+        if len(draws) > d:
+            del draws[: len(draws) - d]
+        order = sorted(range(len(draws)), key=lambda i: draws[i]["base"])
+        med = draws[order[(len(draws) - 1) // 2]]
+        elite.fitness = float(med["fit"])
+        elite.objectives = np.asarray(med["obj"], float)
+        elite.at_floor = bool(med.get("at_floor", False))
+        elite.meta.update(med.get("meta") or {})
+        removed = self._settle(elite.cell)
+        return {"n": len(draws), "median_base": float(med["base"]), "removed": removed}
+
+    def _settle(self, cell) -> list:
+        """Re-establish a front among its own members after a score changed."""
+        front = self.fronts.get(cell) or []
+        if not front:
+            return []
+        kept = [e for e in front
+                if not any(self._dominates(o.objectives, e.objectives) for o in front if o is not e)]
+        kept = [e for e in kept if not e.at_floor] or kept
+        removed = [e for e in front if not any(e is k for k in kept)]
+        self.fronts[cell] = kept
+        self.cells[cell] = self._representative(kept)
+        return removed
+
     # ----------------------------------------------------------------- rebin
 
     def rebin(self, axes: list[tuple[str, float, float, int]], reproject,
@@ -414,7 +464,9 @@ class Archive:
             "best_fitness": max(fits) if fits else 0.0,
             "mean_fitness": float(np.mean(fits)) if fits else 0.0,
             "best_cell": list(b.cell) if b else None,
-            "best_meta": (b.meta or {}) if b else {},
+            # Without the draw buffer: each draw carries a policy, and this lands
+            # in ``history`` once per generation.
+            "best_meta": {k: v for k, v in (b.meta or {}).items() if k != "draws"} if b else {},
             "tainted_cells": len(self.tainted),
         }
 
@@ -471,7 +523,8 @@ class Archive:
                     "improvements": e.improvements,
                     "curiosity": e.curiosity,
                     "meta": {k: v for k, v in (e.meta or {}).items()
-                             if isinstance(v, (int, float, str, bool, list))},
+                             if k != "draws" and isinstance(v, (int, float, str, bool, list))},
+                    "draws": [_draw_row(dr) for dr in (e.meta or {}).get("draws", [])],
                 }
             )
         path = Path(path)

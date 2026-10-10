@@ -2,7 +2,7 @@
 
 # Modules
 
-105 modules, 37,788 lines, 1,098 indexed symbols.
+105 modules, 37,841 lines, 1,099 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -112,7 +112,7 @@ is what makes a violation visible while reading.
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
-| `evolution.archive` | The MAP-Elites archive: a map of what is achievable, not a single winner. | 486 | — | `numpy` | — |
+| `evolution.archive` | The MAP-Elites archive: a map of what is achievable, not a single winner. | 539 | — | `numpy` | — |
 | `evolution.auditor` | The third party: a check on both the designs and the judge. | 425 | — | `numpy` | — |
 | `evolution.cmaes` | CMA-ES for controller weights. | 231 | — | `numpy` | — |
 | `evolution.critic` | The critic: a learned adversary trained to catch what cheap evaluation misses. | 435 | — | `numpy` | — |
