@@ -3863,6 +3863,24 @@ reproduce as a control. Not run yet. If (c) holds, a single land draw carries
 no information about a design, and the K-draw score is required on land, not
 optional (Q5's land K = 18 was computed from the same draws).*
 
+*R2, the three arms (2026-10-10, branch impl-r2 89ed0c8,
+`runs/analysis_1010_failure_theory/R2_result.md`; the 25 non-reproducers plus
+10 controls). (a) CONFIRMED. A freshly identified basis restores 25 of 25 and
+breaks no control. All 39 land within 0.0005 of the record, median 0.00024.
+The final network restores 1, and dropping the stored policy restores 0.
+(b) REFUTED. Batch composition moves no elite at all (range 0.0 for 35 of
+35). (c) REFUTED as frozen, because 2 of 10 controls moved and the bar was 3.
+Land is nonetheless hypersensitive: repeats are bit-identical, but a 1e-9
+change of one initial coordinate moves land by more than 0.005 for 20 of 25,
+median 0.030 against a median record gap of 0.029. **So a stored elite's
+`mobility_basis` is not what scored its recorded land.** It is enough for air
+(58/58) and nearly for water (55/58), and land, which uses the air basis
+(`evaluate.py:50-57`), is what exposes the difference. Paradox not yet
+explained: if the air basis differed, air should move too. The mechanism read
+is R3 (opus, running). P1 has merged and makes reevaluations use exactly that
+stored basis. No run uses P1 yet, and none may until R3 says whether P1
+re-measures land with the wrong controller.*
+
 **Q5 (analytic + stored rows, minutes): the K curve on real draws.** From
 `experiments/draw_variance/results_arch49.json` (229 elites x 7 draws), the
 Spearman of a k-draw mean against the held-out mean for k = 1..6, against
