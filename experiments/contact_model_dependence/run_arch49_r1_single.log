@@ -1,0 +1,91 @@
+229 elites, 58 with meta.land >= 0.012; segment_seconds 8.0; stiffness ratio x2 0.271 x4 0.074
+[1/58] elite 1 hard: land 0.0489 (recorded 0.0500) crossed 0.00 12s total 12s
+[2/58] elite 6 hard: land 0.1009 (recorded 0.1010) crossed 0.00 19s total 31s
+[3/58] elite 14 hard: land 0.0494 (recorded 0.0450) crossed 0.00 15s total 46s
+[4/58] elite 18 hard: land 0.0166 (recorded 0.0500) crossed 0.00 12s total 58s
+[5/58] elite 22 hard: land 0.0420 (recorded 0.0480) crossed 0.00 11s total 69s
+[6/58] elite 23 hard: land 0.0402 (recorded 0.0730) crossed 0.00 12s total 81s
+[7/58] elite 25 hard: land 0.0102 (recorded 0.0640) crossed 0.00 16s total 97s
+[8/58] elite 29 hard: land 0.0668 (recorded 0.0670) crossed 0.00 18s total 115s
+[9/58] elite 32 hard: land 0.0969 (recorded 0.1410) crossed 0.00 14s total 129s
+[10/58] elite 34 hard: land 0.1035 (recorded 0.0990) crossed 0.00 12s total 142s
+[11/58] elite 35 hard: land 0.1039 (recorded 0.1040) crossed 0.00 19s total 161s
+[12/58] elite 36 hard: land 0.0218 (recorded 0.0170) crossed 0.00 13s total 174s
+[13/58] elite 38 hard: land 0.0160 (recorded 0.0380) crossed 0.00 12s total 186s
+[14/58] elite 39 hard: land 0.0117 (recorded 0.0120) crossed 0.00 22s total 208s
+[15/58] elite 41 hard: land 0.0139 (recorded 0.0150) crossed 0.00 24s total 232s
+[16/58] elite 49 hard: land 0.0683 (recorded 0.0930) crossed 0.00 15s total 247s
+[17/58] elite 51 hard: land 0.0605 (recorded 0.0610) crossed 0.00 15s total 261s
+[18/58] elite 54 hard: land 0.0000 (recorded 0.0540) crossed 0.00 13s total 274s
+[19/58] elite 56 hard: land 0.0457 (recorded 0.0580) crossed 0.00 12s total 287s
+[20/58] elite 60 hard: land 0.0824 (recorded 0.0830) crossed 0.00 18s total 305s
+[21/58] elite 61 hard: land 0.0309 (recorded 0.0350) crossed 0.00 13s total 318s
+[22/58] elite 63 hard: land 0.0536 (recorded 0.0320) crossed 0.00 16s total 334s
+[23/58] elite 64 hard: land 0.1270 (recorded 0.1290) crossed 0.00 21s total 355s
+[24/58] elite 65 hard: land 0.0191 (recorded 0.0190) crossed 0.00 24s total 379s
+[25/58] elite 68 hard: land 0.0649 (recorded 0.0650) crossed 0.00 12s total 391s
+[26/58] elite 69 hard: land 0.0663 (recorded 0.0660) crossed 0.00 16s total 407s
+[27/58] elite 72 hard: land 0.0000 (recorded 0.0750) crossed 0.00 13s total 421s
+[28/58] elite 73 hard: land 0.0000 (recorded 0.0460) crossed 0.00 16s total 436s
+[29/58] elite 75 hard: land 0.1396 (recorded 0.1100) crossed 0.00 12s total 448s
+[30/58] elite 76 hard: land 0.0216 (recorded 0.0560) crossed 0.00 16s total 464s
+[31/58] elite 80 hard: land 0.0418 (recorded 0.0520) crossed 0.00 12s total 476s
+[32/58] elite 83 hard: land 0.1238 (recorded 0.0910) crossed 0.00 14s total 490s
+[33/58] elite 86 hard: land 0.1032 (recorded 0.0990) crossed 0.00 13s total 503s
+[34/58] elite 89 hard: land 0.1238 (recorded 0.2750) crossed 0.00 14s total 517s
+[35/58] elite 90 hard: land 0.0171 (recorded 0.0170) crossed 0.00 16s total 533s
+[36/58] elite 97 hard: land 0.0319 (recorded 0.0320) crossed 0.00 19s total 553s
+[37/58] elite 104 hard: land 0.0000 (recorded 0.0170) crossed 0.00 14s total 567s
+[38/58] elite 107 hard: land 0.0005 (recorded 0.0510) crossed 0.00 16s total 583s
+[39/58] elite 111 hard: land 0.0000 (recorded 0.0190) crossed 0.00 15s total 598s
+[40/58] elite 116 hard: land 0.2817 (recorded 0.2820) crossed 0.25 18s total 616s
+[41/58] elite 119 hard: land 0.0000 (recorded 0.0170) crossed 0.00 13s total 628s
+[42/58] elite 122 hard: land 0.0515 (recorded 0.0510) crossed 0.00 13s total 641s
+[43/58] elite 126 hard: land 0.1716 (recorded 0.1640) crossed 0.00 16s total 658s
+[44/58] elite 134 hard: land 0.0192 (recorded 0.0190) crossed 0.00 11s total 669s
+[45/58] elite 150 hard: land 0.0526 (recorded 0.0520) crossed 0.00 11s total 680s
+[46/58] elite 159 hard: land 0.0332 (recorded 0.0330) crossed 0.00 12s total 692s
+[47/58] elite 166 hard: land 0.0134 (recorded 0.0130) crossed 0.00 19s total 711s
+[48/58] elite 179 hard: land 0.0165 (recorded 0.0160) crossed 0.00 14s total 725s
+[49/58] elite 180 hard: land 0.0748 (recorded 0.0750) crossed 0.00 13s total 738s
+[50/58] elite 181 hard: land 0.0340 (recorded 0.0170) crossed 0.00 12s total 750s
+[51/58] elite 182 hard: land 0.0167 (recorded 0.0230) crossed 0.00 14s total 763s
+[52/58] elite 185 hard: land 0.0145 (recorded 0.0150) crossed 0.00 13s total 776s
+[53/58] elite 186 hard: land 0.0137 (recorded 0.0150) crossed 0.00 14s total 790s
+[54/58] elite 187 hard: land 0.0404 (recorded 0.0400) crossed 0.00 13s total 803s
+[55/58] elite 192 hard: land 0.0017 (recorded 0.0380) crossed 0.00 10s total 813s
+[56/58] elite 194 hard: land 0.0141 (recorded 0.0150) crossed 0.00 12s total 825s
+[57/58] elite 213 hard: land 0.0000 (recorded 0.0160) crossed 0.00 23s total 848s
+[58/58] elite 218 hard: land 0.0000 (recorded 0.0430) crossed 0.00 12s total 860s
+/home/hundo/Projects/Dytiscidae/impl-r1/experiments/contact_model_dependence/run.py:263: RuntimeWarning: Mean of empty slice
+  d = {"share_lt20": float((rel < 0.2).mean()), "k_lt20": int((rel < 0.2).sum()),
+/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/lib/python3.12/site-packages/numpy/_core/_methods.py:142: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+/home/hundo/Projects/Dytiscidae/impl-r1/experiments/contact_model_dependence/run.py:264: RuntimeWarning: Mean of empty slice
+  "share_gt50": float((rel > 0.5).mean()), "k_gt50": int((rel > 0.5).sum()),
+/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/lib/python3.12/site-packages/numpy/_core/fromnumeric.py:3862: RuntimeWarning: Mean of empty slice
+  return _methods._mean(a, axis=axis, dtype=dtype,
+Traceback (most recent call last):
+  File "/home/hundo/Projects/Dytiscidae/impl-r1/experiments/contact_model_dependence/run.py", line 324, in <module>
+    main()
+  File "/home/hundo/Projects/Dytiscidae/impl-r1/experiments/contact_model_dependence/run.py", line 173, in main
+    summarise(rows_path, Path(args.out), time.time() - t0, arms)
+  File "/home/hundo/Projects/Dytiscidae/impl-r1/experiments/contact_model_dependence/run.py", line 265, in summarise
+    "median_abs_rel": float(np.median(rel)), "iqr_abs_rel": [float(np.percentile(rel, 25)),
+                                                                   ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py", line 4258, in percentile
+    return _quantile_unchecked(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py", line 4522, in _quantile_unchecked
+    return _ureduce(a,
+           ^^^^^^^^^^^
+  File "/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py", line 3892, in _ureduce
+    r = func(a, **kwargs)
+        ^^^^^^^^^^^^^^^^^
+  File "/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py", line 4681, in _quantile_ureduce_func
+    result = _quantile(arr,
+             ^^^^^^^^^^^^^^
+  File "/home/hundo/Projects/Dytiscidae/dytiscidae/.venv/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py", line 4805, in _quantile
+    slices_having_nans = np.isnan(arr[-1, ...])
+                                  ~~~^^^^^^^^^
+IndexError: index -1 is out of bounds for axis 0 with size 0

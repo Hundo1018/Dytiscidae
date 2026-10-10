@@ -53,9 +53,10 @@ from .archive import Archive
 from .auditor import Auditor
 from .critic import CRITIC_TARGETS, Critic, critic_features, expensive_outcome
 from .curator import Curator
-from .curriculum import STAGES, WEAKEST_BARS, Curriculum
+from .curriculum import STAGES, WEAKEST_BARS, ZERO_SCORE, Curriculum
 from .descriptors import LearnedDescriptors, episode_features
-from .islands import ISLANDS, Archipelago, curriculum_for, island_score
+from .islands import (ISLANDS, Archipelago, below_competence_floor,
+                      curriculum_for, island_score)
 from .judge import Judge
 from .scout import Scout, novelty_of, scout_features
 
@@ -156,17 +157,28 @@ class SearchConfig:
     #: (ROADMAP M2, 2026-10-08).  Off reproduces the shared draw of every run
     #: up to arch48; water and land scores are not comparable across it.
     draw_per_candidate: bool = True
+    #: Slots of each generation's ``batch`` spent re-running archived
+    #: representatives at a fresh seed (ROADMAP N11).  0 = off, every run to
+    #: arch50; arch51: 4 of batch 16, Extract-ME's 25%.
+    reeval_per_generation: int = 0
+    #: Draws an elite's buffer keeps; its score is the lower median (N11).
+    reeval_depth: int = 8
 
     # Controller refinement.  Each step is one extra batched Tier-1 for the
     # whole generation, so a generation costs (1 + steps) evaluations.
     controller_refine_steps: int = 0  # (1+1)-ES steps per candidate; 0 = inherit only
+    #: 0.30 from 2026-09-01 through arch50; 0.0 from ARCH51_SPEC:
+    #: ``mission_fraction`` is zero for 97-100% of every island's window
+    #: (ROADMAP N2), so the term decided nothing and cost 0.3 of the scale.  The
+    #: field stays for resumes and the job path.
+    #:
     #: Share of the archive's scalar that is the mission itself, as a
     #: population quantile, rather than the island/curriculum blend.  Measured
     #: over arch31: at 0.0 (which is what every run before 2026-09-01 was)
     #: corr(archive fitness, mission_fraction) = 0.159 and the search traded
     #: 36% of its energy fraction for 32% more competence, because energy is a
     #: factor of the mission and appeared nowhere in the score.
-    mission_weight: float = 0.30
+    mission_weight: float = 0.0
     #: Weight on the potential-based shaping term in the PPO reward.  Zero
     #: reproduces the terminal-only reward every run before 2026-09-01 used.
     #: Shaping of this form cannot change what is optimal (Ng, Harada & Russell
@@ -188,6 +200,10 @@ class SearchConfig:
     #: by promotions rather than by population, which is what makes a nonzero
     #: default affordable.
     promotion_refine_steps: int = 6
+    #: How promotion spends ``promotion_refine_steps`` trials per elite: True,
+    #: one (1+lambda) step, every trial of every promoted elite in one batch
+    #: (IMPL_1010 P2); False, the serial (1+1) steps every run to arch50 used.
+    promotion_refine_parallel: bool = True
     policy_hidden: int = 0
     n_modes: int = 6
 
@@ -426,6 +442,7 @@ def evaluate_candidate(
     identify: bool = True,
     spec: MissionSpec | None = None,
     seed: int = 0,
+    bases=None,
 ):
     """Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``."""
     pheno = build(genome)
@@ -434,7 +451,7 @@ def evaluate_candidate(
         return pheno, t0, None
 
     policy = _controller_for(pheno, genome, cfg, inherited_policy)
-    ctrl = Controller(params=None, policy=policy)  # params filled by the env
+    ctrl = Controller(params=None, policy=policy, bases=bases or None)  # params filled by the env
     result = evaluate_tier1(
         pheno,
         spec=spec,
@@ -555,6 +572,7 @@ def evaluate_candidates(
     log: dict | None = None,
     select=None,
     cost: GenerationCost | None = None,
+    bases=None,
 ):
     """Tier-0 gate then a shared Tier-1 for the whole group.
 
@@ -579,6 +597,7 @@ def evaluate_candidates(
     k = len(genomes)
     inherited = inherited or [None] * k
     seeds = seeds or [0] * k
+    bases = bases or [None] * k
     out = [None] * k
     # One bool for the group, or one per genome: the generation's
     # `identify_axes_every` cadence (ROADMAP AN).
@@ -615,7 +634,7 @@ def evaluate_candidates(
             for i in passed:
                 out[i] = evaluate_candidate(
                     genomes[i], cfg, inherited_policy=inherited[i],
-                    identify=wants[i], spec=spec, seed=seeds[i])
+                    identify=wants[i], spec=spec, seed=seeds[i], bases=bases[i])
         if cost is not None:
             cost.count("main", [out[i][1] for i in passed])
         return out
@@ -623,7 +642,7 @@ def evaluate_candidates(
     ctrls = []
     for i in passed:
         policy = _controller_for(phenos[i], genomes[i], cfg, inherited[i])
-        ctrls.append(Controller(params=None, policy=policy))
+        ctrls.append(Controller(params=None, policy=policy, bases=bases[i] or None))
 
     # Each candidate faces its own draw (ROADMAP M2): one draw shared by the
     # generation made every water and land score a measurement of that draw,
@@ -815,6 +834,7 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
         return results
 
     best = [float(r.mission_fraction) for r in results]
+    base = list(best)
     if select is not None:
         chosen = [bool(select(i, r)) for i, r in enumerate(results)]
         if log is not None:
@@ -862,6 +882,8 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
             log["step_walls"].append(round(_time.perf_counter() - t0, 3))
             log["accepted"].append(accepted)
 
+    if log is not None:
+        log["refine_base"], log["refine_best"] = base, best
     return results
 
 
@@ -956,6 +978,23 @@ def _batched(pool, phenos, **kwargs):
     if pool is not None:
         return pool.evaluate_tier1(phenos, **kwargs)
     return batchroll.evaluate_tier1_batch(phenos, **kwargs)
+
+
+#: The ``_meta`` keys a draw carries: everything that reads the evaluation
+#: (``result``, ``ctrl``) or the scoring of it, so swapping them together
+#: leaves the elite's record the experiment its score came from (the film reads
+#: ``eval_seed``, ``gen``, the media, the basis and the policy; ROADMAP N11).
+#: Left out: pheno-only keys (mass ... worst_check), ``features`` (a cell is
+#: never re-filed), ``novelty`` and the scout's keys, ``island``, the
+#: promotion and Tier-2 keys, and ``draws`` itself.
+SCORED_KEYS = (
+    "air", "water", "land", "mission_fraction", "energy_margin", "tier",
+    "max_depth", "air_gates", "eval_seed", "gen", "scored_with_shared_policy",
+    "mobility_rank", "mobility_cond", "mobility_underdetermined",
+    "mobility_axes", "mobility_basis", "policy", "objectives", "score_parts",
+    "stage", "stage_name", "rungs", "judged", "ladder_measurements",
+    "critic_discount", "critic_features",
+)
 
 
 def _meta_light(pheno, result) -> dict:
@@ -1070,7 +1109,7 @@ def _meta(pheno, result, ctrl) -> dict:
 
 
 def _score_candidate(state: SearchState, pheno, result, parent, *,
-                     commit: bool = True) -> dict:
+                     commit: bool = True, at_cell=None) -> dict:
     """Everything that decides a finished candidate's fitness, and where it goes.
 
     ``_place`` calls this with ``commit=True``, which feeds the descriptors, the
@@ -1120,7 +1159,7 @@ def _score_candidate(state: SearchState, pheno, result, parent, *,
             "transition": tmeas,
         })
 
-    cell = state.archive.cell_of(bd)
+    cell = state.archive.cell_of(bd) if at_cell is None else tuple(at_cell)
     # An unvisited cell starts at the stage its parent had earned, not at zero.
     # 58.9% of arch31's children landed in an empty cell and every one of them
     # was asked the easiest question regardless of what its lineage could
@@ -1143,9 +1182,14 @@ def _score_candidate(state: SearchState, pheno, result, parent, *,
     # the search is looking for a triphibian again by the end, so the weight has
     # to move.  A fixed 0.5 left the air island selecting 96% on a score that
     # does not read air.
+    # A design competent in none of its island's media stands at 0 on every
+    # half and is flagged for the archive (ROADMAP N5; ARCH51_SPEC L5).  Asked
+    # before the window is fed: the window ranks only the designs above it.
+    floored = below_competence_floor(state.island, result)
     if commit:
         state.curriculum.observe_blend(base, sr.score, sr.stage,
-                                       float(result.mission_fraction))
+                                       float(result.mission_fraction),
+                                       at_floor=bool(floored))
     # Blend the two halves as population standings, not raw scores.  They are
     # not on the same scale -- measured over arch30 the island half spans 0.0437
     # p10-p90 and the curriculum half 0.5092 -- so a convex combination of the
@@ -1154,6 +1198,8 @@ def _score_candidate(state: SearchState, pheno, result, parent, *,
     isl_q, cur_q = state.curriculum.standing(base, sr.score, sr.stage)
     mis_q = state.curriculum.mission_standing(result.mission_fraction, sr.stage)
     w = state.curriculum.handover(sr.stage)
+    if floored:
+        isl_q, cur_q, mis_q = 0.0, 0.0, 0.0
     # Three quantiles, not two.  The first two answer "how well did this design
     # answer the question its cell was asked"; the third answers "how much of
     # the mission did it actually do", and measurement says those are nearly
@@ -1163,6 +1209,7 @@ def _score_candidate(state: SearchState, pheno, result, parent, *,
     # mission the score could not see.  See Curriculum.mission_standing.
     mw = float(np.clip(getattr(state.config, "mission_weight", 0.30), 0.0, 1.0))
     base = float((1.0 - mw) * (w * isl_q + (1.0 - w) * cur_q) + mw * mis_q)
+    at_floor = bool(floored or base <= ZERO_SCORE)
     cfeat = critic_features(_meta_light(pheno, result), result)
     discount = state.critic.discount(cfeat) if state.critic is not None else 1.0
     fit = float(base * discount)
@@ -1171,7 +1218,7 @@ def _score_candidate(state: SearchState, pheno, result, parent, *,
     # dominance vector, so an island's Pareto front is a front over *its* task.
     obj[0] = float(base if result.feasible else -0.5 + 0.5 * base)
 
-    return {"feats": feats, "bd": bd, "judged": judged, "tset": tset, "tmeas": tmeas, "cell": cell, "sr": sr, "isl_q": isl_q, "cur_q": cur_q, "mis_q": mis_q, "w": w, "mw": mw, "base": base, "cfeat": cfeat, "discount": discount, "fit": fit, "obj": obj}
+    return {"feats": feats, "bd": bd, "judged": judged, "tset": tset, "tmeas": tmeas, "cell": cell, "sr": sr, "isl_q": isl_q, "cur_q": cur_q, "mis_q": mis_q, "w": w, "mw": mw, "base": base, "at_floor": at_floor, "cfeat": cfeat, "discount": discount, "fit": fit, "obj": obj}
 
 
 def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -> str:
@@ -1246,6 +1293,7 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
         "island_q": round(isl_q, 4), "curriculum_q": round(cur_q, 4),
         "mission_q": round(mis_q, 4), "handover": round(w, 4),
         "mission_weight": round(mw, 4), "blend": round(base, 4),
+        "at_floor": bool(sc["at_floor"]),
     }
 
     # What was knowable about this design at birth, for the scout.  Novelty is
@@ -1267,7 +1315,12 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
         )
         meta["scout_features"] = [float(x) for x in sfeat]
 
-    status = state.archive.add(genome, fit, bd, meta, tier=result.tier, objectives=obj)
+    if int(getattr(cfg, "reeval_per_generation", 0)) > 0:
+        meta["draws"] = [{"base": base, "fit": fit, "obj": [float(x) for x in obj],
+                          "at_floor": bool(sc["at_floor"]),
+                          "meta": {k: meta[k] for k in SCORED_KEYS if k in meta}}]
+
+    status = state.archive.add(genome, fit, bd, meta, tier=result.tier, objectives=obj, at_floor=sc["at_floor"])
     state.curriculum.update(cell, sr)
 
     if state.scout is not None:
@@ -1298,6 +1351,77 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
     return status
 
 
+def _reevaluate(state, elite, pheno, result, ctrl) -> str:
+    """One more draw of an archived representative (ROADMAP N11).  Feeds no window."""
+    gen = int(state.archive.generation)
+    cell = list(elite.cell)
+    if result.tier == 0 or not any(m is elite for m in state.archive.fronts.get(elite.cell) or []):
+        state.telemetry.event({"kind": "reevaluate", "gen": gen, "island": state.island,
+                               "cell": cell, "status": "orphan"})
+        return "orphan"
+    if result.exploit:
+        state.curator.quarantine(elite.descriptor, result.exploit, elite.genome)
+        state.telemetry.event({"kind": "reevaluate", "gen": gen, "island": state.island,
+                               "cell": cell, "status": "exploit", "reason": result.exploit})
+        return "exploit"
+    sc = _score_candidate(state, pheno, result, elite, commit=False, at_cell=elite.cell)
+    meta = _meta(pheno, result, ctrl)
+    # A draw at the stored basis identified nothing, so ``result.mobility`` is
+    # empty; keep the elite's own identification record (IMPL_1010 P1, F11).
+    if not result.mobility:
+        for key in ("mobility_rank", "mobility_cond", "mobility_underdetermined", "mobility_axes"):
+            if key in elite.meta:
+                meta[key] = elite.meta[key]
+    # The keys ``_place`` writes beyond ``_meta``, for the scored subset.
+    meta["gen"] = gen
+    meta["scored_with_shared_policy"] = bool(state.shared is not None)
+    meta["objectives"] = {n: round(float(v), 4) for n, v in zip(OBJECTIVE_NAMES, sc["obj"])}
+    meta["stage"] = sc["sr"].stage
+    meta["stage_name"] = (state.curriculum.stage_name(sc["sr"].stage)
+                          if hasattr(state.curriculum, "stage_name")
+                          else STAGES[sc["sr"].stage][0])
+    meta["rungs"] = {d: j["rung"] for d, j in sc["judged"].items()}
+    meta["judged"] = {d: round(j["total"], 3) for d, j in sc["judged"].items()}
+    meta["ladder_measurements"] = {
+        **{d: dict(getattr(s, "measurements", {}) or {}) for d, s in result.segments.items()},
+        "transition": dict(sc["tmeas"]),
+    }
+    meta["critic_discount"] = round(sc["discount"], 3)
+    meta["critic_features"] = [float(x) for x in sc["cfeat"]]
+    meta["score_parts"] = {
+        "island_q": round(sc["isl_q"], 4), "curriculum_q": round(sc["cur_q"], 4),
+        "mission_q": round(sc["mis_q"], 4), "handover": round(sc["w"], 4),
+        "mission_weight": round(sc["mw"], 4), "blend": round(sc["base"], 4),
+        "at_floor": bool(sc["at_floor"]),
+    }
+    draw = {"base": sc["base"], "fit": sc["fit"], "obj": [float(x) for x in sc["obj"]],
+            "at_floor": bool(sc["at_floor"]), "meta": {k: meta[k] for k in SCORED_KEYS if k in meta}}
+    # The buffer's first entry is the elite's own draw.  ``record_draw`` would
+    # synthesise it with an empty ``meta``, and if it later became the median its
+    # eval_seed, gen, media and policy would not come back; so seed it here with
+    # the scored keys the elite carries now (an archive restored from before N11,
+    # or a seed elite, has no buffer yet).
+    if not elite.meta.get("draws"):
+        elite.meta["draws"] = [{
+            "base": float((elite.meta.get("score_parts") or {}).get("blend", elite.fitness)),
+            "fit": float(elite.fitness),
+            "obj": [float(x) for x in elite.objectives],
+            "at_floor": bool(elite.at_floor),
+            "meta": {k: elite.meta[k] for k in SCORED_KEYS if k in elite.meta}}]
+    first = (elite.meta["draws"][0].get("meta") or {}).get("eval_seed", elite.meta.get("eval_seed"))
+    before = float(elite.fitness)
+    out = state.archive.record_draw(elite, draw)
+    state.telemetry.event({"kind": "reevaluate", "gen": gen, "island": state.island,
+                           "cell": cell, "status": "recorded", "draws": out["n"],
+                           "fitness_before": round(before, 4),
+                           "fitness_after": round(float(elite.fitness), 4),
+                           "eval_seed": meta.get("eval_seed"), "first_eval_seed": first,
+                           "median_eval_seed": elite.meta.get("eval_seed"),
+                           "removed": len(out["removed"]),
+                           **{m: meta.get(m) for m in ("air", "water", "land")}})
+    return "recorded"
+
+
 # --------------------------------------------------------------------------
 
 
@@ -1308,7 +1432,7 @@ def _dry_status(state: SearchState, pheno, result, parent) -> str:
     if result.exploit:
         return "exploit"
     sc = _score_candidate(state, pheno, result, parent, commit=False)
-    return state.archive.would_add(sc["fit"], sc["bd"], sc["obj"])
+    return state.archive.would_add(sc["fit"], sc["bd"], sc["obj"], at_floor=sc["at_floor"])
 
 
 def _funnel(state: SearchState, parents):
@@ -1646,6 +1770,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         curator = state.curator
         for a in archipelago.archives.values():
             a.generation = gen
+            a.draw_depth = int(cfg.reeval_depth)
         regime = curator.update_regime()
 
         # The generation's candidates are built first and evaluated together, so
@@ -1662,7 +1787,16 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         # does not care where the phase sits.
         built = []
         counter = state.evaluated
-        for _ in range(cfg.batch):
+        # N11: some slots re-run archived representatives instead of breeding.
+        # Nothing is drawn from ``rng`` when the feature is off, so a run
+        # without it reproduces bit for bit.
+        picks = []
+        if int(cfg.reeval_per_generation) > 0:
+            pool_re = [e for c, e in archive.cells.items() if c not in archive.tainted]
+            n_re = min(int(cfg.reeval_per_generation), len(pool_re), max(int(cfg.batch) - 1, 0))
+            if n_re:
+                picks = [pool_re[i] for i in rng.choice(len(pool_re), size=n_re, replace=False)]
+        for _ in range(cfg.batch - len(picks)):
             # Immigrants and hybrids are evaluated before anything home-grown,
             # because the whole point of moving them is to find out whether they
             # are worth anything under the receiving island's objective.
@@ -1693,6 +1827,9 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             counter += 1
             built.append((child, inherited, identify, operators, parent,
                           int(rng.integers(1 << 30))))
+        for elite in picks:
+            stored = bool(MobilityBasis.bases_from_record(elite.meta.get("mobility_basis")))
+            built.append((elite.genome.copy(), elite.meta.get("policy"), not stored, ["reeval"], elite, int(rng.integers(1 << 30))))
 
         stage_log: dict = {}
         if state.pool is not None:
@@ -1709,6 +1846,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 inherited=[b[1] for b in built],
                 identify=[b[2] for b in built], spec=spec,
                 seeds=[b[5] for b in built],
+                bases=[(MobilityBasis.bases_from_record(b[4].meta.get("mobility_basis")) or None)
+                       if b[3] == ["reeval"] else None for b in built],
                 shared=state.shared, buffer=buffer, pool=state.pool,
                 log=stage_log,
                 select=_funnel(state, [b[4] for b in built]), cost=cost)
@@ -1716,7 +1855,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             telemetry.event({"kind": "error", "gen": gen, "island": state.island,
                              "error": f"{type(exc).__name__}: {exc}"})
             for _c, _i, _id, operators, _p, _s in built:
-                curator.credit(operators, "rejected", 0.0)
+                if operators != ["reeval"]:
+                    curator.credit(operators, "rejected", 0.0)
             evaluated = []
 
         cost.lap("evaluate")
@@ -1726,7 +1866,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         for j, ((child, _inh, _idf, operators, parent, _sd), got) in enumerate(
                 zip(built, evaluated)):
             if got is None:
-                curator.credit(operators, "rejected", 0.0)
+                if operators != ["reeval"]:
+                    curator.credit(operators, "rejected", 0.0)
                 continue
             pheno, result, ctrl = got
             if ctrl is not None:
@@ -1735,6 +1876,9 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             curator.evaluations += 1
             gen_diverged += result.diverged_rollouts
             gen_rollouts += result.n_rollouts
+            if operators == ["reeval"]:
+                _reevaluate(state, parent, pheno, result, ctrl)
+                continue
             # AK: would this design have landed differently without the
             # refinement steps?  Only a design a step changed can differ, and
             # both answers are asked of the archive as it stands now.
@@ -2520,9 +2664,15 @@ def seed_archipelago(state: SearchState, spec: MissionSpec) -> None:
 
     seed_seeds = [int(state.rng.integers(1 << 30)) for _ in seeds]
     try:
+        # With the shared policy, as every child is scored: `_place` stamps
+        # `scored_with_shared_policy` from `state.shared`, and the film drives
+        # the elite with the network that scored its generation (gen 0's is
+        # this one, no update has run), so a seed scored without it did not
+        # reproduce (2026-10-10: `land.command_reversal` 0 recorded, 0.52 on
+        # film, once the competence floor made a seed the top elite).
         evaluated = evaluate_candidates(
             seeds, cfg, identify=True, spec=spec, seeds=seed_seeds,
-            pool=state.pool)
+            shared=state.shared, pool=state.pool)
     except Exception:
         return
 
@@ -2557,7 +2707,48 @@ def _with_shared(state: SearchState, ctrl):
                             n_modes=state.config.n_modes))
 
 
-def _refined_controllers_for(state: SearchState, elites, phenos, spec, rng):
+def _refine_population(phenos, ctrls, results, cfg, *, spec, seed, population,
+                       shared=None, pool=None, log=None, cost=None):
+    """One (1+lambda) step on every candidate's policy weights, in one batch
+    with the noise-free re-score (IMPL_1010 P2).  The best trial replaces the
+    controller only if it beats the baseline, as in the (1+1) step."""
+    import time as _time
+
+    sigma = float(getattr(cfg, "controller_refine_sigma", 0.1))
+    rng = np.random.default_rng(int(seed) ^ 0x9E3779B9)
+    k = len(ctrls)
+    owners, trials = [], []
+    for i, c in enumerate(ctrls):
+        w = c.policy.weights if c.policy is not None else None
+        if w is None or w.size == 0:
+            continue
+        for _ in range(int(population)):
+            trials.append(Controller(params=c.params, bases=c.bases,
+                                     policy=_copy_policy(c.policy, w + rng.normal(0.0, sigma, size=w.shape))))
+            owners.append(i)
+    nb = k if shared is not None else 0
+    t0 = _time.perf_counter()
+    with _phase(cost, "evaluate.refine"):
+        got = batchroll_eval(list(phenos[:nb]) + [phenos[i] for i in owners],
+                             list(ctrls[:nb]) + trials, cfg, spec=spec, seed=int(seed),
+                             shared=shared, pool=pool)
+    if shared is not None:
+        results = list(got[:k])
+    base = [float(r.mission_fraction) for r in results]
+    best = list(base)
+    for j, i in enumerate(owners):
+        tr = got[nb + j]
+        if float(tr.mission_fraction) > best[i]:
+            best[i] = float(tr.mission_fraction)
+            ctrls[i].policy = trials[j].policy
+            results[i] = tr
+    if log is not None:
+        log["refine_wall"] = round(_time.perf_counter() - t0, 3)
+        log["refine_base"], log["refine_best"] = base, best
+    return results
+
+
+def _refined_controllers_for(state: SearchState, elites, phenos, spec, rng, log=None):
     """The elites' controllers, refined together at the moment they are promoted.
 
     Refining every candidate every generation costs a full batched Tier-1 per
@@ -2622,10 +2813,17 @@ def _refined_controllers_for(state: SearchState, elites, phenos, spec, rng):
     for i, c in enumerate(ctrls):
         out[slots[i]] = c
     if keep:
-        _refine_controllers([group[i] for i in keep], [ctrls[i] for i in keep],
-                            [base[i] for i in keep], cfg, spec=spec,
-                            seed=int(rng.integers(1 << 30)), steps=steps,
-                            shared=state.shared, pool=state.pool)
+        sub = [group[i] for i in keep], [ctrls[i] for i in keep], [base[i] for i in keep]
+        rlog: dict = {}
+        if getattr(cfg, "promotion_refine_parallel", True):
+            _refine_population(*sub, cfg, spec=spec, seed=int(rng.integers(1 << 30)),
+                               population=steps, shared=state.shared, pool=state.pool, log=rlog)
+        else:
+            _refine_controllers(*sub, cfg, spec=spec, seed=int(rng.integers(1 << 30)), steps=steps,
+                                shared=state.shared, pool=state.pool, log=rlog)
+        if log is not None:
+            log["by_elite"] = {slots[keep[j]]: (rlog["refine_base"][j], rlog["refine_best"][j])
+                               for j in range(len(keep)) if "refine_base" in rlog}
     return out
 
 
@@ -2712,7 +2910,7 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
     cfg = state.config
     archive, curator = state.archive, state.curator
     chosen, phenos = [], []
-    for elite in sorted(archive.cells.values(), key=lambda e: -e.fitness)[:3]:
+    for elite in curator.promotion_candidates(3):
         if not curator.should_promote(elite):
             continue
         try:
@@ -2726,7 +2924,8 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
         return
     t0 = time.perf_counter()
     try:
-        refined = _refined_controllers_for(state, chosen, phenos, spec, rng)
+        rlog: dict = {}
+        refined = _refined_controllers_for(state, chosen, phenos, spec, rng, log=rlog)
     except Exception as exc:
         state.telemetry.event({"kind": "error", "gen": gen, "stage": "promotion_refine",
                                "error": f"{type(exc).__name__}: {exc}"})
@@ -2749,8 +2948,8 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
             else [_verification_job(*j) for j in jobs])
     verify_wall = round(time.perf_counter() - t1, 3)
 
-    for elite, p2, ctrl2, c, (seg, r2, (w15, w2)) in zip(
-            chosen, phenos, refined, comps, done):
+    for ki, (elite, p2, ctrl2, c, (seg, r2, (w15, w2))) in enumerate(zip(
+            chosen, phenos, refined, comps, done)):
         # Asked again: a promotion earlier in this round can have spent the
         # budget, which is what the one-at-a-time loop used to see.
         if not curator.should_promote(elite):
@@ -2809,6 +3008,9 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
                                            else round(float(elite.meta[k]), 4))
                                        for k in CRITIC_TARGETS},
                                    **long_leg, **walls,
+                                   "refine_parallel": bool(getattr(cfg, "promotion_refine_parallel", True)),
+                                   "refine_base": (rlog.get("by_elite") or {}).get(ki, (None, None))[0],
+                                   "refine_best": (rlog.get("by_elite") or {}).get(ki, (None, None))[1],
                                    "exploit": r2.exploit, "notes": r2.notes[:3]})
             if r2.exploit:
                 curator.quarantine(elite.descriptor, r2.exploit, elite.genome)

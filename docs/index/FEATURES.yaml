@@ -60,6 +60,7 @@ RolloutBuffer:
     - tests.test_ppo::test_gae_matches_an_independent_reference
     - tests.test_ppo::test_one_trajectory_never_bootstraps_off_another
     - tests.test_ppo::test_terminal_rewards_are_scaled_within_their_own_kind
+    - tests.test_ppo::test_the_return_splits_into_shaping_and_terminal
 
 AdvantageAndReturn:
   implementation:
@@ -202,12 +203,16 @@ SegmentTasks:
 HeadingPair:
   implementation:
     - envs.tasks.antipode
+    - envs.tasks.mirror
+    - envs.tasks.pair_of
     - envs.evaluate.run_segment
     - envs.triphibian.pair_partner_of
+    - envs.triphibian.air_task
   tests:
     - tests.test_search::test_the_heading_pair_cancels_what_the_command_did_not_choose
     - tests.test_search::test_tier2_draws_its_headings
-  note: water and land are scored on the drawn heading and its opposite from one initial state, progress on the mean signed speed along the two, so motion the command did not choose cancels exactly (docs/PAPERS_2610.md); batchroll.evaluate_tier1_batch runs the same sequence
+    - tests.test_physics::test_air_is_scored_on_a_mirrored_turn
+  note: water and land are scored on the drawn heading and its opposite from one initial state, progress on the mean signed speed along the two, so motion the command did not choose cancels exactly (docs/PAPERS_2610.md); air (since 2026-10-10, the user's answer of 10-09) on the drawn turn and its mirror, the turn response on the mean of the two, and height paying only through the turn (air_task); batchroll.evaluate_tier1_batch runs the same sequence
 
 ConfigExport:
   implementation:
@@ -349,9 +354,26 @@ QualityDiversity:
     - evolution.loop.run_search
     - evolution.loop.SearchConfig
     - evolution.loop.SearchState
+    - evolution.archive.Archive.record_draw
   tests:
     - tests.test_search::test_archive_placement_and_improvement
     - tests.test_search::test_the_loop_wires_every_layer_together
+    - tests.test_search::test_margins_alone_cannot_fill_a_cell
+    - tests.test_search::test_a_cells_score_is_the_median_of_its_draws
+    - tests.test_search::test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu
+  note: a cell's score is the median of up to Archive.draw_depth draws (ARCH51 L8); an elite at the competence floor (Elite.at_floor) cannot fill a cell on margins alone (L3)
+
+ArchiveReevaluation:
+  implementation:
+    - evolution.loop.SearchConfig
+    - evolution.loop.run_search
+    - evolution.archive.Archive.record_draw
+  tests:
+    - tests.test_search::test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu
+    - tests.test_search::test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median
+    - tests.test_search::test_a_reevaluation_runs_at_the_stored_basis_cpu
+    - tests.test_search_adapter::test_the_plan_translates_into_a_search_config
+  note: loop._reevaluate (scored fields: loop.SCORED_KEYS); SearchConfig.reeval_per_generation > 0 re-runs that many archived elites at a fresh seed each generation and keeps each at the median of its last reeval_depth draws (ARCH51 L9-L11, ROADMAP N11); reevals run at the stored basis (IMPL_1010 P1); off by default
 
 Islands:
   implementation:
@@ -361,6 +383,8 @@ Islands:
     - evolution.islands.curriculum_for
     - evolution.islands.triphibian_score
     - evolution.islands.Archipelago.colonists
+    - evolution.islands.island_media
+    - evolution.islands.below_competence_floor
   tests:
     - tests.test_search::test_the_island_objective_takes_its_weight_back
     - tests.test_search::test_the_triphibian_island_pays_the_weakest_medium
@@ -371,25 +395,35 @@ Islands:
     - tests.test_search::test_an_islands_best_is_judged_on_its_own_domains
     - tests.test_search::test_one_islands_archive_is_read_alone_not_through_the_merge
     - tests.test_search::test_a_specialist_islands_curriculum_reads_only_its_own_medium
+    - tests.test_search::test_a_design_competent_in_nothing_its_island_reads_is_below_the_floor
+    - tests.test_search::test_the_scalar_stands_at_zero_below_the_competence_floor
+  note: a design competent in nothing its island reads (islands.COMPETENCE_FLOOR) is below the floor (ARCH51 L2/L6) and its scalar stands at zero
 
 Curation:
   implementation:
     - evolution.curator.Curator
     - evolution.curator.OperatorBandit
     - evolution.curator.Regime
+    - evolution.curator.Curator.promotion_candidates
+    - evolution.curator.Curator.record_promotion
   tests:
     - tests.test_search::test_bandit_learns_which_operator_pays
     - tests.test_search::test_no_operator_can_go_dormant_under_the_structural_tilt
     - tests.test_search::test_curator_regimes_respond_to_the_run
+    - tests.test_search::test_a_tier2_failure_does_not_make_the_best_design_the_worst_parent
+    - tests.test_search::test_verification_offers_designs_not_yet_verified
 
 Curriculum:
   implementation:
     - evolution.curriculum.Curriculum
     - evolution.curriculum.stage_score
     - evolution.curriculum.triphibian_stage_score
+    - evolution.curriculum.Curriculum.mission_standing
   tests:
     - tests.test_search::test_curriculum_and_islands_give_gradient_where_the_mission_gives_none
     - tests.test_search::test_the_triphibian_island_pays_the_weakest_medium
+    - tests.test_search::test_a_score_of_zero_stands_at_zero
+    - tests.test_search::test_standing_ranks_only_against_designs_above_the_floor
 
 Judge:
   implementation:
@@ -638,6 +672,7 @@ SearchTrainer:
     - adapters.trainers.synthetic.SyntheticTrainer
   tests:
     - tests.test_search_adapter
+    - tests.test_search_adapter::test_the_plan_translates_into_a_search_config
 
 Storage:
   implementation:
@@ -668,6 +703,7 @@ CommandLine:
   tests:
     - tests.test_adapters
     - tests.test_search_adapter
+    - tests.test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration
 
 # ------------------------------------------------------------- observability
 

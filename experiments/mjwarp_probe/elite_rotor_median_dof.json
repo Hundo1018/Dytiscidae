@@ -1,0 +1,27 @@
+{
+ "island": "amphibian",
+ "genome_id": "am251_4048",
+ "dof": 18,
+ "n_rotors": 2,
+ "actuators": [
+  "seg1_fin_a",
+  "seg2_fin_a",
+  "seg3_fin_a",
+  "seg4_fin_a",
+  "seg5_fin_a",
+  "seg6_bell_a",
+  "seg6_bell_r",
+  "seg7_paddle_a",
+  "seg8_paddle_a",
+  "seg9_bell_a",
+  "seg9_bell_r",
+  "seg10_paddle_a",
+  "seg11_paddle_a",
+  "seg12_ballast_a",
+  "seg13_ballast_a",
+  "seg14_ballast_a",
+  "seg15_ballast_a",
+  "seg16_ballast_a"
+ ],
+ "n_unique": 191
+}

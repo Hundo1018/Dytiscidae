@@ -78,6 +78,7 @@ CLI too.
 | `controller_refine_steps` | 0 | 1 | measured | `docs/ROADMAP.md` §"D. M1 read (2026-10-08, `experiments/refine_criterion/`)": over 600 one-step trials on arch48's 200 elites an accepted trial kept 23% (`island` criterion) or 8.5% (`stage`) of its reported gain at a fresh draw, and 2 of 600 were accepted under the criterion in use. CLI `--refine-steps` default is 0 from 2026-10-08. Every run from arch34 to arch44 passed 2; arch48 passed 1. Not comparable across this. |
 | `controller_refine_sigma` | 0.1 | 0.1 | typed | Perturbation scale on policy weights. No sweep found. |
 | `promotion_refine_steps` | 6 | 6 | typed | `loop.py`: affordable because bounded by promotions (at most three per round). M1 states "Promotion's 6 steps are not measured here"; no other measurement found. |
+| `promotion_refine_parallel` | True | False (to arch50) | typed | IMPL_1010 P2: one (1+6) batch instead of six serial (1+1) trips; read by D-P2 |
 | `policy_hidden` | 0 | 0 | typed | Width of the per-candidate policy (0 = linear). No sweep found. |
 | `n_modes` | 6 | 6 | typed | Number of gait modes. No sweep found. |
 
@@ -144,4 +145,6 @@ CLI too.
 | field | default | arch48 | set by | source |
 |---|---|---|---|---|
 | `draw_per_candidate` | True | not recorded | switch | Added 2026-10-08 (`docs/ROADMAP.md` item M2). arch48 predates it and ran one task draw per generation, which is the behaviour of `False` (`eval_seed` had one distinct value in 299 of 300 generations). The default was decided by `docs/PAPERS_2610.md` §1 (a fresh seed alone took Tier-1 water passes 15/16 to 3/16 and land 13/16 to 0/16) and the M2 first read in `docs/ROADMAP.md` §"D. M1 read" (draw variance over design variance 2.16 air, 1.01 water, 1.04 land). Not comparable across it. |
+| `reeval_per_generation` | 0 | not recorded | int | Added 2026-10-10 (`docs/ARCH51_SPEC.md` L9, `docs/ROADMAP.md` N11). Slots of each generation's `batch` spent re-running uniformly chosen non-tainted representatives of the visited island at a fresh seed; 0 is off and every run to arch50 ran with it off (no `rng` draw is made, so a run with it off reproduces bit for bit). arch51 sets 4 of batch 16 (Extract-ME's 25%). With it on, an elite's score is the lower median of its draws, so archive scores are not comparable across it. |
+| `reeval_depth` | 8 | not recorded | int | Added 2026-10-10 (`docs/ARCH51_SPEC.md` L9, N11). Draws an elite's buffer keeps (`meta["draws"]`), oldest dropped first; Extract-ME's depth 8 (arXiv 2502.06585). Read only while `reeval_per_generation > 0`. |
 | `placement_draws` | 1 | not recorded | switch | Added 2026-10-08 (`docs/ROADMAP.md` M3). Draws each candidate is scored at before placement; the median one by summed medium competence is placed. Off because C2's rows show the median buys little (Spearman vs an independent mean: water 0.36 -> 0.48, land 0.30 -> 0.36); its form is an open question. |

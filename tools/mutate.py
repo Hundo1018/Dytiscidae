@@ -159,6 +159,24 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_a_still_machine_is_still_from_the_first_step",), item="still machine"),
     # --- the antipodal heading pair (2026-10-06) ----------------------------
     Mutation(
+        id="air-height-adds-to-the-turn",
+        path="dytiscidae/envs/triphibian.py",
+        find="    return float(turn) * (0.5 + 0.5 * float(height))\n",
+        replace="    return 0.5 * float(turn) + 0.5 * float(height)\n",
+        defect="air pays a still glider for the height its airframe keeps, the leak "
+               "the 2026-10-09 rule closed",
+        suites=("test_physics::test_air_is_scored_on_a_mirrored_turn",
+                "test_search::test_the_heading_pair_cancels_what_the_command_did_not_choose"), item="air pair"),
+    Mutation(
+        id="air-pair-turns-the-same-way",
+        path="dytiscidae/envs/tasks.py",
+        find="        Phase(ph.kind, ph.start, _wrap(-ph.heading), ph.speed, ph.depth)\n",
+        replace="        Phase(ph.kind, ph.start, ph.heading, ph.speed, ph.depth)\n",
+        defect="the air pair repeats the turn, so lateral drift toward the drawn "
+               "side does not cancel",
+        suites=("test_physics::test_air_is_scored_on_a_mirrored_turn",
+                "test_search::test_the_heading_pair_cancels_what_the_command_did_not_choose"), item="air pair"),
+    Mutation(
         id="pair-takes-the-better-half",
         path="dytiscidae/envs/triphibian.py",
         find="        along = 0.5 * (cruise[\"along\"] + p[\"along\"])\n",
@@ -261,6 +279,105 @@ MUTATIONS: tuple = (
                "so the Tier-1/Tier-2 gap can only be recovered by a join that "
                "breaks at every descriptor refit",
         suites=("test_search::test_promotion_spends_refinement_and_keeps_what_it_buys",), item="tier-gap telemetry"),
+
+    Mutation(
+        id="score-ignores-the-competence-floor",
+        path="dytiscidae/evolution/loop.py",
+        find="    floored = below_competence_floor(state.island, result)\n",
+        replace="    floored = False\n",
+        defect="a design competent in none of its island's media is ranked like "
+               "any other, so a machine that does nothing stands where the "
+               "window puts it",
+        suites=("test_search::test_the_scalar_stands_at_zero_below_the_competence_floor",), item="blend wiring"),
+    Mutation(
+        id="mission-weight-back-in-the-blend",
+        path="dytiscidae/evolution/loop.py",
+        find="    mission_weight: float = 0.0\n",
+        replace="    mission_weight: float = 0.30\n",
+        defect="0.3 of the scalar is a term that is zero for 97-100% of every "
+               "island's window",
+        suites=("test_search::test_the_scalar_stands_at_zero_below_the_competence_floor",), item="blend wiring"),
+    Mutation(
+        id="place-forgets-the-floor",
+        path="dytiscidae/evolution/loop.py",
+        find='objectives=obj, at_floor=sc["at_floor"])',
+        replace="objectives=obj)",
+        defect="the archive is never told a design is at the floor, so it "
+               "displaces a ranked incumbent on the strength of a tie",
+        suites=("test_search::test_the_scalar_stands_at_zero_below_the_competence_floor",), item="blend wiring"),
+    Mutation(
+        id="dry-run-forgets-the-floor",
+        path="dytiscidae/evolution/loop.py",
+        find='sc["obj"], at_floor=sc["at_floor"])',
+        replace='sc["obj"])',
+        defect="the refinement funnel's dry status calls a floored design a "
+               "replacement the real placement then refuses",
+        suites=("test_search::test_the_scalar_stands_at_zero_below_the_competence_floor",), item="blend wiring"),
+    Mutation(
+        id="verify-offers-verified-designs",
+        path="dytiscidae/evolution/loop.py",
+        find="    for elite in curator.promotion_candidates(3):",
+        replace="    for elite in sorted(archive.cells.values(), key=lambda e: -e.fitness)[:3]:",
+        defect="the verification round takes the top three by fitness, so two "
+               "verified elites at the top leave it one design to try",
+        suites=("test_search::test_verification_offers_designs_not_yet_verified",), item="blend wiring"),
+    Mutation(
+        id="seeds-scored-without-the-shared-policy",
+        path="dytiscidae/evolution/loop.py",
+        find="            shared=state.shared, pool=state.pool)",
+        replace="            pool=state.pool)",
+        defect="the seeds are scored without the shared policy but stamped "
+               "scored_with_shared_policy, so the film drives a seed elite with "
+               "a controller that never produced its record (2026-10-10)",
+        suites=("test_search::test_a_film_reproduces_the_scored_experiment",), item="blend wiring"),
+    Mutation(
+        id="reeval-reuses-the-stored-seed",
+        path="dytiscidae/evolution/loop.py",
+        find='["reeval"], elite, int(rng.integers(1 << 30))))',
+        replace='["reeval"], elite, int(elite.meta.get("eval_seed") or 0)))',
+        defect="a re-evaluation runs at the seed that scored the elite, so it "
+               "measures the same draw again and the median of its draws is one draw",
+        suites=("test_search::test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu",
+                "test_search::test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median"), item="re-evaluation"),
+    Mutation(
+        id="reeval-commits-to-the-window",
+        path="dytiscidae/evolution/loop.py",
+        find="commit=False, at_cell=elite.cell)",
+        replace="commit=True, at_cell=elite.cell)",
+        defect="a re-evaluation feeds the curriculum window, the judge and the "
+               "descriptor buffer, so one design is counted once per re-run",
+        suites=("test_search::test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu",
+                "test_search::test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median"), item="re-evaluation"),
+    Mutation(
+        id="reeval-records-nothing",
+        path="dytiscidae/evolution/loop.py",
+        find="    out = state.archive.record_draw(elite, draw)\n",
+        replace='    out = {"n": 1, "median_base": 0.0, "removed": []}\n',
+        defect="a re-evaluation is run and logged but never reaches the elite's "
+               "buffer, so its score stays the single draw it began with",
+        suites=("test_search::test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu",
+                "test_search::test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median"), item="re-evaluation"),
+    Mutation(
+        id="reeval-re-identifies",
+        path="dytiscidae/evolution/loop.py",
+        find='            stored = bool(MobilityBasis.bases_from_record(elite.meta.get("mobility_basis")))\n',
+        replace='            stored = False\n',
+        defect="a re-evaluation re-identifies the axes, so a draw varies the basis as well as the task",
+        suites=("test_search::test_a_reevaluation_runs_at_the_stored_basis_cpu",), item="re-evaluation"),
+    Mutation(
+        id="reeval-drops-the-stored-basis",
+        path="dytiscidae/evolution/loop.py",
+        find='                       if b[3] == ["reeval"] else None for b in built],',
+        replace='                       if False else None for b in built],',
+        defect="a re-evaluation is told not to identify but is given no basis, so it runs on none",
+        suites=("test_search::test_a_reevaluation_runs_at_the_stored_basis_cpu",), item="re-evaluation"),
+    Mutation(
+        id="reeval-blanks-the-identification-record",
+        path="dytiscidae/evolution/loop.py",
+        find='    if not result.mobility:\n        for key in ("mobility_rank"',
+        replace='    if False:\n        for key in ("mobility_rank"',
+        defect="a draw at the stored basis overwrites the elite's identification record with an empty one",
+        suites=("test_search::test_a_reevaluation_runs_at_the_stored_basis_cpu",), item="re-evaluation"),
 
     # --- the learner's arithmetic -----------------------------------------
     Mutation(
@@ -508,6 +625,26 @@ MUTATIONS: tuple = (
         item="triphibian island"),
 
     Mutation(
+        id="competence-floor-at-zero",
+        path="dytiscidae/evolution/islands.py",
+        find='                and float(getattr(segs[d], "competence", 0.0)) >= COMPETENCE_FLOOR[d]):',
+        replace='                and float(getattr(segs[d], "competence", 0.0)) >= 0.0):',
+        defect="the competence floor is zero, so every design that has a segment "
+               "clears it and the floor flags nothing",
+        suites=("test_search::test_a_design_competent_in_nothing_its_island_reads_is_below_the_floor",),
+        item="competence floor"),
+
+    Mutation(
+        id="competence-floor-reads-every-medium",
+        path="dytiscidae/evolution/islands.py",
+        find="    for d in island_media(island):\n        if (d in segs",
+        replace='    for d in ("air", "water", "land"):\n        if (d in segs',
+        defect="the competence floor reads all three media for every island, so a "
+               "water specialist is excused by competence in a medium it does not read",
+        suites=("test_search::test_a_design_competent_in_nothing_its_island_reads_is_below_the_floor",),
+        item="competence floor"),
+
+    Mutation(
         id="island-archive-read-through-the-merge",
         path="dytiscidae/ops/run.py",
         find="    if island is not None:\n        if island not in names:",
@@ -515,6 +652,51 @@ MUTATIONS: tuple = (
         defect="one island's archive is read through the cross-island merge, so "
                "an elite that lost its cell to another island is never filmed",
         suites=("test_search::test_one_islands_archive_is_read_alone_not_through_the_merge",), item="per-island best"),
+
+    Mutation(
+        id="floor-candidate-joins-the-front",
+        path="dytiscidae/evolution/archive.py",
+        find="        if cand.at_floor:\n            return \"rejected\", None\n",
+        replace="",
+        defect="a design below the competence floor joins a ranked incumbent's "
+               "front on margins alone, so a machine that cannot move holds a cell",
+        suites=("test_search::test_margins_alone_cannot_fill_a_cell",), item="competence floor"),
+
+    Mutation(
+        id="floor-member-survives-a-ranked-entry",
+        path="dytiscidae/evolution/archive.py",
+        find="        kept = [e for e in ranked if not self._dominates(obj, e.objectives)]",
+        replace="        kept = [e for e in front if not self._dominates(obj, e.objectives)]",
+        defect="a ranked design entering a cell leaves the floor members beside "
+               "it, so large margins keep a competence-zero machine in the front",
+        suites=("test_search::test_margins_alone_cannot_fill_a_cell",), item="competence floor"),
+
+    Mutation(
+        id="representative-is-the-max-draw",
+        path="dytiscidae/evolution/archive.py",
+        find="        med = draws[order[(len(draws) - 1) // 2]]",
+        replace="        med = draws[order[-1]]",
+        defect="an elite's score is its best draw, so re-evaluation can only "
+               "raise it and the winner's curse the buffer exists to remove stays",
+        suites=("test_search::test_a_cells_score_is_the_median_of_its_draws",), item="draw buffer"),
+
+    Mutation(
+        id="draw-buffer-is-unbounded",
+        path="dytiscidae/evolution/archive.py",
+        find="        if len(draws) > d:\n            del draws[: len(draws) - d]\n",
+        replace="",
+        defect="an elite keeps every draw it was ever given, so its checkpoint "
+               "grows with each re-evaluation and a stale draw never ages out",
+        suites=("test_search::test_a_cells_score_is_the_median_of_its_draws",), item="draw buffer"),
+
+    Mutation(
+        id="rescore-leaves-the-front-alone",
+        path="dytiscidae/evolution/archive.py",
+        find="        removed = self._settle(elite.cell)",
+        replace="        removed = []",
+        defect="a re-evaluated score that is now dominated stays in its cell's "
+               "front, so the front is a record of first draws",
+        suites=("test_search::test_a_cells_score_is_the_median_of_its_draws",), item="draw buffer"),
 
     Mutation(
         id="curriculum-reads-every-medium",
@@ -526,6 +708,34 @@ MUTATIONS: tuple = (
         suites=("test_search::test_a_specialist_islands_curriculum_reads_only_its_own_medium",), item="island purity"),
 
     Mutation(
+        id="standing-ranks-ties-at-or-below",
+        path="dytiscidae/evolution/curriculum.py",
+        find="    return float(np.mean(np.asarray(window, float) < x))",
+        replace="    return float(np.mean(np.asarray(window, float) <= x))",
+        defect="a tie takes its own mass as rank, so a design that equals the "
+               "window's mode stands high on a score everyone shares",
+        suites=("test_search::test_a_score_of_zero_stands_at_zero",), item="floor rank"),
+
+    Mutation(
+        id="zero-takes-the-young-window-half",
+        path="dytiscidae/evolution/curriculum.py",
+        find="    if x <= ZERO_SCORE:\n        return 0.0\n    if len(window) < min_n:",
+        replace="    if len(window) < min_n:",
+        defect="a raw score of zero stands at 0.5 while the stage window is "
+               "young, so doing nothing is paid the median early in a run",
+        suites=("test_search::test_a_score_of_zero_stands_at_zero",), item="floor rank"),
+
+    Mutation(
+        id="standing-ranks-against-the-floor",
+        path="dytiscidae/evolution/curriculum.py",
+        find="        return [e for e in w if not (len(e) > 3 and e[3])]",
+        replace="        return list(w)",
+        defect="the quantile is taken over the whole window, so with most of it "
+               "at the floor every competent design stands at 0.95-1.0 and the "
+               "scalar separates them by 0.05",
+        suites=("test_search::test_standing_ranks_only_against_designs_above_the_floor",), item="floor rank"),
+
+    Mutation(
         id="bandit-without-an-exploration-floor",
         path="dytiscidae/evolution/curator.py",
         find="                 epsilon: float = 0.2) -> None:",
@@ -533,6 +743,25 @@ MUTATIONS: tuple = (
         defect="the tilted argmax alone decides every slot, so a non-structural "
                "operator with a good mean can go unpicked for 80 generations",
         suites=("test_search::test_no_operator_can_go_dormant_under_the_structural_tilt",), item="operator dormancy"),
+
+    Mutation(
+        id="tier2-caps-fitness-again",
+        path="dytiscidae/evolution/curator.py",
+        find='        elite.meta["tier2_fitness"] = float(tier2_fitness)\n',
+        replace='        elite.meta["tier2_fitness"] = float(tier2_fitness)\n'
+                '        elite.fitness = min(elite.fitness, tier2_fitness)\n',
+        defect="a failed Tier-2 read caps the design's fitness, so the best design "
+               "becomes the worst parent and the last migrant (ROADMAP 2026-10-10 N4)",
+        suites=("test_search::test_a_tier2_failure_does_not_make_the_best_design_the_worst_parent",), item="tier-2 flag"),
+
+    Mutation(
+        id="promotion-pool-keeps-verified-elites",
+        path="dytiscidae/evolution/curator.py",
+        find="        pool = [e for e in self.archive.cells.values() if e.tier < 2]",
+        replace="        pool = list(self.archive.cells.values())",
+        defect="the promotion pool offers designs already verified, so the Tier-2 "
+               "budget is spent twice on the same elite",
+        suites=("test_search::test_a_tier2_failure_does_not_make_the_best_design_the_worst_parent",), item="tier-2 flag"),
 
     Mutation(
         id="checkpoint-asks-git-at-every-write",
@@ -591,6 +820,26 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
         item="cli defaults"),
     Mutation(
+        id="cli-mission-weight-default-back",
+        path="dytiscidae/ops/run.py",
+        find='p.add_argument("--mission-weight", type=float, default=0.0,',
+        replace='p.add_argument("--mission-weight", type=float, default=0.30,',
+        defect="a search launched with no flags weights the mission term at 0.30 "
+               "again, the quantile blend ARCH51 removed because mission_fraction "
+               "is zero for 97-100% of every window (ROADMAP N2)",
+        suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
+        item="cli defaults"),
+    Mutation(
+        id="cli-drops-reeval",
+        path="dytiscidae/ops/run.py",
+        find="        reeval_per_generation=args.reeval_per_generation,\n",
+        replace="",
+        defect="--reeval-per-generation parses and is then dropped before the "
+               "SearchConfig, so a run launched with re-evaluation on runs "
+               "without it and its pre-registered read measures nothing",
+        suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
+        item="cli defaults"),
+    Mutation(
         id="config-file-loses-to-cli-defaults",
         path="dytiscidae/ops/run.py",
         find="        if name in raw and not keep and mine == getattr(default, name):\n",
@@ -623,6 +872,16 @@ MUTATIONS: tuple = (
                "starts as the system interpreter, so post-run dies on import numpy",
         suites=("test_physics::test_a_child_python_is_the_venv_after_the_kernel_poisons_the_environment",),
         item="post-run environment"),
+    Mutation(
+        id="job-path-refuses-reeval",
+        path="dytiscidae/adapters/trainers/search.py",
+        find='"placement_draws", "reeval_per_generation", "reeval_depth",',
+        replace='"placement_draws",',
+        defect="the job path does not list the re-evaluation settings, so a plan "
+               "that sets them is refused as an unknown hyperparameter and the "
+               "arch51 re-evaluation loop cannot be launched as a job",
+        suites=("test_search_adapter::test_the_plan_translates_into_a_search_config",),
+        item="re-evaluation"),
     Mutation(
         id="single-path-drops-the-gain",
         path="dytiscidae/control/cpg.py",
@@ -668,9 +927,22 @@ MUTATIONS: tuple = (
         suites=("test_search::test_an_audit_perturbs_the_scored_experiment_and_nothing_else",),
         item="audit"),
     Mutation(
+        id="audit-silent-when-unmeasurable",
+        path="dytiscidae/evolution/auditor.py",
+        find="            rep.findings.append(Finding(\n"
+             "                check=\"perturbation\", severity=\"note\",\n"
+             "                detail=(\"not measurable:",
+        replace="            [].append(Finding(\n"
+                "                check=\"perturbation\", severity=\"note\",\n"
+                "                detail=(\"not measurable:",
+        defect="a design credited in no medium with mission 0 gets no perturbation "
+               "finding, so a check that could not run looks like one that passed",
+        suites=("test_search::test_an_audit_perturbs_the_scored_experiment_and_nothing_else",),
+        item="audit"),
+    Mutation(
         id="audit-base-is-the-record",
         path="dytiscidae/evolution/loop.py",
-        find="            mission_fraction = float(reevaluate().mission_fraction)",
+        find="            mission_fraction = float(base_result.mission_fraction)",
         replace="            mission_fraction = float(elite.meta.get(\"mission_fraction\", 0.0))",
         defect="the audit divides a re-run by the recorded score, which another path "
                "and another network earned, so the ratio is not the perturbation's",
@@ -684,7 +956,7 @@ MUTATIONS: tuple = (
         replace="                        ab = np.ones(top - lo, bool)",
         defect="holding height no longer asks whether the machine is in the air, "
                "so a body that fell into the sea floats to full marks",
-        suites=("test_physics",), item="task response"),
+        suites=("test_physics::test_the_seeds_include_something_that_flies", "test_physics"), item="task response"),
     Mutation(
         id="hold-ignores-sinking",
         path="dytiscidae/envs/triphibian.py",
@@ -880,6 +1152,46 @@ MUTATIONS: tuple = (
                "Tier-2 a basis its Tier-1 score was not earned with (AL)",
         suites=("test_search::test_promotion_spends_refinement_and_keeps_what_it_buys",),
         item="AL promotion"),
+    Mutation(
+        id="promotion-es-keeps-the-worse-trial",
+        path="dytiscidae/evolution/loop.py",
+        find='        if float(tr.mission_fraction) > best[i]:',
+        replace='        if float(tr.mission_fraction) < best[i]:',
+        defect="a promotion keeps the worst of its trials instead of the best, and never one that beats its baseline",
+        suites=("test_search::test_promotion_refinement_is_one_batch",),
+        item="IMPL_1010 P2"),
+    Mutation(
+        id="promotion-es-serial-again",
+        path="dytiscidae/evolution/loop.py",
+        find='    promotion_refine_parallel: bool = True',
+        replace='    promotion_refine_parallel: bool = False',
+        defect="the default promotion refinement is the six serial trips again",
+        suites=("test_search::test_promotion_refinement_is_one_batch",),
+        item="IMPL_1010 P2"),
+    Mutation(
+        id="promotion-es-trials-on-one-elite",
+        path="dytiscidae/evolution/loop.py",
+        find='            owners.append(i)',
+        replace='            owners.append(0)',
+        defect="every trial is credited to the first elite, so the others are never refined",
+        suites=("test_search::test_promotion_refinement_is_one_batch",),
+        item="IMPL_1010 P2"),
+    Mutation(
+        id="cli-promotion-refine-serial-default",
+        path="dytiscidae/ops/run.py",
+        find='        promotion_refine_parallel=not args.promotion_refine_serial,',
+        replace='        promotion_refine_parallel=False',
+        defect="the CLI launches the serial promotion refinement by default",
+        suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
+        item="IMPL_1010 P2"),
+    Mutation(
+        id="job-path-refuses-promotion-parallel",
+        path="dytiscidae/adapters/trainers/search.py",
+        find='    "promotion_refine_steps", "promotion_refine_parallel", "mission_weight", "reward_shaping",',
+        replace='    "promotion_refine_steps", "mission_weight", "reward_shaping",',
+        defect="a job's plan cannot set promotion_refine_parallel",
+        suites=("test_search_adapter::test_the_plan_translates_into_a_search_config",),
+        item="IMPL_1010 P2"),
     Mutation(
         id="identify-one-means-identify-all",
         path="dytiscidae/envs/batchroll.py",
@@ -1488,6 +1800,24 @@ MUTATIONS: tuple = (
         defect="a mixed update standardises the group rows with the ordinary "
                "ones, adding a different kind of number's mean and scale back",
         suites=("test_ppo",), item="N mixed batch"),
+    Mutation(
+        id="return-split-drops-the-discount",
+        path="dytiscidae/learning/ppo.py",
+        find="            p[2] += float(disc @ term)\n",
+        replace="            p[2] += float(term.sum())\n",
+        defect="the terminal part of the reported return is undiscounted, so the "
+               "shaping share N10 reads is computed against the wrong denominator",
+        suites=("test_ppo::test_the_return_splits_into_shaping_and_terminal",),
+        item="N10 return split"),
+    Mutation(
+        id="return-split-omits-shaping",
+        path="dytiscidae/learning/ppo.py",
+        find="            shp = rew - term\n",
+        replace="            shp = np.zeros(n)\n",
+        defect="the reported shaping part is always zero, so N10 would read the "
+               "learner as pure competence whatever the shaping does",
+        suites=("test_ppo::test_the_return_splits_into_shaping_and_terminal",),
+        item="N10 return split"),
     Mutation(
         id="grpo-rollouts-leak-into-the-archive",
         path="dytiscidae/evolution/loop.py",

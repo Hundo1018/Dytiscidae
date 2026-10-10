@@ -55,6 +55,14 @@ import numpy as np
 #: all cost evaluations, which is the budget this whole tier cascade exists to
 #: protect.  Tier-2 promotion re-checks elites but on another single sample, so
 #: it confirms rather than averages.  Worth deciding deliberately.
+def _draw_row(dr: dict) -> dict:
+    """A draw as export_json writes it: the score and which draw it was, not the
+    policy weights and basis its ``meta`` carries."""
+    m = dr.get("meta") or {}
+    return {"base": float(dr["base"]), "fit": float(dr["fit"]),
+            **{k: m.get(k) for k in ("eval_seed", "gen", "air", "water", "land")}}
+
+
 @dataclass(eq=False)
 class Elite:
     """One occupant of one cell."""
@@ -77,6 +85,9 @@ class Elite:
     #: whether a challenger takes the cell.  ``fitness`` survives for reporting
     #: and for the curator's parent weighting, where a scalar is unavoidable.
     objectives: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    #: Below the competence floor (ARCH51_SPEC L3): holds a cell only while no
+    #: ranked design is there.  A plain default, so older pickles read False.
+    at_floor: bool = False
 
     @property
     def curiosity(self) -> float:
@@ -154,6 +165,10 @@ class Archive:
     #: rate I invented, not to turn every cell into an archive of its own.
     front_capacity: int = 4
 
+    #: Draws kept per elite (ARCH51_SPEC L8).  Extract-ME depth 8, arXiv
+    #: 2502.06585; set from ``SearchConfig.reeval_depth``.
+    draw_depth: int = 8
+
     @staticmethod
     def _crowding(front: list["Elite"]) -> np.ndarray:
         """Crowding distance over the objective vectors (NSGA-II).
@@ -193,6 +208,7 @@ class Archive:
         meta: dict | None = None,
         tier: int = 1,
         objectives: np.ndarray | None = None,
+        at_floor: bool = False,
     ) -> str:
         """Insert a candidate.  Returns 'new', 'improved' or 'rejected'.
 
@@ -221,7 +237,7 @@ class Archive:
         cand = Elite(
             genome=genome, fitness=fitness, descriptor=np.asarray(descriptor, float),
             cell=cell, meta=meta or {}, born_at=self.generation, tier=tier,
-            objectives=obj,
+            objectives=obj, at_floor=bool(at_floor),
         )
         if front and self.cells.get(cell) is None:
             # A front with no representative should be impossible, but repairing
@@ -234,7 +250,8 @@ class Archive:
             self.cells[cell] = self._representative(kept)
         return status
 
-    def would_add(self, fitness: float, descriptor, objectives=None) -> str:
+    def would_add(self, fitness: float, descriptor, objectives=None,
+                  at_floor: bool = False) -> str:
         """What ``add`` would return for this candidate, changing nothing.
 
         The same verdict, from the same code (``_verdict``).  AK's dry run: the
@@ -247,7 +264,8 @@ class Archive:
         cell = self.cell_of(descriptor)
         cand = Elite(genome=None, fitness=fitness,
                      descriptor=np.asarray(descriptor, float), cell=cell,
-                     meta={}, born_at=self.generation, objectives=obj)
+                     meta={}, born_at=self.generation, objectives=obj,
+                     at_floor=bool(at_floor))
         return self._verdict(cell, cand)[0]
 
     @staticmethod
@@ -263,6 +281,10 @@ class Archive:
         obj, fitness = cand.objectives, cand.fitness
         if not front:
             return "new", [cand]
+        # F1 (ARCH51_SPEC L3): a design below the competence floor fills an
+        # empty cell and nothing else.
+        if cand.at_floor:
+            return "rejected", None
 
         # Inherit the cell's exploration bookkeeping: it describes the region,
         # not the individual, and resetting it every time an occupant changes
@@ -278,10 +300,11 @@ class Archive:
                 return "improved", [cand]
             return "rejected", None
 
-        if any(self._dominates(e.objectives, obj) for e in front):
+        ranked = [e for e in front if not e.at_floor]
+        if any(self._dominates(e.objectives, obj) for e in ranked):
             return "rejected", None
-
-        kept = [e for e in front if not self._dominates(obj, e.objectives)]
+        # F2: a design above the floor displaces every member below it.
+        kept = [e for e in ranked if not self._dominates(obj, e.objectives)]
         kept.append(cand)
         if len(kept) > self.front_capacity:
             order = np.argsort(-self._crowding(kept))
@@ -307,6 +330,44 @@ class Archive:
         self.cells.pop(cell, None)
         self.fronts.pop(cell, None)
         return had
+
+    def record_draw(self, elite: Elite, draw: dict, depth: int | None = None) -> dict:
+        """One more evaluation of ``elite``; its score becomes its lower-median draw.
+
+        ``draw`` = {"base", "fit", "obj": [3], "at_floor", "meta": {scored keys}}.
+        """
+        draws = elite.meta.get("draws")
+        if not draws:
+            draws = [{"base": float((elite.meta.get("score_parts") or {}).get("blend", elite.fitness)),
+                      "fit": float(elite.fitness),
+                      "obj": [float(x) for x in elite.objectives],
+                      "at_floor": bool(elite.at_floor), "meta": {}}]
+            elite.meta["draws"] = draws
+        draws.append(draw)
+        d = int(depth if depth is not None else self.draw_depth)
+        if len(draws) > d:
+            del draws[: len(draws) - d]
+        order = sorted(range(len(draws)), key=lambda i: draws[i]["base"])
+        med = draws[order[(len(draws) - 1) // 2]]
+        elite.fitness = float(med["fit"])
+        elite.objectives = np.asarray(med["obj"], float)
+        elite.at_floor = bool(med.get("at_floor", False))
+        elite.meta.update(med.get("meta") or {})
+        removed = self._settle(elite.cell)
+        return {"n": len(draws), "median_base": float(med["base"]), "removed": removed}
+
+    def _settle(self, cell) -> list:
+        """Re-establish a front among its own members after a score changed."""
+        front = self.fronts.get(cell) or []
+        if not front:
+            return []
+        kept = [e for e in front
+                if not any(self._dominates(o.objectives, e.objectives) for o in front if o is not e)]
+        kept = [e for e in kept if not e.at_floor] or kept
+        removed = [e for e in front if not any(e is k for k in kept)]
+        self.fronts[cell] = kept
+        self.cells[cell] = self._representative(kept)
+        return removed
 
     # ----------------------------------------------------------------- rebin
 
@@ -403,7 +464,9 @@ class Archive:
             "best_fitness": max(fits) if fits else 0.0,
             "mean_fitness": float(np.mean(fits)) if fits else 0.0,
             "best_cell": list(b.cell) if b else None,
-            "best_meta": (b.meta or {}) if b else {},
+            # Without the draw buffer: each draw carries a policy, and this lands
+            # in ``history`` once per generation.
+            "best_meta": {k: v for k, v in (b.meta or {}).items() if k != "draws"} if b else {},
             "tainted_cells": len(self.tainted),
         }
 
@@ -460,7 +523,8 @@ class Archive:
                     "improvements": e.improvements,
                     "curiosity": e.curiosity,
                     "meta": {k: v for k, v in (e.meta or {}).items()
-                             if isinstance(v, (int, float, str, bool, list))},
+                             if k != "draws" and isinstance(v, (int, float, str, bool, list))},
+                    "draws": [_draw_row(dr) for dr in (e.meta or {}).get("draws", [])],
                 }
             )
         path = Path(path)

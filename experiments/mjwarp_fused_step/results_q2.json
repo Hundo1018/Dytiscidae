@@ -1,0 +1,699 @@
+{
+ "date": "2026-10-10",
+ "commit": "ef32a04",
+ "command": "../mjwarp-venv/bin/python experiments/mjwarp_fused_step/run.py",
+ "device": "cuda:0",
+ "warp": "1.18.0",
+ "mujoco": "3.15.0",
+ "mujoco_warp": "3.15.0",
+ "gravity": 0,
+ "steps": 2000,
+ "reps": 3,
+ "worlds": [
+  24,
+  100,
+  730
+ ],
+ "blk": 32,
+ "records": [
+  {
+   "wall_s": [
+    0.711930310993921,
+    0.7122667359944899,
+    0.7117831400028081
+   ],
+   "median_s": 0.711930310993921,
+   "step_us": 355.9651554969605,
+   "world_steps_per_s": 67422.32948754146,
+   "mode": "per-step graph",
+   "checks": {
+    "ctrl_finite": true,
+    "ctrl_std_across_worlds_max": 0.3212434947490692,
+    "ctrl_differs_across_worlds": true,
+    "xfrc_nonzero_fraction": 0.9285714285714286,
+    "xfrc_finite": true,
+    "worlds_with_finite_qpos": 24,
+    "nworld": 24
+   },
+   "fixture": "median",
+   "W": 24,
+   "variant": "cb_perstep"
+  },
+  {
+   "wall_s": [
+    0.7399791630014079,
+    0.7398965210013557,
+    0.7398406990032527
+   ],
+   "median_s": 0.7398965210013557,
+   "step_us": 369.94826050067786,
+   "world_steps_per_s": 64873.93660810584,
+   "mode": "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+   "checks": {
+    "ctrl_finite": true,
+    "ctrl_std_across_worlds_max": 0.3212434947490692,
+    "ctrl_differs_across_worlds": true,
+    "xfrc_nonzero_fraction": 0.9285714285714286,
+    "xfrc_finite": true,
+    "worlds_with_finite_qpos": 24,
+    "nworld": 24
+   },
+   "fixture": "median",
+   "W": 24,
+   "variant": "cb_rollout"
+  },
+  {
+   "wall_s": [
+    0.5408322200019029,
+    0.5406479559969739,
+    0.5407403270000941
+   ],
+   "median_s": 0.5407403270000941,
+   "step_us": 270.37016350004706,
+   "world_steps_per_s": 88767.19120671695,
+   "mode": "per-step graph",
+   "fixture": "median",
+   "W": 24,
+   "variant": "nocb_perstep"
+  },
+  {
+   "wall_s": [
+    0.566896034993988,
+    0.5676066340020043,
+    0.5676272319979034
+   ],
+   "median_s": 0.5676066340020043,
+   "step_us": 283.80331700100214,
+   "world_steps_per_s": 84565.6078075904,
+   "mode": "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+   "fixture": "median",
+   "W": 24,
+   "variant": "nocb_rollout"
+  },
+  {
+   "wall_s": [
+    0.8107013939952594,
+    0.8107609310027328,
+    0.8148929860035423
+   ],
+   "median_s": 0.8107609310027328,
+   "step_us": 405.3804655013664,
+   "world_steps_per_s": 246681.84214629585,
+   "mode": "per-step graph",
+   "checks": {
+    "ctrl_finite": true,
+    "ctrl_std_across_worlds_max": 0.32029473781585693,
+    "ctrl_differs_across_worlds": true,
+    "xfrc_nonzero_fraction": 0.9285714285714286,
+    "xfrc_finite": true,
+    "worlds_with_finite_qpos": 100,
+    "nworld": 100
+   },
+   "fixture": "median",
+   "W": 100,
+   "variant": "cb_perstep"
+  },
+  {
+   "wall_s": [
+    0.8315810790008982,
+    0.8320353439994506,
+    0.8315462479949929
+   ],
+   "median_s": 0.8315810790008982,
+   "step_us": 415.7905395004491,
+   "world_steps_per_s": 240505.71261228033,
+   "mode": "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+   "checks": {
+    "ctrl_finite": true,
+    "ctrl_std_across_worlds_max": 0.32029473781585693,
+    "ctrl_differs_across_worlds": true,
+    "xfrc_nonzero_fraction": 0.9285714285714286,
+    "xfrc_finite": true,
+    "worlds_with_finite_qpos": 100,
+    "nworld": 100
+   },
+   "fixture": "median",
+   "W": 100,
+   "variant": "cb_rollout"
+  },
+  {
+   "wall_s": [
+    0.630119776003994,
+    0.6299119770046673,
+    0.6289017750023049
+   ],
+   "median_s": 0.6299119770046673,
+   "step_us": 314.95598850233364,
+   "world_steps_per_s": 317504.67890931707,
+   "mode": "per-step graph",
+   "fixture": "median",
+   "W": 100,
+   "variant": "nocb_perstep"
+  },
+  {
+   "wall_s": [
+    0.64398915500351,
+    0.6439567850029562,
+    0.644093040995358
+   ],
+   "median_s": 0.64398915500351,
+   "step_us": 321.994577501755,
+   "world_steps_per_s": 310564.2361305136,
+   "mode": "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+   "fixture": "median",
+   "W": 100,
+   "variant": "nocb_rollout"
+  },
+  {
+   "wall_s": [
+    1.1652478290052386,
+    1.1652602719987044,
+    1.1651898529962637
+   ],
+   "median_s": 1.1652478290052386,
+   "step_us": 582.6239145026193,
+   "world_steps_per_s": 1252952.3451216284,
+   "mode": "per-step graph",
+   "checks": {
+    "ctrl_finite": true,
+    "ctrl_std_across_worlds_max": 0.3317191004753113,
+    "ctrl_differs_across_worlds": true,
+    "xfrc_nonzero_fraction": 0.9285714285714286,
+    "xfrc_finite": true,
+    "worlds_with_finite_qpos": 730,
+    "nworld": 730
+   },
+   "fixture": "median",
+   "W": 730,
+   "variant": "cb_perstep"
+  },
+  {
+   "wall_s": [
+    1.1925919580025948,
+    1.1882797379948897,
+    1.1881883159949211
+   ],
+   "median_s": 1.1882797379948897,
+   "step_us": 594.1398689974449,
+   "world_steps_per_s": 1228666.9151353305,
+   "mode": "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+   "checks": {
+    "ctrl_finite": true,
+    "ctrl_std_across_worlds_max": 0.3317191004753113,
+    "ctrl_differs_across_worlds": true,
+    "xfrc_nonzero_fraction": 0.9285714285714286,
+    "xfrc_finite": true,
+    "worlds_with_finite_qpos": 730,
+    "nworld": 730
+   },
+   "fixture": "median",
+   "W": 730,
+   "variant": "cb_rollout"
+  },
+  {
+   "wall_s": [
+    0.9783697960010613,
+    0.9783310910061118,
+    0.9785051880026003
+   ],
+   "median_s": 0.9783697960010613,
+   "step_us": 489.1848980005306,
+   "world_steps_per_s": 1492278.2836996086,
+   "mode": "per-step graph",
+   "fixture": "median",
+   "W": 730,
+   "variant": "nocb_perstep"
+  },
+  {
+   "wall_s": [
+    1.0065447749948362,
+    1.0006753119960194,
+    1.0005939789989498
+   ],
+   "median_s": 1.0006753119960194,
+   "step_us": 500.3376559980097,
+   "world_steps_per_s": 1459014.70986406,
+   "mode": "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+   "fixture": "median",
+   "W": 730,
+   "variant": "nocb_rollout"
+  },
+  {
+   "wall_s": [
+    0.7787499289988773,
+    0.7792281010042643,
+    0.7789103699979023
+   ],
+   "median_s": 0.7789103699979023,
+   "step_us": 389.45518499895115,
+   "world_steps_per_s": 61624.54866293444,
+   "mode": "per-step graph",
+   "checks": {
+    "ctrl_finite": true,
+    "ctrl_std_across_worlds_max": 0.33728888630867004,
+    "ctrl_differs_across_worlds": true,
+    "xfrc_nonzero_fraction": 0.95,
+    "xfrc_finite": true,
+    "worlds_with_finite_qpos": 24,
+    "nworld": 24
+   },
+   "fixture": "rotor_median",
+   "W": 24,
+   "variant": "cb_perstep"
+  },
+  {
+   "wall_s": [
+    0.811652400996536,
+    0.8115745169998263,
+    0.8115869739995105
+   ],
+   "median_s": 0.8115869739995105,
+   "step_us": 405.79348699975526,
+   "world_steps_per_s": 59143.383935125785,
+   "mode": "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+   "checks": {
+    "ctrl_finite": true,
+    "ctrl_std_across_worlds_max": 0.33728891611099243,
+    "ctrl_differs_across_worlds": true,
+    "xfrc_nonzero_fraction": 0.95,
+    "xfrc_finite": true,
+    "worlds_with_finite_qpos": 24,
+    "nworld": 24
+   },
+   "fixture": "rotor_median",
+   "W": 24,
+   "variant": "cb_rollout"
+  },
+  {
+   "wall_s": [
+    0.546771309003816,
+    0.5466437440045411,
+    0.546459616998618
+   ],
+   "median_s": 0.5466437440045411,
+   "step_us": 273.32187200227054,
+   "world_steps_per_s": 87808.56001088939,
+   "mode": "per-step graph",
+   "fixture": "rotor_median",
+   "W": 24,
+   "variant": "nocb_perstep"
+  },
+  {
+   "wall_s": [
+    0.5715279810028733,
+    0.5710560849984176,
+    0.571252376998018
+   ],
+   "median_s": 0.571252376998018,
+   "step_us": 285.626188499009,
+   "world_steps_per_s": 84025.90856994638,
+   "mode": "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+   "fixture": "rotor_median",
+   "W": 24,
+   "variant": "nocb_rollout"
+  },
+  {
+   "wall_s": [
+    0.8595148570020683,
+    0.859433393998188,
+    0.8595418379991315
+   ],
+   "median_s": 0.8595148570020683,
+   "step_us": 429.75742850103416,
+   "world_steps_per_s": 232689.40422692278,
+   "mode": "per-step graph",
+   "checks": {
+    "ctrl_finite": true,
+    "ctrl_std_across_worlds_max": 0.327241450548172,
+    "ctrl_differs_across_worlds": true,
+    "xfrc_nonzero_fraction": 0.95,
+    "xfrc_finite": true,
+    "worlds_with_finite_qpos": 100,
+    "nworld": 100
+   },
+   "fixture": "rotor_median",
+   "W": 100,
+   "variant": "cb_perstep"
+  },
+  {
+   "wall_s": [
+    0.8830041110049933,
+    0.8830104730004678,
+    0.8830699120007921
+   ],
+   "median_s": 0.8830104730004678,
+   "step_us": 441.5052365002339,
+   "world_steps_per_s": 226497.879827405,
+   "mode": "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+   "checks": {
+    "ctrl_finite": true,
+    "ctrl_std_across_worlds_max": 0.327241450548172,
+    "ctrl_differs_across_worlds": true,
+    "xfrc_nonzero_fraction": 0.95,
+    "xfrc_finite": true,
+    "worlds_with_finite_qpos": 100,
+    "nworld": 100
+   },
+   "fixture": "rotor_median",
+   "W": 100,
+   "variant": "cb_rollout"
+  },
+  {
+   "wall_s": [
+    0.5904851259983843,
+    0.5907698809969588,
+    0.5868540139999823
+   ],
+   "median_s": 0.5904851259983843,
+   "step_us": 295.24256299919216,
+   "world_steps_per_s": 338704.5518917055,
+   "mode": "per-step graph",
+   "fixture": "rotor_median",
+   "W": 100,
+   "variant": "nocb_perstep"
+  },
+  {
+   "wall_s": [
+    0.6135524929995881,
+    0.6137169889989309,
+    0.6136601219986915
+   ],
+   "median_s": 0.6136601219986915,
+   "step_us": 306.83006099934573,
+   "world_steps_per_s": 325913.30743245926,
+   "mode": "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+   "fixture": "rotor_median",
+   "W": 100,
+   "variant": "nocb_rollout"
+  },
+  {
+   "wall_s": [
+    1.469557247000921,
+    1.4695619179983623,
+    1.4695051339949714
+   ],
+   "median_s": 1.469557247000921,
+   "step_us": 734.7786235004605,
+   "world_steps_per_s": 993496.5126262176,
+   "mode": "per-step graph",
+   "checks": {
+    "ctrl_finite": true,
+    "ctrl_std_across_worlds_max": 0.33028095960617065,
+    "ctrl_differs_across_worlds": true,
+    "xfrc_nonzero_fraction": 0.95,
+    "xfrc_finite": true,
+    "worlds_with_finite_qpos": 730,
+    "nworld": 730
+   },
+   "fixture": "rotor_median",
+   "W": 730,
+   "variant": "cb_perstep"
+  },
+  {
+   "wall_s": [
+    1.4991797379989293,
+    1.498592063995602,
+    1.4989765229984187
+   ],
+   "median_s": 1.4989765229984187,
+   "step_us": 749.4882614992093,
+   "world_steps_per_s": 973997.9096400699,
+   "mode": "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+   "checks": {
+    "ctrl_finite": true,
+    "ctrl_std_across_worlds_max": 0.33028098940849304,
+    "ctrl_differs_across_worlds": true,
+    "xfrc_nonzero_fraction": 0.95,
+    "xfrc_finite": true,
+    "worlds_with_finite_qpos": 730,
+    "nworld": 730
+   },
+   "fixture": "rotor_median",
+   "W": 730,
+   "variant": "cb_rollout"
+  },
+  {
+   "wall_s": [
+    1.1635716939999838,
+    1.163696675997926,
+    1.166786587004026
+   ],
+   "median_s": 1.163696675997926,
+   "step_us": 581.848337998963,
+   "world_steps_per_s": 1254622.4717433173,
+   "mode": "per-step graph",
+   "fixture": "rotor_median",
+   "W": 730,
+   "variant": "nocb_perstep"
+  },
+  {
+   "wall_s": [
+    1.1881591339988518,
+    1.1880933809952694,
+    1.1882034650043352
+   ],
+   "median_s": 1.1881591339988518,
+   "step_us": 594.0795669994259,
+   "world_steps_per_s": 1228791.6308703907,
+   "mode": "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+   "fixture": "rotor_median",
+   "W": 730,
+   "variant": "nocb_rollout"
+  }
+ ],
+ "fits": {
+  "median": {
+   "cb_perstep": {
+    "a_ms": 0.36097669647702746,
+    "b_us": 0.3056667986766563,
+    "r2": 0.9878162505204399,
+    "points_us": [
+     355.9651554969605,
+     405.3804655013664,
+     582.6239145026193
+    ],
+    "W": [
+     24,
+     100,
+     730
+    ],
+    "class": "CONFIRMED"
+   },
+   "cb_rollout": {
+    "a_ms": 0.37336234648048255,
+    "b_us": 0.30420565521911525,
+    "r2": 0.9907095224836004,
+    "points_us": [
+     369.94826050067786,
+     415.7905395004491,
+     594.1398689974449
+    ],
+    "W": [
+     24,
+     100,
+     730
+    ],
+    "class": "CONFIRMED"
+   },
+   "nocb_perstep": {
+    "a_ms": 0.2736225574742043,
+    "b_us": 0.29700629693243374,
+    "r2": 0.9908513363617426,
+    "points_us": [
+     270.37016350004706,
+     314.95598850233364,
+     489.1848980005306
+    ],
+    "W": [
+     24,
+     100,
+     730
+    ],
+    "class": "CONFIRMED"
+   },
+   "nocb_rollout": {
+    "a_ms": 0.2840073744859386,
+    "b_us": 0.297556706139287,
+    "r2": 0.9954150147916767,
+    "points_us": [
+     283.80331700100214,
+     321.994577501755,
+     500.3376559980097
+    ],
+    "W": [
+     24,
+     100,
+     730
+    ],
+    "class": "CONFIRMED"
+   }
+  },
+  "rotor_median": {
+   "cb_perstep": {
+    "a_ms": 0.37930656143927766,
+    "b_us": 0.4872032232817483,
+    "r2": 0.9999240681066848,
+    "points_us": [
+     389.45518499895115,
+     429.75742850103416,
+     734.7786235004605
+    ],
+    "W": [
+     24,
+     100,
+     730
+    ],
+    "class": "CONFIRMED"
+   },
+   "cb_rollout": {
+    "a_ms": 0.3934557979129347,
+    "b_us": 0.4876107625999936,
+    "r2": 0.9999871803083057,
+    "points_us": [
+     405.79348699975526,
+     441.5052365002339,
+     749.4882614992093
+    ],
+    "W": [
+     24,
+     100,
+     730
+    ],
+    "class": "CONFIRMED"
+   },
+   "nocb_perstep": {
+    "a_ms": 0.2570935925558381,
+    "b_us": 0.4439484722867818,
+    "r2": 0.9988100835620064,
+    "points_us": [
+     273.32187200227054,
+     295.24256299919216,
+     581.848337998963
+    ],
+    "W": [
+     24,
+     100,
+     730
+    ],
+    "class": "CONFIRMED"
+   },
+   "nocb_rollout": {
+    "a_ms": 0.26904000188583216,
+    "b_us": 0.4442808089464688,
+    "r2": 0.9986581902013455,
+    "points_us": [
+     285.626188499009,
+     306.83006099934573,
+     594.0795669994259
+    ],
+    "W": [
+     24,
+     100,
+     730
+    ],
+    "class": "CONFIRMED"
+   }
+  }
+ },
+ "delta_fits": {
+  "median": {
+   "perstep": {
+    "a_ms": 0.08735413900282292,
+    "b_us": 0.00866050174422271,
+    "r2": 0.7194719862062036,
+    "points_us": [
+     85.59499199691345,
+     90.42447699903278,
+     93.43901650208869
+    ],
+    "W": [
+     24,
+     100,
+     730
+    ]
+   },
+   "rollout": {
+    "a_ms": 0.08935497199454381,
+    "b_us": 0.006648949079828487,
+    "r2": 0.3399862218049944,
+    "points_us": [
+     86.14494349967572,
+     93.79596199869411,
+     93.80221299943514
+    ],
+    "W": [
+     24,
+     100,
+     730
+    ]
+   }
+  },
+  "rotor_median": {
+   "perstep": {
+    "a_ms": 0.12221296888343967,
+    "b_us": 0.04325475099496627,
+    "r2": 0.8301008287291829,
+    "points_us": [
+     116.13331299668062,
+     134.514865501842,
+     152.93028550149756
+    ],
+    "W": [
+     24,
+     100,
+     730
+    ]
+   },
+   "rollout": {
+    "a_ms": 0.12441579602710254,
+    "b_us": 0.0433299536535249,
+    "r2": 0.8988005137408654,
+    "points_us": [
+     120.16729850074626,
+     134.67517550088814,
+     155.40869449978345
+    ],
+    "W": [
+     24,
+     100,
+     730
+    ]
+   }
+  }
+ },
+ "dropped": "none",
+ "rollout_modes": [
+  "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+  "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+  "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+  "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+  "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+  "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+  "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+  "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+  "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+  "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+  "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))",
+  "unrolled 2000-step graph (capture_while failed: RuntimeError: Conditional body graph contains an unsupported operation (memory allocation))"
+ ],
+ "fixture_dims": {
+  "median": {
+   "nbody": 14,
+   "nq": 19,
+   "nv": 18,
+   "nu": 12
+  },
+  "rotor_median": {
+   "nbody": 20,
+   "nq": 25,
+   "nv": 24,
+   "nu": 18
+  }
+ },
+ "mlp_used": "tile",
+ "mlp_fallback_reason": null,
+ "wall_s": 1523.0721982579998,
+ "outcome": "CONFIRMED",
+ "by": "median cb_perstep: a = 0.361 ms, b = 0.306 us -> CONFIRMED; median cb_rollout: a = 0.373 ms, b = 0.304 us -> CONFIRMED; rotor_median cb_perstep: a = 0.379 ms, b = 0.487 us -> CONFIRMED; rotor_median cb_rollout: a = 0.393 ms, b = 0.488 us -> CONFIRMED",
+ "outcome_rule": "headline = the per-step captured-graph callback variant on both fixtures (worst class wins); the rollout variant is reported beside it"
+}

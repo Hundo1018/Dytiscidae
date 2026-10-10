@@ -411,6 +411,36 @@ def test_curator_quarantines_repeat_exploits() -> None:
           c.select_parent() is None)
 
 
+def test_a_tier2_failure_does_not_make_the_best_design_the_worst_parent() -> None:
+    print("\ncurator: a Tier-2 outcome is a flag, not a cap on fitness")
+    from dytiscidae.evolution.islands import Archipelago
+    a = Archive([("m", 0.0, 1.0, 4), ("d", 0.0, 1.0, 4)])
+    c = Curator(a, seed=0)
+    for g, fit, bd in (("g9", 0.9, (0.1, 0.1)), ("g8", 0.8, (0.1, 0.4)),
+                       ("g7", 0.7, (0.1, 0.6)), ("g6", 0.6, (0.4, 0.1)),
+                       ("g5", 0.5, (0.4, 0.4))):
+        a.add(g, fit, np.array(bd), {"feasible": True})
+    check("five cells are filled", len(a.cells) == 5, f"{len(a.cells)}")
+    best = a.best
+    c.record_promotion(best, 0.1)
+    check("the best design keeps its fitness", best.fitness == 0.9, f"{best.fitness}")
+    check("and is marked verified", best.tier == 2, f"tier={best.tier}")
+    check("the Tier-2 outcome is stored beside it",
+          best.meta.get("tier2_fitness") == 0.1, f"{best.meta.get('tier2_fitness')}")
+    check("with the generation it was read at",
+          best.meta.get("tier2_gen") == a.generation, f"{best.meta.get('tier2_gen')}")
+    check("the archive's best is still that design", a.best is best)
+    check("a verified design is not promoted again", c.should_promote(best) is False)
+    arch = Archipelago(migrate_every=1, n_migrants=2)
+    arch.register("water", a, c)
+    check("migration still sends the best design first",
+          arch.emigrants("water")[0] is best.genome)
+    second = next(e for e in a.cells.values() if e.fitness == 0.8)
+    c.record_promotion(second, 0.2)
+    pool = [e.fitness for e in c.promotion_candidates(3)]
+    check("the promotion pool skips verified designs", pool == [0.7, 0.6, 0.5], f"{pool}")
+
+
 def test_cmaes_optimises_a_known_function() -> None:
     """Sanity: CMA-ES must solve a shifted sphere and an ill-conditioned ellipse."""
     print("\ncmaes: convergence")
@@ -955,6 +985,161 @@ def test_cells_hold_a_pareto_front_not_a_weighted_sum() -> None:
           f"sampled {sorted(picked)} from front {sorted(e.genome for e in a.front(cell))}")
 
 
+def test_margins_alone_cannot_fill_a_cell() -> None:
+    """A design below the competence floor holds a cell only while it is empty.
+
+    ARCH51_SPEC L3 (F1, F2): margins are objectives 1 and 2, and a design that
+    cannot do anything in its island's media can still have large ones.  Before
+    this rule such a design was non-dominated against a ranked incumbent and
+    joined its front.
+    """
+    print("\narchive: the competence floor in a cell")
+    from dytiscidae.evolution.archive import Archive
+
+    axes = [("a", 0.0, 1.0, 4), ("b", 0.0, 1.0, 4)]
+    pt = [0.5, 0.5]
+
+    # F1a: an empty cell accepts a floor candidate.
+    a = Archive(axes)
+    cell = a.cell_of(pt)
+    st = a.add("floor0", 0.0, pt, objectives=np.array([0.0, 3.0, 2.0]), at_floor=True)
+    check("an empty cell accepts a floor candidate as new",
+          st == "new" and [e.genome for e in a.front(cell)] == ["floor0"]
+          and a.front(cell)[0].at_floor, f"{st}")
+
+    # F1b: a floor challenger never joins a ranked incumbent's front.
+    b = Archive(axes)
+    b.add("ranked", 0.5, pt, objectives=np.array([0.5, 1.0, 1.0]))
+    would = b.would_add(0.0, pt, objectives=np.array([0.0, 3.0, 2.0]), at_floor=True)
+    st = b.add("floor", 0.0, pt, objectives=np.array([0.0, 3.0, 2.0]), at_floor=True)
+    check("a floor challenger with larger margins is rejected by a ranked incumbent",
+          st == "rejected" and [e.genome for e in b.front(cell)] == ["ranked"],
+          f"{st}, front={[e.genome for e in b.front(cell)]}")
+    check("would_add(at_floor=True) equals add's status (rejected)",
+          would == st, f"would_add={would} add={st}")
+
+    # F1c: a floor challenger with higher margins against a floor incumbent.
+    c = Archive(axes)
+    c.add("floor_a", 0.0, pt, objectives=np.array([0.0, 1.0, 1.0]), at_floor=True)
+    would = c.would_add(0.0, pt, objectives=np.array([0.0, 3.0, 2.0]), at_floor=True)
+    st = c.add("floor_b", 0.0, pt, objectives=np.array([0.0, 3.0, 2.0]), at_floor=True)
+    check("a floor challenger with higher margins is rejected by a floor incumbent",
+          st == "rejected" and [e.genome for e in c.front(cell)] == ["floor_a"],
+          f"{st}, front={[e.genome for e in c.front(cell)]}")
+    check("would_add(at_floor=True) equals add's status (floor vs floor)",
+          would == st, f"would_add={would} add={st}")
+
+    # F2: a ranked design entering a cell held by a floor member displaces it.
+    d = Archive(axes)
+    d.add("floor", 0.0, pt, objectives=np.array([0.0, 3.0, 2.0]), at_floor=True)
+    would = d.would_add(0.3, pt, objectives=np.array([0.3, 1.0, 1.0]))
+    st = d.add("ranked", 0.3, pt, objectives=np.array([0.3, 1.0, 1.0]))
+    check("a ranked design entering a floor member's cell leaves the front [ranked]",
+          st == "improved" and [e.genome for e in d.front(cell)] == ["ranked"]
+          and d.cells[cell].genome == "ranked",
+          f"{st}, front={[e.genome for e in d.front(cell)]}")
+    check("would_add agrees on the F2 entry", would == st, f"would_add={would} add={st}")
+
+    # F2b: a floor member with margins no ranked design beats is still displaced.
+    e = Archive(axes)
+    e.add("floor1", 0.0, pt, objectives=np.array([0.0, 9.0, 9.0]), at_floor=True)
+    e.add("ranked", 0.3, pt, objectives=np.array([0.3, 1.0, 1.0]))
+    st = e.add("ranked2", 0.2, pt, objectives=np.array([0.2, 3.0, 0.5]))
+    check("ranked designs trade off among themselves, floor members stay gone",
+          st == "improved"
+          and sorted(x.genome for x in e.front(cell)) == ["ranked", "ranked2"],
+          f"{st}, front={sorted(x.genome for x in e.front(cell))}")
+
+    # Omitting at_floor reproduces the old verdicts (cf. the Pareto test above).
+    f = Archive(axes)
+    f.add("fast", 0.50, pt, objectives=np.array([0.50, 0.05, 0.05]))
+    st = f.add("robust", 0.72, pt, objectives=np.array([0.49, 2.80, 1.90]))
+    st2 = f.add("worse", 0.41, pt, objectives=np.array([0.40, 0.02, 0.02]))
+    check("at_floor omitted: the old verdicts (trade-off kept, dominated rejected)",
+          st == "improved" and st2 == "rejected"
+          and sorted(x.genome for x in f.front(cell)) == ["fast", "robust"],
+          f"{st}, {st2}")
+
+
+def test_a_cells_score_is_the_median_of_its_draws() -> None:
+    """An elite's score is the lower median of its draws, not its luckiest one.
+
+    ARCH51_SPEC L8 (N11): `Archive.record_draw` keeps up to `draw_depth` draws on
+    the elite, orders them by blend, and swaps the lower-median draw's score,
+    objectives and scored meta in together, then re-settles the cell's front.
+    """
+    print("\narchive: a score is the median of its draws")
+    import json
+    import tempfile
+    from dytiscidae.evolution.archive import Archive
+
+    axes = [("a", 0.0, 1.0, 4), ("b", 0.0, 1.0, 4)]
+    pt = [0.5, 0.5]
+
+    def d(b, s):
+        return {"base": b, "fit": b, "obj": [b, 1, 1], "at_floor": False,
+                "meta": {"eval_seed": s, "water": b}}
+
+    # (a) the first draw was 0.9; two lower ones follow, the median is the 0.5.
+    a = Archive(axes)
+    cell = a.cell_of(pt)
+    a.add("A", 0.9, pt, meta={"eval_seed": 1}, objectives=np.array([0.9, 1.0, 1.0]))
+    A = a.front(cell)[0]
+    a.record_draw(A, d(0.2, 11))
+    info = a.record_draw(A, d(0.5, 12))
+    check("three draws 0.9, 0.2, 0.5 score as the 0.5, with that draw's seed",
+          A.fitness == 0.5 and A.meta["eval_seed"] == 12 and A.objectives[0] == 0.5
+          and info["n"] == 3 and info["median_base"] == 0.5,
+          f"fitness={A.fitness} seed={A.meta.get('eval_seed')} obj0={A.objectives[0]}")
+
+    # (b) with two draws the lower median is an actual draw, not their mean.
+    b = Archive(axes)
+    b.add("B", 0.9, pt, objectives=np.array([0.9, 1.0, 1.0]))
+    B = b.front(cell)[0]
+    b.record_draw(B, d(0.2, 21))
+    check("two draws 0.9 and 0.2 score as the lower one, 0.2",
+          B.fitness == 0.2 and B.meta["eval_seed"] == 21, f"fitness={B.fitness}")
+
+    # (c) the buffer is bounded at draw_depth.
+    for i in range(10):
+        b.record_draw(B, d(0.3 + 0.01 * i, 30 + i))
+    check("after 10 more draws the buffer holds 8", len(B.meta["draws"]) == 8,
+          f"{len(B.meta['draws'])}")
+    b.record_draw(B, d(0.6, 99), depth=3)
+    check("an explicit depth trims to it", len(B.meta["draws"]) == 3,
+          f"{len(B.meta['draws'])}")
+
+    # (d) a re-scored member that is now dominated leaves the front.
+    c = Archive(axes)
+    c.add("A2", 0.9, pt, objectives=np.array([0.9, 1.0, 1.0]))
+    c.add("B", 0.6, pt, objectives=np.array([0.6, 2.0, 2.0]))
+    A2 = next(e for e in c.front(cell) if e.genome == "A2")
+    before = sorted(e.genome for e in c.front(cell))
+    c.record_draw(A2, d(0.5, 41))
+    c.record_draw(A2, d(0.4, 42))
+    check("a front of A2 [.9,1,1] and B [.6,2,2] becomes [B] once A2's median is 0.5",
+          before == ["A2", "B"] and [e.genome for e in c.front(cell)] == ["B"]
+          and c.cells[cell].genome == "B",
+          f"before={before} front={[e.genome for e in c.front(cell)]}")
+
+    # (e) export_json writes each draw as a row, not the weights it carries.
+    e = Archive(axes)
+    e.add("E", 0.9, pt, objectives=np.array([0.9, 1.0, 1.0]))
+    E = e.front(cell)[0]
+    e.record_draw(E, dict(d(0.2, 51), meta={"eval_seed": 51, "gen": 7, "water": 0.2,
+                                              "policy": [0.0] * 4}))
+    with tempfile.TemporaryDirectory() as tmp:
+        e.export_json(f"{tmp}/archive.json")
+        doc = json.loads(open(f"{tmp}/archive.json").read())
+        row = doc["elites"][0]
+    check("export_json writes draws as base/fit/eval_seed/gen/air/water/land rows",
+          len(row["draws"]) == 2 and "draws" not in row["meta"]
+          and "draws" not in doc["summary"]["best_meta"]
+          and row["draws"][1] == {"base": 0.2, "fit": 0.2, "eval_seed": 51, "gen": 7,
+                                  "air": None, "water": 0.2, "land": None},
+          f"{row['draws']}")
+
+
 def test_intervention_is_triggered_by_evidence_not_a_schedule() -> None:
     """When to intervene must come from the data, not from a number I typed.
 
@@ -1424,9 +1609,34 @@ def test_the_heading_pair_cancels_what_the_command_did_not_choose() -> None:
         check(f"{label}: the pair's mean signed progress is zero on both paths",
               worst < 1e-12, f"worst |mean| {worst:.2e}")
         gap = max(abs(a.segments[m].competence - b.segments[m].competence)
-                  for a, b in zip(single, batch) for m in ("water", "land"))
+                  for a, b in zip(single, batch) for m in ("water", "land", "air"))
         check(f"{label}: the two paths agree on the paired score", gap < 1e-9,
               f"max gap {gap:.2e}")
+        # Air, since 2026-10-10: a mirrored pair of turns, and height paying
+        # only as far as the machine turned when told.  Neither a still body
+        # nor an open-loop gait reads the command, so both score zero.
+        air = [r.segments["air"] for r in single + batch if "air" in r.segments]
+        check(f"{label}: air pays nothing for a turn the command did not choose",
+              air and all(x.competence == 0.0 for x in air)
+              and all(x.measurements.get("pair_turn_mean", 0.0) <= 1e-12 for x in air),
+              f"air {[round(x.competence, 4) for x in air]}, turn mean "
+              f"{[round(x.measurements.get('pair_turn_mean', float('nan')), 3) for x in air]}")
+
+    from dytiscidae.envs.tasks import mirror, pair_of
+    from dytiscidae.envs.triphibian import air_task
+    check("air height pays only through the turn",
+          air_task(0.0, 1.0) == 0.0 and air_task(1.0, 0.0) == 0.5
+          and air_task(1.0, 1.0) == 1.0 and air_task(0.4, 1.0) == 0.4,
+          f"{[air_task(*x) for x in ((0, 1), (1, 0), (1, 1), (0.4, 1))]}")
+    ta = schedule_for("air", np.random.default_rng(4))
+    turns = [ph.heading for ph in ta.phases]
+    mturns = [ph.heading for ph in mirror(ta).phases]
+    check("the air pair mirrors the turn and keeps the straight phase",
+          mturns[0] == turns[0] == 0.0 and abs(mturns[1] + turns[1]) < 1e-12
+          and turns[1] != 0.0, f"{turns} -> {mturns}")
+    check("pair_of mirrors air and takes the antipode elsewhere",
+          [ph.heading for ph in pair_of(ta).phases] == mturns
+          and [ph.heading for ph in pair_of(t).phases] == [ph.heading for ph in antipode(t).phases])
 
 
 def test_tier2_draws_its_headings() -> None:
@@ -2638,6 +2848,94 @@ def test_the_island_objective_takes_its_weight_back() -> None:
           "report() carries the weight actually applied, not a field nothing writes")
 
 
+def test_a_score_of_zero_stands_at_zero() -> None:
+    """A raw score of zero ranks 0, and ties rank at the share strictly below.
+
+    ``<=`` gave a design the whole zero mass of its window as its standing:
+    ROADMAP 2026-10-10 N2 measured that mass at 0.46-0.61 in water and land
+    and 0.97 in air, so a machine that did nothing stood at 0.46-0.97.
+    """
+    print("\ncurriculum: a score of zero stands at zero")
+    from dytiscidae.evolution.curriculum import Curriculum
+
+    c = Curriculum()
+    for _ in range(230):
+        c.observe_blend(0.0, 0.0, 0)
+    for k in range(1, 27):
+        c.observe_blend(0.001 * k, 0.002 * k, 0)
+    check("zero stands at 0 in a window that is 90% zero",
+          c.standing(0.0, 0.0, 0) == (0.0, 0.0)
+          and c.mission_standing(0.0, 0) == 0.0,
+          f"standing(0,0)={c.standing(0.0, 0.0, 0)}, "
+          f"mission_standing(0)={c.mission_standing(0.0, 0)}")
+
+    young = Curriculum()
+    for _ in range(5):
+        young.observe_blend(0.1, 0.1, 3)
+    check("zero stands at 0 in a young window; a non-zero score gets 0.5",
+          young.standing(0.0, 0.3, 3) == (0.0, 0.5),
+          f"standing(0.0, 0.3, 3)={young.standing(0.0, 0.3, 3)}")
+
+    ties = Curriculum()
+    for _ in range(32):
+        ties.observe_blend(0.0, 0.0, 1)
+    for _ in range(16):
+        ties.observe_blend(0.02, 0.02, 1)
+    for _ in range(16):
+        ties.observe_blend(0.5, 0.5, 1)
+    check("a tie takes the share strictly below it",
+          ties.standing(0.02, 0.02, 1)[0] == 0.5,
+          f"standing(0.02, 0.02, 1)[0]={ties.standing(0.02, 0.02, 1)[0]} (want 0.5)")
+
+
+def test_standing_ranks_only_against_designs_above_the_floor() -> None:
+    """A window mostly at the floor must not hand every competent design 0.99.
+
+    ARCH51_SPEC §D' item 2: with the whole window the competent designs sit at
+    0.9-1.0 and the scalar separates them by 0.1, so ``standing`` ranks against
+    the entries not at the competence floor and falls back to 0.5 (zero: 0)
+    when fewer than 12 of those remain.
+    """
+    print("\ncurriculum: standing ranks against the designs above the floor")
+    from dytiscidae.evolution.curriculum import Curriculum
+
+    c = Curriculum()
+    for _ in range(200):
+        c.observe_blend(0.0005, 0.001, 0, 0.0005, at_floor=True)
+    for k in range(1, 13):
+        c.observe_blend(0.01 * k, 0.02 * k, 0, 0.03 * k)
+    # The design holding the second-best ranked score (k = 11): 10 of the 12
+    # ranked entries lie strictly below it.
+    got = c.standing(0.01 * 11, 0.02 * 11, 0)
+    wholly = c.standing(0.01 * 11, 0.02 * 11, 0, floor_only=False)
+    mis = c.mission_standing(0.03 * 11, 0)
+    want = 10 / 12
+    check("the second-best ranked design stands at 10/12 of the ranked entries",
+          abs(got[0] - want) < 1e-12 and abs(got[1] - want) < 1e-12
+          and abs(mis - want) < 1e-12,
+          f"standing={got}, mission_standing={mis}, want {want:.4f}")
+    check("and against the whole window it would stand above 0.95",
+          wholly[0] > 0.95, f"standing(floor_only=False)={wholly}")
+
+    thin = Curriculum()
+    for _ in range(200):
+        thin.observe_blend(0.0005, 0.001, 0, 0.0005, at_floor=True)
+    for k in range(1, 12):
+        thin.observe_blend(0.01 * k, 0.02 * k, 0, 0.03 * k)
+    check("fewer than 12 ranked entries: a non-zero score stands at 0.5, zero at 0",
+          thin.standing(0.01 * 11, 0.02 * 11, 0) == (0.5, 0.5)
+          and thin.standing(0.0, 0.0, 0) == (0.0, 0.0)
+          and thin.mission_standing(0.03 * 11, 0) == 0.5
+          and thin.mission_standing(0.0, 0) == 0.0,
+          f"{thin.standing(0.01 * 11, 0.02 * 11, 0)}, {thin.standing(0.0, 0.0, 0)}")
+
+    old = Curriculum()
+    old._recent[0] = [(0.01 * k, 0.02 * k, 0.03 * k) for k in range(1, 14)]
+    check("a window of 3-tuples from an old checkpoint reads as not at the floor",
+          old.standing(0.065, 0.13, 0)[0] == 6 / 13,
+          f"{old.standing(0.065, 0.13, 0)}")
+
+
 def test_curriculum_and_islands_give_gradient_where_the_mission_gives_none() -> None:
     """A design that is good at one thing must be distinguishable from a design
     that is good at nothing.
@@ -3070,24 +3368,74 @@ def test_an_audit_perturbs_the_scored_experiment_and_nothing_else() -> None:
             e.genome = BODY_PLANS["gannet"]()
             e.meta["policy"] = None
             e.meta["eval_seed"] = 5
+            # A recorded score the re-run does not reproduce (another path and
+            # another network earned it): an audit whose base is the record,
+            # not the re-run, divides by this 0.5 and invalidates the design
+            # (mutation `audit-base-is-the-record`).
+            e.meta["mission_fraction"] = 0.5
         state.auditor = Auditor(held_out_seeds=0, perturbations=(("cd_scale", 1.0),))
         loop_mod._audit(state, 1, MissionSpec(), np.random.default_rng(0))
         rep = state.auditor.reports[-1]
-        # Two checks need only the result; the third is the perturbation, which
-        # runs on a mission above zero or on any medium the design is credited
-        # in (2026-10-06: since water and land are paired, an open-loop gannet's
-        # mission is 0, and on the mission alone the check never ran -- as it
-        # never ran in arch48).
-        check("the perturbation check ran", rep.checks_run == 3,
-              f"{rep.checks_run} checks, credited {sorted(rep.perturbed_by_medium)}")
-        kept = list(rep.perturbed_by_medium.values()) + (
-            [rep.retained_fraction] if rep.retained_fraction is not None else [])
-        check("and a perturbation of x1.0 retains exactly what the scored experiment scored",
-              bool(kept) and all(abs(k - 1.0) < 1e-9 for k in kept) and not rep.invalid,
+        # 2026-10-10: this fixture used to be credited in air by its glide.
+        # Since the paired scores (c8c623d: air is a mirrored turn pair; water
+        # and land are antipodal pairs since PR #32) every open-loop design
+        # scores exactly 0 in every medium -- motion the command did not choose
+        # cancels -- so the audit has no credited medium and no mission base,
+        # and the perturbation ratio would be 0/0.  The auditor must say so
+        # (rule 4) instead of running nothing; the ratio itself is exercised
+        # below with a stub that has a credited medium.
+        check("an open-loop gannet is credited nowhere, and the audit says it cannot measure",
+              not rep.perturbation_measurable
+              and not rep.perturbed_by_medium and rep.retained_fraction is None
+              and any(f.check == "perturbation" and f.severity == "note"
+                      and "not measurable" in f.detail for f in rep.findings),
               f"per medium {rep.perturbed_by_medium}, mission {rep.retained_fraction}, "
-              f"invalid {rep.invalid}")
+              f"{[(f.check, f.detail) for f in rep.findings]}")
+        # Two checks need only the result; the third is the perturbation check,
+        # which reports "not measurable" rather than staying silent.
+        check("the perturbation check is counted, and is not an invalidation",
+              rep.checks_run == 3 and not rep.invalid, f"{rep.checks_run} checks")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+    # The ratio, with a credited medium: a stub whose competence is 0.4 * factor
+    # only at the seed the elite was scored at, and 0.1 at any other.
+    from dytiscidae.evolution.auditor import Auditor
+
+    class Ph:
+        mass, wing_area = 5.0, 0.5
+
+    class Seg:
+        mean_power, duration = 0.0, 1.0
+
+        def __init__(self, c):
+            self.competence = c
+
+    class Res:
+        def __init__(self, mf, **media):
+            self.mission_fraction = mf
+            self.segments = {k: Seg(v) for k, v in media.items()}
+
+    eval_seed = 7
+    asked = []
+
+    def stub(seed=0, perturb=None):
+        asked.append(seed)
+        factor = 1.0 if not perturb else float(next(iter(perturb.values())))
+        return Res(0.0, water=0.4 * factor if seed == eval_seed else 0.1)
+
+    scored = Res(0.0, water=0.4)
+    rep = Auditor(held_out_seeds=0, perturbations=(("cd_scale", 1.0),)).audit(
+        Ph(), scored, reevaluate=stub, seed=eval_seed, name="stub")
+    check("a perturbation of x1.0 at the elite's own seed retains exactly 1",
+          rep.perturbed_by_medium == {"water": 1.0} and not rep.invalid
+          and rep.perturbation_measurable and asked == [eval_seed],
+          f"per medium {rep.perturbed_by_medium}, seeds {asked}, invalid {rep.invalid}")
+    rep = Auditor(held_out_seeds=0, perturbations=(("cd_scale", 0.8),)).audit(
+        Ph(), scored, reevaluate=stub, seed=eval_seed, name="stub")
+    check("and a real perturbation retains the ratio the perturbation caused",
+          abs(rep.perturbed_by_medium.get("water", -1) - 0.8) < 1e-9,
+          f"{rep.perturbed_by_medium}")
 
 
 def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
@@ -3122,10 +3470,48 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
             # and Tier-2 legs (`ActorPool.map`) go through real processes (AL).
             workers=2, min_shard=1,
             promotion_refine_steps=2), MissionSpec())
-        events = [json.loads(l) for l in open(Path(tmp) / "events.jsonl")]
+        def _read_events():
+            return [json.loads(l) for l in open(Path(tmp) / "events.jsonl")]
+
+        # ARCH51_SPEC A.0 and D' item 4 (L5): a design competent in none of its
+        # island's media stands at fitness 0 and flagged `at_floor`, so
+        # `archive.best.fitness == 0` and `Curator.should_promote`
+        # (`fitness > 0.85 * best`) promotes nothing.  That is the design, not a
+        # fault.  Measured 2026-10-10 (runs/promo_floor_trial*.log): with 2 seed
+        # plans at 0.5 / 1 / 2 / 4 s on the generalist island, and with all 8
+        # seed plans at 8 s on the air, water and generalist islands, every
+        # seed's recorded air, water and land competence is exactly 0.0 at its
+        # draw, so no `segment_seconds` or island choice makes a seed clear the
+        # 0.012 floor.  The test therefore (1) pins that nothing at the floor
+        # promotes, then (2) lifts one elite above the floor by hand and drives
+        # the verification round directly, which is what this test is about.
+        events = _read_events()
+        promotions = [e for e in events if e.get("kind") == "promote"]
+        check("nothing at the competence floor promotes (ARCH51_SPEC D' item 4)",
+              len(promotions) == 0 and state.archive.best is not None
+              and state.archive.best.fitness == 0.0,
+              f"{len(promotions)} promotions, best fitness "
+              f"{getattr(state.archive.best, 'fitness', None)}")
+
+        from dytiscidae.envs.actors import ActorPool
+        from dytiscidae.evolution import loop as _loop
+        lifted = next(iter(state.archive.cells.values()))
+        lifted.fitness = 0.5
+        lifted.at_floor = False
+        state.curator.evaluations = max(state.curator.evaluations, 1000)
+        # `run_search` closed its pool on the way out; open a fresh one so the
+        # round's refinement batch and its Tier-1.5 / Tier-2 legs still go
+        # through real worker processes (AL).
+        state.pool = ActorPool(2, min_shard=1, per_worker=state.config.pool_per_worker,
+                               balance=state.config.pool_balance)
+        try:
+            _loop._verify_and_label(state, 2, MissionSpec(), np.random.default_rng(0))
+        finally:
+            state.pool.close()
+        events = _read_events()
         promotions = [e for e in events if e.get("kind") == "promote"]
         errors = [e for e in events if e.get("kind") == "error"]
-        check("verification still promotes", len(promotions) >= 1,
+        check("verification still promotes the lifted elite", len(promotions) >= 1,
               f"{len(promotions)} promotions")
         check("and refinement at promotion raises no errors", not errors,
               f"{[e.get('error') for e in errors[:2]]}")
@@ -3167,6 +3553,506 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
             for k in rec))
         check("promotion drives the recorded basis, not a fresh identification",
               same, f"media {sorted((got.bases or {}) if got else [])} against {sorted(rec)}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_promotion_refinement_is_one_batch() -> None:
+    """Promotion's six trials per elite are one (1+6) step in one batch (IMPL_1010 P2).
+
+    Three elites, a stub evaluator that scores a controller by how close its
+    weights sum to 1.  The parallel mode makes one call of 3 re-scores + 18
+    trials; each elite keeps the best of its own six trials only if it beats
+    its baseline; the serial mode is the old six trips.
+    """
+    print("\nloop: promotion refinement is one batch (IMPL_1010 P2)")
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.evolution import loop
+
+    rec = {"air": {"modes": [[1.0, 0.0], [0.0, 1.0]], "effects": [[1.0, 0.0], [0.0, 1.0]],
+                   "authority": [1.0, 1.0], "medium": "air"}}
+    probe = loop._controller_for(None, None, loop.SearchConfig(), None)
+    nw = probe.n_weights
+
+    def score(c) -> float:
+        return -abs(float(c.policy.weights.sum()) - 1.0)
+
+    calls: list[int] = []
+    scores: list[list[float]] = []
+
+    def stub(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None):
+        calls.append(len(phenos))
+        scores.append([score(c) for c in ctrls])
+        return [NS(mission_fraction=score(c)) for c in ctrls]
+
+    original = loop.batchroll_eval
+    loop.batchroll_eval = stub
+    try:
+        def run(parallel: bool):
+            calls.clear()
+            scores.clear()
+            # The parallel arm uses the default, so a changed default is seen.
+            cfg = (loop.SearchConfig(promotion_refine_steps=6) if parallel
+                   else loop.SearchConfig(promotion_refine_steps=6,
+                                          promotion_refine_parallel=False))
+            state = NS(config=cfg, shared=object(), pool=None)
+            elites = [NS(genome=None, meta={"policy": [0.0] * nw, "mobility_basis": rec})
+                      for _ in range(3)]
+            lg: dict = {}
+            out = loop._refined_controllers_for(state, elites, [NS()] * 3, None,
+                                                np.random.default_rng(0), log=lg)
+            return out, lg
+
+        out, lg = run(True)
+        check("parallel: exactly one batch of 3 re-scores + 18 trials",
+              calls == [21], f"{calls}")
+        ok = len(out) == 3 and all(c is not None for c in out)
+        trial_best = []
+        for i in range(3):
+            trials = scores[0][3 + 6 * i: 3 + 6 * i + 6]
+            trial_best.append(max([scores[0][i]] + trials))
+        check("each elite keeps max(baseline, best of its own six trials)",
+              ok and all(abs(score(out[i]) - trial_best[i]) < 1e-12 for i in range(3)),
+              f"{[score(c) for c in out]} against {trial_best}")
+        be = lg.get("by_elite", {})
+        check("the log carries base and best for each elite, best >= base",
+              len(be) == 3 and all(b[1] >= b[0] for b in be.values())
+              and any(b[1] > b[0] for b in be.values()), f"{be}")
+        out2, lg2 = run(False)
+        check("serial: the old six trips, the first merging the re-score with step one",
+              calls == [6, 3, 3, 3, 3, 3], f"{calls}")
+        check("serial records base and best too",
+              len(lg2.get("by_elite", {})) == 3, f"{lg2.get('by_elite')}")
+    finally:
+        loop.batchroll_eval = original
+
+
+def _floor_state(loop):
+    """A ``SearchState`` stand-in for the scalar's tests: the real archive,
+    curriculum, judge and curator, with the physics-side features stubbed."""
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.evolution.islands import curriculum_for as island_curriculum
+    from dytiscidae.evolution.judge import Judge
+
+    archive = Archive([("x", 0, 1, 5), ("y", 0, 1, 5)])
+    events: list = []
+    tel = NS(event=lambda d: events.append(d), exploit=lambda d: events.append(d))
+    state = NS(config=loop.SearchConfig(), descriptors=None,
+               judge=Judge(quantile=0.9, update_every=50), island="water",
+               archive=archive, curriculum=island_curriculum("water"),
+               critic=None, curator=Curator(archive, seed=0), telemetry=tel,
+               scout=None, shared=None, tier0_rejected=0)
+    return state, events
+
+
+def _floor_result(water):
+    from types import SimpleNamespace as NS
+    seg = NS(competence=float(water), measurements={}, score=float(water))
+    return NS(segments={"water": seg}, mission_fraction=0.0, feasible=True,
+              transitions=None, tier=1, exploit="", wall_time=0.0, notes=[],
+              eval_seed=0, mobility=0.0)
+
+
+def test_the_scalar_stands_at_zero_below_the_competence_floor() -> None:
+    """ARCH51_SPEC L5: a design competent in none of its island's media stands
+    at 0 on every half, is flagged ``at_floor``, and fills only an empty cell."""
+    print("\nloop: the scalar stands at zero below the competence floor")
+    from dytiscidae.evolution import loop
+
+    saved = {k: getattr(loop, k) for k in (
+        "episode_features", "behaviour_descriptor", "objectives",
+        "_meta_light", "critic_features", "_meta")}
+    loop.episode_features = lambda r, p: np.zeros(16)
+    loop.behaviour_descriptor = lambda p, r: np.array([0.5, 0.5])
+    loop.objectives = lambda p, r: np.array([0.0, 3.0, 2.0])
+    loop._meta_light = lambda p, r: {}
+    loop.critic_features = lambda m, r: np.zeros(4)
+    loop._meta = lambda p, r, c: {"air": 0.0, "water": r.segments["water"].competence,
+                                  "land": 0.0}
+    try:
+        state, events = _floor_state(loop)
+        for _ in range(40):
+            state.curriculum.observe_blend(0.0, 0.0, 0)
+        for k in range(1, 25):
+            state.curriculum.observe_blend(0.001 * k, 0.002 * k, 0)
+
+        low = loop._score_candidate(state, None, _floor_result(0.005), None, commit=False)
+        check("(a) a design under the floor is flagged and stands at zero",
+              low["at_floor"] is True and low["isl_q"] == 0.0 and low["cur_q"] == 0.0
+              and low["fit"] == 0.0 and low["obj"][0] == 0.0,
+              f"at_floor={low['at_floor']} isl_q={low['isl_q']} cur_q={low['cur_q']} "
+              f"fit={low['fit']} obj0={low['obj'][0]}")
+
+        hi = loop._score_candidate(state, None, _floor_result(0.2), None, commit=False)
+        blend = hi["w"] * hi["isl_q"] + (1.0 - hi["w"]) * hi["cur_q"]
+        check("(b) a competent design is not flagged, the mission weight is 0, "
+              "and the blend is the two standings",
+              hi["at_floor"] is False and hi["mw"] == 0.0
+              and abs(hi["base"] - blend) < 1e-12 and hi["base"] > 0.5,
+              f"at_floor={hi['at_floor']} mw={hi['mw']} base={hi['base']:.4f} "
+              f"blend={blend:.4f}")
+
+        cell = state.archive.cell_of(np.array([0.5, 0.5]))
+        state.archive.add("incumbent", 0.3, np.array([0.5, 0.5]), {},
+                          objectives=np.array([0.3, 1.0, 1.0]))
+        check("the incumbent holds the cell", cell in state.archive.cells)
+        placed = loop._place(state, "g", None, _floor_result(0.005), None, None, ["scale"])
+        dry = loop._dry_status(state, None, _floor_result(0.005), None)
+        check("(c) a floored design does not displace a ranked incumbent, wet or dry",
+              placed == "rejected" and dry == "rejected"
+              and [e.genome for e in state.archive.front(cell)] == ["incumbent"],
+              f"placed={placed} dry={dry} "
+              f"front={[e.genome for e in state.archive.front(cell)]}")
+    finally:
+        for k, v in saved.items():
+            setattr(loop, k, v)
+
+
+def test_verification_offers_designs_not_yet_verified() -> None:
+    """ARCH51_SPEC L5: the verification round walks ``promotion_candidates``,
+    so two verified elites at the top do not leave it one design to try."""
+    print("\nloop: verification offers designs not yet verified")
+    from dytiscidae.evolution import loop
+
+    state, events = _floor_state(loop)
+    cur = state.curator
+    for g, fit, bd in (("a", 0.9, (0.1, 0.1)), ("b", 0.8, (0.1, 0.4)),
+                       ("c", 0.7, (0.1, 0.6)), ("d", 0.6, (0.4, 0.1)),
+                       ("e", 0.5, (0.4, 0.4))):
+        state.archive.add(g, fit, np.array(bd), {"feasible": True})
+    cur.evaluations = 1000
+    for g in ("a", "b"):
+        cur.record_promotion(next(e for e in state.archive.cells.values()
+                                  if e.genome == g), 0.1)
+    saved = loop.build
+
+    def boom(g):
+        raise RuntimeError(f"built {g}")
+    loop.build = boom
+    try:
+        loop._verify_and_label(state, 0, None, np.random.default_rng(0))
+    finally:
+        loop.build = saved
+    tried = {e["error"].split("built ")[-1] for e in events if e.get("kind") == "error"}
+    check("the round tries exactly the unverified designs c, d and e",
+          tried == {"c", "d", "e"}, f"tried {sorted(tried)}")
+
+
+def _reeval_stub_search(loop, tmp, reeval, generations=4, batch=4, basis=None, kw_log=None):
+    """``run_search`` with the physics stubbed out: every candidate comes back
+    from a fake ``evaluate_candidates`` whose result carries the seed it was
+    asked to run at.  Returns ``(state, calls, events)``; ``calls`` is the
+    ``seeds`` list of each evaluation call, in order."""
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.envs.triphibian import MissionSpec
+
+    saved = {k: getattr(loop, k) for k in (
+        "episode_features", "behaviour_descriptor", "objectives", "_meta_light",
+        "critic_features", "_meta", "evaluate_candidates", "_verify_and_label", "_audit")}
+    n = {"k": 0}
+    calls: list = []
+
+    def fake_eval(genomes, cfg, *, seeds=None, **kw):
+        calls.append(list(seeds or []))
+        idn = kw.get("identify")
+        idn = list(idn) if isinstance(idn, (list, tuple)) else [bool(idn)] * len(genomes)
+        if kw_log is not None:
+            kw_log.append({"identify": idn, "bases": kw.get("bases"),
+                           "ids": [g.genome_id for g in genomes]})
+        out = []
+        for slot, (g, sd) in enumerate(zip(genomes, seeds or [0] * len(genomes))):
+            n["k"] += 1
+            water = 0.2 + 0.001 * (sd % 400)
+            seg = NS(competence=water, measurements={}, score=water, max_depth=0.0,
+                     max_actuator_overload=0.0)
+            res = NS(segments={"water": seg}, mission_fraction=0.0, feasible=True,
+                     transitions=None, tier=1, exploit="", wall_time=0.0, notes=[],
+                     eval_seed=int(sd), mobility=({"air": "id"} if idn[slot] else {}),
+                     diverged_rollouts=0, n_rollouts=1,
+                     energy_margin=0.0, air_gates=[])
+            pheno = NS(report=NS(min_margin=1.0, worst=None, ok=True), genome=g)
+            out.append((pheno, res, None))
+        return out
+
+    loop.episode_features = lambda r, p: np.zeros(16)
+    loop.behaviour_descriptor = lambda p, r: np.array(
+        [(r.eval_seed % 97) / 97.0, (r.eval_seed % 89) / 89.0,
+         (r.eval_seed % 83) / 83.0, (r.eval_seed % 79) / 79.0])
+    loop.objectives = lambda p, r: np.array([0.0, 3.0, 2.0])
+    loop._meta_light = lambda p, r: {}
+    loop.critic_features = lambda m, r: np.zeros(4)
+    loop._meta = lambda p, r, c: {
+        "air": 0.0, "water": r.segments["water"].competence, "land": 0.0,
+        "mission_fraction": 0.0, "energy_margin": 0.0, "tier": 1, "eval_seed": r.eval_seed,
+        "mobility_basis": basis or {}, "mobility_rank": {k: 3 for k in r.mobility},
+        "policy": None, "mass": 1.0, "feasible": True}
+    loop.evaluate_candidates = fake_eval
+    loop._verify_and_label = lambda *a, **k: None
+    loop._audit = lambda *a, **k: None
+    try:
+        cfg = loop.SearchConfig(
+            generations=generations, batch=batch, workers=0, seed=7,
+            n_reference_seeds=4, n_random_seeds=0, islands=("water",),
+            tier2_every=999, audit_every=999, migrate_every=999,
+            checkpoint_every=999, run_dir=tmp, reeval_per_generation=reeval,
+            reeval_depth=3)
+        state = loop.run_search(cfg, MissionSpec())
+        return state, calls, state.telemetry
+    finally:
+        for k, v in saved.items():
+            setattr(loop, k, v)
+
+
+def _read_events(tmp):
+    import json
+    path = Path(tmp) / "events.jsonl"
+    return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+
+
+def test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu() -> None:
+    """ARCH51_SPEC L9, on a stub evaluator (the physics version,
+    ``test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median``,
+    needs the GPU): the same wiring -- the picks, their seeds, ``_reevaluate``,
+    the window it must not feed, the buffer it keeps -- with each candidate's
+    score a function of the seed it was run at."""
+    print("\nloop: a re-evaluation draws a fresh seed, feeds no window, and is "
+          "kept at its median (stub evaluator)")
+    import shutil
+    import tempfile
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.evolution import loop
+
+    tmp = tempfile.mkdtemp(prefix="dyt-reeval-")
+    try:
+        state, calls, _tel = _reeval_stub_search(loop, tmp, reeval=2)
+        evs = _read_events(tmp)
+        rec = [e for e in evs if e.get("kind") == "reevaluate" and e.get("status") == "recorded"]
+        check("(1) at least two re-evaluations were recorded", len(rec) >= 2,
+              f"{len(rec)} recorded of {sum(1 for e in evs if e.get('kind') == 'reevaluate')}")
+        check("(2) each ran at a seed other than the one that first scored the elite",
+              bool(rec) and all(e["eval_seed"] != e["first_eval_seed"] for e in rec),
+              f"{[(e['eval_seed'], e['first_eval_seed']) for e in rec][:4]}")
+        multi = [e for e in state.archive.cells.values() if len(e.meta.get("draws") or []) >= 2]
+        ok = bool(multi)
+        detail = f"{len(multi)} elites with >= 2 draws"
+        for e in multi:
+            dr = e.meta["draws"]
+            order = sorted(range(len(dr)), key=lambda i: dr[i]["base"])
+            med = dr[order[(len(dr) - 1) // 2]]
+            if not (e.meta.get("eval_seed") == med["meta"].get("eval_seed")
+                    and e.meta.get("water") == med["meta"].get("water")
+                    and e.fitness == med["fit"]
+                    and all(d["meta"].get("eval_seed") is not None for d in dr)
+                    and len(dr) <= 3):
+                ok = False
+                detail = f"elite {e.cell}: eval_seed {e.meta.get('eval_seed')} draws " \
+                         f"{[(d['base'], d['meta'].get('eval_seed')) for d in dr]}"
+        check("(3) an elite's seed, medium score and fitness are its lower-median "
+              "draw's, every draw carries its seed, and the buffer holds at most "
+              "reeval_depth", ok, detail)
+        window = sum(len(w) for w in state.curriculum._recent.values())
+        placed = sum(1 for e in evs if e.get("kind") == "evaluate")
+        check("(4) re-evaluations feed no curriculum window: the window holds "
+              "exactly the placed evaluations", window == placed and placed > 0,
+              f"window {window}, evaluate events {placed}")
+        per_gen = {}
+        for e in evs:
+            if e.get("kind") in ("evaluate", "reevaluate", "tier0_reject") \
+                    and e.get("operators") != ["seed"]:
+                per_gen[e["gen"]] = per_gen.get(e["gen"], 0) + 1
+        check("(6) per generation, placed + re-evaluated + rejected = batch",
+              bool(per_gen) and all(v == 4 for v in per_gen.values()),
+              f"{per_gen}")
+        check("each generation is still one evaluation call of `batch` candidates",
+              all(len(c) == 4 for c in calls[1:]), f"{[len(c) for c in calls]}")
+
+        # The off arm: nothing re-evaluated, no buffer anywhere.
+        tmp0 = tempfile.mkdtemp(prefix="dyt-reeval0-")
+        try:
+            state0, calls0, _ = _reeval_stub_search(loop, tmp0, reeval=0)
+            evs0 = _read_events(tmp0)
+            check("with reeval_per_generation == 0 nothing is re-evaluated and "
+                  "no elite carries a buffer",
+                  not any(e.get("kind") == "reevaluate" for e in evs0)
+                  and not any("draws" in e.meta for e in state0.archive.cells.values()),
+                  f"{sum(1 for e in evs0 if e.get('kind') == 'reevaluate')} events")
+        finally:
+            shutil.rmtree(tmp0, ignore_errors=True)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # An elite with no buffer (a seed elite, an archive from before N11): the
+    # first fresh draw seeds the buffer with the elite's own scored keys, so
+    # when the original is the median they come back.
+    saved = {k: getattr(loop, k) for k in (
+        "episode_features", "behaviour_descriptor", "objectives",
+        "_meta_light", "critic_features", "_meta")}
+    loop.episode_features = lambda r, p: np.zeros(16)
+    loop.behaviour_descriptor = lambda p, r: np.array([0.5, 0.5])
+    loop.objectives = lambda p, r: np.array([0.0, 3.0, 2.0])
+    loop._meta_light = lambda p, r: {}
+    loop.critic_features = lambda m, r: np.zeros(4)
+    loop._meta = lambda p, r, c: {"air": 0.0, "water": r.segments["water"].competence,
+                                  "land": 0.0, "eval_seed": r.eval_seed}
+    try:
+        state, events = _floor_state(loop)
+        for k in range(1, 25):
+            state.curriculum.observe_blend(0.001 * k, 0.002 * k, 0)
+        state.archive.generation = 3
+        state.archive.add("orig", 0.4, np.array([0.5, 0.5]),
+                          {"eval_seed": 111, "gen": 1, "water": 0.1, "policy": [1.0],
+                           "score_parts": {"blend": 0.0}},
+                          objectives=np.array([0.0, 1.0, 1.0]))
+        elite = next(iter(state.archive.cells.values()))
+        res = _floor_result(0.9)
+        res.eval_seed = 222
+        win_before = sum(len(w) for w in state.curriculum._recent.values())
+        out = loop._reevaluate(state, elite, None, res, None)
+        win_after = sum(len(w) for w in state.curriculum._recent.values())
+        check("a re-evaluation of an elite with no buffer is recorded",
+              out == "recorded" and len(elite.meta["draws"]) == 2, f"{out}")
+        check("when the original draw stays the median its seed, medium score and "
+              "policy come back, not an empty meta",
+              elite.meta["eval_seed"] == 111 and elite.meta["water"] == 0.1
+              and elite.meta["policy"] == [1.0] and elite.meta["gen"] == 1
+              and elite.fitness == 0.4,
+              f"seed {elite.meta['eval_seed']} water {elite.meta['water']} "
+              f"policy {elite.meta['policy']} gen {elite.meta['gen']} fit {elite.fitness}")
+        check("and the re-evaluation fed no window", win_before == win_after,
+              f"{win_before} -> {win_after}")
+        # An elite that left the front is an orphan: nothing recorded.
+        state.archive.fronts[elite.cell] = []
+        out = loop._reevaluate(state, elite, None, res, None)
+        check("an elite no longer on its front is an orphan and nothing is recorded",
+              out == "orphan" and len(elite.meta["draws"]) == 2, f"{out}")
+    finally:
+        for k, v in saved.items():
+            setattr(loop, k, v)
+
+
+def test_a_reevaluation_runs_at_the_stored_basis_cpu() -> None:
+    """IMPL_1010 P1 (ROADMAP N11): an elite that carries ``mobility_basis`` is
+    re-measured with ``identify`` False and that basis, so a reeval draw varies
+    the task only; it keeps the elite's identification record (F11)."""
+    print("\nloop: a re-evaluation runs at the stored basis and keeps the "
+          "identification record (stub evaluator)")
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution import loop
+
+    R = {"air": {"modes": [[1.0, 0.0]],
+                 "effects": [[1, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0]],
+                 "authority": [1.0], "medium": "air"}}
+
+    def reeval_slots(log):
+        seen, found = set(), []
+        for entry in log:
+            for slot, gid in enumerate(entry["ids"]):
+                if gid in seen:
+                    found.append((entry, slot))
+            seen.update(entry["ids"])
+        return found
+
+    for tag, basis in (("R", R), ("none", None)):
+        tmp = tempfile.mkdtemp(prefix="dyt-reeval-basis-")
+        try:
+            log: list = []
+            state, _calls, _tel = _reeval_stub_search(loop, tmp, reeval=2, basis=basis, kw_log=log)
+            re = reeval_slots(log)
+            seen_ids = {gid for e in log for gid in e["ids"]}
+            if basis is not None:
+                ok = bool(re) and all(
+                    not e["identify"][s] and e["bases"][s] is not None
+                    and np.allclose(e["bases"][s]["air"].modes, R["air"]["modes"])
+                    for e, s in re)
+                check("(a) every reeval slot runs with identify False and the stored basis",
+                      ok, f"{len(re)} reeval slots")
+                children = [(e, s) for e in log[1:] for s in range(len(e["ids"]))
+                            if (e, s) not in re]
+                check("(a) every child slot still identifies and carries no basis",
+                      bool(children) and all(e["identify"][s] and e["bases"][s] is None
+                                             for e, s in children),
+                      f"{len(children)} child slots")
+                multi = [e for e in state.archive.cells.values()
+                         if len(e.meta.get("draws") or []) >= 2]
+                check("(c) every elite with two or more draws, and each draw, keeps "
+                      "mobility_rank {'air': 3}",
+                      bool(multi) and all(
+                          e.meta.get("mobility_rank") == {"air": 3}
+                          and all(d["meta"].get("mobility_rank") == {"air": 3}
+                                  for d in e.meta["draws"]) for e in multi),
+                      f"{len(multi)} elites; "
+                      f"{[e.meta.get('mobility_rank') for e in multi][:3]}")
+            else:
+                check("(b) an elite without a record is re-identified: identify True, no basis",
+                      bool(re) and all(e["identify"][s] and e["bases"][s] is None
+                                       for e, s in re), f"{len(re)} reeval slots")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median() -> None:
+    """ARCH51_SPEC L9 (GPU): a real, sharded search re-runs archived
+    representatives at fresh seeds; the re-runs feed no window, and an elite
+    with several draws is filmed as its lower-median draw."""
+    if needs_batched_evaluator("test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median"):
+        return
+    print("\nloop: an elite is re-measured at fresh draws and kept at its median")
+    import shutil
+    import tempfile
+
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution.loop import SearchConfig, run_search
+    from dytiscidae.viz.film import MEDIA, TOLERANCE, evaluate_on_film
+
+    tmp = tempfile.mkdtemp(prefix="dyt-reeval-gpu-")
+    try:
+        cfg = SearchConfig(generations=4, batch=4, workers=2, min_shard=2, seed=5,
+                           segment_seconds=2.0, n_reference_seeds=4, n_random_seeds=0,
+                           islands=("generalist",), tier2_every=999, audit_every=999,
+                           migrate_every=999, checkpoint_every=1, run_dir=tmp,
+                           use_shared_policy=True, promotion_refine_steps=0,
+                           controller_refine_steps=1, reeval_per_generation=2)
+        state = run_search(cfg, MissionSpec())
+        evs = _read_events(tmp)
+        rec = [e for e in evs if e.get("kind") == "reevaluate" and e.get("status") == "recorded"]
+        check("(1) at least two re-evaluations were recorded", len(rec) >= 2,
+              f"{len(rec)} recorded")
+        check("(2) each ran at a seed other than the one that first scored the elite",
+              bool(rec) and all(e["eval_seed"] != e["first_eval_seed"] for e in rec),
+              f"{[(e['eval_seed'], e['first_eval_seed']) for e in rec][:4]}")
+        multi = [e for a in state.archipelago.archives.values()
+                 for e in a.cells.values() if len(e.meta.get("draws") or []) >= 2]
+        ok = bool(multi)
+        for e in multi:
+            dr = e.meta["draws"]
+            order = sorted(range(len(dr)), key=lambda i: dr[i]["base"])
+            ok = ok and e.meta.get("eval_seed") == dr[order[(len(dr) - 1) // 2]]["meta"].get("eval_seed")
+        check("(3) an elite's eval_seed is its lower-median draw's", ok,
+              f"{len(multi)} elites with >= 2 draws")
+        window = sum(len(w) for c in state.curricula.values() for w in c._recent.values())
+        placed = sum(1 for e in evs if e.get("kind") == "evaluate")
+        check("(4) re-evaluations feed no curriculum window",
+              window == placed and window < 256, f"window {window}, evaluate events {placed}")
+        if multi:
+            ev = evaluate_on_film(multi[0], tmp, film=False, log=lambda *a, **k: None)
+            check("(5) the film of an elite with draws reproduces its median draw "
+                  "within TOLERANCE in every medium",
+                  all(ev["media"][m]["match"] for m in MEDIA),
+                  f"{ {m: (ev['media'][m]['recorded'], ev['media'][m]['reproduced']) for m in MEDIA} } "
+                  f"tolerance {TOLERANCE}")
+        per_gen = {}
+        for e in evs:
+            if e.get("kind") in ("evaluate", "reevaluate", "tier0_reject") \
+                    and e.get("operators") != ["seed"]:
+                per_gen[e["gen"]] = per_gen.get(e["gen"], 0) + 1
+        check("(6) per generation, placed + re-evaluated + rejected = batch",
+              bool(per_gen) and all(v == 4 for v in per_gen.values()), f"{per_gen}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -5762,6 +6648,40 @@ def NS_two_media():
         "water": NS(competence=0.5, measurements={})})
 
 
+def test_a_design_competent_in_nothing_its_island_reads_is_below_the_floor() -> None:
+    """ARCH51_SPEC L2: the competence floor reads the island's own media only."""
+    print("\nislands: a design competent in nothing its island reads is below the floor")
+    from dytiscidae.evolution.curriculum import WEAKEST_BARS
+    from dytiscidae.evolution.islands import COMPETENCE_FLOOR, below_competence_floor
+
+    class Seg:
+        def __init__(self, c):
+            self.competence = c
+
+    class Res:
+        def __init__(self, **comps):
+            self.segments = {k: Seg(v) for k, v in comps.items()}
+
+    check("the floor is WEAKEST_BARS[1] in every medium",
+          COMPETENCE_FLOOR == {m: WEAKEST_BARS[1] for m in ("air", "water", "land")},
+          str(COMPETENCE_FLOOR))
+    check("water island: water 0.011 is below the floor",
+          below_competence_floor("water", Res(air=0.0, water=0.011, land=0.0)) is True)
+    check("water island: water 0.012 is at the floor, not below",
+          below_competence_floor("water", Res(air=0.0, water=0.012, land=0.0)) is False)
+    check("water island: water 0.0 with air 0.5 is below (air is not read)",
+          below_competence_floor("water", Res(air=0.5, water=0.0, land=0.0)) is True)
+    check("amphibian: water 0.0, land 0.02 clears",
+          below_competence_floor("amphibian", Res(air=0.0, water=0.0, land=0.02)) is False)
+    for isl in ("triphibian", "generalist"):
+        check(f"{isl}: 0.011 in all three is below",
+              below_competence_floor(isl, Res(air=0.011, water=0.011, land=0.011)) is True)
+        check(f"{isl}: land 0.02 alone clears",
+              below_competence_floor(isl, Res(air=0.0, water=0.0, land=0.02)) is False)
+    check("water island with no water segment is below",
+          below_competence_floor("water", Res(air=0.5, land=0.5)) is True)
+
+
 def test_a_still_machine_climbs_nothing_on_the_triphibian_island() -> None:
     """Every body plan held still, on the real Tier-1 path, scored by the island.
 
@@ -6122,6 +7042,7 @@ def main() -> int:
         test_no_operator_can_go_dormant_under_the_structural_tilt,
         test_curator_regimes_respond_to_the_run,
         test_curator_quarantines_repeat_exploits,
+        test_a_tier2_failure_does_not_make_the_best_design_the_worst_parent,
         test_cmaes_optimises_a_known_function,
         test_cppn_fields_are_deterministic_and_bounded,
         test_the_gait_operator_moves_every_coordinate_at_once,
@@ -6131,6 +7052,8 @@ def main() -> int:
         test_a_rare_capability_survives_the_learned_projection,
         test_learned_descriptors_replace_the_hand_picked_axes,
         test_cells_hold_a_pareto_front_not_a_weighted_sum,
+        test_margins_alone_cannot_fill_a_cell,
+        test_a_cells_score_is_the_median_of_its_draws,
         test_intervention_is_triggered_by_evidence_not_a_schedule,
         test_no_dataclass_can_raise_on_equality,
         test_arriving_somewhere_is_not_one_lucky_timestep,
@@ -6151,6 +7074,8 @@ def main() -> int:
         test_an_islands_best_is_judged_on_its_own_domains,
         test_one_islands_archive_is_read_alone_not_through_the_merge,
         test_the_island_objective_takes_its_weight_back,
+        test_a_score_of_zero_stands_at_zero,
+        test_standing_ranks_only_against_designs_above_the_floor,
         test_curriculum_and_islands_give_gradient_where_the_mission_gives_none,
         test_scout_finds_dark_horses_and_may_only_protect,
         test_scout_skill_separates_regression_to_the_mean_from_foresight,
@@ -6160,6 +7085,12 @@ def main() -> int:
         test_the_headline_is_the_mission,
         test_an_audit_perturbs_the_scored_experiment_and_nothing_else,
         test_promotion_spends_refinement_and_keeps_what_it_buys,
+        test_promotion_refinement_is_one_batch,
+        test_the_scalar_stands_at_zero_below_the_competence_floor,
+        test_verification_offers_designs_not_yet_verified,
+        test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu,
+        test_a_reevaluation_runs_at_the_stored_basis_cpu,
+        test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median,
         test_the_refinement_funnel_refines_only_what_it_selects,
         test_the_distance_curriculum_steps_back_only_on_evidence,
         test_a_shared_command_means_the_same_thing_on_every_body,
@@ -6193,6 +7124,7 @@ def main() -> int:
         test_grpo_rollouts_never_reach_the_archive,
         test_grpo_group_ids_survive_the_shard_split,
         test_the_triphibian_island_pays_the_weakest_medium,
+        test_a_design_competent_in_nothing_its_island_reads_is_below_the_floor,
         test_a_still_machine_climbs_nothing_on_the_triphibian_island,
         test_a_pair_cross_reaches_the_triphibian_island,
         test_the_triphibian_island_joins_a_resumed_run,

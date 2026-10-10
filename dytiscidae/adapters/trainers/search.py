@@ -60,7 +60,7 @@ _CONFIG_FIELDS = (
     "identify_axes_every", "controller_refine_steps", "controller_refine_sigma",
     "controller_refine_funnel", "distance_curriculum", "distance_step",
     "distance_advance_share", "distance_window",
-    "promotion_refine_steps", "mission_weight", "reward_shaping",
+    "promotion_refine_steps", "promotion_refine_parallel", "mission_weight", "reward_shaping",
     "descriptor_bins", "descriptor_refit_every", "learned_axes",
     "migrate_every", "n_migrants", "use_critic", "critic_refit_every",
     "audit_every", "use_scout", "scout_horizon", "scout_reserve",
@@ -71,7 +71,7 @@ _CONFIG_FIELDS = (
     "shared_minibatch", "audits_per_review", "checkpoint_every", "snapshot_every",
     "event_sample", "n_reference_seeds", "n_random_seeds", "islands",
     "descriptor_keep_if_overlap", "tier2_label_all_media", "draw_per_candidate",
-    "placement_draws",
+    "placement_draws", "reeval_per_generation", "reeval_depth",
 )
 #: Accepted from the job's ``resources`` rather than its plan, because they are
 #: properties of the machine and not of the experiment.  This project measured

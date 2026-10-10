@@ -1,0 +1,21 @@
+{
+ "island": "air",
+ "genome_id": "ai248_3991",
+ "dof": 12,
+ "n_rotors": 0,
+ "actuators": [
+  "seg1_wing_a",
+  "seg2_wing_a",
+  "seg3_wing_a",
+  "seg4_wing_a",
+  "seg5_wing_a",
+  "seg6_wing_a",
+  "seg7_wing_a",
+  "seg8_wing_a",
+  "seg9_wing_a",
+  "seg10_wing_a",
+  "seg11_membrane_a",
+  "seg12_membrane_a"
+ ],
+ "n_unique": 645
+}

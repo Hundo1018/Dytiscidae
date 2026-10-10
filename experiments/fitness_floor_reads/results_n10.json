@@ -1,0 +1,316 @@
+{
+ "arch48": {
+  "ppo_events": 300,
+  "ppo_event_keys": [
+   "clipfrac",
+   "deterministic",
+   "entropy",
+   "gen",
+   "grad_steps",
+   "island",
+   "kind",
+   "kl",
+   "log_std",
+   "lr",
+   "pi_loss",
+   "reward_by_tag",
+   "shaping",
+   "skipped",
+   "stopped_early",
+   "t",
+   "trajectories",
+   "transitions",
+   "v_loss"
+  ],
+  "shaping_values": [
+   0.2
+  ],
+  "tags": {
+   "air": {
+    "events": 300,
+    "trajectories": 4656,
+    "weighted_mean_terminal": 0.00014759450171821306,
+    "events_mean0_and_std0": 0.72,
+    "events_mean_gt0": 0.23333333333333334,
+    "max_event_mean": 0.0058,
+    "max_event_std": 0.0224
+   },
+   "land": {
+    "events": 300,
+    "trajectories": 4656,
+    "weighted_mean_terminal": 0.050162435567010305,
+    "events_mean0_and_std0": 0.013333333333333334,
+    "events_mean_gt0": 0.9833333333333333,
+    "max_event_mean": 0.2078,
+    "max_event_std": 0.2134
+   },
+   "transition:air_to_water": {
+    "events": 300,
+    "trajectories": 4656,
+    "weighted_mean_terminal": 0.0,
+    "events_mean0_and_std0": 1.0,
+    "events_mean_gt0": 0.0,
+    "max_event_mean": 0.0,
+    "max_event_std": 0.0
+   },
+   "transition:land_to_air": {
+    "events": 300,
+    "trajectories": 4656,
+    "weighted_mean_terminal": 0.0,
+    "events_mean0_and_std0": 1.0,
+    "events_mean_gt0": 0.0,
+    "max_event_mean": 0.0,
+    "max_event_std": 0.0
+   },
+   "transition:water_to_air": {
+    "events": 300,
+    "trajectories": 4656,
+    "weighted_mean_terminal": 0.0,
+    "events_mean0_and_std0": 1.0,
+    "events_mean_gt0": 0.0,
+    "max_event_mean": 0.0,
+    "max_event_std": 0.0
+   },
+   "transition:water_to_land": {
+    "events": 300,
+    "trajectories": 4656,
+    "weighted_mean_terminal": 0.0,
+    "events_mean0_and_std0": 1.0,
+    "events_mean_gt0": 0.0,
+    "max_event_mean": 0.0,
+    "max_event_std": 0.0
+   },
+   "water": {
+    "events": 300,
+    "trajectories": 4656,
+    "weighted_mean_terminal": 0.036565528350515464,
+    "events_mean0_and_std0": 0.0,
+    "events_mean_gt0": 1.0,
+    "max_event_mean": 0.1412,
+    "max_event_std": 0.1539
+   }
+  }
+ },
+ "arch49": {
+  "ppo_events": 300,
+  "ppo_event_keys": [
+   "clipfrac",
+   "deterministic",
+   "entropy",
+   "gen",
+   "grad_steps",
+   "island",
+   "kind",
+   "kl",
+   "log_std",
+   "lr",
+   "pi_loss",
+   "reward_by_tag",
+   "shaping",
+   "skipped",
+   "stopped_early",
+   "t",
+   "trajectories",
+   "transitions",
+   "v_loss"
+  ],
+  "shaping_values": [
+   0.2
+  ],
+  "tags": {
+   "air": {
+    "events": 300,
+    "trajectories": 4622,
+    "weighted_mean_terminal": 0.00031469061012548677,
+    "events_mean0_and_std0": 0.7333333333333333,
+    "events_mean_gt0": 0.23,
+    "max_event_mean": 0.016,
+    "max_event_std": 0.0599
+   },
+   "land": {
+    "events": 300,
+    "trajectories": 9244,
+    "weighted_mean_terminal": 0.014080116832540028,
+    "events_mean0_and_std0": 0.006666666666666667,
+    "events_mean_gt0": 0.9933333333333333,
+    "max_event_mean": 0.0596,
+    "max_event_std": 0.1125
+   },
+   "transition:air_to_water": {
+    "events": 300,
+    "trajectories": 4622,
+    "weighted_mean_terminal": 0.00018485504110774556,
+    "events_mean0_and_std0": 0.9966666666666667,
+    "events_mean_gt0": 0.0033333333333333335,
+    "max_event_mean": 0.0534,
+    "max_event_std": 0.207
+   },
+   "transition:land_to_air": {
+    "events": 300,
+    "trajectories": 4622,
+    "weighted_mean_terminal": 0.00015084379056685417,
+    "events_mean0_and_std0": 0.9966666666666667,
+    "events_mean_gt0": 0.0033333333333333335,
+    "max_event_mean": 0.0498,
+    "max_event_std": 0.1797
+   },
+   "transition:water_to_air": {
+    "events": 300,
+    "trajectories": 4622,
+    "weighted_mean_terminal": 0.0,
+    "events_mean0_and_std0": 1.0,
+    "events_mean_gt0": 0.0,
+    "max_event_mean": 0.0,
+    "max_event_std": 0.0
+   },
+   "transition:water_to_land": {
+    "events": 300,
+    "trajectories": 4622,
+    "weighted_mean_terminal": 0.0003675681523150152,
+    "events_mean0_and_std0": 0.9933333333333333,
+    "events_mean_gt0": 0.006666666666666667,
+    "max_event_mean": 0.0549,
+    "max_event_std": 0.2128
+   },
+   "water": {
+    "events": 300,
+    "trajectories": 9244,
+    "weighted_mean_terminal": 0.012000757247944614,
+    "events_mean0_and_std0": 0.0,
+    "events_mean_gt0": 1.0,
+    "max_event_mean": 0.0451,
+    "max_event_std": 0.1144
+   }
+  }
+ },
+ "arch50": {
+  "ppo_events": 122,
+  "ppo_event_keys": [
+   "clipfrac",
+   "deterministic",
+   "entropy",
+   "gen",
+   "grad_steps",
+   "island",
+   "kind",
+   "kl",
+   "log_std",
+   "lr",
+   "pi_loss",
+   "reward_by_tag",
+   "shaping",
+   "skipped",
+   "stopped_early",
+   "t",
+   "trajectories",
+   "transitions",
+   "v_loss"
+  ],
+  "shaping_values": [
+   0.2
+  ],
+  "tags": {
+   "air": {
+    "events": 122,
+    "trajectories": 1905,
+    "weighted_mean_terminal": 0.00010503937007874016,
+    "events_mean0_and_std0": 0.7213114754098361,
+    "events_mean_gt0": 0.20491803278688525,
+    "max_event_mean": 0.0025,
+    "max_event_std": 0.0094
+   },
+   "land": {
+    "events": 122,
+    "trajectories": 3810,
+    "weighted_mean_terminal": 0.01638629921259843,
+    "events_mean0_and_std0": 0.00819672131147541,
+    "events_mean_gt0": 0.9918032786885246,
+    "max_event_mean": 0.0572,
+    "max_event_std": 0.1038
+   },
+   "transition:air_to_water": {
+    "events": 122,
+    "trajectories": 1905,
+    "weighted_mean_terminal": 0.0,
+    "events_mean0_and_std0": 1.0,
+    "events_mean_gt0": 0.0,
+    "max_event_mean": 0.0,
+    "max_event_std": 0.0
+   },
+   "transition:land_to_air": {
+    "events": 122,
+    "trajectories": 1905,
+    "weighted_mean_terminal": 0.0,
+    "events_mean0_and_std0": 1.0,
+    "events_mean_gt0": 0.0,
+    "max_event_mean": 0.0,
+    "max_event_std": 0.0
+   },
+   "transition:water_to_air": {
+    "events": 122,
+    "trajectories": 1905,
+    "weighted_mean_terminal": 0.0,
+    "events_mean0_and_std0": 1.0,
+    "events_mean_gt0": 0.0,
+    "max_event_mean": 0.0,
+    "max_event_std": 0.0
+   },
+   "transition:water_to_land": {
+    "events": 122,
+    "trajectories": 1905,
+    "weighted_mean_terminal": 0.00046062992125984255,
+    "events_mean0_and_std0": 0.9918032786885246,
+    "events_mean_gt0": 0.00819672131147541,
+    "max_event_mean": 0.0585,
+    "max_event_std": 0.2188
+   },
+   "water": {
+    "events": 122,
+    "trajectories": 3810,
+    "weighted_mean_terminal": 0.008245144356955381,
+    "events_mean0_and_std0": 0.0,
+    "events_mean_gt0": 1.0,
+    "max_event_mean": 0.0213,
+    "max_event_std": 0.0454
+   }
+  }
+ },
+ "grep_counts": {
+  "arch49/generations.jsonl": {
+   "reward_by_tag": 0,
+   "shaping": 1,
+   "terminal": 0,
+   "shaping_return": 0,
+   "return_by_tag": 0,
+   "terminal_return": 0,
+   "\"ppo\"": 301
+  },
+  "arch49/events.jsonl": {
+   "reward_by_tag": 300,
+   "shaping": 300,
+   "terminal": 0,
+   "shaping_return": 0,
+   "return_by_tag": 0,
+   "terminal_return": 0,
+   "\"ppo\"": 300
+  },
+  "arch50/generations.jsonl": {
+   "reward_by_tag": 0,
+   "shaping": 1,
+   "terminal": 0,
+   "shaping_return": 0,
+   "return_by_tag": 0,
+   "terminal_return": 0,
+   "\"ppo\"": 123
+  },
+  "arch50/events.jsonl": {
+   "reward_by_tag": 122,
+   "shaping": 122,
+   "terminal": 0,
+   "shaping_return": 0,
+   "return_by_tag": 0,
+   "terminal_return": 0,
+   "\"ppo\"": 122
+  }
+ }
+}

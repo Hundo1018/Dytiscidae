@@ -430,6 +430,11 @@ class RolloutBuffer:
         self.gamma, self.lam = float(gamma), float(lam)
         self.shaping = float(shaping)
         self.trajectories: list[Trajectory] = []
+        #: Per segment kind, how the discounted return splits into the
+        #: potential-shaping part and the terminal (competence) part.  Filled by
+        #: ``build``; ROADMAP N10 reads it as ``abs_shaping / (abs_shaping +
+        #: abs_terminal)``.
+        self.decomposition: dict = {}
 
     def add(self, traj: Trajectory) -> None:
         if len(traj):
@@ -454,6 +459,7 @@ class RolloutBuffer:
         """
         O, A, L, ADV, RET, VAL = [], [], [], [], [], []
         scale = self._terminal_scale()
+        parts: dict = {}
         for t in self.trajectories:
             n = len(t)
             rew = np.zeros(n)
@@ -464,6 +470,17 @@ class RolloutBuffer:
                 phi = np.asarray(t.phi, float)
                 nxt = np.concatenate([phi[1:], [0.0]])
                 rew = rew + self.shaping * (self.gamma * nxt - phi)
+            disc = self.gamma ** np.arange(n)
+            term = np.zeros(n)
+            term[-1] = t.terminal_reward / scale.get(t.tag, 1.0)
+            shp = rew - term
+            p = parts.setdefault(t.tag, [0, 0.0, 0.0, 0.0, 0.0, 0.0])
+            p[0] += 1
+            p[1] += float(disc @ shp)
+            p[2] += float(disc @ term)
+            p[3] += float(disc @ rew)
+            p[4] += abs(float(disc @ shp))
+            p[5] += abs(float(disc @ term))
             val = np.asarray(t.val, float)
             # GAE with a terminal bootstrap of zero: the segment is over, there
             # is no continuation to value.
@@ -480,6 +497,10 @@ class RolloutBuffer:
             ADV.append(adv)
             RET.append(adv + val)
             VAL.append(val)
+        self.decomposition = {
+            tag: {"n": c, "shaping_return": s / c, "terminal_return": tm / c,
+                  "return": r / c, "abs_shaping": a / c, "abs_terminal": b / c}
+            for tag, (c, s, tm, r, a, b) in sorted(parts.items())}
         return (np.concatenate(O), np.concatenate(A), np.concatenate(L),
                 np.concatenate(ADV), np.concatenate(RET), np.concatenate(VAL))
 
@@ -623,7 +644,8 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
         unused_group = group_buffer.stats()
         group_buffer = None
     if n + n_group < 2:
-        return {"transitions": n + n_group, "skipped": True, **unused_group}
+        return {"transitions": n + n_group, "skipped": True, "return_by_tag": {},
+                **unused_group}
 
     n_ord = n
     group_info = None
@@ -789,6 +811,11 @@ def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
         #: a caller plans against.
         "deterministic": rng is not None,
         "skipped": False,
+        #: N10: per segment kind, the discounted return split into its shaping
+        #: and terminal parts (``RolloutBuffer.decomposition``).
+        "return_by_tag": {k: {kk: (round(vv, 6) if isinstance(vv, float) else vv)
+                              for kk, vv in v.items()}
+                          for k, v in getattr(buffer, "decomposition", {}).items()},
     }
     out.update(unused_group)
     if group_info is not None:

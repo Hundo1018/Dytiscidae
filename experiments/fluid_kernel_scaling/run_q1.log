@@ -1,0 +1,9 @@
+   252 panels (  2 copies, 28 bodies): step median 111.4 us p90 116.3 us | launch 5.6 wait 105.5 | finite True
+  1008 panels (  8 copies, 112 bodies): step median 142.7 us p90 147.4 us | launch 5.5 wait 135.5 | finite True
+  5040 panels ( 40 copies, 560 bodies): step median 361.1 us p90 372.7 us | launch 9.1 wait 313.8 | finite True
+ 20034 panels (159 copies, 2226 bodies): step median 1026.2 us p90 1098.3 us | launch 24.5 wait 986.0 | finite True
+ 50022 panels (397 copies, 5558 bodies): step median 2307.1 us p90 2380.5 us | launch 49.7 wait 2207.1 | finite True
+   252 panels (  2 copies, 28 bodies): step median 84.9 us p90 85.8 us | launch 5.2 wait 80.2 | finite True
+wrote /home/hundo/Projects/Dytiscidae/dytiscidae/experiments/fluid_kernel_scaling/results_arch49.json
+wrote /home/hundo/Projects/Dytiscidae/dytiscidae/runs/analysis_1010_failure_theory/Q1_result.md
+OUTCOME CONFIRMED  a=117.4 us  b=0.0440 us/panel

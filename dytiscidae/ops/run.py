@@ -172,6 +172,8 @@ def search_config_from_args(args, shared: bool):
         distance_curriculum=bool(args.distance_curriculum),
         draw_per_candidate=bool(args.draw_per_candidate),
         placement_draws=args.placement_draws,
+        reeval_per_generation=args.reeval_per_generation,
+        reeval_depth=args.reeval_depth,
         action_rate_penalty=args.action_rate_penalty,
         descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
         tier2_label_all_media=not args.no_tier2_label_all_media,
@@ -180,6 +182,7 @@ def search_config_from_args(args, shared: bool):
         controller_refine_steps=args.refine_steps,
         controller_refine_sigma=args.refine_sigma,
         promotion_refine_steps=args.promotion_refine_steps,
+        promotion_refine_parallel=not args.promotion_refine_serial,
         policy_hidden=args.policy_hidden,
         use_shared_policy=bool(shared),
         shared_hidden=args.shared_hidden,
@@ -1002,6 +1005,14 @@ def build_parser() -> argparse.ArgumentParser:
                         "run to date. C2 measured one draw's reliability at "
                         "0.18-0.30. Costs (n - 1) more noise-free evaluations of "
                         "the generation; needs --refine-steps 0")
+    p.add_argument("--reeval-per-generation", type=int, default=0,
+                   help="archived representatives re-measured at a fresh draw "
+                        "each generation, taken from the batch (ROADMAP N11, "
+                        "ARCH51 L9). 0 (default) is off, every run to arch50; "
+                        "arch51 uses 4 of batch 16")
+    p.add_argument("--reeval-depth", type=int, default=8,
+                   help="draws an elite keeps; it is placed at the median one "
+                        "(ARCH51 L9)")
     p.add_argument("--draw-per-candidate", action=argparse.BooleanOptionalAction,
                    default=True,
                    help="each candidate faces its own task draw (heading, "
@@ -1053,6 +1064,7 @@ def build_parser() -> argparse.ArgumentParser:
                         "verification round) rather than by population, so "
                         "unlike --refine-steps it is affordable by default. 0 "
                         "verifies the elite exactly as the archive stored it.")
+    p.add_argument("--promotion-refine-serial", action="store_true", help="the (1+1) promotion refinement of every run to arch50 (IMPL_1010 P2)")
     p.add_argument("--shared-policy", action=argparse.BooleanOptionalAction,
                    default=None,
                    help="on by default when torch imports (what every run since "
@@ -1124,8 +1136,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="run without the potential predictor (greedy selection)")
     p.add_argument("--scout-reserve", type=float, default=0.15,
                    help="share of each archive protected on predicted potential")
-    p.add_argument("--mission-weight", type=float, default=0.30,
-                   help="share of the archive's scalar that is the mission "
+    p.add_argument("--mission-weight", type=float, default=0.0,
+                   help="0.30 through arch50; 0.0 from ARCH51_SPEC "
+                        "(mission_fraction is zero for 97-100%% of every "
+                        "window, ROADMAP N2). Share of the archive's scalar "
+                        "that is the mission "
                         "itself, as a population quantile, rather than the "
                         "island/curriculum blend. At 0 -- every run before "
                         "2026-09-01 -- corr(fitness, mission_fraction) "

@@ -3,7 +3,8 @@
 Generative design + control search for triphibian flapping-wing machines.
 MAP-Elites over eight islands, MuJoCo rigid bodies plus this project's own
 quasi-steady fluid solver (`docs/model_validity.md`: not CFD), and a shared PPO
-policy the search keeps for its variation operator.
+policy that is the controller inside every evaluation (it proposes no
+variation; `batchroll.py:839`, ROADMAP 2026-10-10 §1).
 
 `docs/ROADMAP.md` is the work list and carries the measurement behind every
 item. Read it before proposing anything.
@@ -223,8 +224,18 @@ then films (`dytiscidae/viz/film.py`) into `runs/<run>/media/`, embedded in
 - **Comparability boundaries.** Air scores and `mission_fraction` are not
   comparable across arch33→34, arch34→35, arch36→37 (air ladder 7 → 11 rungs),
   2026-09-20, and arch43 (corrected physics: nothing before it is comparable on
-  air or water forces). The ROADMAP lists each boundary. Write "not comparable";
-  do not quote a shrunken difference.
+  air or water forces), and air across the mirrored turn pair (merged
+  2026-10-10, arch51 onward). From 2026-10-10 (ARCH51_SPEC N5, arch51 onward) the
+  stored `fitness`, `objectives[0]` and everything built on them (`qd_score`,
+  parent weight, migrants, promotion and prune order, `best`) are not
+  comparable with any earlier run: a design competent in none of its island's
+  media (< 0.012) stands at 0 where it stood at its window's zero share
+  (0.46-0.99), ranking is among designs above that floor, `mission_weight` is
+  0.0 (was 0.30), and Tier-2 no longer caps `fitness`. With
+  `--reeval-per-generation > 0` (N11) an elite's recorded scores are those of
+  its median draw, not one draw. Per-medium competences, `mission_fraction`
+  and coverage are unchanged by both. The ROADMAP lists each boundary. Write
+  "not comparable"; do not quote a shrunken difference.
 - `sink_rate` is the difference of two endpoints of the late airborne window, so
   it reads zero for a machine that drops and comes back. `station_keeping` sees
   the path between; where they disagree, trust `station_keeping` (arch37: 10x
@@ -348,7 +359,10 @@ Each rule below was paid for by a score that rewarded the wrong thing.
    2026-10-08 each candidate also faces its own draw
    (`SearchConfig.draw_per_candidate`, ROADMAP M2): the batched path takes one
    seed per machine, and a result equals what that machine scores alone at its
-   `eval_seed`.
+   `eval_seed`. Since 2026-10-10 air is paired too (the user, 10-09): the drawn turn
+   and its mirror (`tasks.mirror`), the turn response on the mean of the two,
+   and height paying only through the turn (`triphibian.air_task`), after the
+   fixed still machine cleared air on 11 arch49 gannets against the elites' 6.
 
 ## Where things are
 

@@ -95,6 +95,10 @@ class AuditReport:
     held_out_by_medium: dict = field(default_factory=dict)
     #: The same, under each perturbed model coefficient (``perturbations``).
     perturbed_by_medium: dict = field(default_factory=dict)
+    #: False when the perturbation check had nothing to divide by: the design is
+    #: credited in no medium and its mission is 0.  "Could not measure" is not
+    #: "measured zero" (CLAUDE.md rule 4); set by ``Auditor.audit``.
+    perturbation_measurable: bool = True
     checks_run: int = 0
 
     @property
@@ -109,6 +113,7 @@ class AuditReport:
                          else round(self.retained_fraction, 3)),
             "held_out": {k: round(v, 3) for k, v in self.held_out_by_medium.items()},
             "perturbed": {k: round(v, 3) for k, v in self.perturbed_by_medium.items()},
+            "perturbation_measurable": self.perturbation_measurable,
             "checks": self.checks_run,
             "findings": [
                 {"check": f.check, "severity": f.severity, "detail": f.detail}
@@ -339,6 +344,18 @@ class Auditor:
                         detail=(f"{k} competence keeps {keep:.0%} of {media[k]:.3f} "
                                 "under perturbed model coefficients"),
                         measured=keep, expected=self.collapse_threshold))
+
+        else:
+            # Since the paired scores (2026-10-10: air a mirrored turn pair,
+            # water and land antipodal pairs) an open-loop design scores
+            # exactly 0 in every medium, so there is nothing to perturb the
+            # ratio of.  Say so; a skipped check must not read as a passed one.
+            rep.checks_run += 1
+            rep.perturbation_measurable = False
+            rep.findings.append(Finding(
+                check="perturbation", severity="note",
+                detail=("not measurable: no credited medium and mission 0 "
+                        "(rule 4: could-not-measure is not measured-zero)")))
 
         if retained:
             rep.retained_fraction = float(np.mean(retained))

@@ -1,0 +1,621 @@
+{
+ "run": {
+  "date": "2026-10-10",
+  "commit": "c8c623d",
+  "dirty": "",
+  "command": "PYTHONPATH=. MUJOCO_GL=disable DYTISCIDAE_KERNEL_DIR=/home/hundo/Projects/Dytiscidae/dytiscidae/mojo/build .venv/bin/python experiments/random_sampling_control/run.py --run runs/arch49",
+  "run": "runs/arch49",
+  "wall_s": 4301.553983449936,
+  "limit": 0
+ },
+ "aggregate": {
+  "meta": {
+   "kind": "meta",
+   "drawn": 356,
+   "rounds": 18,
+   "rejects": {
+    "random:tier0": 50,
+    "reference:tier0": 6
+   },
+   "n_ref": 12,
+   "n_rand": 8,
+   "seed": 20261010,
+   "comparison": {
+    "air": {
+     "gen": 150,
+     "evals": 311,
+     "by_gen": {
+      "0": 32,
+      "50": 126,
+      "100": 221,
+      "150": 311,
+      "200": 421,
+      "250": 517
+     },
+     "total": 611
+    },
+    "water": {
+     "gen": 150,
+     "evals": 295,
+     "by_gen": {
+      "0": 16,
+      "50": 122,
+      "100": 202,
+      "150": 295,
+      "200": 383,
+      "250": 495
+     },
+     "total": 587
+    },
+    "land": {
+     "gen": 150,
+     "evals": 308,
+     "by_gen": {
+      "0": 16,
+      "50": 120,
+      "100": 213,
+      "150": 308,
+      "200": 399,
+      "250": 509
+     },
+     "total": 604
+    },
+    "amphibian": {
+     "gen": 150,
+     "evals": 315,
+     "by_gen": {
+      "0": 16,
+      "50": 110,
+      "100": 221,
+      "150": 315,
+      "200": 408,
+      "250": 504
+     },
+     "total": 610
+    },
+    "aerial_diver": {
+     "gen": 150,
+     "evals": 305,
+     "by_gen": {
+      "0": 16,
+      "50": 107,
+      "100": 210,
+      "150": 305,
+      "200": 396,
+      "250": 488
+     },
+     "total": 578
+    },
+    "land_air": {
+     "gen": 150,
+     "evals": 313,
+     "by_gen": {
+      "0": 16,
+      "50": 109,
+      "100": 202,
+      "150": 313,
+      "200": 406,
+      "250": 500
+     },
+     "total": 594
+    },
+    "triphibian": {
+     "gen": 150,
+     "evals": 296,
+     "by_gen": {
+      "0": 16,
+      "50": 104,
+      "100": 189,
+      "150": 296,
+      "200": 387,
+      "250": 475
+     },
+     "total": 568
+    },
+    "generalist": {
+     "gen": 150,
+     "evals": 296,
+     "by_gen": {
+      "0": 16,
+      "50": 106,
+      "100": 201,
+      "150": 296,
+      "200": 408,
+      "250": 502
+     },
+     "total": 597
+    }
+   },
+   "net_gen": 150,
+   "net_loaded": true,
+   "cpu": false,
+   "cfg_seed": 20261007,
+   "wall_draw_s": 4.26381254196167
+  },
+  "n_scored": 300,
+  "dropped": [],
+  "per_island": {
+   "air": {
+    "compare_gen": 150,
+    "arch49_evals": 311,
+    "arch49_snapshot_elites": 56,
+    "arch49_elites_with_features": 56,
+    "random_n": 300,
+    "arch49": {
+     "filled": 36,
+     "coverage": 0.0576,
+     "summed": 0.37
+    },
+    "random": {
+     "filled": 55,
+     "coverage": 0.088,
+     "summed": 1.252765013490035
+    },
+    "random_ci95": {
+     "coverage": [
+      0.0672,
+      0.0816
+     ],
+     "summed": [
+      0.1286244650817269,
+      1.236498208499742
+     ]
+    },
+    "context_gen50": {
+     "evals": 126,
+     "filled": 26,
+     "coverage": 0.0416,
+     "summed": 0.366
+    },
+    "random_nonzero_cells": 19,
+    "arch49_nonzero_cells": 4,
+    "verdict": {
+     "coverage": {
+      "random": 0.088,
+      "arch49": 0.0576,
+      "random_over_arch49": 1.5277777777777777,
+      "arch49_over_random_minus_1": -0.34545454545454546,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "summed": {
+      "random": 1.252765013490035,
+      "arch49": 0.37,
+      "random_over_arch49": 3.3858513878109053,
+      "arch49_over_random_minus_1": -0.7046533100655248,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "outcome": "NEITHER (not confirmed, not falsified)"
+    }
+   },
+   "water": {
+    "compare_gen": 150,
+    "arch49_evals": 295,
+    "arch49_snapshot_elites": 58,
+    "arch49_elites_with_features": 58,
+    "random_n": 300,
+    "arch49": {
+     "filled": 41,
+     "coverage": 0.0656,
+     "summed": 0.769
+    },
+    "random": {
+     "filled": 55,
+     "coverage": 0.088,
+     "summed": 1.7866521846565258
+    },
+    "random_ci95": {
+     "coverage": [
+      0.0672,
+      0.0816
+     ],
+     "summed": [
+      1.0356889061064165,
+      1.5700687158177515
+     ]
+    },
+    "context_gen50": {
+     "evals": 122,
+     "filled": 21,
+     "coverage": 0.0336,
+     "summed": 0.319
+    },
+    "random_nonzero_cells": 44,
+    "arch49_nonzero_cells": 26,
+    "verdict": {
+     "coverage": {
+      "random": 0.088,
+      "arch49": 0.0656,
+      "random_over_arch49": 1.3414634146341462,
+      "arch49_over_random_minus_1": -0.2545454545454544,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "summed": {
+      "random": 1.7866521846565258,
+      "arch49": 0.769,
+      "random_over_arch49": 2.3233448435065354,
+      "arch49_over_random_minus_1": -0.5695860634744438,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "outcome": "NEITHER (not confirmed, not falsified)"
+    }
+   },
+   "land": {
+    "compare_gen": 150,
+    "arch49_evals": 308,
+    "arch49_snapshot_elites": 55,
+    "arch49_elites_with_features": 55,
+    "random_n": 300,
+    "arch49": {
+     "filled": 32,
+     "coverage": 0.0512,
+     "summed": 1.5
+    },
+    "random": {
+     "filled": 55,
+     "coverage": 0.088,
+     "summed": 2.010855225338698
+    },
+    "random_ci95": {
+     "coverage": [
+      0.0672,
+      0.0816
+     ],
+     "summed": [
+      1.0661188164701205,
+      1.8166624822084085
+     ]
+    },
+    "context_gen50": {
+     "evals": 120,
+     "filled": 23,
+     "coverage": 0.0368,
+     "summed": 0.358
+    },
+    "random_nonzero_cells": 42,
+    "arch49_nonzero_cells": 16,
+    "verdict": {
+     "coverage": {
+      "random": 0.088,
+      "arch49": 0.0512,
+      "random_over_arch49": 1.7187499999999998,
+      "arch49_over_random_minus_1": -0.4181818181818181,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "summed": {
+      "random": 2.010855225338698,
+      "arch49": 1.5,
+      "random_over_arch49": 1.3405701502257987,
+      "arch49_over_random_minus_1": -0.25404873453913235,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "outcome": "NEITHER (not confirmed, not falsified)"
+    }
+   },
+   "amphibian": {
+    "compare_gen": 150,
+    "arch49_evals": 315,
+    "arch49_snapshot_elites": 53,
+    "arch49_elites_with_features": 53,
+    "random_n": 300,
+    "arch49": {
+     "filled": 41,
+     "coverage": 0.0656,
+     "summed": 0.22
+    },
+    "random": {
+     "filled": 55,
+     "coverage": 0.088,
+     "summed": 0.3768358645818853
+    },
+    "random_ci95": {
+     "coverage": [
+      0.0672,
+      0.0816
+     ],
+     "summed": [
+      0.15386600868896205,
+      0.3453529103907765
+     ]
+    },
+    "context_gen50": {
+     "evals": 110,
+     "filled": 27,
+     "coverage": 0.0432,
+     "summed": 0.184
+    },
+    "random_nonzero_cells": 29,
+    "arch49_nonzero_cells": 9,
+    "verdict": {
+     "coverage": {
+      "random": 0.088,
+      "arch49": 0.0656,
+      "random_over_arch49": 1.3414634146341462,
+      "arch49_over_random_minus_1": -0.2545454545454544,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "summed": {
+      "random": 0.3768358645818853,
+      "arch49": 0.22,
+      "random_over_arch49": 1.712890293554024,
+      "arch49_over_random_minus_1": -0.416191449176158,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "outcome": "NEITHER (not confirmed, not falsified)"
+    }
+   },
+   "aerial_diver": {
+    "compare_gen": 150,
+    "arch49_evals": 305,
+    "arch49_snapshot_elites": 59,
+    "arch49_elites_with_features": 59,
+    "random_n": 300,
+    "arch49": {
+     "filled": 40,
+     "coverage": 0.064,
+     "summed": 0.004
+    },
+    "random": {
+     "filled": 55,
+     "coverage": 0.088,
+     "summed": 0.06345040279769565
+    },
+    "random_ci95": {
+     "coverage": [
+      0.0672,
+      0.0816
+     ],
+     "summed": [
+      0.020027158178589542,
+      0.05992261247849623
+     ]
+    },
+    "context_gen50": {
+     "evals": 107,
+     "filled": 21,
+     "coverage": 0.0336,
+     "summed": 0.004
+    },
+    "random_nonzero_cells": 13,
+    "arch49_nonzero_cells": 1,
+    "verdict": {
+     "coverage": {
+      "random": 0.088,
+      "arch49": 0.064,
+      "random_over_arch49": 1.375,
+      "arch49_over_random_minus_1": -0.2727272727272727,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "summed": {
+      "random": 0.06345040279769565,
+      "arch49": 0.004,
+      "random_over_arch49": 15.862600699423911,
+      "arch49_over_random_minus_1": -0.9369586350341456,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "outcome": "NEITHER (not confirmed, not falsified)"
+    }
+   },
+   "land_air": {
+    "compare_gen": 150,
+    "arch49_evals": 313,
+    "arch49_snapshot_elites": 58,
+    "arch49_elites_with_features": 58,
+    "random_n": 300,
+    "arch49": {
+     "filled": 43,
+     "coverage": 0.0688,
+     "summed": 0.0
+    },
+    "random": {
+     "filled": 55,
+     "coverage": 0.088,
+     "summed": 0.04496708163773704
+    },
+    "random_ci95": {
+     "coverage": [
+      0.0672,
+      0.0816
+     ],
+     "summed": [
+      0.009049503016322466,
+      0.044146516233120235
+     ]
+    },
+    "context_gen50": {
+     "evals": 109,
+     "filled": 26,
+     "coverage": 0.0416,
+     "summed": 0.002
+    },
+    "random_nonzero_cells": 12,
+    "arch49_nonzero_cells": 0,
+    "verdict": {
+     "coverage": {
+      "random": 0.088,
+      "arch49": 0.0688,
+      "random_over_arch49": 1.2790697674418603,
+      "arch49_over_random_minus_1": -0.21818181818181814,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "summed": {
+      "random": 0.04496708163773704,
+      "arch49": 0.0,
+      "random_over_arch49": Infinity,
+      "arch49_over_random_minus_1": -1.0,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "outcome": "NEITHER (not confirmed, not falsified)"
+    }
+   },
+   "triphibian": {
+    "compare_gen": 150,
+    "arch49_evals": 296,
+    "arch49_snapshot_elites": 64,
+    "arch49_elites_with_features": 64,
+    "random_n": 300,
+    "arch49": {
+     "filled": 45,
+     "coverage": 0.072,
+     "summed": 0.1103373899576118
+    },
+    "random": {
+     "filled": 55,
+     "coverage": 0.088,
+     "summed": 0.22203459096225717
+    },
+    "random_ci95": {
+     "coverage": [
+      0.0672,
+      0.0816
+     ],
+     "summed": [
+      0.14819154213340507,
+      0.19303778927607415
+     ]
+    },
+    "context_gen50": {
+     "evals": 104,
+     "filled": 25,
+     "coverage": 0.04,
+     "summed": 0.07138180077430091
+    },
+    "random_nonzero_cells": 53,
+    "arch49_nonzero_cells": 37,
+    "verdict": {
+     "coverage": {
+      "random": 0.088,
+      "arch49": 0.072,
+      "random_over_arch49": 1.2222222222222223,
+      "arch49_over_random_minus_1": -0.18181818181818188,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "summed": {
+      "random": 0.22203459096225717,
+      "arch49": 0.1103373899576118,
+      "random_over_arch49": 2.0123241183025624,
+      "arch49_over_random_minus_1": -0.5030621603623571,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "outcome": "NEITHER (not confirmed, not falsified)"
+    }
+   },
+   "generalist": {
+    "compare_gen": 150,
+    "arch49_evals": 296,
+    "arch49_snapshot_elites": 61,
+    "arch49_elites_with_features": 61,
+    "random_n": 300,
+    "arch49": {
+     "filled": 47,
+     "coverage": 0.0752,
+     "summed": 0.0
+    },
+    "random": {
+     "filled": 55,
+     "coverage": 0.088,
+     "summed": 8.177146091348913e-06
+    },
+    "random_ci95": {
+     "coverage": [
+      0.0672,
+      0.0816
+     ],
+     "summed": [
+      1.793518770797879e-06,
+      8.167946802923054e-06
+     ]
+    },
+    "context_gen50": {
+     "evals": 106,
+     "filled": 24,
+     "coverage": 0.0384,
+     "summed": 0.0
+    },
+    "random_nonzero_cells": 9,
+    "arch49_nonzero_cells": 0,
+    "verdict": {
+     "coverage": {
+      "random": 0.088,
+      "arch49": 0.0752,
+      "random_over_arch49": 1.1702127659574466,
+      "arch49_over_random_minus_1": -0.1454545454545454,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "summed": {
+      "random": 8.177146091348913e-06,
+      "arch49": 0.0,
+      "random_over_arch49": Infinity,
+      "arch49_over_random_minus_1": -1.0,
+      "within_15": false,
+      "arch49_leads_gt_30": false
+     },
+     "outcome": "NEITHER (not confirmed, not falsified)"
+    }
+   }
+  },
+  "pooled": {
+   "arch49": {
+    "filled": 325,
+    "coverage": 0.065,
+    "summed": 2.9733373899576123
+   },
+   "random": {
+    "filled": 440,
+    "coverage": 0.088,
+    "summed": 5.757568540610924
+   },
+   "verdict": {
+    "coverage": {
+     "random": 0.088,
+     "arch49": 0.065,
+     "random_over_arch49": 1.3538461538461537,
+     "arch49_over_random_minus_1": -0.26136363636363624,
+     "within_15": false,
+     "arch49_leads_gt_30": false
+    },
+    "summed": {
+     "random": 5.757568540610924,
+     "arch49": 2.9733373899576123,
+     "random_over_arch49": 1.9363993336433991,
+     "arch49_over_random_minus_1": -0.48357759547537793,
+     "within_15": false,
+     "arch49_leads_gt_30": false
+    },
+    "outcome": "NEITHER (not confirmed, not falsified)"
+   }
+  },
+  "verdict_counts": {
+   "NEITHER (not confirmed, not falsified)": 8
+  },
+  "origins": {
+   "reference": 210,
+   "random": 90
+  },
+  "plans": {
+   "beetle": 31,
+   "medusa": 30,
+   "bat": 28,
+   "eel": 29,
+   "ray": 31,
+   "gannet": 31,
+   "teal": 30,
+   "random": 90
+  },
+  "bad_qacc_bodies": 0
+ }
+}

@@ -827,10 +827,12 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `antipode` | function | 240 | `(schedule: TaskSchedule) -> TaskSchedule` | The same script with every cruise heading turned by pi. |
+| `antipode` | function | 265 | `(schedule: TaskSchedule) -> TaskSchedule` | The same script with every cruise heading turned by pi. |
+| `mirror` | function | 234 | `(schedule: TaskSchedule) -> TaskSchedule` | The same air script with the drawn turn the other way. |
+| `pair_of` | function | 253 | `(schedule: TaskSchedule) -> TaskSchedule` | The second half of a paired segment: the antipode in water and on land, |
 | `Phase` | class | 136 | — | One purpose, over one stretch of a segment. |
 | `schedule_for` | function | 189 | `(domain, rng=None, *, trim_speed: float=0.0) -> TaskSchedule` | The two-phase script for one segment in ``domain``. |
-| `task_seed` | function | 270 | `(scatter_seed: int) -> int` | The task draw for one segment, derived from its scatter draw. |
+| `task_seed` | function | 295 | `(scatter_seed: int) -> int` | The task draw for one segment, derived from its scatter draw. |
 | `TaskSchedule` | class | 156 | — | The phases one segment is made of, in order. |
 | `Phase.moving` | property | 151 | `(self) -> bool` | — |
 | `TaskSchedule.at` | method | 170 | `(self, frac: float) -> Phase` | — |
@@ -867,6 +869,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
+| `air_task` | function | 3044 | `(turn: float, height: float) -> float` | Air's task score: the turn response, qualified by holding height. |
 | `airworthiness` | function | 342 | `(p: Phenotype) -> list[str]` | Which flight gates a design fails, as reasons.  Empty means none. |
 | `command_statistics` | function | 114 | `(commands) -> tuple[float, float] \| None` | How much, and how erratically, a controller's commands move. |
 | `Domain` | class | 66 | `(str, Enum)` | — |
@@ -874,7 +877,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `MissionResult` | class | 183 | — | Aggregate of a whole evaluation, at whatever fidelity produced it. |
 | `MissionSpec` | class | 79 | — | The mission the user specified, with every number left adjustable. |
 | `morphology_channels` | function | 489 | `(*, mass: float, density_ratio: float, wing_area: float, span: float, aspect_ratio: float, wing_loading: float, n_actuated: int, battery_wh: float) -> np.ndarray` | The eight body-identity channels, from scalars rather than a phenotype. |
-| `pair_partner_of` | function | 3025 | `(seg: SegmentResult) -> dict` | What the second half of an antipodal pair needs from the first. |
+| `pair_partner_of` | function | 3055 | `(seg: SegmentResult) -> dict` | What the second half of an antipodal pair needs from the first. |
 | `rotor_lift_ratio` | function | 330 | `(p: Phenotype) -> float` | Static thrust of every propeller at top speed, in air, over the weight. |
 | `SegmentResult` | class | 139 | — | What one stretch of operating in one domain produced. |
 | `TriphibianEnv` | class | 519 | — | A compiled machine in the triphibian world, steppable by a controller. |
@@ -892,7 +895,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `TriphibianEnv.ground_height` | method | 1423 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
 | `TriphibianEnv.ground_heights` | method | 1432 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
 | `TriphibianEnv.held_still_params` | method | 1377 | `(self) -> CPGParams` | The base gait with every actuator held still: the still machine of |
-| `TriphibianEnv.identify` | method | 2985 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.identify` | method | 3004 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
 | `TriphibianEnv.launch_pitch` | property | 920 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
 | `TriphibianEnv.launch_speed` | property | 888 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
 | `TriphibianEnv.level_margin` | method | 1107 | `(self)` | Can this machine hold height *and* speed, with its own actuators? |
@@ -916,27 +919,28 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Archive` | class | 88 | — | An N-dimensional grid of elites. |
-| `Elite` | class | 59 | — | One occupant of one cell. |
-| `Archive.__init__` | method | 99 | `(self, axes: list[tuple[str, float, float, int]]) -> None` | — |
-| `Archive.add` | method | 188 | `(self, genome, fitness: float, descriptor: np.ndarray, meta: dict \| None=None, tier: int=1, objectives: np.ndarray \| None=None) -> str` | Insert a candidate.  Returns 'new', 'improved' or 'rejected'. |
-| `Archive.best` | property | 135 | `(self) -> Elite \| None` | — |
-| `Archive.capacity` | property | 118 | `(self) -> int` | — |
-| `Archive.cell_of` | method | 138 | `(self, descriptor: np.ndarray) -> tuple[int, ...]` | — |
-| `Archive.coverage` | property | 122 | `(self) -> float` | — |
-| `Archive.export_json` | method | 450 | `(self, path: str \| Path) -> None` | Human- and browser-readable dump for the dashboard. |
-| `Archive.front` | method | 179 | `(self, cell: tuple[int, ...]) -> list['Elite']` | The non-dominated set occupying a cell. |
-| `Archive.front_size` | property | 184 | `(self) -> int` | Total designs held across all cells, fronts included. |
-| `Archive.load` | method | 439 | `(path: str \| Path) -> 'Archive'` | — |
-| `Archive.neighbour_density` | method | 368 | `(self, cell: tuple[int, ...], radius: int=1) -> int` | How crowded the neighbourhood of a cell is. |
-| `Archive.project` | method | 381 | `(self, ax_x: int, ax_y: int) -> tuple[np.ndarray, np.ndarray]` | 2D projection for plotting: max fitness and occupancy per (x, y) bin. |
-| `Archive.qd_score` | property | 126 | `(self) -> float` | Sum of elite fitnesses: the standard scalar summary of a QD run. |
-| `Archive.rebin` | method | 313 | `(self, axes: list[tuple[str, float, float, int]], reproject, priority=None) -> dict` | Rebuild the grid under new axes, re-placing every elite. |
-| `Archive.remove` | method | 295 | `(self, cell: tuple[int, ...]) -> bool` | Empty a cell completely. |
-| `Archive.save` | method | 412 | `(self, path: str \| Path) -> None` | Write the archive, atomically. |
-| `Archive.snapshot` | method | 393 | `(self) -> dict` | A JSON-safe summary, recorded once per generation for the dashboard. |
-| `Archive.would_add` | method | 237 | `(self, fitness: float, descriptor, objectives=None) -> str` | What ``add`` would return for this candidate, changing nothing. |
-| `Elite.curiosity` | property | 82 | `(self) -> float` | — |
+| `Archive` | class | 99 | — | An N-dimensional grid of elites. |
+| `Elite` | class | 67 | — | One occupant of one cell. |
+| `Archive.__init__` | method | 110 | `(self, axes: list[tuple[str, float, float, int]]) -> None` | — |
+| `Archive.add` | method | 203 | `(self, genome, fitness: float, descriptor: np.ndarray, meta: dict \| None=None, tier: int=1, objectives: np.ndarray \| None=None, at_floor: bool=False) -> str` | Insert a candidate.  Returns 'new', 'improved' or 'rejected'. |
+| `Archive.best` | property | 146 | `(self) -> Elite \| None` | — |
+| `Archive.capacity` | property | 129 | `(self) -> int` | — |
+| `Archive.cell_of` | method | 149 | `(self, descriptor: np.ndarray) -> tuple[int, ...]` | — |
+| `Archive.coverage` | property | 133 | `(self) -> float` | — |
+| `Archive.export_json` | method | 513 | `(self, path: str \| Path) -> None` | Human- and browser-readable dump for the dashboard. |
+| `Archive.front` | method | 194 | `(self, cell: tuple[int, ...]) -> list['Elite']` | The non-dominated set occupying a cell. |
+| `Archive.front_size` | property | 199 | `(self) -> int` | Total designs held across all cells, fronts included. |
+| `Archive.load` | method | 502 | `(path: str \| Path) -> 'Archive'` | — |
+| `Archive.neighbour_density` | method | 429 | `(self, cell: tuple[int, ...], radius: int=1) -> int` | How crowded the neighbourhood of a cell is. |
+| `Archive.project` | method | 442 | `(self, ax_x: int, ax_y: int) -> tuple[np.ndarray, np.ndarray]` | 2D projection for plotting: max fitness and occupancy per (x, y) bin. |
+| `Archive.qd_score` | property | 137 | `(self) -> float` | Sum of elite fitnesses: the standard scalar summary of a QD run. |
+| `Archive.rebin` | method | 374 | `(self, axes: list[tuple[str, float, float, int]], reproject, priority=None) -> dict` | Rebuild the grid under new axes, re-placing every elite. |
+| `Archive.record_draw` | method | 334 | `(self, elite: Elite, draw: dict, depth: int \| None=None) -> dict` | One more evaluation of ``elite``; its score becomes its lower-median draw. |
+| `Archive.remove` | method | 318 | `(self, cell: tuple[int, ...]) -> bool` | Empty a cell completely. |
+| `Archive.save` | method | 475 | `(self, path: str \| Path) -> None` | Write the archive, atomically. |
+| `Archive.snapshot` | method | 454 | `(self) -> dict` | A JSON-safe summary, recorded once per generation for the dashboard. |
+| `Archive.would_add` | method | 253 | `(self, fitness: float, descriptor, objectives=None, at_floor: bool=False) -> str` | What ``add`` would return for this candidate, changing nothing. |
+| `Elite.curiosity` | property | 93 | `(self) -> float` | — |
 
 ## `evolution.auditor` — `dytiscidae/evolution/auditor.py`
 
@@ -944,16 +948,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Auditor` | class | 203 | — | Re-measures designs under conditions they were not selected on. |
+| `Auditor` | class | 208 | — | Re-measures designs under conditions they were not selected on. |
 | `AuditReport` | class | 85 | — | — |
-| `check_energy_conservation` | function | 125 | `(result) -> Finding \| None` | The fluid must not be a power source. |
-| `check_scaling` | function | 156 | `(phenotype) -> Finding \| None` | Wing loading against mass, compared with the real world. |
+| `check_energy_conservation` | function | 130 | `(result) -> Finding \| None` | The fluid must not be a power source. |
+| `check_scaling` | function | 161 | `(phenotype) -> Finding \| None` | Wing loading against mass, compared with the real world. |
 | `Finding` | class | 74 | — | One thing the auditor objected to. |
-| `Auditor.audit` | method | 233 | `(self, phenotype, result, *, reevaluate=None, name: str='', seed: int=0) -> AuditReport` | Run every check that the available information supports. |
-| `Auditor.report` | method | 407 | `(self) -> dict` | — |
-| `Auditor.review_tightening` | method | 353 | `(self, judge, moves: list, invalid_designs) -> list` | Veto a bar that was moved by evidence that did not hold up. |
-| `AuditReport.invalid` | property | 101 | `(self) -> bool` | — |
-| `AuditReport.summary` | method | 104 | `(self) -> dict` | — |
+| `Auditor.audit` | method | 238 | `(self, phenotype, result, *, reevaluate=None, name: str='', seed: int=0) -> AuditReport` | Run every check that the available information supports. |
+| `Auditor.report` | method | 424 | `(self) -> dict` | — |
+| `Auditor.review_tightening` | method | 370 | `(self, judge, moves: list, invalid_designs) -> list` | Veto a bar that was moved by evidence that did not hold up. |
+| `AuditReport.invalid` | property | 105 | `(self) -> bool` | — |
+| `AuditReport.summary` | method | 108 | `(self) -> dict` | — |
 
 ## `evolution.cmaes` — `dytiscidae/evolution/cmaes.py`
 
@@ -1003,23 +1007,24 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `OperatorStats` | class | 57 | — | Running record for one mutation operator. |
 | `Regime` | class | 175 | — | The curator's read on what the run is currently doing. |
 | `Curator.__init__` | method | 197 | `(self, archive: Archive, *, seed: int=0, tier2_budget_fraction: float=0.08, crowding_limit: int=14) -> None` | — |
-| `Curator.check_famine` | method | 608 | `(self) -> list[str]` | Detect domains no design in the archive can perform, and act. |
+| `Curator.check_famine` | method | 622 | `(self) -> list[str]` | Detect domains no design in the archive can perform, and act. |
 | `Curator.choose_operators` | method | 245 | `(self) -> list[str]` | — |
-| `Curator.cohort_report` | method | 741 | `(self, cohort: list[Elite]) -> list[dict]` | A compact, printable description of an approved cohort. |
+| `Curator.cohort_report` | method | 755 | `(self, cohort: list[Elite]) -> list[dict]` | A compact, printable description of an approved cohort. |
 | `Curator.credit` | method | 254 | `(self, operators: list[str], status: str, gain: float) -> None` | Pay an operator for the improvement it produced. |
-| `Curator.domain_bests` | method | 557 | `(self) -> dict[str, float]` | Best competence any elite achieves in each domain. |
-| `Curator.generation_report` | method | 763 | `(self) -> dict` | — |
+| `Curator.domain_bests` | method | 571 | `(self) -> dict[str, float]` | Best competence any elite achieves in each domain. |
+| `Curator.generation_report` | method | 777 | `(self) -> dict` | — |
 | `Curator.note_offspring` | method | 360 | `(self, parent: Elite \| None, status: str) -> None` | — |
-| `Curator.observe_domains` | method | 567 | `(self, meta: dict) -> None` | Record one evaluation's per-domain competences. |
-| `Curator.on_rebin` | method | 389 | `(self) -> None` | Forget everything keyed by cell coordinate. |
-| `Curator.plateau_p` | method | 585 | `(self, domain: str) -> float` | How surprising the current drought is, if the search were still |
-| `Curator.prune` | method | 489 | `(self, max_prunes: int=3) -> int` | Drop marginal elites from over-dense regions. |
-| `Curator.quarantine` | method | 410 | `(self, descriptor: np.ndarray, reason: str, genome=None) -> None` | Record an exploit and taint the region it came from. |
-| `Curator.record_promotion` | method | 400 | `(self, elite: Elite, tier2_fitness: float) -> None` | — |
-| `Curator.select_cohort` | method | 695 | `(self, n: int \| None=None, *, require_feasible: bool=True, require_verified: bool=False) -> list[Elite]` | Approve a cohort to carry into the next round. |
+| `Curator.observe_domains` | method | 581 | `(self, meta: dict) -> None` | Record one evaluation's per-domain competences. |
+| `Curator.on_rebin` | method | 394 | `(self) -> None` | Forget everything keyed by cell coordinate. |
+| `Curator.plateau_p` | method | 599 | `(self, domain: str) -> float` | How surprising the current drought is, if the search were still |
+| `Curator.promotion_candidates` | method | 389 | `(self, k: int=3) -> list[Elite]` | The top ``k`` representatives by ``fitness`` not yet verified (tier < 2). |
+| `Curator.prune` | method | 503 | `(self, max_prunes: int=3) -> int` | Drop marginal elites from over-dense regions. |
+| `Curator.quarantine` | method | 424 | `(self, descriptor: np.ndarray, reason: str, genome=None) -> None` | Record an exploit and taint the region it came from. |
+| `Curator.record_promotion` | method | 405 | `(self, elite: Elite, tier2_fitness: float) -> None` | Mark ``elite`` verified and store the Tier-2 outcome beside its score. |
+| `Curator.select_cohort` | method | 709 | `(self, n: int \| None=None, *, require_feasible: bool=True, require_verified: bool=False) -> list[Elite]` | Approve a cohort to carry into the next round. |
 | `Curator.select_parent` | method | 292 | `(self) -> Elite \| None` | Pick who to breed from, weighting four independent signals. |
 | `Curator.should_promote` | method | 369 | `(self, elite: Elite) -> bool` | Whether this elite has earned a high-fidelity re-evaluation. |
-| `Curator.update_regime` | method | 435 | `(self) -> Regime` | Classify the run and set search pressure accordingly. |
+| `Curator.update_regime` | method | 449 | `(self) -> Regime` | Classify the run and set search pressure accordingly. |
 | `OperatorBandit.__init__` | method | 87 | `(self, names: list[str] \| None=None, c: float=0.6, epsilon: float=0.2) -> None` | — |
 | `OperatorBandit.report` | method | 163 | `(self) -> list[dict]` | — |
 | `OperatorBandit.select` | method | 113 | `(self, rng: np.random.Generator, *, structural_bias: float=1.0, exclude: tuple=()) -> str` | Pick an operator by UCB, tilted by the current structural appetite. |
@@ -1033,29 +1038,29 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Curriculum` | class | 290 | — | Tracks what each lineage is ready to be asked. |
-| `DistanceCurriculum` | class | 653 | — | Move each transition probe's start back as the population crosses it. |
+| `Curriculum` | class | 304 | — | Tracks what each lineage is ready to be asked. |
+| `DistanceCurriculum` | class | 689 | — | Move each transition probe's start back as the population crosses it. |
 | `stage_score` | function | 165 | `(stage: int, result, transitions=None, *, domains=None, transition_names=None, weakest: bool=False) -> float` | How well a result answers the question *this* stage asks. |
 | `StageResult` | class | 142 | — | — |
 | `triphibian_stage_score` | function | 109 | `(stage: int, comps, crossing: dict \| None=None, mission: float=0.0) -> float` | What stage ``stage`` of the triphibian ladder reads. |
-| `Curriculum.bar` | method | 343 | `(self, stage: int) -> float` | The bar to leave ``stage`` on this curriculum's ladder. |
-| `Curriculum.evaluate` | method | 505 | `(self, cell, result, transitions=None, *, stage: int \| None=None) -> StageResult` | Score a design at its cell's stage, and at the next one up. |
-| `Curriculum.forget` | method | 604 | `(self, cell) -> None` | Drop a cell's stage when the cell itself is gone. |
-| `Curriculum.handover` | method | 392 | `(self, stage: int) -> float` | How much weight the island's own objective has earned, in [0, 1]. |
-| `Curriculum.mission_standing` | method | 480 | `(self, mission: float, stage: int=0) -> float` | ``mission_fraction`` as a population quantile, on the same scale. |
-| `Curriculum.observe_blend` | method | 380 | `(self, island_score: float, curriculum_score: float, stage: int=0, mission: float=0.0) -> None` | Record what each half of the blend said about one design. |
-| `Curriculum.rebuild_from` | method | 577 | `(self, archive) -> dict` | Re-key the stage record after the descriptor axes have moved. |
-| `Curriculum.report` | method | 613 | `(self) -> dict` | — |
-| `Curriculum.seed_stage` | method | 354 | `(self, cell, stage: int) -> int` | Give an unvisited cell the stage its parent had earned. |
-| `Curriculum.stage_for` | method | 373 | `(self, cell, stage: int) -> int` | The stage ``seed_stage`` would give ``cell``, without giving it. |
-| `Curriculum.stage_name` | method | 349 | `(self, stage: int) -> str` | — |
-| `Curriculum.stage_of` | method | 340 | `(self, cell) -> int` | — |
-| `Curriculum.standing` | method | 439 | `(self, island_score: float, curriculum_score: float, stage: int=0)` | Both halves of the blend as population quantiles in [0, 1]. |
-| `Curriculum.update` | method | 529 | `(self, cell, sr: StageResult) -> str` | Promote or demote the cell.  Returns what happened. |
-| `DistanceCurriculum.apply` | method | 723 | `(self, spec) -> None` | Write the current starts into the mission spec the evaluators read. |
-| `DistanceCurriculum.observe` | method | 684 | `(self, result) -> None` | Record one Tier-1 result's crossings and its air score. |
-| `DistanceCurriculum.report` | method | 729 | `(self) -> dict` | — |
-| `DistanceCurriculum.update` | method | 700 | `(self) -> list` | Step any start the population has earned.  Returns the moves. |
+| `Curriculum.bar` | method | 357 | `(self, stage: int) -> float` | The bar to leave ``stage`` on this curriculum's ladder. |
+| `Curriculum.evaluate` | method | 541 | `(self, cell, result, transitions=None, *, stage: int \| None=None) -> StageResult` | Score a design at its cell's stage, and at the next one up. |
+| `Curriculum.forget` | method | 640 | `(self, cell) -> None` | Drop a cell's stage when the cell itself is gone. |
+| `Curriculum.handover` | method | 412 | `(self, stage: int) -> float` | How much weight the island's own objective has earned, in [0, 1]. |
+| `Curriculum.mission_standing` | method | 515 | `(self, mission: float, stage: int=0, floor_only: bool=True) -> float` | ``mission_fraction`` as a population quantile, on the same scale. |
+| `Curriculum.observe_blend` | method | 394 | `(self, island_score: float, curriculum_score: float, stage: int=0, mission: float=0.0, at_floor: bool=False) -> None` | Record what each half of the blend said about one design. |
+| `Curriculum.rebuild_from` | method | 613 | `(self, archive) -> dict` | Re-key the stage record after the descriptor axes have moved. |
+| `Curriculum.report` | method | 649 | `(self) -> dict` | — |
+| `Curriculum.seed_stage` | method | 368 | `(self, cell, stage: int) -> int` | Give an unvisited cell the stage its parent had earned. |
+| `Curriculum.stage_for` | method | 387 | `(self, cell, stage: int) -> int` | The stage ``seed_stage`` would give ``cell``, without giving it. |
+| `Curriculum.stage_name` | method | 363 | `(self, stage: int) -> str` | — |
+| `Curriculum.stage_of` | method | 354 | `(self, cell) -> int` | — |
+| `Curriculum.standing` | method | 459 | `(self, island_score: float, curriculum_score: float, stage: int=0, floor_only: bool=True)` | Both halves of the blend as population quantiles in [0, 1]. |
+| `Curriculum.update` | method | 565 | `(self, cell, sr: StageResult) -> str` | Promote or demote the cell.  Returns what happened. |
+| `DistanceCurriculum.apply` | method | 759 | `(self, spec) -> None` | Write the current starts into the mission spec the evaluators read. |
+| `DistanceCurriculum.observe` | method | 720 | `(self, result) -> None` | Record one Tier-1 result's crossings and its air score. |
+| `DistanceCurriculum.report` | method | 765 | `(self) -> dict` | — |
+| `DistanceCurriculum.update` | method | 736 | `(self) -> list` | Step any start the population has earned.  Returns the moves. |
 
 ## `evolution.descriptors` — `dytiscidae/evolution/descriptors.py`
 
@@ -1080,18 +1085,20 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Archipelago` | class | 275 | — | Several archives, evolved in parallel, with migration and hybridisation. |
-| `curriculum_for` | function | 227 | `(island: str)` | A curriculum that asks an island's questions in the island's own media. |
-| `island_score` | function | 185 | `(island: str, result, transitions=None) -> float` | Score a design on one island's own terms. |
-| `own_domain_score` | function | 245 | `(island: str, meta: dict) -> float` | How good a stored elite is at *its island's own* domains, from its meta. |
-| `triphibian_score` | function | 138 | `(comps, floor: float=TRIPHIBIAN_FLOOR) -> float` | The triphibian island's objective: a soft minimum of the three media. |
-| `Archipelago.colonists` | method | 395 | `(self, name: str, n: int) -> list` | Immigrants for an island that is empty, from every other island. |
-| `Archipelago.due` | method | 311 | `(self, generation: int) -> bool` | — |
-| `Archipelago.emigrants` | method | 314 | `(self, name: str) -> list` | The designs this island sends abroad: its best, by its own lights. |
-| `Archipelago.migrate` | method | 322 | `(self, generation: int, rng: np.random.Generator, crossover=None) -> list` | Move genomes between islands and cross specialists. |
-| `Archipelago.names` | property | 302 | `(self) -> list` | — |
-| `Archipelago.register` | method | 305 | `(self, name: str, archive, curator) -> None` | — |
-| `Archipelago.report` | method | 418 | `(self) -> dict` | — |
+| `Archipelago` | class | 300 | — | Several archives, evolved in parallel, with migration and hybridisation. |
+| `below_competence_floor` | function | 153 | `(island: str, result) -> bool` | True when the design clears the floor in none of its island's media. |
+| `curriculum_for` | function | 252 | `(island: str)` | A curriculum that asks an island's questions in the island's own media. |
+| `island_media` | function | 148 | `(island: str) -> tuple` | The media an island's score reads; every medium for an unknown name. |
+| `island_score` | function | 210 | `(island: str, result, transitions=None) -> float` | Score a design on one island's own terms. |
+| `own_domain_score` | function | 270 | `(island: str, meta: dict) -> float` | How good a stored elite is at *its island's own* domains, from its meta. |
+| `triphibian_score` | function | 163 | `(comps, floor: float=TRIPHIBIAN_FLOOR) -> float` | The triphibian island's objective: a soft minimum of the three media. |
+| `Archipelago.colonists` | method | 420 | `(self, name: str, n: int) -> list` | Immigrants for an island that is empty, from every other island. |
+| `Archipelago.due` | method | 336 | `(self, generation: int) -> bool` | — |
+| `Archipelago.emigrants` | method | 339 | `(self, name: str) -> list` | The designs this island sends abroad: its best, by its own lights. |
+| `Archipelago.migrate` | method | 347 | `(self, generation: int, rng: np.random.Generator, crossover=None) -> list` | Move genomes between islands and cross specialists. |
+| `Archipelago.names` | property | 327 | `(self) -> list` | — |
+| `Archipelago.register` | method | 330 | `(self, name: str, archive, curator) -> None` | — |
+| `Archipelago.report` | method | 443 | `(self) -> dict` | — |
 
 ## `evolution.judge` — `dytiscidae/evolution/judge.py`
 
@@ -1117,28 +1124,28 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 929 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `draw_key` | function | 873 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
-| `evaluate_candidate` | function | 421 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 544 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 452 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2236 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `median_draw` | function | 878 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
-| `placement_draw_seed` | function | 868 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
-| `run_search` | function | 1463 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2111 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
-| `SearchConfig` | class | 64 | — | Everything adjustable about a run. |
-| `SearchState` | class | 330 | — | — |
-| `seed_archipelago` | function | 2500 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 469 | `(self)` | — |
-| `GenerationCost.count` | method | 489 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 475 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 482 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 498 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 495 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 390 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 394 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 398 | `(self) -> Curriculum` | — |
+| `batchroll_eval` | function | 951 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `draw_key` | function | 895 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
+| `evaluate_candidate` | function | 437 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 561 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 469 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2380 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `median_draw` | function | 900 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
+| `placement_draw_seed` | function | 890 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
+| `run_search` | function | 1587 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2255 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `SearchConfig` | class | 65 | — | Everything adjustable about a run. |
+| `SearchState` | class | 346 | — | — |
+| `seed_archipelago` | function | 2644 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `GenerationCost.__init__` | method | 486 | `(self)` | — |
+| `GenerationCost.count` | method | 506 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 492 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 499 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 515 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 512 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 406 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 410 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 414 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1203,18 +1210,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `potential_of` | function | 374 | `(obs, domain: str) -> float` | A state's potential, for potential-based reward shaping. |
-| `ppo_update` | function | 526 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None, group_buffer=None) -> dict` | One PPO update over everything the generation collected. |
+| `ppo_update` | function | 547 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None, group_buffer=None) -> dict` | One PPO update over everything the generation collected. |
 | `RolloutBuffer` | class | 414 | — | Trajectories from a whole generation, flattened into a PPO batch. |
-| `SegmentCollector` | class | 487 | — | Records one segment's decisions, per machine, into trajectories. |
+| `SegmentCollector` | class | 508 | — | Records one segment's decisions, per machine, into trajectories. |
 | `SharedPolicy` | class | 122 | `(nn.Module if AVAILABLE else object)` | A Gaussian policy and a value head, shared by every morphology. |
 | `Trajectory` | class | 346 | — | One segment's worth of decisions from one machine. |
 | `RolloutBuffer.__init__` | method | 428 | `(self, gamma: float=0.99, lam: float=0.95, shaping: float=0.2)` | — |
-| `RolloutBuffer.add` | method | 434 | `(self, traj: Trajectory) -> None` | — |
-| `RolloutBuffer.build` | method | 449 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |
-| `RolloutBuffer.n_transitions` | property | 439 | `(self) -> int` | — |
-| `SegmentCollector.__init__` | method | 495 | `(self, k: int)` | — |
-| `SegmentCollector.finish` | method | 507 | `(self, buffer: RolloutBuffer, rewards, tag: str='', groups=None) -> None` | Attach each machine's segment competence and bank the trajectory. |
-| `SegmentCollector.record` | method | 499 | `(self, m: int, obs, act, logp, val, phi: float=0.0) -> None` | — |
+| `RolloutBuffer.add` | method | 439 | `(self, traj: Trajectory) -> None` | — |
+| `RolloutBuffer.build` | method | 454 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |
+| `RolloutBuffer.n_transitions` | property | 444 | `(self) -> int` | — |
+| `SegmentCollector.__init__` | method | 516 | `(self, k: int)` | — |
+| `SegmentCollector.finish` | method | 528 | `(self, buffer: RolloutBuffer, rewards, tag: str='', groups=None) -> None` | Attach each machine's segment competence and bank the trajectory. |
+| `SegmentCollector.record` | method | 520 | `(self, m: int, obs, act, logp, val, phi: float=0.0) -> None` | — |
 | `SharedPolicy.__init__` | method | 130 | `(self, n_obs: int, n_modes: int, hidden: int=64)` | — |
 | `SharedPolicy.act` | method | 317 | `(self, obs_np, *, deterministic: bool=False, rng=None)` | One decision, numpy in and numpy out, for use inside a rollout. |
 | `SharedPolicy.act_many` | method | 258 | `(self, obs_np, *, deterministic: bool=False, rngs=None)` | One decision per row, in a single forward pass. |
@@ -1260,27 +1267,27 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 635 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `build_parser` | function | 960 | `() -> argparse.ArgumentParser` | — |
-| `child_env` | function | 336 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
-| `cmd_cohort` | function | 576 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_config` | function | 446 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
-| `cmd_dashboard` | function | 905 | `(args) -> int` | — |
-| `cmd_distill` | function | 943 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 464 | `(args) -> int` | — |
-| `cmd_postrun` | function | 412 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 638 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `build_parser` | function | 963 | `() -> argparse.ArgumentParser` | — |
+| `child_env` | function | 339 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
+| `cmd_cohort` | function | 579 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_config` | function | 449 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
+| `cmd_dashboard` | function | 908 | `(args) -> int` | — |
+| `cmd_distill` | function | 946 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 467 | `(args) -> int` | — |
+| `cmd_postrun` | function | 415 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 124 | `(args) -> int` | — |
-| `cmd_render` | function | 912 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
-| `cmd_search` | function | 263 | `(args) -> int` | — |
-| `cmd_showcase` | function | 763 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 471 | `(args) -> int` | — |
-| `cmd_train` | function | 505 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_render` | function | 915 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_search` | function | 266 | `(args) -> int` | — |
+| `cmd_showcase` | function | 766 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 474 | `(args) -> int` | — |
+| `cmd_train` | function | 508 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 117 | `(args) -> int` | — |
-| `controller_for_elite` | function | 645 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 355 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 648 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 358 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 32 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 1293 | `(argv=None) -> int` | — |
-| `merge_config_file` | function | 221 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
+| `main` | function | 1308 | `(argv=None) -> int` | — |
+| `merge_config_file` | function | 224 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
 | `search_config_from_args` | function | 159 | `(args, shared: bool)` | The ``SearchConfig`` a ``search`` command line asks for. |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`

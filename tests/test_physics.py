@@ -198,17 +198,29 @@ def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
     first as the project's behaviour and concluded the controller was never
     trained (2026-10-06).  The parser's defaults now are the stored-run
     configuration, except ``--refine-steps``, which is 0 since ROADMAP M1
-    (2026-10-08) measured its gain as draw-selection."""
+    (2026-10-08) measured its gain as draw-selection, and ``--mission-weight``,
+    which is 0.0 since ARCH51 (it was 0.30 through arch50)."""
     print("\nops: `search` with no flags is the configuration the runs used")
     import os
 
-    from dytiscidae.ops.run import build_parser
+    from dytiscidae.evolution.loop import SearchConfig
+    from dytiscidae.ops.run import build_parser, search_config_from_args
 
     a = build_parser().parse_args(["search"])
     check("batch 16", a.batch == 16, f"{a.batch}")
     check("workers 4, capped at the core count",
           a.workers == min(4, os.cpu_count() or 1), f"{a.workers}")
     check("refine steps 0 (ROADMAP M1)", a.refine_steps == 0, f"{a.refine_steps}")
+    check("promotion refinement is one batch (IMPL_1010 P2)",
+          a.promotion_refine_serial is False
+          and search_config_from_args(a, True).promotion_refine_parallel is True)
+    check("mission weight 0 (ARCH51_SPEC)", a.mission_weight == 0.0,
+          f"{a.mission_weight}")
+    check("and the CLI agrees with SearchConfig",
+          search_config_from_args(a, True).mission_weight
+          == SearchConfig().mission_weight,
+          f"{search_config_from_args(a, True).mission_weight} vs "
+          f"{SearchConfig().mission_weight}")
     check("shared policy is decided at run time, not off",
           a.shared_policy is None, f"{a.shared_policy!r}")
     check("--no-shared-policy is accepted and false",
@@ -217,6 +229,13 @@ def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
     check("min-shard 2 and pool-per-worker 2 (the queue)",
           (a.min_shard, a.pool_per_worker) == (2, 2.0),
           f"{a.min_shard}, {a.pool_per_worker}")
+    check("re-evaluation off, depth 8 (ARCH51 L10)",
+          (a.reeval_per_generation, a.reeval_depth) == (0, 8),
+          f"{a.reeval_per_generation}, {a.reeval_depth}")
+    b = build_parser().parse_args(["search", "--reeval-per-generation", "4"])
+    check("--reeval-per-generation reaches the SearchConfig",
+          search_config_from_args(b, True).reeval_per_generation == 4,
+          f"{search_config_from_args(b, True).reeval_per_generation}")
 
 
 def run_all(functions) -> None:
@@ -810,6 +829,18 @@ def test_the_seeds_include_something_that_flies() -> None:
     # commanded: seeds 1-4 were unchanged, seed 0 went 0.213 -> 0.022 and seed
     # 5 0.012 -> 0.001, and seed 3 falls either way.  The test was sitting on
     # seed 0 alone.
+    #
+    # Since 2026-10-10 air is a mirrored pair of turns and height pays only
+    # through the turn (``triphibian.air_task``), so every open-loop seed
+    # scores 0 in air by design: none can read the turn command.  A foothold
+    # is a *state* the archive can climb from, so the plan is picked and judged
+    # on what the air segment measures of that state -- the airborne fraction
+    # and the sink rate -- never on the score.  Measured 2026-10-10 (medians
+    # over seeds 0-2, airborne / sink m/s): gannet 1.00 / 1.51, teal 0.65 /
+    # 4.94, beetle 0.44 / 8.79, bat 0.50 / 10.41, ray 0.41 / 13.99, medusa
+    # 0.40 / 11.94, eel 0.42 / 9.90 (seed 0 published nothing).  A plan whose
+    # segment published nothing reads as grounded and falling (0, 99), so
+    # "could not measure" cannot pass.
     spec = MissionSpec()
     air = {}
     for name, fn in BODY_PLANS.items():
@@ -817,20 +848,80 @@ def test_the_seeds_include_something_that_flies() -> None:
         for seed in (0, 1, 2):
             r = evaluate_tier1(build(fn()), spec=spec, seed=seed, segment_seconds=8.0)
             seg = r.segments.get("air")
-            rows.append((seg.competence if seg else 0.0,
-                         (seg.measurements if seg else {}).get("airborne_fraction", 0.0),
-                         (seg.measurements if seg else {}).get("sink_rate", 99.0)))
+            m = (seg.measurements if seg else None) or {}
+            rows.append((float(m.get("airborne_fraction", 0.0)),
+                         float(m.get("sink_rate", 99.0)),
+                         float(m.get("height_hold", 1.0))))
         air[name] = tuple(float(np.median([row[i] for row in rows])) for i in range(3))
-    best = max(air, key=lambda k: air[k][0])
-    score, frac, sink = air[best]
-    others = sorted(v[0] for k, v in air.items() if k != best)
+
+    def stays_up(v):
+        return v[0] > 0.95 and v[1] < 3.0
+
+    best = max(air, key=lambda k: (air[k][0], -air[k][1]))
+    frac, sink, _hold = air[best]
+    table = ", ".join(f"{k} {v[0]:.2f}/{v[1]:.2f}" for k, v in air.items())
     check("one seed stays airborne for the whole segment",
           frac > 0.95, f"{best}: airborne {frac:.2f} of the segment")
     check("and descends slowly enough to be flying rather than falling",
-          sink < 3.0, f"{best}: {sink:.2f} m/s sink against 10-14 for the flappers")
+          sink < 3.0, f"{best}: {sink:.2f} m/s sink against 8-14 for the flappers")
+    next_sink = min(v[1] for k, v in air.items() if k != best)
     check("it is clearly ahead of the plans that cannot",
-          score > 2.0 * others[-1],
-          f"{best} {score:.3f} against next best {others[-1]:.3f}")
+          sink < 0.5 * next_sink,
+          f"{best} sinks {sink:.2f} m/s against the next slowest {next_sink:.2f} "
+          f"(airborne/sink: {table})")
+    # The negative control: the two plans built to be incapable of flight must
+    # fail the same bar, or the bar is not a gate.  And they hold no height:
+    # both are in the sea before the turn phase starts, and since height pays
+    # only through the turn the score cannot see a height term that forgot to
+    # ask whether the body is still in the air (mutation
+    # ``air-height-counts-floating``), so ``height_hold`` is read directly.  A
+    # segment that published nothing reads 1.0 here, so it cannot pass.
+    wingless = {k: air[k] for k in ("eel", "medusa") if k in air}
+    check("and the plans built not to fly (eel, medusa) fail the bar it clears, "
+          "holding no height",
+          len(wingless) == 2 and not any(stays_up(v) for v in wingless.values())
+          and all(v[2] == 0.0 for v in wingless.values()),
+          f"airborne/sink/height_hold {wingless}")
+
+
+def test_air_is_scored_on_a_mirrored_turn() -> None:
+    """Air's pair and its score, without a simulator (2026-10-10, the user's
+    answer of 10-09: air is scored on a commanded difference too).
+
+    The same arithmetic is checked in ``test_search`` after the batched path,
+    which needs the GPU; here it runs on any machine, so the two air mutations
+    (``air-height-adds-to-the-turn``, ``air-pair-turns-the-same-way``) are
+    caught without one.
+    """
+    print("\ntasks: air is a mirrored pair of turns, height pays through the turn")
+    import numpy as np
+
+    from dytiscidae.envs.tasks import CRUISE, PAIRED_MEDIA, antipode, mirror, pair_of, schedule_for
+    from dytiscidae.envs.triphibian import air_task
+
+    check("air height pays only through the turn",
+          air_task(0.0, 1.0) == 0.0 and air_task(1.0, 0.0) == 0.5
+          and air_task(1.0, 1.0) == 1.0 and air_task(0.4, 1.0) == 0.4,
+          f"{[air_task(*x) for x in ((0, 1), (1, 0), (1, 1), (0.4, 1))]}")
+    worst, turned = 0.0, 0
+    for seed in range(8):
+        ta = schedule_for("air", np.random.default_rng(seed))
+        a = [(ph.kind, ph.heading) for ph in ta.phases]
+        b = [(ph.kind, ph.heading) for ph in mirror(ta).phases]
+        worst = max(worst, max(abs(x[1] + y[1]) for x, y in zip(a, b)
+                               if x[0] == CRUISE))
+        turned += any(x[0] == CRUISE and x[1] != 0.0 for x in a)
+        same = [ph.heading for ph in pair_of(ta).phases] == [h for _k, h in b]
+        if not same:
+            break
+    check("the mirror turns every air cruise heading to the other side, on 8 draws",
+          worst < 1e-12 and turned == 8 and same, f"worst |h + h'| {worst:.2e}, "
+          f"{turned}/8 draws with a turn")
+    tw = schedule_for("water", np.random.default_rng(1))
+    check("pair_of takes the antipode in water and is in PAIRED_MEDIA for all three",
+          [ph.heading for ph in pair_of(tw).phases]
+          == [ph.heading for ph in antipode(tw).phases]
+          and set(PAIRED_MEDIA) == {"air", "water", "land"}, f"{PAIRED_MEDIA}")
 
 
 def test_the_render_shows_the_shape_the_solver_reads() -> None:
@@ -3392,7 +3483,8 @@ def test_a_film_is_the_evaluation() -> None:
     check("detail geometry and a per-step hook leave every segment bit-identical",
           same, " ".join(f"{getattr(d, 'value', d)} {plain.segments[d].distance:.6f}/"
                          f"{filmed.segments[d].distance:.6f}" for d in plain.segments))
-    # Five rollouts: air once, water and land as antipodal pairs (rule 8).
+    # One rollout per medium, two for each paired one (rule 8; all three since
+    # 2026-10-10).
     from dytiscidae.envs.tasks import PAIRED_MEDIA
     check("and the hook was actually called on every step of every segment",
           calls == (3 + len(PAIRED_MEDIA)) * int(2.0 / TriphibianEnv(p).timestep),
@@ -4326,8 +4418,8 @@ def test_an_evaluation_counts_the_steps_it_took() -> None:
     arch44 ran 120 s a generation for fifty generations and ~320 s after, and
     nothing it recorded could say which part grew.  A beetle survives every
     part, so each count equals its schedule exactly: identification is 2 media
-    x 24 probes x 2 signs x 1.2 s, five segment rollouts (water and land are
-    pairs), four 6 s transitions, and
+    x 24 probes x 2 signs x 1.2 s, six segment rollouts (every medium is a
+    pair since air's mirrored turn, 2026-10-10), four 6 s transitions, and
     the level-flight rig (0.5 s settle + 0.7 s average) apart from all three.
     """
     print("\nevaluate: the steps an evaluation took are on its result")
@@ -4340,8 +4432,12 @@ def test_an_evaluation_counts_the_steps_it_took() -> None:
     r = evaluate_tier1(build(BODY_PLANS["beetle"]()), spec=MissionSpec(),
                        segment_seconds=seg, identify_axes=True, seed=5)
     want = {"identify": 2 * 24 * 2 * int(1.2 / dt),
-            # air once, water and land as antipodal pairs (CLAUDE.md rule 8)
-            "segments": 5 * int(seg / dt),
+            # every medium is a pair from one initial state (CLAUDE.md rule 8):
+            # water and land on the antipode, air on the mirrored turn
+            # (``tasks.pair_of``), each half the full segment.  Written as a
+            # literal, not from ``PAIRED_MEDIA``, so a medium dropped from the
+            # pair fails here instead of moving the expectation with it.
+            "segments": 2 * 3 * int(seg / dt),
             "transitions": 4 * int(6.0 / dt),
             "rig": int(TriphibianEnv.RIG_SETTLE / dt) + int(TriphibianEnv.RIG_AVERAGE / dt)}
     for part, n in want.items():
@@ -4407,6 +4503,7 @@ def main() -> int:
         test_each_plan_moves_the_way_it_says_it_does,
         test_a_surface_can_be_told_to_hold_still,
         test_the_seeds_include_something_that_flies,
+        test_air_is_scored_on_a_mirrored_turn,
         test_the_render_shows_the_shape_the_solver_reads,
         test_machine_does_not_collide_with_itself,
         test_air_segment_can_be_scored,

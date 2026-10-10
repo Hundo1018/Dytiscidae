@@ -1935,11 +1935,12 @@ class TriphibianEnv:
           walk command would have covered -- walking on at the commanded speed
           scores 0.
 
-        Combined: water and air are the mean of their two phases, because
-        neither phase is free for a machine that does nothing.  On land a
-        machine that does nothing stops perfectly, so stopping *qualifies* the
-        walk instead of adding to it -- ``walk * (0.5 + 0.5 * stop)`` -- and a
-        rock scores zero.
+        Combined: water is the mean of its two phases.  On land a machine that
+        does nothing stops perfectly, so stopping *qualifies* the walk instead
+        of adding to it -- ``walk * (0.5 + 0.5 * stop)`` -- and a rock scores
+        zero.  In the air a glider keeps its height on its airframe, so since
+        2026-10-10 height qualifies the turn the same way -- ``turn * (0.5 +
+        0.5 * height)`` -- and the turn is the mean over a mirrored pair.
         """
         t = self._active_task
         if t is None or t.domain != domain.value:
@@ -2179,11 +2180,29 @@ class TriphibianEnv:
                 # stopped: stopping is a velocity change *toward* it, and
                 # scored 0.28 and 0.34 as turning.
                 gain = min(float(b["v"] @ n), float((b["v"] - a["v"]) @ n))
-                turn = (float(np.clip(gain / want, 0.0, 1.0)) * _served(a, b)
-                        * min(a.get("airborne", 1.0), b.get("airborne", 1.0)))
+                # Signed and unclipped, for the mirrored pair (``tasks.mirror``):
+                # the second half's turn goes the other way, so a lateral
+                # velocity the command did not choose reads with opposite signs
+                # in the two halves and the mean cancels it.
+                signed = gain / want
+                factor = _served(a, b) * min(a.get("airborne", 1.0), b.get("airborne", 1.0))
+                m["pair_turn"] = float(signed)
+                m["pair_turn_factor"] = float(factor)
+                p = self.pair_partner
+                if p is not None and "turn" in p:
+                    signed = 0.5 * (signed + float(p["turn"]))
+                    factor = min(factor, float(p.get("turn_factor", 0.0)))
+                    m["pair_turn_mean"] = float(signed)
+                turn = float(np.clip(signed, 0.0, 1.0)) * factor
                 m["turn_response"] = turn
             height = float(np.mean([r.get("vertical", 0.0) * r.get("served", 0.0) for r in (a, b)]))
-            task = 0.5 * turn + 0.5 * height
+            # The turn *qualifies* height rather than adding to it (the user,
+            # 2026-10-09: air is scored on a commanded difference too).  Height
+            # is a state a glider keeps on its airframe -- held still, 11
+            # arch49 gannets cleared air >= 0.012 against the elites' 6 -- so
+            # it pays only as far as the machine turned when told: a still
+            # body scores 0, one that turns perfectly and holds height 1.
+            task = air_task(turn, height)
             if a["measured"]:
                 m["cruise_tracking"] = a["tracking"]
                 m["cruise_progress"] = a["progress"]
@@ -3022,6 +3041,17 @@ class TriphibianEnv:
         )
 
 
+def air_task(turn: float, height: float) -> float:
+    """Air's task score: the turn response, qualified by holding height.
+
+    Since 2026-10-10 (the user's answer of 10-09 to the gliding leak): a glider keeps
+    its height on its airframe, so height pays only as far as the machine
+    turned when told.  A still body scores 0; a perfect turn on the deck 0.5;
+    a perfect turn holding height 1.
+    """
+    return float(turn) * (0.5 + 0.5 * float(height))
+
+
 def pair_partner_of(seg: SegmentResult) -> dict:
     """What the second half of an antipodal pair needs from the first.
 
@@ -3030,6 +3060,8 @@ def pair_partner_of(seg: SegmentResult) -> dict:
     """
     m = seg.measurements or {}
     out = {"second": float(m.get("pair_second", 0.0))}
+    if "pair_turn" in m:
+        out.update(turn=float(m["pair_turn"]), turn_factor=float(m["pair_turn_factor"]))
     if "pair_along" in m:
         out.update(along=float(m["pair_along"]), across=float(m["pair_across"]),
                    tracking=float(m["pair_tracking"]), served=float(m["pair_served"]))

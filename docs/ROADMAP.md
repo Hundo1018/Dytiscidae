@@ -1,5 +1,50 @@
 # Roadmap
 
+**2026-10-10: a theory of why the search does not progress, with its
+predictions, before any measurement; see
+[why the search does not progress](#2026-10-10--why-the-search-does-not-progress-a-theory-its-predictions-and-the-list).**
+Read from the code and the stored archives: 91% of arch49's and arch50's
+elites have own-medium competence below 0.012 at a median `fitness` of 0.81,
+and the scalar was at 0.995 in arch48's first fifty generations. The fitness
+is a blend of `mean(window <= x)` quantiles, so a design that scores zero
+stands at the share of the window that also scored zero (0.91-0.99), and
+Tier-2 caps the three best designs of an island to ~0.1. Six mechanisms, fifteen
+pre-registered items (N1-N15). **Read the same day:** N1 neither (a still
+twin stands at 0.71 and is non-dominated in 81% of cells), N2 refuted in
+water/land (the floor is a competence floor, not an inequality), N3 refuted,
+N4 confirmed (Tier-2 inverts selection, 24/24 islands), N6 neither (rotor
+elites cannot lift themselves), N7 refuted (power is 3.6-28x sufficient), N8
+neither against the archive (300 random bodies beat arch49's gen-150 archive
+1.35x on coverage, 1.94x on competence), N9 refuted (MJWarp 0.68x at 24
+worlds), N13 refuted the other way, N14 neither. **Built and merged** on
+`failure-theory-1010` (`docs/ARCH51_SPEC.md`): N5 the competence floor, N11
+Extract-ME re-evaluation, N10's telemetry, the paired air score (the user,
+10-09/10-10), seeds scored with the shared policy; full canary green, 27
+mutations caught. arch51 = N5 + N11 + paired air, the user's decision; its
+notes are `runs/arch51_notes.md`.
+
+**2026-10-10, last: the implementation roadmap is `docs/IMPL_1010_SPEC.md`.**
+Q6 and Q8 were read (both refuted; A takes a Warp port of `fluid.py`, B on MAX
+is closed). The spec turns P1-P3 and option A into sixteen lanes with
+machine gates and thirteen deferred measurements. Its §0 lists thirteen places
+where this roadmap and the code disagree, among them: P3 is not the move
+`MERGE_FIRST_REFINE` made, fluid forces written from `callback.control` reach
+the mass matrix a step late, Q1/Q2 leave the host-side fluid finish out, and
+identification is 96 worlds per body, not 24. Six questions for the user
+close it (§D).
+
+**2026-10-10, later still: the order of the loop; see
+[what can share a launch](#2026-10-10-later-still--the-order-of-the-loop-what-can-share-a-launch-and-what-cannot).**
+Rollouts are 98.3% of arch50's wall and the search's decisions 1.7%, so order
+matters only through how rollouts are grouped. On today's CPU-per-body path
+reordering is worth ~17%, all of it redundancy: reevals re-identify a stored
+basis (and so draw a new basis, not the experiment Q5 measured), promotion
+refinement is six serial launches of three worlds, main and re-score are two
+trips for one batch (P1-P3). Batching islands or generations buys nothing
+there (P4, a null). On the device a launch is dispatch-bound below ~200
+worlds, so the all-island epoch with K draws per body is the prerequisite for
+T8, not an optimisation (T11, P5-P6).
+
 **2026-10-09: answers to the sweep's questions, and where the work stopped;
 see [state when stopped](#state-when-stopped-2026-10-09).** Air on a commanded
 difference (answer 1) is built on a branch with four `test_physics` checks
@@ -2949,6 +2994,1436 @@ costs, and the gates that hold it to "changes nothing when off".
 
 ---
 
+## 2026-10-10 — why the search does not progress: a theory, its predictions, and the list
+
+Asked by the user: find why training fails or falls short, from theory first,
+trusting neither the repo's claims nor its fixed ideas; write theory and
+predictions here before anything is measured, and fix directions here before
+anything is built. Three readers went to the code (not the docs) and one to the
+stored telemetry of arch48, arch49 and arch50; their reports are
+`runs/analysis_1010_failure_theory/{A_selection_code_truth,B_controller_ppo_code_truth,C_telemetry,D_claims_ledger}.md`
+(gitignored with `runs/`; the numbers used here are quoted below). Everything in
+§1 is read from records that already existed; nothing in §4 has been measured.
+
+### 0. The question, and the decision that hangs on it
+
+Twenty-odd arms since arch29 have left the mission at 0, the best air score of
+any elite at 0.42-0.55, and water and land below 0.3 since the antipodal pair.
+Each arm has fixed a measurement leak and each has been read as "the search is
+not yet reaching it". The question here is different: **does the selection
+machinery, as written, prefer a competent machine to an incompetent one at
+all?** If it does not, no scoring fix that leaves the machinery alone can move
+the archive, and the next arm (arch51) would be wasted. Two answers are
+imaginable: the machinery ranks competence and is starved of signal by noise and
+budget (then throughput and re-evaluation are the work), or it does not rank
+competence (then the fitness floor is the work, and comes first).
+
+### 1. What is established, from the code and the stored archives
+
+Read 2026-10-10 from `runs/arch{48,49,50}/archive_*.json` and
+`generations.jsonl`; the code lines are at commit 3d639e8.
+
+| fact | arch48 | arch49 | arch50 (gen 120) |
+|---|---|---|---|
+| elites in the eight archives | 621 | 645 | 494 |
+| median elite `fitness` (meta) | 0.809 | 0.828 | 0.836 |
+| elites whose own-medium competence is < 0.012 | 82% | 91% | 91% |
+| median `fitness` of those | 0.785 | 0.810 | 0.822 |
+| Spearman(`fitness`, own-medium competence) | 0.27 | 0.30 | 0.30 |
+| median / max evaluated `fitness`, gens 0-49 | 0.675 / 0.995 | 0.776 / 1.000 | 0.759 / 1.000 |
+| elites inserted in the last 50 gens | 37% | 45% | 52% |
+| Tier-2 promotions with any completed leg | 9 / 192 | 1 / 192 | 0 / 78 |
+| `fitness` of Tier-2 elites vs Tier-1 elites (median) | 0.109 vs 0.800 | 0.095 vs 0.817 | 0.105 vs 0.829 |
+| evaluations with water > 0.15 / land > 0.15 (last 50 gens) | 8.6% / 8.8% | 0.5% / 0.9% | 0.3% / 1.7% |
+
+The elites are not competent and the scalar does not know it. A design on the
+air island with air 0.000, water 0.003 and land 0.000 carries `fitness` 0.945
+(arch49, `archive_air.json`). The scalar was at its ceiling before selection had
+done anything: 0.995 in arch48's first fifty generations, which are random
+bodies and their first mutants.
+
+What the code does (A §1-3, B §1-5; the docs say otherwise in five places,
+listed in A's last section):
+
+1. **The fitness scalar is a blend of three population quantiles**, each
+   `mean(window <= x)` over the island's last 256 evaluations at the cell's
+   stage (`curriculum.py:472-478, 503`; `loop.py:1164-1168`): island score,
+   curriculum score and Tier-1 `mission_fraction`, weighted
+   `0.7 * (w * isl_q + (1 - w) * cur_q) + 0.3 * mis_q`. The window includes the
+   candidate itself.
+2. **A cell is decided by Pareto dominance** on
+   `[blend, structural_margin, energy_margin]` (`archive.py:257-293`), front
+   capacity 4, equal vectors non-dominated. The scalar `fitness` never enters
+   replacement; it weights parent choice (0.35 of the weight), migration,
+   promotion and pruning.
+3. **Tier-2 caps `fitness` to `min(fitness, f2)`**, where `f2` is on a different
+   scale (mission completion plus at most 0.3 of tie-breakers,
+   `curator.py:400-406`, `evaluate.py:726-753`). Zero completed legs gives
+   `f2 <= 0.2`.
+4. The judge's rung ladder enters no score (`loop.py:1231-1232`); the shared
+   PPO policy is the controller inside every evaluation and proposes nothing
+   (`batchroll.py:839`; the "variation operator" sentence in CLAUDE.md is
+   wrong); the auditor's only invalidating check is skipped when base mission
+   `<= 1e-6` (`auditor.py:318-319`), which is 98.8% of evaluations, so it has
+   invalidated 2 designs in three runs; `held_still_params` is never called in
+   the search (B §6).
+5. The rotor channel's offset is a speed in rad/s inside a basis identified
+   with probes of sigma 0.35 (`cpg.py:553`), and the shared policy's 6-D twist
+   reaches the gait only through that basis; the gait gain is off (B §1, [INF]
+   until §4 N6 measures it).
+
+### 2. The theory: six mechanisms, ranked by how much of §1 each explains
+
+**T1. The quantile floor: selection has no gradient on competence, by
+construction.** With `<=`, a design that scores zero stands at the share of
+the window that also scored zero. In every medium that share is 0.91-0.99
+(§1), so an incompetent design's island quantile is 0.91-0.99 and the island's
+best is 1.00: the whole competent range of the island half is 0.01-0.09 of the
+scale, and the mission quantile is 0.99 for everyone. This is why `fitness`
+is 0.8 at gen 0 and 0.8 at gen 300, why 91% of elites are incompetent at 0.81,
+and why Spearman against competence is 0.3. Dominance then decides cells
+mostly on `structural_margin` and `energy_margin`, which are properties of the
+body at rest, and equal blends join the front as "improved": hence 45-52%
+turnover with no competence change. The mechanism predicts something the
+observation did not put in: **a still machine, scored through
+`_score_candidate` against a run's final windows, stands near the top of every
+island, and its dominance vector (high margins, blend ~0.9) is non-dominated
+against most incumbents.** This is rule 1 of "Designing a measurement" applied
+to the fitness itself, which no still-machine probe has done; they all read
+competences, which were gated, and left the scalar that selects.
+
+**T1'. Tier-2 inverts selection at the top.** The three best designs of an
+island by `fitness` are promoted; with zero completed legs their scalar falls
+to ~0.1 (§1, 0.095-0.109 against 0.80-0.83), below every unpromoted elite.
+Parent weight carries 0.35 of normalised fitness, migration takes the top two
+by `fitness`, and pruning removes the lowest: the search's own best designs
+become its least likely parents and are never migrated. Since Tier-2 has
+completed a leg in 10 of 462 promotions over three runs, this is the rule, not
+an edge case.
+
+**T2. Each cell keeps its luckiest draw, and one draw per candidate (M2) does
+not change that.** C2 measured draw variance at 2.5-4.6x design variance
+(one-draw reliability 0.18-0.30). A cell visited by k candidates keeps the
+maximum of k noisy draws; its stored score is inflated by about
+`sigma_draw * E[max of k standard normals]`, i.e. 0.56 / 0.85 / 1.03 sigma at
+k = 2 / 3 / 4, and the incumbent is never re-measured (`archive.py:257-293`).
+M2 removes the best-of-16 on a shared draw; it leaves the best-of-k over the
+cell's history. The mechanism predicts a dependence the draw-variance account
+alone does not: **held-out retention falls with the number of contested
+insertions a cell has seen** (`improvements`), and is lowest where the
+archive is densest.
+
+**T3. The controller cannot express what the tasks ask of it.** (a) The only
+bodies that fly in this model are rotorcraft (0.963-0.987 under a hand
+controller, 2026-09-26); a rotor's channel is reached only through a basis
+whose probes are sized for angles (sigma 0.35 against a top speed of
+150/R rad/s), so the class of design that can fly is the class the controller
+cannot steer. (b) Air on a commanded difference (the 10-09 branch) needs a
+policy that turns on command at 25 Hz through a 6-D twist with authority 0.5 of
+reach; whether the identified bases have yaw authority at all is unmeasured.
+(c) A glider needs its gait stopped; the gait gain is off (arch51 turns it on).
+
+**T4. Flapping flight is infeasible in the model under the actuator limits, so
+land→air and the mission are unreachable by any flapper.** Measured
+2026-09-26: level flight needs margin 1.0, the best feathering gait reaches
+0.42 with joints free, motors torque-limited 60% of the time; the best flapper
+ever scored 0.378. The mission needs land→air. With T3(a), **no design class
+in the genome can both fly and be controlled**, and mission = 0 for twenty runs
+is the correct answer to the question as posed, not a search failure. This is
+the one mechanism whose fix is a decision (rotor-assisted flight as the
+accepted answer, or a different actuator spec), not a build.
+
+**T5. Budget: ~600 evaluations per island per run at reliability 0.25 is ~150
+informative samples for a 625-cell archive.** MAP-Elites literature spends
+10^5-10^6 evaluations; the lineage depth at gen 121 is 5. At this budget the
+archive's growth should be indistinguishable from random sampling of the
+genome prior, and if it is, throughput outranks every scoring change: the
+identification step is 57% of the wall (M6) and is 24 probes of the *same*
+body, the one shape of work a batched rigid-body engine does best (§5, MJWarp).
+
+**T6. PPO learns the shaping potential, not competence.** The per-step reward
+is `0.2 * (gamma * Phi(s') - Phi(s))` and the terminal reward is competence
+over its tag's std (`ppo.py:442-466`); competence is zero for >95% of
+rollouts, so the return is the potential. Phi in water is `-|depth error|`,
+which is the hold task, and M4 learns a fixed body in water; Phi in air is
+altitude plus upright, which is not the turn, and M4 learns nothing in air.
+The learner is working on the reward it was given.
+
+**Rivals kept.** *Instrument error*: the `fitness` field in the archives is
+the quantile blend as designed, and the competence fields are the raw scores
+in [0,1]; the decoupling in §1 is between two correctly recorded quantities.
+*Nothing happened*: every arm is one seed, so differences between arms are
+reads, not effects; T1 is a statement about code, not about a run, and its
+test (N1) does not compare runs. *The user's prior (noise and the draw)*: T2
+keeps it and says what M2 leaves behind.
+
+### 3. What this overturns in the repo's own account
+
+- "Selection still has a gradient (20-23% of elites nonzero)" (PAPERS_2610,
+  reasoned, not measured): T1 says the gradient is 0.01-0.09 of the scale and
+  that zero scorers are ranked above 90% of the population.
+- The ladder, the critic, the auditor, M3's form, E2's bars: all act on or
+  read a scalar that does not rank competence. Fixing them first repeats the
+  pattern of arch38 (a term with nothing reachable above its floor).
+- "The shared PPO is the variation operator" (CLAUDE.md): it is the controller.
+- "stage0/1" in the log is the curriculum stage, not Tier-2.
+
+### 4. Pre-registered reads and builds, in cost-then-speed-then-learning order
+
+Each item names its prediction with a number and what falsifies it. Reads
+N1-N4 need no new arm; they run on arch49's stored elites and windows. Nothing
+below is measured yet; a result is appended under the item when it arrives,
+with the frozen text left as written.
+
+**N1 (read, ~1 h GPU or numpy): the inert probe of the fitness itself.** For
+each of arch49's 229 elites, build its still twin (`held_still_params`) and
+score both through `_score_candidate(commit=False)` against the run's final
+curriculum windows (restored from `search_state.pkl`), on the elite's own
+`eval_seed`. Report per island: the twin's `fit`, `isl_q`, `mis_q`, and
+whether its dominance vector is non-dominated against the incumbent's front.
+*Prediction (T1):* median twin `fit` >= 0.80 in every island; the twin is
+non-dominated or dominating in >= 60% of cells. *Falsified* if median twin
+`fit` < 0.5 in any specialist island, or non-dominated in < 30% of cells. If
+confirmed, every archive since the quantile blend was introduced is a sample
+of bodies with good margins, and §1's Spearman 0.3 is the ceiling.
+
+*N1 was run the same day* (`experiments/still_twin_fitness/run.py`, 229 elites x
+2 arms at commit 5cc9db9, batched path, the elite's own draw, 2965 s; report
+`N1_result.md`; the elite arm reproduced its recorded competence within 0.005
+in 229 / 215 / 195 of 229 for air / water / land, the same counts as the
+no-model gate). **Outcome: neither.** The twin's median `fit` against the
+final windows: air 0.895, water 0.707, land 0.716, the other islands
+0.59-0.76, pooled 0.707 [IQR 0.667-0.756]; only air reaches the 0.80 clause,
+no specialist island is below the 0.5 falsifier. The twin is non-dominated or
+dominating against the elite's own front in **81.2%** of cells (dominating
+outright in 30.6%; land lowest at 45%, air 96.8%); the 60% clause holds and
+the 30% falsifier is far. Dominated in 18.8%, so the revised T1's "move it
+back" line (>= 70% dominated) is not met either. *Belief update:* a machine
+that does nothing stands at 0.7 of the scale (0.9 in air) and would join four
+of five cells' fronts; the first clause missed because the water and land
+windows are not zero-saturated (N2), which is the revision already made. The
+competence floor (N5) is the right shape: it is the floor, not the inequality,
+that this probe says is missing. Caveats recorded in the report: all twins sit
+at stage 0; the twin lands in a different cell from its elite in 88% of cases,
+so `would_add` at its own cell is also reported.
+
+**N2 (read, minutes): the floor in the windows.** From `search_state.pkl`, the
+share of each island's window at exactly zero island score, and the quantile a
+zero scorer receives. *Prediction:* >= 0.90 in air, water and land islands.
+*Falsified* below 0.7.
+
+**N3 (read, minutes, existing rows): T2's signature.** Join
+`experiments/draw_variance/results_arch49.json` (229 elites, recorded score and
+six fresh draws) to the archive's `improvements`. *Prediction:* Spearman
+between (recorded - mean fresh) and `improvements` > 0.15 in each of water and
+land; elites with `improvements >= 3` retain < 70% of what elites with 0
+retain. *Falsified* if both are within [-0.1, 0.1].
+
+**N4 (read, minutes): T1'.** From the three runs' promote events and archives,
+the parent-selection weight of Tier-2 elites against Tier-1 elites of the same
+island (`curator.select_parent`'s formula on stored fields). *Prediction:*
+Tier-2 elites sit in the bottom decile of weight in >= 80% of islands; none
+was ever chosen as a migrant. *Falsified* if their median weight is above the
+island median.
+
+**N5 (build, after N1-N2 read as predicted): a floor that ranks.** The
+direction, for the implementation plan to make exact: a design at zero
+competence stands at zero (strict `<`, and the mission term dropped from the
+blend while `mission_fraction` is zero for 98.8% of evaluations, it decides
+nothing and costs 0.3 of the scale); the dominance tie among zero blends is
+broken toward the incumbent, so margins alone cannot fill a cell; Tier-2's cap
+is replaced by a flag the curator reads (a Tier-2 failure must not make the
+best design the worst parent). *Prediction for the first arm with it:*
+evaluated `fitness` median in gens 0-49 < 0.3 (was 0.68-0.78); share of elites
+with own-medium competence >= 0.012 rises from 9% to >= 40% by gen 150;
+Spearman(`fitness`, own competence) over the archive >= 0.7 (was 0.3).
+*Falsified* if any of the three misses. Each change carries a mutation in
+`tools/mutate.py`.
+
+**N6 (probe, ~30 min): rotor authority through the basis (T3a).** On arch49's
+rotor elites: the component of each identified mode on `_r` channels, scaled
+by top speed; then a hand PD hover law applied (i) through
+`coeffs_for_twist` and (ii) directly to `ctrl`. *Prediction:* (i) scores air
+< 0.3 while (ii) scores >= 0.8 on the same body and seed, and the basis moves
+rotor speed by < 5% of top speed per unit coefficient. *Falsified* if (i) >=
+0.6. If confirmed, the controller is the gate on the only flying class, and
+the direction is a rotor channel the twist reaches directly (speed as a
+fraction of top speed, outside the identified basis).
+
+*N6 was run the same day* (`experiments/rotor_authority/run.py`, 191 rotor
+elites scanned, 24 lift-tested bodies rolled out, numpy path, 8 min; report
+`N6_result.md`). **Outcome: neither.** Clause 3 held hard: the identified
+bases move rotor speed by 0.0003 of top speed per unit coefficient (median,
+IQR 0.0002-0.0003, p90 0.0004, air and water alike; 191 of 191 below 0.05),
+so the twist cannot reach a rotor. But the comparison the item rested on did
+not exist: the hand hover law that flies the reference quadrotor at 0.816
+through the *direct* channel flew 0 of 24 arch49 rotor bodies (median 0.000;
+one body 0.446, one 0.011), and 153 of 191 rotor elites cannot lift their own
+weight with their upward-pointing rotors at top speed (upward thrust over
+weight median 0.15; half the rotors on the "eel" bodies point down and cannot
+reverse). *Belief update:* T3(a)'s premise, "the only bodies that fly are
+rotorcraft", is true of the hand-built quadrotor and false of the archive:
+the search has accumulated rotors (generation cost doubled with them,
+2026-10-03) on bodies that cannot fly with them, which is what T1 predicts
+when nothing in the scalar pays for lift. The rotor channel's unreachability
+is confirmed and still needs the direct mapping once something selects for
+flight; it is not the binding gate today. What would move this back: a
+rotor elite under N5's selection that lifts its weight and still scores 0
+through the twist.
+
+**N7 (derivation, no run): the flapping power and torque bound (T4).** A
+document under `derivations/`: for the genome's ranges of mass, wing area and
+actuator torque/speed, the ratio of available stroke power to the induced plus
+profile power of level flight, and the frequency at which the motor's torque
+binds. *Prediction:* ratio < 1 for every flapper plan at every frequency the
+spar allows; the 0.42 margin of 2026-09-26 is reproduced within 30%.
+*Falsified* if any plan's ratio exceeds 1 inside the allowed frequency band.
+If confirmed, the decision goes to the user: accept rotor-assisted flight as
+the design answer (and then N6's direction is the enabling build), or change
+the actuator specification.
+
+*N7 was derived the same day* (`derivations/flapping_power_bound.md`, script
+beside it, 39 code citations checked by the script; report
+`runs/analysis_1010_failure_theory/N7_result.md`). **Outcome: refuted, both
+clauses.** Available stroke power over the induced-plus-profile power of level
+flight, inside the spar's band: gannet 28.1 (max, at 2.3 Hz) / 12.7 (band
+top 7.80 Hz), teal 27.8 / 12.6, beetle 6.3 / 1.3, bat 7.7 / 4.6, feathering
+teal 17.6 / 7.5; never below 3.6 in nine modelling variants. At the 09-26
+level gait (11.33 Hz) the ratio is 3.0-7.0, not 0.42, and the prediction's
+second clause compared a power ratio to a force margin without a conversion.
+What the derivation found instead: the spar band closes at 7.80 Hz
+(the 09-23 audit implied 7.76), so the only level gait ever found (11.33 Hz)
+is outside the band the search is allowed; at 11.33 Hz the left stroke motor
+needs 22x its torque limit to swing the wing's inertia, the stroke servo's
+closed-loop corner is 2.88 Hz (80 deg lag at 11.33 Hz), and the series spring
+is tuned on an estimated inertia 0.180 kg m² against MuJoCo's 0.372, so it
+cancels 48% of the real one. **Revised T4: flapping flight is not short of
+actuator power; it is short of a gait that makes thrust inside the band the
+spar and the servo allow.** Break-even conversion efficiency is 3.6% (gannet,
+teal) to 16% (beetle): the model's aerodynamic conversion at in-band
+frequencies would have to be below that for power to bind. The user's
+decision (rotor-assisted flight as the answer, or a different spec) stands,
+with the spec question now "stroke bandwidth and amplitude", not "power".
+Two reads follow:
+
+**N13 (derivation + read, minutes): the Strouhal gap.** Thrust from a
+flapping foil sits at Strouhal number `St = 2 f A / U` of 0.2-0.4 (Triantafyllou
+1993; Taylor, Nudds & Thomas 2003 for flying animals). For each seed plan and
+for arch49's flapping elites, `St` at the spar band's top with the genome's
+maximum stroke amplitude (`Part.stroke_amplitude` x half-travel) and the
+measured trim speed. *Prediction:* gannet and teal sit below 0.15 at 7.80 Hz,
+so no in-band gait can reach the thrust regime at their trim speeds, and the
+reachable levers are stroke amplitude (joint range), trim speed (wing loading)
+and the band (spar), not frequency. *Falsified* if either plan's `St` at the
+band top is >= 0.25. Appended to `derivations/flapping_power_bound.md`.
+
+**N14 (read, minutes, stored data): the Tier-0 spar check reads 5 Hz, not the
+commanded frequency** (N7's finding). For arch49's 229 elites, the share whose
+`flap_hz` exceeds their own spar band. *Prediction:* >= 10% of flapping elites
+are commanded above their band and so hold a structural margin the check
+never tested. *Falsified* below 3%. If confirmed, the Tier-0 check is given
+the commanded frequency (a gate, one line), with a mutation.
+
+*N13 and N14 were read the same day* (`derivations/flapping_power_bound.py
+--strouhal`, §"N13" of the derivation; `experiments/spar_band_read/run.py`;
+reports `N13_result.md`, `N14_result.md`).
+
+| item | outcome | the deciding numbers |
+|---|---|---|
+| N13 | **refuted, in the opposite direction** | `St` at the band top (7.80 Hz, genome's maximum stroke, trim speed): gannet 0.967, teal 0.959; beetle 0.653 and bat 0.770 at 12 Hz; feathering teal 0.881. `St` reaches 0.25 at 2.0 Hz, so most of the allowed band is *above* the thrust regime, not below it. Of arch49's 157 flapping elites, 99 (63%) are >= 0.25 at their band top. (N7's script had printed 0.28 at 2.3 Hz with the power-optimal amplitude, not at the band top.) |
+| N14 | **neither** (between the 3% and 10% bars) | 14 of 224 flapping elites (6.2%, Wilson 95% CI 3.8-10.2) are above their own spar band. Two corrections to N7's wording: the Tier-0 spar check runs at `genome.flap_frequency` (`phenotype.py:899`), the number stored as `flap_hz`, not at a fixed 5 Hz (5 Hz is the teal seed's value); and the 14 are designs whose check margin was negative (-0.14 to -0.81) and passed the gate at -0.85 (`loop.py:137`), not designs the check skipped. What the check does not see is the CPG's *commanded* frequency (up to 20 Hz, not stored), and 124 of 229 elites get no spar check because `phenotype.py:842-857` skips non-plausible flyers; forcing it gives 9.4-12.3% over band. |
+
+*Belief update on T4, second revision.* Power is 3.6-28x sufficient (N7) and
+the kinematic thrust regime (`St` 0.2-0.4) is reachable inside the band, at
+about 2 Hz where the reduced frequency `k = pi f c / U` is ~0.08, inside the
+solver's validated regime (N13). Yet the 09-23 and 09-26 gait searches found
+no level gait below 11 Hz, and a foil at `St` 0.25-0.35 with a 75-90 deg
+pitch-heave phase reaches propulsive efficiency 0.5-0.87 in experiment
+(Anderson, Streitlien, Barrett & Triantafyllou 1998, J. Fluid Mech.), against a
+break-even of 0.036-0.16 here. **Either the gait searches never sampled the
+pitch-heave phase at `St` 0.25 and 2 Hz (they drew 300 random gaits with
+frequency 1.5-12 Hz, so a 2 Hz feathering gait at the right phase is one draw
+in many), or the fluid model's propulsive force in its own validated regime is
+an order of magnitude low.** Only a fixture separates the two:
+
+**N15 (fixture, no GPU, no MuJoCo, ~hours of build): propulsive efficiency of
+a heaving-pitching foil.** Prescribed kinematics through `physics/fluid.py`'s
+strip model: heave amplitude 0.75 chord, `St` 0.25 / 0.30 / 0.35, pitch
+phase 75 / 90 deg, `alpha_max` 15 / 20 / 25 deg, Re ~4e4, as in Anderson et
+al. 1998 Table/Fig. Report thrust coefficient and efficiency `eta = T U /
+P_in`. *Prediction (the model is low):* `eta` < 0.10 at `St` 0.30, phase 90
+deg, `alpha_max` 20 deg, where the experiment gives ~0.6-0.7; *falsified*
+(the gait search is the problem) if `eta` >= 0.30 there. Either outcome
+redirects: a low `eta` makes F-13/F-02 (wake and LEV) the next physics item
+and un-promotes every flapping-thrust read since 2026-09-23; a high `eta`
+sends the gait operators (axis-aligned, per "Thrust needs a joint move") and a
+2 Hz feathering seed to the top of the list. Gated into `test_physics` like
+the robofly fixture once its numbers are in.
+
+**N8 (control run, ~40 min GPU): random sampling against the archive (T5).**
+300 bodies from the genome prior, scored through the current scorer at their
+own draws, binned by arch49's final descriptor axes. *Prediction:* coverage
+and summed competence within 15% of arch49's island archives at the snapshot
+nearest 300 evaluations per island (about gen 150; "gen-37" in the first
+draft was an arithmetic slip), verdict per island. *Falsified* if arch49 leads by > 30%. If
+confirmed, selection has not yet contributed and throughput (N9) comes before
+any further scoring work beyond N5.
+
+*N8 was run the same day* (`experiments/random_sampling_control/run.py`, 300
+bodies from the genome prior scored by the current scorer at their own draws,
+binned by arch49's final axes, against arch49's gen-150 snapshot per island,
+~300 evaluations each side; 4,700 s; report `N8_result.md`). **Outcome:
+neither, and in the direction the prediction did not name: random sampling
+beats the archive.** Coverage, random / arch49: air 55 / 36 cells, water
+55 / 41, land 55 / 32, pooled 1.35x; summed competence, random / arch49: air
+3.4x, water 2.3x, land 1.3x, amphibian 1.7x, triphibian 2.0x, pooled 1.94x;
+cells with any competence above zero, random / arch49: air 19 / 4, water
+44 / 26, land 42 / 16. Bootstrap 95% intervals over the 300 bodies exclude the
+archive's value in every medium. Caveats: one draw per body on both sides;
+the archive's scores are arch49's own (shared draw per generation, pre-M2),
+the random side's are the current scorer's; the two share the competence
+definitions since PR #32. *Belief update (T5):* at this budget selection has
+not merely failed to add to random sampling, it has subtracted from it: 150
+generations of MAP-Elites left fewer cells and less competence than 300
+random bodies, which is what T1 and T2 together predict (cells kept for
+margins and for lucky draws displace competent designs; §1's 91% at the
+floor). The prediction should have allowed this outcome; it is recorded as a
+station-3 miss. N5 + N11's first read now has a control: arch51's gen-150
+archives against this same random sample, per island, on the same scorer.
+
+**N9 (probe, <= 10 lines first, per the probe-before-build rule): MuJoCo Warp
+for the same-body work.** The user asked whether MJWarp (GPU-batched MuJoCo,
+many worlds of one model) can accelerate the loop. The theory of where it fits:
+heterogeneous bodies are one model each and do not batch (the 2026-08 finding
+stands), but three of the loop's costs are *the same body many times*:
+identification (24 probes per domain per body, 57% of the wall), placement on
+several draws (M3, off because it costs `n - 1` re-scores), and the PPO
+rollouts that T6 says need more samples per body. Those are MJWarp's shape.
+Open before anything is built: whether the project's fluid forces (the Mojo
+GPU kernel) can be applied per world without a host round trip, and what a
+16-world step costs against 16 CPU steps on one of arch49's bodies. The probe
+is a 24-world identification of one elite, timed, against the current path.
+*Prediction:* the rigid-body part is >= 5x faster at 24 worlds; the fluid
+interop is the cost that decides it. *Falsified* if < 2x. Literature and
+tooling facts are collected in §5 when the brief returns.
+
+*N9 was run the same day* (`experiments/mjwarp_probe/`, scratch venv
+`../mjwarp-venv`: mujoco-warp 3.15.0, warp-lang 1.18.0, mujoco 3.15.0; RTX 3060
+Laptop 6 GB, driver 580.178; report `N9_result.md`). **Outcome: refuted.**
+Rigid-body only, 24 worlds x 2000 steps, median of 3, MJWarp with a captured
+CUDA graph against 24 sequential CPU rollouts in the project's mujoco 3.11
+(one thread): a 12-dof elite in flight **0.68x** (0.537 s vs 0.367 s), with
+contacts 0.85x; an 18-dof rotor elite 1.18x / 1.09x. Without graph capture
+0.04-0.08x (launch-bound, ~5 ms per step). Scaling on the 12-dof body: 1 world
+0.03x, 48 worlds 1.27x, 96 worlds 2.37x; break-even near 39 worlds; a step
+costs ~240 us fixed plus ~1.2 us per world against 7.4 us per world on the
+CPU, so 5x needs ~730 worlds of one body. The identification shape (48 worlds
+x 300 steps, no fluid) is 1.26x. Host copies for ctrl and `xfrc_applied` in
+and xpos/xmat/xipos/cvel out add 113 us per step (+42%) at 24 worlds; the
+Mojo fluid hand-off itself was not measured. Accuracy: qpos within 1.1e-5 of
+CPU over 300 steps (float32). Feasibility: the project's MJCF does not load as
+written, `put_model` rejects the 1 mm `geom margin` (`mjcf.py:193`) under
+MULTICCD and then NATIVECCD on a box-box pair; with the margin zeroed both
+bodies compile and step, rotors and velocity servos included, but a zero
+margin changes the contact physics the search scores. Per-world body mass and
+inertia are supported (the added-mass write at `batchroll.py:529-531` needs
+them); MJWarp's default `njmax` 64 overflowed on landing (512 used).
+*Belief update:* on this machine MJWarp does not accelerate the loop's
+same-body work at the world counts the loop has (24 identification probes, a
+handful of draws, 16 PPO rollouts); it would need hundreds of worlds of one
+body, and the fluid hand-off and the contact margin are unresolved on top.
+The 2026-08 finding stands and is now measured on the current engine. What
+would move it: a workload of >= 100 draws per body (a different search
+design), or a GPU where the fixed per-step cost is far below 240 us. The user
+asked the question; the answer is no, with these numbers.
+
+**N10 (read, minutes, if logged): T6.** `reward_by_tag` or the PPO buffer's
+return decomposition for arch49/50: the share of |return| that is shaping
+versus terminal competence, per tag. *Prediction:* shaping >= 90% in air.
+*Falsified* below 60%. The direction, once N5 gives competence a rank, is
+terminal credit that the learner can see (per-body group baselines are already
+in GRPO, off by default).
+
+**N2, N3, N4 and N10 were read the same day** (`experiments/fitness_floor_reads/run.py`,
+reports in `runs/analysis_1010_failure_theory/N{2,3,4,10}_result.md`, ~7 s on
+stored data). Against the frozen text:
+
+| item | outcome | the deciding numbers |
+|---|---|---|
+| N2 | **refuted in water and land, confirmed in air** | share of the window at exactly zero island score, arch49 / arch50: air 0.965 / 0.973, aerial_diver 0.984 / 0.988, land_air 0.992 / 0.984, generalist 0.996 / 0.992; **water 0.586 / 0.464, land 0.605 / 0.601**, triphibian 0.301 / 0.256, amphibian 0.855 / 0.807. Mission zero share 0.973-1.000 everywhere. A design at zero on all three scores receives `fit` 0.69-0.72 at stage 0 (median stored elite 0.83). |
+| N3 | **refuted** (not the falsifier's reverse: water is above 0.1) | Spearman(recorded - mean fresh, `improvements`): water 0.123 [CI -0.01, 0.25], land 0.094 [-0.05, 0.23], air 0.062; only 9 of 229 elites have `improvements >= 3`, so the retention ratio (0.685 water, 0.092 land) has CIs spanning 1. Mean recorded vs mean fresh over all 229: water 0.0133 vs 0.0096, land 0.0159 vs 0.0120, air 0.0042 vs 0.0017. |
+| N4 | **confirmed** | Tier-2 elites' median parent weight is in the bottom decile in 24 of 24 islands (three runs), never above the island median (ratio 0.38-0.76); 86-90% of individual Tier-2 elites sit in the bottom decile; at every migration at least 19 representatives per island out-rank the best Tier-2 fitness (0.12-0.25), so no Tier-2 elite could be a top-2 migrant. |
+| N10 | **not comparable** | runs log `reward_by_tag` (raw terminal competence per tag, air exactly 0 in 72-73% of PPO events, mean 0.0001-0.0003) and the coefficient 0.2, not the shaping return. Needed: per tag, the shaping return and the scaled terminal reward, both computed in `PPOBuffer.build`; N5's telemetry lane adds them. |
+
+*Belief update.* T1 as written (a `<=` floor that ranks a zero scorer above
+90% of the window) holds in the four islands whose score is air-bound and
+fails in water, land and triphibian, where 40-70% of the window is above
+zero. What those windows show instead: 91% of water and land elites score
+below 0.012, the bar under which the still-machine gate certifies nothing and
+the draw variance is 2-3x the design variance (C2), so the quantile hands the
+full [0,1] scale to differences that are noise. **Revised T1: the rank
+transform gives full scale to sub-noise differences, and in air it also ties
+97% of the population at the top.** The N1 probe still decides whether a still
+machine is non-dominated against incumbents; N5's floor must now be a
+competence floor (standing is 0 below the certified bar, 0.012 or the
+island's own), not merely a strict inequality. T1' is confirmed and N5's
+Tier-2 lane stands. T2's cell-history signature is not visible in this
+population (N3): the draw-variance account alone explains the retention, the
+k-dependence is demoted to "not shown", and N11 keeps its justification from
+the literature, not from N3. What would move T1 back: N1 finding the still
+twin dominated in >= 70% of cells.
+
+**N5 and N11 are built** (branch `failure-theory-1010`, lanes L1-L11 of
+`docs/ARCH51_SPEC.md`, each with its test and mutations caught; CPU gates
+green on the merged tree, GPU gates below). Comparability boundary, from the
+commit that merges this branch: stored `fitness`, `objectives[0]` and
+everything built on them (`qd_score`, parent weight, migrants, promotion and
+prune order, `best`) are not comparable with any earlier run; a design below
+the competence floor stands at 0, ranking is among designs above the floor,
+`mission_weight` is 0.0, Tier-2 flags instead of capping; with
+`--reeval-per-generation > 0` an elite's recorded scores are its median
+draw's. Per-medium competences, `mission_fraction` and coverage are unchanged.
+The GPU gate found one latent defect the floor exposed: seeds were scored
+*without* the shared policy and stamped `scored_with_shared_policy` anyway,
+so a film of a seed elite drove it with a controller that never produced its
+record (`land.command_reversal` 0 recorded, 0.52 on film); with every elite at
+`fitness` 0 the film test's `pick_elite` returned a seed and caught it. Seeds
+are now scored with the shared policy like every child (mutation
+`seeds-scored-without-the-shared-policy`). Every archive before this held its
+seed elites' scores from a different controller than the one the film replays.
+Two measurements the gate forced, both recorded here because they bear on
+arch51's first generations: (a) **every seed plan scores exactly 0 in air,
+water and land at its draw** under the current scoring, on the batched path
+(2 plans at 0.5 / 1 / 2 / 4 s on the generalist island; all 8 plans at 8 s on
+the air, water and generalist islands; `runs/promo_floor_trial*.log`), so
+arch51 starts with nothing above the floor and nothing promotable until a
+child clears 0.012 (`test_the_seeds_include_something_that_flies` reads the
+single path and the gannet's glide, which the paired turn has not yet
+touched); (b) in those trials the actor pool's workers failed to construct the
+GPU fluid extension (`symbol not found: Py_NewRef`) and every batch was re-run
+in the parent, which the pool reports and survives but which turns 2 workers
+into 0; the gate chain's own tests under `systemd-run` and this shell both
+showed it in the promotion configuration and not in the film test's. Not
+diagnosed; a read item for the next session (which configuration, which
+process, since when).
+The air-tree canary found a third consequence of the paired scores: **the
+auditor's perturbation check is unmeasurable for every open-loop design**,
+because under three paired media an open-loop machine is credited in no
+medium and has mission 0 (the check's ratio is 0/0); the fixture test that
+audited an open-loop gannet by its glide failed for that reason. The auditor
+now reports "not measurable" as a note instead of running nothing (rule 4),
+and the test exercises the ratio through a stub re-evaluation. In arch51 the
+perturbation check therefore reads only policy-driven designs that turn or
+swim on command; until one exists, every audit says "not measurable". The
+same fix found that the mutation `audit-base-is-the-record` had been
+MISAPPLIED (its target line no longer existed, so `tools/mutate.py` had been
+reporting a gate that tested nothing); re-targeted, it survived on an
+open-loop fixture whose recorded and re-run missions are both 0, and is caught
+now that the fixture records a mission of 0.5. A misapplied mutation is a
+silent hole of the kind docs/TEST_AUDIT.md warns about; `mutate.py` should
+fail loudly on MISAPPLIED (a read item, not done here).
+Two consequences to read in arch51: an island whose every elite is at the
+floor promotes nothing to Tier-2 (and gives the critic no labels) until one
+clears it; and 4 of 16 evaluations per generation are re-evaluations, so
+offspring per generation fall to 12.
+
+**Order.** N2, N3, N4, N10 ran first (above); N1 and N6 are the two probes that decide the shape of the build; N7 is
+a derivation for the user's decision; N5 is the first build and goes to an
+implementation plan (`docs/ARCH51_SPEC.md`), written by a stronger model from
+this section, before any code; N8 and N9 are the throughput questions and run
+while N5 is built. arch51 does not start until N5 is built and its mutations
+caught. The expensive measurements report in the fixed format of
+`runs/analysis_1010_failure_theory/REPORT_FORMAT.md`, so that a smaller model
+can run them and the numbers land in this section unchanged.
+
+### 5. Literature and tooling brief (returned 2026-10-10)
+
+`runs/analysis_1010_failure_theory/E_literature.md`, 248 lines, every claim
+tagged primary-read / abstract-only / inference. What bears on the theory:
+
+- **T2 is the known failure mode of elitist MAP-Elites, and the literature's
+  cheapest fix is budget-neutral.** Flageat & Cully, "Uncertain
+  Quality-Diversity" (arXiv 2302.00463): under noise MAP-Elites "keeps lucky
+  evaluations", and on Walker MAP-Elites with *random* replacement beat it on
+  corrected QD-score (p < 1e-2). Flageat & Cully 2020 (arXiv 2006.14253): at
+  one sample per offspring fewer than 20% of elites were in the right cell on
+  re-evaluation. Extract-ME (Flageat, Huber, Helenon, Doncieux, Cully 2025,
+  arXiv 2502.06585): a fixed 25% of each generation's evaluations re-evaluate
+  randomly chosen archive elites at fresh draws, a depth-8 buffer per cell, the
+  representative read from the buffer; at equal budget it matched or beat
+  archive-sampling, deep-grid and ME-sampling on every task and beat all on Ant
+  (p < 1e-3). No paper tests reliability below 0.3 or 600 evaluations per
+  island; the method is the closest evidence, not a guarantee. This becomes
+  **N11** below.
+- **T5 and T6 have direct measurements elsewhere.** Mertan & Cheney (arXiv
+  2508.17464, v2 2026-08, Artificial Life): with undertrained controllers the
+  ranking among the top 5% and 1% of bodies correlates ~0 with the final
+  ranking, "the selection between top-ranked individuals would be random".
+  Song et al. (arXiv 2608.23100): premature fitness favours fast learners;
+  learning speed and true potential are orthogonal across 250 elites
+  (Spearman 0.05); with one shared policy this reads as a bias toward bodies
+  the policy already handles. Strgar & Kriegman (arXiv 2502.10862, abstract):
+  jointly training a universal controller while evolving bodies collapses
+  diversity toward shapes the controller can steer; they pretrain first and
+  fine-tune between rounds. Per-body budgets in the field: DERL 5M steps per
+  body, MetaMorph 1e8 steps over 100 bodies; this loop gives a body ~1.5k
+  decisions per generation.
+- **The 8 morphology scalars have no precedent.** Every shared controller
+  that worked (MetaMorph, arXiv 2203.11931) fed per-limb tokens; MetaMorph's
+  no-morphology ablation fails outright; no paper tested a few per-body
+  scalars. The brief found nothing that says eight scalars suffice.
+- **MJWarp, for N9: heterogeneous bodies do not batch, the same body does.**
+  Official docs: one `Model`, `make_data(nworld=N)`; body, joint and DoF
+  counts must match across worlds (Newton has the same limit, PR #4312 open
+  2026-09-27). `Data.xfrc_applied` is a `(nworld, nbody, 6)` Warp device
+  array that a Warp kernel can write, so per-world external forces need no
+  host round trip; handing a Mojo-allocated buffer to Warp is tested nowhere
+  the brief found; `.numpy()` is a copy. No published benchmark at 16-1000
+  worlds; a single world is slower than CPU MuJoCo; "~60 DoF" single-mechanism
+  scaling is listed as open. The 2026-08 finding stands and N9's shape is
+  confirmed: identification, placement draws and PPO rollouts of *one* body.
+  A superset-topology workaround (pad every body to the maximum part count and
+  zero the rest) would be a genome redesign and is not proposed.
+- **For N7:** no published measurement that flapping flight is infeasible
+  under a torque cap, only scaling arguments; the derivation is new work.
+- **For N6:** Lambert et al. (RA-L 2019, arXiv 1901.03737) learned hover at
+  25 Hz and 50 Hz with no notable difference at equal data, so the 25 Hz
+  decision rate is not the stopper; N6 isolates the basis.
+- No direct fixed-versus-fresh-seed comparison exists for MAP-Elites (N11
+  uses fresh draws); no ladder-specific ablation against shaping or Go-Explore
+  exists (and this ladder is not in fitness anyway, §1 item 4).
+
+**N11 (build, after N5, before N8/N9 are read): Extract-ME-style
+re-evaluation of the archive (T2).** Each generation, 4 of the 16 evaluations
+go to randomly chosen elites of the visited island, at fresh draws (not the
+stored `eval_seed`); each cell keeps a depth buffer of its evaluations and the
+representative's score is the buffer's median; a film reproduces the median
+draw. *Prediction for the first arm with N5 + N11:* auditor held-out retention
+>= 0.5 in every medium (arch49: 0.09-0.33) at the same wall per generation;
+Tier-1→Tier-2 Spearman >= 0.3 (arch49: 0.17/0.18). *Falsified* if retention
+stays below 0.35 in any medium. Comparability: archive scores are not
+comparable across it (a median of draws, not a draw).
+
+**N12 (direction, after M4 finishes; not scheduled): a pretrained, frozen
+shared policy per arm (T5, T6).** Train the shared policy on a fixed body set
+with the M4 harness before an arm, freeze it for the arm, fine-tune between
+arms; the search then ranks bodies under one controller (Strgar & Kriegman's
+order). Its pre-registered read is written when M4's nine runs are in.
+
+## 2026-10-10, later — an evaluation that never leaves the device: theory, options, probes
+
+The user, after N9: find the design in which each body is scored on >= 100
+draws (re-evaluation and PPO rollouts in hundreds), with the fluid solver and
+the control law inside the device kernel so a rollout never returns to the
+host; Mojo is a candidate. Nothing below is measured; the probes come first.
+
+### 0. The question and the decision
+
+N9 said MJWarp does not pay at this loop's world counts. The question here is
+different: **is a whole rollout, on device, cheap enough per extra draw that
+the search can afford to score every candidate on a hundred draws and so
+remove the noise that T2 and C2 measured (one-draw reliability 0.15-0.35)?**
+Two answers are imaginable: the per-step cost on device is nearly fixed, so a
+hundred draws cost about what one costs today and the redesign is worth
+weeks; or the per-draw marginal cost stays within a small factor of the
+host's and nothing changes. The decision is which of three architectures to
+build, or none.
+
+### 1. What is known about where a step's time goes
+
+- The current batched path is dispatch-bound on the host, not GPU-bound
+  (`experiments/perf/NOTES.md`, 2026-09-27): one worker's shard of 4 designs
+  spent 62% in identification, 64% (cumulative) in the fluid's host-side
+  numpy, 18% in the GPU round trip (338 us per call, later 89 us), 4% in
+  `mj_step`; the GPU sat at 5%. After the fusions, 4 designs without
+  identification take ~12.2 s for ~40,000 design-steps: **~0.3 ms per
+  design-step, ~0.8 ms with identification.**
+- N9 (2026-10-10): an MJWarp rigid-body step costs ~240 us fixed plus ~1.2 us
+  per world, graph-captured; host copies of ctrl, `xfrc_applied`, xpos, xmat,
+  xipos and cvel add 113 us per step at 24 worlds.
+- The Mojo fluid kernel already batches panels across heterogeneous bodies
+  (memory, 2026-08; `mojo/src/fluid_gpu.mojo`); its cost at 190 panels was 89
+  us per call and its marginal cost per panel beyond that is unmeasured
+  (5% GPU busy says it is small).
+- Draw noise (C2, arch48 and arch49): draw variance over design variance R =
+  4.6-5.8 (air), 3.0-3.4 (water), 1.8-2.5 (land). With a mean over K draws,
+  reliability is `K / (K + R)`: K = 1 gives 0.15-0.35; K = 10 gives 0.63-0.85;
+  **K = 100 gives 0.95-0.98**; K = 30 gives 0.84-0.94.
+- arch49's 645 elites: dof median 12, p90 30, max 53; parts median 5, max 11;
+  191 carry rotors (max 21). A padded-superset body of 32 dof covers 90%.
+- Per generation today: 16 candidates x (1 air + 2 water + 2 land halves + 4
+  transitions) segments, ~110-175 s wall; identification is 24 probes per
+  domain per body.
+
+### 2. The theory
+
+**T7. On device, a rollout's step cost is nearly fixed, so draws are nearly
+free up to the hundreds.** Model: `T_step(W) = a + b * W` for W worlds of one
+body. From N9, rigid `a` ~ 240 us, `b` ~ 1.2 us; a fluid kernel adds its own
+launch (~90 us today) and a per-panel marginal cost `b_f` per world (a 12-dof
+body has ~50 panels; unmeasured, predicted <= 0.5 us per world); a fused CPG +
+2x64 MLP per world adds `b_c` (predicted <= 0.3 us per world). Prediction:
+**`a` <= 0.5 ms and `b` <= 2 us**, so W = 100 draws of one body cost <= 0.7 ms
+per step, about 2x today's single-draw design-step with identification, and
+W = 1000 cost <= 2.5 ms. *Falsified* if a fused step measures `a` > 1 ms or
+`b` > 5 us at W = 100-1000. If T7 holds, a generation that scores every
+candidate on 100 draws costs about today's wall, reliability rises from
+0.15-0.35 to 0.95-0.98, and the Extract-ME re-evaluation (N11) and the median
+placement (M3) become unnecessary: the archive stores a mean with a confidence
+interval and the film replays the named median draw.
+
+**T8. The fixed cost is paid per launch, so the architecture that puts the
+whole generation in one launch wins by the number of bodies.** Option A pays
+`a` once per body per step (16 launches); option B pays it once per step for
+all bodies and all draws. The difference is 16x on the fixed term: at W = 100
+per body, A ~ 16 x 0.7 ms = 11 ms per step (~110 s per generation, today's
+wall), B ~ 0.5 + 1600 x 0.002 ~ 3.7 ms per step (~37 s per generation).
+
+**T9. The physics that changes is contacts, and only land and the crossings
+read them.** Air and water segments touch nothing; land and the two
+water-land crossings read the beach and the ramp. Any engine that is not
+MuJoCo's constraint solver changes those scores; the "two evaluation paths"
+rule (`test_search` asserts their agreement) is the shape of the check, with
+MuJoCo kept as the reference path for Tier-2, films and verification.
+
+### 3. The three architectures, and what each costs to find out
+
+| | A. Warp-native | B. Mojo-native | C. Hybrid |
+|---|---|---|---|
+| rigid body | MJWarp, one `Model` per body, W worlds | own Featherstone ABA in Mojo, padded to 32 dof, soft contacts, all bodies x draws in one launch | MJWarp |
+| fluid | `physics/fluid.py` ported to Warp (a third implementation) | the existing Mojo kernel | the existing Mojo kernel through zero-copy interop (untested anywhere, E §Q6) |
+| control | Warp kernel (CPG + MLP) via MJWarp's control callback | Mojo, in the same launch | Warp kernel |
+| heterogeneity | serial over bodies (16 launches) | one launch | serial over bodies |
+| blockers known today | `geom margin` 1 mm rejected by MULTICCD/NATIVECCD (N9); contact physics changes if zeroed; MJWarp `njmax` | the largest build: contacts, joint limits, verification against MuJoCo per body; Mojo GPU maturity (atan2 linking 2026-08; the `Py_NewRef` worker symptom today) | interop stream ordering; same margin blocker as A |
+| predicted step at W = 100 per body, 16 bodies | ~11 ms | ~4 ms | ~11 ms + copy |
+| build size | weeks (fluid port) | weeks to months (engine) | days if interop works, else = A |
+
+### 4. Probes, in cost order (each <= a day; nothing is built before them)
+
+**Q1 (GPU, ~10 min): the fluid kernel's marginal cost.** Time
+`FullPipeline.step` (the Mojo kernel, as the batched path calls it) at 190,
+5,000 and 50,000 panels built from copies of one arch49 body, back to back,
+graph-free as today. *Prediction (T7):* <= 0.5 us per panel marginal above
+the ~90 us launch, so 50,000 panels (1,000 worlds of a 50-panel body) cost
+<= 25 ms per step. *Falsified* above 2 us per panel. Decides whether the fluid
+side can carry hundreds of draws at all; if it cannot, none of A, B, C pays.
+
+*Outcome (2026-10-10, `experiments/fluid_kernel_scaling/run.py`, commit
+ef32a04, arch49 air body ai248_3991 with 126 panels copied 2-397 times, 200
+timed steps per size): **CONFIRMED**. Median us per step: 252 panels 111.4,
+1,008 142.7, 5,040 361.1, 20,034 1,026, 50,022 2,307; the fit t = 117.4 us +
+0.0440 us per panel (R^2 0.9994, bootstrap CI [0.0439, 0.0442]); 50,022
+panels (397 bodies, 5,558 rigid bodies) cost 2.31 ms per step against the
+predicted <= 25 ms. The launch is 117 us, not 90; the wait is the rest. So
+the fluid side carries a thousand worlds of a 50-panel body at ~2.3 ms per
+step, 11x under the prediction's bound, and the fixed cost per launch (117 us)
+is where the per-step floor sits: T7's c0, on this kernel, as the loop-order
+section's T11 assumes. The pipeline's capacity had to be raised from
+`batchroll`'s default (16,384 panels, 256 machines) to hold the two largest
+sizes.*
+
+**Q2 (GPU, Warp, ~1 day): the fused rigid + control step.** In the scratch
+venv from N9: an MJWarp step with a user control kernel evaluating a
+33-64-64-6 tanh MLP plus a CPG per world and a user passive-force kernel
+writing a body-frame force per body (a placeholder for the fluid), inside the
+captured graph, no host copy per step; W = 24 / 100 / 730 on the N9 fixtures
+(margin zeroed, `njmax` 512). *Prediction:* `a` <= 0.5 ms, `b` <= 2 us per
+world. *Falsified* if `a` > 1 ms or `b` > 5 us. Gives A's and C's step cost
+without the fluid port. Waits on F (tooling brief) for the callback API.
+
+*Outcome (2026-10-10, `experiments/mjwarp_fused_step/run.py`, mujoco-warp
+3.15.0 / warp-lang 1.18.0 in the scratch venv, commit ef32a04, 1,523 s; both
+N9 fixtures, gravity off, no contacts, 2,000-step replays x 3, graph-captured;
+`wp.capture_while` refused the body ("Conditional body graph contains an
+unsupported operation (memory allocation)"), so the rollout is one unrolled
+2,000-step graph, and the per-step graph is reported beside it): **CONFIRMED**
+in every cell. With the control callback (33-64-64-6 tanh MLP as a tile
+kernel plus a CPG, writing `ctrl` and `xfrc_applied` inside the graph):
+median body `a` = 0.361 ms, `b` = 0.306 us per world (R^2 0.988); rotor body
+`a` = 0.379 ms, `b` = 0.487 us (R^2 0.9999); W = 24 / 100 / 730 cost 356 /
+405 / 583 us per step (median body) and 389 / 430 / 735 (rotor). The callback
+itself costs 0.09-0.12 ms fixed and 0.01-0.04 us per world. Every correctness
+check held (controls finite and different across worlds, forces nonzero,
+`qpos` finite everywhere). Spread: the three replays of a cell differ by <= 3
+us.*
+
+*The decision rule, applied.* Per-step cost of a generation at K draws per
+body, from Q1's and Q2's fits (median body, 126 panels, 16 bodies, 16,000
+steps per generation of segments and transitions; identification probes are
+extra worlds and do not add steps; no contacts):
+
+| K | worlds | A, fluid as a kernel in the same graph | A, fluid as today's separate launch | B, one launch for everything |
+|---|---|---|---|---|
+| 1 | 16 | 94 s (0.56x arch50's 168 s) | 124 s | 9 s |
+| 10 | 160 | 107 s (0.64x) | 137 s | 23 s |
+| 30 | 480 | 137 s (0.82x) | 167 s | 53 s |
+| 50 | 800 | 167 s (1.00x) | 197 s (1.17x) | 83 s |
+| 100 | 1,600 | **242 s (1.44x)** | 272 s (1.62x) | 157 s (0.94x) |
+
+A at K = 100 is 1.44x today's wall with the fluid in the graph, which the
+rule reads as "build A, not B"; 1.62x with the fluid launched separately,
+which falls in the band the rule leaves to the user. **What the numbers
+changed in the theory:** the per-world cost is the fluid, not the rigid body
+(5.5 us per world for 126 panels against 0.3 us for the dynamics), so T8's
+"16x on the fixed term" is 16x on a term that is 15% of the step at K = 100;
+B's whole advantage over A is 1.5x at K = 100 (157 s against 242 s), and
+W* = c0 / c1 = (0.36 + 0.12 ms) / 5.8 us ~ 80 worlds, not 200 (T11's
+figure, corrected here). An engine rewrite for 1.5x is not the trade §7
+contemplated; it was written against a 16x. Recommendation: **build A**; set
+K from the wall budget (K ~ 50 holds today's wall, K = 100 costs 1.44-1.62x
+of it) rather than from Q5 alone; Q3' is not run. The lever that remains is
+the fluid kernel's 0.044 us per panel (Q1), which is the same whether the
+rigid body is Warp's or Mojo's. Caveats carried into A's spec: Q2 has no
+contacts and no gravity (land and the crossings add constraint solves whose
+cost T9 owns), the fixtures are 12-dof bodies with 126 panels (a rotor-heavy
+body costs 1.6x per world in Q2), the fused-fluid column needs either Q6's
+interop or a Warp port of `fluid.py`, and `capture_while` is not available
+for the rollout loop in warp-lang 1.18.0 (an unrolled graph of 2,000 steps
+captured in Q2; a segment's 16,000 steps would be 8 such graphs or a
+host-driven loop of per-step graphs at +12 us per step, the per-step column).*
+
+**Q3 (CPU then GPU, 2-3 days): Featherstone for one body in Mojo.** An
+articulated-body algorithm for one arch49 12-dof elite (hinges and the
+rotor's velocity servo, no contacts), checked against `mj_forward`'s `qacc`
+on 100 random states (|diff| < 1e-6 relative), then batched on the GPU at
+W = 1,600 padded to 32 dof. *Prediction:* agreement holds and the batched
+step costs <= 1 ms. *Falsified* if agreement fails on joint limits or the
+servo, or the step costs > 5 ms. This is B's feasibility; run only if Q1 and
+Q2 say the fixed cost is the lever (T7 holds) and Q2's A-cost is not already
+enough.
+
+**Q4 (CPU, hours, stored elites): how much of land and the crossings is the
+contact model.** Re-score arch49's 51 land-competent elites under MuJoCo with
+softened contacts (`solref` time constant x4, `solimp` widened) and under
+hard ones. *Prediction:* land competence moves by < 20% for >= 80% of them.
+*Falsified* if it moves > 50% for a quarter. Says whether B's soft contacts
+are a comparability boundary or a different physics.
+
+*Outcome (2026-10-10, `experiments/contact_model_dependence/`, 58 elites with
+stored land >= 0.012, each at its own `eval_seed`, single path, 2800 s +
+870 s): **REFUTED**, with a caveat that limits what the refutation means.
+Under x4 (`solref[0]` 0.008 -> 0.032, `solimp` 0.5/0.80/0.010; contact
+stiffness 0.074x) 10 of 58 (17.2%) moved < 20% and 40 of 58 (69.0%) moved
+> 50%, median |relative change| 1.00; under x2, 29.3% and 60.3%. But a null
+control the agent added (`solref[0]` x1.01, nothing else) already moves 20 of
+58 (34.5%) by > 50% and leaves only 41.4% within 20%: the per-elite land
+score is hypersensitive to any perturbation of the contact constants, and the
+frozen thresholds cannot be met by physics that is 99% identical. The
+population mean is mild (0.0485 -> 0.0298 at x4, 0.0465 under the null);
+rank agreement Spearman(hard, soft) is 0.71 under the null, 0.23 at x2, 0.18
+at x4. So the read is "land scores are not insensitive to the contact
+constants", not "soft contacts are a different physics"; the two were not
+separated. Crossings carried nothing: `water_to_land` and `land_to_air`
+crossed 0/58 in every arm. Artifact: the single path reproduced the recorded
+land score (within 0.005) for 31 of 58 only, where the batched re-score in
+`experiments/no_model_gate` reproduces 195 of 229; cause not investigated
+(open read). Restricted to the 31 the verdict is the same (x4: 3.2% < 20%,
+87.1% > 50%). For option B this means a soft-contact build is a comparability
+boundary on land in any case, and that land competence per elite is a draw
+of the contact constants as much as of the task; the K-draw score (§5)
+should vary the contact seed too.*
+
+*R1, the open read (2026-10-10, `docs/IMPL_1010_SPEC.md` lane R1,
+`runs/analysis_1010_failure_theory/R1_result.md`, branch impl-r1 d6da2c3):
+REFUTED as frozen. The batched path reproduces 33 of the 58 land-competent
+elites, at or below the falsifier's 35. The artifact is not the single path.
+
+| on the 58 elites with recorded land >= 0.012 | reproduce land within 0.005 |
+|---|---|
+| single path (rerun equals Q4's hard arm, 58/58) | 31 |
+| batched path, tree 23b8052 | 33 |
+| batched path, arch49's own commit 7a894b7 (values identical to 23b8052, 58/58) | 33 |
+| `no_model_gate`'s elite arm | 33 |
+| single and batched agree with each other | 36 |
+
+The 195/229 quoted above is a population effect: 162 of the 171 elites with
+recorded land < 0.012 reproduce trivially. The failure is on land alone.
+Air reproduces 58/58 and water 55/58 on the same elites. Of the 25 batched
+non-reproducers, the median re-score minus recorded is -0.014. Seventeen
+differ by more than 50%, and four re-score exactly 0. Code drift is excluded.
+Both paths build the controller with `controller_for_elite`, so the read
+cannot tell a stored-input mismatch from a recording-time effect. The two-path
+agreement test in `test_search.py` cannot see this either, because the paths
+disagree with the record more than with each other.
+
+Rivals for the next read. Each predicts something the others do not:
+(a) **a stored input differs from the one scored**: the scoring network
+snapshot, the stored policy, or the stored basis (land uses the air basis,
+`evaluate.py:56-59`). Swapping the right input restores the recorded value
+exactly for most of the 25. (b) **The recorded value depended on its batch
+at record time**, through scatter or task streams, shard composition, or the
+order of float operations. Re-scoring one elite inside different batch
+compositions changes its land score. Under (a) it does not. (c) **Land is
+chaotic in the contact solve.** Q4's 1% null moved 34.5% of land elites by
+more than 50%, so any float-level difference flips outcomes. Re-scoring the
+same elite twice in the same batch is identical, but a 1e-9 perturbation of
+one initial coordinate moves it by the same margin as the record gap. The
+next read runs all three arms on the 25 non-reproducers plus 10 that
+reproduce as a control. Not run yet. If (c) holds, a single land draw carries
+no information about a design, and the K-draw score is required on land, not
+optional (Q5's land K = 18 was computed from the same draws).*
+
+**Q5 (analytic + stored rows, minutes): the K curve on real draws.** From
+`experiments/draw_variance/results_arch49.json` (229 elites x 7 draws), the
+Spearman of a k-draw mean against the held-out mean for k = 1..6, against
+`K / (K + R)`. *Prediction:* within 0.1 of the formula. Sets K for the design.
+
+*Q5 was read the same day* (`experiments/draw_variance/k_curve.py`, arch49's
+229 elites x 6 fresh draws, all C(6,k) subsets; report `Q5_result.md`).
+**Outcome: refuted on rank, held on value.** Spearman between a k-draw mean
+and the (6-k)-draw mean sits below `sqrt(rel_k rel_{6-k})` in all 15 cells,
+by 0.15-0.24 in air and 0.12-0.18 in land (water within 0.08); Pearson on the
+same pairs matches the formula within 0.02 in water and land. The scores are
+zero-heavy and heavy-tailed (air: 182 of 229 elites have six zero draws and
+are excluded), so the formula is fair for a design that places on the mean and
+optimistic for anything that ranks. R on the included elites: air 7.3, water
+4.0, land 2.0. **K for reliability 0.9: air 66, water 36, land 18** (0.8:
+29 / 16 / 8; 0.95: 139 / 75 / 38); air's R has a wide interval (file CI
+2.2-38). For §5, K = 30-100 stands, with the mean, not the rank, as the
+placed quantity.
+
+**Q6 (interop, hours): Mojo -> Warp zero copy.** A Mojo `DeviceBuffer`
+exposed to Python and wrapped by `wp.from_dlpack` or `wp.array(ptr=...)`,
+written by a Mojo kernel and read by a Warp kernel on one stream, 1e6 floats,
+checksum equal, no host copy (measure with `nvidia-smi`'s PCIe counters or a
+timing that does not scale with size). *Prediction:* it works or fails on the
+first try; there is no partial outcome. Decides C.
+
+*Outcome (2026-10-10, re-run at 6c24152 after the probe's duplicate-keyword
+crash; `Q6_result.md`, `experiments/mojo_warp_interop/results_q6.json`):
+REFUTED as frozen, because a partial outcome occurred. At 1e5 floats every
+check held: the Mojo fill's checksum, Warp reading Mojo's buffer, Mojo seeing
+Warp's writes after one and two kernels, and the buffer intact after the
+wrappers. One CUDA context is shared (Mojo's, Warp's and the pointer's owner
+are the primary context; memory type device). The wrap is zero copy:
+
+| n | wrap median | wrap p10-p90 | H2D copy median | wrap / H2D |
+|---|---|---|---|---|
+| 100,000 | 1.8 us | 1.6-2.0 us | 1213.6 us | 0.0015 |
+
+The two runtimes use different streams (Mojo's handle is reachable only
+through a private module), so a mixed pipeline needs an explicit
+synchronisation or event between them. The headline size, 1e6, never
+finished: the probe's own 300 s child timeout killed it (reported as
+signal 9), with no CUDA error recorded; why 1e6 took that long is not read. What this decides for A: the
+fused-fluid column of the decision table does not rest on Mojo-Warp interop.
+Putting a Mojo launch inside Warp's captured graph on Warp's stream is not
+shown, so A's spec takes the path that needs no interop, a Warp port of
+`fluid.py` (Q1's cost model is a property of the kernel's arithmetic and is
+carried over as a prediction, not a measurement).*
+
+### 5. What the search becomes if T7 holds (for the plan, not yet decided)
+
+Score = mean over K draws (K from Q5; 30-100), stored with its standard
+error; a candidate enters a cell when its lower bound beats the incumbent's
+(the rule N11 was built toward); the film replays the median draw by name.
+Identification's 24 probes are worlds in the same launch. PPO sees K rollouts
+per body per generation (1.5k decisions today per body, 150k at K = 100),
+which is the budget the co-design literature spends (DERL 5M steps per body;
+Mertan & Cheney: undertrained controllers rank bodies at random). N11 and M3
+are retired. Comparability: every score, the archive and the learner's data
+change; nothing is comparable across it.
+
+*Revised 2026-10-10 (`docs/IMPL_1010_SPEC.md` §D answer 3, from the noisy-QD
+literature: Flageat & Cully's UQD, arXiv 2302.00463, and Extract-QD, arXiv
+2502.06585). No lower bound decides placement. A design places on the pooled
+mean of all its draws, and incumbents keep collecting draws through N11's
+re-evaluation, which is therefore kept, not retired. No paper in that
+literature places on a confidence bound. The ones that beat plain MAP-Elites
+re-evaluate incumbents and compare means.*
+
+### 6. Tooling facts (returned 2026-10-10; `F_on_device_tooling.md`, claims
+tagged primary / secondary / inference; read from installed source where
+possible)
+
+- **MJWarp has the hook A needs.** `Model.callback.control` is a Python
+  `f(m, d)` that launches Warp kernels; in the installed mujoco_warp 3.15.0 it
+  runs after `fwd_position` and `fwd_velocity` and before `fwd_actuation` and
+  `fwd_acceleration` (`forward.py:2081`), so it can read xpos, xmat, xipos,
+  cvel and subtree_com and write `d.ctrl`; `fwd_acceleration` then accumulates
+  `d.xfrc_applied` and `d.qfrc_applied`, so a force written there from the
+  callback takes effect (by data flow; the docs list only `ctrl` as its
+  output, and nothing zeroes `xfrc_applied` for you). A callback that only
+  launches kernels should capture into the graph; `wp.capture_while`
+  (warp 1.18, CUDA >= 12.4) can put a whole 2000-step rollout in one graph,
+  which removes the per-step Python launch that N9's 240 us partly is. No
+  published aero or fluid example uses the hook. MJWarp's built-in fluid is
+  a body-level ellipsoid drag, not a panel model.
+- **The MLP and CPG are cheap in Warp**: `examples/tile/example_tile_mlp.py`
+  shows a 4-layer MLP with `wp.tile_matmul`; `wp.tanh` and `wp.atan2` are
+  builtins; 33-64-64-6 is ~6.6k MACs per world per step. Newton's
+  `example_robot_policy.py` runs device-resident policy inference but still
+  calls the policy from Python per control step; no published example has the
+  policy inside the same graph as the physics.
+- **Mojo -> Warp zero copy is raw pointers only.** Mojo `DeviceBuffer` has no
+  DLPack or `__cuda_array_interface__`; `unsafe_ptr()` into
+  `wp.array(ptr=..., copy=False)` is the route; `max.driver.Buffer` on the
+  Python side does carry `__dlpack__` (MAX 26.5/26.6). Stream and context
+  sharing between a Mojo launch and a Warp graph are undocumented. Porting
+  `fluid_gpu.mojo` to Warp removes the question; keeping Mojo means a sync or
+  a shared-stream launch every step.
+- **Heterogeneous bodies are not supported where it matters.** Newton PR
+  #4312 still open ("body counts, joint layouts, and degrees of freedom must
+  still match across worlds"); padding to a superset is documented nowhere;
+  Newton's `SolverKamino` does support heterogeneous worlds with hard NCP
+  contacts but is BETA 1 and "users are discouraged from depending on it". No
+  Newton throughput number exists for <= 20-dof bodies.
+- **A GPU Featherstone from scratch is precedented, its accuracy is not.**
+  Newton `SolverFeatherstone` (CRBA, batched Cholesky, penalty contacts, no
+  joint friction or effort limits), Brax `generalized` (dense M^-1 with
+  MuJoCo-style solref/solimp and a projected-gradient solver), BARD (arXiv
+  2605.31481), GRiD (arXiv 2109.06976); none reports accuracy against MuJoCo
+  on contact trajectories or cost per world-step with contacts; Newton's own
+  PR reports 4-70 mm trajectory divergence from contact selection alone.
+  **Mojo's `atan2` is an external libm call with no GPU path** (`tanh` has a
+  PTX path), so B would carry its own; no Mojo-vs-CUDA benchmark for small
+  kernels exists beyond ORNL arXiv 2509.21039 (parity on memory-bound
+  kernels, gaps on atomics and fast-math).
+
+*What this does to §3.* Option C (raw-pointer interop, undocumented stream
+sharing) is not a shortcut; Option B (Mojo engine) carries the `atan2` gap,
+no heterogeneity precedent with reported accuracy, and the largest build; so
+**Option A, Warp-native, is the lower-risk route**, with the fluid solver
+ported to Warp as a third implementation that the existing numpy/Mojo pair
+cross-checks, and with the whole rollout captured by `wp.capture_while`. T8's
+16x (one launch for all bodies) is then not available; the per-body serial
+launch is A's cost, and Q2 measures it. Newton `SolverKamino` is the one
+supported heterogeneous path and gets a probe only if A's per-body fixed cost
+proves to be the lever (Q7, not yet written). Q2's shape is now concrete: a
+control-callback kernel (CPG + MLP) that also writes a placeholder body force
+into `xfrc_applied`, the rollout under `wp.capture_while`, W = 24 / 100 / 730
+on the N9 fixtures, no host copy per step.
+
+### 7. The linear-algebra formulation (the user's question: `max.gpu`,
+TileTensor, "some of this should parallelise as linear algebra")
+
+What in a step is linear algebra, and what is not. A rollout step for W worlds
+of B bodies decomposes into five kinds of work; the first three are dense or
+batched linear algebra, the last two are not.
+
+| work | shape per step | linear algebra? | GPU form |
+|---|---|---|---|
+| control MLP (33-64-64-6) | one GEMM per layer over all worlds: `(W*B) x 33 @ 33 x 64`, `... x 64 @ 64 x 64`, `... x 64 @ 64 x 6` | yes, the cleanest case | three GEMMs; a `TileTensor` tiled matmul or a MAX `matmul` op; ~6.6k MACs per world |
+| mass matrix and its solve (CRBA then `M qacc = tau - bias`) | per world a padded `32 x 32` SPD matrix: build from per-body `6 x 6` spatial inertias (batched small matmuls), then a batched Cholesky and two triangular solves | yes, batched small dense | thread-per-world (a 32x32 Cholesky is ~5k flops: trivial) or a batched routine if the stdlib has one; this is the Brax-generalized / Newton-Featherstone recipe, not ABA's recursion |
+| panel forces to body forces | `(B*6) x P` sparse incidence times `P x 1` panel forces, per world | yes, a sparse (or block-dense) matmul | segmented reduction; the Mojo kernel does it per panel today |
+| panel kinematics and coefficients | per panel: a rotation (3x3 matvec), relative velocity (cross products), `alpha = atan2(...)`, `CL(alpha)`, `CD(alpha)`, stall and LEV branches | the matvecs yes, the coefficients no (elementwise nonlinear with branches) | elementwise kernel, thread-per-panel, as today |
+| kinematic tree recursion (forward kinematics, bias forces, joint limits, soft contacts, integration) | per world, sequential along the tree depth (<= 11 parts), each step a `6 x 6` spatial transform | small matvecs inside a sequential recursion; parallel across worlds, not within one | thread-per-world, as Newton and Brax do |
+
+So the honest statement: **the physics is not one large linear system but
+`W x B` tiny ones plus nonlinear elementwise work**; GEMM-style parallelism
+buys the MLP (three GEMMs instead of 1,600 tiny matvecs) and the mass-matrix
+solve (a batched Cholesky instead of a recursion), and the rest parallelises
+only across worlds and bodies, which is what the thread-per-world kernels in
+Warp, Newton and the project's own fluid kernel already do. The gain of the
+formulation is therefore not a different asymptotic cost but **one launch
+for everything** (T8): a Mojo pipeline that owns the rigid body as well as the
+fluid can batch all bodies and all draws of a generation in one kernel
+sequence, because padding to 32 dof is a layout choice in one's own code and
+not a feature one waits for from an engine. That is Option B's content, and
+the user's framing names its implementation: CRBA + batched Cholesky + soft
+contacts in Mojo (TileTensor for the GEMMs, thread-per-world for the rest),
+beside the existing fluid kernel, with MuJoCo kept as the reference path.
+
+What it costs, against §6: the engine (CRBA, Cholesky, joint limits as
+penalties, soft contacts with the beach and ramp, the servo and rotor
+actuators, the energy model), its validation against MuJoCo body by body
+(T9: contacts are the physics that changes), and Mojo's gaps (`atan2` has no
+GPU path and would be hand-written; `tanh` has one; no small-matrix batched
+routines are known in the stdlib, so Cholesky is per thread). The reward:
+T8's single launch, predicted `T_step ~ a + b * (W * B)` with `a` paid once
+per step for the whole generation, against A's `16 * a`.
+
+**Decision rule (pre-registered).** Q2 measures A's step cost; if A at
+W = 100 per body gives a generation at <= 1.5x today's wall (<= ~200 s), A is
+built and B is not, because a 16x saving on a fixed term that is already
+affordable buys nothing the search needs. If A costs > 3x today's wall, B is
+the only route to K = 100 and Q3 is rewritten as the linear-algebra probe:
+**Q3' (Mojo, 3-5 days): CRBA + batched Cholesky for one arch49 12-dof body
+in Mojo, padded to 32 dof, checked against `mj_forward`'s `qacc` on 100
+random states (|diff| < 1e-6 relative, no contacts), then batched to W x B =
+1,600 worlds; prediction: agreement holds and the batched step costs <= 1 ms
+with the MLP as a `TileTensor` GEMM; falsified if > 5 ms or if agreement
+fails on the servo or joint-limit terms.** Between 1.5x and 3x the user
+decides. The Mojo/MAX tooling facts this plan depends on (module names,
+TileTensor status, `atan2`, MAX graph loops, the `Py_NewRef` worker failure)
+are collected in `G_mojo_max_gpu.md` when its brief returns and summarised
+here as §8.
+
+### 8. Mojo and MAX, as installed and as of nightly (read and run 2026-10-10;
+`G_mojo_max_gpu.md`)
+
+Installed: Mojo 1.0.0b3.dev2026080106, max 26.5.0.dev2026080106; upstream
+stable v1.1.0 (2026-09-17), nightly 1.2.0.dev2026100905. The GPU was idle
+for the probes below.
+
+- **Module path.** `std.gpu` and `max.gpu` both work on the installed build
+  (`from max.gpu.host import DeviceContext` compiled and ran); the project
+  imports `std.gpu` everywhere (`fluid_gpu.mojo:25-26`,
+  `full_pipeline.mojo:24-25`); v1.1.0 says `max.gpu` mirrors `std.gpu` and
+  `std.gpu` becomes private. New code imports `max.gpu`.
+- **TileTensor** is a new type beside `LayoutTensor`, not a rename, and does
+  not yet implement all of `LayoutTensor`'s features; the official tiled
+  shared-memory matmul uses `TileTensor.tile`, SHARED `stack_allocation`,
+  `barrier`, `copy_dram_to_sram` and `layout.tensor_core.TensorCore`
+  (`max/examples/custom_ops/kernels/matrix_multiplication.mojo`). The only
+  library batched routine is `linalg/bmm.mojo`; **there is no Cholesky or
+  triangular solve** in max/kernels, so a 32x32 solve is per-thread code. The
+  project's kernels use raw pointers and `global_idx.x`, no shared memory or
+  tensor cores; only `gpu_probe.mojo` touches TileTensor.
+- **MAX graph has the loop.** `ops.matmul` is batched; `ops.while_loop`,
+  `cond`, `custom`, `inplace_custom`, `buffer_load/store` exist; no solve,
+  Cholesky or inverse op. **Measured here: a 2000-iteration `while_loop` of a
+  4096 x (6 x 6) f32 batched matmul ran fully on device in 101.8 ms, 50.9 us
+  per iteration** (18 s compile); per-execute cost with device-resident
+  buffers 23.7 us for a trivial graph, 60.9 us for the bmm; results matched
+  numpy exactly. A custom Mojo op inside the loop is untested. For T7 this is
+  the number that matters: a MAX-graph step's fixed cost is ~5x below MJWarp's
+  240 us, so B's `a` may be ~0.05-0.1 ms rather than 0.24.
+- **Transcendentals on the 3060, installed build:** f32 sin, cos, tanh, exp,
+  sqrt work; f64 tanh, exp, sqrt work (exp off by ~5e-13); f64 sin and cos
+  fail ("not supported on NVIDIA GPU"); `atan` and `atan2` fail in f32 and f64
+  ("libm operations are only available on CPU targets"); no nightly note
+  through 2026-10-09 mentions a fix. **The project already carries its own**
+  (`mojo/src/mathx.mojo`: `atan2f`, `atan2d`, `sind`, `cosd`, `expd`), so §7's
+  "atan2 gap" is closed in-project and is not a B risk.
+- **Python interop.** Device buffers persist across Python calls (`GpuFluid`
+  in `fluid_state.mojo:36-60`, `FullPipeline` in `full_pipeline.mojo:190, 335,
+  575`); numpy arrives as an int64 descriptor of addresses
+  (`fluid_state.mojo:73-76`), results copy back to host. The `Py_NewRef` abort
+  seen in today's worker processes matches no upstream issue (only modular
+  #6833, a refcount leak whose text shows `PythonObject` calling
+  `cpy.Py_NewRef`) and did not reproduce when `FullPipeline(64, 64, 4)` was
+  constructed in a `multiprocessing` spawn child with torch and mujoco
+  imported, so it depends on how the process is launched; still undiagnosed.
+
+*What this does to §3 and §7.* Two of B's three risks shrink: `atan2` is
+already solved in `mathx.mojo`, and the per-step fixed cost of a MAX-graph
+loop is measured at ~51 us against MJWarp's ~240 us, so B's single launch
+would carry both T8's 16x on the fixed term and a 5x smaller fixed term. The
+remaining risk is the engine itself and its validation (T9), unchanged. The
+§7 decision rule stands, with one more probe before Q3':
+
+**Q8 (MAX graph, ~half a day): a custom Mojo op inside `ops.while_loop`.**
+The existing fluid kernel (or a stub of its shape: a thread-per-panel kernel
+over a `(W*B, panels)` buffer) registered as a MAX custom op and called once
+per iteration of a 2000-step `while_loop` beside a `(W*B) x 33 @ 33 x 64`
+matmul, buffers device-resident; W*B = 1,600. *Prediction:* <= 150 us per
+iteration (fixed ~50 us plus the two ops). *Falsified* above 500 us, or if a
+custom op cannot be placed inside the loop. If Q8 holds and Q2 says A is
+> 3x today's wall, B is built on MAX graph + Mojo custom ops rather than on
+hand-launched kernels.
+
+*Outcome (2026-10-10, re-run at 6c24152 with `LD_LIBRARY_PATH` pointing at a
+cuBLAS 12 directory; the first run aborted on a missing `cublasCreate_v2`;
+`Q8_result.md`): REFUTED. A custom op can be placed inside the loop, and it
+agrees with numpy to 4.3e-5 on a force scale of 61. The loop is slow even
+without it:
+
+| variant | us per iteration, median | min-max over 5 executes | compile s |
+|---|---|---|---|
+| matmul only | 974.5 | 963.5-976.2 | 1.6 |
+| matmul + functional custom op | 1132.8 | 1127.6-1133.6 | 25.0 |
+| matmul + in-place custom op | 980.4 | 978.4-988.0 | 23.0 |
+
+G's 51 us was a 4096 x 6 x 6 batched matmul; at this shape (1,600 x 33 @ 33
+x 64, loop-carried state) the matmul-only loop costs 974 us per iteration,
+so the "fixed ~50 us" in the prediction was the wrong shape's fixed cost.
+With Q2 already reading "build A", B on MAX graph is closed.*
+
+## 2026-10-10, later still — the order of the loop: what can share a launch, and what cannot
+
+The user's question (10-10): can the loop be reordered so that like work is
+batched (across phases, across islands, across generations), and is there a
+better arrangement? Written before anything is built or timed, from arch50's
+telemetry and the code; the literature is in §4. The on-device section above
+(T7-T9) settles *where* a rollout runs; this one settles *what goes into one
+launch*, and it turns out to be the prerequisite for T8's prize rather than an
+optimisation of today's loop.
+
+### 0. The question and the decision
+
+Does the order of the loop cost wall, and where? Two different answers are
+imaginable: that today's loop leaves a large factor on the table by dispatching
+small batches in many phases (then a scheduler change pays now), or that
+today's wall is per-body CPU work that no batching shortens (then reordering
+pays only once rollouts are on the device, and must be built *as* the device
+path's scheduler). The decision hanging on it: whether the scheduler change is
+built before, with, or after Q2's verdict on option A/B.
+
+### 1. What one generation does now (arch50, 122 generations, medians; `cost` in `generations.jsonl`, `promote` events)
+
+| phase | median s | share of the 168 s median generation | what it is |
+|---|---|---|---|
+| `evaluate.main` | 105.1 | 63% | 16 bodies (20 with N11's reevals) in 8 shards of 2 over 4 workers; per generation 460,800 identification steps, 160,000 segment steps, 96,000 transition steps; the policy is stochastic and fills the PPO buffer (25,473 transitions, 144 trajectories per update) |
+| `evaluate.rescore` | 43.6 | 26% | the same bodies at the same seeds with the policy at its mean; the score the archive places |
+| `tier2` (every 5th generation; 26 rounds) | 166.7 per round, 33 amortised | 20% of an amortised 202 s | per round: promotion refinement 105.0 s (six serial (1+1)-ES steps on up to three designs, each step one pool trip of <= 3 worlds), Tier-1.5 leg 15.2 s, Tier-2 mission 33.2 s (single path, in the pool since AL) |
+| `audit` (every 30th; 8 rounds) | 63.5 per round, 2 amortised | 1% | held-out re-runs of the suspicious |
+| `ppo` | 1.4 | 0.8% | 130 gradient steps on the buffer |
+| `place`, `judge_scout_critic`, `refit`, `migrate`, `report`, `build` | 0.02-0.05 each | < 0.1% | the host-side logic of the search |
+
+Rollouts are 98.3% of the summed wall (evaluate + tier2 + audit over the
+total). Everything the search *decides* costs 1.7%. So the loop's order can
+matter only through how rollouts are grouped, never through overlapping
+decisions with rollouts. Identification is 64% of the main phase's simulator
+steps and was measured at 57% of its wall (M6). In the pool each worker steps
+its 2 bodies in lockstep on the CPU (MuJoCo per body, the numpy/Mojo fluid per
+shard); the GPU sees a batch of 2, and `batchroll`'s own sweep found 4 shards
+of 4 faster than 1 shard of 16 by 2.3x because the per-body CPU work is what
+the wall is.
+
+Three places today's order repeats work or launches small:
+
+- **Reevals re-identify a body that already carries its basis.** N11's reevals
+  are built with `identify=True` (`loop.py`, the `["reeval"]` entry) while
+  promotion refinement reads `mobility_basis` from the elite's record and
+  identifies only elites without one (`_refined_controllers_for`). A reeval
+  therefore pays 28,800 identification steps per body (4 of 20 bodies, 20% of
+  the generation's identification) and, worse, its "fresh draw" perturbs the
+  *basis* as well as the task: the reeval is not the experiment Q5's K curve
+  measured, whose rows (`experiments/no_model_gate`, `identify_axes=False`,
+  stored bases) vary the task only. M6's objection to caching bases (bases
+  depend on the gait's base and every child carries an operator) is about
+  children; an unchanged genome has an unchanged basis.
+- **Promotion refinement is six serial launches of three worlds.** A (1+1)-ES
+  is sequential by construction; the 105 s per round is six pool trips each
+  stepping <= 3 bodies for a full segment. The same budget as one trip of 18
+  worlds (three designs x six perturbations, a (1+6)-ES: accept the best
+  perturbation, else keep) finishes in one segment's wall.
+- **Main and re-score are two trips for the same bodies at the same seeds.**
+  `MERGE_FIRST_REFINE` already proves the move: a machine's score does not
+  depend on what shares its batch (`test_search`), so one trip of 40 worlds
+  returns exactly what two of 20 did. The saving is one pool ramp and wider
+  shards; the per-body work is unchanged.
+
+### 2. The theory
+
+**T10 (today's architecture: order buys little, redundancy buys some).** With
+rollouts stepped per body on the CPU, the wall of a pool trip is max over
+workers of the sum of their bodies' per-step cost x steps; worlds are not free,
+so merging islands or generations into one trip only makes the trip longer in
+proportion. Reordering can pay only by (a) not repeating work (identification
+of a body whose basis is stored), (b) turning serial launches into one (the
+(1+6)-ES), (c) saving ramps (main + re-score in one trip). The sum of the three
+is bounded by (105 x 20/16) x 0.57 x 4/20 + (105 - ~20)/5 + a ramp: roughly
+15 + 17 + 5 = 37 s of a ~215 s amortised generation at 20 built, ~17%. Nothing in the order of islands
+or generations can add to that today.
+
+**T11 (on the device: the order is the prerequisite).** A fused step costs
+`c0 + c1 W` for W worlds (N9: c0 ~ 240 us, c1 ~ 1.2 us; Q2 re-measures both on
+this project's bodies). Below W* = c0/c1 a launch is dispatch-bound and a world costs almost
+nothing (written as ~200 worlds from N9's rigid-body figures; Q1 + Q2 put it
+at ~80 once the fluid's 5.5 us per world is counted, see the on-device
+section's Q2 outcome); today's loop offers 16-20
+worlds per launch and would leave the device ~90% idle. T8's prize (one launch
+for all bodies x draws) therefore requires a loop that *has* hundreds to
+thousands of worlds ready at once: all eight islands bred in one epoch (8 x 16
+= 128 bodies), K draws per body (Q5: 30-100), the reevals, the promotion
+perturbations, the Tier-2 mission and the audit's held-out seeds as further
+worlds of the same launch, horizons masked. The epoch, not the generation,
+becomes the unit, and the scheduler is part of option A or B, not a later
+optimisation of it.
+
+**T12 (what the epoch costs the search).** Islands are independent except for
+migration (every 60 generations, 2 events in arch50) and the shared policy, so
+breeding all eight per epoch changes the island order from round-robin to
+simultaneous and nothing else in the archives. What changes is the batch per
+selection step (128 vs 16) and the learner's data: eight generations' worth of
+transitions arrive under one behaviour policy. MAP-Elites' efficiency per
+evaluation is flat in batch size over three orders of magnitude (QDax, §4.1);
+the gradient side is not (ASCII-ME, §4.6: actor-critic QD loses 8-13% as the
+batch grows because the critic gets fewer rounds), and every accelerator-scale
+RL paper warns that enlarging the acting batch at a fixed learner batch costs
+sample efficiency (§4.3, §4.8). So the epoch keeps PPO's gradient steps per
+transition where they are (130 per 25k today -> ~1,040 per 200k epoch, in
+minibatches; Podracer's rule of decoupling the acting batch from the learning
+batch) and accepts fewer distinct behaviour policies per evaluation; the policy
+here has learned little under any cadence (2026-10-10 §1, M4), so this is the
+cheaper of the two risks, and P6 reads it.
+Asynchronous or steady-state schemes (place each world as it finishes; breed
+the next epoch before this one is placed) are *not* indicated: all worlds in a
+launch finish together, the host work between launches is 1.7% of the wall,
+and steady-state asynchrony carries a measured bias toward fast-evaluating
+individuals (§4.2) that a synchronous epoch does not; this project's
+evaluation cost is heritable (+1.6-1.8 s per rotor), which is exactly the
+condition under which the bias acts. Double-buffering the host's update under
+the next launch (§4.8) is correct and worth at most the 1.7% the host spends.
+
+### 3. Predictions (frozen 2026-10-10; outcome words per REPORT_FORMAT)
+
+**P1 (stored bases for reevals; build cost hours).** With reevals built
+`identify=False` and their controllers carrying `mobility_basis` from the
+record: `steps.main.identify` falls from 576,000 (20 x 28,800; arch50's 460,800 is
+16 bodies without reevals) to 460,800 per generation at 20 built (exact: 16 x
+28,800); `evaluate.main` falls by 8-14% (M6's 57% x 4/20). The reeval's draw variance falls, because the basis no longer moves:
+*prediction* R (draw var / design var) on reevals of arch49 elites at stored
+bases is below the re-identified value by >= 15% in every medium. *Falsified*
+if the step count does not fall exactly, or if R at stored bases is not lower.
+Comparability: a reeval's recorded score becomes a task draw at a fixed basis,
+which is what the film and Q5 already assume; nothing else moves.
+
+**P2 ((1+6)-ES at promotion; hours).** One pool trip of <= 18 worlds replaces
+six of <= 3: `refine_wall` median 105.0 s -> <= 30 s; the round's `tier2`
+median 166.7 -> <= 95 s; amortised -14 s per generation (-7%). The acceptance
+rate of a refined controller over its parent (promotions whose refined
+`tier1_fraction` beats the unrefined, from the `promote` events) within +-10
+points of arch50's. *Falsified* if `refine_wall` stays above 50 s, or the
+acceptance rate falls by more than 10 points.
+
+**P3 (main + re-score in one trip; hours).** Generation wall -3 to -8% at
+equal results (bit-identical scores, as `test_search` asserts for batch
+independence). *Falsified* if the merged trip of 40 worlds is slower than two
+of 20 (memory per worker) or any score changes.
+
+**P4 (the all-island epoch in today's architecture: a null).** Evaluating 128
+bodies in one trip instead of 16 in eight changes the wall per evaluation by
+less than +-10%. Written so that nobody builds the epoch for speed on the CPU
+path; it is built only as T11's scheduler. *Falsified* either way by a change
+beyond 10%, which would mean the pool's cost is not per body.
+
+**P5 (the epoch on the device; after Q2).** From Q2's measured c0 and c1 the
+wall of one epoch of W = 128 x K worlds is `steps x (c0 + c1 W)`, 16,000 steps
+per 8 s segment pair plus transitions; the table at K = 1, 10, 30, 100 is
+filled in from Q2 and the rule is: the epoch is built when its predicted wall
+at K = 30 is <= 8 x today's generation (<= 1,600 s), which is the same amount
+of search per wall at 30x the draws. *Falsified* if Q2's c1 is above 10 us per
+world (then W* < 25 and the device is not dispatch-bound at today's widths).
+
+**P6 (search efficiency of the epoch; the first on-device arm).** At equal
+evaluations, the epoch arm's coverage and summed competence per island are
+within 10% of a round-robin arm with the same scoring; held-out retention and
+Tier-1->Tier-2 Spearman are not lower. PPO, at fixed gradient steps per
+transition, reaches the same `return_by_tag` per transition within one draw's
+SD of arch51's form; its `kl` per update stays under the target (0.01 today's
+value). *Falsified* if coverage per evaluation is lower by more than 10% in
+>= 3 islands, or if the policy's return per transition is lower by more than
+one SD (then the critic-rounds effect of §4.6 is live here and the epoch's
+learner is split into more, smaller updates: ASCII-ME's remedy).
+
+### 4. Literature (read 2026-10-10 by a research agent from the arXiv/ar5iv texts; UNVERIFIED marks a number read from an abstract or a secondary source only)
+
+1. **MAP-Elites is batch-size insensitive at equal evaluations.** Lim, Allard,
+   Grillotti, Cully, *Accelerated Quality-Diversity through Massive
+   Parallelism*, TMLR 2023 (arXiv 2202.01258): batch swept 64 -> 131,072 at
+   fixed budgets (5M evaluations QD-RL, 20M Rastrigin/Sphere); "the metrics
+   converge to the same final score after the fixed number of evaluations
+   regardless of the batch size used", Wilcoxon p > 0.05 across sizes; 39
+   iterations at batch 131,072 matched 19,532 at batch 256. Two stated
+   caveats: large batches need somewhat more evaluations early, and the run
+   still needs enough iterations for stepping stones. Throughput plateaued at
+   the hardware's width (8,192 worlds on an RTX 2080, 65,536 on an A100). This
+   is the licence for T12's epoch and the reason P6 is written as "within 10%
+   at equal evaluations".
+2. **Steady-state asynchrony is biased toward fast evaluators.** Scott & De
+   Jong, FOGA 2015 / GECCO 2015, 2016 (effect sizes UNVERIFIED, full texts
+   unreachable); Guijt, Thierens, Alderliesten, Bosman, GECCO 2023 (arXiv
+   2303.15543): "steady-state asynchronous EAs are much more vulnerable to the
+   biases induced by heterogeneous evaluation times", a generational
+   asynchronous variant "degrades substantially less, by at most a factor 5" in
+   required population size, and synchronous schemes "were invariant to the
+   evaluation time distributions tested"; Harada 2021 (arXiv 2107.12053)
+   corrects it with a selection-frequency counter; Karns & Desell, GECCO 2025,
+   replicate it (UNVERIFIED numbers). No asynchronous MAP-Elites paper was
+   found. T12 rejects steady-state placement on this.
+3. **Fused env + learner on the accelerator; large-batch PPO.** Hessel et al.,
+   *Podracer architectures*, 2021 (arXiv 2104.06272): Anakin keeps
+   environment, action and update on each core and vmaps a batch "large
+   enough to ensure good utilisation of an entire TPU core"; the warning that
+   a larger acting batch "can result in much reduced data efficiency", fixed by
+   decoupling the acting batch from the learning batch. Rudin, Hoeller, Reist,
+   Hutter, *Learning to Walk in Minutes*, CoRL 2021 (arXiv 2109.11978): 4,096
+   environments x 24 steps = 98,304 samples per PPO iteration, 5 epochs,
+   minibatch 24,576, KL target 0.01; near-linear scaling to ~4,000 robots;
+   performance falls slowly below a threshold of robots and "sharply" when the
+   number is too high; "2048 to 4096 robots with a batch size of ~100k or ~200k
+   provides the best trade-off"; fewer than 25 consecutive steps per rollout
+   breaks it. T12's "fixed gradient steps per transition" is this rule.
+4. **Policy lag.** Sample Factory, Petrenko et al., ICML 2020 (arXiv
+   2006.11751): V-trace (rho = c = 1) plus PPO clipping in every experiment;
+   "the policy lag was on average between 5 and 10 SGD steps, which results in
+   stable training"; no curve of performance vs lag. IMPALA, Espeholt et al.,
+   ICML 2018 (arXiv 1802.01561), Table 2: without correction 5.0 vs V-trace
+   31.3 on lasertag, 94.9 vs 229.2 on explore_goal, i.e. uncorrected stale
+   data loses 2.4-6x. Hilton, Cobbe, Schulman, *Batch size-invariance for
+   policy optimization*, NeurIPS 2022 (arXiv 2110.00641): PPO is not
+   batch-size invariant because of how it controls the update size; a
+   decoupled proximal policy (EWMA) makes it so and tolerates data ~8
+   iterations stale (UNVERIFIED against the paper's figures). EnvPool (item 8)
+   adds the mechanism: more environments at a fixed learner batch gives "stale
+   data after the first gradient update" and a measured efficiency drop. For
+   this loop: every world in an epoch is collected under one behaviour policy,
+   so there is no lag inside an epoch; lag appears only if the next epoch's
+   launch overlaps the update (§4.8), and then its data must carry its policy
+   version and the ratio must be taken against it.
+5. **Shared controllers over many bodies in one batch.** MetaMorph, Gupta,
+   Fan, Ganguli, Fei-Fei, ICLR 2022 (arXiv 2203.11931): one PPO policy over
+   100 UNIMAL bodies, 16 workers x 32 environments, batch 5,120, bodies
+   tokenised per module and zero-padded; a body is sampled per episode with
+   probability rising with its smoothed return. Transform2Act, Yuan, Song,
+   Luo, Sun, Kitani, ICLR 2022 (arXiv 2110.03659): a new design every
+   episode, 50,000-sample batches, zero padding per joint. Huang, Mordatch,
+   Pathak, *One Policy to Control Them All*, ICML 2020 (arXiv 2007.04976):
+   8-23 morphologies, per-limb modules with dynamic batching. Evolution Gym,
+   Bhatia et al., NeurIPS 2021 (arXiv 2201.09863), is the opposite design (one
+   PPO per body, 512k steps each, hours per task on 80 CPUs). Every paper that
+   shares a policy puts many bodies in one update and pads per-limb tensors;
+   none evaluates bodies in batches of 16. This is T7's padded-world layout.
+6. **Hybrid EA + RL loops and the batch split.** PGA-MAP-Elites, Nilsson &
+   Cully, GECCO 2021 (settings via Flageat, Chalumeau, Cully, arXiv
+   2210.13156): batch 100 = 50 GA + 50 PG, 300 critic steps per generation,
+   the critic trained at the start of each loop; the PG operator "is only
+   crucial for the first phase". DCG-ME, Faldor et al., GECCO 2023 (arXiv
+   2303.03832): 128 + 128, 3,000 critic steps per iteration, sequential;
+   DCRL-ME (arXiv 2401.08632): 128 GA + 64 PG + 64 actor injection. QD-PG
+   (arXiv 2006.08505), CEM-RL (arXiv 1810.01222), ERL (arXiv 1805.07917) all
+   split the population between evaluated-as-is and gradient-stepped halves
+   and run the critic serially. The one that measures batch size: ASCII-ME,
+   Mitsides, Faldor, Cully, 2025 (arXiv 2501.18723): from 256 to 8,192 at 1M
+   evaluations "DCRL-ME and PGA-ME show an average decline in performance as
+   batch sizes increase, with mean CVs of 13% and 8%" while GA-only ME holds
+   at 2-3%, because the critic gets fewer rounds; scaling critic steps with
+   batch recovered the score but "did not reduce runtime". T12 and P6 carry
+   this: the epoch keeps the learner's steps per transition and reads the
+   policy's return per transition.
+7. **Speculative evaluation.** Gardner, McNabb, Seppi, *Speculative
+   Evaluation in PSO*, PPSN 2010 / Swarm Intelligence 2012: iteration t+1 is
+   evaluated alongside t by enumerating t's possible selections, exactly
+   equivalent to PSO, up to 6x with relaxed variants; Lu et al. 2015 on
+   speculative GAs on GPU (speedup UNVERIFIED). Nothing for MAP-Elites; the
+   waste would be the share of epoch e+1's parents that epoch e's placements
+   would have displaced, small for per-cell addition but not measured. T12 does
+   not use it: the host work it would hide is 1.7% of the wall.
+8. **Double-buffered and asynchronous sampling.** Sample Factory's two-group
+   rollout workers mask inference latency when k/2 > t_inf/t_env (no ablation
+   number). SEED RL, Espeholt et al., ICLR 2020 (arXiv 1910.06591): inference
+   on the learner, step latency 17.97 -> 10.98 ms, 2.5x IMPALA on 2 TPU
+   cores. EnvPool, Weng et al., NeurIPS 2022 (arXiv 2206.10558): async (return
+   whoever finished) over sync 2.08x Atari / 2.49x MuJoCo on 256 cores, 1.3-
+   1.6x on 12; the gain exists because "the performance of the synchronous
+   step is determined by the slowest environment execution time". Here all
+   worlds of a launch step in lockstep and finish together, so there is no
+   slowest-environment tail to recover; the only overlap available is the
+   host's 1.7%.
+
+What the eight say for this loop, in one line each: pool every same-policy
+rollout of all islands into one launch (1, 5); keep the learner's gradient
+steps per transition fixed and minibatch the larger epoch (3, 6); never place
+steady-state as worlds finish (2); do not speculate or double-buffer for a
+host that costs 1.7% (7, 8); if a launch ever overlaps an update, tag its data
+with the behaviour policy's version and take the ratio against it (4).
+
+### 5. What is built, and in what order (cost, then speed, then learning)
+
+1. P1, now, with arch51's form (it makes N11's reeval the experiment Q5
+   measured; a correctness fix as much as a saving). 2. P2 and P3, now
+   (hours each; -10 to -15% wall on today's path, scores unchanged). 3. P4 is
+   not built; it is a prediction that stops a mistake. 4. The epoch scheduler
+   (T11) is built with option A or B after Q2, under P5's rule, and read by P6
+   in the first on-device arm. Comparability: P1-P3 change no score's
+   definition; the epoch changes the batch and PPO's cadence and is a boundary
+   on `qd_score`-per-generation (one epoch = eight generations of evaluations),
+   not on any per-medium competence.
+
+
 ## 2026-10-08, later — the work-list sweep
 
 The open items of the 10-06 lists (arch48 items 1–5, PAPERS_2610, the external
@@ -3273,7 +4748,7 @@ must survive a fresh seed).
 Each level is read on the auditor's held-out seeds, never on the draw that
 selected the design.
 
-### Air on a commanded difference (question 1 → B) — in progress, not merged
+### Air on a commanded difference (question 1 → B) — merged 2026-10-10 (branch `a51-air`), item 4 owed
 
 Branch `air-commanded-difference` (off `main` at 5554cf0). **Stopped at the
 user's request on 2026-10-09 with four `test_physics` checks failing**; nothing
@@ -3322,7 +4797,73 @@ from a policy that reads the turn command.
    `nmg-arch49-airpair`, at group 36 of 136 when this was written):
    it says whether any air bar is certified, and how many elites keep air > 0.
 
+   *Outcome (2026-10-10, finished 16:58, 4,539 s, 229 of 229 elites, no
+   controller missing; `results_arch49_airpair.json`): under the paired air
+   score **no arch49 elite keeps air credit**: 0 of 229 clear air competence
+   0.012 (6 did on the recorded score), 1 of 229 is above zero at all (0.0108;
+   12 were recorded above zero), mean elite air competence 4.7e-5; the still
+   machine and the base machine are 0 of 229 on every air competence bar, so
+   those bars are "unmeasured" rather than certified (no elite to certify
+   against). The air *rungs*, which read state (`makes_lift` ... `holds_height`),
+   still leak at every rung: the still machine clears `makes_lift` 203/229,
+   `carries_itself` 121/229, `stays_up` 18/229 against the elites' 14, `glides`
+   11 against 1, as before this change; the rungs are the state-rung item
+   already open (PAPERS_2610 "ladder state-rungs"). Reproduction of the
+   recorded scores on the batched path: air 222/229, water 215/229, land
+   195/229 within 0.005. Water and land are unchanged by this change and read as
+   before (comp:water 0.012 certified 64 vs still 3; comp:land 0.012 certified
+   51 vs 0; `moves`, `climbs_slope`, `unweights` certified; the rest leak or are
+   underpowered). So: the paired score removes air credit from everything arch49
+   bred, as predicted when it was built ("none turns when told"); arch51 starts
+   with no air-competent lineage, and the first air credit it awards will be the
+   first turn anything in this project has made on command.*
+
 **Comparability:** air competence is not comparable across this change.
+
+*Merged 2026-10-10* onto `failure-theory-1010` as branch `a51-air` (the user:
+fix it and merge it; arch51 carries it). The code merged without conflicts
+beside the ARCH51 lanes.
+- Item 1: `test_the_seeds_include_something_that_flies` now picks and judges
+  the plan on the air segment's state measurements (`airborne_fraction`,
+  `sink_rate`, medians over scatter seeds 0-2), never on the score; a segment
+  that published nothing reads as (0, 99), so "could not measure" cannot pass.
+  Measured, airborne / sink m/s: gannet **1.00 / 1.51**, teal 0.65 / 4.94,
+  beetle 0.44 / 8.79, bat 0.50 / 10.41, ray 0.41 / 13.99, medusa 0.40 / 11.94,
+  eel 0.42 / 9.90 (eel seed 0 published nothing). Bars unchanged (airborne >
+  0.95, sink < 3.0 m/s); the third check is now sink under half the next
+  slowest plan's (1.51 vs 4.94); a fourth check is the negative control, eel
+  and medusa (built not to fly) fail the bar and read `height_hold` 0. With
+  the gannet removed from
+  `BODY_PLANS` the test fails 3 of 4 (teal 0.65 / 4.94 is picked and clears
+  neither bar), so it is a gate. Every open-loop seed scores air 0 (median
+  competence 0.0 on all 7 plans).
+- Item 2: the step count expects six segment rollouts (every medium a pair,
+  each half the full segment), written as a literal; with `"air"` removed from
+  `PAIRED_MEDIA` by hand it fails, `segments: 1000 steps, scheduled 1200`.
+- The air arithmetic (`air_task`, `mirror`, `pair_of`) is also checked without
+  a simulator in `test_physics::test_air_is_scored_on_a_mirrored_turn`, listed
+  first for both air mutations, so they are caught on a machine with no GPU
+  (both caught by it, 0.3-0.4 s).
+- Found on the way: mutation `air-height-counts-floating` (the height term
+  stops asking whether the body is still in the air) **survived** the whole
+  `test_physics` after the merge. Height now pays only through the turn, so an
+  open-loop body scores 0 in air whatever height reads (which check caught it
+  before the merge was not re-measured). The seeds test's
+  negative control now reads `height_hold` directly: under the mutation eel
+  reads 0.15, unmutated 0.0; caught (listed first for that mutation).
+- Item 3 (full `test_search.py`, including the batched-path air checks in
+  `test_the_heading_pair_cancels_what_the_command_did_not_choose`) and item 4
+  (the no-model gate under the paired air score on arch49: whether any air
+  bar is certified, and how many elites keep air > 0) need the GPU and are
+  **still owed**. Item 4, from the `a51-air` tree:
+  `systemd-run --user --unit nmg-arch49-airpair -p MemoryMax=3500M
+  --working-directory=<a51-air> env MUJOCO_GL=disable PYTHONPATH=<a51-air>
+  DYTISCIDAE_KERNEL_DIR=<main>/mojo/build <main>/.venv/bin/python -u
+  experiments/no_model_gate/run.py --run <main>/runs/arch49
+  --out experiments/no_model_gate/results_arch49_airpair.json`.
+
+**Comparability (merge):** air competence is not comparable across this
+change (2026-10-10); arch51 is the first run on it.
 
 ### M4 — partial (7 of 9 runs; the pre-registered read waits for all 9)
 
