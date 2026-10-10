@@ -985,6 +985,82 @@ def test_cells_hold_a_pareto_front_not_a_weighted_sum() -> None:
           f"sampled {sorted(picked)} from front {sorted(e.genome for e in a.front(cell))}")
 
 
+def test_margins_alone_cannot_fill_a_cell() -> None:
+    """A design below the competence floor holds a cell only while it is empty.
+
+    ARCH51_SPEC L3 (F1, F2): margins are objectives 1 and 2, and a design that
+    cannot do anything in its island's media can still have large ones.  Before
+    this rule such a design was non-dominated against a ranked incumbent and
+    joined its front.
+    """
+    print("\narchive: the competence floor in a cell")
+    from dytiscidae.evolution.archive import Archive
+
+    axes = [("a", 0.0, 1.0, 4), ("b", 0.0, 1.0, 4)]
+    pt = [0.5, 0.5]
+
+    # F1a: an empty cell accepts a floor candidate.
+    a = Archive(axes)
+    cell = a.cell_of(pt)
+    st = a.add("floor0", 0.0, pt, objectives=np.array([0.0, 3.0, 2.0]), at_floor=True)
+    check("an empty cell accepts a floor candidate as new",
+          st == "new" and [e.genome for e in a.front(cell)] == ["floor0"]
+          and a.front(cell)[0].at_floor, f"{st}")
+
+    # F1b: a floor challenger never joins a ranked incumbent's front.
+    b = Archive(axes)
+    b.add("ranked", 0.5, pt, objectives=np.array([0.5, 1.0, 1.0]))
+    would = b.would_add(0.0, pt, objectives=np.array([0.0, 3.0, 2.0]), at_floor=True)
+    st = b.add("floor", 0.0, pt, objectives=np.array([0.0, 3.0, 2.0]), at_floor=True)
+    check("a floor challenger with larger margins is rejected by a ranked incumbent",
+          st == "rejected" and [e.genome for e in b.front(cell)] == ["ranked"],
+          f"{st}, front={[e.genome for e in b.front(cell)]}")
+    check("would_add(at_floor=True) equals add's status (rejected)",
+          would == st, f"would_add={would} add={st}")
+
+    # F1c: a floor challenger with higher margins against a floor incumbent.
+    c = Archive(axes)
+    c.add("floor_a", 0.0, pt, objectives=np.array([0.0, 1.0, 1.0]), at_floor=True)
+    would = c.would_add(0.0, pt, objectives=np.array([0.0, 3.0, 2.0]), at_floor=True)
+    st = c.add("floor_b", 0.0, pt, objectives=np.array([0.0, 3.0, 2.0]), at_floor=True)
+    check("a floor challenger with higher margins is rejected by a floor incumbent",
+          st == "rejected" and [e.genome for e in c.front(cell)] == ["floor_a"],
+          f"{st}, front={[e.genome for e in c.front(cell)]}")
+    check("would_add(at_floor=True) equals add's status (floor vs floor)",
+          would == st, f"would_add={would} add={st}")
+
+    # F2: a ranked design entering a cell held by a floor member displaces it.
+    d = Archive(axes)
+    d.add("floor", 0.0, pt, objectives=np.array([0.0, 3.0, 2.0]), at_floor=True)
+    would = d.would_add(0.3, pt, objectives=np.array([0.3, 1.0, 1.0]))
+    st = d.add("ranked", 0.3, pt, objectives=np.array([0.3, 1.0, 1.0]))
+    check("a ranked design entering a floor member's cell leaves the front [ranked]",
+          st == "improved" and [e.genome for e in d.front(cell)] == ["ranked"]
+          and d.cells[cell].genome == "ranked",
+          f"{st}, front={[e.genome for e in d.front(cell)]}")
+    check("would_add agrees on the F2 entry", would == st, f"would_add={would} add={st}")
+
+    # F2b: a floor member with margins no ranked design beats is still displaced.
+    e = Archive(axes)
+    e.add("floor1", 0.0, pt, objectives=np.array([0.0, 9.0, 9.0]), at_floor=True)
+    e.add("ranked", 0.3, pt, objectives=np.array([0.3, 1.0, 1.0]))
+    st = e.add("ranked2", 0.2, pt, objectives=np.array([0.2, 3.0, 0.5]))
+    check("ranked designs trade off among themselves, floor members stay gone",
+          st == "improved"
+          and sorted(x.genome for x in e.front(cell)) == ["ranked", "ranked2"],
+          f"{st}, front={sorted(x.genome for x in e.front(cell))}")
+
+    # Omitting at_floor reproduces the old verdicts (cf. the Pareto test above).
+    f = Archive(axes)
+    f.add("fast", 0.50, pt, objectives=np.array([0.50, 0.05, 0.05]))
+    st = f.add("robust", 0.72, pt, objectives=np.array([0.49, 2.80, 1.90]))
+    st2 = f.add("worse", 0.41, pt, objectives=np.array([0.40, 0.02, 0.02]))
+    check("at_floor omitted: the old verdicts (trade-off kept, dominated rejected)",
+          st == "improved" and st2 == "rejected"
+          and sorted(x.genome for x in f.front(cell)) == ["fast", "robust"],
+          f"{st}, {st2}")
+
+
 def test_intervention_is_triggered_by_evidence_not_a_schedule() -> None:
     """When to intervene must come from the data, not from a number I typed.
 
@@ -6236,6 +6312,7 @@ def main() -> int:
         test_a_rare_capability_survives_the_learned_projection,
         test_learned_descriptors_replace_the_hand_picked_axes,
         test_cells_hold_a_pareto_front_not_a_weighted_sum,
+        test_margins_alone_cannot_fill_a_cell,
         test_intervention_is_triggered_by_evidence_not_a_schedule,
         test_no_dataclass_can_raise_on_equality,
         test_arriving_somewhere_is_not_one_lucky_timestep,

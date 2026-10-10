@@ -916,27 +916,27 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Archive` | class | 88 | — | An N-dimensional grid of elites. |
+| `Archive` | class | 91 | — | An N-dimensional grid of elites. |
 | `Elite` | class | 59 | — | One occupant of one cell. |
-| `Archive.__init__` | method | 99 | `(self, axes: list[tuple[str, float, float, int]]) -> None` | — |
-| `Archive.add` | method | 188 | `(self, genome, fitness: float, descriptor: np.ndarray, meta: dict \| None=None, tier: int=1, objectives: np.ndarray \| None=None) -> str` | Insert a candidate.  Returns 'new', 'improved' or 'rejected'. |
-| `Archive.best` | property | 135 | `(self) -> Elite \| None` | — |
-| `Archive.capacity` | property | 118 | `(self) -> int` | — |
-| `Archive.cell_of` | method | 138 | `(self, descriptor: np.ndarray) -> tuple[int, ...]` | — |
-| `Archive.coverage` | property | 122 | `(self) -> float` | — |
-| `Archive.export_json` | method | 450 | `(self, path: str \| Path) -> None` | Human- and browser-readable dump for the dashboard. |
-| `Archive.front` | method | 179 | `(self, cell: tuple[int, ...]) -> list['Elite']` | The non-dominated set occupying a cell. |
-| `Archive.front_size` | property | 184 | `(self) -> int` | Total designs held across all cells, fronts included. |
-| `Archive.load` | method | 439 | `(path: str \| Path) -> 'Archive'` | — |
-| `Archive.neighbour_density` | method | 368 | `(self, cell: tuple[int, ...], radius: int=1) -> int` | How crowded the neighbourhood of a cell is. |
-| `Archive.project` | method | 381 | `(self, ax_x: int, ax_y: int) -> tuple[np.ndarray, np.ndarray]` | 2D projection for plotting: max fitness and occupancy per (x, y) bin. |
-| `Archive.qd_score` | property | 126 | `(self) -> float` | Sum of elite fitnesses: the standard scalar summary of a QD run. |
-| `Archive.rebin` | method | 313 | `(self, axes: list[tuple[str, float, float, int]], reproject, priority=None) -> dict` | Rebuild the grid under new axes, re-placing every elite. |
-| `Archive.remove` | method | 295 | `(self, cell: tuple[int, ...]) -> bool` | Empty a cell completely. |
-| `Archive.save` | method | 412 | `(self, path: str \| Path) -> None` | Write the archive, atomically. |
-| `Archive.snapshot` | method | 393 | `(self) -> dict` | A JSON-safe summary, recorded once per generation for the dashboard. |
-| `Archive.would_add` | method | 237 | `(self, fitness: float, descriptor, objectives=None) -> str` | What ``add`` would return for this candidate, changing nothing. |
-| `Elite.curiosity` | property | 82 | `(self) -> float` | — |
+| `Archive.__init__` | method | 102 | `(self, axes: list[tuple[str, float, float, int]]) -> None` | — |
+| `Archive.add` | method | 191 | `(self, genome, fitness: float, descriptor: np.ndarray, meta: dict \| None=None, tier: int=1, objectives: np.ndarray \| None=None, at_floor: bool=False) -> str` | Insert a candidate.  Returns 'new', 'improved' or 'rejected'. |
+| `Archive.best` | property | 138 | `(self) -> Elite \| None` | — |
+| `Archive.capacity` | property | 121 | `(self) -> int` | — |
+| `Archive.cell_of` | method | 141 | `(self, descriptor: np.ndarray) -> tuple[int, ...]` | — |
+| `Archive.coverage` | property | 125 | `(self) -> float` | — |
+| `Archive.export_json` | method | 461 | `(self, path: str \| Path) -> None` | Human- and browser-readable dump for the dashboard. |
+| `Archive.front` | method | 182 | `(self, cell: tuple[int, ...]) -> list['Elite']` | The non-dominated set occupying a cell. |
+| `Archive.front_size` | property | 187 | `(self) -> int` | Total designs held across all cells, fronts included. |
+| `Archive.load` | method | 450 | `(path: str \| Path) -> 'Archive'` | — |
+| `Archive.neighbour_density` | method | 379 | `(self, cell: tuple[int, ...], radius: int=1) -> int` | How crowded the neighbourhood of a cell is. |
+| `Archive.project` | method | 392 | `(self, ax_x: int, ax_y: int) -> tuple[np.ndarray, np.ndarray]` | 2D projection for plotting: max fitness and occupancy per (x, y) bin. |
+| `Archive.qd_score` | property | 129 | `(self) -> float` | Sum of elite fitnesses: the standard scalar summary of a QD run. |
+| `Archive.rebin` | method | 324 | `(self, axes: list[tuple[str, float, float, int]], reproject, priority=None) -> dict` | Rebuild the grid under new axes, re-placing every elite. |
+| `Archive.remove` | method | 306 | `(self, cell: tuple[int, ...]) -> bool` | Empty a cell completely. |
+| `Archive.save` | method | 423 | `(self, path: str \| Path) -> None` | Write the archive, atomically. |
+| `Archive.snapshot` | method | 404 | `(self) -> dict` | A JSON-safe summary, recorded once per generation for the dashboard. |
+| `Archive.would_add` | method | 241 | `(self, fitness: float, descriptor, objectives=None, at_floor: bool=False) -> str` | What ``add`` would return for this candidate, changing nothing. |
+| `Elite.curiosity` | property | 85 | `(self) -> float` | — |
 
 ## `evolution.auditor` — `dytiscidae/evolution/auditor.py`
 
