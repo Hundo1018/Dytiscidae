@@ -3881,6 +3881,44 @@ is R3 (opus, running). P1 has merged and makes reevaluations use exactly that
 stored basis. No run uses P1 yet, and none may until R3 says whether P1
 re-measures land with the wrong controller.*
 
+*R3, the mechanism (2026-10-10, branch impl-r3 5be5e87, `R3_result.md`). The
+stored and freshly identified bases hold bit-identical numbers (modes,
+effects, authority; max diff 0.0, 10 of 10 elites, air and water). Only the
+memory layout of `modes` differs. A fresh basis takes `U[:, :r].T`
+(`control/cpg.py:629`), while `bases_from_record` rebuilds it in C order from a
+list (`cpg.py:286-299`). The first divergence is `command_params`,
+`self.modes[:r].T @ c[:r]` (`cpg.py:418`), which rounds differently by 1e-18
+to 1e-16 at control step 0. Changing only the layout flips the score in both
+directions for 8 of 8 failing elites. Elite 34 is the example: land 0.0000
+against 0.0992, recorded 0.099. Everything before the segment is identical,
+and identification has no side effect. The paradox dissolves because air was
+never tested: none of the 58 elites scores in air, and only 6 of 229 reach
+0.012 in air, all of which reproduce. Water has the same defect (54 of 66
+reproduce). **The archives are right.** The search scored with the layout it
+stored, and every offline restore was wrong: probes, Q4, R1, reproduction
+counts, films (arch49's filmed design records land 0.015 and reproduces
+0.0137, which passes only because the film tolerance is 0.02), and P1's
+reevaluations. P1 runs the same control law plus about 1e-16 of noise at seeds
+that are fresh anyway, so it is unbiased but not bit-exact. Lane F2 restores
+the fresh layout in `bases_from_record` and adds a round-trip test that
+compares bit for bit.
+
+**What this changes in the theory.** A perturbation of 1e-16 in one command
+moves a land score from 0.099 to 0. A land score is then not a property of a
+design at a seed in any useful sense. It is one sample of a chaotic map, and
+its information about the design is what survives averaging over draws. This
+is stronger than Q4's reading, which was sensitivity to the contact
+constants, and stronger than R2's 1e-9 arm. Consequences: (1) land needs the
+K-draw score more than Q5's K = 18 says. Q5 measured the spread between
+seeds, while this spread exists within a seed at machine precision, so the
+reliability of one draw is bounded by chaos as well as by the task draw. (2)
+Any two implementations of the same law, numpy against Warp float32 for
+option A, cannot agree per draw on land. A5's agreement test must compare
+distributions over draws, which F5 already required for float32, now for a
+stronger reason. (3) Reproducing a land score to 3 decimals tests that the
+code path is bit-identical, not that the physics is the same. That is what it
+was all along.*
+
 **Q5 (analytic + stored rows, minutes): the K curve on real draws.** From
 `experiments/draw_variance/results_arch49.json` (229 elites x 7 draws), the
 Spearman of a k-draw mean against the held-out mean for k = 1..6, against
