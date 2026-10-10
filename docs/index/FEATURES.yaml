@@ -371,8 +371,9 @@ ArchiveReevaluation:
   tests:
     - tests.test_search::test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu
     - tests.test_search::test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median
+    - tests.test_search::test_a_reevaluation_runs_at_the_stored_basis_cpu
     - tests.test_search_adapter::test_the_plan_translates_into_a_search_config
-  note: loop._reevaluate (scored fields: loop.SCORED_KEYS); SearchConfig.reeval_per_generation > 0 re-runs that many archived elites at a fresh seed each generation and keeps each at the median of its last reeval_depth draws (ARCH51 L9-L11, ROADMAP N11); off by default
+  note: loop._reevaluate (scored fields: loop.SCORED_KEYS); SearchConfig.reeval_per_generation > 0 re-runs that many archived elites at a fresh seed each generation and keeps each at the median of its last reeval_depth draws (ARCH51 L9-L11, ROADMAP N11); reevals run at the stored basis (IMPL_1010 P1); off by default
 
 Islands:
   implementation:
