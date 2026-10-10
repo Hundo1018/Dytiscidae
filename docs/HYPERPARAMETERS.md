@@ -78,6 +78,7 @@ CLI too.
 | `controller_refine_steps` | 0 | 1 | measured | `docs/ROADMAP.md` §"D. M1 read (2026-10-08, `experiments/refine_criterion/`)": over 600 one-step trials on arch48's 200 elites an accepted trial kept 23% (`island` criterion) or 8.5% (`stage`) of its reported gain at a fresh draw, and 2 of 600 were accepted under the criterion in use. CLI `--refine-steps` default is 0 from 2026-10-08. Every run from arch34 to arch44 passed 2; arch48 passed 1. Not comparable across this. |
 | `controller_refine_sigma` | 0.1 | 0.1 | typed | Perturbation scale on policy weights. No sweep found. |
 | `promotion_refine_steps` | 6 | 6 | typed | `loop.py`: affordable because bounded by promotions (at most three per round). M1 states "Promotion's 6 steps are not measured here"; no other measurement found. |
+| `promotion_refine_parallel` | True | False (to arch50) | typed | IMPL_1010 P2: one (1+6) batch instead of six serial (1+1) trips; read by D-P2 |
 | `policy_hidden` | 0 | 0 | typed | Width of the per-candidate policy (0 = linear). No sweep found. |
 | `n_modes` | 6 | 6 | typed | Number of gait modes. No sweep found. |
 

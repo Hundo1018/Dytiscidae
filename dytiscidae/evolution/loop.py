@@ -200,6 +200,10 @@ class SearchConfig:
     #: by promotions rather than by population, which is what makes a nonzero
     #: default affordable.
     promotion_refine_steps: int = 6
+    #: How promotion spends ``promotion_refine_steps`` trials per elite: True,
+    #: one (1+lambda) step, every trial of every promoted elite in one batch
+    #: (IMPL_1010 P2); False, the serial (1+1) steps every run to arch50 used.
+    promotion_refine_parallel: bool = True
     policy_hidden: int = 0
     n_modes: int = 6
 
@@ -830,6 +834,7 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
         return results
 
     best = [float(r.mission_fraction) for r in results]
+    base = list(best)
     if select is not None:
         chosen = [bool(select(i, r)) for i, r in enumerate(results)]
         if log is not None:
@@ -877,6 +882,8 @@ def _refine_controllers(phenos, ctrls, results, cfg, *, spec, seed,
             log["step_walls"].append(round(_time.perf_counter() - t0, 3))
             log["accepted"].append(accepted)
 
+    if log is not None:
+        log["refine_base"], log["refine_best"] = base, best
     return results
 
 
@@ -2700,7 +2707,48 @@ def _with_shared(state: SearchState, ctrl):
                             n_modes=state.config.n_modes))
 
 
-def _refined_controllers_for(state: SearchState, elites, phenos, spec, rng):
+def _refine_population(phenos, ctrls, results, cfg, *, spec, seed, population,
+                       shared=None, pool=None, log=None, cost=None):
+    """One (1+lambda) step on every candidate's policy weights, in one batch
+    with the noise-free re-score (IMPL_1010 P2).  The best trial replaces the
+    controller only if it beats the baseline, as in the (1+1) step."""
+    import time as _time
+
+    sigma = float(getattr(cfg, "controller_refine_sigma", 0.1))
+    rng = np.random.default_rng(int(seed) ^ 0x9E3779B9)
+    k = len(ctrls)
+    owners, trials = [], []
+    for i, c in enumerate(ctrls):
+        w = c.policy.weights if c.policy is not None else None
+        if w is None or w.size == 0:
+            continue
+        for _ in range(int(population)):
+            trials.append(Controller(params=c.params, bases=c.bases,
+                                     policy=_copy_policy(c.policy, w + rng.normal(0.0, sigma, size=w.shape))))
+            owners.append(i)
+    nb = k if shared is not None else 0
+    t0 = _time.perf_counter()
+    with _phase(cost, "evaluate.refine"):
+        got = batchroll_eval(list(phenos[:nb]) + [phenos[i] for i in owners],
+                             list(ctrls[:nb]) + trials, cfg, spec=spec, seed=int(seed),
+                             shared=shared, pool=pool)
+    if shared is not None:
+        results = list(got[:k])
+    base = [float(r.mission_fraction) for r in results]
+    best = list(base)
+    for j, i in enumerate(owners):
+        tr = got[nb + j]
+        if float(tr.mission_fraction) > best[i]:
+            best[i] = float(tr.mission_fraction)
+            ctrls[i].policy = trials[j].policy
+            results[i] = tr
+    if log is not None:
+        log["refine_wall"] = round(_time.perf_counter() - t0, 3)
+        log["refine_base"], log["refine_best"] = base, best
+    return results
+
+
+def _refined_controllers_for(state: SearchState, elites, phenos, spec, rng, log=None):
     """The elites' controllers, refined together at the moment they are promoted.
 
     Refining every candidate every generation costs a full batched Tier-1 per
@@ -2765,10 +2813,17 @@ def _refined_controllers_for(state: SearchState, elites, phenos, spec, rng):
     for i, c in enumerate(ctrls):
         out[slots[i]] = c
     if keep:
-        _refine_controllers([group[i] for i in keep], [ctrls[i] for i in keep],
-                            [base[i] for i in keep], cfg, spec=spec,
-                            seed=int(rng.integers(1 << 30)), steps=steps,
-                            shared=state.shared, pool=state.pool)
+        sub = [group[i] for i in keep], [ctrls[i] for i in keep], [base[i] for i in keep]
+        rlog: dict = {}
+        if getattr(cfg, "promotion_refine_parallel", True):
+            _refine_population(*sub, cfg, spec=spec, seed=int(rng.integers(1 << 30)),
+                               population=steps, shared=state.shared, pool=state.pool, log=rlog)
+        else:
+            _refine_controllers(*sub, cfg, spec=spec, seed=int(rng.integers(1 << 30)), steps=steps,
+                                shared=state.shared, pool=state.pool, log=rlog)
+        if log is not None:
+            log["by_elite"] = {slots[keep[j]]: (rlog["refine_base"][j], rlog["refine_best"][j])
+                               for j in range(len(keep)) if "refine_base" in rlog}
     return out
 
 
@@ -2869,7 +2924,8 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
         return
     t0 = time.perf_counter()
     try:
-        refined = _refined_controllers_for(state, chosen, phenos, spec, rng)
+        rlog: dict = {}
+        refined = _refined_controllers_for(state, chosen, phenos, spec, rng, log=rlog)
     except Exception as exc:
         state.telemetry.event({"kind": "error", "gen": gen, "stage": "promotion_refine",
                                "error": f"{type(exc).__name__}: {exc}"})
@@ -2892,8 +2948,8 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
             else [_verification_job(*j) for j in jobs])
     verify_wall = round(time.perf_counter() - t1, 3)
 
-    for elite, p2, ctrl2, c, (seg, r2, (w15, w2)) in zip(
-            chosen, phenos, refined, comps, done):
+    for ki, (elite, p2, ctrl2, c, (seg, r2, (w15, w2))) in enumerate(zip(
+            chosen, phenos, refined, comps, done)):
         # Asked again: a promotion earlier in this round can have spent the
         # budget, which is what the one-at-a-time loop used to see.
         if not curator.should_promote(elite):
@@ -2952,6 +3008,9 @@ def _verify_and_label(state: SearchState, gen: int, spec, rng) -> None:
                                            else round(float(elite.meta[k]), 4))
                                        for k in CRITIC_TARGETS},
                                    **long_leg, **walls,
+                                   "refine_parallel": bool(getattr(cfg, "promotion_refine_parallel", True)),
+                                   "refine_base": (rlog.get("by_elite") or {}).get(ki, (None, None))[0],
+                                   "refine_best": (rlog.get("by_elite") or {}).get(ki, (None, None))[1],
                                    "exploit": r2.exploit, "notes": r2.notes[:3]})
             if r2.exploit:
                 curator.quarantine(elite.descriptor, r2.exploit, elite.genome)

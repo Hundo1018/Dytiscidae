@@ -255,6 +255,14 @@ def test_the_plan_translates_into_a_search_config() -> None:
           (re_cfg.reeval_per_generation, re_cfg.reeval_depth) == (4, 6),
           str((re_cfg.reeval_per_generation, re_cfg.reeval_depth)))
 
+    serial_plan = _plan(steps=3, promotion_refine_parallel=False)
+    serial_cfg = trainer._config(StubContext(serial_plan, workspace), workspace,
+                                 resume=False)
+    check("the serial promotion refinement reaches the config (IMPL_1010 P2)",
+          serial_cfg.promotion_refine_parallel is False
+          and cfg.promotion_refine_parallel is True,
+          str(serial_cfg.promotion_refine_parallel))
+
     # The budget wins over a stray ``generations`` hyperparameter: two places
     # saying how long a run is would eventually disagree.
     both = _plan(steps=5, generations=900)

@@ -182,6 +182,7 @@ def search_config_from_args(args, shared: bool):
         controller_refine_steps=args.refine_steps,
         controller_refine_sigma=args.refine_sigma,
         promotion_refine_steps=args.promotion_refine_steps,
+        promotion_refine_parallel=not args.promotion_refine_serial,
         policy_hidden=args.policy_hidden,
         use_shared_policy=bool(shared),
         shared_hidden=args.shared_hidden,
@@ -1063,6 +1064,7 @@ def build_parser() -> argparse.ArgumentParser:
                         "verification round) rather than by population, so "
                         "unlike --refine-steps it is affordable by default. 0 "
                         "verifies the elite exactly as the archive stored it.")
+    p.add_argument("--promotion-refine-serial", action="store_true", help="the (1+1) promotion refinement of every run to arch50 (IMPL_1010 P2)")
     p.add_argument("--shared-policy", action=argparse.BooleanOptionalAction,
                    default=None,
                    help="on by default when torch imports (what every run since "
