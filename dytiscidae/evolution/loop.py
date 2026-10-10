@@ -2645,9 +2645,15 @@ def seed_archipelago(state: SearchState, spec: MissionSpec) -> None:
 
     seed_seeds = [int(state.rng.integers(1 << 30)) for _ in seeds]
     try:
+        # With the shared policy, as every child is scored: `_place` stamps
+        # `scored_with_shared_policy` from `state.shared`, and the film drives
+        # the elite with the network that scored its generation (gen 0's is
+        # this one, no update has run), so a seed scored without it did not
+        # reproduce (2026-10-10: `land.command_reversal` 0 recorded, 0.52 on
+        # film, once the competence floor made a seed the top elite).
         evaluated = evaluate_candidates(
             seeds, cfg, identify=True, spec=spec, seeds=seed_seeds,
-            pool=state.pool)
+            shared=state.shared, pool=state.pool)
     except Exception:
         return
 

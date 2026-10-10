@@ -304,6 +304,15 @@ MUTATIONS: tuple = (
                "verified elites at the top leave it one design to try",
         suites=("test_search::test_verification_offers_designs_not_yet_verified",), item="blend wiring"),
     Mutation(
+        id="seeds-scored-without-the-shared-policy",
+        path="dytiscidae/evolution/loop.py",
+        find="            shared=state.shared, pool=state.pool)",
+        replace="            pool=state.pool)",
+        defect="the seeds are scored without the shared policy but stamped "
+               "scored_with_shared_policy, so the film drives a seed elite with "
+               "a controller that never produced its record (2026-10-10)",
+        suites=("test_search::test_a_film_reproduces_the_scored_experiment",), item="blend wiring"),
+    Mutation(
         id="reeval-reuses-the-stored-seed",
         path="dytiscidae/evolution/loop.py",
         find='["reeval"], elite, int(rng.integers(1 << 30))))',
