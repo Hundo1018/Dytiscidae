@@ -3208,6 +3208,48 @@ If confirmed, the decision goes to the user: accept rotor-assisted flight as
 the design answer (and then N6's direction is the enabling build), or change
 the actuator specification.
 
+*N7 was derived the same day* (`derivations/flapping_power_bound.md`, script
+beside it, 39 code citations checked by the script; report
+`runs/analysis_1010_failure_theory/N7_result.md`). **Outcome: refuted, both
+clauses.** Available stroke power over the induced-plus-profile power of level
+flight, inside the spar's band: gannet 28.1 (max, at 2.3 Hz) / 12.7 (band
+top 7.80 Hz), teal 27.8 / 12.6, beetle 6.3 / 1.3, bat 7.7 / 4.6, feathering
+teal 17.6 / 7.5; never below 3.6 in nine modelling variants. At the 09-26
+level gait (11.33 Hz) the ratio is 3.0-7.0, not 0.42, and the prediction's
+second clause compared a power ratio to a force margin without a conversion.
+What the derivation found instead: the spar band closes at 7.80 Hz
+(the 09-23 audit implied 7.76), so the only level gait ever found (11.33 Hz)
+is outside the band the search is allowed; at 11.33 Hz the left stroke motor
+needs 22x its torque limit to swing the wing's inertia, the stroke servo's
+closed-loop corner is 2.88 Hz (80 deg lag at 11.33 Hz), and the series spring
+is tuned on an estimated inertia 0.180 kg m² against MuJoCo's 0.372, so it
+cancels 48% of the real one. **Revised T4: flapping flight is not short of
+actuator power; it is short of a gait that makes thrust inside the band the
+spar and the servo allow.** Break-even conversion efficiency is 3.6% (gannet,
+teal) to 16% (beetle): the model's aerodynamic conversion at in-band
+frequencies would have to be below that for power to bind. The user's
+decision (rotor-assisted flight as the answer, or a different spec) stands,
+with the spec question now "stroke bandwidth and amplitude", not "power".
+Two reads follow:
+
+**N13 (derivation + read, minutes): the Strouhal gap.** Thrust from a
+flapping foil sits at Strouhal number `St = 2 f A / U` of 0.2-0.4 (Triantafyllou
+1993; Taylor, Nudds & Thomas 2003 for flying animals). For each seed plan and
+for arch49's flapping elites, `St` at the spar band's top with the genome's
+maximum stroke amplitude (`Part.stroke_amplitude` x half-travel) and the
+measured trim speed. *Prediction:* gannet and teal sit below 0.15 at 7.80 Hz,
+so no in-band gait can reach the thrust regime at their trim speeds, and the
+reachable levers are stroke amplitude (joint range), trim speed (wing loading)
+and the band (spar), not frequency. *Falsified* if either plan's `St` at the
+band top is >= 0.25. Appended to `derivations/flapping_power_bound.md`.
+
+**N14 (read, minutes, stored data): the Tier-0 spar check reads 5 Hz, not the
+commanded frequency** (N7's finding). For arch49's 229 elites, the share whose
+`flap_hz` exceeds their own spar band. *Prediction:* >= 10% of flapping elites
+are commanded above their band and so hold a structural margin the check
+never tested. *Falsified* below 3%. If confirmed, the Tier-0 check is given
+the commanded frequency (a gate, one line), with a mutation.
+
 **N8 (control run, ~40 min GPU): random sampling against the archive (T5).**
 300 bodies from the genome prior, scored through the current scorer at their
 own draws, binned by arch49's final descriptor axes. *Prediction:* coverage
