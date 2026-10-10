@@ -2,7 +2,7 @@
 
 # Modules
 
-105 modules, 38,154 lines, 1,102 indexed symbols.
+105 modules, 38,163 lines, 1,102 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -99,7 +99,7 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `envs.actors` | Several generations' worth of machines, stepped in several processes. | 472 | — | `torch` | `envs`, `envs.batchroll`, `learning.ppo` |
-| `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1347 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor` |
+| `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1356 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor` |
 | `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 753 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 72 | — | — | — |
 | `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 336 | — | `numpy` | `envs.triphibian` |

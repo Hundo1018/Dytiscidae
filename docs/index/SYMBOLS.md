@@ -715,20 +715,20 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `BatchedFluid` | class | 220 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 920 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `identify_batch` | function | 650 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `observation_finite` | function | 574 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
-| `rollout_batch` | function | 731 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 1196 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 595 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
-| `usable` | function | 95 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
-| `BatchedFluid.__init__` | method | 231 | `(self, envs)` | — |
-| `BatchedFluid.apply` | method | 371 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
-| `BatchedFluid.finish` | method | 452 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
-| `BatchedFluid.launch` | method | 377 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
-| `BatchedFluid.ready` | method | 367 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
-| `BatchedFluid.reset_slam` | method | 342 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
+| `BatchedFluid` | class | 229 | — | One GPU pipeline serving N environments stepped in lockstep. |
+| `evaluate_tier1_batch` | function | 929 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `identify_batch` | function | 659 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `observation_finite` | function | 583 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
+| `rollout_batch` | function | 740 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 1205 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 604 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `usable` | function | 104 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
+| `BatchedFluid.__init__` | method | 240 | `(self, envs)` | — |
+| `BatchedFluid.apply` | method | 380 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
+| `BatchedFluid.finish` | method | 461 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
+| `BatchedFluid.launch` | method | 386 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
+| `BatchedFluid.ready` | method | 376 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
+| `BatchedFluid.reset_slam` | method | 351 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 

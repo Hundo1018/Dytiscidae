@@ -783,6 +783,16 @@ MUTATIONS: tuple = (
                "the search and every verification run different physics",
         suites=("test_search::test_a_kernel_older_than_its_source_is_not_usable",), item="kernel freshness"),
 
+    Mutation(
+        id="worker-inherits-the-pyenv-shim",
+        path="dytiscidae/envs/batchroll.py",
+        find='    _os.environ["PYTHONEXECUTABLE"] = _sys.executable\n',
+        replace="",
+        defect="the extension import leaves PYTHONEXECUTABLE at the first python "
+               "on PATH, so a spawn worker runs a different interpreter (a "
+               "Python 3.9 shim) and its usable() probe aborts on Py_NewRef",
+        suites=("test_search::test_a_spawned_worker_runs_the_parents_interpreter",), item="worker interpreter"),
+
     # --- the task: each phase scored on its own purpose (2026-09-21) --------
     Mutation(
         id="cruise-pays-for-speed-in-any-direction",

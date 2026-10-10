@@ -4873,6 +4873,65 @@ def test_a_kernel_older_than_its_source_is_not_usable() -> None:
         kernel.freshness, batchroll._USABLE, batchroll.AVAILABLE = saved[:3]
 
 
+def test_a_spawned_worker_runs_the_parents_interpreter() -> None:
+    """Importing the GPU extension must not repoint a spawn worker's interpreter.
+
+    D1 (2026-10-10): the import C-setenvs PYTHONEXECUTABLE to the first
+    ``python`` on PATH.  Under a pyenv-shims-first PATH (the Claude shell, and
+    ``systemd-run --user``) that is a Python 3.9 shim; a spawn worker inherited
+    it, its sys.executable became the shim, and its ``usable()`` probe aborted
+    on ``Py_NewRef``.  The shim here is a script that execs the real
+    interpreter, so the failure is observable without a 3.9 install: without
+    the fix the worker's sys.executable is the shim, not the parent's.
+    """
+    print("\nbatchroll: a spawned worker runs the parent's interpreter")
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+
+    from dytiscidae.envs import batchroll
+
+    if needs_batched_evaluator("test_a_spawned_worker_runs_the_parents_interpreter"):
+        return
+    tmp = Path(tempfile.mkdtemp(prefix="dyt-shim-"))
+    try:
+        shim = tmp / "shims"
+        shim.mkdir()
+        for name in ("python", "python3"):
+            (shim / name).write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n')
+            (shim / name).chmod(0o755)
+        script = tmp / "parent.py"
+        script.write_text(
+            "import json, sys\n"
+            "import multiprocessing as mp\n"
+            "def work():\n"
+            "    from dytiscidae.envs import batchroll\n"
+            "    return sys.executable, list(batchroll.usable())\n"
+            "if __name__ == '__main__':\n"
+            "    from dytiscidae.envs import batchroll\n"
+            "    assert batchroll.AVAILABLE\n"
+            "    with mp.get_context('spawn').Pool(1) as p:\n"
+            "        exe, usable = p.apply(work)\n"
+            "    print('RESULT ' + json.dumps([sys.executable, exe, usable]))\n")
+        env = dict(os.environ, PATH=f"{shim}{os.pathsep}{os.environ['PATH']}")
+        for k in ("PYTHONEXECUTABLE", "MOJO_PYTHON_LIBRARY"):
+            env.pop(k, None)
+        out = subprocess.run([sys.executable, str(script)], cwd=str(tmp), env=env,
+                             capture_output=True, text=True, timeout=600)
+        line = [ln for ln in out.stdout.splitlines() if ln.startswith("RESULT ")]
+        check("the parent ran and reported", bool(line), out.stderr[-200:])
+        if line:
+            import json
+            parent_exe, worker_exe, usable = json.loads(line[0][7:])
+            check("the worker's sys.executable is the parent's",
+                  worker_exe == parent_exe, f"{worker_exe} vs {parent_exe}")
+            check("the worker can use the extension", usable[0] is True, str(usable))
+        check("no worker abort", "Py_NewRef" not in out.stderr and "worker raised" not in out.stderr)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_a_checkpoint_names_the_commit_the_process_started_from() -> None:
     """A commit made during a run must not be stamped on that run's checkpoints.
 
@@ -7156,6 +7215,7 @@ def main() -> int:
         test_a_film_reproduces_the_scored_experiment,
         test_seeds_are_scored_with_the_shared_policy,
         test_a_kernel_older_than_its_source_is_not_usable,
+        test_a_spawned_worker_runs_the_parents_interpreter,
         test_a_checkpoint_names_the_commit_the_process_started_from,
         test_a_finished_run_is_a_checkpoint,
         test_the_two_evaluation_paths_score_the_same_machine_the_same,
