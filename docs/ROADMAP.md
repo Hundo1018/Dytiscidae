@@ -3698,6 +3698,20 @@ the ~90 us launch, so 50,000 panels (1,000 worlds of a 50-panel body) cost
 <= 25 ms per step. *Falsified* above 2 us per panel. Decides whether the fluid
 side can carry hundreds of draws at all; if it cannot, none of A, B, C pays.
 
+*Outcome (2026-10-10, `experiments/fluid_kernel_scaling/run.py`, commit
+ef32a04, arch49 air body ai248_3991 with 126 panels copied 2-397 times, 200
+timed steps per size): **CONFIRMED**. Median us per step: 252 panels 111.4,
+1,008 142.7, 5,040 361.1, 20,034 1,026, 50,022 2,307; the fit t = 117.4 us +
+0.0440 us per panel (R^2 0.9994, bootstrap CI [0.0439, 0.0442]); 50,022
+panels (397 bodies, 5,558 rigid bodies) cost 2.31 ms per step against the
+predicted <= 25 ms. The launch is 117 us, not 90; the wait is the rest. So
+the fluid side carries a thousand worlds of a 50-panel body at ~2.3 ms per
+step, 11x under the prediction's bound, and the fixed cost per launch (117 us)
+is where the per-step floor sits: T7's c0, on this kernel, as the loop-order
+section's T11 assumes. The pipeline's capacity had to be raised from
+`batchroll`'s default (16,384 panels, 256 machines) to hold the two largest
+sizes.*
+
 **Q2 (GPU, Warp, ~1 day): the fused rigid + control step.** In the scratch
 venv from N9: an MJWarp step with a user control kernel evaluating a
 33-64-64-6 tanh MLP plus a CPG per world and a user passive-force kernel
@@ -4631,6 +4645,27 @@ from a policy that reads the turn command.
    (`experiments/no_model_gate/results_arch49_airpair.json`, unit
    `nmg-arch49-airpair`, at group 36 of 136 when this was written):
    it says whether any air bar is certified, and how many elites keep air > 0.
+
+   *Outcome (2026-10-10, finished 16:58, 4,539 s, 229 of 229 elites, no
+   controller missing; `results_arch49_airpair.json`): under the paired air
+   score **no arch49 elite keeps air credit**: 0 of 229 clear air competence
+   0.012 (6 did on the recorded score), 1 of 229 is above zero at all (0.0108;
+   12 were recorded above zero), mean elite air competence 4.7e-5; the still
+   machine and the base machine are 0 of 229 on every air competence bar, so
+   those bars are "unmeasured" rather than certified (no elite to certify
+   against). The air *rungs*, which read state (`makes_lift` ... `holds_height`),
+   still leak at every rung: the still machine clears `makes_lift` 203/229,
+   `carries_itself` 121/229, `stays_up` 18/229 against the elites' 14, `glides`
+   11 against 1, as before this change; the rungs are the state-rung item
+   already open (PAPERS_2610 "ladder state-rungs"). Reproduction of the
+   recorded scores on the batched path: air 222/229, water 215/229, land
+   195/229 within 0.005. Water and land are unchanged by this change and read as
+   before (comp:water 0.012 certified 64 vs still 3; comp:land 0.012 certified
+   51 vs 0; `moves`, `climbs_slope`, `unweights` certified; the rest leak or are
+   underpowered). So: the paired score removes air credit from everything arch49
+   bred, as predicted when it was built ("none turns when told"); arch51 starts
+   with no air-competent lineage, and the first air credit it awards will be the
+   first turn anything in this project has made on command.*
 
 **Comparability:** air competence is not comparable across this change.
 
