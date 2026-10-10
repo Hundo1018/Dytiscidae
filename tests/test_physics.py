@@ -226,6 +226,13 @@ def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
     check("min-shard 2 and pool-per-worker 2 (the queue)",
           (a.min_shard, a.pool_per_worker) == (2, 2.0),
           f"{a.min_shard}, {a.pool_per_worker}")
+    check("re-evaluation off, depth 8 (ARCH51 L10)",
+          (a.reeval_per_generation, a.reeval_depth) == (0, 8),
+          f"{a.reeval_per_generation}, {a.reeval_depth}")
+    b = build_parser().parse_args(["search", "--reeval-per-generation", "4"])
+    check("--reeval-per-generation reaches the SearchConfig",
+          search_config_from_args(b, True).reeval_per_generation == 4,
+          f"{search_config_from_args(b, True).reeval_per_generation}")
 
 
 def run_all(functions) -> None:

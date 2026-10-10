@@ -172,6 +172,8 @@ def search_config_from_args(args, shared: bool):
         distance_curriculum=bool(args.distance_curriculum),
         draw_per_candidate=bool(args.draw_per_candidate),
         placement_draws=args.placement_draws,
+        reeval_per_generation=args.reeval_per_generation,
+        reeval_depth=args.reeval_depth,
         action_rate_penalty=args.action_rate_penalty,
         descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
         tier2_label_all_media=not args.no_tier2_label_all_media,
@@ -1002,6 +1004,14 @@ def build_parser() -> argparse.ArgumentParser:
                         "run to date. C2 measured one draw's reliability at "
                         "0.18-0.30. Costs (n - 1) more noise-free evaluations of "
                         "the generation; needs --refine-steps 0")
+    p.add_argument("--reeval-per-generation", type=int, default=0,
+                   help="archived representatives re-measured at a fresh draw "
+                        "each generation, taken from the batch (ROADMAP N11, "
+                        "ARCH51 L9). 0 (default) is off, every run to arch50; "
+                        "arch51 uses 4 of batch 16")
+    p.add_argument("--reeval-depth", type=int, default=8,
+                   help="draws an elite keeps; it is placed at the median one "
+                        "(ARCH51 L9)")
     p.add_argument("--draw-per-candidate", action=argparse.BooleanOptionalAction,
                    default=True,
                    help="each candidate faces its own task draw (heading, "
