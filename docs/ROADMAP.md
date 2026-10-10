@@ -3484,6 +3484,15 @@ into 0; the gate chain's own tests under `systemd-run` and this shell both
 showed it in the promotion configuration and not in the film test's. Not
 diagnosed; a read item for the next session (which configuration, which
 process, since when).
+The air-tree canary found a third consequence of the paired scores: **the
+auditor's perturbation check is unmeasurable for every open-loop design**,
+because under three paired media an open-loop machine is credited in no
+medium and has mission 0 (the check's ratio is 0/0); the fixture test that
+audited an open-loop gannet by its glide failed for that reason. The auditor
+now reports "not measurable" as a note instead of running nothing (rule 4),
+and the test exercises the ratio through a stub re-evaluation. In arch51 the
+perturbation check therefore reads only policy-driven designs that turn or
+swim on command; until one exists, every audit says "not measurable".
 Two consequences to read in arch51: an island whose every elite is at the
 floor promotes nothing to Tier-2 (and gives the critic no labels) until one
 clears it; and 4 of 16 evaluations per generation are re-evaluations, so
