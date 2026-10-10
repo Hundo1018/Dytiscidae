@@ -198,17 +198,26 @@ def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
     first as the project's behaviour and concluded the controller was never
     trained (2026-10-06).  The parser's defaults now are the stored-run
     configuration, except ``--refine-steps``, which is 0 since ROADMAP M1
-    (2026-10-08) measured its gain as draw-selection."""
+    (2026-10-08) measured its gain as draw-selection, and ``--mission-weight``,
+    which is 0.0 since ARCH51 (it was 0.30 through arch50)."""
     print("\nops: `search` with no flags is the configuration the runs used")
     import os
 
-    from dytiscidae.ops.run import build_parser
+    from dytiscidae.evolution.loop import SearchConfig
+    from dytiscidae.ops.run import build_parser, search_config_from_args
 
     a = build_parser().parse_args(["search"])
     check("batch 16", a.batch == 16, f"{a.batch}")
     check("workers 4, capped at the core count",
           a.workers == min(4, os.cpu_count() or 1), f"{a.workers}")
     check("refine steps 0 (ROADMAP M1)", a.refine_steps == 0, f"{a.refine_steps}")
+    check("mission weight 0 (ARCH51_SPEC)", a.mission_weight == 0.0,
+          f"{a.mission_weight}")
+    check("and the CLI agrees with SearchConfig",
+          search_config_from_args(a, True).mission_weight
+          == SearchConfig().mission_weight,
+          f"{search_config_from_args(a, True).mission_weight} vs "
+          f"{SearchConfig().mission_weight}")
     check("shared policy is decided at run time, not off",
           a.shared_policy is None, f"{a.shared_policy!r}")
     check("--no-shared-policy is accepted and false",

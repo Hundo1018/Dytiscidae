@@ -666,6 +666,16 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
         item="cli defaults"),
     Mutation(
+        id="cli-mission-weight-default-back",
+        path="dytiscidae/ops/run.py",
+        find='p.add_argument("--mission-weight", type=float, default=0.0,',
+        replace='p.add_argument("--mission-weight", type=float, default=0.30,',
+        defect="a search launched with no flags weights the mission term at 0.30 "
+               "again, the quantile blend ARCH51 removed because mission_fraction "
+               "is zero for 97-100% of every window (ROADMAP N2)",
+        suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
+        item="cli defaults"),
+    Mutation(
         id="config-file-loses-to-cli-defaults",
         path="dytiscidae/ops/run.py",
         find="        if name in raw and not keep and mine == getattr(default, name):\n",

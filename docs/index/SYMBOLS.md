@@ -1282,7 +1282,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `controller_for_elite` | function | 645 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
 | `launch_postrun` | function | 355 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 32 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 1293 | `(argv=None) -> int` | — |
+| `main` | function | 1296 | `(argv=None) -> int` | — |
 | `merge_config_file` | function | 221 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
 | `search_config_from_args` | function | 159 | `(args, shared: bool)` | The ``SearchConfig`` a ``search`` command line asks for. |
 
