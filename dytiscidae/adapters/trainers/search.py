@@ -60,7 +60,7 @@ _CONFIG_FIELDS = (
     "identify_axes_every", "controller_refine_steps", "controller_refine_sigma",
     "controller_refine_funnel", "distance_curriculum", "distance_step",
     "distance_advance_share", "distance_window",
-    "promotion_refine_steps", "mission_weight", "reward_shaping",
+    "promotion_refine_steps", "promotion_refine_parallel", "mission_weight", "reward_shaping",
     "descriptor_bins", "descriptor_refit_every", "learned_axes",
     "migrate_every", "n_migrants", "use_critic", "critic_refit_every",
     "audit_every", "use_scout", "scout_horizon", "scout_reserve",

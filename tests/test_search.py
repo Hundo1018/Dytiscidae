@@ -3557,6 +3557,77 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_promotion_refinement_is_one_batch() -> None:
+    """Promotion's six trials per elite are one (1+6) step in one batch (IMPL_1010 P2).
+
+    Three elites, a stub evaluator that scores a controller by how close its
+    weights sum to 1.  The parallel mode makes one call of 3 re-scores + 18
+    trials; each elite keeps the best of its own six trials only if it beats
+    its baseline; the serial mode is the old six trips.
+    """
+    print("\nloop: promotion refinement is one batch (IMPL_1010 P2)")
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.evolution import loop
+
+    rec = {"air": {"modes": [[1.0, 0.0], [0.0, 1.0]], "effects": [[1.0, 0.0], [0.0, 1.0]],
+                   "authority": [1.0, 1.0], "medium": "air"}}
+    probe = loop._controller_for(None, None, loop.SearchConfig(), None)
+    nw = probe.n_weights
+
+    def score(c) -> float:
+        return -abs(float(c.policy.weights.sum()) - 1.0)
+
+    calls: list[int] = []
+    scores: list[list[float]] = []
+
+    def stub(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None):
+        calls.append(len(phenos))
+        scores.append([score(c) for c in ctrls])
+        return [NS(mission_fraction=score(c)) for c in ctrls]
+
+    original = loop.batchroll_eval
+    loop.batchroll_eval = stub
+    try:
+        def run(parallel: bool):
+            calls.clear()
+            scores.clear()
+            # The parallel arm uses the default, so a changed default is seen.
+            cfg = (loop.SearchConfig(promotion_refine_steps=6) if parallel
+                   else loop.SearchConfig(promotion_refine_steps=6,
+                                          promotion_refine_parallel=False))
+            state = NS(config=cfg, shared=object(), pool=None)
+            elites = [NS(genome=None, meta={"policy": [0.0] * nw, "mobility_basis": rec})
+                      for _ in range(3)]
+            lg: dict = {}
+            out = loop._refined_controllers_for(state, elites, [NS()] * 3, None,
+                                                np.random.default_rng(0), log=lg)
+            return out, lg
+
+        out, lg = run(True)
+        check("parallel: exactly one batch of 3 re-scores + 18 trials",
+              calls == [21], f"{calls}")
+        ok = len(out) == 3 and all(c is not None for c in out)
+        trial_best = []
+        for i in range(3):
+            trials = scores[0][3 + 6 * i: 3 + 6 * i + 6]
+            trial_best.append(max([scores[0][i]] + trials))
+        check("each elite keeps max(baseline, best of its own six trials)",
+              ok and all(abs(score(out[i]) - trial_best[i]) < 1e-12 for i in range(3)),
+              f"{[score(c) for c in out]} against {trial_best}")
+        be = lg.get("by_elite", {})
+        check("the log carries base and best for each elite, best >= base",
+              len(be) == 3 and all(b[1] >= b[0] for b in be.values())
+              and any(b[1] > b[0] for b in be.values()), f"{be}")
+        out2, lg2 = run(False)
+        check("serial: the old six trips, the first merging the re-score with step one",
+              calls == [6, 3, 3, 3, 3, 3], f"{calls}")
+        check("serial records base and best too",
+              len(lg2.get("by_elite", {})) == 3, f"{lg2.get('by_elite')}")
+    finally:
+        loop.batchroll_eval = original
+
+
 def _floor_state(loop):
     """A ``SearchState`` stand-in for the scalar's tests: the real archive,
     curriculum, judge and curator, with the physics-side features stubbed."""
@@ -6945,6 +7016,7 @@ def main() -> int:
         test_the_headline_is_the_mission,
         test_an_audit_perturbs_the_scored_experiment_and_nothing_else,
         test_promotion_spends_refinement_and_keeps_what_it_buys,
+        test_promotion_refinement_is_one_batch,
         test_the_scalar_stands_at_zero_below_the_competence_floor,
         test_verification_offers_designs_not_yet_verified,
         test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu,

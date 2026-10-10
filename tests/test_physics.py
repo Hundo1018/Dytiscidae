@@ -211,6 +211,9 @@ def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
     check("workers 4, capped at the core count",
           a.workers == min(4, os.cpu_count() or 1), f"{a.workers}")
     check("refine steps 0 (ROADMAP M1)", a.refine_steps == 0, f"{a.refine_steps}")
+    check("promotion refinement is one batch (IMPL_1010 P2)",
+          a.promotion_refine_serial is False
+          and search_config_from_args(a, True).promotion_refine_parallel is True)
     check("mission weight 0 (ARCH51_SPEC)", a.mission_weight == 0.0,
           f"{a.mission_weight}")
     check("and the CLI agrees with SearchConfig",
