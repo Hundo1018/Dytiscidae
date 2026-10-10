@@ -3884,6 +3884,14 @@ Mertan & Cheney: undertrained controllers rank bodies at random). N11 and M3
 are retired. Comparability: every score, the archive and the learner's data
 change; nothing is comparable across it.
 
+*Revised 2026-10-10 (`docs/IMPL_1010_SPEC.md` §D answer 3, from the noisy-QD
+literature: Flageat & Cully's UQD, arXiv 2302.00463, and Extract-QD, arXiv
+2502.06585). No lower bound decides placement. A design places on the pooled
+mean of all its draws, and incumbents keep collecting draws through N11's
+re-evaluation, which is therefore kept, not retired. No paper in that
+literature places on a confidence bound. The ones that beat plain MAP-Elites
+re-evaluate incumbents and compare means.*
+
 ### 6. Tooling facts (returned 2026-10-10; `F_on_device_tooling.md`, claims
 tagged primary / secondary / inference; read from installed source where
 possible)
