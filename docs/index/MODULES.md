@@ -2,7 +2,7 @@
 
 # Modules
 
-105 modules, 38,163 lines, 1,102 indexed symbols.
+105 modules, 38,171 lines, 1,102 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -64,7 +64,7 @@ is what makes a violation visible while reading.
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
-| `control.cpg` | Central pattern generator, and the *discovered* control basis. | 698 | — | `numpy` | — |
+| `control.cpg` | Central pattern generator, and the *discovered* control basis. | 706 | — | `numpy` | — |
 | `control.train` | Learning a controller for one morphology. | 257 | — | `numpy` | `control.cpg`, `envs.evaluate`, `envs.mission`, `envs.triphibian`, `evolution.cmaes`, `physics.wake`, `viz.showcase` |
 
 ## `core`

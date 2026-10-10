@@ -467,6 +467,39 @@ def test_the_basis_reconstructs_the_jacobian_it_came_from() -> None:
                and np.all(np.diff(basis.authority) <= 1e-12)))
 
 
+def test_a_restored_basis_commands_bit_for_bit_what_the_fresh_one_did() -> None:
+    """R3: `bases_from_record` rebuilt `modes` in C order while a fresh basis
+    holds a transposed view; the two rounded `command_params` differently."""
+    print("\nproperty: a basis restored from its record commands identically")
+    rng = _rng(3)
+    for n_params, max_modes in ((19, 6), (23, 4)):
+        deltas = rng.normal(0.0, 0.35, size=(40, n_params))
+        responses = deltas @ rng.normal(size=(n_params, 6)) + 0.01 * rng.normal(size=(40, 6))
+        fresh = basis_from_probes(deltas, responses, max_modes=max_modes)
+        # exactly the dict evolution.loop._meta writes
+        record = {"air": {"modes": np.asarray(fresh.modes, float).tolist(),
+                          "effects": np.asarray(fresh.effects, float).tolist(),
+                          "authority": np.asarray(fresh.authority, float).tolist(),
+                          "medium": str(fresh.medium)}}
+        back = MobilityBasis.bases_from_record(record)["air"]
+        check(f"restored modes equal fresh modes ({max_modes} modes)",
+              bool(np.array_equal(back.modes, fresh.modes)))
+        # A full-rank fresh basis is F-contiguous; a truncated one is a strided
+        # view of U's columns, which a record cannot know the stride of.  The
+        # restored layout is F-contiguous either way (bit-equality is checked
+        # below for both).
+        check("restored modes are the transposed (P, r) C array, as a fresh one is",
+              bool(back.modes.flags.f_contiguous)
+              and (back.modes.flags.f_contiguous == fresh.modes.flags.f_contiguous
+                   or not fresh.modes.flags.owndata and max_modes == 4))
+        ok = True
+        for _ in range(200):
+            c = rng.normal(size=max_modes)
+            ok &= bool(np.array_equal(fresh.modes[:max_modes].T @ c,
+                                      back.modes[:max_modes].T @ c))
+        check(f"modes.T @ c is bit-equal over 200 draws ({max_modes} modes)", ok)
+
+
 def test_the_inverse_model_delivers_what_it_can_and_no_more() -> None:
     """`coeffs_for_twist` must be the damped least-squares solution, and its
     residual must lie outside what the body can reach."""
@@ -686,6 +719,7 @@ def main() -> int:
     test_buoyancy_is_exactly_archimedes()
     test_the_force_limiter_bounds_each_element_not_the_machine()
     test_the_basis_reconstructs_the_jacobian_it_came_from()
+    test_a_restored_basis_commands_bit_for_bit_what_the_fresh_one_did()
     test_the_inverse_model_delivers_what_it_can_and_no_more()
     test_the_cpg_command_is_the_function_it_claims()
     test_cmaes_keeps_its_own_invariants()
