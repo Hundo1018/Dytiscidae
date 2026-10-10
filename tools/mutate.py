@@ -526,6 +526,24 @@ MUTATIONS: tuple = (
         suites=("test_search::test_a_specialist_islands_curriculum_reads_only_its_own_medium",), item="island purity"),
 
     Mutation(
+        id="standing-ranks-ties-at-or-below",
+        path="dytiscidae/evolution/curriculum.py",
+        find="    return float(np.mean(np.asarray(window, float) < x))",
+        replace="    return float(np.mean(np.asarray(window, float) <= x))",
+        defect="a tie takes its own mass as rank, so a design that equals the "
+               "window's mode stands high on a score everyone shares",
+        suites=("test_search::test_a_score_of_zero_stands_at_zero",), item="floor rank"),
+
+    Mutation(
+        id="zero-takes-the-young-window-half",
+        path="dytiscidae/evolution/curriculum.py",
+        find="    if x <= ZERO_SCORE:\n        return 0.0\n    if len(window) < min_n:",
+        replace="    if len(window) < min_n:",
+        defect="a raw score of zero stands at 0.5 while the stage window is "
+               "young, so doing nothing is paid the median early in a run",
+        suites=("test_search::test_a_score_of_zero_stands_at_zero",), item="floor rank"),
+
+    Mutation(
         id="bandit-without-an-exploration-floor",
         path="dytiscidae/evolution/curator.py",
         find="                 epsilon: float = 0.2) -> None:",
