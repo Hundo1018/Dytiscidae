@@ -71,7 +71,7 @@ _CONFIG_FIELDS = (
     "shared_minibatch", "audits_per_review", "checkpoint_every", "snapshot_every",
     "event_sample", "n_reference_seeds", "n_random_seeds", "islands",
     "descriptor_keep_if_overlap", "tier2_label_all_media", "draw_per_candidate",
-    "placement_draws",
+    "placement_draws", "reeval_per_generation", "reeval_depth",
 )
 #: Accepted from the job's ``resources`` rather than its plan, because they are
 #: properties of the machine and not of the experiment.  This project measured
