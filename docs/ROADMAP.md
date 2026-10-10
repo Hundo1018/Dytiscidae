@@ -3250,6 +3250,42 @@ are commanded above their band and so hold a structural margin the check
 never tested. *Falsified* below 3%. If confirmed, the Tier-0 check is given
 the commanded frequency (a gate, one line), with a mutation.
 
+*N13 and N14 were read the same day* (`derivations/flapping_power_bound.py
+--strouhal`, §"N13" of the derivation; `experiments/spar_band_read/run.py`;
+reports `N13_result.md`, `N14_result.md`).
+
+| item | outcome | the deciding numbers |
+|---|---|---|
+| N13 | **refuted, in the opposite direction** | `St` at the band top (7.80 Hz, genome's maximum stroke, trim speed): gannet 0.967, teal 0.959; beetle 0.653 and bat 0.770 at 12 Hz; feathering teal 0.881. `St` reaches 0.25 at 2.0 Hz, so most of the allowed band is *above* the thrust regime, not below it. Of arch49's 157 flapping elites, 99 (63%) are >= 0.25 at their band top. (N7's script had printed 0.28 at 2.3 Hz with the power-optimal amplitude, not at the band top.) |
+| N14 | **neither** (between the 3% and 10% bars) | 14 of 224 flapping elites (6.2%, Wilson 95% CI 3.8-10.2) are above their own spar band. Two corrections to N7's wording: the Tier-0 spar check runs at `genome.flap_frequency` (`phenotype.py:899`), the number stored as `flap_hz`, not at a fixed 5 Hz (5 Hz is the teal seed's value); and the 14 are designs whose check margin was negative (-0.14 to -0.81) and passed the gate at -0.85 (`loop.py:137`), not designs the check skipped. What the check does not see is the CPG's *commanded* frequency (up to 20 Hz, not stored), and 124 of 229 elites get no spar check because `phenotype.py:842-857` skips non-plausible flyers; forcing it gives 9.4-12.3% over band. |
+
+*Belief update on T4, second revision.* Power is 3.6-28x sufficient (N7) and
+the kinematic thrust regime (`St` 0.2-0.4) is reachable inside the band, at
+about 2 Hz where the reduced frequency `k = pi f c / U` is ~0.08, inside the
+solver's validated regime (N13). Yet the 09-23 and 09-26 gait searches found
+no level gait below 11 Hz, and a foil at `St` 0.25-0.35 with a 75-90 deg
+pitch-heave phase reaches propulsive efficiency 0.5-0.87 in experiment
+(Anderson, Streitlien, Barrett & Triantafyllou 1998, J. Fluid Mech.), against a
+break-even of 0.036-0.16 here. **Either the gait searches never sampled the
+pitch-heave phase at `St` 0.25 and 2 Hz (they drew 300 random gaits with
+frequency 1.5-12 Hz, so a 2 Hz feathering gait at the right phase is one draw
+in many), or the fluid model's propulsive force in its own validated regime is
+an order of magnitude low.** Only a fixture separates the two:
+
+**N15 (fixture, no GPU, no MuJoCo, ~hours of build): propulsive efficiency of
+a heaving-pitching foil.** Prescribed kinematics through `physics/fluid.py`'s
+strip model: heave amplitude 0.75 chord, `St` 0.25 / 0.30 / 0.35, pitch
+phase 75 / 90 deg, `alpha_max` 15 / 20 / 25 deg, Re ~4e4, as in Anderson et
+al. 1998 Table/Fig. Report thrust coefficient and efficiency `eta = T U /
+P_in`. *Prediction (the model is low):* `eta` < 0.10 at `St` 0.30, phase 90
+deg, `alpha_max` 20 deg, where the experiment gives ~0.6-0.7; *falsified*
+(the gait search is the problem) if `eta` >= 0.30 there. Either outcome
+redirects: a low `eta` makes F-13/F-02 (wake and LEV) the next physics item
+and un-promotes every flapping-thrust read since 2026-09-23; a high `eta`
+sends the gait operators (axis-aligned, per "Thrust needs a joint move") and a
+2 Hz feathering seed to the top of the list. Gated into `test_physics` like
+the robofly fixture once its numbers are in.
+
 **N8 (control run, ~40 min GPU): random sampling against the archive (T5).**
 300 bodies from the genome prior, scored through the current scorer at their
 own draws, binned by arch49's final descriptor axes. *Prediction:* coverage

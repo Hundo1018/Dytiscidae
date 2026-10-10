@@ -68,15 +68,16 @@ SOURCES = [
 ]
 
 
-def check_sources() -> None:
+def check_sources(sources=None) -> None:
+    sources = SOURCES if sources is None else sources
     bad = []
-    for path, line, needle, _ in SOURCES:
+    for path, line, needle, _ in sources:
         text = (ROOT / path).read_text().splitlines()
         if line > len(text) or needle not in text[line - 1]:
             bad.append(f"{path}:{line} no longer contains {needle!r}")
     if bad:
         raise SystemExit("cited source lines moved:\n  " + "\n  ".join(bad))
-    print(f"sources: {len(SOURCES)} cited lines checked")
+    print(f"sources: {len(sources)} cited lines checked")
 
 
 sys.path.insert(0, str(ROOT))
@@ -157,7 +158,7 @@ def machine(label, genome):
             if x == jb:
                 sub.add(bid)
         ax, anc = data.xaxis[j].copy(), data.xanchor[j].copy()
-        rs, cdr = [], []
+        rs, cdr, rtip = [], [], []
         for n in range(panels.n):
             if panels.kind[n] != 0 or int(panels.body_id[n]) not in sub:
                 continue
@@ -166,8 +167,10 @@ def machine(label, genome):
             r = xw - anc
             rs.append(float(np.linalg.norm(r - (r @ ax) * ax)))
             cdr.append(float(panels.chord[n] * panels.dr[n]))
+            rtip.append(rs[-1] + 0.5 * float(panels.dr[n]))   # strip's outer edge (N13)
         joints.append(dict(
-            r=np.array(rs), cdr=np.array(cdr), main=float(np.sum(cdr)) > 0.05,   # a tail or trim tab carries <= 0.04 m2
+            r=np.array(rs), cdr=np.array(cdr), r_tip=(max(rtip) if rtip else 0.0),
+            frac=float(s.part.stroke_amplitude), main=float(np.sum(cdr)) > 0.05,   # a tail or trim tab carries <= 0.04 m2
             name=an, tau=float(model.actuator_forcerange[k, 1]),
             I=float(M[dof, dof]), I_phen=float(s.joint_inertia),
             d=float(model.dof_damping[dof]), A_max=float(0.5 * (hi - lo)),
@@ -449,5 +452,165 @@ def main():
     print("\nJSON " + json.dumps(res, default=float))
 
 
+# ------------------------------------------------------------------ N13 (--strouhal)
+
+SOURCES_N13 = [
+    ("dytiscidae/core/genome.py", 153, "stroke_amplitude: float = 0.45", "the stroke gene (fraction of half-travel)"),
+    ("dytiscidae/core/genome.py", 563, "0.0, 1.0", "stroke gene clipped to [0, 1]: its maximum is 1.0"),
+    ("dytiscidae/core/genome.py", 460, "-2.6, -0.05", "joint range lower limit down to -2.6 rad"),
+    ("dytiscidae/core/genome.py", 461, "0.05, 2.6", "joint range upper limit up to 2.6 rad"),
+    ("dytiscidae/core/genome.py", 620, "rng.uniform(1.5, 12.0)", "frequency draw"),
+    ("dytiscidae/envs/triphibian.py", 719, 'getattr(part, "stroke_amplitude", 0.45)', "the CPG reads the gene"),
+    ("dytiscidae/envs/triphibian.py", 722, "amps.append(np.clip(frac, 0.0, 1.0) * half)", "amplitude = gene x half-travel"),
+    ("dytiscidae/control/cpg.py", 89, "amp = np.minimum(np.maximum(self.amplitude", "amplitude never above half-travel"),
+    ("dytiscidae/envs/triphibian.py", 243, "LAUNCH_SPEED_RANGE = (6.0, 30.0)", "trim speed clipped to 6-30 m/s"),
+    ("dytiscidae/envs/triphibian.py", 1186, "out = self._measure_trim_speed(lo, hi)", "the measured trim speed"),
+    ("dytiscidae/envs/triphibian.py", 1316, "v = float(np.clip(v_stall * self.LAUNCH_MARGIN, lo, hi))", "trim = 1.2 x measured stall speed"),
+]
+ST_HI, ST_LO = 0.25, 0.15      # ROADMAP N13: falsified if either plan >= 0.25; confirmed if both < 0.15
+ARCHIVE = ROOT / "runs/arch49"
+N14_JSON = ROOT / "experiments/spar_band_read/results_arch49.json"
+
+
+def st(f, a_tip, U):
+    """Strouhal number of the wing tip: St = 2 f A / U, A the tip's half excursion [m]."""
+    return 2.0 * f * a_tip / U
+
+
+def tip_excursion(j, A, how="sin"):
+    """Half excursion of the wing tip for a stroke of half-amplitude A [rad] about the joint
+    axis: R sin(A) (the tip's height above the stroke plane, as the N7 script's St used), or
+    the arc R A."""
+    return j["r_tip"] * (math.sin(A) if how == "sin" else A)
+
+
+def pick_joint(mc, flapping_only=False):
+    js = [j for j in mc["joints"] if (j["frac"] > 0.0 and j["A_max"] > 0.0 or not flapping_only)]
+    mains = [j for j in js if j["main"]] or js
+    return max(mains, key=lambda q: q["r_tip"], default=None)
+
+
+def trim_of(genome):
+    """Measured trim speed [m/s], pitch, lift margin: TriphibianEnv._trim (triphibian.py:1181)."""
+    from dytiscidae.envs.triphibian import TriphibianEnv
+    env = TriphibianEnv(build(genome), seed=0)
+    v, pitch, margin = env._trim()[:3]
+    return float(v), float(pitch), float(margin)
+
+
+def strouhal():
+    check_sources(SOURCES_N13)
+    plans = [("gannet", BODY_PLANS["gannet"]()), ("teal", BODY_PLANS["teal"]()),
+             ("beetle", BODY_PLANS["beetle"]()), ("bat", BODY_PLANS["bat"]()),
+             ("teal, feathering", feathered("teal"))]
+    out = {"plans": {}, "elites": {}}
+    print("\n## N13  St = 2 f A_tip / U at the spar band top")
+    print("## f = min(12 Hz, spar f_max); A = stroke gene 1.0 x the plan's own half-travel;"
+          " A_tip = R_tip sin(A); U = TriphibianEnv._trim() (measured trim speed)")
+    hdr = (f"{'plan':17s} {'f top':>6s} {'A rad':>6s} {'R_tip':>6s} {'A_tip':>6s} {'U trim':>7s} {'margin':>7s}"
+           f" {'St(top)':>8s} | {'St arc':>7s} {'St U_minP':>9s} {'St@12Hz':>8s} {'St own A':>8s}"
+           f" | {'U for .25':>9s} {'A_tip .25':>9s} {'f for .25':>9s}")
+    print(hdr)
+    for label, g in plans:
+        mc = machine(label, g)
+        v, pitch, margin = trim_of(g)
+        _, U2, _ = p_required_min(mc, parasite=False)
+        j = pick_joint(mc)
+        f = mc["f_hi"]
+        at = tip_excursion(j, j["A_max"])
+        S = st(f, at, v)
+        row = dict(f_top=f, A_max=j["A_max"], R_tip=j["r_tip"], A_tip=at, U_trim=v, trim_margin=margin,
+                   St_top=S, St_arc=st(f, tip_excursion(j, j["A_max"], "arc"), v),
+                   St_Uminpower=st(f, at, U2), U_minpower=U2, St_12Hz=st(F_HI, at, v),
+                   St_own_amplitude=st(f, tip_excursion(j, j["frac"] * j["A_max"]), v),
+                   stroke_gene=j["frac"], U_for_025=2 * f * at / ST_HI, A_tip_for_025=ST_HI * v / (2 * f),
+                   f_for_025=ST_HI * v / (2 * at), joint=j["name"],
+                   St_joint_range_2p6=st(f, j["r_tip"] * math.sin(2.6), v))
+        out["plans"][label] = row
+        print(f"{label:17s} {f:6.2f} {row['A_max']:6.3f} {row['R_tip']:6.3f} {at:6.3f} {v:7.2f} {margin:7.2f}"
+              f" {S:8.3f} | {row['St_arc']:7.3f} {row['St_Uminpower']:9.3f} {row['St_12Hz']:8.3f}"
+              f" {row['St_own_amplitude']:8.3f} | {row['U_for_025']:9.2f} {row['A_tip_for_025']:9.3f} {row['f_for_025']:9.2f}")
+    print("    (St arc: A_tip = R A.  St U_minP: U = the min-power speed of the N7 table.  St@12Hz: f = the genome's"
+          " draw ceiling.  St own A: the plan's own stroke gene.  Last three: what would reach St 0.25"
+          " with the other two held.)")
+    print(f"    joint-range lever, A = 2.6 rad (genome.py:461), St at band top: "
+          + ", ".join(f"{k} {v['St_joint_range_2p6']:.3f}" for k, v in out["plans"].items()))
+
+    g_s, t_s = out["plans"]["gannet"]["St_top"], out["plans"]["teal"]["St_top"]
+    outcome = ("FALSIFIED" if (g_s >= ST_HI or t_s >= ST_HI) else
+               "CONFIRMED" if (g_s < ST_LO and t_s < ST_LO) else "NEITHER")
+    print(f"\n## against the prediction: gannet {g_s:.3f}, teal {t_s:.3f} at {out['plans']['gannet']['f_top']:.2f} Hz"
+          f" -> {outcome} (confirmed < {ST_LO} both; falsified >= {ST_HI} either)")
+    out["outcome"] = outcome
+
+    # ------------------------------------------------------ arch49's flapping elites
+    from dytiscidae.ops.run import load_run_archive
+    arch, _ = load_run_archive(str(ARCHIVE))
+    elites = list(arch.cells.values())
+    n14 = {}
+    if N14_JSON.exists():
+        n14 = {r["i"]: r for r in json.loads(N14_JSON.read_text())["rows"]}
+    rows, dropped = [], []
+    for i, e in enumerate(elites):
+        try:
+            mc = machine(f"elite{i}", e.genome)
+            j = pick_joint(mc, flapping_only=True)
+            if j is None:
+                continue                      # no lift-carrying stroke joint with a nonzero stroke gene
+            v, pitch, margin = trim_of(e.genome)
+        except Exception as ex:               # noqa: BLE001
+            dropped.append((i, repr(ex)[:100]))
+            continue
+        meta = e.meta or {}
+        at = tip_excursion(j, j["A_max"])
+        f_asbuilt = mc["f_hi"]
+        r14 = n14.get(i)
+        assert r14 is None or abs(r14["flap_hz"] - float(e.genome.flap_frequency)) < 1e-9
+        f_cf = F_HI if r14 is None or r14["f_spar_cf"] is None else min(F_HI, r14["f_spar_cf"])
+        rows.append(dict(i=i, island=meta.get("island"), body_plan=meta.get("body_plan"),
+                         n_rotors=int(meta.get("n_rotors") or 0), flap_hz=float(e.genome.flap_frequency),
+                         f_top=f_asbuilt, f_top_cf=f_cf, has_spar_check=bool(r14 and r14["n_spar_checks"] > 0),
+                         A_max=j["A_max"], R_tip=j["r_tip"], A_tip=at, U_trim=v, trim_margin=margin,
+                         real_trim=bool(margin >= 1.0),
+                         St_top=st(f_asbuilt, at, v), St_top_cf=st(f_cf, at, v), St_12Hz=st(F_HI, at, v),
+                         St_at_own_hz=st(min(float(e.genome.flap_frequency), 20.0), at, v),
+                         St_own_amplitude=st(f_asbuilt, tip_excursion(j, j["frac"] * j["A_max"]), v),
+                         mass=meta.get("mass"), span=meta.get("span"), wing_area=meta.get("wing_area")))
+    out["elites"]["rows"] = rows
+    out["elites"]["dropped"] = dropped
+    out["elites"]["n_archive"] = len(elites)
+
+    def summ(sel, key):
+        x = np.array([r[key] for r in sel], float)
+        if x.size == 0:
+            return None
+        return dict(n=int(x.size), median=float(np.median(x)), q25=float(np.percentile(x, 25)),
+                    q75=float(np.percentile(x, 75)), min=float(x.min()), max=float(x.max()),
+                    below_015=int((x < ST_LO).sum()), between=int(((x >= ST_LO) & (x < ST_HI)).sum()),
+                    at_least_025=int((x >= ST_HI).sum()))
+
+    subsets = {"flapping elites (a lift-carrying stroke joint with gene > 0)": rows,
+               "  of which n_rotors == 0": [r for r in rows if r["n_rotors"] == 0],
+               "  of which a real trim (lift margin >= 1)": [r for r in rows if r["real_trim"]],
+               "  of which a real trim and n_rotors == 0": [r for r in rows if r["real_trim"] and r["n_rotors"] == 0]}
+    out["elites"]["summary"] = {}
+    print(f"\n## arch49's flapping elites ({len(rows)} of {len(elites)} in the merged archive; dropped {len(dropped)})")
+    print("## St at the band top, stroke gene 1.0, measured trim speed; band = min(12, as-built spar f_max)")
+    for name, sel in subsets.items():
+        out["elites"]["summary"][name] = {k: summ(sel, k) for k in ("St_top", "St_top_cf", "St_12Hz", "St_at_own_hz")}
+        for k, lab in (("St_top", "band top, as built"), ("St_top_cf", "band top, spar check forced"),
+                       ("St_12Hz", "12 Hz ceiling"), ("St_at_own_hz", "the elite's own flap_hz")):
+            sm = out["elites"]["summary"][name][k]
+            if sm:
+                print(f"{name:62s} {lab:28s} n {sm['n']:3d}  median {sm['median']:.3f}  IQR [{sm['q25']:.3f}, {sm['q75']:.3f}]"
+                      f"  range [{sm['min']:.3f}, {sm['max']:.3f}]  <0.15: {sm['below_015']}  0.15-0.25: {sm['between']}  >=0.25: {sm['at_least_025']}")
+    ARC_OUT = ROOT / "derivations/flapping_power_bound_strouhal.json"
+    ARC_OUT.write_text(json.dumps(out, indent=1, default=float))
+    print("wrote", ARC_OUT.relative_to(ROOT))
+
+
 if __name__ == "__main__":
-    main()
+    if "--strouhal" in sys.argv[1:]:
+        strouhal()
+    else:
+        main()

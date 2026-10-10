@@ -359,3 +359,103 @@ What the refutation leaves standing:
   - or the PD servo's bandwidth;
   - or the fact that the quasi-steady model makes its thrust only above the
     spar's band (ROADMAP §5: every best gait at 10.8-11.8 Hz).
+
+## N13 — the Strouhal gap
+
+ROADMAP N13, §"2026-10-10 — why the search does not progress". Reproduced by
+
+    PYTHONPATH=. MUJOCO_GL=disable .venv/bin/python derivations/flapping_power_bound.py --strouhal
+
+(about 30 s, CPU only, no rollout; it writes `derivations/flapping_power_bound_strouhal.json`,
+reads `runs/arch49/archive_*.pkl` and `experiments/spar_band_read/results_arch49.json`, and
+checks 11 more cited source lines first). Running the script without the flag prints
+exactly what it printed before this section existed.
+
+### What the N7 script's `St` was
+
+The `St` in the N7 output (gannet and teal 0.28, beetle 0.12, bat 0.03, feathering teal 0.21)
+is `f 2 r sin(A) / U` with
+
+* `f` the frequency of the largest power ratio (2.3 Hz for gannet and teal, 6.0 Hz bat),
+  **not the band top**;
+* `A` the power-optimal amplitude at that frequency (`joint_power`'s argmax). It equals
+  the half-travel 0.875 rad for gannet and teal, but is 0.053 rad for the bat;
+* `r` the largest strip-centre distance from the stroke axis (1.20 m), not the tip;
+* `U` the minimum-power speed `U2` of the N7 table (15.1 m/s), not a measured trim speed.
+
+It answers "what is the Strouhal number where the motors are strongest". It is not
+N13's quantity.
+
+### Definition
+
+`St = 2 f A_tip / U`, with
+
+* `f = min(12 Hz, f_spar)`, the band top of the table above (`genome.py:620`; the spar
+  scaling is the derivation's "allowed band"): 7.80 Hz gannet, teal and feathering teal;
+  12 Hz beetle and bat.
+* `A_tip = R_tip sin(A)`, the half excursion of the wing tip normal to the stroke plane.
+  `R_tip` is the outer edge of the outermost lifting strip of the main stroke joint
+  (`panels.pos_local` + `dr/2`: 1.233 m for the 1.2 m semi-span wing). A variant uses the
+  arc `R_tip A`.
+* `A = Part.stroke_amplitude x half-travel` at the gene's maximum. The gene is clipped to
+  [0, 1] (`genome.py:563`) and the CPG commands `clip(gene, 0, 1) * half` (`triphibian.py:719-722`,
+  `cpg.py:89`), so the maximum is the joint's own half-travel (0.875 rad gannet, teal;
+  0.620 beetle; 0.725 bat). The gannet's wing carries gene 0.0 (`bodyplans.py:499-502`, "a trim surface,
+  not an oscillator") and the teal inherits it (`bodyplans.py:606`, "Wing, tail and fuselage carry over from the
+  gannet"; its 5 Hz drives the legs); N13 asks for the maximum, so the gene is set to 1.0 and the "own
+  gene" column shows what the plan commands.
+* `U` is the measured trim speed: `TriphibianEnv._trim()` (`triphibian.py:1181-1186`,
+  `_measure_trim_speed`): 1.2 x the stall speed found by bisection on the solver's own
+  lift, clipped to 6-30 m/s (`triphibian.py:243, 1316`). A machine that cannot lift its
+  weight at 30 m/s gets 6.0 exactly.
+
+### Numbers
+
+| plan | f top (Hz) | A (rad) | R_tip (m) | A_tip (m) | U trim (m/s) | lift margin | **St at band top** | arc | U = min-power | f = 12 Hz | plan's own gene |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| gannet | 7.80 | 0.875 | 1.233 | 0.947 | 15.27 | 5.58 | **0.967** | 1.103 | 0.982 | 1.488 | 0.000 |
+| teal | 7.80 | 0.875 | 1.233 | 0.947 | 15.41 | 5.47 | **0.959** | 1.093 | 0.978 | 1.474 | 0.000 |
+| beetle | 12.00 | 0.620 | 0.946 | 0.549 | 20.19 | 3.18 | **0.653** | 0.697 | 0.654 | 0.653 | 0.309 |
+| bat | 12.00 | 0.725 | 0.819 | 0.543 | 16.93 | 4.52 | **0.770** | 0.842 | 0.790 | 0.770 | 0.372 |
+| teal, feathering | 7.80 | 0.875 | 1.233 | 0.947 | 16.76 | 4.62 | **0.881** | 1.005 | 0.900 | 1.355 | 0.000 |
+
+What St 0.25 would take, the other two held: gannet and teal need `f = 2.0 Hz`, or
+`U = 59 m/s`, or a tip excursion of 0.245 m (a quarter of the maximum). The band starts
+at 1.5 Hz, so for these two wings the band spans St 0.19 to 0.97. With the joint range at
+the genome's largest, 2.6 rad (`genome.py:460-461`), St at the band top is 0.64-0.65.
+
+arch49's flapping elites: the 157 of the 229 merged-archive elites with a lift-carrying
+stroke joint (the derivation's `machine` definition) whose stroke gene is above 0. Each
+at its own joint travel (gene 1.0), measured trim speed and band top
+`min(12, as-built spar f_max)` (92 of the 157 have no spar check at all, so 12 Hz):
+
+| subset | n | median St | IQR | < 0.15 | 0.15-0.25 | >= 0.25 |
+|---|---|---|---|---|---|---|
+| flapping elites | 157 | 0.500 | 0.173-0.906 | 35 | 23 | 99 |
+| ... n_rotors == 0 | 111 | 0.441 | 0.182-0.646 | 21 | 19 | 71 |
+| ... a real trim (lift margin >= 1) | 80 | 0.422 | 0.095-0.585 | 23 | 6 | 51 |
+| ... real trim and n_rotors == 0 | 58 | 0.279 | 0.050-0.531 | 18 | 5 | 35 |
+
+The median trim speed of the 157 is 6.0 m/s, the floor of the launch band that a
+machine which cannot lift its weight is given, so the first row is inflated by small
+`U`; the "real trim" rows exclude those. At the elite's own gene instead of 1.0 the first row has
+median 0.229 (68 / 15 / 74). Forcing the spar check onto designs that skip it changes
+the first-row median from 0.500 to 0.483.
+
+### Against the frozen prediction
+
+prediction: "gannet and teal sit below 0.15 at 7.80 Hz, so no in-band gait can reach the thrust
+regime at their trim speeds, and the reachable levers are stroke amplitude (joint range),
+trim speed (wing loading) and the band (spar), not frequency. *Falsified* if either plan's
+`St` at the band top is >= 0.25."
+
+outcome: **FALSIFIED**. Gannet 0.967 and teal 0.959 at 7.80 Hz, four times the threshold, and
+>= 0.25 in every variant above except the plan's own gene (0 for both: their wings are held;
+smallest of the others for any plan at the band top is 0.65; 0.25 itself is crossed at 2.0 Hz). In-band, these wings are not too slow to reach the thrust regime; at the
+top of the band they stroke at roughly four times the frequency the thrust regime needs, so
+the Strouhal argument gives no support for "the band is too low". The opposite problem
+shows: St passes 0.4 at 3.2 Hz (gannet), so most of the allowed band is above the efficient range,
+and the 2.3 Hz figure the N7 script printed (0.28) was the one point of the band
+inside it. This says nothing about whether the model's wing makes thrust at St ~ 0.3; it
+says only that the premise "frequency is out of reach of the thrust regime" is false for the seed
+wings.
