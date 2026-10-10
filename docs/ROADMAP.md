@@ -3336,6 +3336,28 @@ draft was an arithmetic slip), verdict per island. *Falsified* if arch49 leads b
 confirmed, selection has not yet contributed and throughput (N9) comes before
 any further scoring work beyond N5.
 
+*N8 was run the same day* (`experiments/random_sampling_control/run.py`, 300
+bodies from the genome prior scored by the current scorer at their own draws,
+binned by arch49's final axes, against arch49's gen-150 snapshot per island,
+~300 evaluations each side; 4,700 s; report `N8_result.md`). **Outcome:
+neither, and in the direction the prediction did not name: random sampling
+beats the archive.** Coverage, random / arch49: air 55 / 36 cells, water
+55 / 41, land 55 / 32, pooled 1.35x; summed competence, random / arch49: air
+3.4x, water 2.3x, land 1.3x, amphibian 1.7x, triphibian 2.0x, pooled 1.94x;
+cells with any competence above zero, random / arch49: air 19 / 4, water
+44 / 26, land 42 / 16. Bootstrap 95% intervals over the 300 bodies exclude the
+archive's value in every medium. Caveats: one draw per body on both sides;
+the archive's scores are arch49's own (shared draw per generation, pre-M2),
+the random side's are the current scorer's; the two share the competence
+definitions since PR #32. *Belief update (T5):* at this budget selection has
+not merely failed to add to random sampling, it has subtracted from it: 150
+generations of MAP-Elites left fewer cells and less competence than 300
+random bodies, which is what T1 and T2 together predict (cells kept for
+margins and for lucky draws displace competent designs; §1's 91% at the
+floor). The prediction should have allowed this outcome; it is recorded as a
+station-3 miss. N5 + N11's first read now has a control: arch51's gen-150
+archives against this same random sample, per island, on the same scorer.
+
 **N9 (probe, <= 10 lines first, per the probe-before-build rule): MuJoCo Warp
 for the same-body work.** The user asked whether MJWarp (GPU-batched MuJoCo,
 many worlds of one model) can accelerate the loop. The theory of where it fits:
