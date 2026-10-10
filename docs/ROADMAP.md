@@ -4062,17 +4062,26 @@ optimisation of it.
 migration (every 60 generations, 2 events in arch50) and the shared policy, so
 breeding all eight per epoch changes the island order from round-robin to
 simultaneous and nothing else in the archives. What changes is the batch per
-selection step (128 vs 16) and PPO's cadence (8x the transitions per update,
-1/8 the updates per evaluation). MAP-Elites' efficiency per evaluation is
-reported to be nearly insensitive to batch size over several orders of
-magnitude (§4), and PPO on thousands of environments with large batches is the
-standard regime on accelerators (§4); the policy here has learned little under
-any cadence (2026-10-10 §1, M4), so its cadence is not where the risk is.
+selection step (128 vs 16) and the learner's data: eight generations' worth of
+transitions arrive under one behaviour policy. MAP-Elites' efficiency per
+evaluation is flat in batch size over three orders of magnitude (QDax, §4.1);
+the gradient side is not (ASCII-ME, §4.6: actor-critic QD loses 8-13% as the
+batch grows because the critic gets fewer rounds), and every accelerator-scale
+RL paper warns that enlarging the acting batch at a fixed learner batch costs
+sample efficiency (§4.3, §4.8). So the epoch keeps PPO's gradient steps per
+transition where they are (130 per 25k today -> ~1,040 per 200k epoch, in
+minibatches; Podracer's rule of decoupling the acting batch from the learning
+batch) and accepts fewer distinct behaviour policies per evaluation; the policy
+here has learned little under any cadence (2026-10-10 §1, M4), so this is the
+cheaper of the two risks, and P6 reads it.
 Asynchronous or steady-state schemes (place each world as it finishes; breed
 the next epoch before this one is placed) are *not* indicated: all worlds in a
 launch finish together, the host work between launches is 1.7% of the wall,
-and asynchrony carries a known bias toward fast-evaluating individuals (§4)
-that a synchronous epoch does not.
+and steady-state asynchrony carries a measured bias toward fast-evaluating
+individuals (§4.2) that a synchronous epoch does not; this project's
+evaluation cost is heritable (+1.6-1.8 s per rotor), which is exactly the
+condition under which the bias acts. Double-buffering the host's update under
+the next launch (§4.8) is correct and worth at most the 1.7% the host spends.
 
 ### 3. Predictions (frozen 2026-10-10; outcome words per REPORT_FORMAT)
 
@@ -4117,14 +4126,125 @@ world (then W* < 25 and the device is not dispatch-bound at today's widths).
 **P6 (search efficiency of the epoch; the first on-device arm).** At equal
 evaluations, the epoch arm's coverage and summed competence per island are
 within 10% of a round-robin arm with the same scoring; held-out retention and
-Tier-1->Tier-2 Spearman are not lower. PPO's `return_by_tag` slopes per
-transition are indistinguishable from arch51's form. *Falsified* if coverage
-per evaluation is lower by more than 10% in >= 3 islands.
+Tier-1->Tier-2 Spearman are not lower. PPO, at fixed gradient steps per
+transition, reaches the same `return_by_tag` per transition within one draw's
+SD of arch51's form; its `kl` per update stays under the target (0.01 today's
+value). *Falsified* if coverage per evaluation is lower by more than 10% in
+>= 3 islands, or if the policy's return per transition is lower by more than
+one SD (then the critic-rounds effect of §4.6 is live here and the epoch's
+learner is split into more, smaller updates: ASCII-ME's remedy).
 
-### 4. Literature
+### 4. Literature (read 2026-10-10 by a research agent from the arXiv/ar5iv texts; UNVERIFIED marks a number read from an abstract or a secondary source only)
 
-(filled in below when the research agent reports; each claim with its
-citation and number, UNVERIFIED where it could not be confirmed)
+1. **MAP-Elites is batch-size insensitive at equal evaluations.** Lim, Allard,
+   Grillotti, Cully, *Accelerated Quality-Diversity through Massive
+   Parallelism*, TMLR 2023 (arXiv 2202.01258): batch swept 64 -> 131,072 at
+   fixed budgets (5M evaluations QD-RL, 20M Rastrigin/Sphere); "the metrics
+   converge to the same final score after the fixed number of evaluations
+   regardless of the batch size used", Wilcoxon p > 0.05 across sizes; 39
+   iterations at batch 131,072 matched 19,532 at batch 256. Two stated
+   caveats: large batches need somewhat more evaluations early, and the run
+   still needs enough iterations for stepping stones. Throughput plateaued at
+   the hardware's width (8,192 worlds on an RTX 2080, 65,536 on an A100). This
+   is the licence for T12's epoch and the reason P6 is written as "within 10%
+   at equal evaluations".
+2. **Steady-state asynchrony is biased toward fast evaluators.** Scott & De
+   Jong, FOGA 2015 / GECCO 2015, 2016 (effect sizes UNVERIFIED, full texts
+   unreachable); Guijt, Thierens, Alderliesten, Bosman, GECCO 2023 (arXiv
+   2303.15543): "steady-state asynchronous EAs are much more vulnerable to the
+   biases induced by heterogeneous evaluation times", a generational
+   asynchronous variant "degrades substantially less, by at most a factor 5" in
+   required population size, and synchronous schemes "were invariant to the
+   evaluation time distributions tested"; Harada 2021 (arXiv 2107.12053)
+   corrects it with a selection-frequency counter; Karns & Desell, GECCO 2025,
+   replicate it (UNVERIFIED numbers). No asynchronous MAP-Elites paper was
+   found. T12 rejects steady-state placement on this.
+3. **Fused env + learner on the accelerator; large-batch PPO.** Hessel et al.,
+   *Podracer architectures*, 2021 (arXiv 2104.06272): Anakin keeps
+   environment, action and update on each core and vmaps a batch "large
+   enough to ensure good utilisation of an entire TPU core"; the warning that
+   a larger acting batch "can result in much reduced data efficiency", fixed by
+   decoupling the acting batch from the learning batch. Rudin, Hoeller, Reist,
+   Hutter, *Learning to Walk in Minutes*, CoRL 2021 (arXiv 2109.11978): 4,096
+   environments x 24 steps = 98,304 samples per PPO iteration, 5 epochs,
+   minibatch 24,576, KL target 0.01; near-linear scaling to ~4,000 robots;
+   performance falls slowly below a threshold of robots and "sharply" when the
+   number is too high; "2048 to 4096 robots with a batch size of ~100k or ~200k
+   provides the best trade-off"; fewer than 25 consecutive steps per rollout
+   breaks it. T12's "fixed gradient steps per transition" is this rule.
+4. **Policy lag.** Sample Factory, Petrenko et al., ICML 2020 (arXiv
+   2006.11751): V-trace (rho = c = 1) plus PPO clipping in every experiment;
+   "the policy lag was on average between 5 and 10 SGD steps, which results in
+   stable training"; no curve of performance vs lag. IMPALA, Espeholt et al.,
+   ICML 2018 (arXiv 1802.01561), Table 2: without correction 5.0 vs V-trace
+   31.3 on lasertag, 94.9 vs 229.2 on explore_goal, i.e. uncorrected stale
+   data loses 2.4-6x. Hilton, Cobbe, Schulman, *Batch size-invariance for
+   policy optimization*, NeurIPS 2022 (arXiv 2110.00641): PPO is not
+   batch-size invariant because of how it controls the update size; a
+   decoupled proximal policy (EWMA) makes it so and tolerates data ~8
+   iterations stale (UNVERIFIED against the paper's figures). EnvPool (item 8)
+   adds the mechanism: more environments at a fixed learner batch gives "stale
+   data after the first gradient update" and a measured efficiency drop. For
+   this loop: every world in an epoch is collected under one behaviour policy,
+   so there is no lag inside an epoch; lag appears only if the next epoch's
+   launch overlaps the update (§4.8), and then its data must carry its policy
+   version and the ratio must be taken against it.
+5. **Shared controllers over many bodies in one batch.** MetaMorph, Gupta,
+   Fan, Ganguli, Fei-Fei, ICLR 2022 (arXiv 2203.11931): one PPO policy over
+   100 UNIMAL bodies, 16 workers x 32 environments, batch 5,120, bodies
+   tokenised per module and zero-padded; a body is sampled per episode with
+   probability rising with its smoothed return. Transform2Act, Yuan, Song,
+   Luo, Sun, Kitani, ICLR 2022 (arXiv 2110.03659): a new design every
+   episode, 50,000-sample batches, zero padding per joint. Huang, Mordatch,
+   Pathak, *One Policy to Control Them All*, ICML 2020 (arXiv 2007.04976):
+   8-23 morphologies, per-limb modules with dynamic batching. Evolution Gym,
+   Bhatia et al., NeurIPS 2021 (arXiv 2201.09863), is the opposite design (one
+   PPO per body, 512k steps each, hours per task on 80 CPUs). Every paper that
+   shares a policy puts many bodies in one update and pads per-limb tensors;
+   none evaluates bodies in batches of 16. This is T7's padded-world layout.
+6. **Hybrid EA + RL loops and the batch split.** PGA-MAP-Elites, Nilsson &
+   Cully, GECCO 2021 (settings via Flageat, Chalumeau, Cully, arXiv
+   2210.13156): batch 100 = 50 GA + 50 PG, 300 critic steps per generation,
+   the critic trained at the start of each loop; the PG operator "is only
+   crucial for the first phase". DCG-ME, Faldor et al., GECCO 2023 (arXiv
+   2303.03832): 128 + 128, 3,000 critic steps per iteration, sequential;
+   DCRL-ME (arXiv 2401.08632): 128 GA + 64 PG + 64 actor injection. QD-PG
+   (arXiv 2006.08505), CEM-RL (arXiv 1810.01222), ERL (arXiv 1805.07917) all
+   split the population between evaluated-as-is and gradient-stepped halves
+   and run the critic serially. The one that measures batch size: ASCII-ME,
+   Mitsides, Faldor, Cully, 2025 (arXiv 2501.18723): from 256 to 8,192 at 1M
+   evaluations "DCRL-ME and PGA-ME show an average decline in performance as
+   batch sizes increase, with mean CVs of 13% and 8%" while GA-only ME holds
+   at 2-3%, because the critic gets fewer rounds; scaling critic steps with
+   batch recovered the score but "did not reduce runtime". T12 and P6 carry
+   this: the epoch keeps the learner's steps per transition and reads the
+   policy's return per transition.
+7. **Speculative evaluation.** Gardner, McNabb, Seppi, *Speculative
+   Evaluation in PSO*, PPSN 2010 / Swarm Intelligence 2012: iteration t+1 is
+   evaluated alongside t by enumerating t's possible selections, exactly
+   equivalent to PSO, up to 6x with relaxed variants; Lu et al. 2015 on
+   speculative GAs on GPU (speedup UNVERIFIED). Nothing for MAP-Elites; the
+   waste would be the share of epoch e+1's parents that epoch e's placements
+   would have displaced, small for per-cell addition but not measured. T12 does
+   not use it: the host work it would hide is 1.7% of the wall.
+8. **Double-buffered and asynchronous sampling.** Sample Factory's two-group
+   rollout workers mask inference latency when k/2 > t_inf/t_env (no ablation
+   number). SEED RL, Espeholt et al., ICLR 2020 (arXiv 1910.06591): inference
+   on the learner, step latency 17.97 -> 10.98 ms, 2.5x IMPALA on 2 TPU
+   cores. EnvPool, Weng et al., NeurIPS 2022 (arXiv 2206.10558): async (return
+   whoever finished) over sync 2.08x Atari / 2.49x MuJoCo on 256 cores, 1.3-
+   1.6x on 12; the gain exists because "the performance of the synchronous
+   step is determined by the slowest environment execution time". Here all
+   worlds of a launch step in lockstep and finish together, so there is no
+   slowest-environment tail to recover; the only overlap available is the
+   host's 1.7%.
+
+What the eight say for this loop, in one line each: pool every same-policy
+rollout of all islands into one launch (1, 5); keep the learner's gradient
+steps per transition fixed and minibatch the larger epoch (3, 6); never place
+steady-state as worlds finish (2); do not speculate or double-buffer for a
+host that costs 1.7% (7, 8); if a launch ever overlaps an update, tag its data
+with the behaviour policy's version and take the ratio against it (4).
 
 ### 5. What is built, and in what order (cost, then speed, then learning)
 
