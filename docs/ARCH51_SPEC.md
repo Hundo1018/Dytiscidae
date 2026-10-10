@@ -704,7 +704,20 @@ Before launch, write `runs/arch51_notes.md` with:
 
 Pending the user: whether the air-commanded-difference branch (not merged into main as of 5cc9db9) is in arch51.
 
-## §D. Open questions (for the user; not decided here)
+## §D'. Decisions taken 2026-10-10 on the questions below (routine judgment; the user's items are marked)
+
+1. Floor predicate: competent in *any* medium the island reads, as specified; the floor zeroes both halves. Air's bar stays 0.012 and ROADMAP records that it is uncertified in air until the paired air score's gate runs.
+2. **Yes: above the floor, a design is ranked only among window entries that also passed the floor** (L5 amendment, below). With the whole window the competent designs sit at 0.9-1.0 and the scalar separates them by 0.1; the quantile should spend its range on the designs that did something.
+   - `Curriculum.observe_blend(...)` gains a fourth tuple element `at_floor: bool` (default False; old pickles hold 3-tuples, read them as not-at-floor).
+   - `standing` and `mission_standing` take `floor_only: bool = True` and rank against `[entry for entry in window if not entry.at_floor]`; with fewer than 12 such entries a non-zero score stands at 0.5, a zero score at 0.
+   - This touches curriculum.py, so L5 edits four files (loop.py, curriculum.py, test_search.py, mutate.py); the blast radius is one function pair and accepted. Mutation `standing-ranks-against-the-floor` (the filter removed) is caught by a test with 200 floor entries and 12 ranked ones, in which the design holding the second-best ranked score stands at exactly 10/12 filtered and above 0.95 unfiltered; the test asserts the filtered value from its own counts.
+3. F2 accepted as written: a design above the floor evicts members at the floor.
+4. Accepted: Tier-2 and critic labels pause on an island whose best is at the floor; L12a records it.
+5. N11: buffer per elite (representatives only), median by blend, cells never re-filed from re-evaluation features. As specified.
+6. N8: match on evaluations per island, i.e. the arch49 snapshot nearest 300 evaluations per island (about gen 150), verdict per island with a pooled row as a secondary read. ROADMAP N8's "gen-37" is corrected.
+7. **The user's:** N5 alone or N5 + N11 in arch51 (recommendation: together, they are read by different quantities: N5 by the fitness distribution, competence share and Spearman; N11 by held-out retention and Tier-1→Tier-2 Spearman); with or without the paired air score (recommendation: without, until its four failing checks are fixed and merged); and whether N9 may `pip install mujoco-warp` into a scratch venv.
+
+## §D. Open questions (as raised by the plan; see §D' for the decisions)
 
 1. Floor predicate: competent in *any* medium the island reads (specified), or in its *weakest*? Does the floor zero both halves of the blend (specified), or only the island quantile? Air's bar: 0.012 is a leak on arch49.
 2. Should designs above the floor be ranked only among the window entries that also passed the floor? With the whole window they sit at about 0.9-1.0, and parent weight barely separates them.

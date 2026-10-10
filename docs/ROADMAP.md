@@ -3211,8 +3211,9 @@ the actuator specification.
 **N8 (control run, ~40 min GPU): random sampling against the archive (T5).**
 300 bodies from the genome prior, scored through the current scorer at their
 own draws, binned by arch49's final descriptor axes. *Prediction:* coverage
-and summed competence within 15% of arch49's gen-37 island archives (the same
-evaluation count per island). *Falsified* if arch49 leads by > 30%. If
+and summed competence within 15% of arch49's island archives at the snapshot
+nearest 300 evaluations per island (about gen 150; "gen-37" in the first
+draft was an arithmetic slip), verdict per island. *Falsified* if arch49 leads by > 30%. If
 confirmed, selection has not yet contributed and throughput (N9) comes before
 any further scoring work beyond N5.
 
