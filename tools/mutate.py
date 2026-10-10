@@ -535,6 +535,25 @@ MUTATIONS: tuple = (
         suites=("test_search::test_no_operator_can_go_dormant_under_the_structural_tilt",), item="operator dormancy"),
 
     Mutation(
+        id="tier2-caps-fitness-again",
+        path="dytiscidae/evolution/curator.py",
+        find='        elite.meta["tier2_fitness"] = float(tier2_fitness)\n',
+        replace='        elite.meta["tier2_fitness"] = float(tier2_fitness)\n'
+                '        elite.fitness = min(elite.fitness, tier2_fitness)\n',
+        defect="a failed Tier-2 read caps the design's fitness, so the best design "
+               "becomes the worst parent and the last migrant (ROADMAP 2026-10-10 N4)",
+        suites=("test_search::test_a_tier2_failure_does_not_make_the_best_design_the_worst_parent",), item="tier-2 flag"),
+
+    Mutation(
+        id="promotion-pool-keeps-verified-elites",
+        path="dytiscidae/evolution/curator.py",
+        find="        pool = [e for e in self.archive.cells.values() if e.tier < 2]",
+        replace="        pool = list(self.archive.cells.values())",
+        defect="the promotion pool offers designs already verified, so the Tier-2 "
+               "budget is spent twice on the same elite",
+        suites=("test_search::test_a_tier2_failure_does_not_make_the_best_design_the_worst_parent",), item="tier-2 flag"),
+
+    Mutation(
         id="checkpoint-asks-git-at-every-write",
         path="dytiscidae/ops/checkpoint.py",
         find="    if _PROCESS_SHA is not None:\n        return _PROCESS_SHA\n",

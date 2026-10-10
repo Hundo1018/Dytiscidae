@@ -386,6 +386,11 @@ class Curator:
         last = self._verified.get(elite.cell, -999)
         return self.archive.generation - last > 60 and elite.fitness > 0.4 * top
 
+    def promotion_candidates(self, k: int = 3) -> list[Elite]:
+        """The top ``k`` representatives by ``fitness`` not yet verified (tier < 2)."""
+        pool = [e for e in self.archive.cells.values() if e.tier < 2]
+        return sorted(pool, key=lambda e: -e.fitness)[:k]
+
     def on_rebin(self) -> None:
         """Forget everything keyed by cell coordinate.
 
@@ -398,12 +403,21 @@ class Curator:
         self._verified.clear()
 
     def record_promotion(self, elite: Elite, tier2_fitness: float) -> None:
+        """Mark ``elite`` verified and store the Tier-2 outcome beside its score.
+
+        ``fitness`` is NOT capped (ARCH51_SPEC L4).  Who reads the flag:
+        ``should_promote`` and ``promotion_candidates`` (tier >= 2 is skipped) and
+        ``select_cohort(require_verified=True)``.  Who does not: parent weight
+        (``select_parent``), migration (``Archipelago.emigrants``), ``prune`` and
+        ``Archive.best``; all of them keep the uncapped ``fitness``.
+        """
         self.promotions += 1
         self._verified[elite.cell] = self.archive.generation
         elite.tier = 2
-        # Trust the verified number: an elite whose Tier-1 score does not survive
-        # contact with the full mission should not keep its inflated rank.
-        elite.fitness = min(elite.fitness, tier2_fitness)
+        # The Tier-2 outcome is a flag beside the score, not a cap on it
+        # (ROADMAP 2026-10-10 T1'/N4): a cap made the best design the worst parent.
+        elite.meta["tier2_fitness"] = float(tier2_fitness)
+        elite.meta["tier2_gen"] = int(self.archive.generation)
 
     # ------------------------------------------------------- 4. exploit control
 
