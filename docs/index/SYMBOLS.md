@@ -1264,27 +1264,27 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 635 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `build_parser` | function | 960 | `() -> argparse.ArgumentParser` | — |
-| `child_env` | function | 336 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
-| `cmd_cohort` | function | 576 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_config` | function | 446 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
-| `cmd_dashboard` | function | 905 | `(args) -> int` | — |
-| `cmd_distill` | function | 943 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 464 | `(args) -> int` | — |
-| `cmd_postrun` | function | 412 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 637 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `build_parser` | function | 962 | `() -> argparse.ArgumentParser` | — |
+| `child_env` | function | 338 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
+| `cmd_cohort` | function | 578 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_config` | function | 448 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
+| `cmd_dashboard` | function | 907 | `(args) -> int` | — |
+| `cmd_distill` | function | 945 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 466 | `(args) -> int` | — |
+| `cmd_postrun` | function | 414 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 124 | `(args) -> int` | — |
-| `cmd_render` | function | 912 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
-| `cmd_search` | function | 263 | `(args) -> int` | — |
-| `cmd_showcase` | function | 763 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 471 | `(args) -> int` | — |
-| `cmd_train` | function | 505 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_render` | function | 914 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_search` | function | 265 | `(args) -> int` | — |
+| `cmd_showcase` | function | 765 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 473 | `(args) -> int` | — |
+| `cmd_train` | function | 507 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 117 | `(args) -> int` | — |
-| `controller_for_elite` | function | 645 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 355 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 647 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 357 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 32 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 1296 | `(argv=None) -> int` | — |
-| `merge_config_file` | function | 221 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
+| `main` | function | 1306 | `(argv=None) -> int` | — |
+| `merge_config_file` | function | 223 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
 | `search_config_from_args` | function | 159 | `(args, shared: bool)` | The ``SearchConfig`` a ``search`` command line asks for. |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`

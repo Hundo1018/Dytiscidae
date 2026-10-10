@@ -2,7 +2,7 @@
 
 # Modules
 
-105 modules, 37,991 lines, 1,099 indexed symbols.
+105 modules, 38,001 lines, 1,099 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -138,7 +138,7 @@ is what makes a violation visible while reading.
 |---|---|---:|---|---|---|
 | `ops.checkpoint` | A run's finished state as one portable artefact. | 398 | — | `numpy`, `torch` | `envs.kernel`, `evolution.judge`, `learning`, `learning.ppo` |
 | `ops.postrun_status` | What a finished run's post-run left behind, readable without numpy. | 32 | — | — | — |
-| `ops.run` | Command-line entry point. | 1302 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.islands`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.postrun_status`, `viz.dashboard`, `viz.film`, `viz.render`, `viz.showcase` |
+| `ops.run` | Command-line entry point. | 1312 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.islands`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.postrun_status`, `viz.dashboard`, `viz.film`, `viz.render`, `viz.showcase` |
 | `ops.telemetry` | Structured telemetry. | 111 | — | `numpy` | — |
 
 ## `physics`
