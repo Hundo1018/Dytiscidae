@@ -1080,18 +1080,20 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Archipelago` | class | 275 | — | Several archives, evolved in parallel, with migration and hybridisation. |
-| `curriculum_for` | function | 227 | `(island: str)` | A curriculum that asks an island's questions in the island's own media. |
-| `island_score` | function | 185 | `(island: str, result, transitions=None) -> float` | Score a design on one island's own terms. |
-| `own_domain_score` | function | 245 | `(island: str, meta: dict) -> float` | How good a stored elite is at *its island's own* domains, from its meta. |
-| `triphibian_score` | function | 138 | `(comps, floor: float=TRIPHIBIAN_FLOOR) -> float` | The triphibian island's objective: a soft minimum of the three media. |
-| `Archipelago.colonists` | method | 395 | `(self, name: str, n: int) -> list` | Immigrants for an island that is empty, from every other island. |
-| `Archipelago.due` | method | 311 | `(self, generation: int) -> bool` | — |
-| `Archipelago.emigrants` | method | 314 | `(self, name: str) -> list` | The designs this island sends abroad: its best, by its own lights. |
-| `Archipelago.migrate` | method | 322 | `(self, generation: int, rng: np.random.Generator, crossover=None) -> list` | Move genomes between islands and cross specialists. |
-| `Archipelago.names` | property | 302 | `(self) -> list` | — |
-| `Archipelago.register` | method | 305 | `(self, name: str, archive, curator) -> None` | — |
-| `Archipelago.report` | method | 418 | `(self) -> dict` | — |
+| `Archipelago` | class | 300 | — | Several archives, evolved in parallel, with migration and hybridisation. |
+| `below_competence_floor` | function | 153 | `(island: str, result) -> bool` | True when the design clears the floor in none of its island's media. |
+| `curriculum_for` | function | 252 | `(island: str)` | A curriculum that asks an island's questions in the island's own media. |
+| `island_media` | function | 148 | `(island: str) -> tuple` | The media an island's score reads; every medium for an unknown name. |
+| `island_score` | function | 210 | `(island: str, result, transitions=None) -> float` | Score a design on one island's own terms. |
+| `own_domain_score` | function | 270 | `(island: str, meta: dict) -> float` | How good a stored elite is at *its island's own* domains, from its meta. |
+| `triphibian_score` | function | 163 | `(comps, floor: float=TRIPHIBIAN_FLOOR) -> float` | The triphibian island's objective: a soft minimum of the three media. |
+| `Archipelago.colonists` | method | 420 | `(self, name: str, n: int) -> list` | Immigrants for an island that is empty, from every other island. |
+| `Archipelago.due` | method | 336 | `(self, generation: int) -> bool` | — |
+| `Archipelago.emigrants` | method | 339 | `(self, name: str) -> list` | The designs this island sends abroad: its best, by its own lights. |
+| `Archipelago.migrate` | method | 347 | `(self, generation: int, rng: np.random.Generator, crossover=None) -> list` | Move genomes between islands and cross specialists. |
+| `Archipelago.names` | property | 327 | `(self) -> list` | — |
+| `Archipelago.register` | method | 330 | `(self, name: str, archive, curator) -> None` | — |
+| `Archipelago.report` | method | 443 | `(self) -> dict` | — |
 
 ## `evolution.judge` — `dytiscidae/evolution/judge.py`
 

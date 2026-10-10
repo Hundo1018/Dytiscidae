@@ -508,6 +508,26 @@ MUTATIONS: tuple = (
         item="triphibian island"),
 
     Mutation(
+        id="competence-floor-at-zero",
+        path="dytiscidae/evolution/islands.py",
+        find='                and float(getattr(segs[d], "competence", 0.0)) >= COMPETENCE_FLOOR[d]):',
+        replace='                and float(getattr(segs[d], "competence", 0.0)) >= 0.0):',
+        defect="the competence floor is zero, so every design that has a segment "
+               "clears it and the floor flags nothing",
+        suites=("test_search::test_a_design_competent_in_nothing_its_island_reads_is_below_the_floor",),
+        item="competence floor"),
+
+    Mutation(
+        id="competence-floor-reads-every-medium",
+        path="dytiscidae/evolution/islands.py",
+        find="    for d in island_media(island):\n        if (d in segs",
+        replace='    for d in ("air", "water", "land"):\n        if (d in segs',
+        defect="the competence floor reads all three media for every island, so a "
+               "water specialist is excused by competence in a medium it does not read",
+        suites=("test_search::test_a_design_competent_in_nothing_its_island_reads_is_below_the_floor",),
+        item="competence floor"),
+
+    Mutation(
         id="island-archive-read-through-the-merge",
         path="dytiscidae/ops/run.py",
         find="    if island is not None:\n        if island not in names:",
