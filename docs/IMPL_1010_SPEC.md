@@ -132,7 +132,7 @@ Ranked by cost first, then speed, then learning (memory: "rank work: cost, then 
 | 11 | A3 control | observation, policy, basis, CPG and servo on the device | days | A1a, A1b, A2 | none | opus |
 | 12 | A4a air-water | identification, air and water segments with gravity, divergence counter, still machine | days | A3 | none | opus |
 | 13 | A5 third-path | agreement test against both evaluation paths (air and water) | 1-2 days | A4a | none | opus |
-| 14 | A6 k-draw scoring | K draws, standard error, lower-bound placement, median-draw film, epoch only if D-A5 says so | days | A5, P1 | none | opus |
+| 14 | A6 k-draw scoring | K draws, standard error, pooled-mean placement with re-evaluated incumbents (§D answer 3), median-draw film, epoch only if D-A5 says so | days | A5, P1 | none | opus |
 | 15 | A4b land-crossings | contacts, land and four transitions on the device | days | A4a, A6 (the user said yes, §D answer 1) | none | opus |
 | 16 | A7 boundary-docs | ROADMAP, CLAUDE.md, FEATURES, HYPERPARAMETERS | hours | A6 (and A4b if built) | none | sonnet |
 
@@ -736,7 +736,6 @@ Goal (ROADMAP:3865-3875; P5 and P6, ROADMAP:4225-4242): the search scores throug
 - `evaluator: str = "batched"` (`"device"` selects A);
 - `k_mean: int = 50`;
 - `k_sampled: int = 10`;
-- `lb_z: float = 1.0`, the lower bound's multiplier, typed, set by D-A6;
 - `device_streams: int = 4`, set by D-A5;
 - `epoch: bool = False`.
 
@@ -744,8 +743,10 @@ Scoring:
 - Each medium's competence is the mean over the K_m worlds.
 - Each result carries `draws` with `n`, the per-medium mean, the standard error (`sd / sqrt(K_m)`), the median draw by `draw_key` (loop.py:886-889, reused) and its seed.
 - The window gets one entry per candidate (the mean), as today.
-- Placement: `obj[0]` is computed from the lower-bound island score (`mean - lb_z x SE`), and `fitness` from the mean. Both are stored in `score_parts`.
-- N11 (`reeval_per_generation`) and M3 (`placement_draws`) refuse to combine with `evaluator == "device"`, with a `ValueError`, as `placement_draws` refuses refinement (loop.py:336-337).
+- Placement (§D answer 3): `obj[0]` and `fitness` are both from the **pooled mean** of every draw the design has had. No lower bound, no `lb_z`.
+- Each elite stores sufficient statistics per medium in `meta["draw_stats"]` (`n`, `sum`, `sum_sq`), not the draws themselves. A candidate enters with its K_m draws.
+- N11 is kept and changes meaning under `evaluator == "device"`. A re-evaluation runs K_m more draws at fresh seeds and the stored basis (P1), adds them to the elite's `draw_stats`, and re-places the elite on the new pooled mean through the same insertion path as offspring (Extract-ME). The batched path keeps N11's median-of-draws behaviour unchanged. Defaults stay `reeval_per_generation 4` of 16 (25%, Extract-QD's share) and `reeval_depth 8` (Extract-QD's d = 8).
+- M3 (`placement_draws`) refuses to combine with `evaluator == "device"`, with a `ValueError`, as `placement_draws` refuses refinement (loop.py:336-337).
 
 Learner:
 - K_s sampled worlds per body feed `RolloutBuffer` through the host recomputation (A3).
@@ -763,14 +764,15 @@ Epoch:
 - Asynchronous placement is not built (T12, ROADMAP:4184-4193).
 
 Tests:
-- `test_device_scores_are_draw_means_with_a_lower_bound` (CPU, stub device evaluator; anchor: after `test_a_reevaluation_runs_at_the_stored_basis_cpu`):
-  - (a) `fitness` is from the mean, and `obj[0]` is from `mean - lb_z x SE` recomputed from `draws`;
-  - (b) a candidate whose mean beats the incumbent's, but whose lower bound does not, is rejected;
-  - (c) `reeval_per_generation=2` with `evaluator="device"` raises `ValueError`.
+- `test_device_scores_are_pooled_draw_means` (CPU, stub device evaluator; anchor: after `test_a_reevaluation_runs_at_the_stored_basis_cpu`):
+  - (a) `fitness` and `obj[0]` equal the pooled mean recomputed from `draw_stats`;
+  - (b) a re-evaluation of an elite adds exactly K_m to its `n` and re-places it on the pooled mean, so an incumbent whose first K_m draws were lucky loses its cell to a challenger once its pooled mean falls below the challenger's;
+  - (c) `placement_draws=3` with `evaluator="device"` raises `ValueError`.
 - `test_a_device_film_reproduces_its_score` (GPU and warp, in test_device): the stamped score equals the recorded score within `TOLERANCE` (0.02, film.py:53) for 3 bodies.
 
 Mutations:
-- `device-places-on-the-mean`: `obj[0]` from the mean.
+- `device-reeval-replaces-the-draws`: a re-evaluation overwrites `draw_stats` instead of adding to it.
+- `device-places-on-the-first-draws`: `obj[0]` from the candidate's first K_m draws, ignoring later re-evaluations.
 - `device-film-replays-the-cpu`: drop `trajectory=`.
 - `device-minibatch-scales-with-buffer`.
 
@@ -797,7 +799,7 @@ Until A4b passes, `evaluator="device"` scores land and the crossings on the batc
 ### A7 — boundary-docs (docs/ROADMAP.md; CLAUDE.md; docs/index/FEATURES.yaml; docs/HYPERPARAMETERS.md). Last. Tier: sonnet.
 
 Boundary sentence, for ROADMAP and CLAUDE.md "Comparability boundaries":
-> From commit <A6 merge sha>, with `evaluator = "device"` (first device arm onward), every Tier-1 score is a mean over `k_mean` draws, and `obj[0]` is placed on its lower bound. The draws run in float32 on MuJoCo Warp 3.15 with geom margin 0, the Warp fluid port, the control and fluid kernels between steps, and per-(seed, draw, segment) streams. Nothing is comparable with any earlier run: per-medium competences, `mission_fraction`, coverage, `qd_score`, `fitness`, `objectives`, the Tier-1/Tier-2 gap, PPO `return_by_tag`, wall per generation. Tier-2, audits and the reference film stay on the MuJoCo CPU path. A device film replays the recorded trajectory of the median draw. Land and the crossings are scored on the batched path until A4b's merge, and each result says which path scored it.
+> From commit <A6 merge sha>, with `evaluator = "device"` (first device arm onward), every Tier-1 score is the pooled mean over every draw the design has had (`k_mean` at entry, plus `k_mean` per re-evaluation). The draws run in float32 on MuJoCo Warp 3.15 with geom margin 0, the Warp fluid port, the control and fluid kernels between steps, and per-(seed, draw, segment) streams. Nothing is comparable with any earlier run: per-medium competences, `mission_fraction`, coverage, `qd_score`, `fitness`, `objectives`, the Tier-1/Tier-2 gap, PPO `return_by_tag`, wall per generation. Tier-2, audits and the reference film stay on the MuJoCo CPU path. A device film replays the recorded trajectory of the median draw. Land and the crossings are scored on the batched path until A4b's merge, and each result says which path scored it.
 
 Also:
 - CLAUDE.md: the suite table row (A0), "Two evaluation paths" becomes three, and the `devroll` kernel facts (the float32 state, the margin, no callback).
@@ -824,7 +826,7 @@ Each item is frozen: run it as written, report in the shape of `runs/analysis_10
 | D-A3 | A2 | Capture wall of an unrolled 2,000-step graph per body against host-driven per-step graphs over 2,300 steps | 30 min / 1 h | Capture >= 1 s per body, so per-step graphs (+28 ms per body) stay the default | Capture < 28 ms per body |
 | D-A4 | A2 | GPU memory per world at `njmax` 512 for the median and p90 bodies; the largest W of 16 concurrent bodies on the 6 GB RTX 3060 | 30 min / 1 h | <= 1 MB per world; 16 bodies x 600 worlds fit | 16 x 600 does not fit (then K_m + K_s drops, or bodies run in waves) |
 | D-A5 | A4a | Stream overlap: 16 bodies at K_m + K_s = 2, 20 and 60 on 1, 4 and 16 streams; then 128 bodies on the best stream count | 1 h / 3 h | 4 streams cut the wall by >= 20% at K_m + K_s = 2 (dispatch-bound) and by <= 10% at 60 (W = 600 > W*); 128 bodies save <= 10% per body over 16 | The 128 saving > 10% (then A6 builds the epoch) |
-| D-A6 | A6 | `lb_z` from the distribution: on 229 arch49 elites at K_m = 50, the share of cells where the incumbent's lower bound flips under 1,000 bootstrap resamples, for z in {0.5, 1, 1.645, 2} | 2 h / 4 h | z = 1 flips <= 10% of pairwise comparisons whose means differ by more than 1 SE | No z keeps flips <= 10% |
+| D-A6 | A6 | Winner's curse, the UQD paper's corrected score: at the end of the first device arm's gen-150 read, re-evaluate every elite at 64 fresh draws and compare with its recorded pooled mean; run the same read on the batched path's arch49 archive for contrast | 2 h / 4 h | Recorded minus corrected, median over elites: device <= 0.25x the batched path's gap; Spearman(recorded, corrected) >= 0.8 per medium | Device gap > 0.5x batched, or Spearman < 0.6 in any medium |
 | D-A7 | A6 | Generation wall at K_m, K_s = (10, 10), (50, 10), (100, 10) on 16 real bodies with air and water on device and land and crossings on batched, against arch50's 168 s (ROADMAP:4097) | 3 h / 6 h | Within 1.5x of §3's table plus the batched land and crossing time (P1-P3 era, measured in the same run) | > 1.5x the prediction at (50, 10) |
 | D-A8 | A4a | Still machine and divergence on the device across arch49's 229 elites (no_model_gate's arms on `evaluator="device"`, air and water) | 2 h / 5 h | Still machine: air 0/229, comp:water 0.012 <= 5/229 (batched: 3); elites' device water competence Spearman >= 0.7 with batched | Still water > 10/229, or Spearman < 0.5 |
 
@@ -851,8 +853,32 @@ R1 (§2) and D1 (§2) are reads of the same kind and use the same reporting shap
    F4's terms and contacts. D-A7 adds the point (64, 10); if it holds within
    1.5x of its prediction and the wall stays under 1.2x arch50's, K_m becomes
    64. Whether K is fixed or adaptive per candidate is set with question 3.
-3. Pending: a literature read on noisy quality-diversity placement, then
-   written here.
+3. **Pooled mean with re-evaluated incumbents, no lower bound** (literature
+   read 2026-10-10, sources below; A6 rewritten to it). None of the noisy-QD
+   papers places on a confidence bound. Extract-QD names confidence ordering
+   only as untested future work. What works is comparing pooled means while
+   incumbents keep collecting draws, so a lucky draw cannot hold a cell:
+   - Flageat & Cully, *Uncertain Quality-Diversity*, arXiv 2302.00463 (2023).
+     Plain MAP-Elites fills with lucky solutions. Archive-sampling and
+     Parallel-Adaptive-sampling, which re-evaluate the archive, were best on
+     closed-loop Ant (p < 5e-4) and most reproducible. A fixed K with no
+     re-evaluation (ME-Sampling) loses on complex control.
+   - Flageat et al., *Extract-QD Framework*, arXiv 2502.06585 (2025,
+     preprint). 25% of evaluations re-evaluate elites, which re-enter through
+     the normal insertion path, with depth d = 8 and pooled means. At least as
+     good as the best existing method on the standard noisy tasks. This is
+     what N11 already built, so the device path extends N11 rather than
+     replacing it.
+   - Flageat & Cully, deep grids, arXiv 2006.14253 (2020), averages a depth
+     of D solutions per cell. Justesen, Risi & Mouret, GECCO 2019 Companion,
+     uses adaptive sampling. Heidrich-Meisner & Igel, ICML 2009, and Hansen et
+     al., IEEE TEVC 2009, use races and uncertainty handling, which rank
+     within a population rather than per cell. These were checked at abstract
+     level only.
+   K stays fixed per candidate (answer 2). Adaptive K, a race per cell, is
+   tried only if D-A6 shows the 25% re-evaluation budget is not enough. D-A6
+   is now the winner's-curse read that the UQD paper uses: recorded against
+   corrected scores on fresh draws.
 4. **Upgrade to mujoco 3.15.** D-M0 still runs before A0, but it no longer
    gates anything. It measures the boundary, and its result goes into A7's
    boundary text. If any medium loses more than 10 reproductions, air, water
