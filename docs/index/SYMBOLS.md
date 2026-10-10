@@ -1124,25 +1124,25 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 941 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `draw_key` | function | 885 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
-| `evaluate_candidate` | function | 433 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 556 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 464 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2361 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `median_draw` | function | 890 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
-| `placement_draw_seed` | function | 880 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
-| `run_search` | function | 1571 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2236 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 944 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `draw_key` | function | 888 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
+| `evaluate_candidate` | function | 433 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 557 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 465 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2373 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `median_draw` | function | 893 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
+| `placement_draw_seed` | function | 883 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
+| `run_search` | function | 1580 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2248 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 65 | — | Everything adjustable about a run. |
 | `SearchState` | class | 342 | — | — |
-| `seed_archipelago` | function | 2625 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 481 | `(self)` | — |
-| `GenerationCost.count` | method | 501 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 487 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 494 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 510 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 507 | `(self, pheno) -> None` | — |
+| `seed_archipelago` | function | 2637 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `GenerationCost.__init__` | method | 482 | `(self)` | — |
+| `GenerationCost.count` | method | 502 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 488 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 495 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 511 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 508 | `(self, pheno) -> None` | — |
 | `SearchState.archive` | property | 402 | `(self) -> Archive` | — |
 | `SearchState.curator` | property | 406 | `(self) -> Curator` | — |
 | `SearchState.curriculum` | property | 410 | `(self) -> Curriculum` | — |

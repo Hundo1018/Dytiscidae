@@ -3669,7 +3669,7 @@ def test_verification_offers_designs_not_yet_verified() -> None:
           tried == {"c", "d", "e"}, f"tried {sorted(tried)}")
 
 
-def _reeval_stub_search(loop, tmp, reeval, generations=4, batch=4):
+def _reeval_stub_search(loop, tmp, reeval, generations=4, batch=4, basis=None, kw_log=None):
     """``run_search`` with the physics stubbed out: every candidate comes back
     from a fake ``evaluate_candidates`` whose result carries the seed it was
     asked to run at.  Returns ``(state, calls, events)``; ``calls`` is the
@@ -3686,15 +3686,21 @@ def _reeval_stub_search(loop, tmp, reeval, generations=4, batch=4):
 
     def fake_eval(genomes, cfg, *, seeds=None, **kw):
         calls.append(list(seeds or []))
+        idn = kw.get("identify")
+        idn = list(idn) if isinstance(idn, (list, tuple)) else [bool(idn)] * len(genomes)
+        if kw_log is not None:
+            kw_log.append({"identify": idn, "bases": kw.get("bases"),
+                           "ids": [g.genome_id for g in genomes]})
         out = []
-        for g, sd in zip(genomes, seeds or [0] * len(genomes)):
+        for slot, (g, sd) in enumerate(zip(genomes, seeds or [0] * len(genomes))):
             n["k"] += 1
             water = 0.2 + 0.001 * (sd % 400)
             seg = NS(competence=water, measurements={}, score=water, max_depth=0.0,
                      max_actuator_overload=0.0)
             res = NS(segments={"water": seg}, mission_fraction=0.0, feasible=True,
                      transitions=None, tier=1, exploit="", wall_time=0.0, notes=[],
-                     eval_seed=int(sd), mobility={}, diverged_rollouts=0, n_rollouts=1,
+                     eval_seed=int(sd), mobility=({"air": "id"} if idn[slot] else {}),
+                     diverged_rollouts=0, n_rollouts=1,
                      energy_margin=0.0, air_gates=[])
             pheno = NS(report=NS(min_margin=1.0, worst=None, ok=True), genome=g)
             out.append((pheno, res, None))
@@ -3710,7 +3716,8 @@ def _reeval_stub_search(loop, tmp, reeval, generations=4, batch=4):
     loop._meta = lambda p, r, c: {
         "air": 0.0, "water": r.segments["water"].competence, "land": 0.0,
         "mission_fraction": 0.0, "energy_margin": 0.0, "tier": 1, "eval_seed": r.eval_seed,
-        "mobility_basis": {}, "policy": None, "mass": 1.0, "feasible": True}
+        "mobility_basis": basis or {}, "mobility_rank": {k: 3 for k in r.mobility},
+        "policy": None, "mass": 1.0, "feasible": True}
     loop.evaluate_candidates = fake_eval
     loop._verify_and_label = lambda *a, **k: None
     loop._audit = lambda *a, **k: None
@@ -3854,6 +3861,68 @@ def test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu(
     finally:
         for k, v in saved.items():
             setattr(loop, k, v)
+
+
+def test_a_reevaluation_runs_at_the_stored_basis_cpu() -> None:
+    """IMPL_1010 P1 (ROADMAP N11): an elite that carries ``mobility_basis`` is
+    re-measured with ``identify`` False and that basis, so a reeval draw varies
+    the task only; it keeps the elite's identification record (F11)."""
+    print("\nloop: a re-evaluation runs at the stored basis and keeps the "
+          "identification record (stub evaluator)")
+    import shutil
+    import tempfile
+
+    from dytiscidae.evolution import loop
+
+    R = {"air": {"modes": [[1.0, 0.0]],
+                 "effects": [[1, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0]],
+                 "authority": [1.0], "medium": "air"}}
+
+    def reeval_slots(log):
+        seen, found = set(), []
+        for entry in log:
+            for slot, gid in enumerate(entry["ids"]):
+                if gid in seen:
+                    found.append((entry, slot))
+            seen.update(entry["ids"])
+        return found
+
+    for tag, basis in (("R", R), ("none", None)):
+        tmp = tempfile.mkdtemp(prefix="dyt-reeval-basis-")
+        try:
+            log: list = []
+            state, _calls, _tel = _reeval_stub_search(loop, tmp, reeval=2, basis=basis, kw_log=log)
+            re = reeval_slots(log)
+            seen_ids = {gid for e in log for gid in e["ids"]}
+            if basis is not None:
+                ok = bool(re) and all(
+                    not e["identify"][s] and e["bases"][s] is not None
+                    and np.allclose(e["bases"][s]["air"].modes, R["air"]["modes"])
+                    for e, s in re)
+                check("(a) every reeval slot runs with identify False and the stored basis",
+                      ok, f"{len(re)} reeval slots")
+                children = [(e, s) for e in log[1:] for s in range(len(e["ids"]))
+                            if (e, s) not in re]
+                check("(a) every child slot still identifies and carries no basis",
+                      bool(children) and all(e["identify"][s] and e["bases"][s] is None
+                                             for e, s in children),
+                      f"{len(children)} child slots")
+                multi = [e for e in state.archive.cells.values()
+                         if len(e.meta.get("draws") or []) >= 2]
+                check("(c) every elite with two or more draws, and each draw, keeps "
+                      "mobility_rank {'air': 3}",
+                      bool(multi) and all(
+                          e.meta.get("mobility_rank") == {"air": 3}
+                          and all(d["meta"].get("mobility_rank") == {"air": 3}
+                                  for d in e.meta["draws"]) for e in multi),
+                      f"{len(multi)} elites; "
+                      f"{[e.meta.get('mobility_rank') for e in multi][:3]}")
+            else:
+                check("(b) an elite without a record is re-identified: identify True, no basis",
+                      bool(re) and all(e["identify"][s] and e["bases"][s] is None
+                                       for e, s in re), f"{len(re)} reeval slots")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 def test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median() -> None:
@@ -6948,6 +7017,7 @@ def main() -> int:
         test_the_scalar_stands_at_zero_below_the_competence_floor,
         test_verification_offers_designs_not_yet_verified,
         test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu,
+        test_a_reevaluation_runs_at_the_stored_basis_cpu,
         test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median,
         test_the_refinement_funnel_refines_only_what_it_selects,
         test_the_distance_curriculum_steps_back_only_on_evidence,

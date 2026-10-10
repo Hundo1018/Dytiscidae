@@ -438,6 +438,7 @@ def evaluate_candidate(
     identify: bool = True,
     spec: MissionSpec | None = None,
     seed: int = 0,
+    bases=None,
 ):
     """Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``."""
     pheno = build(genome)
@@ -446,7 +447,7 @@ def evaluate_candidate(
         return pheno, t0, None
 
     policy = _controller_for(pheno, genome, cfg, inherited_policy)
-    ctrl = Controller(params=None, policy=policy)  # params filled by the env
+    ctrl = Controller(params=None, policy=policy, bases=bases or None)  # params filled by the env
     result = evaluate_tier1(
         pheno,
         spec=spec,
@@ -567,6 +568,7 @@ def evaluate_candidates(
     log: dict | None = None,
     select=None,
     cost: GenerationCost | None = None,
+    bases=None,
 ):
     """Tier-0 gate then a shared Tier-1 for the whole group.
 
@@ -591,6 +593,7 @@ def evaluate_candidates(
     k = len(genomes)
     inherited = inherited or [None] * k
     seeds = seeds or [0] * k
+    bases = bases or [None] * k
     out = [None] * k
     # One bool for the group, or one per genome: the generation's
     # `identify_axes_every` cadence (ROADMAP AN).
@@ -627,7 +630,7 @@ def evaluate_candidates(
             for i in passed:
                 out[i] = evaluate_candidate(
                     genomes[i], cfg, inherited_policy=inherited[i],
-                    identify=wants[i], spec=spec, seed=seeds[i])
+                    identify=wants[i], spec=spec, seed=seeds[i], bases=bases[i])
         if cost is not None:
             cost.count("main", [out[i][1] for i in passed])
         return out
@@ -635,7 +638,7 @@ def evaluate_candidates(
     ctrls = []
     for i in passed:
         policy = _controller_for(phenos[i], genomes[i], cfg, inherited[i])
-        ctrls.append(Controller(params=None, policy=policy))
+        ctrls.append(Controller(params=None, policy=policy, bases=bases[i] or None))
 
     # Each candidate faces its own draw (ROADMAP M2): one draw shared by the
     # generation made every water and land score a measurement of that draw,
@@ -1356,6 +1359,12 @@ def _reevaluate(state, elite, pheno, result, ctrl) -> str:
         return "exploit"
     sc = _score_candidate(state, pheno, result, elite, commit=False, at_cell=elite.cell)
     meta = _meta(pheno, result, ctrl)
+    # A draw at the stored basis identified nothing, so ``result.mobility`` is
+    # empty; keep the elite's own identification record (IMPL_1010 P1, F11).
+    if not result.mobility:
+        for key in ("mobility_rank", "mobility_cond", "mobility_underdetermined", "mobility_axes"):
+            if key in elite.meta:
+                meta[key] = elite.meta[key]
     # The keys ``_place`` writes beyond ``_meta``, for the scored subset.
     meta["gen"] = gen
     meta["scored_with_shared_policy"] = bool(state.shared is not None)
@@ -1812,7 +1821,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             built.append((child, inherited, identify, operators, parent,
                           int(rng.integers(1 << 30))))
         for elite in picks:
-            built.append((elite.genome.copy(), elite.meta.get("policy"), True, ["reeval"], elite, int(rng.integers(1 << 30))))
+            stored = bool(MobilityBasis.bases_from_record(elite.meta.get("mobility_basis")))
+            built.append((elite.genome.copy(), elite.meta.get("policy"), not stored, ["reeval"], elite, int(rng.integers(1 << 30))))
 
         stage_log: dict = {}
         if state.pool is not None:
@@ -1829,6 +1839,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 inherited=[b[1] for b in built],
                 identify=[b[2] for b in built], spec=spec,
                 seeds=[b[5] for b in built],
+                bases=[(MobilityBasis.bases_from_record(b[4].meta.get("mobility_basis")) or None)
+                       if b[3] == ["reeval"] else None for b in built],
                 shared=state.shared, buffer=buffer, pool=state.pool,
                 log=stage_log,
                 select=_funnel(state, [b[4] for b in built]), cost=cost)

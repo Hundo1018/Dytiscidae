@@ -357,6 +357,27 @@ MUTATIONS: tuple = (
                "buffer, so its score stays the single draw it began with",
         suites=("test_search::test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu",
                 "test_search::test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median"), item="re-evaluation"),
+    Mutation(
+        id="reeval-re-identifies",
+        path="dytiscidae/evolution/loop.py",
+        find='            stored = bool(MobilityBasis.bases_from_record(elite.meta.get("mobility_basis")))\n',
+        replace='            stored = False\n',
+        defect="a re-evaluation re-identifies the axes, so a draw varies the basis as well as the task",
+        suites=("test_search::test_a_reevaluation_runs_at_the_stored_basis_cpu",), item="re-evaluation"),
+    Mutation(
+        id="reeval-drops-the-stored-basis",
+        path="dytiscidae/evolution/loop.py",
+        find='                       if b[3] == ["reeval"] else None for b in built],',
+        replace='                       if False else None for b in built],',
+        defect="a re-evaluation is told not to identify but is given no basis, so it runs on none",
+        suites=("test_search::test_a_reevaluation_runs_at_the_stored_basis_cpu",), item="re-evaluation"),
+    Mutation(
+        id="reeval-blanks-the-identification-record",
+        path="dytiscidae/evolution/loop.py",
+        find='    if not result.mobility:\n        for key in ("mobility_rank"',
+        replace='    if False:\n        for key in ("mobility_rank"',
+        defect="a draw at the stored basis overwrites the elite's identification record with an empty one",
+        suites=("test_search::test_a_reevaluation_runs_at_the_stored_basis_cpu",), item="re-evaluation"),
 
     # --- the learner's arithmetic -----------------------------------------
     Mutation(
