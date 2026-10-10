@@ -3823,6 +3823,46 @@ boundary on land in any case, and that land competence per elite is a draw
 of the contact constants as much as of the task; the K-draw score (§5)
 should vary the contact seed too.*
 
+*R1, the open read (2026-10-10, `docs/IMPL_1010_SPEC.md` lane R1,
+`runs/analysis_1010_failure_theory/R1_result.md`, branch impl-r1 d6da2c3):
+REFUTED as frozen. The batched path reproduces 33 of the 58 land-competent
+elites, at or below the falsifier's 35. The artifact is not the single path.
+
+| on the 58 elites with recorded land >= 0.012 | reproduce land within 0.005 |
+|---|---|
+| single path (rerun equals Q4's hard arm, 58/58) | 31 |
+| batched path, tree 23b8052 | 33 |
+| batched path, arch49's own commit 7a894b7 (values identical to 23b8052, 58/58) | 33 |
+| `no_model_gate`'s elite arm | 33 |
+| single and batched agree with each other | 36 |
+
+The 195/229 quoted above is a population effect: 162 of the 171 elites with
+recorded land < 0.012 reproduce trivially. The failure is on land alone.
+Air reproduces 58/58 and water 55/58 on the same elites. Of the 25 batched
+non-reproducers, the median re-score minus recorded is -0.014. Seventeen
+differ by more than 50%, and four re-score exactly 0. Code drift is excluded.
+Both paths build the controller with `controller_for_elite`, so the read
+cannot tell a stored-input mismatch from a recording-time effect. The two-path
+agreement test in `test_search.py` cannot see this either, because the paths
+disagree with the record more than with each other.
+
+Rivals for the next read. Each predicts something the others do not:
+(a) **a stored input differs from the one scored**: the scoring network
+snapshot, the stored policy, or the stored basis (land uses the air basis,
+`evaluate.py:56-59`). Swapping the right input restores the recorded value
+exactly for most of the 25. (b) **The recorded value depended on its batch
+at record time**, through scatter or task streams, shard composition, or the
+order of float operations. Re-scoring one elite inside different batch
+compositions changes its land score. Under (a) it does not. (c) **Land is
+chaotic in the contact solve.** Q4's 1% null moved 34.5% of land elites by
+more than 50%, so any float-level difference flips outcomes. Re-scoring the
+same elite twice in the same batch is identical, but a 1e-9 perturbation of
+one initial coordinate moves it by the same margin as the record gap. The
+next read runs all three arms on the 25 non-reproducers plus 10 that
+reproduce as a control. Not run yet. If (c) holds, a single land draw carries
+no information about a design, and the K-draw score is required on land, not
+optional (Q5's land K = 18 was computed from the same draws).*
+
 **Q5 (analytic + stored rows, minutes): the K curve on real draws.** From
 `experiments/draw_variance/results_arch49.json` (229 elites x 7 draws), the
 Spearman of a k-draw mean against the held-out mean for k = 1..6, against
