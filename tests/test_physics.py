@@ -3775,6 +3775,77 @@ def test_a_universal_joint_flaps_and_feathers() -> None:
           f"{plain.budget.actuators:.3f} -> {p.budget.actuators:.3f} kg of motors")
 
 
+def test_the_host_fluid_steps_a_machine_as_the_single_path_does() -> None:
+    """Without the Mojo kernel the batched path runs on `batchroll.HostFluid`,
+    which must step a machine exactly as `TriphibianEnv.step` does: the numpy
+    `FluidSolver`, then jets, then rotors, then `mj_step`.  Until 2026-10-12
+    the CPU path did not use the batched loop at all, and the shared policy
+    received 0 transitions (`experiments/cpu_path/run.py`).  Three plans cover
+    a wing (gannet), a jet (medusa) and rotors (quad), each 250 steps."""
+    print("\nfluid: the host fluid steps a machine as the single path does")
+    from dytiscidae.core.bodyplans import BODY_PLANS, REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.batchroll import HostFluid, step_batch
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    for plan, dom in (("gannet", Domain.AIR), ("medusa", Domain.WATER),
+                      ("quad", Domain.AIR)):
+        pheno = build({**BODY_PLANS, **REFERENCE_PLANS}[plan]())
+        a, b = TriphibianEnv(pheno, seed=3), TriphibianEnv(pheno, seed=3)
+        a.reset(dom, randomise=False)
+        b.reset(dom, randomise=False)
+        hf = HostFluid([b])
+        for _ in range(250):
+            a.step(a.cpg.command(a.cpg.base, a.data.time))
+            step_batch([b], [b.cpg.command(b.cpg.base, b.data.time)], hf)
+        dq = float(np.max(np.abs(a.data.qpos - b.data.qpos)))
+        dv = float(np.max(np.abs(a.data.qvel - b.data.qvel)))
+        check(f"{plan} in {dom.value}: qpos and qvel identical after 250 steps",
+              dq == 0.0 and dv == 0.0, f"max |dqpos| {dq:.3g}, |dqvel| {dv:.3g}")
+        check(f"{plan}: the machine moved, so the comparison compares something",
+              float(np.max(np.abs(a.data.qvel))) > 1e-3)
+        if plan == "medusa":
+            check("medusa: the observation's submerged fraction matches",
+                  a.solver.diag.mean_submerged == b.solver.diag.mean_submerged
+                  and a.solver.diag.mean_submerged > 0.0,
+                  f"{a.solver.diag.mean_submerged} vs {b.solver.diag.mean_submerged}")
+
+
+def test_without_the_kernel_candidates_take_the_batched_path() -> None:
+    """`evaluate_candidates` with no kernel goes through `_batched` (so the
+    actor pool and the shared policy's buffer), not one machine at a time in
+    the parent, which is what it did until 2026-10-12."""
+    print("\nsearch: without the kernel, candidates take the batched path")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.envs import batchroll
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution import loop
+
+    class _Reached(Exception):
+        pass
+
+    def reached(*a, **k):
+        raise _Reached
+
+    saved = (batchroll.AVAILABLE, loop._batched)
+    try:
+        batchroll.AVAILABLE = False
+        loop._batched = reached
+        try:
+            loop.evaluate_candidates(
+                [BODY_PLANS["beetle"]()],
+                loop.SearchConfig(segment_seconds=0.3, workers=1,
+                                  use_shared_policy=False),
+                identify=False, spec=MissionSpec(), seeds=[1])
+            outcome = "scored without _batched"
+        except _Reached:
+            outcome = "batched"
+        check("no kernel: evaluate_candidates calls _batched", outcome == "batched",
+              outcome)
+    finally:
+        batchroll.AVAILABLE, loop._batched = saved
+
+
 def test_wing_compliance_is_off_unless_asked() -> None:
     """``Part.pitch_compliance`` and its operator change nothing for a run that
     does not ask: no joint is emitted for a rigid surface, the curator's arms
@@ -4629,6 +4700,8 @@ def main() -> int:
         test_a_fall_scores_no_flight,
         test_the_rotor_model_matches_a_measured_propeller,
         test_a_universal_joint_flaps_and_feathers,
+        test_the_host_fluid_steps_a_machine_as_the_single_path_does,
+        test_without_the_kernel_candidates_take_the_batched_path,
         test_wing_compliance_is_off_unless_asked,
         test_a_flexible_wing_gives_way_under_load,
         test_the_wagner_slam_pressure,

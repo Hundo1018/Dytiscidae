@@ -2,7 +2,7 @@
 
 # Modules
 
-106 modules, 38,460 lines, 1,108 indexed symbols.
+106 modules, 38,514 lines, 1,116 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -99,8 +99,8 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `envs.actors` | Several generations' worth of machines, stepped in several processes. | 472 | — | `torch` | `envs`, `envs.batchroll`, `learning.ppo` |
-| `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1347 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor` |
-| `envs.device` | Which device a search scores on, and the one condition that allows the CPU. | 99 | — | — | — |
+| `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1406 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor` |
+| `envs.device` | Which device a search scores on, and the one condition that allows the CPU. | 98 | — | — | — |
 | `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 753 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 72 | — | — | — |
 | `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 336 | — | `numpy` | `envs.triphibian` |
@@ -122,7 +122,7 @@ is what makes a violation visible while reading.
 | `evolution.descriptors` | Learned behaviour descriptors, so the archive axes stop being my guesses. | 253 | — | `numpy` | — |
 | `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 474 | — | `numpy` | `evolution.curriculum` |
 | `evolution.judge` | The judge: a scoring standard that gets stricter as the population improves. | 504 | — | `numpy` | — |
-| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 3120 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.device`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.grpo`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
+| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 3116 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.device`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.grpo`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
 | `evolution.scout` | The scout: a network that predicts a lineage's potential, not its score. | 515 | — | `numpy` | — |
 
 ## `learning`

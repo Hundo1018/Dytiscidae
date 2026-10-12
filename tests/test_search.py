@@ -75,8 +75,9 @@ def skip(name: str, reason: str) -> None:
 def needs_batched_evaluator(fn_name: str) -> bool:
     """True when the caller should return: the batched evaluator is unavailable.
 
-    Six functions here drive a real ``run_search``, which needs the Mojo GPU
-    fluid extension.  Three of them *raise* on a machine without it and
+    Six functions here drive a real ``run_search``, which needed the Mojo GPU
+    fluid extension until 2026-10-12 (it now runs on the numpy fluid where no
+    GPU exists).  Three of them *raise* on a machine without it and
     ``run_all`` skips them; the other three do not, because ``run_search``
     catches a failed generation, records it in telemetry and carries on with
     nothing evaluated.  Those three then failed their own assertions with
@@ -95,12 +96,24 @@ def needs_batched_evaluator(fn_name: str) -> bool:
     # fail.  Measured 2026-09-19, that difference turned the documented three
     # ``[skip]`` into seventeen ``[fail]`` -- a suite reporting defects it had
     # not found, which is the one thing this file exists to prevent.
-    ok, why = batchroll.usable()
-    if ok:
-        return False
-    skip(fn_name, f"{why} — needs `cd mojo && pixi run build-all`, "
-                  f"and a driver whose kernel module matches its userspace")
-    return True
+    #
+    # Since 2026-10-12 a machine with no GPU runs the batched evaluator on the
+    # numpy fluid (``batchroll.HostFluid``), as ``run_search`` does, so these
+    # functions run there; what they check is then the batched loop, not the
+    # kernel (``tests/test_gpu_mirror.py`` and the freshness test hold that).
+    # They skip only where ``run_search`` refuses: a GPU the kernel cannot use.
+    from dytiscidae.envs import device
+
+    try:
+        backend, why = device.choose(batchroll.usable)
+    except device.GpuUnusable as exc:
+        skip(fn_name, f"{str(exc).splitlines()[0]} — needs `cd mojo && pixi run "
+                      f"build-all`, and a driver whose kernel module matches its userspace")
+        return True
+    if backend == "cpu":
+        batchroll.AVAILABLE = False
+        batchroll.UNAVAILABLE_REASON = why
+    return False
 
 
 def run_all(functions) -> None:

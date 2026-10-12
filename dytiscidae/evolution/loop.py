@@ -574,8 +574,9 @@ def _warn_cpu_fallback() -> None:
     print(
         "\n*** GPU fluid kernel not usable; this run is on the CPU. ***\n"
         f"    reason: {batchroll.UNAVAILABLE_REASON}\n"
-        "    Build it with `cd mojo && pixi run build`.  Every timing and\n"
-        "    every wall-clock estimate below is the CPU path.\n",
+        "    The batched path runs with the numpy fluid (HostFluid): same\n"
+        "    search, same shared policy, several times slower per step.\n"
+        "    Every timing and wall-clock estimate below is the CPU path.\n",
         file=sys.stderr, flush=True)
 
 
@@ -650,15 +651,10 @@ def evaluate_candidates(
         return out
 
     if not batchroll.AVAILABLE:
+        # The same batched path, with the numpy fluid (`batchroll.HostFluid`).
+        # Until 2026-10-12 this branch scored each candidate alone in the
+        # parent, and the shared policy saw none of it.
         _warn_cpu_fallback()
-        with _phase(cost, "evaluate.main"):
-            for i in passed:
-                out[i] = evaluate_candidate(
-                    genomes[i], cfg, inherited_policy=inherited[i],
-                    identify=wants[i], spec=spec, seed=seeds[i], bases=bases[i])
-        if cost is not None:
-            cost.count("main", [out[i][1] for i in passed])
-        return out
 
     ctrls = []
     for i in passed:
