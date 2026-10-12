@@ -152,7 +152,8 @@ def test_run_search_routes_through_the_decision() -> None:
              device.gpu_present, loop.seed_archipelago)
     tmp = tempfile.mkdtemp(prefix="device-run-")
     TEMPS.append(Path(tmp))
-    cfg = loop.SearchConfig(generations=1, batch=1, seed=1, run_dir=tmp, workers=1)
+    cfg = loop.SearchConfig(generations=1, batch=1, seed=1, run_dir=tmp, workers=1,
+                            use_shared_policy=False)
     try:
         batchroll.usable = lambda: (False, "Failed to initialize NVML: 18")
         loop.seed_archipelago = reached

@@ -3106,7 +3106,8 @@ def test_a_run_can_be_picked_up_where_it_stopped() -> None:
         base = dict(batch=1, seed=5, segment_seconds=1.0, n_reference_seeds=1,
                     n_random_seeds=0, islands=("water", "generalist"),
                     tier2_every=999, audit_every=999, migrate_every=1,
-                    checkpoint_every=1, run_dir=tmp, identify_axes_every=999)
+                    checkpoint_every=1, run_dir=tmp, identify_axes_every=999,
+                    workers=1, use_shared_policy=False)
 
         first = run_search(SearchConfig(generations=3, **base), MissionSpec())
         n1 = sum(len(a.cells) for a in first.archipelago.archives.values())
@@ -3246,6 +3247,7 @@ def test_the_headline_is_the_mission() -> None:
             n_reference_seeds=1, n_random_seeds=0, islands=("generalist",),
             tier2_every=999, audit_every=999, migrate_every=999,
             checkpoint_every=999, run_dir=tmp, identify_axes_every=999,
+            workers=1, use_shared_policy=False,
         ), MissionSpec())
         rows = [json.loads(l) for l in open(Path(tmp) / "generations.jsonl")]
         gen_rows = [r for r in rows if "mission_best" in r]
@@ -3350,6 +3352,7 @@ def test_an_audit_perturbs_the_scored_experiment_and_nothing_else() -> None:
             n_reference_seeds=1, n_random_seeds=0, islands=("generalist",),
             tier2_every=999, audit_every=999, migrate_every=999,
             checkpoint_every=999, run_dir=tmp, identify_axes_every=999,
+            workers=1, use_shared_policy=False,
         ), MissionSpec())
         check("the fixture leaves an elite to audit", bool(state.archive.cells))
         if not state.archive.cells:
@@ -3468,7 +3471,7 @@ def test_promotion_spends_refinement_and_keeps_what_it_buys() -> None:
             checkpoint_every=999, run_dir=tmp, identify_axes_every=999,
             # Two workers, so the round's refinement batch and its Tier-1.5
             # and Tier-2 legs (`ActorPool.map`) go through real processes (AL).
-            workers=2, min_shard=1,
+            workers=2, min_shard=1, use_shared_policy=False,
             promotion_refine_steps=2), MissionSpec())
         def _read_events():
             return [json.loads(l) for l in open(Path(tmp) / "events.jsonl")]
@@ -3798,7 +3801,7 @@ def _reeval_stub_search(loop, tmp, reeval, generations=4, batch=4, basis=None, k
             n_reference_seeds=4, n_random_seeds=0, islands=("water",),
             tier2_every=999, audit_every=999, migrate_every=999,
             checkpoint_every=999, run_dir=tmp, reeval_per_generation=reeval,
-            reeval_depth=3)
+            reeval_depth=3, use_shared_policy=False)
         state = loop.run_search(cfg, MissionSpec())
         return state, calls, state.telemetry
     finally:
@@ -4887,7 +4890,7 @@ def test_a_finished_run_is_a_checkpoint() -> None:
                          islands=("water", "generalist"), tier2_every=999,
                          audit_every=999, migrate_every=1, checkpoint_every=1,
                          run_dir=tmp, identify_axes_every=1,
-                         use_shared_policy=True),
+                         use_shared_policy=True, workers=1),
             MissionSpec())
         save_state(st, 2)
         c = ck.read(tmp)
@@ -4977,7 +4980,7 @@ def test_the_shared_policy_survives_a_resume() -> None:
                     n_random_seeds=0, islands=("generalist",), tier2_every=999,
                     audit_every=999, migrate_every=999, checkpoint_every=1,
                     run_dir=tmp, identify_axes_every=999,
-                    use_shared_policy=True, promotion_refine_steps=0)
+                    use_shared_policy=True, promotion_refine_steps=0, workers=1)
         first = run_search(SearchConfig(generations=1, **base), MissionSpec())
         w1 = first.shared.state_dict()["actor.0.weight"].detach().numpy().copy()
 
@@ -5023,7 +5026,7 @@ def test_a_resume_says_when_controllers_cannot_be_inherited() -> None:
                     n_random_seeds=0, islands=("generalist",), tier2_every=999,
                     audit_every=999, migrate_every=999, checkpoint_every=1,
                     run_dir=tmp, identify_axes_every=999,
-                    promotion_refine_steps=0)
+                    promotion_refine_steps=0, workers=1, use_shared_policy=False)
         first = run_search(SearchConfig(generations=1, **base), MissionSpec())
         arch = first.archipelago.archives["generalist"]
         check("the run stored controllers to orphan",
@@ -5109,7 +5112,8 @@ def test_learned_axes_survive_resume() -> None:
         base = dict(batch=1, seed=7, segment_seconds=1.0, n_reference_seeds=1,
                     n_random_seeds=0, islands=("generalist",),
                     tier2_every=999, audit_every=999, migrate_every=999,
-                    checkpoint_every=1, run_dir=tmp, identify_axes_every=999)
+                    checkpoint_every=1, run_dir=tmp, identify_axes_every=999,
+                    workers=1, use_shared_policy=False)
         first = run_search(SearchConfig(generations=2, **base), MissionSpec())
 
         # Stand in for the long run this fixture cannot afford: enough observed
@@ -5179,7 +5183,7 @@ def test_the_loop_wires_every_layer_together() -> None:
             n_reference_seeds=1, n_random_seeds=0,
             islands=("water", "generalist"), tier2_every=999, audit_every=999,
             migrate_every=1, checkpoint_every=999, run_dir=tmp,
-            identify_axes_every=999,
+            identify_axes_every=999, workers=1, use_shared_policy=False,
         )
         state = run_search(cfg, MissionSpec())
 
@@ -6808,7 +6812,7 @@ def test_the_triphibian_island_joins_a_resumed_run() -> None:
         base = dict(batch=1, seed=5, segment_seconds=1.0, n_reference_seeds=1,
                     n_random_seeds=0, tier2_every=999, audit_every=999,
                     migrate_every=999, checkpoint_every=1, run_dir=tmp,
-                    identify_axes_every=999)
+                    identify_axes_every=999, workers=1, use_shared_policy=False)
         first = run_search(SearchConfig(generations=2, islands=("water", "generalist"),
                                         **base), MissionSpec())
         before = {n: len(a.cells) for n, a in first.archipelago.archives.items()}

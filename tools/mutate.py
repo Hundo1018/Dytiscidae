@@ -881,6 +881,32 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
         item="cli defaults"),
     Mutation(
+        id="searchconfig-batch-default-four",
+        path="dytiscidae/evolution/loop.py",
+        find="    batch: int = 16  # candidates per generation",
+        replace="    batch: int = 4  # candidates per generation",
+        defect="a job-path plan that omits batch runs 4 candidates a generation, "
+               "not the 16 every stored run used (ROADMAP B1)",
+        suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
+        item="cli defaults"),
+    Mutation(
+        id="searchconfig-one-worker",
+        path="dytiscidae/evolution/loop.py",
+        find="    workers: int = field(default_factory=_default_workers)",
+        replace="    workers: int = 1",
+        defect="a job-path plan that omits workers runs single-process (ROADMAP B1)",
+        suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
+        item="cli defaults"),
+    Mutation(
+        id="searchconfig-shared-policy-off",
+        path="dytiscidae/evolution/loop.py",
+        find="    use_shared_policy: bool = field(default_factory=_torch_importable)",
+        replace="    use_shared_policy: bool = False",
+        defect="a job-path plan that omits the shared policy runs without the "
+               "controller every stored run trained (ROADMAP B1)",
+        suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
+        item="cli defaults"),
+    Mutation(
         id="cli-mission-weight-default-back",
         path="dytiscidae/ops/run.py",
         find='p.add_argument("--mission-weight", type=float, default=0.0,',

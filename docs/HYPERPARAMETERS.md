@@ -28,10 +28,12 @@ not, the row says so. The arch48 column is that run's recorded configuration
 
 **Reading it.** Where the default differs from arch48 the row says so. A
 default is the dataclass default, which is not always the CLI default or what
-the last run used. Nine fields differ from arch48: `generations`, `batch`,
-`seed`, `workers`, `controller_refine_steps`, `use_shared_policy`,
-`n_reference_seeds`, `run_dir`, `memory_ceiling_mb`; `draw_per_candidate` is
-new. `shared_learner`, `grpo_group` and `grpo_bodies` were each declared
+the last run used. Since 2026-10-12 (ROADMAP B1, the user) every dataclass
+default equals the CLI's (`test_the_search_cli_defaults_are_the_stored_run_configuration`
+checks all fields): `batch` 16, `workers` min(4, cores), `use_shared_policy`
+on when torch is installed, `n_reference_seeds` 12. Before that, a job-path
+plan that omitted them ran batch 4, one process, no shared policy and 20
+reference seeds. The arch48 column below is unchanged. `shared_learner`, `grpo_group` and `grpo_bodies` were each declared
 twice in the class body (identical values); the copy was removed on
 2026-10-08 and `tests/test_index.py` now fails on a doubled field.
 `controller_refine_steps` is 0 in the dataclass and, since 2026-10-08, in the
@@ -42,9 +44,9 @@ CLI too.
 | field | default | arch48 | set by | source |
 |---|---|---|---|---|
 | `generations` | 200 | 300 | typed | A run length chosen per run; no measurement found for the default 200. |
-| `batch` | 4 | 16 | typed | `loop.py` calls it "a search-design decision, not a throughput one". The pool-shape sweeps in `CLAUDE.md` (4x4 31.7 s, 1x16 72.2, 2x8 47.6, 8x2 51.8, 16x1 93.3) took batch 16 as given. |
+| `batch` | 16 (4 until 2026-10-12, B1) | 16 | typed | `loop.py` calls it "a search-design decision, not a throughput one". The pool-shape sweeps in `CLAUDE.md` (4x4 31.7 s, 1x16 72.2, 2x8 47.6, 8x2 51.8, 16x1 93.3) took batch 16 as given. |
 | `seed` | 0 | 20261006 | typed | An identifier, not a tuned quantity. |
-| `workers` | 1 | 4 | measured | `CLAUDE.md` "Running a search": 4 shards of 4 won the pool sweep on random bodies (4x4 31.7 s against 1x16 72.2 s); worker count is "bounded by memory before cores", so 4. The default 1 is the old single-process behaviour. |
+| `workers` | 1 | 4 | measured | `CLAUDE.md` "Running a search": 4 shards of 4 won the pool sweep on random bodies (4x4 31.7 s against 1x16 72.2 s); worker count is "bounded by memory before cores", so 4. Default min(4, cores) since 2026-10-12 (B1); it was 1, the single-process path. |
 | `min_shard` | 2 | 2 | measured | `CLAUDE.md` pool-shape sweep (8x2 51.8 s, 16x1 93.3 s, slower than one process); `experiments/budget_sweetspot/README.md` §9: queue of small shards beat 4x4 by 12.5%, faster on 3/3 batches. Not 8: at batch 16 one Tier-0 rejection gives `15 // 8 == 1` and the workers idle (`docs/ROADMAP.md` §"U. `min_shard` still defaults to 8"). |
 | `pool_per_worker` | 2.0 | 2.0 | measured | `experiments/budget_sweetspot/README.md` §8: queue (4x2:q2) total 0.875 of the 4x4 wall on late rotor-heavy bodies; `docs/ROADMAP.md` §"2026-10-03 -- the eight-item pass", row AJ. Changes no score. |
 | `pool_balance` | False | False | switch | Cost-balanced shard assignment, off. `experiments/budget_sweetspot/README.md` §8: balance total 1.031 with the queue, 0.866 alone, mixed across batches; ROADMAP row AJ: "balance stays off until a re-sweep with the rotor cost". |
@@ -99,7 +101,7 @@ CLI too.
 
 | field | default | arch48 | set by | source |
 |---|---|---|---|---|
-| `use_shared_policy` | False | True | switch | Off in the dataclass, on in every run since arch29 (`CLAUDE.md` example command). `experiments/shared_policy_value/` asks whether the network carries weight; arch33 measured -0.0014 +/- 0.0016 in-distribution. No measurement decided the default. |
+| `use_shared_policy` | True when torch is installed (False until 2026-10-12, B1) | True | switch | On in every run since arch29 (`CLAUDE.md` example command). `experiments/shared_policy_value/` asks whether the network carries weight; arch33 measured -0.0014 +/- 0.0016 in-distribution. No measurement decided the default. |
 | `shared_hidden` | 64 | 64 | typed | `docs/ROADMAP.md` §"2026-10-08 -- the MuscleMimic comparison": "no measurement says width is the limit" (13,133 parameters). |
 | `shared_lr` | 1e-3 | 0.001 | typed | No sweep found. Annealed by `shared_lr_anneal`. |
 | `shared_epochs` | 10 | 10 | typed | Same section: a 1/2/4/6 sweep was proposed and not run. arch48 telemetry: `stopped_early` 0 of 300, KL median 0.0062 (max 0.0091), so the epoch loop never hit its KL bound. |
@@ -115,7 +117,7 @@ CLI too.
 
 | field | default | arch48 | set by | source |
 |---|---|---|---|---|
-| `n_reference_seeds` | 20 | 12 | typed | Reference-design seeds. The CLI default (`--reference-seeds`) is 12, which is what arch48 used; the dataclass says 20. No measurement found for either. |
+| `n_reference_seeds` | 12 (20 until 2026-10-12, B1) | 12 | typed | Reference-design seeds. 12 is the CLI default (`--reference-seeds`) and what arch48 used. No measurement found for either value. |
 | `n_random_seeds` | 8 | 8 | typed | Random seed bodies. No measurement found. |
 | `run_dir` | "runs/latest" | "runs/arch48" | typed | A path. |
 | `checkpoint_every` | 20 | 20 | typed | Generations between checkpoints. arch35's OOM kill (`docs/ROADMAP.md` §"What arch35 measured") lost 405 generations from a checkpoint it could have resumed; the interval was not derived from it. |

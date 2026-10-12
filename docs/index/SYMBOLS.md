@@ -739,9 +739,9 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `choose` | function | 79 | `(usable, present=None) -> tuple` | ``("gpu", "")`` or ``("cpu", reason)``; raises :class:`GpuUnusable`. |
-| `gpu_present` | function | 43 | `(root: Path \| str='/') -> tuple` | ``(present, evidence)``.  ``evidence`` names what was found, or what was looked at. |
-| `GpuUnusable` | class | 39 | `(RuntimeError)` | A GPU is present and the kernel cannot run on it.  Not a CPU fallback. |
+| `choose` | function | 81 | `(usable, present=None) -> tuple` | ``("gpu", "")`` or ``("cpu", reason)``; raises :class:`GpuUnusable`. |
+| `gpu_present` | function | 45 | `(root: Path \| str='/') -> tuple` | ``(present, evidence)``.  ``evidence`` names what was found, or what was looked at. |
+| `GpuUnusable` | class | 41 | `(RuntimeError)` | A GPU is present and the kernel cannot run on it.  Not a CPU fallback. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
@@ -1137,28 +1137,28 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 959 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `draw_key` | function | 903 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
-| `evaluate_candidate` | function | 445 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 569 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 477 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2391 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `median_draw` | function | 908 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
-| `placement_draw_seed` | function | 898 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
-| `run_search` | function | 1595 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2266 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
-| `SearchConfig` | class | 65 | — | Everything adjustable about a run. |
-| `SearchState` | class | 354 | — | — |
-| `seed_archipelago` | function | 2655 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 494 | `(self)` | — |
-| `GenerationCost.count` | method | 514 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 500 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 507 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 523 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 520 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 414 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 418 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 422 | `(self) -> Curriculum` | — |
+| `batchroll_eval` | function | 972 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `draw_key` | function | 916 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
+| `evaluate_candidate` | function | 458 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 582 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 490 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2404 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `median_draw` | function | 921 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
+| `placement_draw_seed` | function | 911 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
+| `run_search` | function | 1608 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2279 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `SearchConfig` | class | 74 | — | Everything adjustable about a run. |
+| `SearchState` | class | 367 | — | — |
+| `seed_archipelago` | function | 2668 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `GenerationCost.__init__` | method | 507 | `(self)` | — |
+| `GenerationCost.count` | method | 527 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 513 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 520 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 536 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 533 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 427 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 431 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 435 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
