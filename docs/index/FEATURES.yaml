@@ -259,6 +259,8 @@ BatchedEvaluation:
     - envs.batchroll.rollout_batch
     - envs.batchroll.step_batch
     - envs.batchroll.BatchedFluid
+    - envs.batchroll.HostFluid
+    - envs.batchroll.batched_fluid
     - envs.batchroll.run_transition_batch
     - envs.batchroll.observation_finite
     - physics.energy.BatchedPower
@@ -273,6 +275,8 @@ BatchedEvaluation:
     - tests.test_search::test_a_kernel_older_than_its_source_is_not_usable
     - tests.test_search::test_the_batched_path_tells_the_policy_it_is_wet
     - tests.test_search::test_a_nan_observation_fails_the_rollout_not_the_batch
+    - tests.test_physics::test_the_host_fluid_steps_a_machine_as_the_single_path_does
+    - tests.test_physics::test_without_the_kernel_candidates_take_the_batched_path
     - tests.test_search::test_the_early_fluid_launch_changes_nothing
     - tests.test_physics::test_the_batched_power_budget_is_the_power_budget
     - tests.test_physics::test_the_rotor_batch_is_the_per_rotor_loop

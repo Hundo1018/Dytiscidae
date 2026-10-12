@@ -718,13 +718,15 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
+| `batched_fluid` | function | 625 | `(envs)` | The fluid for a batch: the Mojo kernel when it imports, else `HostFluid`. |
 | `BatchedFluid` | class | 220 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 920 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `identify_batch` | function | 650 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `observation_finite` | function | 574 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
-| `rollout_batch` | function | 731 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 1196 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 595 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `evaluate_tier1_batch` | function | 979 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `HostFluid` | class | 575 | — | `BatchedFluid`'s interface over each machine's own numpy `FluidSolver`. |
+| `identify_batch` | function | 709 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `observation_finite` | function | 633 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
+| `rollout_batch` | function | 790 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 1255 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 654 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 95 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
 | `BatchedFluid.__init__` | method | 231 | `(self, envs)` | — |
 | `BatchedFluid.apply` | method | 371 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
@@ -732,6 +734,12 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `BatchedFluid.launch` | method | 377 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
 | `BatchedFluid.ready` | method | 367 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
 | `BatchedFluid.reset_slam` | method | 342 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
+| `HostFluid.__init__` | method | 592 | `(self, envs)` | — |
+| `HostFluid.apply` | method | 606 | `(self, t: float, active=None) -> None` | — |
+| `HostFluid.finish` | method | 613 | `(self, t: float, active=None) -> None` | — |
+| `HostFluid.launch` | method | 610 | `(self, t: float, active=None) -> None` | — |
+| `HostFluid.ready` | method | 603 | `(self, t: float) -> bool` | — |
+| `HostFluid.reset_slam` | method | 599 | `(self)` | — |
 
 ## `envs.device` — `dytiscidae/envs/device.py`
 
@@ -1137,19 +1145,19 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 972 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `draw_key` | function | 916 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
+| `batchroll_eval` | function | 968 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `draw_key` | function | 912 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
 | `evaluate_candidate` | function | 458 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 582 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `evaluate_candidates` | function | 583 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
 | `GenerationCost` | class | 490 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2404 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `median_draw` | function | 921 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
-| `placement_draw_seed` | function | 911 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
-| `run_search` | function | 1608 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2279 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `load_state` | function | 2400 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `median_draw` | function | 917 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
+| `placement_draw_seed` | function | 907 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
+| `run_search` | function | 1604 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2275 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 74 | — | Everything adjustable about a run. |
 | `SearchState` | class | 367 | — | — |
-| `seed_archipelago` | function | 2668 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `seed_archipelago` | function | 2664 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
 | `GenerationCost.__init__` | method | 507 | `(self)` | — |
 | `GenerationCost.count` | method | 527 | `(self, call: str, results) -> None` | — |
 | `GenerationCost.lap` | method | 513 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
