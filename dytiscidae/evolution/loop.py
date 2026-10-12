@@ -284,6 +284,14 @@ class SearchConfig:
     #: action space.  Changes both policies' shapes, so nothing trained without
     #: it transfers.  Off by default: every stored run was scored without it.
     gait_gain: bool = False
+    #: Lets the search make lifting surfaces flexible: the ``wing_compliance``
+    #: operator (``core.genome.OPTIONAL_OPERATORS``) joins every island's
+    #: bandit, and it sets ``Part.pitch_compliance``, a passive pitch hinge
+    #: (``core.mjcf.passive_pitch_spring``).  Off by default: without it the
+    #: operator set and every seeded draw over it are those of earlier runs, and
+    #: no design can become flexible.  A design that is already flexible
+    #: (seeded, migrated, resumed) compiles flexible either way.
+    wing_compliance: bool = False
     event_sample: int = 1
 
     # --- the archipelago ---------------------------------------------------
@@ -1664,7 +1672,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                  for (n, lo, hi, b) in BD_AXES]
     for name in cfg.islands:
         a = Archive(boot_axes)
-        cur = Curator(a, seed=cfg.seed)
+        cur = Curator(a, seed=cfg.seed, extra_operators=(
+            ("wing_compliance",) if getattr(cfg, "wing_compliance", False) else ()))
         archipelago.register(name, a, cur)
         curricula[name] = curriculum_for(name)
         # So that pruning or quarantining a cell also drops its stage: the

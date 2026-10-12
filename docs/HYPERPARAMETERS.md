@@ -93,6 +93,7 @@ CLI too.
 | `descriptor_refit_every` | 400 | 400 | typed | Evaluations between refits. `docs/ROADMAP.md` item F measured the harm of refitting (archive size at refit fell 105 to 77 over arch34; 331 cells merged); it proposed refitting less often but 400 was not swept. |
 | `descriptor_keep_if_overlap` | 0.95 | 0.95 | measured | `docs/ARCH46_SPEC.md` §3: on arch45's 33 refits, threshold 0.90 skips 25/33 (2238/3066 merges avoided), 0.95 skips 19/33 (1601/3066), 0.97 skips 17/33 (1424/3066); 0.95 chosen as the median case. arch45 and earlier used 0. |
 | `gait_gain` | False | False | switch | `docs/ROADMAP.md` §"AA. The policy could not stop a machine": an oracle that zeros amplitude on stop/hold lifts land task score 0.362 to 0.501. Off by default because it changes both policies' shapes and every stored run was scored without it. |
+| `wing_compliance` | False | False | switch | `docs/ROADMAP.md` §"2026-10-12 — wing flexibility": adds the `wing_compliance` operator, which sets `Part.pitch_compliance` (a passive pitch hinge per surface). Off by default because it changes the operator set, and so every seeded draw over it, and because the still-machine read on air is not finished. |
 
 ## Shared policy (PPO)
 

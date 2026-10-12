@@ -432,44 +432,46 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `crossover` | function | 1202 | `(a: Genome, b: Genome, rng: np.random.Generator) -> Genome` | Blend two designs. |
-| `descendants` | function | 706 | `(g: Genome, start: int) -> list[int]` | Part indices reachable from ``start``, itself included, each once. |
-| `Edge` | class | 202 | — | An attachment of ``child`` onto ``parent``. |
-| `estimated_bodies` | function | 724 | `(g: Genome, *, cap: int=4096, max_depth: int=8) -> int` | How many rigid bodies this graph expands to, near enough to budget with. |
-| `Genome` | class | 224 | — | A complete design. |
-| `graft_subtree` | function | 901 | `(child: Genome, donor: Genome, rng: np.random.Generator) -> bool` | Move a subtree of ``donor`` onto ``child``.  Graph-level recombination. |
-| `mut_actuator` | function | 466 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_add_part` | function | 759 | `(g: Genome, rng: np.random.Generator) -> bool` | Grow a new module and attach it somewhere. |
-| `mut_body_field` | function | 1014 | `(g: Genome, rng: np.random.Generator) -> bool` | Reshape a part's implicit volume. |
-| `mut_cppn_structure` | function | 1052 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_cppn_weights` | function | 1045 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_drivetrain` | function | 423 | `(g: Genome, rng: np.random.Generator) -> bool` | Move a joint's series spring and its drive compliance together. |
-| `mut_duplicate_part` | function | 839 | `(g: Genome, rng: np.random.Generator) -> bool` | Copy a module, attach the copy beside the original, and let it diverge. |
-| `mut_edge_placement` | function | 487 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_edge_topology` | function | 651 | `(g: Genome, rng: np.random.Generator) -> bool` | Rewire, reflect, or change the recursion depth of an attachment. |
-| `mut_gait` | function | 569 | `(g: Genome, rng: np.random.Generator) -> bool` | Resample the whole gait at once: frequency, amplitude, phase and rest. |
-| `mut_global_buoyancy` | function | 1077 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_global_energy` | function | 1066 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_jet` | function | 631 | `(g: Genome, rng: np.random.Generator) -> bool` | Tune a bell's nozzle and stroke. |
-| `mut_joint` | function | 451 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_material` | function | 1006 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_part_dimensions` | function | 410 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
-| `mut_part_kind` | function | 986 | `(g: Genome, rng: np.random.Generator) -> bool` | Reinterpret a module as a different kind. |
-| `mut_phase_gradient` | function | 519 | `(g: Genome, rng: np.random.Generator) -> bool` | Shift the oscillator phases, which is what turns flapping into swimming. |
-| `mut_radial_symmetry` | function | 499 | `(g: Genome, rng: np.random.Generator) -> bool` | Change how many times an attachment is replicated around its parent. |
-| `mut_remove_part` | function | 964 | `(g: Genome, rng: np.random.Generator) -> bool` | Delete a module and everything attached below it. |
-| `mut_rotor` | function | 1105 | `(g: Genome, rng: np.random.Generator) -> bool` | Add, remove or retune a propeller on a part (`physics.rotor`). |
-| `mut_scale` | function | 1088 | `(g: Genome, rng: np.random.Generator) -> bool` | Scale the whole machine. |
-| `mut_stroke` | function | 541 | `(g: Genome, rng: np.random.Generator) -> bool` | Change how far a part strokes, and where it sits at rest. |
-| `mutate` | function | 1170 | `(g: Genome, rng: np.random.Generator, *, operators: list[str] \| None=None, n_ops: int=1) -> tuple[Genome, list[str]]` | Apply the named operators.  Returns the child and what was applied. |
+| `crossover` | function | 1266 | `(a: Genome, b: Genome, rng: np.random.Generator) -> Genome` | Blend two designs. |
+| `descendants` | function | 728 | `(g: Genome, start: int) -> list[int]` | Part indices reachable from ``start``, itself included, each once. |
+| `Edge` | class | 219 | — | An attachment of ``child`` onto ``parent``. |
+| `estimated_bodies` | function | 746 | `(g: Genome, *, cap: int=4096, max_depth: int=8) -> int` | How many rigid bodies this graph expands to, near enough to budget with. |
+| `Genome` | class | 241 | — | A complete design. |
+| `graft_subtree` | function | 923 | `(child: Genome, donor: Genome, rng: np.random.Generator) -> bool` | Move a subtree of ``donor`` onto ``child``.  Graph-level recombination. |
+| `mut_actuator` | function | 488 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_add_part` | function | 781 | `(g: Genome, rng: np.random.Generator) -> bool` | Grow a new module and attach it somewhere. |
+| `mut_body_field` | function | 1063 | `(g: Genome, rng: np.random.Generator) -> bool` | Reshape a part's implicit volume. |
+| `mut_cppn_structure` | function | 1101 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_cppn_weights` | function | 1094 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_drivetrain` | function | 445 | `(g: Genome, rng: np.random.Generator) -> bool` | Move a joint's series spring and its drive compliance together. |
+| `mut_duplicate_part` | function | 861 | `(g: Genome, rng: np.random.Generator) -> bool` | Copy a module, attach the copy beside the original, and let it diverge. |
+| `mut_edge_placement` | function | 509 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_edge_topology` | function | 673 | `(g: Genome, rng: np.random.Generator) -> bool` | Rewire, reflect, or change the recursion depth of an attachment. |
+| `mut_gait` | function | 591 | `(g: Genome, rng: np.random.Generator) -> bool` | Resample the whole gait at once: frequency, amplitude, phase and rest. |
+| `mut_global_buoyancy` | function | 1126 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_global_energy` | function | 1115 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_jet` | function | 653 | `(g: Genome, rng: np.random.Generator) -> bool` | Tune a bell's nozzle and stroke. |
+| `mut_joint` | function | 473 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_material` | function | 1055 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_part_dimensions` | function | 432 | `(g: Genome, rng: np.random.Generator) -> bool` | — |
+| `mut_part_kind` | function | 1008 | `(g: Genome, rng: np.random.Generator) -> bool` | Reinterpret a module as a different kind. |
+| `mut_phase_gradient` | function | 541 | `(g: Genome, rng: np.random.Generator) -> bool` | Shift the oscillator phases, which is what turns flapping into swimming. |
+| `mut_radial_symmetry` | function | 521 | `(g: Genome, rng: np.random.Generator) -> bool` | Change how many times an attachment is replicated around its parent. |
+| `mut_remove_part` | function | 986 | `(g: Genome, rng: np.random.Generator) -> bool` | Delete a module and everything attached below it. |
+| `mut_rotor` | function | 1154 | `(g: Genome, rng: np.random.Generator) -> bool` | Add, remove or retune a propeller on a part (`physics.rotor`). |
+| `mut_scale` | function | 1137 | `(g: Genome, rng: np.random.Generator) -> bool` | Scale the whole machine. |
+| `mut_stroke` | function | 563 | `(g: Genome, rng: np.random.Generator) -> bool` | Change how far a part strokes, and where it sits at rest. |
+| `mut_wing_compliance` | function | 1028 | `(g: Genome, rng: np.random.Generator) -> bool` | Make a lifting surface flexible, stiffer, softer, or rigid again. |
+| `mutate` | function | 1234 | `(g: Genome, rng: np.random.Generator, *, operators: list[str] \| None=None, n_ops: int=1) -> tuple[Genome, list[str]]` | Apply the named operators.  Returns the child and what was applied. |
+| `mutation_operator` | function | 1218 | `(name: str)` | The operator registered under ``name``, default or optional. |
 | `Part` | class | 67 | — | One module type.  May be instantiated many times by the expansion. |
-| `random_genome` | function | 307 | `(rng: np.random.Generator, *, target_scale: float=1.0) -> Genome` | A random but structurally sensible starting design. |
-| `Edge.copy` | method | 219 | `(self) -> 'Edge'` | — |
-| `Genome.complexity` | property | 298 | `(self) -> int` | — |
-| `Genome.copy` | method | 275 | `(self) -> 'Genome'` | — |
-| `Part.copy` | method | 181 | `(self) -> 'Part'` | — |
-| `Part.has_own_spar` | property | 191 | `(self) -> bool` | Whether this surface carries its own bending member. |
-| `Part.is_surface` | property | 187 | `(self) -> bool` | — |
+| `random_genome` | function | 324 | `(rng: np.random.Generator, *, target_scale: float=1.0) -> Genome` | A random but structurally sensible starting design. |
+| `Edge.copy` | method | 236 | `(self) -> 'Edge'` | — |
+| `Genome.complexity` | property | 315 | `(self) -> int` | — |
+| `Genome.copy` | method | 292 | `(self) -> 'Genome'` | — |
+| `Part.copy` | method | 198 | `(self) -> 'Part'` | — |
+| `Part.has_own_spar` | property | 208 | `(self) -> bool` | Whether this surface carries its own bending member. |
+| `Part.is_surface` | property | 204 | `(self) -> bool` | — |
 
 ## `core.mjcf` — `dytiscidae/core/mjcf.py`
 
@@ -479,9 +481,10 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 |---|---|---:|---|---|
 | `beach_extent` | function | 86 | `() -> tuple[float, float]` | The world x range over which the beach ramp actually exists. |
 | `beach_surface_z` | function | 95 | `(x: float) -> float` | World height of the top of the beach ramp at ``x``. |
-| `build_model_xml` | function | 484 | `(p: Phenotype, *, spawn: tuple[float, float, float]=(-6.0, 0.0, 1.5), scene: ET.Element \| None=None, detail: bool=False) -> tuple[str, list[str]]` | Compile a phenotype into MJCF. |
-| `compile_phenotype` | function | 735 | `(p: Phenotype, **kw)` | Build and compile.  Returns ``(model, data, actuator_names, panels)``. |
+| `build_model_xml` | function | 564 | `(p: Phenotype, *, spawn: tuple[float, float, float]=(-6.0, 0.0, 1.5), scene: ET.Element \| None=None, detail: bool=False) -> tuple[str, list[str]]` | Compile a phenotype into MJCF. |
+| `compile_phenotype` | function | 843 | `(p: Phenotype, **kw)` | Build and compile.  Returns ``(model, data, actuator_names, panels)``. |
 | `mat2quat` | function | 28 | `(R: np.ndarray) -> tuple[float, float, float, float]` | Rotation matrix to (w, x, y, z), MuJoCo's convention. |
+| `passive_pitch_spring` | function | 506 | `(s: Segment, weight_share: float, timestep: float) -> dict \| None` | Stiffness, damping and armature of a surface's passive pitch hinge. |
 | `scene_xml` | function | 116 | `(*, seabed_depth: float=18.0, beach_slope: float=0.12, shore_x: float=12.0, timestep: float=0.002, bare: bool=False) -> ET.Element` | Root ``<mujoco>`` element with the triphibian world already in it. |
 
 ## `core.phenotype` — `dytiscidae/core/phenotype.py`
@@ -1006,25 +1009,25 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `OperatorBandit` | class | 76 | — | UCB over mutation operators, on a sliding window. |
 | `OperatorStats` | class | 57 | — | Running record for one mutation operator. |
 | `Regime` | class | 175 | — | The curator's read on what the run is currently doing. |
-| `Curator.__init__` | method | 197 | `(self, archive: Archive, *, seed: int=0, tier2_budget_fraction: float=0.08, crowding_limit: int=14) -> None` | — |
-| `Curator.check_famine` | method | 622 | `(self) -> list[str]` | Detect domains no design in the archive can perform, and act. |
-| `Curator.choose_operators` | method | 245 | `(self) -> list[str]` | — |
-| `Curator.cohort_report` | method | 755 | `(self, cohort: list[Elite]) -> list[dict]` | A compact, printable description of an approved cohort. |
-| `Curator.credit` | method | 254 | `(self, operators: list[str], status: str, gain: float) -> None` | Pay an operator for the improvement it produced. |
-| `Curator.domain_bests` | method | 571 | `(self) -> dict[str, float]` | Best competence any elite achieves in each domain. |
-| `Curator.generation_report` | method | 777 | `(self) -> dict` | — |
-| `Curator.note_offspring` | method | 360 | `(self, parent: Elite \| None, status: str) -> None` | — |
-| `Curator.observe_domains` | method | 581 | `(self, meta: dict) -> None` | Record one evaluation's per-domain competences. |
-| `Curator.on_rebin` | method | 394 | `(self) -> None` | Forget everything keyed by cell coordinate. |
-| `Curator.plateau_p` | method | 599 | `(self, domain: str) -> float` | How surprising the current drought is, if the search were still |
-| `Curator.promotion_candidates` | method | 389 | `(self, k: int=3) -> list[Elite]` | The top ``k`` representatives by ``fitness`` not yet verified (tier < 2). |
-| `Curator.prune` | method | 503 | `(self, max_prunes: int=3) -> int` | Drop marginal elites from over-dense regions. |
-| `Curator.quarantine` | method | 424 | `(self, descriptor: np.ndarray, reason: str, genome=None) -> None` | Record an exploit and taint the region it came from. |
-| `Curator.record_promotion` | method | 405 | `(self, elite: Elite, tier2_fitness: float) -> None` | Mark ``elite`` verified and store the Tier-2 outcome beside its score. |
-| `Curator.select_cohort` | method | 709 | `(self, n: int \| None=None, *, require_feasible: bool=True, require_verified: bool=False) -> list[Elite]` | Approve a cohort to carry into the next round. |
-| `Curator.select_parent` | method | 292 | `(self) -> Elite \| None` | Pick who to breed from, weighting four independent signals. |
-| `Curator.should_promote` | method | 369 | `(self, elite: Elite) -> bool` | Whether this elite has earned a high-fidelity re-evaluation. |
-| `Curator.update_regime` | method | 449 | `(self) -> Regime` | Classify the run and set search pressure accordingly. |
+| `Curator.__init__` | method | 197 | `(self, archive: Archive, *, seed: int=0, tier2_budget_fraction: float=0.08, crowding_limit: int=14, extra_operators: tuple[str, ...]=()) -> None` | — |
+| `Curator.check_famine` | method | 628 | `(self) -> list[str]` | Detect domains no design in the archive can perform, and act. |
+| `Curator.choose_operators` | method | 251 | `(self) -> list[str]` | — |
+| `Curator.cohort_report` | method | 761 | `(self, cohort: list[Elite]) -> list[dict]` | A compact, printable description of an approved cohort. |
+| `Curator.credit` | method | 260 | `(self, operators: list[str], status: str, gain: float) -> None` | Pay an operator for the improvement it produced. |
+| `Curator.domain_bests` | method | 577 | `(self) -> dict[str, float]` | Best competence any elite achieves in each domain. |
+| `Curator.generation_report` | method | 783 | `(self) -> dict` | — |
+| `Curator.note_offspring` | method | 366 | `(self, parent: Elite \| None, status: str) -> None` | — |
+| `Curator.observe_domains` | method | 587 | `(self, meta: dict) -> None` | Record one evaluation's per-domain competences. |
+| `Curator.on_rebin` | method | 400 | `(self) -> None` | Forget everything keyed by cell coordinate. |
+| `Curator.plateau_p` | method | 605 | `(self, domain: str) -> float` | How surprising the current drought is, if the search were still |
+| `Curator.promotion_candidates` | method | 395 | `(self, k: int=3) -> list[Elite]` | The top ``k`` representatives by ``fitness`` not yet verified (tier < 2). |
+| `Curator.prune` | method | 509 | `(self, max_prunes: int=3) -> int` | Drop marginal elites from over-dense regions. |
+| `Curator.quarantine` | method | 430 | `(self, descriptor: np.ndarray, reason: str, genome=None) -> None` | Record an exploit and taint the region it came from. |
+| `Curator.record_promotion` | method | 411 | `(self, elite: Elite, tier2_fitness: float) -> None` | Mark ``elite`` verified and store the Tier-2 outcome beside its score. |
+| `Curator.select_cohort` | method | 715 | `(self, n: int \| None=None, *, require_feasible: bool=True, require_verified: bool=False) -> list[Elite]` | Approve a cohort to carry into the next round. |
+| `Curator.select_parent` | method | 298 | `(self) -> Elite \| None` | Pick who to breed from, weighting four independent signals. |
+| `Curator.should_promote` | method | 375 | `(self, elite: Elite) -> bool` | Whether this elite has earned a high-fidelity re-evaluation. |
+| `Curator.update_regime` | method | 455 | `(self) -> Regime` | Classify the run and set search pressure accordingly. |
 | `OperatorBandit.__init__` | method | 87 | `(self, names: list[str] \| None=None, c: float=0.6, epsilon: float=0.2) -> None` | — |
 | `OperatorBandit.report` | method | 163 | `(self) -> list[dict]` | — |
 | `OperatorBandit.select` | method | 113 | `(self, rng: np.random.Generator, *, structural_bias: float=1.0, exclude: tuple=()) -> str` | Pick an operator by UCB, tilted by the current structural appetite. |
@@ -1124,28 +1127,28 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 951 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `draw_key` | function | 895 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
-| `evaluate_candidate` | function | 437 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 561 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 469 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2380 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `median_draw` | function | 900 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
-| `placement_draw_seed` | function | 890 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
-| `run_search` | function | 1587 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2255 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 959 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `draw_key` | function | 903 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
+| `evaluate_candidate` | function | 445 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 569 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 477 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2389 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `median_draw` | function | 908 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
+| `placement_draw_seed` | function | 898 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
+| `run_search` | function | 1595 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2264 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 65 | — | Everything adjustable about a run. |
-| `SearchState` | class | 346 | — | — |
-| `seed_archipelago` | function | 2644 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 486 | `(self)` | — |
-| `GenerationCost.count` | method | 506 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 492 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 499 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 515 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 512 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 406 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 410 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 414 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 354 | — | — |
+| `seed_archipelago` | function | 2653 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `GenerationCost.__init__` | method | 494 | `(self)` | — |
+| `GenerationCost.count` | method | 514 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 500 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 507 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 523 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 520 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 414 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 418 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 422 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1267,27 +1270,27 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 638 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `build_parser` | function | 963 | `() -> argparse.ArgumentParser` | — |
-| `child_env` | function | 339 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
-| `cmd_cohort` | function | 579 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_config` | function | 449 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
-| `cmd_dashboard` | function | 908 | `(args) -> int` | — |
-| `cmd_distill` | function | 946 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 467 | `(args) -> int` | — |
-| `cmd_postrun` | function | 415 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 639 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `build_parser` | function | 964 | `() -> argparse.ArgumentParser` | — |
+| `child_env` | function | 340 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
+| `cmd_cohort` | function | 580 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_config` | function | 450 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
+| `cmd_dashboard` | function | 909 | `(args) -> int` | — |
+| `cmd_distill` | function | 947 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 468 | `(args) -> int` | — |
+| `cmd_postrun` | function | 416 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 124 | `(args) -> int` | — |
-| `cmd_render` | function | 915 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
-| `cmd_search` | function | 266 | `(args) -> int` | — |
-| `cmd_showcase` | function | 766 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 474 | `(args) -> int` | — |
-| `cmd_train` | function | 508 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_render` | function | 916 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_search` | function | 267 | `(args) -> int` | — |
+| `cmd_showcase` | function | 767 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 475 | `(args) -> int` | — |
+| `cmd_train` | function | 509 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 117 | `(args) -> int` | — |
-| `controller_for_elite` | function | 648 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 358 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 649 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 359 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 32 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 1308 | `(argv=None) -> int` | — |
-| `merge_config_file` | function | 224 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
+| `main` | function | 1313 | `(argv=None) -> int` | — |
+| `merge_config_file` | function | 225 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
 | `search_config_from_args` | function | 159 | `(args, shared: bool)` | The ``SearchConfig`` a ``search`` command line asks for. |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`

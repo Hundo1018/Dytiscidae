@@ -1,0 +1,406 @@
+{
+ "rig": [],
+ "air": [
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 0,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 9.715,
+   "airborne": 0.544,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 0,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 9.8,
+   "airborne": 0.564,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 1,
+   "arm": "own_gait",
+   "competence": 0.1281,
+   "sink": 1.511,
+   "airborne": 1.0,
+   "height_hold": 0.147
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 1,
+   "arm": "still",
+   "competence": 0.0701,
+   "sink": 1.758,
+   "airborne": 1.0,
+   "height_hold": 0.131
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 2,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 0.26,
+   "airborne": 1.0,
+   "height_hold": 0.323
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 2,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 0.409,
+   "airborne": 1.0,
+   "height_hold": 0.272
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 3,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 14.087,
+   "airborne": 0.397,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 3,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 14.525,
+   "airborne": 0.388,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 4,
+   "arm": "own_gait",
+   "competence": 0.2501,
+   "sink": 4.838,
+   "airborne": 0.949,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 4,
+   "arm": "still",
+   "competence": 0.4053,
+   "sink": 4.851,
+   "airborne": 0.967,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 5,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": -0.846,
+   "airborne": 1.0,
+   "height_hold": 0.107
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 5,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": -0.246,
+   "airborne": 1.0,
+   "height_hold": 0.088
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 6,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 4.529,
+   "airborne": 0.868,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 6,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 4.284,
+   "airborne": 0.888,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 7,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 0.036,
+   "airborne": 1.0,
+   "height_hold": 0.095
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 7,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 1.621,
+   "airborne": 0.973,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 8,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 2.051,
+   "airborne": 1.0,
+   "height_hold": 0.05
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 8,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 1.868,
+   "airborne": 1.0,
+   "height_hold": 0.051
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 9,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 5.215,
+   "airborne": 0.869,
+   "height_hold": 0.006
+  },
+  {
+   "plan": "gannet",
+   "compliance": 0.0,
+   "seed": 9,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 4.739,
+   "airborne": 0.851,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 0,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 14.788,
+   "airborne": 0.461,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 0,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 6.732,
+   "airborne": 0.596,
+   "height_hold": 0.028
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 1,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 7.942,
+   "airborne": 0.88,
+   "height_hold": 0.047
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 1,
+   "arm": "still",
+   "competence": 0.117,
+   "sink": 6.879,
+   "airborne": 0.946,
+   "height_hold": 0.021
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 2,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 1.586,
+   "airborne": 1.0,
+   "height_hold": 0.117
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 2,
+   "arm": "still",
+   "competence": 0.2026,
+   "sink": 1.776,
+   "airborne": 1.0,
+   "height_hold": 0.11
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 3,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 14.701,
+   "airborne": 0.392,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 3,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 14.738,
+   "airborne": 0.392,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 4,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 8.622,
+   "airborne": 0.735,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 4,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 13.503,
+   "airborne": 0.527,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 5,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 9.076,
+   "airborne": 0.604,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 5,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 9.796,
+   "airborne": 0.574,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 6,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 14.393,
+   "airborne": 0.538,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 6,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 14.304,
+   "airborne": 0.541,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 7,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 12.591,
+   "airborne": 0.47,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 7,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 13.618,
+   "airborne": 0.442,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 8,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 8.81,
+   "airborne": 0.79,
+   "height_hold": 0.016
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 8,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 10.491,
+   "airborne": 0.695,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 9,
+   "arm": "own_gait",
+   "competence": 0.0,
+   "sink": 14.571,
+   "airborne": 0.482,
+   "height_hold": 0.0
+  },
+  {
+   "plan": "gannet",
+   "compliance": 1.0,
+   "seed": 9,
+   "arm": "still",
+   "competence": 0.0,
+   "sink": 15.274,
+   "airborne": 0.454,
+   "height_hold": 0.0
+  }
+ ],
+ "wall_s": 136.1
+}
