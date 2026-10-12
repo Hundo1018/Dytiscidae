@@ -61,22 +61,35 @@ from .judge import Judge
 from .scout import Scout, novelty_of, scout_features
 
 
+def _default_workers() -> int:
+    return min(4, os.cpu_count() or 1)
+
+
+def _torch_importable() -> bool:
+    import importlib.util
+    return importlib.util.find_spec("torch") is not None
+
+
 @dataclass
 class SearchConfig:
     """Everything adjustable about a run.
 
-    The defaults are tuned for a four-core CPU with no GPU, which is the
-    environment this was developed in.  ``segment_seconds`` is the main
+    The defaults are the configuration every stored run launched with
+    (ROADMAP B1, the user 2026-10-12): batch 16, ``min(4, cores)`` workers,
+    the shared policy on when torch is installed, 12 reference seeds -- the
+    same as ``ops.run search``'s, so a job-path plan that omits a field runs
+    what the command line runs.  Until 2026-10-12 a plan that omitted them ran
+    batch 4, one process, no shared policy and 20 reference seeds, silently.  ``segment_seconds`` is the main
     cost/fidelity dial: halving it roughly halves the run time and roughly
     doubles the variance of every Tier-1 score.
     """
 
     generations: int = 200
-    batch: int = 4  # candidates per generation
+    batch: int = 16  # candidates per generation
     seed: int = 0
 
-    #: Worker processes stepping machines in parallel.  1 is the old
-    #: single-process behaviour and is what every stored run used.
+    #: Worker processes stepping machines in parallel, ``min(4, cores)``.  1 is
+    #: the single-process path.
     #:
     #: Measured on this machine: 16 workers of 8 machines return 12.7x the
     #: throughput of one worker of 8, at 26% more wall per worker, because only
@@ -88,7 +101,7 @@ class SearchConfig:
     #: more shards than ``batch // min_shard``.  Using twenty cores means
     #: raising ``batch``, which is a search-design decision, not a throughput
     #: one -- so it is left to the caller rather than done here.
-    workers: int = 1
+    workers: int = field(default_factory=_default_workers)
     #: 2 with a queue of two shards per worker, since 2026-10-03.  On random
     #: bodies 4 shards of 4 were the swept optimum (31.7 s, against 1x16 72.2,
     #: 2x8 47.6, 8x2 51.8, 16x1 93.3); on late, rotor-heavy bodies a design's
@@ -213,7 +226,7 @@ class SearchConfig:
     #: generalises across bodies, the per-candidate (1+1)-ES adapts to the one
     #: body it lives on, and the two intents are summed.  Per-candidate PPO is
     #: not an option -- see learning/ppo.py for the arithmetic.
-    use_shared_policy: bool = False
+    use_shared_policy: bool = field(default_factory=_torch_importable)
     shared_hidden: int = 64
     shared_lr: float = 1e-3
     shared_epochs: int = 10
@@ -246,7 +259,7 @@ class SearchConfig:
     shared_lr_anneal: bool = True
 
     # Seeding
-    n_reference_seeds: int = 20
+    n_reference_seeds: int = 12
     n_random_seeds: int = 8
 
     # Output

@@ -1,5 +1,16 @@
 # Roadmap
 
+**2026-10-12: the user answered the 10-08 questions 4-6; see
+[the answers](#answers-2026-10-12-questions-4-6).** E2 is adopted with air's
+L1 bar left open until arch51 measures it; `SearchConfig`'s defaults are now
+the CLI's (B1, done); E1/E3 are funded, to run on a CPU container. **They
+cannot run there as the search stands:** without the Mojo kernel the search
+scores each candidate in the parent on the single-machine path, and the
+shared policy neither drives a candidate nor receives a transition
+(`experiments/cpu_path/run.py`: batched evaluator 0 calls, single 10, both PPO
+events 0 transitions and skipped, 593 s user in 600 s wall). Decision owed by
+the user, below.
+
 **2026-10-12: wing flexibility is in the model, off by default; see
 [wing flexibility](#2026-10-12--wing-flexibility-a-passive-pitch-hinge-built-off-by-default).**
 `Part.pitch_compliance` gives a surface a passive pitch hinge at its leading
@@ -5034,6 +5045,12 @@ must survive a fresh seed).
 | L3 mission | one design completes the continuous mission (`mission_fraction > 0` with both transitions, film reproduced) on ≥ 3 of 5 held-out seeds | 0 |
 | L4 target | L3 at 15 kg, 10 m depth, 45 min (README §"On the 15 kg / 10 m / 45 min target") | — |
 
+**Adopted 2026-10-12 (the user, question 4).** L1-L4 as tabled. Air's L1
+bar is left open: under the paired air score (2026-10-10) no bar has been
+certified against still machines, and a typed one would break rule 5. arch51's
+still-machine read on its own population sets it. arch51's notes carry L1, L2
+and L3 counts on held-out seeds at gens 150 and 300 (`docs/ARCH51_SPEC.md`).
+
 Each level is read on the auditor's held-out seeds, never on the draw that
 selected the design.
 
@@ -5199,14 +5216,18 @@ third seed. The decision rule is applied when the run finishes
 | D1, flexibility | deferred | its measurement is thrust lost to deflection, and thrust is not where any elite stops (C3) |
 | D3, off-diagonal added mass | deferred | its own condition: only if D1/D2/C3 leave air short of thrust; they leave it short of staying up |
 | G, identification | closed for probe count | M6 found it 57% of the wall; 12 probes moved one elite past one draw's noise and the mean by 40% |
-| B1, `SearchConfig` and job-path defaults | open, for the user | the CLI now matches practice (refine 0 since M1); the dataclass still defaults to batch 4, 1 worker, no shared policy, and changing it changes every plan digest |
-| E1 / E3, multi-seed ablations | open, for the user | ≥ 5 seeds per arm at ~12 h per 300 gens is 60 h per arm; M1 already answered the refine-steps arm offline |
+| B1, `SearchConfig` and job-path defaults | **done 2026-10-12** (the user) | every dataclass default equals the CLI's (batch 16, min(4, cores) workers, shared policy when torch imports, 12 reference seeds); test checks every field, three mutations caught. Correction: a plan's digest hashes the plan's own hyperparameters, not `SearchConfig`, so no digest changed; a job-path plan that omits these fields hashes the same and now runs the CLI's configuration |
+| E1 / E3, multi-seed ablations | funded 2026-10-12, on CPU; blocked | see [the answers](#answers-2026-10-12-questions-4-6): the CPU path does not run the shared policy |
 | PAPERS item 2, water cruise chosen | open, for the user | the 2026-09-21 rule; the antipodal pair cancels motion the command did not choose, so what remains is the rule's wording |
 | PAPERS item 3, leaking bars | partly read | water and land competence certified on arch49; stage 1 and air leak through the same glide (question 1 below); stage 4's `mission > 0` decides nothing measurable (elite missions ≤ 1e-5) |
 | Skill pretraining, learnability score | waiting on M4 | M4 (7 of 9 runs): learns a fixed body in water, not in air, land split |
 | M5, PPO epochs | waiting on M4 | the harness takes `--epochs`/`--minibatch` (a fixed gradient-step budget is `minibatch = 2048·E/10`); if M4 ends with water learned, M5 runs on the water body |
 
 ### Questions for the user (collected 2026-10-08)
+
+**Answered 2026-10-12:** 4 → adopt E2, air's bar after arch51; 5 → yes
+(B1 done); 6 → fund E1/E3, run on a CPU container, not the GPU machine. See
+[the answers](#answers-2026-10-12-questions-4-6).
 
 **Answered 2026-10-09:** 1 → B (air is scored on a commanded difference too;
 in progress, below), 2 → the gait gain is on in arch51, 3 → M3 stays off,
@@ -5236,6 +5257,69 @@ CI green on all three jobs, the first green physics job since 2026-10-06).
 6. **E1/E3 budget:** run ≥ 5 seeds for the arms that matter (60 h per arm)?
 7. **PRs:** #37 (refine-steps default 0) and #38 (this sweep, stacked on #37)
    are open; arch50 runs from #38's commit 2b7bb53.
+
+### Answers 2026-10-12, questions 4-6
+
+The user accepted each recommendation and added one condition to question 6.
+
+- **4, E2:** adopted; air's L1 bar is set from arch51's still-machine read
+  (E2 section above).
+- **5, B1:** done. `SearchConfig()` now equals `ops.run search` with no
+  flags on every field (`test_the_search_cli_defaults_are_the_stored_run_configuration`;
+  mutations `searchconfig-batch-default-four`, `searchconfig-one-worker`,
+  `searchconfig-shared-policy-off`, all caught). Tests that ran a search on
+  the old defaults now pin `workers=1, use_shared_policy=False`, so they
+  test what they tested before.
+- **6, E1/E3:** funded, to run on this cloud container's CPU (4 cores, 16 GB,
+  no GPU) instead of the GPU machine.
+
+**What the CPU path is, measured before launching anything.**
+`experiments/cpu_path/run.py`: two generations, batch 4, 4 workers, 1 s
+segments, generalist island, shared policy on.
+
+| read | value |
+|---|---|
+| batched evaluator (`evaluate_tier1_batch`) calls | 0 |
+| single-machine evaluator (`evaluate_candidate`) calls | 10 |
+| PPO events | 2, each `transitions: 0`, skipped |
+| wall / user CPU | 600 s / 593 s (one core of four) |
+
+The cause is `evaluate_candidates` (`evolution/loop.py`, the
+`if not batchroll.AVAILABLE` branch). Without the kernel it calls
+`evaluate_candidate` once per machine, in the parent. That function drives
+each machine with its own per-candidate policy (`_controller_for`) and takes
+no shared policy and no PPO buffer, so there is no worker pool and no learning.
+At `--refine-steps 0` a candidate's own weights are zero, so on this path
+arch51's configuration scores open-loop gaits. The `ops.run search` warning
+says so: "a candidate whose own weights are zero commands nothing". That
+warning only fires when the shared policy is off, so it does not fire here.
+The sentence "PPO's update is on the CPU either way" in CLAUDE.md and
+`envs/device.py` was wrong for this path and is corrected in the same commit.
+
+Consequences for E1/E3 here:
+- The arms they compare (shared policy on/off, critic on/off, refinement)
+  are not the algorithm arch51 runs. An E1 "shared policy on" arm would
+  equal its "off" arm.
+- Cost is a lower bound from the probe: 10 evaluations at 1 s segments
+  took 600 s on one core. At 16 evaluations a generation that is about
+  16 min per generation before 8 s segments, so 300 generations take
+  80 h or more per seed. Four seeds on four cores take the same time.
+- The container is reclaimed after inactivity and `runs/` is gitignored
+  (`docs/PORTING.md`). A multi-day run here needs its checkpoint copied off
+  the container on a schedule.
+
+Decision owed by the user. Three options:
+- **(a) Build a CPU batched path.** A numpy `BatchedFluid` behind the
+  kernel's interface (`launch`/`finish`, the forces `physics/fluid.py`
+  already computes), so `evaluate_tier1_batch` runs through the worker pool
+  and feeds PPO. Before E1/E3 use it, it needs:
+  - the two-path agreement check (`tests/test_search.py`) on CPU;
+  - a cost read per generation at arch51's configuration.
+- **(b) Run E1/E3 on the GPU machine,** as costed on 10-08 (about 60 h per
+  arm).
+- **(c) Run here only what the CPU path measures faithfully.** That is
+  offline reads on stored archives (single-machine re-scores, still
+  machines), not search arms.
 
 ## 2026-10-08 — the MuscleMimic comparison, reconciled with the repo
 

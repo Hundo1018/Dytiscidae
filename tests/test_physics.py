@@ -199,7 +199,12 @@ def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
     trained (2026-10-06).  The parser's defaults now are the stored-run
     configuration, except ``--refine-steps``, which is 0 since ROADMAP M1
     (2026-10-08) measured its gain as draw-selection, and ``--mission-weight``,
-    which is 0.0 since ARCH51 (it was 0.30 through arch50)."""
+    which is 0.0 since ARCH51 (it was 0.30 through arch50).
+
+    ``SearchConfig``'s own defaults were the old ones until 2026-10-12 (ROADMAP
+    B1, the user): a job-path plan that omitted batch, workers or the shared
+    policy ran batch 4, one process, no shared policy and 20 reference seeds.
+    Every field now equals the parser's default."""
     print("\nops: `search` with no flags is the configuration the runs used")
     import os
 
@@ -232,6 +237,15 @@ def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
     check("re-evaluation off, depth 8 (ARCH51 L10)",
           (a.reeval_per_generation, a.reeval_depth) == (0, 8),
           f"{a.reeval_per_generation}, {a.reeval_depth}")
+    import dataclasses
+    import importlib.util
+    torch_here = importlib.util.find_spec("torch") is not None
+    cli, dc = search_config_from_args(a, torch_here), SearchConfig()
+    differ = [f"{f.name}: cli {getattr(cli, f.name)!r}, SearchConfig {getattr(dc, f.name)!r}"
+              for f in dataclasses.fields(SearchConfig)
+              if getattr(cli, f.name) != getattr(dc, f.name)]
+    check("every SearchConfig default is the CLI's (ROADMAP B1)", not differ,
+          "; ".join(differ))
     b = build_parser().parse_args(["search", "--reeval-per-generation", "4"])
     check("--reeval-per-generation reaches the SearchConfig",
           search_config_from_args(b, True).reeval_per_generation == 4,

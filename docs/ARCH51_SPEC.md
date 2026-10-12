@@ -701,6 +701,7 @@ Before launch, write `runs/arch51_notes.md` with:
 - N5's three predictions and N11's two, verbatim, read at gens 150 and 300;
 - the comparability sentences;
 - the note that one arm carries both N5 and N11, so a read belongs to the pair.
+- E2's levels (ROADMAP, adopted 2026-10-12): L1 counts per medium, L2 per crossing, L3, on the auditor's held-out seeds, read at gens 150 and 300; and the still-machine distribution in air under the paired score, from which air's L1 bar is set.
 
 Pending the user: whether the air-commanded-difference branch (not merged into main as of 5cc9db9) is in arch51.
 

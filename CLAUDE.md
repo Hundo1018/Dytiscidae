@@ -152,7 +152,10 @@ systemd-run --user --unit archNN --same-dir bash -c \
   the PCI bus, no `/proc/driver/nvidia/gpus/*`, `/dev/nvidia<N>`, `/dev/kfd`),
   the run goes on the numpy path. If a GPU is present (broken driver, stale
   kernel, out of memory, unbuilt extension) it raises `GpuUnusable` instead.
-  PPO's update is on the CPU either way.
+  On the numpy path the search is not the same algorithm: each candidate is
+  scored in the parent on the single-machine evaluator, no worker pool, and
+  the shared policy neither drives a candidate nor receives a transition
+  (`experiments/cpu_path/run.py`, 2026-10-12: PPO 0 transitions, one core).
 - **Launch with `systemd-run --user`, not `setsid nohup`.** A process started
   from a Claude session stays in that session's cgroup scope, and `setsid` does
   not leave it; arch43 died at gen 39 in that scope's OOM.
