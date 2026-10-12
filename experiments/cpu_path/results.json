@@ -1,0 +1,73 @@
+{
+ "kernel_usable": false,
+ "reason": "no GPU on this machine (no NVIDIA/AMD controller under /sys/bus/pci/devices, nothing under /proc/driver/nvidia/gpus, no /dev/nvidia<N> or /dev/kfd); ModuleNotFoundError: No module named 'full_pipeline'",
+ "config": {
+  "generations": 2,
+  "batch": 4,
+  "workers": 4,
+  "segment_seconds": 1.0
+ },
+ "cores": 4,
+ "evaluator_calls": {
+  "batched": 6,
+  "single": 0
+ },
+ "event_kinds": {
+  "evaluate": 10,
+  "stages": 2,
+  "ppo": 2,
+  "stage_wall": 2,
+  "audit": 2
+ },
+ "ppo": [
+  {
+   "gen": 0,
+   "transitions": 3000,
+   "trajectories": 40,
+   "kl": 0.006860980944475159,
+   "grad_steps": 20,
+   "skipped": 0
+  },
+  {
+   "gen": 1,
+   "transitions": 3000,
+   "trajectories": 40,
+   "kl": 0.003327021404857078,
+   "grad_steps": 20,
+   "skipped": 0
+  }
+ ],
+ "generations": [
+  {
+   "gen": 0,
+   "evaluate_s": 151.43,
+   "ppo_s": 0.22,
+   "steps": {
+    "main.identify": 115200,
+    "main.rig": 1196,
+    "main.segments": 6000,
+    "main.transitions": 24000,
+    "rescore.rig": 1196,
+    "rescore.segments": 6000,
+    "rescore.transitions": 24000
+   }
+  },
+  {
+   "gen": 1,
+   "evaluate_s": 156.27,
+   "ppo_s": 0.2,
+   "steps": {
+    "main.identify": 115200,
+    "main.rig": 1196,
+    "main.segments": 6000,
+    "main.transitions": 24000,
+    "rescore.rig": 1196,
+    "rescore.segments": 6000,
+    "rescore.transitions": 24000
+   }
+  }
+ ],
+ "wall_s": 559.9,
+ "cpu_s": 251.1,
+ "cores_used": 0.45
+}
