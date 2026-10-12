@@ -747,9 +747,9 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `choose` | function | 81 | `(usable, present=None) -> tuple` | ``("gpu", "")`` or ``("cpu", reason)``; raises :class:`GpuUnusable`. |
-| `gpu_present` | function | 45 | `(root: Path \| str='/') -> tuple` | ``(present, evidence)``.  ``evidence`` names what was found, or what was looked at. |
-| `GpuUnusable` | class | 41 | `(RuntimeError)` | A GPU is present and the kernel cannot run on it.  Not a CPU fallback. |
+| `choose` | function | 80 | `(usable, present=None) -> tuple` | ``("gpu", "")`` or ``("cpu", reason)``; raises :class:`GpuUnusable`. |
+| `gpu_present` | function | 44 | `(root: Path \| str='/') -> tuple` | ``(present, evidence)``.  ``evidence`` names what was found, or what was looked at. |
+| `GpuUnusable` | class | 40 | `(RuntimeError)` | A GPU is present and the kernel cannot run on it.  Not a CPU fallback. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 

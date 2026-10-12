@@ -1,9 +1,8 @@
 """Which device a search scores on, and the one condition that allows the CPU.
 
 The search scores through the Mojo fluid kernel (``envs.batchroll``).  On the
-numpy path it scores each candidate in the parent on the single-machine
-evaluator, and the shared policy gets no transitions
-(``experiments/cpu_path/run.py``).  Until 2026-10-12
+numpy path the same batched loop runs on ``batchroll.HostFluid``, each
+machine's own ``FluidSolver`` (``experiments/cpu_path/run.py``).  Until 2026-10-12
 ``run_search`` fell back to the numpy path on *any* failure of
 ``batchroll.usable()``: a driver whose kernel module did not match its
 userspace (2026-09-19, ``Failed to initialize NVML: 18``), a kernel older than

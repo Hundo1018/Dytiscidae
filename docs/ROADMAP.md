@@ -3,13 +3,13 @@
 **2026-10-12: the user answered the 10-08 questions 4-6; see
 [the answers](#answers-2026-10-12-questions-4-6).** E2 is adopted with air's
 L1 bar left open until arch51 measures it; `SearchConfig`'s defaults are now
-the CLI's (B1, done); E1/E3 are funded, to run on a CPU container. **They
-cannot run there as the search stands:** without the Mojo kernel the search
-scores each candidate in the parent on the single-machine path, and the
-shared policy neither drives a candidate nor receives a transition
-(`experiments/cpu_path/run.py`: batched evaluator 0 calls, single 10, both PPO
-events 0 transitions and skipped, 593 s user in 600 s wall). Decision owed by
-the user, below.
+the CLI's (B1, done); E1/E3 are funded, to run on a CPU container. Before
+2026-10-12 the search could not run them there: without the Mojo kernel it
+scored each candidate alone and the shared policy received 0 transitions
+(`experiments/cpu_path/run.py`). **Option (a) is now built:** the batched path
+runs on the numpy fluid (`batchroll.HostFluid`). It matches the single path
+to 0, and costs 405-409 s per generation at arch51's configuration on 4 cores.
+The E1/E3 budget is owed by the user, below.
 
 **2026-10-12: wing flexibility is in the model, off by default; see
 [wing flexibility](#2026-10-12--wing-flexibility-a-passive-pitch-hinge-built-off-by-default).**
@@ -5308,7 +5308,28 @@ Consequences for E1/E3 here:
   (`docs/PORTING.md`). A multi-day run here needs its checkpoint copied off
   the container on a schedule.
 
-Decision owed by the user. Three options:
+**The user chose (a) on 2026-10-12; built the same day.** `batchroll.HostFluid`
+gives `BatchedFluid`'s interface over each machine's own numpy `FluidSolver`,
+then jets, then rotors, which is what `TriphibianEnv.step` runs, and
+`evaluate_candidates` always takes the batched path. Measured on this
+container (4-core Xeon, no GPU):
+
+| read | value |
+|---|---|
+| `test_physics`, HostFluid vs `TriphibianEnv.step`, 250 steps | gannet, medusa, quad: qpos and qvel identical (difference 0) |
+| `test_search` two-path agreement, now run on the CPU | beetle and eel: air, water, land, with and without identification, crossings: worst difference 0.000000 |
+| `experiments/cpu_path/run.py` (batch 4, 1 s, 2 gens) | batched 6 calls, single 0; PPO 3000 transitions per generation, updated (kl 0.0069, 0.0033) |
+| arch51's configuration, 10 gens (batch 16, 8 s, 4 workers, `runs/cpu_arch51_timing`) | gen 0 1108 s (with seeding); gens 1-7, the eight-island burst with audit and Tier-2, 640-1064 s; gens 8 and 9, 405 s and 409 s |
+
+The GPU reference is about 110 s per generation early in a run and about
+225 s late (2026-10-03), so early generations here cost about 3.7x. Late
+generations, where rotors accumulate, are not measured on the CPU. Mutations
+`host-fluid-skips-rotors`, `host-fluid-skips-jets`, `host-fluid-no-fluid` and
+`cpu-path-scores-alone` are all caught. `test_search`'s batched-evaluator
+functions now run where no GPU exists. They skip only where `run_search`
+refuses: a GPU that the kernel cannot use.
+
+The options as they stood before the choice:
 - **(a) Build a CPU batched path.** A numpy `BatchedFluid` behind the
   kernel's interface (`launch`/`finish`, the forces `physics/fluid.py`
   already computes), so `evaluate_tier1_batch` runs through the worker pool
