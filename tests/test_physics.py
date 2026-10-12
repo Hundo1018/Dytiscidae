@@ -199,7 +199,12 @@ def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
     trained (2026-10-06).  The parser's defaults now are the stored-run
     configuration, except ``--refine-steps``, which is 0 since ROADMAP M1
     (2026-10-08) measured its gain as draw-selection, and ``--mission-weight``,
-    which is 0.0 since ARCH51 (it was 0.30 through arch50)."""
+    which is 0.0 since ARCH51 (it was 0.30 through arch50).
+
+    ``SearchConfig``'s own defaults were the old ones until 2026-10-12 (ROADMAP
+    B1, the user): a job-path plan that omitted batch, workers or the shared
+    policy ran batch 4, one process, no shared policy and 20 reference seeds.
+    Every field now equals the parser's default."""
     print("\nops: `search` with no flags is the configuration the runs used")
     import os
 
@@ -232,6 +237,15 @@ def test_the_search_cli_defaults_are_the_stored_run_configuration() -> None:
     check("re-evaluation off, depth 8 (ARCH51 L10)",
           (a.reeval_per_generation, a.reeval_depth) == (0, 8),
           f"{a.reeval_per_generation}, {a.reeval_depth}")
+    import dataclasses
+    import importlib.util
+    torch_here = importlib.util.find_spec("torch") is not None
+    cli, dc = search_config_from_args(a, torch_here), SearchConfig()
+    differ = [f"{f.name}: cli {getattr(cli, f.name)!r}, SearchConfig {getattr(dc, f.name)!r}"
+              for f in dataclasses.fields(SearchConfig)
+              if getattr(cli, f.name) != getattr(dc, f.name)]
+    check("every SearchConfig default is the CLI's (ROADMAP B1)", not differ,
+          "; ".join(differ))
     b = build_parser().parse_args(["search", "--reeval-per-generation", "4"])
     check("--reeval-per-generation reaches the SearchConfig",
           search_config_from_args(b, True).reeval_per_generation == 4,
@@ -3761,6 +3775,220 @@ def test_a_universal_joint_flaps_and_feathers() -> None:
           f"{plain.budget.actuators:.3f} -> {p.budget.actuators:.3f} kg of motors")
 
 
+def test_the_host_fluid_steps_a_machine_as_the_single_path_does() -> None:
+    """Without the Mojo kernel the batched path runs on `batchroll.HostFluid`,
+    which must step a machine exactly as `TriphibianEnv.step` does: the numpy
+    `FluidSolver`, then jets, then rotors, then `mj_step`.  Until 2026-10-12
+    the CPU path did not use the batched loop at all, and the shared policy
+    received 0 transitions (`experiments/cpu_path/run.py`).  Three plans cover
+    a wing (gannet), a jet (medusa) and rotors (quad), each 250 steps."""
+    print("\nfluid: the host fluid steps a machine as the single path does")
+    from dytiscidae.core.bodyplans import BODY_PLANS, REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.batchroll import HostFluid, step_batch
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    for plan, dom in (("gannet", Domain.AIR), ("medusa", Domain.WATER),
+                      ("quad", Domain.AIR)):
+        pheno = build({**BODY_PLANS, **REFERENCE_PLANS}[plan]())
+        a, b = TriphibianEnv(pheno, seed=3), TriphibianEnv(pheno, seed=3)
+        a.reset(dom, randomise=False)
+        b.reset(dom, randomise=False)
+        hf = HostFluid([b])
+        for _ in range(250):
+            a.step(a.cpg.command(a.cpg.base, a.data.time))
+            step_batch([b], [b.cpg.command(b.cpg.base, b.data.time)], hf)
+        dq = float(np.max(np.abs(a.data.qpos - b.data.qpos)))
+        dv = float(np.max(np.abs(a.data.qvel - b.data.qvel)))
+        check(f"{plan} in {dom.value}: qpos and qvel identical after 250 steps",
+              dq == 0.0 and dv == 0.0, f"max |dqpos| {dq:.3g}, |dqvel| {dv:.3g}")
+        check(f"{plan}: the machine moved, so the comparison compares something",
+              float(np.max(np.abs(a.data.qvel))) > 1e-3)
+        if plan == "medusa":
+            check("medusa: the observation's submerged fraction matches",
+                  a.solver.diag.mean_submerged == b.solver.diag.mean_submerged
+                  and a.solver.diag.mean_submerged > 0.0,
+                  f"{a.solver.diag.mean_submerged} vs {b.solver.diag.mean_submerged}")
+
+
+def test_without_the_kernel_candidates_take_the_batched_path() -> None:
+    """`evaluate_candidates` with no kernel goes through `_batched` (so the
+    actor pool and the shared policy's buffer), not one machine at a time in
+    the parent, which is what it did until 2026-10-12."""
+    print("\nsearch: without the kernel, candidates take the batched path")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.envs import batchroll
+    from dytiscidae.envs.triphibian import MissionSpec
+    from dytiscidae.evolution import loop
+
+    class _Reached(Exception):
+        pass
+
+    def reached(*a, **k):
+        raise _Reached
+
+    saved = (batchroll.AVAILABLE, loop._batched)
+    try:
+        batchroll.AVAILABLE = False
+        loop._batched = reached
+        try:
+            loop.evaluate_candidates(
+                [BODY_PLANS["beetle"]()],
+                loop.SearchConfig(segment_seconds=0.3, workers=1,
+                                  use_shared_policy=False),
+                identify=False, spec=MissionSpec(), seeds=[1])
+            outcome = "scored without _batched"
+        except _Reached:
+            outcome = "batched"
+        check("no kernel: evaluate_candidates calls _batched", outcome == "batched",
+              outcome)
+    finally:
+        batchroll.AVAILABLE, loop._batched = saved
+
+
+def test_wing_compliance_is_off_unless_asked() -> None:
+    """``Part.pitch_compliance`` and its operator change nothing for a run that
+    does not ask: no joint is emitted for a rigid surface, the curator's arms
+    are ``MUTATION_OPERATORS`` exactly, and the operator lives elsewhere."""
+    print("\ngenome: wing compliance is off unless asked")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.genome import (MUTATION_OPERATORS, OPTIONAL_OPERATORS,
+                                        PITCH_COMPLIANCE_RANGE, mut_wing_compliance)
+    from dytiscidae.core.mjcf import build_model_xml
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.evolution.archive import Archive
+    from dytiscidae.evolution.curator import Curator
+    from dytiscidae.evolution.loop import SearchConfig
+
+    check("the operator is optional, not a default arm",
+          "wing_compliance" not in MUTATION_OPERATORS and "wing_compliance" in OPTIONAL_OPERATORS)
+    a = Archive([("x", 0.0, 1.0, 4), ("y", 0.0, 1.0, 4)])
+    plain = Curator(a, seed=0)
+    asked = Curator(a, seed=0, extra_operators=("wing_compliance",))
+    check("a default curator's arms are exactly MUTATION_OPERATORS",
+          list(plain.bandit.stats) == list(MUTATION_OPERATORS))
+    check("and asking adds the one arm, after them",
+          list(asked.bandit.stats) == list(MUTATION_OPERATORS) + ["wing_compliance"])
+    check("SearchConfig leaves it off", SearchConfig().wing_compliance is False)
+
+    xml, _ = build_model_xml(build(BODY_PLANS["gannet"]()))
+    check("a rigid design emits no pitch hinge", "_jp\"" not in xml)
+
+    rng = np.random.default_rng(7)
+    g = BODY_PLANS["gannet"]()
+    seen_on, back_to_rigid, in_range = 0, 0, True
+    for _ in range(200):
+        before = [part.pitch_compliance for part in g.parts]
+        mut_wing_compliance(g, rng)
+        for b, part in zip(before, g.parts):
+            c = part.pitch_compliance
+            if c > 0:
+                in_range &= PITCH_COMPLIANCE_RANGE[0] <= c <= PITCH_COMPLIANCE_RANGE[1]
+            back_to_rigid += b > 0 and c == 0.0
+        seen_on = max(seen_on, sum(1 for part in g.parts if part.pitch_compliance > 0))
+    check("the operator turns surfaces flexible, inside the gene's range",
+          seen_on > 0 and in_range, f"up to {seen_on} flexible parts")
+    check("and can make a flexible one rigid again", back_to_rigid > 0,
+          f"{back_to_rigid} of 200 moves")
+    check("it never touches a non-surface",
+          all(part.pitch_compliance == 0.0 for part in g.parts if not part.is_surface))
+    u = BODY_PLANS["gannet"]()
+    for part in u.parts:
+        if part.is_surface:
+            part.joint = "universal"
+    check("nor a universal joint, which has a driven feathering hinge already",
+          not mut_wing_compliance(u, rng) or all(
+              part.pitch_compliance == 0.0 for part in u.parts if part.joint == "universal"))
+
+
+def _held_at_trim(genome, seconds: float = 3.0, flap_hz: float | None = None):
+    """The airframe pinned at its own rigid trim speed and attitude, the passive
+    hinges free, the joints held at their mean -- or, with ``flap_hz``, running
+    the design's own gait at that frequency: mean fluid force over the last
+    half, and each pitch hinge's mean absolute deflection."""
+    from dataclasses import replace
+    import mujoco
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(genome), seed=0)
+    v, pitch = env._trim()[:2]
+    env.reset(Domain.AIR, randomise=False)
+    d, m = env.data, env.model
+    q0 = d.qpos[:7].copy()
+    q0[3:7] = (math.cos(-pitch / 2), 0.0, math.sin(-pitch / 2), 0.0)
+    jp = [int(m.jnt_qposadr[j]) for j in range(m.njnt)
+          if (mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_JOINT, j) or "").endswith("_jp")]
+    mean = env.cpg.base.offset.copy()
+    gait = None if flap_hz is None else replace(env.cpg.base, frequency=flap_hz)
+    n = int(seconds / env.timestep)
+    F, q = [], []
+    for k in range(n):
+        d.qpos[:7] = q0
+        d.qpos[0] = q0[0] + v * d.time
+        d.qvel[:6] = 0.0
+        d.qvel[0] = v
+        env.step(mean if gait is None else env.cpg.command(gait, d.time))
+        if k > n // 2:
+            F.append(d.xfrc_applied[:, :3].sum(0).copy())
+            q.append(np.abs(d.qpos[jp]) if jp else np.zeros(0))
+    return np.mean(F, axis=0), np.mean(q, axis=0), int(d.warning[mujoco.mjtWarning.mjWARN_BADQACC].number)
+
+
+def test_a_flexible_wing_gives_way_under_load() -> None:
+    """A passive pitch hinge at the leading edge, loaded at the quarter chord,
+    must wash the wing out: deflection grows with compliance, lift and drag
+    fall with it, the two wings of a pair deflect alike, a near-rigid hinge is
+    the rigid wing, and nothing flutters.  2026-10-12: the first sizing
+    (damping on the spring alone) limit-cycled at +-0.3 rad and lost 90% of
+    the gannet's lift (`core.mjcf.PITCH_DAMPING_RATIO`)."""
+    print("\nmjcf: a flexible wing gives way under load")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.genome import MEMBRANE, WING
+
+    def gannet(c):
+        g = BODY_PLANS["gannet"]()
+        for part in g.parts:
+            if part.kind in (WING, MEMBRANE):
+                part.pitch_compliance = c
+        return g
+
+    rows = {c: _held_at_trim(gannet(c)) for c in (0.0, 0.05, 1.0, 4.0)}
+    lift = {c: float(r[0][2]) for c, r in rows.items()}
+    drag = {c: -float(r[0][0]) for c, r in rows.items()}
+    defl = {c: (float(np.abs(r[1]).mean()) if len(r[1]) else 0.0) for c, r in rows.items()}
+    check("deflection grows with compliance",
+          defl[0.05] < defl[1.0] < defl[4.0], f"{defl}")
+    check("lift falls with it: the hinge washes the wing out, not in",
+          lift[0.0] > lift[1.0] > lift[4.0], f"{ {k: round(v, 2) for k, v in lift.items()} } N")
+    check("and so does drag", drag[0.0] > drag[1.0] > drag[4.0],
+          f"{ {k: round(v, 2) for k, v in drag.items()} } N")
+    # Measured 2026-10-12: 0.011 rad (0.13 of the deflection at 1) keeps 95.9%
+    # of the lift -- at trim incidence half a degree is a few percent of lift.
+    check("a near-rigid hinge barely moves (under a fifth of the deflection at 1)",
+          defl[0.05] < 0.2 * defl[1.0], f"{defl[0.05]:.4f} vs {defl[1.0]:.4f} rad")
+    check("and keeps nearly all the rigid lift (over 93%)",
+          lift[0.05] > 0.93 * lift[0.0], f"{lift[0.05]:.2f} vs {lift[0.0]:.2f} N")
+    q = rows[1.0][1]
+    check("the two wings of each pair deflect alike (a mirrored hinge axis)",
+          len(q) >= 2 and np.allclose(q[0::2], q[1::2], rtol=0.05, atol=1e-3), f"{q}")
+    check("at trim no hinge sits on its stop", defl[4.0] < 0.5, f"{defl[4.0]:.3f} rad")
+    check("and no step warned of a bad acceleration",
+          all(r[2] == 0 for r in rows.values()), f"{[r[2] for r in rows.values()]}")
+
+    # Flapping, the damping is what holds the hinge.  Measured 2026-10-12 on the
+    # beetle at 7 Hz, compliance 2: 0.091 rad and -1.96 N of drag as built;
+    # damped on the spring alone it flutters, 0.43 rad and -28 N.
+    b = BODY_PLANS["beetle"]()
+    for part in b.parts:
+        if part.kind in (WING, MEMBRANE):
+            part.pitch_compliance = 2.0
+    F, q, bad = _held_at_trim(b, flap_hz=7.0)
+    check("a flapping flexible wing does not flutter (beetle, 7 Hz, compliance 2)",
+          float(q.mean()) < 0.2 and float(F[0]) > -10.0 and bad == 0,
+          f"{float(q.mean()):.3f} rad, Fx {float(F[0]):+.2f} N, bad qacc {bad}")
+
+
 def test_the_wagner_slam_pressure() -> None:
     """S-02: Wagner's spray-root peak, 0.5 rho (pi V / (2 tan b))^2."""
     print("\nstructure: Wagner's slam pressure")
@@ -4472,6 +4700,10 @@ def main() -> int:
         test_a_fall_scores_no_flight,
         test_the_rotor_model_matches_a_measured_propeller,
         test_a_universal_joint_flaps_and_feathers,
+        test_the_host_fluid_steps_a_machine_as_the_single_path_does,
+        test_without_the_kernel_candidates_take_the_batched_path,
+        test_wing_compliance_is_off_unless_asked,
+        test_a_flexible_wing_gives_way_under_load,
         test_the_wagner_slam_pressure,
         test_lift_and_drag_are_integrated_implicitly,
         test_the_limiter_and_the_weight_cancellation,

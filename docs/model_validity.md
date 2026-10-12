@@ -75,7 +75,13 @@ not a criticism; it is the specification.
 * **Ventilation and cavitation.** A paddle near the free surface entrains air
   and produces a fraction of the modelled force.
 * **Flexibility.** Bodies are rigid in the dynamics. Structural compliance is
-  checked statically and never deflects a surface.
+  checked statically. One exception, off unless a design has it: a surface with
+  `Part.pitch_compliance > 0` gets a passive pitch hinge at its leading edge, a
+  rigid plate on a torsion spring (`core.mjcf.passive_pitch_spring`,
+  `derivations/pitch_compliance.md`). That is chordwise flexibility as a single
+  degree of freedom per surface. There is no spanwise bending, no camber change
+  under load, and no twist that varies along the span: the whole surface pitches
+  as one.
 * **Off-diagonal added mass.** The added-mass tensor is 6x6; MuJoCo takes a
   scalar mass and a diagonal inertia, so translation-rotation coupling cannot
   be represented at all.

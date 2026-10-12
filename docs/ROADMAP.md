@@ -1,5 +1,35 @@
 # Roadmap
 
+**2026-10-12: the user answered the 10-08 questions 4-6; see
+[the answers](#answers-2026-10-12-questions-4-6).** E2 is adopted with air's
+L1 bar left open until arch51 measures it; `SearchConfig`'s defaults are now
+the CLI's (B1, done); E1/E3 are funded, to run on a CPU container. Before
+2026-10-12 the search could not run them there: without the Mojo kernel it
+scored each candidate alone and the shared policy received 0 transitions
+(`experiments/cpu_path/run.py`). **Option (a) is now built:** the batched path
+runs on the numpy fluid (`batchroll.HostFluid`). It matches the single path
+to 0, and costs 405-409 s per generation at arch51's configuration on 4 cores.
+The E1/E3 budget is owed by the user, below.
+
+**2026-10-12: wing flexibility is in the model, off by default; see
+[wing flexibility](#2026-10-12--wing-flexibility-a-passive-pitch-hinge-built-off-by-default).**
+`Part.pitch_compliance` gives a surface a passive pitch hinge at its leading
+edge, sized on its 1 g share of the weight; `--wing-compliance` lets the search
+set it. Rigid designs compile byte-identically. On a fixed rig the beetle at
+7 Hz gains 41% of flapping thrust at compliance 0.5; elsewhere the main effect
+is passive load alleviation. Still machines gain nothing on the gannet
+(2/10 seeds rigid, 2/10 flexible). Three reads stand before a run uses it.
+
+**2026-10-11: an outside paper on butterfly wing morphology (npj Robotics 4:52)
+was checked against the repo; see
+[the butterfly wing-morphology paper](#2026-10-11--the-butterfly-wing-morphology-paper-reconciled-with-the-repo).**
+Its usable part is the measurement method, not its DQN optimiser. Three items,
+pre-registered and unrun: W1 counts elites pinned at a clipped genome bound
+(stored data); W3 adds Ellington's r̂1/r̂2 to the critic's features if
+out-of-fold skill rises; W2 sweeps one gene at a time on fixed elites and
+reads η² against the draw and against a still twin. Five other methods are not
+adopted, each with its reason.
+
 **2026-10-10: a theory of why the search does not progress, with its
 predictions, before any measurement; see
 [why the search does not progress](#2026-10-10--why-the-search-does-not-progress-a-theory-its-predictions-and-the-list).**
@@ -2994,6 +3024,276 @@ costs, and the gates that hold it to "changes nothing when off".
 
 ---
 
+## 2026-10-12 — wing flexibility: a passive pitch hinge, built, off by default
+
+Asked by the user: add wing-surface flexibility to the model. Built as
+chordwise flexibility, one passive degree of freedom per lifting surface. It is
+off by default in two ways:
+- a design without the gene compiles byte-identically to before (MJCF sha256
+  of all 7 body plans compared against HEAD);
+- a run without `--wing-compliance` draws the same operators.
+
+**What it is.** `Part.pitch_compliance = c > 0` gives a surface a hinge
+`<seg>_jp` about its own span axis through the leading edge, on a torsion
+spring with a damper, ±1 rad stops, and no motor
+(`core.mjcf.passive_pitch_spring`, `derivations/pitch_compliance.md`). The
+strips carry their load at the quarter chord, aft of the hinge, so load
+pitches the surface nose-down. This is the pseudo-rigid-body model of
+insect-scale passive pitch (Whitney & Wood 2010).
+- `c` is the deflection at 1 g in units of 0.1 rad: the surface's area share
+  of the weight, spread over its planform. So it reads the same on a fin and
+  a wing, in either medium, at any gait.
+- Range [0.05, 4] (`PITCH_COMPLIANCE_RANGE`).
+- Not built on a universal joint, which already has a driven hinge about the
+  same axis.
+- Not observed or commanded by the policy: `_act_qadr` is built from actuators.
+- The fluid model is untouched. Both evaluation paths read body poses from the
+  same MJCF, so no kernel rebuild is needed. The two-path agreement was **not
+  run**: this container has no Mojo kernel.
+- `--wing-compliance` (`SearchConfig.wing_compliance`) adds the
+  `wing_compliance` operator, which lives in `OPTIONAL_OPERATORS`, not
+  `MUTATION_OPERATORS`, to every island's bandit.
+
+**One design failed first, and the failure is kept in the code comment.** The
+first sizing referenced an air dynamic pressure at 6 m/s and damped the hinge
+at 10% of the *spring's* critical value. On the gannet pinned at its trim
+(15.3 m/s), compliance 0.25 limit-cycled the wing at ±0.3 rad and lift fell
+from 55.9 N to 5.8 N. Two changes removed it: the 1 g weight reference, and
+damping sized on spring plus aerodynamic stiffness. The strip model reads
+velocity at the quarter chord and carries almost no aerodynamic pitch damping.
+
+**Measured** (`experiments/wing_compliance/run.py`, numpy path, open loop,
+`results.json` and `still_gannet.json`, 301 s plus the still read):
+
+Fixed rig, airframe pinned at its rigid trim speed and attitude. "Held" has
+the joints at their gait mean. ΔFx = Fx(flapping) − Fx(held) is the flapping
+thrust increment.
+
+| plan, freq | c = 0 | c = 0.5 | c = 1 | c = 4 |
+|---|---|---|---|---|
+| beetle 7 Hz, ΔFx (N) | +1.37 | **+1.93** | +1.71 | +1.34 |
+| beetle 7 Hz, Fz flapping (N; W 50.3) | 52.2 | 43.2 | 35.9 | 17.8 |
+| beetle 2.2 Hz (own), ΔFx | +1.28 | +1.18 | +1.08 | +0.85 |
+| bat 7 Hz, ΔFx | −23.7 | −20.5 | −18.8 | −28.6 (hinges on the stop 67% of the time) |
+| bat 3.1 Hz (own), ΔFx | −8.2 | −5.4 | −5.3 | −3.7 (stop 20%) |
+| teal 5 Hz (own), ΔFx | −2.56 | −2.52 | −2.49 | −2.55 |
+| gannet held lift (N; W 52.0) | 55.9 | 49.1 | 39.5 | 17.7 |
+| gannet held drag (N) | 4.53 | 3.01 | 2.68 | 2.19 |
+
+- The textbook effect appears in one case. The beetle flapping at 7 Hz gains
+  41% of flapping thrust at c = 0.5. At its own 2.2 Hz it gains nothing.
+- The bat's membrane gains at c ≤ 1 and loses at c ≥ 2. At c = 0.25 and 0.5
+  its rows are identical: the timestep cap on stiffness acted on both
+  (`clipped`), so its light surfaces cannot be made stiffer than that.
+- At a fixed attitude every flexible wing loses lift. That is passive load
+  alleviation (`derivations/pitch_compliance.md`: a surface keeps
+  `k / (k + k_a)` of its lift, half at c = 1). The rig does not re-trim, so it
+  understates a flexible machine.
+
+Still machine on the air segment (gannet, 10 seeds, CLAUDE.md rules 1, 6, 7):
+
+| arm | rigid | c = 1 |
+|---|---|---|
+| still: seeds scoring > 0, mean competence | 2/10, 0.048 | 2/10, 0.032 |
+| own gait | 2/10, 0.038 | 0/10, 0.000 |
+
+The flexible wing does not pay a still machine more than the rigid one does.
+The rigid still gannet clearing air on 2 of 10 seeds is a leak in the
+current air score that predates this change. CLAUDE.md rule 8 records the same
+family on arch49's gannets; it is not reopened here. The other three plans
+scored 0 in every arm on 3 seeds. Open loop, flexibility made the gannet's
+own gait worse (2/10 → 0/10). Nothing re-trims for the lift it loses, so this
+says nothing about a trained controller.
+
+**Held by:**
+- `test_wing_compliance_is_off_unless_asked`;
+- `test_a_flexible_wing_gives_way_under_load`, which includes the beetle 7 Hz
+  flutter case: 0.093 rad as built, 0.43 rad damped on the spring alone.
+
+Four mutations, all caught:
+- `pitch-hinge-not-emitted`;
+- `pitch-hinge-unmirrored`;
+- `pitch-damping-on-the-spring-only`. It first survived the gannet-only test;
+  the flapping case was added for it.
+- `wing-compliance-always-an-arm`. The first version was an equivalent mutant
+  and was rewritten.
+
+**Not built, and where the model stops:**
+- No spanwise bending.
+- No camber change under load.
+- No twist that varies along the span: the whole surface pitches as one.
+- Deflection is per surface. On the gannet the outer panel deflects twice its
+  area share (0.115 vs 0.057 rad), because the 1 g split is by area, not by
+  where the lift is.
+
+**Before a run uses it** (`--wing-compliance`), each is a pre-registered read:
+1. **Two paths.** The batched and single paths agree on a flexible design, on
+   a machine with the kernel (`tests/test_search.py` agreement check).
+2. **Still machine.** The still-machine read on the current population, not
+   on seed plans: flexible elites' still twins must not clear any medium more
+   often than rigid ones.
+3. **A/B.** An A/B run pair with and without the operator, same seed. Read
+   the share of elites that turn flexible, and their per-medium competence
+   against rigid elites in the same cells.
+
+None changes comparability for a run without the switch.
+
+---
+
+## 2026-10-11 — the butterfly wing-morphology paper, reconciled with the repo
+
+Asked by the user: take what is usable from Huang, Chen et al., "Bio-inspired
+exploration of butterfly wing morphology guides deep reinforcement learning
+optimization of robotic flight", npj Robotics 4:52 (2026),
+doi:10.1038/s44182-026-00116-w. Extraction with every number:
+[papers/s44182-026-00116-w.md](papers/s44182-026-00116-w.md). Nothing below
+was measured here: `runs/` and `.venv` do not exist in this container
+(docs/PORTING.md). The three items are pre-registered and unrun.
+
+**What the paper did.** A 48 g flapping robot, three wing parameters (TC
+trailing-edge convergence, L forewing length, H hindwing length), seven values
+per parameter one at a time (19 wings), five free flights per wing under
+motion capture, one-way ANOVA per parameter. Then a surrogate network
+(parameters → flight metrics) and a DQN that walks [TC, L, H] in ±steps on that
+surrogate. Lift metric +339%, thrust metric +46%, flight tests within 7% of the
+surrogate. Exhaustive search of the surrogate finds the same optima, and
+Bayesian optimisation matches the DQN (Supp. Fig. 1). The usable part is how they
+measured, not the optimiser.
+
+### What exists here already (searched first)
+
+| paper | repo | where |
+|---|---|---|
+| stall/fall exclusion before analysis (speed < 1.55 m/s, ascent < −5°) | the same lesson, gated: CLAUDE.md "Designing a measurement" rules 1-2 | `triphibian._score_segment`, air gates |
+| the falling wing (L = 22.5 cm) had the **highest** speed and advance ratio | rule 1, another instance from outside: falling gets paid | — |
+| five replicate flights per wing | per-candidate draws (M2), median-of-draws re-evaluation (N11) | `SearchConfig.draw_per_candidate`, ARCH51_SPEC N11 |
+| surrogate validated on held-out physical wings (3, nRMSE < 0.15) | critic: 5-fold out-of-fold, labels from Tier-2 at a fresh seed | `evolution/critic.py:319-323`, `loop.py:2988` |
+| advance ratio V/f | reduced frequency k = πfc/U per elite (the inverse quantity) | `experiments/reduced_frequency_share/run.py` |
+| flight test reproduces the predicted score (−6.6% to 1.6%) | a film counts only if it reproduces its score | `film_manifest.json`, CLAUDE.md "Reading telemetry" |
+| aspect ratio | per surface and per machine; a critic feature | `core/phenotype.py:309-312, 1107-1121`; `CRITIC_FEATURES` |
+
+### W1. Count elites pinned at a genome bound — stored data, minutes
+
+**Paper:** both surrogate optima lay on the physical bounds
+([0.65, 31.5, 25] and [0.8, 25.3, 26.5]). The paper widened the bounds and
+re-ran: the lift optimum moved out to L = 33.6, past the old bound L = 31.5,
+and the thrust optimum to TC = 0.85, past 0.80. Both bounds were binding.
+
+**Repo:** every jittered gene is clipped
+(`core/genome.py:405-407`, `_jitter` → `np.clip(x * exp(N(0, rel)), lo, hi)`).
+Clipping does not reflect: once a gene sits at its bound, about half of its
+later jitters clip back to the same value, so the bound holds probability mass
+that selection did not choose. Bounds that can bind: span 2.5, root_chord 0.9
+(`:417-418`), flap_frequency 20 (`:1073`), scale 3.0 (`:1095`), series_stiffness 3,
+drive_compliance 4 (`:441-447`), stroke_amplitude 1 (`:562-565`). There is no
+telemetry for this. The repo has 57 ROADMAP hits on "bound", and none is about
+genes.
+
+**Measure:** on arch49, arch50 and arch51's final archives, per gene, take the
+share of elites within 1% of each clip bound. Compare it with a null: the same
+share in lineages of the same mutation count with selection removed. Those are
+the random bodies of `experiments/random_sampling_control` (N8), each mutated
+for the median elite lineage length.
+
+**Read, written before the data:** a gene is *binding* when its elite share at
+a bound exceeds the null's one-sided 95% upper bound, **and** those pinned
+elites' own-medium competence is above the island median. Only a binding gene
+earns the paper's widened-bounds probe: re-score the pinned elites offline
+with the gene stepped 10%, 20% and 40% past the bound, same `eval_seed`, the
+numpy path, and the still-machine twin alongside (rule 1). A widened bound is
+proposed only if the competence gain clears the still twin's gain.
+
+**Comparability:** none; this reads stored data and changes nothing.
+
+### W2. One factor at a time on fixed elites, with η² against the draw — CPU, hours (pilot first)
+
+**Paper:** seven values per parameter, five replicate flights, one-way ANOVA
+per parameter. η² ranged from 0.77 to 0.97 (L on ascent 0.97, H on phase
+offset 0.97). The paper's own case against population correlations is that a
+parameter's effect is confounded by everything else that varies with it. Its
+example is Dudley's finding of no aspect-ratio effect.
+
+**Repo:** no such sweep exists. The repo has no ANOVA, η², Sobol or OFAT code in
+`experiments/` or `tools/`. The ±50% coefficient pass at :1763 was never built.
+The only morphology read is a population correlation (arch37,
+[§4 above](#4-wing-morphology-is-being-evolved-in-the-direction-that-does-not-matter)):
+aspect ratio +0.004 with reaching `glides`, while it climbed 8.47 → 14.76. That
+read has the same confound the paper names. C2 measured draw variance at
+2.5-4.6× design variance, so a gene's effect must be judged against the draw,
+not against zero.
+
+**Measure:**
+- Bodies and genes: 8 elites per island where the medium is in the island's mix (arch51 when finished, else arch50). Vary one gene at a time over 7 log-spaced values within its clip range, centred on the elite's own value. Genes: span, root_chord, flap_frequency, stroke_amplitude, scale.
+- Draws and scoring: 5 held-out draws per point. Shared PPO checkpoint fixed. Antipodal or mirror pair as scored (rule 8). Score with `evaluate.evaluate_tier1`, and repeat one body per island on `batchroll.evaluate_tier1_batch` for the two-path check.
+- Control: the same grid on `held_still_params` twins (rules 1, 6 and 7).
+- Size: 5 × 7 × 5 × 8 = 1,400 evaluations per island, doubled for the still twins.
+- Pilot: run one body and one gene first and record the wall time before committing the rest. No cost is estimated here.
+
+**Report:** per gene and medium, η² = between-value variance / (between +
+within-draw variance). Also report the still twin's η² for the same cell.
+
+**Read, written before the data:**
+- *Effective:* η² on the elite exceeds both the still twin's η² and the share expected from draw variance alone (permutation of the value labels, 1,000 shuffles, 95th percentile).
+- Effective genes are where mutation budget and step size should go. A gene effective only on the still twin pays passive physics. The paper's falling wing is this case, as were arch37's aspect ratio and the 30 m/s wingless throw.
+- Nothing is changed on this read alone. The proposal it can produce is per-gene `rel` in `_jitter` and per-operator weights, and that proposal comes back to the user.
+
+### W3. Ellington's r̂1, r̂2 as features for the critic — stored labels, offline
+
+**Paper:** wings are described by AR, r̂1 and r̂2 (Eq. 5, Ellington 1984).
+TC moves r̂1 and r̂2 and barely moves AR. TC also moved speed (r = 0.86) and
+advance ratio (r = 0.87). AR alone does not describe how area is spread
+along the span.
+
+**Repo:** the fluid model integrates blade-element strips
+(`physics/fluid.py:19`, `L = q * p.area * cl * lift_scale` at `:1158`), so r̂2
+adds nothing to the physics. It is missing from everything that summarises a
+body: the critic sees `aspect_ratio`, `log_wing_loading` and `log_mass`, not
+area distribution (`evolution/critic.py:97-104`). The repo has no `r1_hat`,
+`r2_hat` or "second moment". The chord-along-span arrays exist per surface
+(`core/phenotype.py:1107`, the `np.trapezoid(sf.chord, sf.u)` that gives AR).
+For a flapping wing the quasi-steady force scales with S·R²·r̂2² at a given
+frequency and amplitude. This is a mechanism the critic cannot form from AR
+and wing loading.
+
+**Measure:** compute r̂1, r̂2 per machine from the phenotype, area-weighted
+over lifting surfaces. Add r̂2 and log(S·R²·r̂2²) to the critic's features and
+re-run `experiments/critic_skill/run.py` on arch49's and arch50's labels. This
+needs the labelled designs' genomes. If `search_state.pkl` keeps only the
+feature rows, re-expand the genomes from the archive, and say which labels
+could not be matched.
+
+**Read, written before the data:** adopt only if out-of-fold skill (the
+critic's own definition, `critic.py:432-435`) rises in at least two of three
+media by more than the fold-to-fold standard deviation. Otherwise record the
+null and leave `CRITIC_FEATURES` alone.
+
+**Not a descriptor.** The descriptors are behavioural on purpose
+(`evolution/descriptors.py:45-48`). A morphology axis would reward shape
+variety the medium does not care about.
+
+### Not adopted, with the reason
+
+- **The DQN optimiser, the multistep-memory reward and the bound buffer.** The paper's state is three continuous numbers, small enough that exhaustive search of the surrogate found the optimum, and Bayesian optimisation matched the DQN. Here the genome is a variable-size part graph with a CPPN per surface. MAP-Elites is the search, and the controller is already a learned policy inside every evaluation.
+  - The memory reward is a moving-average filter on a deterministic surrogate. The noise it filters here is the draw, which M2 and N11 handle at the source.
+  - The bound buffer prevents early episode termination in an episodic walk. Mutation here has no episode to terminate, and clipping already keeps the other coordinates.
+- **L_p = θ/f and T_p = V/f as objectives.** Dividing by frequency is undefined for a still machine (f = 0). Rule 4 says "could not measure" must not share a value with zero, so the ratio would have to publish nothing there. Frequency here is policy-modulated through the mobility basis (`control/cpg.py:141-142, 418`), so a per-frequency score would push the policy toward slow flapping in addition to anything about the body. Reduced frequency already covers the regime question (D2).
+  - `SegmentResult.cost_of_transport` (`envs/triphibian.py:175`) is defined and has no caller. If an actuation-normalised score is wanted, that is the existing hook, and it needs its own still-machine check before use.
+- **Trend + sinusoid fit for the climb (Eq. 11-13) in place of `sink_rate`'s endpoint difference.** With heave amplitude a, the endpoint difference over a window T is off by at most 2a/T. At the 4 s cap and a = 0.1 m that is 0.05 m/s, 3% of the 1.5 m/s flight scale (`triphibian.py:2506`) and under 1% of the glide scale (`SINK_BALLISTIC` = 6 m/s).
+  - The defect CLAUDE.md records for `sink_rate` is a drop and return. A least-squares slope over a V-shaped trace is also near zero, so the fit does not fix it; `station_keeping` does.
+  - The slope is already computed as a diagnostic (`:2579-2583`, `np.polyfit`) and stays one.
+- **Fore/hind-wing phase offset from differential flexibility (H: η² 0.97).** The model has no structural wing compliance, only drive compliance (`genome.py:108, 125`). Surfaces are rigid strips (docs/model_validity.md), so a passive phase offset cannot arise. There is no fore/hind distinction to vary.
+- **Similarity to a biological r̂1–r̂2 regression.** This is plausibility, not performance. If W3 builds r̂1 and r̂2, plot elites against an insect regression in the report as a diagnostic. Take the coefficients from Ellington 1984 II itself, not from memory.
+
+### Order
+
+Ranked by the 2026-09-30 rule (build cost, then loop speed, then effect on the
+search): **W1** (stored data, no simulator), **W3** (stored labels, no
+simulator), **W2** (simulator, hours; pilot first). None changes scoring or
+comparability unless its read says adopt, and every adoption comes back to the
+user.
+
+---
+
 ## 2026-10-10 — why the search does not progress: a theory, its predictions, and the list
 
 Asked by the user: find why training fails or falls short, from theory first,
@@ -4801,6 +5101,12 @@ must survive a fresh seed).
 | L3 mission | one design completes the continuous mission (`mission_fraction > 0` with both transitions, film reproduced) on ≥ 3 of 5 held-out seeds | 0 |
 | L4 target | L3 at 15 kg, 10 m depth, 45 min (README §"On the 15 kg / 10 m / 45 min target") | — |
 
+**Adopted 2026-10-12 (the user, question 4).** L1-L4 as tabled. Air's L1
+bar is left open: under the paired air score (2026-10-10) no bar has been
+certified against still machines, and a typed one would break rule 5. arch51's
+still-machine read on its own population sets it. arch51's notes carry L1, L2
+and L3 counts on held-out seeds at gens 150 and 300 (`docs/ARCH51_SPEC.md`).
+
 Each level is read on the auditor's held-out seeds, never on the draw that
 selected the design.
 
@@ -4966,14 +5272,18 @@ third seed. The decision rule is applied when the run finishes
 | D1, flexibility | deferred | its measurement is thrust lost to deflection, and thrust is not where any elite stops (C3) |
 | D3, off-diagonal added mass | deferred | its own condition: only if D1/D2/C3 leave air short of thrust; they leave it short of staying up |
 | G, identification | closed for probe count | M6 found it 57% of the wall; 12 probes moved one elite past one draw's noise and the mean by 40% |
-| B1, `SearchConfig` and job-path defaults | open, for the user | the CLI now matches practice (refine 0 since M1); the dataclass still defaults to batch 4, 1 worker, no shared policy, and changing it changes every plan digest |
-| E1 / E3, multi-seed ablations | open, for the user | ≥ 5 seeds per arm at ~12 h per 300 gens is 60 h per arm; M1 already answered the refine-steps arm offline |
+| B1, `SearchConfig` and job-path defaults | **done 2026-10-12** (the user) | every dataclass default equals the CLI's (batch 16, min(4, cores) workers, shared policy when torch imports, 12 reference seeds); test checks every field, three mutations caught. Correction: a plan's digest hashes the plan's own hyperparameters, not `SearchConfig`, so no digest changed; a job-path plan that omits these fields hashes the same and now runs the CLI's configuration |
+| E1 / E3, multi-seed ablations | funded 2026-10-12, on CPU; blocked | see [the answers](#answers-2026-10-12-questions-4-6): the CPU path does not run the shared policy |
 | PAPERS item 2, water cruise chosen | open, for the user | the 2026-09-21 rule; the antipodal pair cancels motion the command did not choose, so what remains is the rule's wording |
 | PAPERS item 3, leaking bars | partly read | water and land competence certified on arch49; stage 1 and air leak through the same glide (question 1 below); stage 4's `mission > 0` decides nothing measurable (elite missions ≤ 1e-5) |
 | Skill pretraining, learnability score | waiting on M4 | M4 (7 of 9 runs): learns a fixed body in water, not in air, land split |
 | M5, PPO epochs | waiting on M4 | the harness takes `--epochs`/`--minibatch` (a fixed gradient-step budget is `minibatch = 2048·E/10`); if M4 ends with water learned, M5 runs on the water body |
 
 ### Questions for the user (collected 2026-10-08)
+
+**Answered 2026-10-12:** 4 → adopt E2, air's bar after arch51; 5 → yes
+(B1 done); 6 → fund E1/E3, run on a CPU container, not the GPU machine. See
+[the answers](#answers-2026-10-12-questions-4-6).
 
 **Answered 2026-10-09:** 1 → B (air is scored on a commanded difference too;
 in progress, below), 2 → the gait gain is on in arch51, 3 → M3 stays off,
@@ -5003,6 +5313,90 @@ CI green on all three jobs, the first green physics job since 2026-10-06).
 6. **E1/E3 budget:** run ≥ 5 seeds for the arms that matter (60 h per arm)?
 7. **PRs:** #37 (refine-steps default 0) and #38 (this sweep, stacked on #37)
    are open; arch50 runs from #38's commit 2b7bb53.
+
+### Answers 2026-10-12, questions 4-6
+
+The user accepted each recommendation and added one condition to question 6.
+
+- **4, E2:** adopted; air's L1 bar is set from arch51's still-machine read
+  (E2 section above).
+- **5, B1:** done. `SearchConfig()` now equals `ops.run search` with no
+  flags on every field (`test_the_search_cli_defaults_are_the_stored_run_configuration`;
+  mutations `searchconfig-batch-default-four`, `searchconfig-one-worker`,
+  `searchconfig-shared-policy-off`, all caught). Tests that ran a search on
+  the old defaults now pin `workers=1, use_shared_policy=False`, so they
+  test what they tested before.
+- **6, E1/E3:** funded, to run on this cloud container's CPU (4 cores, 16 GB,
+  no GPU) instead of the GPU machine.
+
+**What the CPU path is, measured before launching anything.**
+`experiments/cpu_path/run.py`: two generations, batch 4, 4 workers, 1 s
+segments, generalist island, shared policy on.
+
+| read | value |
+|---|---|
+| batched evaluator (`evaluate_tier1_batch`) calls | 0 |
+| single-machine evaluator (`evaluate_candidate`) calls | 10 |
+| PPO events | 2, each `transitions: 0`, skipped |
+| wall / user CPU | 600 s / 593 s (one core of four) |
+
+The cause is `evaluate_candidates` (`evolution/loop.py`, the
+`if not batchroll.AVAILABLE` branch). Without the kernel it calls
+`evaluate_candidate` once per machine, in the parent. That function drives
+each machine with its own per-candidate policy (`_controller_for`) and takes
+no shared policy and no PPO buffer, so there is no worker pool and no learning.
+At `--refine-steps 0` a candidate's own weights are zero, so on this path
+arch51's configuration scores open-loop gaits. The `ops.run search` warning
+says so: "a candidate whose own weights are zero commands nothing". That
+warning only fires when the shared policy is off, so it does not fire here.
+The sentence "PPO's update is on the CPU either way" in CLAUDE.md and
+`envs/device.py` was wrong for this path and is corrected in the same commit.
+
+Consequences for E1/E3 here:
+- The arms they compare (shared policy on/off, critic on/off, refinement)
+  are not the algorithm arch51 runs. An E1 "shared policy on" arm would
+  equal its "off" arm.
+- Cost is a lower bound from the probe: 10 evaluations at 1 s segments
+  took 600 s on one core. At 16 evaluations a generation that is about
+  16 min per generation before 8 s segments, so 300 generations take
+  80 h or more per seed. Four seeds on four cores take the same time.
+- The container is reclaimed after inactivity and `runs/` is gitignored
+  (`docs/PORTING.md`). A multi-day run here needs its checkpoint copied off
+  the container on a schedule.
+
+**The user chose (a) on 2026-10-12; built the same day.** `batchroll.HostFluid`
+gives `BatchedFluid`'s interface over each machine's own numpy `FluidSolver`,
+then jets, then rotors, which is what `TriphibianEnv.step` runs, and
+`evaluate_candidates` always takes the batched path. Measured on this
+container (4-core Xeon, no GPU):
+
+| read | value |
+|---|---|
+| `test_physics`, HostFluid vs `TriphibianEnv.step`, 250 steps | gannet, medusa, quad: qpos and qvel identical (difference 0) |
+| `test_search` two-path agreement, now run on the CPU | beetle and eel: air, water, land, with and without identification, crossings: worst difference 0.000000 |
+| `experiments/cpu_path/run.py` (batch 4, 1 s, 2 gens) | batched 6 calls, single 0; PPO 3000 transitions per generation, updated (kl 0.0069, 0.0033) |
+| arch51's configuration, 10 gens (batch 16, 8 s, 4 workers, `runs/cpu_arch51_timing`) | gen 0 1108 s (with seeding); gens 1-7, the eight-island burst with audit and Tier-2, 640-1064 s; gens 8 and 9, 405 s and 409 s |
+
+The GPU reference is about 110 s per generation early in a run and about
+225 s late (2026-10-03), so early generations here cost about 3.7x. Late
+generations, where rotors accumulate, are not measured on the CPU. Mutations
+`host-fluid-skips-rotors`, `host-fluid-skips-jets`, `host-fluid-no-fluid` and
+`cpu-path-scores-alone` are all caught. `test_search`'s batched-evaluator
+functions now run where no GPU exists. They skip only where `run_search`
+refuses: a GPU that the kernel cannot use.
+
+The options as they stood before the choice:
+- **(a) Build a CPU batched path.** A numpy `BatchedFluid` behind the
+  kernel's interface (`launch`/`finish`, the forces `physics/fluid.py`
+  already computes), so `evaluate_tier1_batch` runs through the worker pool
+  and feeds PPO. Before E1/E3 use it, it needs:
+  - the two-path agreement check (`tests/test_search.py`) on CPU;
+  - a cost read per generation at arch51's configuration.
+- **(b) Run E1/E3 on the GPU machine,** as costed on 10-08 (about 60 h per
+  arm).
+- **(c) Run here only what the CPU path measures faithfully.** That is
+  offline reads on stored archives (single-machine re-scores, still
+  machines), not search arms.
 
 ## 2026-10-08 — the MuscleMimic comparison, reconciled with the repo
 

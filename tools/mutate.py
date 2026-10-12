@@ -782,6 +782,29 @@ MUTATIONS: tuple = (
         defect="a GPU kernel older than its source is used to score anyway, so "
                "the search and every verification run different physics",
         suites=("test_search::test_a_kernel_older_than_its_source_is_not_usable",), item="kernel freshness"),
+    Mutation(
+        id="cpu-fallback-with-a-gpu-present",
+        path="dytiscidae/envs/device.py",
+        find="    if has_gpu:\n        raise GpuUnusable(",
+        replace="    if False:\n        raise GpuUnusable(",
+        defect="a GPU that is present but broken, stale or out of memory sends "
+               "the run to the CPU path instead of refusing it",
+        suites=("test_device",), item="device choice"),
+    Mutation(
+        id="gpu-presence-ignores-the-pci-bus",
+        path="dytiscidae/envs/device.py",
+        find="    if pci.is_dir():\n",
+        replace="    if False:\n",
+        defect="a GPU whose driver is not loaded is read as no GPU, so a broken "
+               "driver takes the CPU fallback",
+        suites=("test_device",), item="device choice"),
+    Mutation(
+        id="run-search-skips-the-device-choice",
+        path="dytiscidae/evolution/loop.py",
+        find="    _backend, _why = _device.choose(_br.usable)\n",
+        replace="    _ok, _why = _br.usable()\n    _backend = \"gpu\" if _ok else \"cpu\"\n",
+        defect="run_search falls back to the CPU on any kernel failure, GPU or not",
+        suites=("test_device",), item="device choice"),
 
     Mutation(
         id="worker-inherits-the-pyenv-shim",
@@ -822,6 +845,44 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_the_gait_gain_can_stop_a_machine",),
         item="gait gain"),
     Mutation(
+        id="pitch-hinge-not-emitted",
+        path="dytiscidae/core/mjcf.py",
+        find="        if spring is not None:\n            # Chordwise flexibility",
+        replace="        if False:\n            # Chordwise flexibility",
+        defect="a flexible surface compiles rigid: the gene is stored, mutated and "
+               "never reaches the model",
+        suites=("test_physics::test_a_flexible_wing_gives_way_under_load",),
+        item="wing compliance"),
+    Mutation(
+        id="pitch-hinge-unmirrored",
+        path="dytiscidae/core/mjcf.py",
+        find="                pax = pax * np.array([-1.0, -1.0, 1.0])",
+        replace="                pax = pax",
+        defect="the mirrored wing's pitch hinge turns the same way in the world, so "
+               "one wing of a pair washes in while the other washes out",
+        suites=("test_physics::test_a_flexible_wing_gives_way_under_load",),
+        item="wing compliance"),
+    Mutation(
+        id="pitch-damping-on-the-spring-only",
+        path="dytiscidae/core/mjcf.py",
+        find="math.sqrt((k + k_aero) * (inertia + armature))",
+        replace="math.sqrt(k * (inertia + armature)) * 0.1",
+        defect="the hinge's damping ignores the aerodynamic stiffness, the sizing "
+               "that limit-cycled the gannet's wing at trim (2026-10-12)",
+        suites=("test_physics::test_a_flexible_wing_gives_way_under_load",),
+        item="wing compliance"),
+    Mutation(
+        id="wing-compliance-always-an-arm",
+        path="dytiscidae/evolution/curator.py",
+        find="            list(MUTATION_OPERATORS) + [n for n in extra_operators if n in OPTIONAL_OPERATORS]\n"
+             "            if extra_operators else None)",
+        replace="            list(MUTATION_OPERATORS) + list(OPTIONAL_OPERATORS)\n"
+                "            if True else None)",
+        defect="every run's bandit draws the optional operator, so a run without "
+               "--wing-compliance changes its operator set and every seeded draw",
+        suites=("test_physics::test_wing_compliance_is_off_unless_asked",),
+        item="wing compliance"),
+    Mutation(
         id="search-cli-refine-default-two",
         path="dytiscidae/ops/run.py",
         find='p.add_argument("--refine-steps", type=int, default=0,',
@@ -831,6 +892,65 @@ MUTATIONS: tuple = (
                "measured (8-23% of the accepted gain survives a fresh draw)",
         suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
         item="cli defaults"),
+    Mutation(
+        id="searchconfig-batch-default-four",
+        path="dytiscidae/evolution/loop.py",
+        find="    batch: int = 16  # candidates per generation",
+        replace="    batch: int = 4  # candidates per generation",
+        defect="a job-path plan that omits batch runs 4 candidates a generation, "
+               "not the 16 every stored run used (ROADMAP B1)",
+        suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
+        item="cli defaults"),
+    Mutation(
+        id="searchconfig-one-worker",
+        path="dytiscidae/evolution/loop.py",
+        find="    workers: int = field(default_factory=_default_workers)",
+        replace="    workers: int = 1",
+        defect="a job-path plan that omits workers runs single-process (ROADMAP B1)",
+        suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
+        item="cli defaults"),
+    Mutation(
+        id="searchconfig-shared-policy-off",
+        path="dytiscidae/evolution/loop.py",
+        find="    use_shared_policy: bool = field(default_factory=_torch_importable)",
+        replace="    use_shared_policy: bool = False",
+        defect="a job-path plan that omits the shared policy runs without the "
+               "controller every stored run trained (ROADMAP B1)",
+        suites=("test_physics::test_the_search_cli_defaults_are_the_stored_run_configuration",),
+        item="cli defaults"),
+    Mutation(
+        id="host-fluid-skips-rotors",
+        path="dytiscidae/envs/batchroll.py",
+        find="            if e.rotors.n:\n                e.rotors.apply(e.model, e.data, e.medium, t)\n",
+        replace="",
+        defect="on the CPU batched path a rotor machine flies with its rotors off",
+        suites=("test_physics::test_the_host_fluid_steps_a_machine_as_the_single_path_does",),
+        item="host fluid"),
+    Mutation(
+        id="host-fluid-skips-jets",
+        path="dytiscidae/envs/batchroll.py",
+        find="            if e.jets.n:\n                e.jets.apply(e.model, e.data, e.medium, t, e.timestep)\n",
+        replace="",
+        defect="on the CPU batched path a jet machine swims with no jet thrust",
+        suites=("test_physics::test_the_host_fluid_steps_a_machine_as_the_single_path_does",),
+        item="host fluid"),
+    Mutation(
+        id="host-fluid-no-fluid",
+        path="dytiscidae/envs/batchroll.py",
+        find="            e.solver.apply(e.data, t)\n",
+        replace="",
+        defect="on the CPU batched path no machine feels the air or the water",
+        suites=("test_physics::test_the_host_fluid_steps_a_machine_as_the_single_path_does",),
+        item="host fluid"),
+    Mutation(
+        id="cpu-path-scores-alone",
+        path="dytiscidae/evolution/loop.py",
+        find="        _warn_cpu_fallback()\n\n",
+        replace="        _warn_cpu_fallback()\n        return [(None, None, None)] * len(genomes)\n\n",
+        defect="without the kernel the batched path is skipped, as the serial "
+               "fallback skipped it until 2026-10-12",
+        suites=("test_physics::test_without_the_kernel_candidates_take_the_batched_path",),
+        item="host fluid"),
     Mutation(
         id="cli-mission-weight-default-back",
         path="dytiscidae/ops/run.py",

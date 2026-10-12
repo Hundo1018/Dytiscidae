@@ -61,22 +61,35 @@ from .judge import Judge
 from .scout import Scout, novelty_of, scout_features
 
 
+def _default_workers() -> int:
+    return min(4, os.cpu_count() or 1)
+
+
+def _torch_importable() -> bool:
+    import importlib.util
+    return importlib.util.find_spec("torch") is not None
+
+
 @dataclass
 class SearchConfig:
     """Everything adjustable about a run.
 
-    The defaults are tuned for a four-core CPU with no GPU, which is the
-    environment this was developed in.  ``segment_seconds`` is the main
+    The defaults are the configuration every stored run launched with
+    (ROADMAP B1, the user 2026-10-12): batch 16, ``min(4, cores)`` workers,
+    the shared policy on when torch is installed, 12 reference seeds -- the
+    same as ``ops.run search``'s, so a job-path plan that omits a field runs
+    what the command line runs.  Until 2026-10-12 a plan that omitted them ran
+    batch 4, one process, no shared policy and 20 reference seeds, silently.  ``segment_seconds`` is the main
     cost/fidelity dial: halving it roughly halves the run time and roughly
     doubles the variance of every Tier-1 score.
     """
 
     generations: int = 200
-    batch: int = 4  # candidates per generation
+    batch: int = 16  # candidates per generation
     seed: int = 0
 
-    #: Worker processes stepping machines in parallel.  1 is the old
-    #: single-process behaviour and is what every stored run used.
+    #: Worker processes stepping machines in parallel, ``min(4, cores)``.  1 is
+    #: the single-process path.
     #:
     #: Measured on this machine: 16 workers of 8 machines return 12.7x the
     #: throughput of one worker of 8, at 26% more wall per worker, because only
@@ -88,7 +101,7 @@ class SearchConfig:
     #: more shards than ``batch // min_shard``.  Using twenty cores means
     #: raising ``batch``, which is a search-design decision, not a throughput
     #: one -- so it is left to the caller rather than done here.
-    workers: int = 1
+    workers: int = field(default_factory=_default_workers)
     #: 2 with a queue of two shards per worker, since 2026-10-03.  On random
     #: bodies 4 shards of 4 were the swept optimum (31.7 s, against 1x16 72.2,
     #: 2x8 47.6, 8x2 51.8, 16x1 93.3); on late, rotor-heavy bodies a design's
@@ -213,7 +226,7 @@ class SearchConfig:
     #: generalises across bodies, the per-candidate (1+1)-ES adapts to the one
     #: body it lives on, and the two intents are summed.  Per-candidate PPO is
     #: not an option -- see learning/ppo.py for the arithmetic.
-    use_shared_policy: bool = False
+    use_shared_policy: bool = field(default_factory=_torch_importable)
     shared_hidden: int = 64
     shared_lr: float = 1e-3
     shared_epochs: int = 10
@@ -246,7 +259,7 @@ class SearchConfig:
     shared_lr_anneal: bool = True
 
     # Seeding
-    n_reference_seeds: int = 20
+    n_reference_seeds: int = 12
     n_random_seeds: int = 8
 
     # Output
@@ -284,6 +297,14 @@ class SearchConfig:
     #: action space.  Changes both policies' shapes, so nothing trained without
     #: it transfers.  Off by default: every stored run was scored without it.
     gait_gain: bool = False
+    #: Lets the search make lifting surfaces flexible: the ``wing_compliance``
+    #: operator (``core.genome.OPTIONAL_OPERATORS``) joins every island's
+    #: bandit, and it sets ``Part.pitch_compliance``, a passive pitch hinge
+    #: (``core.mjcf.passive_pitch_spring``).  Off by default: without it the
+    #: operator set and every seeded draw over it are those of earlier runs, and
+    #: no design can become flexible.  A design that is already flexible
+    #: (seeded, migrated, resumed) compiles flexible either way.
+    wing_compliance: bool = False
     event_sample: int = 1
 
     # --- the archipelago ---------------------------------------------------
@@ -551,10 +572,11 @@ def _warn_cpu_fallback() -> None:
 
     from ..envs import batchroll
     print(
-        "\n*** GPU fluid extension not importable; this run is on the CPU. ***\n"
+        "\n*** GPU fluid kernel not usable; this run is on the CPU. ***\n"
         f"    reason: {batchroll.UNAVAILABLE_REASON}\n"
-        "    Build it with `cd mojo && pixi run build`.  Every timing and\n"
-        "    every wall-clock estimate below is the CPU path.\n",
+        "    The batched path runs with the numpy fluid (HostFluid): same\n"
+        "    search, same shared policy, several times slower per step.\n"
+        "    Every timing and wall-clock estimate below is the CPU path.\n",
         file=sys.stderr, flush=True)
 
 
@@ -629,15 +651,10 @@ def evaluate_candidates(
         return out
 
     if not batchroll.AVAILABLE:
+        # The same batched path, with the numpy fluid (`batchroll.HostFluid`).
+        # Until 2026-10-12 this branch scored each candidate alone in the
+        # parent, and the shared policy saw none of it.
         _warn_cpu_fallback()
-        with _phase(cost, "evaluate.main"):
-            for i in passed:
-                out[i] = evaluate_candidate(
-                    genomes[i], cfg, inherited_policy=inherited[i],
-                    identify=wants[i], spec=spec, seed=seeds[i], bases=bases[i])
-        if cost is not None:
-            cost.count("main", [out[i][1] for i in passed])
-        return out
 
     ctrls = []
     for i in passed:
@@ -1623,15 +1640,17 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
     # a driver version mismatch does not surface until the pipeline is
     # constructed, so a run could pass every guard, build its archive and die at
     # the first batch hours later.  ``usable()`` probes construction in a
-    # subprocess; a failure downgrades AVAILABLE so the per-generation guard
-    # below takes the CPU path and says so, at t=0, with the reason.
+    # subprocess.  A failure takes the CPU path only on a machine with no GPU
+    # (``envs.device``); with a GPU present it raises ``GpuUnusable`` here, at
+    # t=0, with the reason.  The CPU path downgrades AVAILABLE so the
+    # per-generation guard below takes it and says so.
     from ..envs import batchroll as _br
+    from ..envs import device as _device
 
-    if _br.AVAILABLE:
-        _ok, _why = _br.usable()
-        if not _ok:
-            _br.AVAILABLE = False
-            _br.UNAVAILABLE_REASON = _why
+    _backend, _why = _device.choose(_br.usable)
+    if _backend == "cpu":
+        _br.AVAILABLE = False
+        _br.UNAVAILABLE_REASON = _why
 
     # Pin the commit the checkpoints will name to the one this process started
     # from; see ``ops.checkpoint._git_sha``.
@@ -1664,7 +1683,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                  for (n, lo, hi, b) in BD_AXES]
     for name in cfg.islands:
         a = Archive(boot_axes)
-        cur = Curator(a, seed=cfg.seed)
+        cur = Curator(a, seed=cfg.seed, extra_operators=(
+            ("wing_compliance",) if getattr(cfg, "wing_compliance", False) else ()))
         archipelago.register(name, a, cur)
         curricula[name] = curriculum_for(name)
         # So that pruning or quarantining a cell also drops its stage: the

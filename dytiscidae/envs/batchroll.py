@@ -580,6 +580,65 @@ class BatchedFluid:
             self._rotors.apply(rot, t)
 
 
+
+class HostFluid:
+    """`BatchedFluid`'s interface over each machine's own numpy `FluidSolver`.
+
+    The batched path on a machine with no GPU (`envs.device`, 2026-10-12).
+    Until then the search fell back to scoring each candidate alone on the
+    single-machine evaluator, in the parent, where the shared policy neither
+    drove a machine nor received a transition (`experiments/cpu_path/run.py`:
+    0 PPO transitions, one core of four).  With this, `step_batch` and
+    everything built on it -- the actor pool, the shared policy, the PPO
+    buffer -- run unchanged, and the fluid is exactly what
+    `TriphibianEnv.step` applies: `FluidSolver.apply`, then jets, then rotors.
+
+    `launch` computes nothing, so there is no overlap with the host to buy;
+    `finish` does the work.  `reset_slam` resets nothing: every caller resets
+    or restores its machines first, and both call `FluidSolver.reset`.
+    """
+
+    def __init__(self, envs):
+        self.envs = list(envs)
+        self.nm = len(self.envs)
+        self.power = None
+        self._pending = None
+        self._epoch = 0
+
+    def reset_slam(self):
+        self._epoch += 1
+        self._pending = None
+
+    def ready(self, t: float) -> bool:
+        return self._pending == (t, self._epoch)
+
+    def apply(self, t: float, active=None) -> None:
+        self.launch(t, active)
+        self.finish(t, active)
+
+    def launch(self, t: float, active=None) -> None:
+        self._pending = (t, self._epoch)
+
+    def finish(self, t: float, active=None) -> None:
+        self._pending = None
+        for i, e in enumerate(self.envs):
+            if active is not None and not active[i]:
+                continue
+            e.solver.apply(e.data, t)
+            if e.jets.n:
+                e.jets.apply(e.model, e.data, e.medium, t, e.timestep)
+            if e.rotors.n:
+                e.rotors.apply(e.model, e.data, e.medium, t)
+
+
+def batched_fluid(envs):
+    """The fluid for a batch: the Mojo kernel when it imports, else `HostFluid`.
+
+    `run_search` has already refused a machine with a GPU the kernel cannot
+    use (`envs.device.choose`), so reaching `HostFluid` there means no GPU.
+    """
+    return BatchedFluid(envs) if AVAILABLE else HostFluid(envs)
+
 def observation_finite(obs) -> bool:
     """Whether a machine's observation can be handed to a policy.
 
@@ -702,7 +761,7 @@ def identify_batch(envs, domain, *, probe_time: float = 1.2, n_probes: int = 24,
     snaps = [e.snapshot() for e in envs]
     bases = [e.cpg.base for e in envs]
 
-    bf = BatchedFluid(envs)
+    bf = batched_fluid(envs)
 
     for p in range(n_probes):
         for sign in (1.0, -1.0):
@@ -1065,7 +1124,7 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
         results[i].eval_seed = seeds[i]
 
     group = [envs[i] for i in live]
-    bf = BatchedFluid(group)
+    bf = batched_fluid(group)
     streams = list(range(k)) if streams is None else [int(x) for x in streams]
     if len(streams) != k:
         raise ValueError(f"streams has {len(streams)} entries for {k} phenotypes")

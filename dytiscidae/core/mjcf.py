@@ -19,7 +19,7 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 
-from ..physics.medium import SEAWATER
+from ..physics.medium import GRAVITY, SEAWATER
 from .genome import BALLAST, FOOT, HULL, PADDLE, STRUT
 from .genome import WING as WING_KIND
 from .phenotype import AVIONICS_MASS, Phenotype, Segment
@@ -476,6 +476,86 @@ def _add_geoms(
 #: stroke; one radian is inside that and is a modelling choice.
 FEATHER_RANGE = 1.0
 
+#: The reference load a passive pitch hinge is sized against
+#: (``passive_pitch_spring``): the surface's share of the machine's weight,
+#: carried as lift spread over its area and acting at the quarter chord.  So
+#: ``Part.pitch_compliance`` reads the same on a 20 g fin and a 5 kg wing, in
+#: either medium, at any gait.  A flapping or manoeuvring wing sees several g,
+#: and deflects that many times more.
+#: Deflection at 1 g for a compliance of 1, rad (~6 degrees).
+PITCH_REF_DEFLECTION = 0.1
+#: Incidence at which a surface carries its 1 g share, rad, for the
+#: aerodynamic stiffness that sizes the damping below.  ~6 degrees.
+PITCH_REF_INCIDENCE = 0.1
+#: Damping of the hinge, as a fraction of critical for the spring *plus* the
+#: aerodynamic stiffness at 1 g.  It stands in for aerodynamic pitch damping,
+#: which the strip model barely carries: it reads each strip's velocity at its
+#: quarter chord, where thin-airfoil theory puts the pitch-rate term at three
+#: quarters.  Measured 2026-10-12 on the gannet's held wing at trim (15.3 m/s,
+#: k = 0.29 N m/rad): damping sized on the spring alone (0.0075 N m s/rad)
+#: limit-cycled at +-0.3 rad and lost 90% of the lift; sized on spring plus
+#: aerodynamic stiffness it does not, and 0.1 and 1.0 of critical gave the same
+#: forces to 0.01 N.  1.0 is the overdamped end of that measured-equal range.
+PITCH_DAMPING_RATIO = 1.0
+#: Highest natural frequency of the hinge, as a fraction of 1/timestep.  MuJoCo
+#: integrates joint stiffness explicitly; 0.5 rad per step keeps the spring well
+#: inside the explicit stability limit (2 rad per step).
+PITCH_MAX_OMEGA_DT = 0.5
+
+
+def passive_pitch_spring(s: Segment, weight_share: float, timestep: float) -> dict | None:
+    """Stiffness, damping and armature of a surface's passive pitch hinge.
+
+    ``None`` when the surface is rigid (``pitch_compliance`` 0), is not a
+    surface, has a driven feathering hinge already (``"universal"``), or is the
+    root.  The hinge is about the surface's own span axis (local +X) through the
+    leading edge, which is where ``build_panels`` puts the axis; the strips
+    carry their load at the quarter chord, aft of it, so load pitches the
+    surface nose-down.
+
+    ``weight_share`` is the part of the machine's weight this surface carries
+    at 1 g, N (the caller splits the weight by planform area).  Spread
+    uniformly over the area, it makes a moment about the leading edge
+
+        M_1g = 0.25 * (weight_share / S) * integral c(u)^2 du
+        k    = M_1g / (compliance * PITCH_REF_DEFLECTION)
+
+    and the damping is ``PITCH_DAMPING_RATIO`` of critical for ``k`` plus the
+    aerodynamic stiffness ``M_1g / PITCH_REF_INCIDENCE``.  The stiffness is
+    capped so the hinge stays resolvable at ``timestep``; ``clipped`` says when
+    the cap acted.  Derivation: ``derivations/pitch_compliance.md``.
+    """
+    c = float(getattr(s.part, "pitch_compliance", 0.0))
+    if c <= 0.0 or s.parent < 0 or not s.is_surface or s.surface is None:
+        return None
+    if s.part.joint == "universal":
+        return None
+    sf = s.surface
+    u = np.asarray(sf.u, float)
+    chord = np.asarray(sf.chord, float)
+    if len(u) < 2:
+        return None
+    area = max(float(np.trapezoid(chord, u)), 1e-9)
+    m_1g = 0.25 * (max(weight_share, 1e-6) / area) * float(np.trapezoid(chord**2, u))
+    k = m_1g / (c * PITCH_REF_DEFLECTION)
+    # A thin plate of the surface's mass, about its leading edge.
+    inertia = (s.mass / area) * float(np.trapezoid(chord**3 / 3.0, u))
+    armature = max(1e-4, 0.01 * s.mass)
+    k_max = (PITCH_MAX_OMEGA_DT / timestep) ** 2 * (inertia + armature)
+    clipped = k > k_max
+    k = float(min(k, k_max))
+    k_aero = m_1g / PITCH_REF_INCIDENCE
+    damping = 2.0 * PITCH_DAMPING_RATIO * math.sqrt((k + k_aero) * (inertia + armature))
+    return {"stiffness": k, "damping": max(damping, 1e-6), "armature": armature,
+            "inertia": inertia, "moment_1g": m_1g, "clipped": bool(clipped)}
+
+
+def _lifting_area(s: Segment) -> float:
+    if not s.is_surface or s.surface is None or len(s.surface.u) < 2:
+        return 0.0
+    return max(float(np.trapezoid(s.surface.chord, s.surface.u)), 0.0)
+
+
 #: A propeller's top speed is set by its tip speed, m/s: small propellers are
 #: run to about Mach 0.4-0.5 at most, and 150 m/s is inside that.
 ROTOR_TIP_SPEED = 150.0
@@ -505,6 +585,12 @@ def build_model_xml(
     wb = root.find("worldbody")
     assert wb is not None
     flap_hz = float(getattr(p.genome, "flap_frequency", 1.5))
+    opt = root.find("option")
+    timestep = float(opt.get("timestep", 0.002)) if opt is not None else 0.002
+    # Each surface's 1 g share of the weight, by planform area, for the passive
+    # pitch hinges (`passive_pitch_spring`).
+    s_lift = sum(_lifting_area(s) for s in p.segments)
+    weight = float(p.mass) * GRAVITY
 
     segs = p.segments
     if not segs:
@@ -620,6 +706,28 @@ def build_model_xml(
                         aname, fname, fa.stall_torque,
                         float(getattr(s.part, "drive_compliance", 1.0)),
                     ))
+        spring = passive_pitch_spring(
+            s, weight * _lifting_area(s) / max(s_lift, 1e-9), timestep)
+        if spring is not None:
+            # Chordwise flexibility: a passive hinge about the span through the
+            # leading edge, sprung to zero, no motor (`passive_pitch_spring`).
+            # The same axis as a universal joint's feathering hinge, mirrored
+            # the same way.  Not an actuator, so it is not in the controller's
+            # observation or command (`_act_qadr` is built from actuators).
+            pax = np.array([1.0, 0.0, 0.0])
+            if s.mirrored:
+                pax = pax * np.array([-1.0, -1.0, 1.0])
+            ET.SubElement(body, "joint", {
+                "name": f"{s.name}_jp",
+                "type": "hinge",
+                "axis": _fmt(pax),
+                "range": f"{_fmt(-FEATHER_RANGE)} {_fmt(FEATHER_RANGE)}",
+                "stiffness": _fmt(spring["stiffness"]),
+                "springref": "0",
+                "damping": _fmt(spring["damping"]),
+                "armature": _fmt(spring["armature"]),
+            })
+            s.pitch_spring = spring
         rot = getattr(s, "rotor", None)
         if rot is not None:
             # A propeller at the tip, spinning about the part's local +Z, on a

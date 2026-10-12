@@ -49,7 +49,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..core.genome import MUTATION_OPERATORS, STRUCTURAL_OPERATORS
+from ..core.genome import MUTATION_OPERATORS, OPTIONAL_OPERATORS, STRUCTURAL_OPERATORS
 from .archive import Archive, Elite
 
 
@@ -201,6 +201,7 @@ class Curator:
         seed: int = 0,
         tier2_budget_fraction: float = 0.08,
         crowding_limit: int = 14,
+        extra_operators: tuple[str, ...] = (),
     ) -> None:
         self.archive = archive
         #: Set by the loop.  When a cell is dropped its curriculum stage has to
@@ -208,7 +209,12 @@ class Curator:
         #: reports a progress the archive no longer contains.
         self.curriculum = None
         self.rng = np.random.default_rng(seed)
-        self.bandit = OperatorBandit()
+        #: ``extra_operators`` names entries of ``OPTIONAL_OPERATORS`` this run
+        #: switched on (``SearchConfig.wing_compliance``); without them the
+        #: bandit's arms are exactly ``MUTATION_OPERATORS``, as before.
+        self.bandit = OperatorBandit(
+            list(MUTATION_OPERATORS) + [n for n in extra_operators if n in OPTIONAL_OPERATORS]
+            if extra_operators else None)
         self.tier2_budget_fraction = tier2_budget_fraction
         self.crowding_limit = crowding_limit
 

@@ -178,6 +178,7 @@ def search_config_from_args(args, shared: bool):
         descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
         tier2_label_all_media=not args.no_tier2_label_all_media,
         gait_gain=bool(args.gait_gain),
+        wing_compliance=bool(args.wing_compliance),
         segment_seconds=args.segment_seconds,
         controller_refine_steps=args.refine_steps,
         controller_refine_sigma=args.refine_sigma,
@@ -1171,6 +1172,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="give both policies a gait-gain output, a factor on the "
                         "commanded amplitude, so stopping and throttling are "
                         "reachable (control.cpg.GAIN_RANGE); off by default")
+    p.add_argument("--wing-compliance", action="store_true",
+                   help="let the search make lifting surfaces flexible: a "
+                        "passive pitch hinge per surface (Part.pitch_compliance, "
+                        "operator wing_compliance); off by default")
     p.add_argument("--action-rate-penalty", type=float, default=0.0,
                    help="weight of the command-rate penalty on competence "
                         "(ROADMAP item Y); 0 = off")

@@ -44,7 +44,7 @@ tool call that can time out and kill it.
 on every change:
 
 ```bash
-for s in index architecture domain application search_adapter adapters worker; do
+for s in index architecture domain application search_adapter adapters worker device; do
     PYTHONPATH=. .venv/bin/python tests/test_$s.py | tail -1
 done
 ```
@@ -147,6 +147,18 @@ systemd-run --user --unit archNN --same-dir bash -c \
      > runs/archNN.log 2>&1 < /dev/null'
 ```
 
+- **CPU fallback only without a GPU** (2026-10-12, `envs/device.py`). At t=0
+  `run_search` scores on the Mojo kernel if `batchroll.usable()` passes. If it
+  fails and the machine has no GPU (no NVIDIA/AMD display or 3D controller on
+  the PCI bus, no `/proc/driver/nvidia/gpus/*`, `/dev/nvidia<N>`, `/dev/kfd`),
+  the run goes on the numpy path. If a GPU is present (broken driver, stale
+  kernel, out of memory, unbuilt extension) it raises `GpuUnusable` instead.
+  On the numpy path the batched loop runs unchanged on `batchroll.HostFluid`
+  (each machine's own `FluidSolver`): worker pool, shared policy and PPO as
+  on the GPU. It matches the single path to 0 (`test_physics`, `test_search`'s
+  agreement test). It costs 405-409 s per generation at arch51's
+  configuration on 4 cores, against about 110 s on the GPU
+  (`runs/cpu_arch51_timing`, 2026-10-12, generations 8-9).
 - **Launch with `systemd-run --user`, not `setsid nohup`.** A process started
   from a Claude session stays in that session's cgroup scope, and `setsid` does
   not leave it; arch43 died at gen 39 in that scope's OOM.

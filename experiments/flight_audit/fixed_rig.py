@@ -24,7 +24,10 @@ sys.path.insert(0, "experiments/flight_audit")
 from feather_fly import feathered  # noqa: E402
 
 
-def rig(genome, params, seconds=4.0, hold=False, unsteady=True, inflow=True, kinematic=False):
+def rig(genome, params, seconds=4.0, hold=False, unsteady=True, inflow=True, kinematic=False,
+        on_sample=None):
+    """``on_sample(env)``, if given, is called at every averaged step (the
+    last half), for a caller that wants more than the mean forces."""
     env = TriphibianEnv(build(genome), seed=0)
     env.solver.unsteady = unsteady
     env.solver.inflow = env.solver.inflow and inflow
@@ -56,6 +59,8 @@ def rig(genome, params, seconds=4.0, hold=False, unsteady=True, inflow=True, kin
             F[2] -= (m.body_mass.sum() - env.solver._dry_mass.sum()) * 9.80665
             fx.append(F[0]); fz.append(F[2])
             reach.append(d.qpos[qadr].copy())
+            if on_sample is not None:
+                on_sample(env)
     reach = np.array(reach)
     stroke = (reach.max(0) - reach.min(0)) / np.maximum(2 * params.amplitude, 1e-9)
     weight = float(env.solver._dry_mass.sum() * 9.80665)
