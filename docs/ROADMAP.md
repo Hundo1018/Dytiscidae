@@ -4201,7 +4201,10 @@ counts, films (arch49's filmed design records land 0.015 and reproduces
 reevaluations. P1 runs the same control law plus about 1e-16 of noise at seeds
 that are fresh anyway, so it is unbiased but not bit-exact. Lane F2 restores
 the fresh layout in `bases_from_record` and adds a round-trip test that
-compares bit for bit.
+compares bit for bit (`test_math::test_a_restored_basis_commands_bit_for_bit_what_the_fresh_one_did`,
+mutation `restored-basis-loses-the-fresh-layout`, caught). **Merged into
+`main` 2026-10-12.** Offline re-measurements of stored elites (probes,
+reproduction counts, films, reevaluations) are not comparable across it.
 
 **What this changes in the theory.** A perturbation of 1e-16 in one command
 moves a land score from 0.099 to 0. A land score is then not a property of a

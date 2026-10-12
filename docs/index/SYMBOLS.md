@@ -338,14 +338,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `basis_from_probes` | function | 593 | `(deltas, responses, *, medium: str='air', max_modes: int=6) -> MobilityBasis` | Fit the mobility basis from probe deltas and their measured responses. |
+| `basis_from_probes` | function | 601 | `(deltas, responses, *, medium: str='air', max_modes: int=6) -> MobilityBasis` | Fit the mobility basis from probe deltas and their measured responses. |
 | `CPG` | class | 95 | — | A bank of phase-coupled oscillators, one per actuated joint. |
 | `CPGParams` | class | 46 | — | Open parameters of the pattern generator. |
 | `gait_gain` | function | 206 | `(intent: float) -> float` | The amplitude factor a gain intent asks for. |
-| `identify_mobility` | function | 547 | `(step_fn, reset_fn, n_params: int, *, n_probes: int=24, probe_scale: float=0.35, medium: str='air', rng: np.random.Generator \| None=None, max_modes: int=6) -> MobilityBasis` | Empirically identify a body's control axes. |
+| `identify_mobility` | function | 555 | `(step_fn, reset_fn, n_params: int, *, n_probes: int=24, probe_scale: float=0.35, medium: str='air', rng: np.random.Generator \| None=None, max_modes: int=6) -> MobilityBasis` | Empirically identify a body's control axes. |
 | `MobilityBasis` | class | 246 | — | The control axes a particular body actually has, in a particular medium. |
-| `Policy` | class | 640 | — | Maps observations to intent coefficients in the mobility basis. |
-| `required_probes` | function | 531 | `(n_params: int, *, margin: float=1.5) -> int` | Probes needed for the mobility fit to be determined, with headroom. |
+| `Policy` | class | 648 | — | Maps observations to intent coefficients in the mobility basis. |
+| `required_probes` | function | 539 | `(n_params: int, *, margin: float=1.5) -> int` | Probes needed for the mobility fit to be determined, with headroom. |
 | `split_command` | function | 211 | `(raw, n_modes: int)` | ``(mode coefficients, gain)`` from what a policy returned. |
 | `CPG.__init__` | method | 105 | `(self, n_joints: int, base_frequency: float=2.0, joint_range: np.ndarray \| None=None) -> None` | — |
 | `CPG.command` | method | 155 | `(self, params: CPGParams, t: float) -> np.ndarray` | Target joint angles at time ``t``. |
@@ -357,19 +357,19 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `CPGParams.from_flat` | method | 65 | `(v: np.ndarray, n: int) -> 'CPGParams'` | — |
 | `CPGParams.n` | property | 58 | `(self) -> int` | — |
 | `MobilityBasis.bases_from_record` | method | 286 | `(cls, record) -> dict` | ``{medium: MobilityBasis}`` from an elite's ``meta["mobility_basis"]``. |
-| `MobilityBasis.coeffs_for_twist` | method | 496 | `(self, intent: np.ndarray) -> np.ndarray` | Coefficients that best deliver a commanded body twist. |
-| `MobilityBasis.command_params` | method | 409 | `(self, base: CPGParams, coeffs: np.ndarray, n: int, gain: float=1.0) -> CPGParams` | Turn intent coefficients into concrete CPG parameters. |
-| `MobilityBasis.command_policy` | method | 424 | `(self, base: CPGParams, raw, n: int, policy)` | ``(params, mode coefficients, gain or None)`` for what ``policy`` returned. |
-| `MobilityBasis.condition` | property | 348 | `(self) -> float` | `sigma_0 / sigma_r` over the retained modes.  Infinite if any is 0. |
-| `MobilityBasis.control_rank` | property | 323 | `(self) -> int` | How many axes are worth commanding.  An engineering threshold. |
-| `MobilityBasis.describe` | method | 392 | `(self) -> list[str]` | Human-readable names for the discovered axes. |
-| `MobilityBasis.diagnostics` | method | 377 | `(self) -> dict` | Everything a consumer needs to judge this basis, in one call. |
-| `MobilityBasis.numerical_rank` | property | 306 | `(self) -> int` | Rank in the linear-algebra sense: singular values above the level |
-| `MobilityBasis.twist_of` | method | 521 | `(self, coeffs: np.ndarray) -> np.ndarray` | The twist a coefficient vector produces.  The forward model. |
-| `MobilityBasis.underdetermined` | property | 361 | `(self) -> bool` | Whether the fit behind this basis had fewer probes than parameters. |
-| `Policy.act` | method | 684 | `(self, obs: np.ndarray) -> np.ndarray` | — |
-| `Policy.n_out` | property | 673 | `(self) -> int` | — |
-| `Policy.n_weights` | property | 678 | `(self) -> int` | — |
+| `MobilityBasis.coeffs_for_twist` | method | 504 | `(self, intent: np.ndarray) -> np.ndarray` | Coefficients that best deliver a commanded body twist. |
+| `MobilityBasis.command_params` | method | 417 | `(self, base: CPGParams, coeffs: np.ndarray, n: int, gain: float=1.0) -> CPGParams` | Turn intent coefficients into concrete CPG parameters. |
+| `MobilityBasis.command_policy` | method | 432 | `(self, base: CPGParams, raw, n: int, policy)` | ``(params, mode coefficients, gain or None)`` for what ``policy`` returned. |
+| `MobilityBasis.condition` | property | 356 | `(self) -> float` | `sigma_0 / sigma_r` over the retained modes.  Infinite if any is 0. |
+| `MobilityBasis.control_rank` | property | 331 | `(self) -> int` | How many axes are worth commanding.  An engineering threshold. |
+| `MobilityBasis.describe` | method | 400 | `(self) -> list[str]` | Human-readable names for the discovered axes. |
+| `MobilityBasis.diagnostics` | method | 385 | `(self) -> dict` | Everything a consumer needs to judge this basis, in one call. |
+| `MobilityBasis.numerical_rank` | property | 314 | `(self) -> int` | Rank in the linear-algebra sense: singular values above the level |
+| `MobilityBasis.twist_of` | method | 529 | `(self, coeffs: np.ndarray) -> np.ndarray` | The twist a coefficient vector produces.  The forward model. |
+| `MobilityBasis.underdetermined` | property | 369 | `(self) -> bool` | Whether the fit behind this basis had fewer probes than parameters. |
+| `Policy.act` | method | 692 | `(self, obs: np.ndarray) -> np.ndarray` | — |
+| `Policy.n_out` | property | 681 | `(self) -> int` | — |
+| `Policy.n_weights` | property | 686 | `(self) -> int` | — |
 
 ## `control.train` — `dytiscidae/control/train.py`
 

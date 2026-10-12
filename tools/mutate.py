@@ -816,6 +816,16 @@ MUTATIONS: tuple = (
                "Python 3.9 shim) and its usable() probe aborts on Py_NewRef",
         suites=("test_search::test_a_spawned_worker_runs_the_parents_interpreter",), item="worker interpreter"),
 
+    Mutation(
+        id="restored-basis-loses-the-fresh-layout",
+        path="dytiscidae/control/cpg.py",
+        find="modes = np.ascontiguousarray(np.asarray(b[\"modes\"], float).T).T\n",
+        replace="modes = np.asarray(b[\"modes\"], float)\n",
+        defect="a basis rebuilt from an elite's record holds C-order modes, so "
+               "command_params rounds ~1e-16 differently from the fresh basis and "
+               "land/water amplify it (R3: stored elites do not reproduce)",
+        suites=("test_math::test_a_restored_basis_commands_bit_for_bit_what_the_fresh_one_did",), item="basis restore"),
+
     # --- the task: each phase scored on its own purpose (2026-09-21) --------
     Mutation(
         id="cruise-pays-for-speed-in-any-direction",

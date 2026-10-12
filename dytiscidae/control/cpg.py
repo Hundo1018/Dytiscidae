@@ -294,7 +294,15 @@ class MobilityBasis:
         out = {}
         for dom, b in (record or {}).items():
             try:
-                out[dom] = cls(modes=np.asarray(b["modes"], float),
+                # R3 (runs/analysis_1010_failure_theory/R3_result.md): a fresh
+                # basis has `modes = U[:, :r].T`, a transposed view, so
+                # `modes[:r].T @ c` runs as a C-order (P, r) matmul.  np.asarray
+                # of the stored list is C order (r, P) and rounds ~1e-16
+                # differently, which land and water amplify until a stored
+                # elite no longer reproduces its recorded score.  Rebuild the
+                # fresh layout: a (P, r) C array, transposed.
+                modes = np.ascontiguousarray(np.asarray(b["modes"], float).T).T
+                out[dom] = cls(modes=modes,
                                effects=np.asarray(b["effects"], float),
                                authority=np.asarray(b["authority"], float),
                                medium=str(b.get("medium") or dom))
