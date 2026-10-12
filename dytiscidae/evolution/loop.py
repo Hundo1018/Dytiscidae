@@ -559,7 +559,7 @@ def _warn_cpu_fallback() -> None:
 
     from ..envs import batchroll
     print(
-        "\n*** GPU fluid extension not importable; this run is on the CPU. ***\n"
+        "\n*** GPU fluid kernel not usable; this run is on the CPU. ***\n"
         f"    reason: {batchroll.UNAVAILABLE_REASON}\n"
         "    Build it with `cd mojo && pixi run build`.  Every timing and\n"
         "    every wall-clock estimate below is the CPU path.\n",
@@ -1631,15 +1631,17 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
     # a driver version mismatch does not surface until the pipeline is
     # constructed, so a run could pass every guard, build its archive and die at
     # the first batch hours later.  ``usable()`` probes construction in a
-    # subprocess; a failure downgrades AVAILABLE so the per-generation guard
-    # below takes the CPU path and says so, at t=0, with the reason.
+    # subprocess.  A failure takes the CPU path only on a machine with no GPU
+    # (``envs.device``); with a GPU present it raises ``GpuUnusable`` here, at
+    # t=0, with the reason.  The CPU path downgrades AVAILABLE so the
+    # per-generation guard below takes it and says so.
     from ..envs import batchroll as _br
+    from ..envs import device as _device
 
-    if _br.AVAILABLE:
-        _ok, _why = _br.usable()
-        if not _ok:
-            _br.AVAILABLE = False
-            _br.UNAVAILABLE_REASON = _why
+    _backend, _why = _device.choose(_br.usable)
+    if _backend == "cpu":
+        _br.AVAILABLE = False
+        _br.UNAVAILABLE_REASON = _why
 
     # Pin the commit the checkpoints will name to the one this process started
     # from; see ``ops.checkpoint._git_sha``.

@@ -733,6 +733,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `BatchedFluid.ready` | method | 367 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
 | `BatchedFluid.reset_slam` | method | 342 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
 
+## `envs.device` — `dytiscidae/envs/device.py`
+
+> Which device a search scores on, and the one condition that allows the CPU.
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `choose` | function | 79 | `(usable, present=None) -> tuple` | ``("gpu", "")`` or ``("cpu", reason)``; raises :class:`GpuUnusable`. |
+| `gpu_present` | function | 43 | `(root: Path \| str='/') -> tuple` | ``(present, evidence)``.  ``evidence`` names what was found, or what was looked at. |
+| `GpuUnusable` | class | 39 | `(RuntimeError)` | A GPU is present and the kernel cannot run on it.  Not a CPU fallback. |
+
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
 > Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness.
@@ -1132,14 +1142,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `evaluate_candidate` | function | 445 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
 | `evaluate_candidates` | function | 569 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
 | `GenerationCost` | class | 477 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2389 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `load_state` | function | 2391 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
 | `median_draw` | function | 908 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
 | `placement_draw_seed` | function | 898 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
 | `run_search` | function | 1595 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2264 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `save_state` | function | 2266 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 65 | — | Everything adjustable about a run. |
 | `SearchState` | class | 354 | — | — |
-| `seed_archipelago` | function | 2653 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `seed_archipelago` | function | 2655 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
 | `GenerationCost.__init__` | method | 494 | `(self)` | — |
 | `GenerationCost.count` | method | 514 | `(self, call: str, results) -> None` | — |
 | `GenerationCost.lap` | method | 500 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |

@@ -56,7 +56,7 @@ jobs:
       - name: the suites that need nothing installed
         run: |
           set -e
-          for s in index architecture domain application adapters worker; do
+          for s in index architecture domain application adapters worker device; do
               echo "=== tests/test_$s.py ==="
               PYTHONPATH=. python "tests/test_$s.py"
           done

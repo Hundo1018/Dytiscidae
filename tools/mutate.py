@@ -780,6 +780,29 @@ MUTATIONS: tuple = (
         defect="a GPU kernel older than its source is used to score anyway, so "
                "the search and every verification run different physics",
         suites=("test_search::test_a_kernel_older_than_its_source_is_not_usable",), item="kernel freshness"),
+    Mutation(
+        id="cpu-fallback-with-a-gpu-present",
+        path="dytiscidae/envs/device.py",
+        find="    if has_gpu:\n        raise GpuUnusable(",
+        replace="    if False:\n        raise GpuUnusable(",
+        defect="a GPU that is present but broken, stale or out of memory sends "
+               "the run to the CPU path instead of refusing it",
+        suites=("test_device",), item="device choice"),
+    Mutation(
+        id="gpu-presence-ignores-the-pci-bus",
+        path="dytiscidae/envs/device.py",
+        find="    if pci.is_dir():\n",
+        replace="    if False:\n",
+        defect="a GPU whose driver is not loaded is read as no GPU, so a broken "
+               "driver takes the CPU fallback",
+        suites=("test_device",), item="device choice"),
+    Mutation(
+        id="run-search-skips-the-device-choice",
+        path="dytiscidae/evolution/loop.py",
+        find="    _backend, _why = _device.choose(_br.usable)\n",
+        replace="    _ok, _why = _br.usable()\n    _backend = \"gpu\" if _ok else \"cpu\"\n",
+        defect="run_search falls back to the CPU on any kernel failure, GPU or not",
+        suites=("test_device",), item="device choice"),
 
     # --- the task: each phase scored on its own purpose (2026-09-21) --------
     Mutation(
