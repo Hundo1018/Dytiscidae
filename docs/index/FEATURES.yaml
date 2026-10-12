@@ -279,6 +279,16 @@ BatchedEvaluation:
     - tests.test_physics::test_the_clearance_of_a_batch_is_each_machines_own
   note: the path the search scores with; not interchangeable with evaluate_tier1. Since 2026-09-27 one fused device step per timestep, launched as soon as mj_step is done and read from pinned memory, and the energy model for the whole batch in one pass -- all bit-identical to the unfused path (experiments/perf/NOTES.md); DYTISCIDAE_KERNEL_DIR points a process at a staged kernel build
 
+DeviceChoice:
+  implementation:
+    - envs.device.choose
+    - envs.device.gpu_present
+    - envs.device.GpuUnusable
+    - envs.batchroll.usable
+  tests:
+    - tests.test_device
+  note: run_search scores on the GPU kernel when batchroll.usable() says it runs; the numpy (CPU) path only when no GPU exists (PCI NVIDIA/AMD display or 3D controller, /proc/driver/nvidia/gpus, /dev/nvidia<N>, /dev/kfd); a present GPU that is broken, stale or short of resources raises GpuUnusable at t=0 (the user, 2026-10-12)
+
 Vectorisation:
   implementation:
     - envs.actors.ActorPool
