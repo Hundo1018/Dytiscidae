@@ -1,5 +1,15 @@
 # Roadmap
 
+**2026-10-11: an outside paper on butterfly wing morphology (npj Robotics 4:52)
+was checked against the repo; see
+[the butterfly wing-morphology paper](#2026-10-11--the-butterfly-wing-morphology-paper-reconciled-with-the-repo).**
+Its usable part is the measurement method, not its DQN optimiser. Three items,
+pre-registered and unrun: W1 counts elites pinned at a clipped genome bound
+(stored data); W3 adds Ellington's r̂1/r̂2 to the critic's features if
+out-of-fold skill rises; W2 sweeps one gene at a time on fixed elites and
+reads η² against the draw and against a still twin. Five other methods are not
+adopted, each with its reason.
+
 **2026-10-10: a theory of why the search does not progress, with its
 predictions, before any measurement; see
 [why the search does not progress](#2026-10-10--why-the-search-does-not-progress-a-theory-its-predictions-and-the-list).**
@@ -2991,6 +3001,160 @@ policy carries weight.
 **2026-10-03: built, off by default.** The mechanism is done and tested; the
 decision to run it is not. See item N (arch40 list) for what it is, what it
 costs, and the gates that hold it to "changes nothing when off".
+
+---
+
+## 2026-10-11 — the butterfly wing-morphology paper, reconciled with the repo
+
+Asked by the user: take what is usable from Huang, Chen et al., "Bio-inspired
+exploration of butterfly wing morphology guides deep reinforcement learning
+optimization of robotic flight", npj Robotics 4:52 (2026),
+doi:10.1038/s44182-026-00116-w. Extraction with every number:
+[papers/s44182-026-00116-w.md](papers/s44182-026-00116-w.md). Nothing below
+was measured here: `runs/` and `.venv` do not exist in this container
+(docs/PORTING.md). The three items are pre-registered and unrun.
+
+**What the paper did.** A 48 g flapping robot, three wing parameters (TC
+trailing-edge convergence, L forewing length, H hindwing length), seven values
+per parameter one at a time (19 wings), five free flights per wing under
+motion capture, one-way ANOVA per parameter. Then a surrogate network
+(parameters → flight metrics) and a DQN that walks [TC, L, H] in ±steps on that
+surrogate. Lift metric +339%, thrust metric +46%, flight tests within 7% of the
+surrogate. Exhaustive search of the surrogate finds the same optima, and
+Bayesian optimisation matches the DQN (Supp. Fig. 1). The usable part is how they
+measured, not the optimiser.
+
+### What exists here already (searched first)
+
+| paper | repo | where |
+|---|---|---|
+| stall/fall exclusion before analysis (speed < 1.55 m/s, ascent < −5°) | the same lesson, gated: CLAUDE.md "Designing a measurement" rules 1-2 | `triphibian._score_segment`, air gates |
+| the falling wing (L = 22.5 cm) had the **highest** speed and advance ratio | rule 1, another instance from outside: falling gets paid | — |
+| five replicate flights per wing | per-candidate draws (M2), median-of-draws re-evaluation (N11) | `SearchConfig.draw_per_candidate`, ARCH51_SPEC N11 |
+| surrogate validated on held-out physical wings (3, nRMSE < 0.15) | critic: 5-fold out-of-fold, labels from Tier-2 at a fresh seed | `evolution/critic.py:319-323`, `loop.py:2988` |
+| advance ratio V/f | reduced frequency k = πfc/U per elite (the inverse quantity) | `experiments/reduced_frequency_share/run.py` |
+| flight test reproduces the predicted score (−6.6% to 1.6%) | a film counts only if it reproduces its score | `film_manifest.json`, CLAUDE.md "Reading telemetry" |
+| aspect ratio | per surface and per machine; a critic feature | `core/phenotype.py:309-312, 1107-1121`; `CRITIC_FEATURES` |
+
+### W1. Count elites pinned at a genome bound — stored data, minutes
+
+**Paper:** both surrogate optima lay on the physical bounds
+([0.65, 31.5, 25] and [0.8, 25.3, 26.5]). The paper widened the bounds and
+re-ran: the lift optimum moved out to L = 33.6, past the old bound L = 31.5,
+and the thrust optimum to TC = 0.85, past 0.80. Both bounds were binding.
+
+**Repo:** every jittered gene is clipped
+(`core/genome.py:405-407`, `_jitter` → `np.clip(x * exp(N(0, rel)), lo, hi)`).
+Clipping does not reflect: once a gene sits at its bound, about half of its
+later jitters clip back to the same value, so the bound holds probability mass
+that selection did not choose. Bounds that can bind: span 2.5, root_chord 0.9
+(`:417-418`), flap_frequency 20 (`:1073`), scale 3.0 (`:1095`), series_stiffness 3,
+drive_compliance 4 (`:441-447`), stroke_amplitude 1 (`:562-565`). There is no
+telemetry for this. The repo has 57 ROADMAP hits on "bound", and none is about
+genes.
+
+**Measure:** on arch49, arch50 and arch51's final archives, per gene, take the
+share of elites within 1% of each clip bound. Compare it with a null: the same
+share in lineages of the same mutation count with selection removed. Those are
+the random bodies of `experiments/random_sampling_control` (N8), each mutated
+for the median elite lineage length.
+
+**Read, written before the data:** a gene is *binding* when its elite share at
+a bound exceeds the null's one-sided 95% upper bound, **and** those pinned
+elites' own-medium competence is above the island median. Only a binding gene
+earns the paper's widened-bounds probe: re-score the pinned elites offline
+with the gene stepped 10%, 20% and 40% past the bound, same `eval_seed`, the
+numpy path, and the still-machine twin alongside (rule 1). A widened bound is
+proposed only if the competence gain clears the still twin's gain.
+
+**Comparability:** none; this reads stored data and changes nothing.
+
+### W2. One factor at a time on fixed elites, with η² against the draw — CPU, hours (pilot first)
+
+**Paper:** seven values per parameter, five replicate flights, one-way ANOVA
+per parameter. η² ranged from 0.77 to 0.97 (L on ascent 0.97, H on phase
+offset 0.97). The paper's own case against population correlations is that a
+parameter's effect is confounded by everything else that varies with it. Its
+example is Dudley's finding of no aspect-ratio effect.
+
+**Repo:** no such sweep exists. The repo has no ANOVA, η², Sobol or OFAT code in
+`experiments/` or `tools/`. The ±50% coefficient pass at :1763 was never built.
+The only morphology read is a population correlation (arch37,
+[§4 above](#4-wing-morphology-is-being-evolved-in-the-direction-that-does-not-matter)):
+aspect ratio +0.004 with reaching `glides`, while it climbed 8.47 → 14.76. That
+read has the same confound the paper names. C2 measured draw variance at
+2.5-4.6× design variance, so a gene's effect must be judged against the draw,
+not against zero.
+
+**Measure:**
+- Bodies and genes: 8 elites per island where the medium is in the island's mix (arch51 when finished, else arch50). Vary one gene at a time over 7 log-spaced values within its clip range, centred on the elite's own value. Genes: span, root_chord, flap_frequency, stroke_amplitude, scale.
+- Draws and scoring: 5 held-out draws per point. Shared PPO checkpoint fixed. Antipodal or mirror pair as scored (rule 8). Score with `evaluate.evaluate_tier1`, and repeat one body per island on `batchroll.evaluate_tier1_batch` for the two-path check.
+- Control: the same grid on `held_still_params` twins (rules 1, 6 and 7).
+- Size: 5 × 7 × 5 × 8 = 1,400 evaluations per island, doubled for the still twins.
+- Pilot: run one body and one gene first and record the wall time before committing the rest. No cost is estimated here.
+
+**Report:** per gene and medium, η² = between-value variance / (between +
+within-draw variance). Also report the still twin's η² for the same cell.
+
+**Read, written before the data:**
+- *Effective:* η² on the elite exceeds both the still twin's η² and the share expected from draw variance alone (permutation of the value labels, 1,000 shuffles, 95th percentile).
+- Effective genes are where mutation budget and step size should go. A gene effective only on the still twin pays passive physics. The paper's falling wing is this case, as were arch37's aspect ratio and the 30 m/s wingless throw.
+- Nothing is changed on this read alone. The proposal it can produce is per-gene `rel` in `_jitter` and per-operator weights, and that proposal comes back to the user.
+
+### W3. Ellington's r̂1, r̂2 as features for the critic — stored labels, offline
+
+**Paper:** wings are described by AR, r̂1 and r̂2 (Eq. 5, Ellington 1984).
+TC moves r̂1 and r̂2 and barely moves AR. TC also moved speed (r = 0.86) and
+advance ratio (r = 0.87). AR alone does not describe how area is spread
+along the span.
+
+**Repo:** the fluid model integrates blade-element strips
+(`physics/fluid.py:19`, `L = q * p.area * cl * lift_scale` at `:1158`), so r̂2
+adds nothing to the physics. It is missing from everything that summarises a
+body: the critic sees `aspect_ratio`, `log_wing_loading` and `log_mass`, not
+area distribution (`evolution/critic.py:97-104`). The repo has no `r1_hat`,
+`r2_hat` or "second moment". The chord-along-span arrays exist per surface
+(`core/phenotype.py:1107`, the `np.trapezoid(sf.chord, sf.u)` that gives AR).
+For a flapping wing the quasi-steady force scales with S·R²·r̂2² at a given
+frequency and amplitude. This is a mechanism the critic cannot form from AR
+and wing loading.
+
+**Measure:** compute r̂1, r̂2 per machine from the phenotype, area-weighted
+over lifting surfaces. Add r̂2 and log(S·R²·r̂2²) to the critic's features and
+re-run `experiments/critic_skill/run.py` on arch49's and arch50's labels. This
+needs the labelled designs' genomes. If `search_state.pkl` keeps only the
+feature rows, re-expand the genomes from the archive, and say which labels
+could not be matched.
+
+**Read, written before the data:** adopt only if out-of-fold skill (the
+critic's own definition, `critic.py:432-435`) rises in at least two of three
+media by more than the fold-to-fold standard deviation. Otherwise record the
+null and leave `CRITIC_FEATURES` alone.
+
+**Not a descriptor.** The descriptors are behavioural on purpose
+(`evolution/descriptors.py:45-48`). A morphology axis would reward shape
+variety the medium does not care about.
+
+### Not adopted, with the reason
+
+- **The DQN optimiser, the multistep-memory reward and the bound buffer.** The paper's state is three continuous numbers, small enough that exhaustive search of the surrogate found the optimum, and Bayesian optimisation matched the DQN. Here the genome is a variable-size part graph with a CPPN per surface. MAP-Elites is the search, and the controller is already a learned policy inside every evaluation.
+  - The memory reward is a moving-average filter on a deterministic surrogate. The noise it filters here is the draw, which M2 and N11 handle at the source.
+  - The bound buffer prevents early episode termination in an episodic walk. Mutation here has no episode to terminate, and clipping already keeps the other coordinates.
+- **L_p = θ/f and T_p = V/f as objectives.** Dividing by frequency is undefined for a still machine (f = 0). Rule 4 says "could not measure" must not share a value with zero, so the ratio would have to publish nothing there. Frequency here is policy-modulated through the mobility basis (`control/cpg.py:141-142, 418`), so a per-frequency score would push the policy toward slow flapping in addition to anything about the body. Reduced frequency already covers the regime question (D2).
+  - `SegmentResult.cost_of_transport` (`envs/triphibian.py:175`) is defined and has no caller. If an actuation-normalised score is wanted, that is the existing hook, and it needs its own still-machine check before use.
+- **Trend + sinusoid fit for the climb (Eq. 11-13) in place of `sink_rate`'s endpoint difference.** With heave amplitude a, the endpoint difference over a window T is off by at most 2a/T. At the 4 s cap and a = 0.1 m that is 0.05 m/s, 3% of the 1.5 m/s flight scale (`triphibian.py:2506`) and under 1% of the glide scale (`SINK_BALLISTIC` = 6 m/s).
+  - The defect CLAUDE.md records for `sink_rate` is a drop and return. A least-squares slope over a V-shaped trace is also near zero, so the fit does not fix it; `station_keeping` does.
+  - The slope is already computed as a diagnostic (`:2579-2583`, `np.polyfit`) and stays one.
+- **Fore/hind-wing phase offset from differential flexibility (H: η² 0.97).** The model has no structural wing compliance, only drive compliance (`genome.py:108, 125`). Surfaces are rigid strips (docs/model_validity.md), so a passive phase offset cannot arise. There is no fore/hind distinction to vary.
+- **Similarity to a biological r̂1–r̂2 regression.** This is plausibility, not performance. If W3 builds r̂1 and r̂2, plot elites against an insect regression in the report as a diagnostic. Take the coefficients from Ellington 1984 II itself, not from memory.
+
+### Order
+
+Ranked by the 2026-09-30 rule (build cost, then loop speed, then effect on the
+search): **W1** (stored data, no simulator), **W3** (stored labels, no
+simulator), **W2** (simulator, hours; pilot first). None changes scoring or
+comparability unless its read says adopt, and every adoption comes back to the
+user.
 
 ---
 
