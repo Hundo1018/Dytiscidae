@@ -35,6 +35,7 @@ Two rules:
 | `svd_control_basis.md` | `J = U S V^T`, what `modes`, `effects` and `authority` are |
 | `damped_least_squares.md` | `(A A^T + lam I)^-1 A b`, and what `lam` buys |
 | `flapping_power_bound.md` | `P_avail(f) / P_req` for the flapper seeds over the spar's band (ROADMAP N7), with its script |
+| `pitch_compliance.md` | `k = M_1g / (c · θ_ref)` for a surface's passive pitch hinge, its damping, and the gannet measurement |
 
 Findings that came out of writing these are in `docs/MATH_AUDIT.md`, with the
 experiment that reproduces each.

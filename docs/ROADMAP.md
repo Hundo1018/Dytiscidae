@@ -1,5 +1,14 @@
 # Roadmap
 
+**2026-10-12: wing flexibility is in the model, off by default; see
+[wing flexibility](#2026-10-12--wing-flexibility-a-passive-pitch-hinge-built-off-by-default).**
+`Part.pitch_compliance` gives a surface a passive pitch hinge at its leading
+edge, sized on its 1 g share of the weight; `--wing-compliance` lets the search
+set it. Rigid designs compile byte-identically. On a fixed rig the beetle at
+7 Hz gains 41% of flapping thrust at compliance 0.5; elsewhere the main effect
+is passive load alleviation. Still machines gain nothing on the gannet
+(2/10 seeds rigid, 2/10 flexible). Three reads stand before a run uses it.
+
 **2026-10-11: an outside paper on butterfly wing morphology (npj Robotics 4:52)
 was checked against the repo; see
 [the butterfly wing-morphology paper](#2026-10-11--the-butterfly-wing-morphology-paper-reconciled-with-the-repo).**
@@ -3001,6 +3010,122 @@ policy carries weight.
 **2026-10-03: built, off by default.** The mechanism is done and tested; the
 decision to run it is not. See item N (arch40 list) for what it is, what it
 costs, and the gates that hold it to "changes nothing when off".
+
+---
+
+## 2026-10-12 — wing flexibility: a passive pitch hinge, built, off by default
+
+Asked by the user: add wing-surface flexibility to the model. Built as
+chordwise flexibility, one passive degree of freedom per lifting surface. It is
+off by default in two ways:
+- a design without the gene compiles byte-identically to before (MJCF sha256
+  of all 7 body plans compared against HEAD);
+- a run without `--wing-compliance` draws the same operators.
+
+**What it is.** `Part.pitch_compliance = c > 0` gives a surface a hinge
+`<seg>_jp` about its own span axis through the leading edge, on a torsion
+spring with a damper, ±1 rad stops, and no motor
+(`core.mjcf.passive_pitch_spring`, `derivations/pitch_compliance.md`). The
+strips carry their load at the quarter chord, aft of the hinge, so load
+pitches the surface nose-down. This is the pseudo-rigid-body model of
+insect-scale passive pitch (Whitney & Wood 2010).
+- `c` is the deflection at 1 g in units of 0.1 rad: the surface's area share
+  of the weight, spread over its planform. So it reads the same on a fin and
+  a wing, in either medium, at any gait.
+- Range [0.05, 4] (`PITCH_COMPLIANCE_RANGE`).
+- Not built on a universal joint, which already has a driven hinge about the
+  same axis.
+- Not observed or commanded by the policy: `_act_qadr` is built from actuators.
+- The fluid model is untouched. Both evaluation paths read body poses from the
+  same MJCF, so no kernel rebuild is needed. The two-path agreement was **not
+  run**: this container has no Mojo kernel.
+- `--wing-compliance` (`SearchConfig.wing_compliance`) adds the
+  `wing_compliance` operator, which lives in `OPTIONAL_OPERATORS`, not
+  `MUTATION_OPERATORS`, to every island's bandit.
+
+**One design failed first, and the failure is kept in the code comment.** The
+first sizing referenced an air dynamic pressure at 6 m/s and damped the hinge
+at 10% of the *spring's* critical value. On the gannet pinned at its trim
+(15.3 m/s), compliance 0.25 limit-cycled the wing at ±0.3 rad and lift fell
+from 55.9 N to 5.8 N. Two changes removed it: the 1 g weight reference, and
+damping sized on spring plus aerodynamic stiffness. The strip model reads
+velocity at the quarter chord and carries almost no aerodynamic pitch damping.
+
+**Measured** (`experiments/wing_compliance/run.py`, numpy path, open loop,
+`results.json` and `still_gannet.json`, 301 s plus the still read):
+
+Fixed rig, airframe pinned at its rigid trim speed and attitude. "Held" has
+the joints at their gait mean. ΔFx = Fx(flapping) − Fx(held) is the flapping
+thrust increment.
+
+| plan, freq | c = 0 | c = 0.5 | c = 1 | c = 4 |
+|---|---|---|---|---|
+| beetle 7 Hz, ΔFx (N) | +1.37 | **+1.93** | +1.71 | +1.34 |
+| beetle 7 Hz, Fz flapping (N; W 50.3) | 52.2 | 43.2 | 35.9 | 17.8 |
+| beetle 2.2 Hz (own), ΔFx | +1.28 | +1.18 | +1.08 | +0.85 |
+| bat 7 Hz, ΔFx | −23.7 | −20.5 | −18.8 | −28.6 (hinges on the stop 67% of the time) |
+| bat 3.1 Hz (own), ΔFx | −8.2 | −5.4 | −5.3 | −3.7 (stop 20%) |
+| teal 5 Hz (own), ΔFx | −2.56 | −2.52 | −2.49 | −2.55 |
+| gannet held lift (N; W 52.0) | 55.9 | 49.1 | 39.5 | 17.7 |
+| gannet held drag (N) | 4.53 | 3.01 | 2.68 | 2.19 |
+
+- The textbook effect appears in one case. The beetle flapping at 7 Hz gains
+  41% of flapping thrust at c = 0.5. At its own 2.2 Hz it gains nothing.
+- The bat's membrane gains at c ≤ 1 and loses at c ≥ 2. At c = 0.25 and 0.5
+  its rows are identical: the timestep cap on stiffness acted on both
+  (`clipped`), so its light surfaces cannot be made stiffer than that.
+- At a fixed attitude every flexible wing loses lift. That is passive load
+  alleviation (`derivations/pitch_compliance.md`: a surface keeps
+  `k / (k + k_a)` of its lift, half at c = 1). The rig does not re-trim, so it
+  understates a flexible machine.
+
+Still machine on the air segment (gannet, 10 seeds, CLAUDE.md rules 1, 6, 7):
+
+| arm | rigid | c = 1 |
+|---|---|---|
+| still: seeds scoring > 0, mean competence | 2/10, 0.048 | 2/10, 0.032 |
+| own gait | 2/10, 0.038 | 0/10, 0.000 |
+
+The flexible wing does not pay a still machine more than the rigid one does.
+The rigid still gannet clearing air on 2 of 10 seeds is a leak in the
+current air score that predates this change. CLAUDE.md rule 8 records the same
+family on arch49's gannets; it is not reopened here. The other three plans
+scored 0 in every arm on 3 seeds. Open loop, flexibility made the gannet's
+own gait worse (2/10 → 0/10). Nothing re-trims for the lift it loses, so this
+says nothing about a trained controller.
+
+**Held by:**
+- `test_wing_compliance_is_off_unless_asked`;
+- `test_a_flexible_wing_gives_way_under_load`, which includes the beetle 7 Hz
+  flutter case: 0.093 rad as built, 0.43 rad damped on the spring alone.
+
+Four mutations, all caught:
+- `pitch-hinge-not-emitted`;
+- `pitch-hinge-unmirrored`;
+- `pitch-damping-on-the-spring-only`. It first survived the gannet-only test;
+  the flapping case was added for it.
+- `wing-compliance-always-an-arm`. The first version was an equivalent mutant
+  and was rewritten.
+
+**Not built, and where the model stops:**
+- No spanwise bending.
+- No camber change under load.
+- No twist that varies along the span: the whole surface pitches as one.
+- Deflection is per surface. On the gannet the outer panel deflects twice its
+  area share (0.115 vs 0.057 rad), because the 1 g split is by area, not by
+  where the lift is.
+
+**Before a run uses it** (`--wing-compliance`), each is a pre-registered read:
+1. **Two paths.** The batched and single paths agree on a flexible design, on
+   a machine with the kernel (`tests/test_search.py` agreement check).
+2. **Still machine.** The still-machine read on the current population, not
+   on seed plans: flexible elites' still twins must not clear any medium more
+   often than rigid ones.
+3. **A/B.** An A/B run pair with and without the operator, same seed. Read
+   the share of elites that turn flexible, and their per-medium competence
+   against rigid elites in the same cells.
+
+None changes comparability for a run without the switch.
 
 ---
 

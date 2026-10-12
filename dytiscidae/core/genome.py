@@ -161,6 +161,23 @@ class Part:
     #: positive incidence -- and the one a heaving-and-pitching foil makes its
     #: thrust with.  A gene because the best lead depends on the body.
     feather_lead: float = math.pi / 2
+    #: Chordwise flexibility of a lifting surface, as a passive pitch hinge
+    #: along its leading edge (``core.mjcf.passive_pitch_spring``).  The value is
+    #: how far the hinge deflects when the surface carries its share of the
+    #: machine's weight, in units of 0.1 rad (~6 degrees): 1 g, any medium, any
+    #: gait.  A flapping stroke loads it several g.  0 is a rigid surface, and emits no joint at all, so every design made
+    #: before this gene compiles to the same model.
+    #:
+    #: Why a hinge and not a deforming surface: the fluid model is strips on
+    #: rigid bodies, and a hinge with a spring is the pseudo-rigid-body model
+    #: insect-scale flapping work uses for chordwise flexibility (Whitney & Wood
+    #: 2010, "Aeromechanics of passive rotation in flapping flight").  The load
+    #: acts at the quarter chord, aft of the hinge, so a loaded wing pitches
+    #: nose-down into the flow -- feathering without a second motor.  ROADMAP
+    #: 2026-09-26: level flapping flight existed only with feathering, and was
+    #: lost to actuator torque at 7-12 Hz.  Ignored on a ``"universal"`` joint,
+    #: which already has a driven feathering hinge about the same axis.
+    pitch_compliance: float = 0.0
     #: A propeller at this part's tip, spinning about the part's local +Z:
     #: radius in metres, 0 for none (`physics.rotor`).  Added 2026-09-23 as the
     #: comparison to flapping; see ROADMAP "Why nothing flies, measured a third
@@ -401,6 +418,11 @@ def random_genome(rng: np.random.Generator, *, target_scale: float = 1.0) -> Gen
 # and attribute outcomes back to the operator that produced them.
 # --------------------------------------------------------------------------
 
+
+#: Bounds of ``Part.pitch_compliance`` while it is on (0 is off, outside them).
+#: 0.05 deflects 0.3 degrees at 1 g, near rigid; 4 deflects 23 degrees at 1 g
+#: and reaches its 1 rad stop at about 2.5 g.
+PITCH_COMPLIANCE_RANGE = (0.05, 4.0)
 
 def _jitter(x: float, rng: np.random.Generator, rel: float = 0.15, lo: float = 1e-4,
             hi: float = 1e6) -> float:
@@ -1003,6 +1025,33 @@ def mut_part_kind(g: Genome, rng: np.random.Generator) -> bool:
     return True
 
 
+def mut_wing_compliance(g: Genome, rng: np.random.Generator) -> bool:
+    """Make a lifting surface flexible, stiffer, softer, or rigid again.
+
+    Not in ``MUTATION_OPERATORS``: it is registered in ``OPTIONAL_OPERATORS``
+    and reaches a run only through ``SearchConfig.wing_compliance``, so a run
+    without the switch draws the same operators, in the same order, from the
+    same rng as before the gene existed.
+
+    From rigid it jumps to a log-normal draw about 1 (6 degrees at 1 g),
+    because a small compliance is a wing that barely moves and the search would
+    have to walk to the useful region one jitter at a time.  From flexible, one move in five goes back to rigid so
+    that the switch is reversible by the same operator.
+    """
+    cand = [p for p in g.parts if p.is_surface and p.joint != "universal"]
+    if not cand:
+        return False
+    p = cand[int(rng.integers(len(cand)))]
+    c = float(getattr(p, "pitch_compliance", 0.0))
+    if c <= 0.0:
+        p.pitch_compliance = float(np.clip(rng.lognormal(0.0, 0.5), *PITCH_COMPLIANCE_RANGE))
+    elif rng.random() < 0.2:
+        p.pitch_compliance = 0.0
+    else:
+        p.pitch_compliance = _jitter(c, rng, 0.3, *PITCH_COMPLIANCE_RANGE)
+    return True
+
+
 def mut_material(g: Genome, rng: np.random.Generator) -> bool:
     if not g.parts:
         return False
@@ -1158,6 +1207,21 @@ MUTATION_OPERATORS: dict[str, callable] = {
     "rotor": mut_rotor,
 }
 
+#: Operators a run uses only when its configuration asks for them.  Kept out of
+#: ``MUTATION_OPERATORS`` so that the curator's operator set, and therefore every
+#: seeded draw over it, is unchanged for a run that does not ask.
+OPTIONAL_OPERATORS: dict[str, callable] = {
+    "wing_compliance": mut_wing_compliance,
+}
+
+
+def mutation_operator(name: str):
+    """The operator registered under ``name``, default or optional."""
+    if name in MUTATION_OPERATORS:
+        return MUTATION_OPERATORS[name]
+    return OPTIONAL_OPERATORS[name]
+
+
 #: Operators that change the graph rather than a value.  The curator throttles
 #: these separately: structural moves have much higher variance, so they are
 #: worth more early and less once the archive is dense.
@@ -1193,7 +1257,7 @@ def mutate(
         plan = [names[int(rng.integers(len(names)))] for _ in range(n_ops)]
     applied: list[str] = []
     for name in plan:
-        if MUTATION_OPERATORS[name](child, rng):
+        if mutation_operator(name)(child, rng):
             applied.append(name)
     child.lineage = (g.lineage + applied)[-24:]
     return child, applied

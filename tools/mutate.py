@@ -810,6 +810,44 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_the_gait_gain_can_stop_a_machine",),
         item="gait gain"),
     Mutation(
+        id="pitch-hinge-not-emitted",
+        path="dytiscidae/core/mjcf.py",
+        find="        if spring is not None:\n            # Chordwise flexibility",
+        replace="        if False:\n            # Chordwise flexibility",
+        defect="a flexible surface compiles rigid: the gene is stored, mutated and "
+               "never reaches the model",
+        suites=("test_physics::test_a_flexible_wing_gives_way_under_load",),
+        item="wing compliance"),
+    Mutation(
+        id="pitch-hinge-unmirrored",
+        path="dytiscidae/core/mjcf.py",
+        find="                pax = pax * np.array([-1.0, -1.0, 1.0])",
+        replace="                pax = pax",
+        defect="the mirrored wing's pitch hinge turns the same way in the world, so "
+               "one wing of a pair washes in while the other washes out",
+        suites=("test_physics::test_a_flexible_wing_gives_way_under_load",),
+        item="wing compliance"),
+    Mutation(
+        id="pitch-damping-on-the-spring-only",
+        path="dytiscidae/core/mjcf.py",
+        find="math.sqrt((k + k_aero) * (inertia + armature))",
+        replace="math.sqrt(k * (inertia + armature)) * 0.1",
+        defect="the hinge's damping ignores the aerodynamic stiffness, the sizing "
+               "that limit-cycled the gannet's wing at trim (2026-10-12)",
+        suites=("test_physics::test_a_flexible_wing_gives_way_under_load",),
+        item="wing compliance"),
+    Mutation(
+        id="wing-compliance-always-an-arm",
+        path="dytiscidae/evolution/curator.py",
+        find="            list(MUTATION_OPERATORS) + [n for n in extra_operators if n in OPTIONAL_OPERATORS]\n"
+             "            if extra_operators else None)",
+        replace="            list(MUTATION_OPERATORS) + list(OPTIONAL_OPERATORS)\n"
+                "            if True else None)",
+        defect="every run's bandit draws the optional operator, so a run without "
+               "--wing-compliance changes its operator set and every seeded draw",
+        suites=("test_physics::test_wing_compliance_is_off_unless_asked",),
+        item="wing compliance"),
+    Mutation(
         id="search-cli-refine-default-two",
         path="dytiscidae/ops/run.py",
         find='p.add_argument("--refine-steps", type=int, default=0,',

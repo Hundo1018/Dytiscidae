@@ -145,6 +145,17 @@ GaitGain:
     - tests.test_search::test_the_gait_gain_drives_the_same_on_every_path
   note: a factor on the commanded amplitude, so stopping and throttling are in the action space (--gait-gain)
 
+WingCompliance:
+  implementation:
+    - core.mjcf.passive_pitch_spring
+    - core.genome.mut_wing_compliance
+    - core.genome.mutation_operator
+    - evolution.curator.Curator
+  tests:
+    - tests.test_physics::test_wing_compliance_is_off_unless_asked
+    - tests.test_physics::test_a_flexible_wing_gives_way_under_load
+  note: chordwise flexibility as a passive pitch hinge at the leading edge, sized on the surface's 1 g share of the weight (Part.pitch_compliance; --wing-compliance adds the operator)
+
 ServoFeedForward:
   implementation:
     - control.cpg.CPG.pop_rate
