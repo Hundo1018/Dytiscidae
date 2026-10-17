@@ -4933,6 +4933,9 @@ def test_a_spawned_worker_runs_the_parents_interpreter() -> None:
         env = dict(os.environ, PATH=f"{shim}{os.pathsep}{os.environ['PATH']}")
         for k in ("PYTHONEXECUTABLE", "MOJO_PYTHON_LIBRARY"):
             env.pop(k, None)
+        # the child runs in tmp: a relative PYTHONPATH ("." in the canary) would not resolve there
+        env["PYTHONPATH"] = os.pathsep.join(
+            str(Path(q).resolve()) for q in env.get("PYTHONPATH", ".").split(os.pathsep) if q)
         out = subprocess.run([sys.executable, str(script)], cwd=str(tmp), env=env,
                              capture_output=True, text=True, timeout=600)
         line = [ln for ln in out.stdout.splitlines() if ln.startswith("RESULT ")]
