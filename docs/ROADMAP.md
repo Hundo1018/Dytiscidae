@@ -256,7 +256,8 @@ unit had `MUJOCO_GL=disable`; re-run 2026-10-19 with `MUJOCO_GL=egl` wrote all f
 and the same stamps (`runs/arch51/media/`).
 
 Open: why the share of competent elites stays at 22%; whether more audits (retention n=11)
-move the N11 read; the air L1 bar (E2) from arch51's still-machine read, still to be taken.
+move the N11 read. The air L1 bar (E2) was read the same day and cannot be set: no arch51
+elite reaches air 0.012 (E2 section).
 
 ## What arch34 measured
 
@@ -5162,6 +5163,22 @@ and L3 counts on held-out seeds at gens 150 and 300 (`docs/ARCH51_SPEC.md`).
 
 Each level is read on the auditor's held-out seeds, never on the draw that
 selected the design.
+
+**arch51's still-machine read, 2026-10-19: air's L1 bar cannot be set.**
+`experiments/no_model_gate/results_arch51.json` (every arch51 elite, n = 139,
+3063 s; reproduction within 0.005: air 139/139, water 138/139, land 139/139).
+No arch51 elite reaches air competence 0.012, so no `comp:air` bar has an elite
+to certify. Every air rung an elite clears is `leak` against both controls
+(`makes_lift` .. `leaves_surface`: the still machine clears each as often as
+the elites), and `stays_up` and above are `unmeasured` (0/139 elites). Rule 5
+forbids typing a bar, so air L1 stays open, now for a stated reason: the
+search has produced no air behaviour that a still machine cannot match.
+Water and land, same table: `comp:water >= 0.012` 61/139 elites,
+`comp:water >= 0.15` 9, `comp:land >= 0.15` 9, each certified against still
+and base; `land >= 3:stirs` .. `climbs_slope` certified against still only.
+These counts are on the selecting draw; L1 also needs >= 50% retention on
+held-out seeds, which the gate does not measure (arch51 audits: land 0.02,
+water 0.06).
 
 ### Air on a commanded difference (question 1 → B) — merged 2026-10-10 (branch `a51-air`), item 4 owed
 
