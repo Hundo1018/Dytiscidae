@@ -1074,6 +1074,54 @@ def test_margins_alone_cannot_fill_a_cell() -> None:
           f"{st}, {st2}")
 
 
+def test_below_the_floor_an_air_island_keeps_the_design_that_stayed_aloft() -> None:
+    """Which zero to keep (2026-10-19, experiments/air_turn_bar): among floor
+    members of one cell an island that reads air prefers the one aloft longer.
+    Not a score; a ranked incumbent still rejects every floor challenger."""
+    print("\narchive: below the floor, an air island keeps the design that stayed aloft")
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.evolution.archive import Archive
+    from dytiscidae.evolution.islands import floor_rank
+    from dytiscidae.evolution.loop import SearchConfig
+
+    axes = [("a", 0.0, 1.0, 4), ("b", 0.0, 1.0, 4)]
+    pt = np.array([0.3, 0.3])
+    a = Archive(axes)
+    cell = a.cell_of(pt)
+    a.add("hopper", 0.0, pt, objectives=np.array([0.0, 1.0, 1.0]), at_floor=True, floor_rank=0.2)
+    would = a.would_add(0.0, pt, objectives=np.array([0.0, 0.5, 0.5]), at_floor=True, floor_rank=0.9)
+    st = a.add("glider", 0.0, pt, objectives=np.array([0.0, 0.5, 0.5]), at_floor=True, floor_rank=0.9)
+    check("a floor challenger aloft longer displaces a floor incumbent, margins notwithstanding",
+          st == "improved" and [e.genome for e in a.front(cell)] == ["glider"], f"{st} {[e.genome for e in a.front(cell)]}")
+    check("would_add agrees", would == st, f"{would} vs {st}")
+    st = a.add("brick", 0.0, pt, objectives=np.array([0.0, 9.0, 9.0]), at_floor=True, floor_rank=0.1)
+    check("one aloft less is rejected, whatever its margins", st == "rejected" and a.front(cell)[0].genome == "glider", st)
+    st = a.add("tie", 0.0, pt, objectives=np.array([0.0, 9.0, 9.0]), at_floor=True, floor_rank=0.9)
+    check("an equal rank does not displace", st == "rejected", st)
+    b = Archive(axes)
+    b.add("walker", 0.3, pt, objectives=np.array([0.3, 0.1, 0.1]))
+    st = b.add("glider", 0.0, pt, objectives=np.array([0.0, 0.5, 0.5]), at_floor=True, floor_rank=1.0)
+    check("a ranked incumbent rejects a floor challenger at any rank", st == "rejected", st)
+    c = Archive(axes)
+    c.add("first", 0.0, pt, objectives=np.array([0.0, 1.0, 1.0]), at_floor=True)
+    st = c.add("second", 0.0, pt, objectives=np.array([0.0, 2.0, 2.0]), at_floor=True)
+    check("with no rank (the default) first-come stands, as before", st == "rejected", st)
+
+    def res(**m):
+        return NS(segments={"air": NS(measurements=m, duration=8.0)})
+    check("floor_rank reads airborne_fraction on an island that reads air",
+          floor_rank("air", res(airborne_fraction=0.7)) == 0.7
+          and floor_rank("land_air", res(airborne_fraction=0.7)) == 0.7)
+    check("and airborne_seconds over the duration on the short-hop branch",
+          abs(floor_rank("aerial_diver", res(airborne_seconds=2.0)) - 0.25) < 1e-12)
+    check("an island that does not read air ranks nothing",
+          floor_rank("water", res(airborne_fraction=0.7)) == 0.0
+          and floor_rank("land", res(airborne_fraction=0.7)) == 0.0)
+    check("no air segment is 0", floor_rank("air", NS(segments={})) == 0.0)
+    check("floor_tiebreak is off by default", SearchConfig().floor_tiebreak is False)
+
+
 def test_a_cells_score_is_the_median_of_its_draws() -> None:
     """An elite's score is the lower median of its draws, not its luckiest one.
 
@@ -3721,6 +3769,62 @@ def test_the_scalar_stands_at_zero_below_the_competence_floor() -> None:
               and [e.genome for e in state.archive.front(cell)] == ["incumbent"],
               f"placed={placed} dry={dry} "
               f"front={[e.genome for e in state.archive.front(cell)]}")
+    finally:
+        for k, v in saved.items():
+            setattr(loop, k, v)
+
+
+def test_the_floor_tiebreak_reaches_the_archive() -> None:
+    """2026-10-19 (experiments/air_turn_bar): with ``floor_tiebreak`` on, an
+    air-reading island's floor members carry their time aloft into the
+    archive, so a glider displaces a hopper in the same cell; off, nothing
+    ranks and the first to arrive stays, as in arch51."""
+    print("\nloop: the floor tiebreak reaches the archive")
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.evolution import loop
+    from dytiscidae.evolution.islands import curriculum_for as island_curriculum
+
+    saved = {k: getattr(loop, k) for k in (
+        "episode_features", "behaviour_descriptor", "objectives",
+        "_meta_light", "critic_features", "_meta")}
+    loop.episode_features = lambda r, p: np.zeros(16)
+    loop.behaviour_descriptor = lambda p, r: np.array([0.5, 0.5])
+    loop.objectives = lambda p, r: np.array([0.0, 3.0, 2.0])
+    loop._meta_light = lambda p, r: {}
+    loop.critic_features = lambda m, r: np.zeros(4)
+    loop._meta = lambda p, r, c: {"air": 0.0, "water": 0.0, "land": 0.0}
+
+    def air_result(aloft):
+        seg = NS(competence=0.0, measurements={"airborne_fraction": float(aloft)},
+                 score=0.0, duration=8.0)
+        return NS(segments={"air": seg}, mission_fraction=0.0, feasible=True,
+                  transitions=None, tier=1, exploit="", wall_time=0.0, notes=[],
+                  eval_seed=0, mobility=0.0)
+    try:
+        for flag in (True, False):
+            state, _ = _floor_state(loop)
+            state.island = "air"
+            state.curriculum = island_curriculum("air")
+            state.config.floor_tiebreak = flag
+            for _ in range(40):
+                state.curriculum.observe_blend(0.0, 0.0, 0)
+            sc = loop._score_candidate(state, None, air_result(0.9), None, commit=False)
+            check(f"floor_tiebreak={flag}: the scalar carries the time aloft as its rank",
+                  sc["at_floor"] is True and sc["frank"] == (0.9 if flag else 0.0), f"{sc['frank']}")
+            cell = state.archive.cell_of(np.array([0.5, 0.5]))
+            first = loop._place(state, "hopper", None, air_result(0.2), None, None, ["scale"])
+            dry = loop._dry_status(state, None, air_result(0.9), None)
+            second = loop._place(state, "glider", None, air_result(0.9), None, None, ["scale"])
+            front = [e.genome for e in state.archive.front(cell)]
+            if flag:
+                check("on: the glider displaces the hopper, wet and dry",
+                      first == "new" and dry == "improved" and second == "improved" and front == ["glider"],
+                      f"{first} {dry} {second} {front}")
+            else:
+                check("off: first-come stands (arch51's behaviour)",
+                      first == "new" and dry == "rejected" and second == "rejected" and front == ["hopper"],
+                      f"{first} {dry} {second} {front}")
     finally:
         for k, v in saved.items():
             setattr(loop, k, v)
@@ -7186,6 +7290,7 @@ def main() -> int:
         test_learned_descriptors_replace_the_hand_picked_axes,
         test_cells_hold_a_pareto_front_not_a_weighted_sum,
         test_margins_alone_cannot_fill_a_cell,
+        test_below_the_floor_an_air_island_keeps_the_design_that_stayed_aloft,
         test_a_cells_score_is_the_median_of_its_draws,
         test_intervention_is_triggered_by_evidence_not_a_schedule,
         test_no_dataclass_can_raise_on_equality,
@@ -7220,6 +7325,7 @@ def main() -> int:
         test_promotion_spends_refinement_and_keeps_what_it_buys,
         test_promotion_refinement_is_one_batch,
         test_the_scalar_stands_at_zero_below_the_competence_floor,
+        test_the_floor_tiebreak_reaches_the_archive,
         test_verification_offers_designs_not_yet_verified,
         test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu,
         test_a_reevaluation_runs_at_the_stored_basis_cpu,

@@ -300,16 +300,16 @@ MUTATIONS: tuple = (
     Mutation(
         id="place-forgets-the-floor",
         path="dytiscidae/evolution/loop.py",
-        find='objectives=obj, at_floor=sc["at_floor"])',
-        replace="objectives=obj)",
+        find='objectives=obj,\n                               at_floor=sc["at_floor"], floor_rank=sc["frank"])',
+        replace='objectives=obj, floor_rank=sc["frank"])',
         defect="the archive is never told a design is at the floor, so it "
                "displaces a ranked incumbent on the strength of a tie",
         suites=("test_search::test_the_scalar_stands_at_zero_below_the_competence_floor",), item="blend wiring"),
     Mutation(
         id="dry-run-forgets-the-floor",
         path="dytiscidae/evolution/loop.py",
-        find='sc["obj"], at_floor=sc["at_floor"])',
-        replace='sc["obj"])',
+        find='sc["obj"], at_floor=sc["at_floor"],\n                                   floor_rank=sc["frank"])',
+        replace='sc["obj"], floor_rank=sc["frank"])',
         defect="the refinement funnel's dry status calls a floored design a "
                "replacement the real placement then refuses",
         suites=("test_search::test_the_scalar_stands_at_zero_below_the_competence_floor",), item="blend wiring"),
@@ -658,7 +658,7 @@ MUTATIONS: tuple = (
     Mutation(
         id="floor-candidate-joins-the-front",
         path="dytiscidae/evolution/archive.py",
-        find="        if cand.at_floor:\n            return \"rejected\", None\n",
+        find="        if cand.at_floor:\n            # Floor against floor: the island's tiebreak (``islands.floor_rank``,\n            # 0 unless ``floor_tiebreak`` is on) decides which zero stays.\n            if all(e.at_floor for e in front) and cand.floor_rank > max(e.floor_rank for e in front):\n                incumbent = self.cells.get(cell) or self._representative(front)\n                cand.offspring = incumbent.offspring\n                cand.offspring_placed = incumbent.offspring_placed\n                cand.improvements = incumbent.improvements + 1\n                return \"improved\", [cand]\n            return \"rejected\", None\n",
         replace="",
         defect="a design below the competence floor joins a ranked incumbent's "
                "front on margins alone, so a machine that cannot move holds a cell",
@@ -672,6 +672,34 @@ MUTATIONS: tuple = (
         defect="a ranked design entering a cell leaves the floor members beside "
                "it, so large margins keep a competence-zero machine in the front",
         suites=("test_search::test_margins_alone_cannot_fill_a_cell",), item="competence floor"),
+
+    Mutation(
+        id="floor-tiebreak-ignores-rank",
+        path="dytiscidae/evolution/archive.py",
+        find="            if all(e.at_floor for e in front) and cand.floor_rank > max(e.floor_rank for e in front):",
+        replace="            if all(e.at_floor for e in front):",
+        defect="any floor challenger displaces a floor incumbent, so the cell "
+               "churns on arrival order and the glider it was meant to keep is lost again",
+        suites=("test_search::test_below_the_floor_an_air_island_keeps_the_design_that_stayed_aloft",),
+        item="floor tiebreak"),
+
+    Mutation(
+        id="floor-rank-reads-every-island",
+        path="dytiscidae/evolution/islands.py",
+        find="    if \"air\" not in island_media(island):\n        return 0.0\n    seg = (getattr(result, \"segments\", {}) or {}).get(\"air\")",
+        replace="    seg = (getattr(result, \"segments\", {}) or {}).get(\"air\")",
+        defect="the water and land islands rank their floor members by time aloft",
+        suites=("test_search::test_below_the_floor_an_air_island_keeps_the_design_that_stayed_aloft",),
+        item="floor tiebreak"),
+
+    Mutation(
+        id="place-forgets-the-floor-rank",
+        path="dytiscidae/evolution/loop.py",
+        find="    frank = floor_rank(state.island, result) if getattr(state.config, \"floor_tiebreak\", False) else 0.0",
+        replace="    frank = 0.0",
+        defect="the flag is accepted and does nothing: every floor member ranks 0",
+        suites=("test_search::test_the_floor_tiebreak_reaches_the_archive",),
+        item="floor tiebreak"),
 
     Mutation(
         id="representative-is-the-max-draw",

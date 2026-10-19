@@ -940,28 +940,28 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Archive` | class | 99 | — | An N-dimensional grid of elites. |
+| `Archive` | class | 102 | — | An N-dimensional grid of elites. |
 | `Elite` | class | 67 | — | One occupant of one cell. |
-| `Archive.__init__` | method | 110 | `(self, axes: list[tuple[str, float, float, int]]) -> None` | — |
-| `Archive.add` | method | 203 | `(self, genome, fitness: float, descriptor: np.ndarray, meta: dict \| None=None, tier: int=1, objectives: np.ndarray \| None=None, at_floor: bool=False) -> str` | Insert a candidate.  Returns 'new', 'improved' or 'rejected'. |
-| `Archive.best` | property | 146 | `(self) -> Elite \| None` | — |
-| `Archive.capacity` | property | 129 | `(self) -> int` | — |
-| `Archive.cell_of` | method | 149 | `(self, descriptor: np.ndarray) -> tuple[int, ...]` | — |
-| `Archive.coverage` | property | 133 | `(self) -> float` | — |
-| `Archive.export_json` | method | 513 | `(self, path: str \| Path) -> None` | Human- and browser-readable dump for the dashboard. |
-| `Archive.front` | method | 194 | `(self, cell: tuple[int, ...]) -> list['Elite']` | The non-dominated set occupying a cell. |
-| `Archive.front_size` | property | 199 | `(self) -> int` | Total designs held across all cells, fronts included. |
-| `Archive.load` | method | 502 | `(path: str \| Path) -> 'Archive'` | — |
-| `Archive.neighbour_density` | method | 429 | `(self, cell: tuple[int, ...], radius: int=1) -> int` | How crowded the neighbourhood of a cell is. |
-| `Archive.project` | method | 442 | `(self, ax_x: int, ax_y: int) -> tuple[np.ndarray, np.ndarray]` | 2D projection for plotting: max fitness and occupancy per (x, y) bin. |
-| `Archive.qd_score` | property | 137 | `(self) -> float` | Sum of elite fitnesses: the standard scalar summary of a QD run. |
-| `Archive.rebin` | method | 374 | `(self, axes: list[tuple[str, float, float, int]], reproject, priority=None) -> dict` | Rebuild the grid under new axes, re-placing every elite. |
-| `Archive.record_draw` | method | 334 | `(self, elite: Elite, draw: dict, depth: int \| None=None) -> dict` | One more evaluation of ``elite``; its score becomes its lower-median draw. |
-| `Archive.remove` | method | 318 | `(self, cell: tuple[int, ...]) -> bool` | Empty a cell completely. |
-| `Archive.save` | method | 475 | `(self, path: str \| Path) -> None` | Write the archive, atomically. |
-| `Archive.snapshot` | method | 454 | `(self) -> dict` | A JSON-safe summary, recorded once per generation for the dashboard. |
-| `Archive.would_add` | method | 253 | `(self, fitness: float, descriptor, objectives=None, at_floor: bool=False) -> str` | What ``add`` would return for this candidate, changing nothing. |
-| `Elite.curiosity` | property | 93 | `(self) -> float` | — |
+| `Archive.__init__` | method | 113 | `(self, axes: list[tuple[str, float, float, int]]) -> None` | — |
+| `Archive.add` | method | 206 | `(self, genome, fitness: float, descriptor: np.ndarray, meta: dict \| None=None, tier: int=1, objectives: np.ndarray \| None=None, at_floor: bool=False, floor_rank: float=0.0) -> str` | Insert a candidate.  Returns 'new', 'improved' or 'rejected'. |
+| `Archive.best` | property | 149 | `(self) -> Elite \| None` | — |
+| `Archive.capacity` | property | 132 | `(self) -> int` | — |
+| `Archive.cell_of` | method | 152 | `(self, descriptor: np.ndarray) -> tuple[int, ...]` | — |
+| `Archive.coverage` | property | 136 | `(self) -> float` | — |
+| `Archive.export_json` | method | 525 | `(self, path: str \| Path) -> None` | Human- and browser-readable dump for the dashboard. |
+| `Archive.front` | method | 197 | `(self, cell: tuple[int, ...]) -> list['Elite']` | The non-dominated set occupying a cell. |
+| `Archive.front_size` | property | 202 | `(self) -> int` | Total designs held across all cells, fronts included. |
+| `Archive.load` | method | 514 | `(path: str \| Path) -> 'Archive'` | — |
+| `Archive.neighbour_density` | method | 441 | `(self, cell: tuple[int, ...], radius: int=1) -> int` | How crowded the neighbourhood of a cell is. |
+| `Archive.project` | method | 454 | `(self, ax_x: int, ax_y: int) -> tuple[np.ndarray, np.ndarray]` | 2D projection for plotting: max fitness and occupancy per (x, y) bin. |
+| `Archive.qd_score` | property | 140 | `(self) -> float` | Sum of elite fitnesses: the standard scalar summary of a QD run. |
+| `Archive.rebin` | method | 386 | `(self, axes: list[tuple[str, float, float, int]], reproject, priority=None) -> dict` | Rebuild the grid under new axes, re-placing every elite. |
+| `Archive.record_draw` | method | 346 | `(self, elite: Elite, draw: dict, depth: int \| None=None) -> dict` | One more evaluation of ``elite``; its score becomes its lower-median draw. |
+| `Archive.remove` | method | 330 | `(self, cell: tuple[int, ...]) -> bool` | Empty a cell completely. |
+| `Archive.save` | method | 487 | `(self, path: str \| Path) -> None` | Write the archive, atomically. |
+| `Archive.snapshot` | method | 466 | `(self) -> dict` | A JSON-safe summary, recorded once per generation for the dashboard. |
+| `Archive.would_add` | method | 257 | `(self, fitness: float, descriptor, objectives=None, at_floor: bool=False, floor_rank: float=0.0) -> str` | What ``add`` would return for this candidate, changing nothing. |
+| `Elite.curiosity` | property | 96 | `(self) -> float` | — |
 
 ## `evolution.auditor` — `dytiscidae/evolution/auditor.py`
 
@@ -1106,20 +1106,21 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `Archipelago` | class | 300 | — | Several archives, evolved in parallel, with migration and hybridisation. |
+| `Archipelago` | class | 330 | — | Several archives, evolved in parallel, with migration and hybridisation. |
 | `below_competence_floor` | function | 153 | `(island: str, result) -> bool` | True when the design clears the floor in none of its island's media. |
-| `curriculum_for` | function | 252 | `(island: str)` | A curriculum that asks an island's questions in the island's own media. |
+| `curriculum_for` | function | 282 | `(island: str)` | A curriculum that asks an island's questions in the island's own media. |
+| `floor_rank` | function | 163 | `(island: str, result) -> float` | Which zero to keep.  Among designs below the competence floor that |
 | `island_media` | function | 148 | `(island: str) -> tuple` | The media an island's score reads; every medium for an unknown name. |
-| `island_score` | function | 210 | `(island: str, result, transitions=None) -> float` | Score a design on one island's own terms. |
-| `own_domain_score` | function | 270 | `(island: str, meta: dict) -> float` | How good a stored elite is at *its island's own* domains, from its meta. |
-| `triphibian_score` | function | 163 | `(comps, floor: float=TRIPHIBIAN_FLOOR) -> float` | The triphibian island's objective: a soft minimum of the three media. |
-| `Archipelago.colonists` | method | 420 | `(self, name: str, n: int) -> list` | Immigrants for an island that is empty, from every other island. |
-| `Archipelago.due` | method | 336 | `(self, generation: int) -> bool` | — |
-| `Archipelago.emigrants` | method | 339 | `(self, name: str) -> list` | The designs this island sends abroad: its best, by its own lights. |
-| `Archipelago.migrate` | method | 347 | `(self, generation: int, rng: np.random.Generator, crossover=None) -> list` | Move genomes between islands and cross specialists. |
-| `Archipelago.names` | property | 327 | `(self) -> list` | — |
-| `Archipelago.register` | method | 330 | `(self, name: str, archive, curator) -> None` | — |
-| `Archipelago.report` | method | 443 | `(self) -> dict` | — |
+| `island_score` | function | 240 | `(island: str, result, transitions=None) -> float` | Score a design on one island's own terms. |
+| `own_domain_score` | function | 300 | `(island: str, meta: dict) -> float` | How good a stored elite is at *its island's own* domains, from its meta. |
+| `triphibian_score` | function | 193 | `(comps, floor: float=TRIPHIBIAN_FLOOR) -> float` | The triphibian island's objective: a soft minimum of the three media. |
+| `Archipelago.colonists` | method | 450 | `(self, name: str, n: int) -> list` | Immigrants for an island that is empty, from every other island. |
+| `Archipelago.due` | method | 366 | `(self, generation: int) -> bool` | — |
+| `Archipelago.emigrants` | method | 369 | `(self, name: str) -> list` | The designs this island sends abroad: its best, by its own lights. |
+| `Archipelago.migrate` | method | 377 | `(self, generation: int, rng: np.random.Generator, crossover=None) -> list` | Move genomes between islands and cross specialists. |
+| `Archipelago.names` | property | 357 | `(self) -> list` | — |
+| `Archipelago.register` | method | 360 | `(self, name: str, archive, curator) -> None` | — |
+| `Archipelago.report` | method | 473 | `(self) -> dict` | — |
 
 ## `evolution.judge` — `dytiscidae/evolution/judge.py`
 
@@ -1145,28 +1146,28 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 968 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `draw_key` | function | 912 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
-| `evaluate_candidate` | function | 458 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 583 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 490 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2400 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `median_draw` | function | 917 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
-| `placement_draw_seed` | function | 907 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
-| `run_search` | function | 1604 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2275 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 974 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `draw_key` | function | 918 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
+| `evaluate_candidate` | function | 464 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 589 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 496 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2409 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `median_draw` | function | 923 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
+| `placement_draw_seed` | function | 913 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
+| `run_search` | function | 1613 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2284 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 74 | — | Everything adjustable about a run. |
-| `SearchState` | class | 367 | — | — |
-| `seed_archipelago` | function | 2664 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 507 | `(self)` | — |
-| `GenerationCost.count` | method | 527 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 513 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 520 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 536 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 533 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 427 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 431 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 435 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 373 | — | — |
+| `seed_archipelago` | function | 2673 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `GenerationCost.__init__` | method | 513 | `(self)` | — |
+| `GenerationCost.count` | method | 533 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 519 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 526 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 542 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 539 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 433 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 437 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 441 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1288,27 +1289,27 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 639 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `build_parser` | function | 964 | `() -> argparse.ArgumentParser` | — |
-| `child_env` | function | 340 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
-| `cmd_cohort` | function | 580 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_config` | function | 450 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
-| `cmd_dashboard` | function | 909 | `(args) -> int` | — |
-| `cmd_distill` | function | 947 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 468 | `(args) -> int` | — |
-| `cmd_postrun` | function | 416 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 640 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `build_parser` | function | 965 | `() -> argparse.ArgumentParser` | — |
+| `child_env` | function | 341 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
+| `cmd_cohort` | function | 581 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_config` | function | 451 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
+| `cmd_dashboard` | function | 910 | `(args) -> int` | — |
+| `cmd_distill` | function | 948 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 469 | `(args) -> int` | — |
+| `cmd_postrun` | function | 417 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 124 | `(args) -> int` | — |
-| `cmd_render` | function | 916 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
-| `cmd_search` | function | 267 | `(args) -> int` | — |
-| `cmd_showcase` | function | 767 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 475 | `(args) -> int` | — |
-| `cmd_train` | function | 509 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_render` | function | 917 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_search` | function | 268 | `(args) -> int` | — |
+| `cmd_showcase` | function | 768 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 476 | `(args) -> int` | — |
+| `cmd_train` | function | 510 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 117 | `(args) -> int` | — |
-| `controller_for_elite` | function | 649 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 359 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 650 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 360 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 32 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 1313 | `(argv=None) -> int` | — |
-| `merge_config_file` | function | 225 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
+| `main` | function | 1318 | `(argv=None) -> int` | — |
+| `merge_config_file` | function | 226 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
 | `search_config_from_args` | function | 159 | `(args, shared: bool)` | The ``SearchConfig`` a ``search`` command line asks for. |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`

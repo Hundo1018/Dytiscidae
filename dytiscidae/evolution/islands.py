@@ -160,6 +160,36 @@ def below_competence_floor(island: str, result) -> bool:
     return True
 
 
+def floor_rank(island: str, result) -> float:
+    """Which zero to keep.  Among designs below the competence floor that
+    land in one cell, an island that reads air prefers the one that stayed
+    aloft through more of its air segment; every other island returns 0 and
+    keeps first-come.
+
+    Why (2026-10-19, `experiments/air_turn_bar/README.md`): under the paired
+    air score a glider that does not turn scores 0, and arch51's floor (F1)
+    rejected the gannet seed at gen 0 on every island, so the run held no
+    body that was airborne when the turn was commanded and air stayed at 0
+    for 900 generations.  This is not a score: a still gannet reads 1.0 here
+    too, its fitness stays 0, and the pressure above the floor is unchanged.
+    It only decides which of two zeros occupies the cell.  Reads
+    ``airborne_fraction`` (the long branch) or ``airborne_seconds`` over the
+    segment's duration (the short-hop branch, capped at 2.8 s).
+    """
+    if "air" not in island_media(island):
+        return 0.0
+    seg = (getattr(result, "segments", {}) or {}).get("air")
+    if seg is None:
+        return 0.0
+    m = getattr(seg, "measurements", None) or {}
+    if "airborne_fraction" in m:
+        return float(m["airborne_fraction"])
+    dur = float(getattr(seg, "duration", 0.0) or 0.0)
+    if dur > 0.0 and "airborne_seconds" in m:
+        return float(m["airborne_seconds"]) / dur
+    return 0.0
+
+
 def triphibian_score(comps, floor: float = TRIPHIBIAN_FLOOR) -> float:
     """The triphibian island's objective: a soft minimum of the three media.
 

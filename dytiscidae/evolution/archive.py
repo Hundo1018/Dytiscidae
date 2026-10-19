@@ -88,6 +88,9 @@ class Elite:
     #: Below the competence floor (ARCH51_SPEC L3): holds a cell only while no
     #: ranked design is there.  A plain default, so older pickles read False.
     at_floor: bool = False
+    #: Among floor members of one cell, which zero to keep (``islands.floor_rank``);
+    #: 0 unless the run sets ``floor_tiebreak``.  A plain default for older pickles.
+    floor_rank: float = 0.0
 
     @property
     def curiosity(self) -> float:
@@ -209,6 +212,7 @@ class Archive:
         tier: int = 1,
         objectives: np.ndarray | None = None,
         at_floor: bool = False,
+        floor_rank: float = 0.0,
     ) -> str:
         """Insert a candidate.  Returns 'new', 'improved' or 'rejected'.
 
@@ -237,7 +241,7 @@ class Archive:
         cand = Elite(
             genome=genome, fitness=fitness, descriptor=np.asarray(descriptor, float),
             cell=cell, meta=meta or {}, born_at=self.generation, tier=tier,
-            objectives=obj, at_floor=bool(at_floor),
+            objectives=obj, at_floor=bool(at_floor), floor_rank=float(floor_rank),
         )
         if front and self.cells.get(cell) is None:
             # A front with no representative should be impossible, but repairing
@@ -251,7 +255,7 @@ class Archive:
         return status
 
     def would_add(self, fitness: float, descriptor, objectives=None,
-                  at_floor: bool = False) -> str:
+                  at_floor: bool = False, floor_rank: float = 0.0) -> str:
         """What ``add`` would return for this candidate, changing nothing.
 
         The same verdict, from the same code (``_verdict``).  AK's dry run: the
@@ -265,7 +269,7 @@ class Archive:
         cand = Elite(genome=None, fitness=fitness,
                      descriptor=np.asarray(descriptor, float), cell=cell,
                      meta={}, born_at=self.generation, objectives=obj,
-                     at_floor=bool(at_floor))
+                     at_floor=bool(at_floor), floor_rank=float(floor_rank))
         return self._verdict(cell, cand)[0]
 
     @staticmethod
@@ -284,6 +288,14 @@ class Archive:
         # F1 (ARCH51_SPEC L3): a design below the competence floor fills an
         # empty cell and nothing else.
         if cand.at_floor:
+            # Floor against floor: the island's tiebreak (``islands.floor_rank``,
+            # 0 unless ``floor_tiebreak`` is on) decides which zero stays.
+            if all(e.at_floor for e in front) and cand.floor_rank > max(e.floor_rank for e in front):
+                incumbent = self.cells.get(cell) or self._representative(front)
+                cand.offspring = incumbent.offspring
+                cand.offspring_placed = incumbent.offspring_placed
+                cand.improvements = incumbent.improvements + 1
+                return "improved", [cand]
             return "rejected", None
 
         # Inherit the cell's exploration bookkeeping: it describes the region,

@@ -410,6 +410,7 @@ Islands:
     - evolution.islands.Archipelago.colonists
     - evolution.islands.island_media
     - evolution.islands.below_competence_floor
+    - evolution.islands.floor_rank
   tests:
     - tests.test_search::test_the_island_objective_takes_its_weight_back
     - tests.test_search::test_the_triphibian_island_pays_the_weakest_medium
@@ -422,6 +423,8 @@ Islands:
     - tests.test_search::test_a_specialist_islands_curriculum_reads_only_its_own_medium
     - tests.test_search::test_a_design_competent_in_nothing_its_island_reads_is_below_the_floor
     - tests.test_search::test_the_scalar_stands_at_zero_below_the_competence_floor
+    - tests.test_search::test_below_the_floor_an_air_island_keeps_the_design_that_stayed_aloft
+    - tests.test_search::test_the_floor_tiebreak_reaches_the_archive
   note: a design competent in nothing its island reads (islands.COMPETENCE_FLOOR) is below the floor (ARCH51 L2/L6) and its scalar stands at zero
 
 Curation:

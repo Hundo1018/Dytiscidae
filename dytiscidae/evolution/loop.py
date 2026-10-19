@@ -56,7 +56,7 @@ from .curator import Curator
 from .curriculum import STAGES, WEAKEST_BARS, ZERO_SCORE, Curriculum
 from .descriptors import LearnedDescriptors, episode_features
 from .islands import (ISLANDS, Archipelago, below_competence_floor,
-                      curriculum_for, island_score)
+                      curriculum_for, floor_rank, island_score)
 from .judge import Judge
 from .scout import Scout, novelty_of, scout_features
 
@@ -297,6 +297,12 @@ class SearchConfig:
     #: action space.  Changes both policies' shapes, so nothing trained without
     #: it transfers.  Off by default: every stored run was scored without it.
     gait_gain: bool = False
+    #: Below the competence floor, an island that reads air keeps the design
+    #: that stayed aloft through more of its air segment (``islands.floor_rank``)
+    #: instead of first-come.  Not a score: fitness stays 0 and ranking above
+    #: the floor is untouched.  Off by default: arch51 ran without it and lost
+    #: its only glider at gen 0 (`experiments/air_turn_bar/README.md`).
+    floor_tiebreak: bool = False
     #: Lets the search make lifting surfaces flexible: the ``wing_compliance``
     #: operator (``core.genome.OPTIONAL_OPERATORS``) joins every island's
     #: bandit, and it sets ``Part.pitch_compliance``, a passive pitch hinge
@@ -1227,6 +1233,7 @@ def _score_candidate(state: SearchState, pheno, result, parent, *,
     mw = float(np.clip(getattr(state.config, "mission_weight", 0.30), 0.0, 1.0))
     base = float((1.0 - mw) * (w * isl_q + (1.0 - w) * cur_q) + mw * mis_q)
     at_floor = bool(floored or base <= ZERO_SCORE)
+    frank = floor_rank(state.island, result) if getattr(state.config, "floor_tiebreak", False) else 0.0
     cfeat = critic_features(_meta_light(pheno, result), result)
     discount = state.critic.discount(cfeat) if state.critic is not None else 1.0
     fit = float(base * discount)
@@ -1235,7 +1242,7 @@ def _score_candidate(state: SearchState, pheno, result, parent, *,
     # dominance vector, so an island's Pareto front is a front over *its* task.
     obj[0] = float(base if result.feasible else -0.5 + 0.5 * base)
 
-    return {"feats": feats, "bd": bd, "judged": judged, "tset": tset, "tmeas": tmeas, "cell": cell, "sr": sr, "isl_q": isl_q, "cur_q": cur_q, "mis_q": mis_q, "w": w, "mw": mw, "base": base, "at_floor": at_floor, "cfeat": cfeat, "discount": discount, "fit": fit, "obj": obj}
+    return {"feats": feats, "bd": bd, "judged": judged, "tset": tset, "tmeas": tmeas, "cell": cell, "sr": sr, "isl_q": isl_q, "cur_q": cur_q, "mis_q": mis_q, "w": w, "mw": mw, "base": base, "at_floor": at_floor, "frank": frank, "cfeat": cfeat, "discount": discount, "fit": fit, "obj": obj}
 
 
 def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -> str:
@@ -1337,7 +1344,8 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
                           "at_floor": bool(sc["at_floor"]),
                           "meta": {k: meta[k] for k in SCORED_KEYS if k in meta}}]
 
-    status = state.archive.add(genome, fit, bd, meta, tier=result.tier, objectives=obj, at_floor=sc["at_floor"])
+    status = state.archive.add(genome, fit, bd, meta, tier=result.tier, objectives=obj,
+                               at_floor=sc["at_floor"], floor_rank=sc["frank"])
     state.curriculum.update(cell, sr)
 
     if state.scout is not None:
@@ -1449,7 +1457,8 @@ def _dry_status(state: SearchState, pheno, result, parent) -> str:
     if result.exploit:
         return "exploit"
     sc = _score_candidate(state, pheno, result, parent, commit=False)
-    return state.archive.would_add(sc["fit"], sc["bd"], sc["obj"], at_floor=sc["at_floor"])
+    return state.archive.would_add(sc["fit"], sc["bd"], sc["obj"], at_floor=sc["at_floor"],
+                                   floor_rank=sc["frank"])
 
 
 def _funnel(state: SearchState, parents):
