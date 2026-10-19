@@ -129,3 +129,25 @@ reads <= 0, so a replicated mean > 0.1 is a read with 10% of a perfect turn.
 Decision: R1 -> the air problem is admission (keep gliders at the floor so the
 turn can be learned), not actuation; R2 -> the gannet airframe needs a control
 surface before any air score can move.
+
+**C (pre-registered 2026-10-19, before any C data; built as `floor_tiebreak`,
+commit c7c92f8): does keeping the glider at the floor keep a glider in the
+archive?** Two arms, the air island alone, 40 generations, arch51's
+configuration (batch 16, 4 workers, 8 s, refine 0, shared policy, gait gain,
+mission weight 0, reeval 4/8), seed 20261019, pinned worktree; one arm with
+`--floor-tiebreak`, one without. GPU single-lane: after the screen and B'.
+Predicted wall 40 x 110-150 s = 1.3-1.7 h per arm.
+- C1 (mechanism): at gen 40 the air archive holds >= 3 elites with
+  `airborne_fraction` >= 0.5 in the on arm and 0 in the off arm (arch51: 0 of
+  139 overall; its gannet seed was rejected at gen 0 on every island).
+  *Falsified* if the on arm holds 0.
+- C2 (lineage): gannet evaluations after gen 8: on arm > 8, off arm <= 8
+  (arch51: 8 in 900 generations, the seeds).
+- C3 (the point, reported, not predicted at 40 gens): evaluations with air
+  competence >= 0.012, and evaluations with `pair_turn_mean` > 0 at
+  `pair_turn_factor` > 0.5 and `spin_rate` < 6.28, per arm. B' says whether a
+  random linear policy can turn a gannet at all; if B' is R1, C3 > 0 in the on
+  arm is the first air gradient the search has had under the paired score.
+- One seed per arm: C1 and C2 are checks of a mechanism that is deterministic
+  in direction, not effect sizes. Nothing here is comparable with arch51 on
+  `fitness`; `airborne_fraction` and air competence are.
