@@ -1,5 +1,14 @@
 # Roadmap
 
+**2026-10-19: arch51 (N5 + N11 + paired air) finished, 900 generations; see
+[what arch51 measured](#2026-10-19--what-arch51-measured).** Both pre-registered
+predictions are falsified as written, the mission is 0/0 for a sixth run, and
+nothing in it is comparable with arch49/arch50 on `fitness`. N5's ranking half
+worked (Spearman 0.47 -> 0.97); its population half did not (share of elites above
+the competence floor 22.4% -> 22.8%, against >= 40%). N11's retention is 0.02-0.06
+(land, water; air unmeasurable) and Tier-1->Tier-2 is 0.09/0.23 (water/land), against
+>= 0.5 and >= 0.3.
+
 **2026-10-12: the user answered the 10-08 questions 4-6; see
 [the answers](#answers-2026-10-12-questions-4-6).** E2 is adopted with air's
 L1 bar left open until arch51 measures it; `SearchConfig`'s defaults are now
@@ -207,6 +216,47 @@ Read [CPU_LEGACY.md](CPU_LEGACY.md) for the older backlog. This file supersedes
 it wherever the two disagree.
 
 ---
+
+
+## 2026-10-19 — what arch51 measured
+
+Run: `runs/arch51`, seed 20261018, 900 generations, 36.6 h (125 s/gen in the report,
+146 s/gen wall including the audits), pinned worktree at 443d0c6, `--memory-ceiling-mb
+6000` with a 7000 MB unit limit. Config: `runs/arch51_notes.md`. Before it: canary green
+(one test fixed, 01d3026) and the no-model gate re-run on the merged tree (every air rung
+`leak`, no air bar certified; `experiments/no_model_gate/results_arch49_airpair_main.json`).
+
+Mechanics checks all passed: `at_floor` on every `evaluate` event, 4 `reevaluate`
+`recorded` events per generation, `return_by_tag` on every `ppo` event.
+
+| pre-registered read | predicted | arch51 | arch49 (same method) | verdict |
+|---|---|---|---|---|
+| `fitness` median, gens 0-49 | < 0.3 | 0.0 | 0.68-0.78 | met |
+| Spearman(`fitness`, own-medium competence), archive | >= 0.7 | 0.97 | 0.47 | met |
+| share of elites with own-medium competence >= 0.012 | >= 40% | 22.8% (145) | 22.4% (246) | **missed** |
+| auditor held-out retention, per medium | >= 0.5 | land 0.02 (n=9), water 0.06 (n=2), air not measurable | land 0.06, air 0.0, water 0.09 | **missed** |
+| Tier-1->Tier-2 Spearman (`tier1_media` vs `tier2_media`, promotions) | >= 0.3 | water 0.093, land 0.225, air undefined (Tier-1 air is 0 in all 468) | water 0.174, land 0.182, air 0.403 | **missed** |
+
+N5 is falsified (any miss falsifies); N11 is falsified (retention below 0.35). Method
+notes: the share and Spearman use the air/water/land islands' archives and each island's
+own medium, so 22.4% is not the 9% in the notes (a different population). Retention is
+parsed from audit findings ("keeps X% of Y at unseen seeds"); audits ran only at gens 0-7
+and 240-247 (and later rounds), so n is 11 in total.
+
+What it does and does not say. The floor fixed the ranking: a design's fitness now tracks
+its competence. It did not raise the share of competent designs, so the bottleneck is not
+the selection scalar. That is a reading of one seed against one earlier run, not an effect.
+`mission_best` 0.0 and `three_media` 0 at generation 899, as in arch48-50.
+
+Film: the best-by-mission elite (triphibian, fitness 0.9905, gen 830's network) reproduces
+air (0.000) and water (0.180) but not land (recorded 0.091, reproduced 0.029, "NOT THE SAME
+EXPERIMENT"): under N11 an elite's record is its median draw's, and the film re-runs one.
+Do not read that footage as evidence for land. The first post-run wrote no films because the
+unit had `MUJOCO_GL=disable`; re-run 2026-10-19 with `MUJOCO_GL=egl` wrote all five clips
+and the same stamps (`runs/arch51/media/`).
+
+Open: why the share of competent elites stays at 22%; whether more audits (retention n=11)
+move the N11 read; the air L1 bar (E2) from arch51's still-machine read, still to be taken.
 
 ## What arch34 measured
 
