@@ -151,3 +151,34 @@ Predicted wall 40 x 110-150 s = 1.3-1.7 h per arm.
 - One seed per arm: C1 and C2 are checks of a mechanism that is deterministic
   in direction, not effect sizes. Nothing here is comparable with arch51 on
   `fitness`; `airborne_fraction` and air competence are.
+
+## A, appended after the screen (2026-10-19, unit `atb-screen`, 7218 s)
+
+**6.** Ran as designed: 139 elites x 8 fresh draws (2026101900..07) x 2 arms,
+`experiments/air_turn_bar/screen.json` and `.rows.jsonl`, main at c7c92f8
+(the floor-tiebreak code is off and not on this path).
+
+**7.** Of 1,112 elite draws, 3 had `pair_turn_factor` > 0; 533 ended "battery
+exhausted", 64 "diverged", 48 "unstable". The still arm had 3 measurable draws
+(all on elite 3's body), pair means -0.007, -0.007, -0.092: **all <= 0**, as the
+strict null requires. Two elite draws (134 at seed ..00, 40 at ..03) carry a
+single half (`pair_turn` 1.02 and -1.96, factor 1.0 and 0.43) and no pair mean:
+the mirrored half was not measurable, and `triphibian.py` then scores the
+*unpaired* half (`if p is not None and "turn" in p` else the single `signed`),
+so elite 134 took air 0.025 from one half with nothing to cancel against. An
+unpaired half is "could not measure", not a measurement (rule 4); left as an
+open item below, not fixed here.
+
+**8/9.** Against the frozen text: verdict `unmeasured` for 139 of 139 (138 with
+0 measurable draws, 1 with 1); 0 screen passes, 0 elites with a positive
+measurable draw. **R3's third form holds: nothing in arch51's archive is
+airborne when the turn is commanded**, so the null-referenced bar cannot be
+read on this population. R1/R2 are untouched by A (as frozen); B' decides them.
+The bar itself stands: a non-reader reads <= 0 (3/3 still draws), so any
+elite with a positive pair mean over K draws is evidence of reading the
+command, and the frozen sign test is the conservative form of it.
+
+**10.** Before: the air problem was a scoring/threshold question. After: the
+archive holds no body to score; the floor plus first-come emptied the air
+island of gliders at gen 0 (addendum above). What would move it back: C's on
+arm holding 0 airborne elites at gen 40.
