@@ -182,3 +182,33 @@ command, and the frozen sign test is the conservative form of it.
 archive holds no body to score; the floor plus first-come emptied the air
 island of gliders at gen 0 (addendum above). What would move it back: C's on
 arm holding 0 airborne elites at gen 40.
+
+## B', appended after the run (2026-10-19, 859 s, `authority.json`)
+
+**6.** 8 arch49 gannet gliders (rung >= 6, no rotors; 12 were asked for, 8
+exist), 32 random linear own policies each at sigma 0.5, one draw, top 3 by pair
+mean replicated at 4 fresh draws; the still machine on the same draws.
+
+**7.** Held still, 5 of 8 bodies are airborne through the command on >= 1 of
+the 4 replication draws (159: 4/4, 74: 4/4, 80: 4/4, 161: 1/4, 186: 1/4) and
+every still pair mean is <= 0 (max -0.034 .. -0.293): the strict null holds on
+gliders too. Under random policies at sigma 0.5, 6 of 8 bodies had **0 of 32**
+measurable draws, including 159, 161 and 186 that glide when held still: a
+random policy of that size takes the glider out of the air before the
+command. Body 74: 6/32 measurable, 3 positive, best 0.307 on the screen draw;
+its top 3 replicated at 0.007 (n = 3). Body 80: 3/32, best 0.111; replicated
+-0.037.
+
+**8/9.** Against the frozen text: "R2 predicts: no body's best replicated mean
+exceeds 0.1" -- **0 of 8**, R2's prediction held, R1's falsifier fired. But
+station 4 was weak: the probe measured "random sigma-0.5 linear policies", and
+most of those crash the glide, so the read is "a random policy does not turn a
+gannet", not "a gannet cannot be turned". The single-draw 0.307 that did not
+replicate is the winner's curse the design anticipated. **Classification:
+confirmed for R2 as frozen; authority at a policy scale that keeps the glide is
+untested.**
+
+**B'' (pre-registered now, before data): the same probe at sigma 0.1 and
+0.02** on the same 8 bodies, same seeds. R2 predicts 0 bodies > 0.1 at both;
+R1 predicts >= 1 at one of them with measurable draws >= 8/32 (the glide kept).
+Queued after C (one GPU lane).
