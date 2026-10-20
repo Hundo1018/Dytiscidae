@@ -7,7 +7,10 @@ arch52's command + `--air-turn-reward 1.0`, same seed) starts when arch52
 reaches gen 100 and is read against it at matched generations.** arch53's first
 launch was void: the weight did not cross to the workers' buffers (spec), so it
 replicated arch52 bit for bit through gen 50; fixed the same evening, relaunched
-from gen 0 ().
+from gen 0 (`runs/arch53_notes.md`). **arch53 at gen 100 (2026-10-21):** L1, L2,
+L3 met -- the learner's air return non-zero from gen 0 and positive on 6 of its
+last 49 updates; 26 clean commanded-turn reads against arch52's 3; 7 air elites
+above the floor (max 0.202) against 0. Reliability (R1-R3) is read at gen 300.
 
 | # | item | what it changes | read by | status |
 |---|---|---|---|---|
