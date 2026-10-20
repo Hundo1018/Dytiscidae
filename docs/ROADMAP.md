@@ -18,6 +18,28 @@ Kept on purpose: the still-machine rule, the antipodal/mirrored pair, and
 them. They were misapplied to admission and to the learner's signal, which is
 what 1 and 2 remove.
 
+**How long to run an arm (the user, 2026-10-20: "find a sweet spot that holds
+for later training").** Read from every stored `generations.jsonl` with >= 100
+generations (31 runs): the generation at which each island's coverage and each
+medium's running-max best reach 90% of their final value.
+- Coverage: since arch34 (8 islands), 90% of final by gen 40-160 in every run
+  (arch51: 42-160; arch49: 90-221; arch48: 109-275). Before arch34 it was still
+  rising at gen 450 of 520. Distributions settle by ~150, as the 2026-09 note said.
+- Best per medium: 90% of final by gen 0-250 in 21 of 27 (medium, run) pairs
+  from the 9 runs of >= 600 generations; the other 6 are single late jumps
+  (arch36 land 702, arch40 air 581, arch44 air 557, arch45 air 377 and land 375,
+  arch51 land 463 and water 415). Before N11 a running max of one-draw scores
+  is the winner's curse as much as capability; under N11 (arch51) the two late
+  jumps are median-draw scores and stand.
+- Rule: **a mechanism arm (does X do what it was built for) runs 150
+  generations, read at 100 and 150; a capability arm runs 300, read at 150 and
+  300, and is extended by resume only if its pre-registered quantity moved
+  between 150 and 300 by more than the draw spread N11 reports; 900 is for the
+  confirmatory run of a finished design.** 300 generations is 11-13 h on this
+  GPU at 8 islands (126-150 s/gen), 150 is 6 h; arch52 (air island, 300) fits.
+  What would change it: a late jump that a 150-300 resume rule misses in a
+  run that was read, which the rule's own extension clause is there to catch.
+
 
 **2026-10-20: air's bar, the floor's blind spot, and the first commanded turn;
 see [the air turn bar](#2026-10-20--the-air-turn-bar-the-floor-tiebreak-and-the-first-commanded-turn).**
