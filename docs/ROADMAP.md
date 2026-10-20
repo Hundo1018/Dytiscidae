@@ -1,5 +1,24 @@
 # Roadmap
 
+**2026-10-20, later: the air list, in the order the user set (from the 10-20
+section's evidence). arch52 (air island, `--floor-tiebreak`, 300 gens, seed
+20261020, unit `arch52`) runs as the control; arch53 carries the list.**
+
+| # | item | what it changes | read by | status |
+|---|---|---|---|---|
+| 1 | **Dense air reward for the learner.** The shared policy's air return is 0 until the archive credits a turn (`return_by_tag` air 0 in arch48 and arch51), and the archive credits a turn only once a reader exists. The unclipped pair mean is <= 0 for any non-reader by construction, so it can be PPO's air reward without leaking into the archive score. | `learning/ppo` reward shaping, air only; archive scoring untouched | `return_by_tag` air > 0 within 50 gens; M4-style fixed-gannet learning curve rising above the base gait; the air screen's pass count | building |
+| 2 | **Admission decoupled from the floor.** F1 (a floor design fills only an empty cell) rejected the gannet seed at gen 0 on every island. The tiebreak is a patch; the floor should rank and weight parents, not gate entry. | `archive._verdict`, `curator.select_parent` | gannet seed `new` on every island at gen 0; floor members' parent weight; nothing above the floor displaced by a floor design (test) | after 1 |
+| 3 | **Battery exhaustion in the air segment: a read.** 533 of arch51's 1,112 fresh air draws ended "battery exhausted" inside 8 s, before or during the command. Cause unmeasured: `battery_wh` sizing, the energy gate, or rotor draw. | none until read | share of air draws ending in exhaustion by body plan and rotor count; time of exhaustion vs the 4 s command | read on the CPU now |
+| 4 | **The air cruise speed command.** `cmd_speed` 6.0 m/s is typed; a gannet glides at ~15 m/s, and the straight phase's tracking pays for a speed the airframe cannot hold. Rule 5: set it from the airframe (trim speed, `flight audit`) or drop speed from the air command. | `envs/tasks.py` air schedule | tracking distribution on gliders before/after; still machine still 0 | after 1 |
+| 5 | **Retire air rungs 1-5.** `makes_lift` .. `leaves_surface` leak against the still machine on every population measured (arch49, arch51, C-on); they rank nothing. | `judge.LADDER` air | no elite's rung_reached changes except through these; telemetry only | after 4 |
+| 6 | Policy initialisation scale: sigma 0.5 crashes a glider, 0.02 turns it 12% (B''). A hyperparameter read, not a rule. | `controller_refine_sigma`, mutation sigma on policy weights | measurable share of random policies at each sigma; later, arch53's gannet survival | read after 3 |
+
+Kept on purpose: the still-machine rule, the antipodal/mirrored pair, and
+"a score survives a fresh seed" -- the honesty of every number above rests on
+them. They were misapplied to admission and to the learner's signal, which is
+what 1 and 2 remove.
+
+
 **2026-10-20: air's bar, the floor's blind spot, and the first commanded turn;
 see [the air turn bar](#2026-10-20--the-air-turn-bar-the-floor-tiebreak-and-the-first-commanded-turn).**
 The user asked whether rule 5 admits a statistical threshold; it does, and the
