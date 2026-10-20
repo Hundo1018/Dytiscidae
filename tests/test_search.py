@@ -1700,6 +1700,69 @@ def test_the_heading_pair_cancels_what_the_command_did_not_choose() -> None:
           and [ph.heading for ph in pair_of(t).phases] == [ph.heading for ph in antipode(t).phases])
 
 
+def test_the_learners_air_return_reaches_the_buffer() -> None:
+    """ROADMAP 2026-10-20 air list item 1: through the batched path, with
+    ``air_turn_reward`` > 0, every air trajectory's terminal reward is
+    ``learner_reward`` of its segment (competence + weight x pair mean where
+    the pair was measurable), and with it 0 it is the bare competence.  A
+    quiet shared network on a gannet so the glide is kept and the pair
+    measurable: for a non-reader the mean is <= 0, so the reward is below the
+    competence, which is what the archive never sees."""
+    print("\nlearner: the air return reaches the buffer through the batched path")
+    from collections import Counter
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.batchroll import evaluate_tier1_batch
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import TriphibianEnv
+    from dytiscidae.learning.ppo import AVAILABLE, RolloutBuffer, SharedPolicy, learner_reward
+
+    if needs_batched_evaluator("test_the_learners_air_return_reaches_the_buffer"):
+        return
+    if not AVAILABLE:
+        print("  [skip] torch not installed")
+        SKIPS.append("test_the_learners_air_return_reaches_the_buffer")
+        return
+    import torch
+
+    p = build(BODY_PLANS["gannet"]())
+    seeds = [3, 4, 5, 6]
+    net = SharedPolicy(TriphibianEnv.OBS_DIM, 6, hidden=16)
+    with torch.no_grad():
+        # Command nothing, and sample nothing: the gannet glides as held still.
+        last = [m for m in net.actor.modules() if isinstance(m, torch.nn.Linear)][-1]
+        last.weight.zero_(); last.bias.zero_()
+        net.log_std.fill_(-12.0)
+    out = {}
+    for beta in (0.0, 1.0):
+        buf = RolloutBuffer(shaping=0.0, air_turn_reward=beta)
+        ctrls = [Controller(params=TriphibianEnv(p, seed=s).held_still_params()) for s in seeds]
+        # The shared policy acts through the mobility basis, so the trajectories
+        # are banked only for an identified machine.
+        res = evaluate_tier1_batch([p] * len(seeds), controllers=ctrls, segment_seconds=8.0,
+                                   identify_axes=True, seed=seeds, shared=net, buffer=buf)
+        got = Counter(round(t.terminal_reward, 9) for t in buf.trajectories if t.tag == "air")
+        want = Counter()
+        for r in res:
+            want[round(learner_reward(r.segments["air"], "air", beta), 9)] += (
+                sum(1 for t in buf.trajectories if t.tag == "air") // len(res))
+        out[beta] = (got, want, res)
+    got0, want0, res0 = out[0.0]
+    check("off: every air terminal reward is the segment's competence",
+          got0 == want0 and all(round(r.segments["air"].competence, 9) in got0 for r in res0),
+          f"{dict(got0)} vs {dict(want0)}")
+    got1, want1, res1 = out[1.0]
+    meas = [r for r in res1 if (r.segments["air"].measurements or {}).get("pair_turn_factor", 0.0) > 0.0]
+    check("the gannet's pair is measurable on at least one draw (else this test reads nothing)",
+          len(meas) >= 1, f"{len(meas)}/{len(res1)} measurable")
+    check("on: every air terminal reward is competence + the pair mean, as learner_reward says",
+          got1 == want1, f"{dict(got1)} vs {dict(want1)}")
+    check("and for a non-reader it sits below the competence (the archive score)",
+          all(learner_reward(r.segments["air"], "air", 1.0) < float(r.segments["air"].competence) for r in meas),
+          str([(round(learner_reward(r.segments["air"], "air", 1.0), 4), round(r.segments["air"].competence, 4)) for r in meas]))
+
+
 def test_tier2_draws_its_headings() -> None:
     """A verifier fixed at one heading has the defect it is meant to catch."""
     print("\nTier-2 draws the task it verifies")
@@ -7300,6 +7363,7 @@ def main() -> int:
         test_an_attempted_takeoff_outscores_never_leaving_the_ground,
         test_a_crossing_is_commanded_and_a_still_machine_makes_none,
         test_the_heading_pair_cancels_what_the_command_did_not_choose,
+        test_the_learners_air_return_reaches_the_buffer,
         test_tier2_draws_its_headings,
         test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing,
         test_judge_ladder_is_fixed_and_bar_only_tightens,

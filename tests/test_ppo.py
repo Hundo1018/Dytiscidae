@@ -466,6 +466,33 @@ def test_the_return_splits_into_shaping_and_terminal() -> None:
           skipped.get("return_by_tag") == {}, str(skipped))
 
 
+def test_the_learners_air_return_carries_the_pair_mean() -> None:
+    """ROADMAP 2026-10-20 air list item 1: with ``air_turn_reward`` > 0 the air
+    terminal reward is competence plus the weighted unclipped pair mean, only
+    where the pair was measurable; off, and in every other medium, it is the
+    competence alone, so arch51's returns are byte-identical."""
+    print("\nlearner: the air return carries the pair mean")
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.learning.ppo import learner_reward
+
+    seg = NS(competence=0.0, measurements={"pair_turn_mean": -0.3, "pair_turn_factor": 1.0})
+    check("off: the competence alone", learner_reward(seg, "air", 0.0) == 0.0)
+    check("on: competence + weight x pair mean, negative for a non-reader",
+          abs(learner_reward(seg, "air", 0.5) - (-0.15)) < 1e-12, f"{learner_reward(seg, 'air', 0.5)}")
+    seg2 = NS(competence=0.111, measurements={"pair_turn_mean": 0.204, "pair_turn_factor": 1.0})
+    check("a reader's positive mean adds to its competence",
+          abs(learner_reward(seg2, "air", 0.5) - (0.111 + 0.102)) < 1e-12)
+    seg3 = NS(competence=0.0, measurements={"pair_turn_mean": 0.9, "pair_turn_factor": 0.0})
+    check("an unmeasurable pair (factor 0) adds nothing", learner_reward(seg3, "air", 0.5) == 0.0)
+    seg4 = NS(competence=0.0, measurements={})
+    check("no pair at all adds nothing", learner_reward(seg4, "air", 0.5) == 0.0)
+    check("water and land ignore it", learner_reward(seg, "water", 0.5) == 0.0 and learner_reward(seg2, "land", 0.5) == 0.111)
+    buf = RolloutBuffer(shaping=0.0, air_turn_reward=0.5)
+    check("the buffer carries the weight", buf.air_turn_reward == 0.5)
+    check("and defaults to off", RolloutBuffer().air_turn_reward == 0.0)
+
+
 def test_terminal_rewards_are_scaled_within_their_own_kind() -> None:
     """Water competence averaged 0.635 against 0.089 on land; unscaled, water wins.
 
@@ -1480,6 +1507,7 @@ def main() -> int:
     test_potential_shaping_telescopes_to_nothing()
     test_the_return_splits_into_shaping_and_terminal()
     test_terminal_rewards_are_scaled_within_their_own_kind()
+    test_the_learners_air_return_carries_the_pair_mean()
 
     test_an_empty_generation_is_skipped_not_crashed_on()
     test_the_batch_boundaries()

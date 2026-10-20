@@ -342,6 +342,31 @@ def _draw(base, rngs):
     return mean + std * torch.as_tensor(eps)
 
 
+def learner_reward(seg, tag: str, air_turn_reward: float = 0.0) -> float:
+    """The terminal reward the learner sees for one segment.
+
+    The segment's own competence -- the number the search selects on -- plus,
+    in the air and only when ``air_turn_reward`` > 0, that weight times the
+    unclipped pair mean of the mirrored turn (``triphibian.paired_turn``).
+    Why (ROADMAP 2026-10-20, air list item 1): the archive credits air only
+    once a design turns toward the command, so until one does the learner's
+    air return is 0 (arch48 and arch51: ``return_by_tag`` air 0 throughout)
+    and nothing can be learned.  The pair mean is <= 0 for any controller that
+    does not read the command (-0.5 |a - b| by construction, 0 positive still
+    draws on three populations), so it is a gradient toward reading the
+    command that a still machine cannot climb, and it never touches the
+    archive score.  A draw that was not measurable (``pair_turn_factor`` 0:
+    not aloft or not served through the command) adds nothing: could-not-
+    measure is not measured-zero (CLAUDE.md rule 4).
+    """
+    r = float(getattr(seg, "competence", 0.0) or 0.0)
+    if tag == "air" and air_turn_reward > 0.0:
+        m = getattr(seg, "measurements", None) or {}
+        if (m.get("pair_turn_factor") or 0.0) > 0.0 and m.get("pair_turn_mean") is not None:
+            r += float(air_turn_reward) * float(m["pair_turn_mean"])
+    return r
+
+
 @dataclass
 class Trajectory:
     """One segment's worth of decisions from one machine."""
@@ -426,9 +451,12 @@ class RolloutBuffer:
     """
 
     def __init__(self, gamma: float = 0.99, lam: float = 0.95,
-                 shaping: float = 0.2):
+                 shaping: float = 0.2, air_turn_reward: float = 0.0):
         self.gamma, self.lam = float(gamma), float(lam)
         self.shaping = float(shaping)
+        #: Weight of the unclipped air pair mean in the learner's air return
+        #: (``learner_reward``); 0 is off and leaves every return byte-identical.
+        self.air_turn_reward = float(air_turn_reward)
         self.trajectories: list[Trajectory] = []
         #: Per segment kind, how the discounted return splits into the
         #: potential-shaping part and the terminal (competence) part.  Filled by

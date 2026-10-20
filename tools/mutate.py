@@ -167,6 +167,28 @@ MUTATIONS: tuple = (
                "scores its own turn with nothing to cancel against (arch51: air 0.025 from one half)",
         suites=("test_physics::test_an_unpaired_air_half_pays_nothing",), item="air pair"),
     Mutation(
+        id="air-turn-reward-pays-the-unmeasurable",
+        path="dytiscidae/learning/ppo.py",
+        find="        if (m.get(\"pair_turn_factor\") or 0.0) > 0.0 and m.get(\"pair_turn_mean\") is not None:",
+        replace="        if m.get(\"pair_turn_mean\") is not None:",
+        defect="the learner's air return pays a pair mean from a draw that was not "
+               "aloft or not served through the command (could-not-measure as measured)",
+        suites=("test_ppo::test_the_learners_air_return_carries_the_pair_mean",), item="air learner reward"),
+    Mutation(
+        id="air-turn-reward-inert",
+        path="dytiscidae/learning/ppo.py",
+        find="    if tag == \"air\" and air_turn_reward > 0.0:",
+        replace="    if False:",
+        defect="the flag is accepted and the learner's air return stays the competence alone",
+        suites=("test_ppo::test_the_learners_air_return_carries_the_pair_mean",), item="air learner reward"),
+    Mutation(
+        id="batch-rewards-skip-the-learner-reward",
+        path="dytiscidae/envs/batchroll.py",
+        find="                coll.finish(buffer, [learner_reward(x, dom.value, getattr(buffer, \"air_turn_reward\", 0.0))\n                                     for x in segs], tag=dom.value, groups=live_groups)",
+        replace="                coll.finish(buffer, [x.competence for x in segs], tag=dom.value, groups=live_groups)",
+        defect="the batched path hands the buffer the bare competence, so the flag never reaches a run",
+        suites=("test_search::test_the_learners_air_return_reaches_the_buffer",), item="air learner reward"),
+    Mutation(
         id="air-height-adds-to-the-turn",
         path="dytiscidae/envs/triphibian.py",
         find="    return float(turn) * (0.5 + 0.5 * float(height))\n",

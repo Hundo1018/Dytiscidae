@@ -212,6 +212,7 @@ def search_config_from_args(args, shared: bool):
         mission_weight=args.mission_weight,
         descriptor_bins=args.descriptor_bins,
         reward_shaping=args.reward_shaping,
+        air_turn_reward=args.air_turn_reward,
         n_modes=args.n_modes,
         **({"islands": tuple(x.strip() for x in args.islands.split(","))}
            if args.islands else {}),
@@ -1159,6 +1160,11 @@ def build_parser() -> argparse.ArgumentParser:
                         "0 is the terminal-only reward, which delivered one "
                         "scalar per 161 decisions. Shaping of this form cannot "
                         "change the optimal policy.")
+    p.add_argument("--air-turn-reward", type=float, default=0.0,
+                   help="weight of the unclipped air pair mean in the shared "
+                        "policy's air return (ppo.learner_reward); 0 = off. "
+                        "A non-reader's pair mean is <= 0, so a still machine "
+                        "cannot climb it; the archive score is untouched")
     p.add_argument("--n-modes", type=int, default=6,
                    help="mobility modes identified per body per domain, and "
                         "the width the shared policy commands through")

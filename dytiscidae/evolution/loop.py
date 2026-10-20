@@ -198,6 +198,13 @@ class SearchConfig:
     #: 1999); it changes only when credit arrives, which for a scalar delivered
     #: once every 161 decisions is the whole problem.
     reward_shaping: float = 0.2
+    #: Weight of the unclipped air pair mean in the shared policy's air return
+    #: (``ppo.learner_reward``).  0 is off: every return byte-identical to
+    #: arch51's.  ROADMAP 2026-10-20 air list item 1: the archive credits air
+    #: only once a design turns, so the learner's air return was 0 throughout
+    #: arch48 and arch51; the pair mean is <= 0 for any non-reader, so it is a
+    #: gradient a still machine cannot climb.  Archive scoring is untouched.
+    air_turn_reward: float = 0.0
     #: Bins per learned descriptor axis.  Four axes at 8 bins is 4096 cells per
     #: island and 24,576 across six -- 2.6x arch31's *entire* evaluation budget
     #: of 9,620, so 81.9% of surviving cells were never improved on and
@@ -1547,7 +1554,7 @@ def _grpo_rollouts(state: SearchState, cfg: SearchConfig, gen: int, evaluated,
             groups.append(b)
             streams.append(GRPO_STREAM_BASE + b * G + g)
 
-    gbuf = GroupRolloutBuffer()
+    gbuf = GroupRolloutBuffer(air_turn_reward=getattr(cfg, "air_turn_reward", 0.0))
     pool = state.pool
     n_calls = len(pool.shard_log) if pool is not None else 0
     t0 = _time.perf_counter()
@@ -1867,7 +1874,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             buffer = None
             if state.shared is not None:
                 from ..learning.ppo import RolloutBuffer
-                buffer = RolloutBuffer(shaping=cfg.reward_shaping)
+                buffer = RolloutBuffer(shaping=cfg.reward_shaping,
+                                       air_turn_reward=getattr(cfg, "air_turn_reward", 0.0))
                 _save_scoring_network(state, gen)
             cost.lap("build")
             evaluated = evaluate_candidates(
@@ -1950,7 +1958,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                 # Trained on the group rollouts alone; the ordinary ones were
                 # collected because they are the generation's scores.
                 from ..learning.ppo import RolloutBuffer as _RB
-                update_buffer = _RB(shaping=cfg.reward_shaping)
+                update_buffer = _RB(shaping=cfg.reward_shaping,
+                                    air_turn_reward=getattr(cfg, "air_turn_reward", 0.0))
             else:
                 update_buffer = buffer
             info = ppo_update(state.shared, update_buffer, lr=cfg.shared_lr,

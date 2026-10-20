@@ -1205,8 +1205,9 @@ def evaluate_tier1_batch(phenos, *, spec=None, controllers=None,
                 # search selects on -- delivered once, at the end, to both
                 # halves of a pair. See ppo.py for why nothing denser is
                 # invented here.
-                coll.finish(buffer, [x.competence for x in segs], tag=dom.value,
-                            groups=live_groups)
+                from ..learning.ppo import learner_reward
+                coll.finish(buffer, [learner_reward(x, dom.value, getattr(buffer, "air_turn_reward", 0.0))
+                                     for x in segs], tag=dom.value, groups=live_groups)
 
     # `land_to_air` was excluded because "nothing gets off the ground"
     # (transitions.py records exactly that for all six seed plans).  Two
