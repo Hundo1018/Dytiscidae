@@ -118,7 +118,7 @@ def _run_shard(payload):
 
         from ..learning.ppo import RolloutBuffer, SharedPolicy
 
-        n_obs, n_modes, hidden, state, shaping, seed, want_buffer = shared_spec
+        n_obs, n_modes, hidden, state, shaping, seed, want_buffer, air_turn_reward = shared_spec
         policy = _WORKER.get("shared")
         if policy is None or (policy.n_obs, policy.n_modes) != (n_obs, n_modes):
             policy = SharedPolicy(n_obs, n_modes, hidden=hidden)
@@ -132,7 +132,12 @@ def _run_shard(payload):
         # and the refinement trials drive the shared policy at its mean and
         # bank nothing, and a buffer here would switch the batched path to
         # sampling.
-        buffer = RolloutBuffer(shaping=shaping) if want_buffer else None
+        # The buffer's reward settings cross to the worker in the spec: the
+        # terminal reward is attached here, at ``finish``, not in the parent
+        # (arch53's first launch, 2026-10-20: ``air_turn_reward`` set in the
+        # parent's buffer never reached a worker, and the run replicated
+        # arch52 bit for bit).
+        buffer = RolloutBuffer(shaping=shaping, air_turn_reward=air_turn_reward) if want_buffer else None
 
     results = batchroll.evaluate_tier1_batch(
         phenos, controllers=ctrls, shared=shared, buffer=buffer, **kwargs)
@@ -329,6 +334,7 @@ class ActorPool:
                 float(getattr(buffer, "shaping", 0.0)) if buffer is not None else 0.0,
                 _first_seed(kwargs.get("seed", 0)),
                 buffer is not None,
+                float(getattr(buffer, "air_turn_reward", 0.0)) if buffer is not None else 0.0,
             )
 
         import time

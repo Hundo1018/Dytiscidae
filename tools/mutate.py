@@ -189,6 +189,14 @@ MUTATIONS: tuple = (
         defect="the batched path hands the buffer the bare competence, so the flag never reaches a run",
         suites=("test_search::test_the_learners_air_return_reaches_the_buffer",), item="air learner reward"),
     Mutation(
+        id="worker-spec-drops-the-air-turn-reward",
+        path="dytiscidae/envs/actors.py",
+        find="                float(getattr(buffer, \"air_turn_reward\", 0.0)) if buffer is not None else 0.0,\n            )\n",
+        replace="                0.0,\n            )\n",
+        defect="the parent's air_turn_reward never reaches a worker's buffer, so a run "
+               "with the flag replicates one without it (arch53's first launch)",
+        suites=("test_search::test_the_learners_air_return_crosses_the_worker_pool",), item="air learner reward"),
+    Mutation(
         id="air-height-adds-to-the-turn",
         path="dytiscidae/envs/triphibian.py",
         find="    return float(turn) * (0.5 + 0.5 * float(height))\n",

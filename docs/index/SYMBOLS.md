@@ -703,14 +703,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `ActorPool` | class | 238 | — | A persistent pool of worker processes, each with its own batched evaluator. |
-| `plan_shards` | function | 185 | `(costs, workers: int, min_shard: int, *, per_worker: float=1.0, balance: bool=False) -> list` | Shards as lists of indices, most expensive first (ROADMAP AJ). |
-| `shard_cost` | function | 170 | `(pheno) -> float` | A machine's predicted evaluation wall, for ``plan_shards(balance=True)``. |
-| `split` | function | 143 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
-| `ActorPool.__init__` | method | 253 | `(self, workers: int=1, *, min_shard: int=2, per_worker: float=2.0, balance: bool=False) -> None` | — |
-| `ActorPool.close` | method | 463 | `(self) -> None` | — |
-| `ActorPool.evaluate_tier1` | method | 283 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
-| `ActorPool.map` | method | 394 | `(self, fn, jobs) -> list` | ``[fn(*job) for job in jobs]``, one job per worker at a time. |
+| `ActorPool` | class | 243 | — | A persistent pool of worker processes, each with its own batched evaluator. |
+| `plan_shards` | function | 190 | `(costs, workers: int, min_shard: int, *, per_worker: float=1.0, balance: bool=False) -> list` | Shards as lists of indices, most expensive first (ROADMAP AJ). |
+| `shard_cost` | function | 175 | `(pheno) -> float` | A machine's predicted evaluation wall, for ``plan_shards(balance=True)``. |
+| `split` | function | 148 | `(n: int, workers: int, min_shard: int) -> list` | Contiguous shard boundaries, never finer than ``min_shard``. |
+| `ActorPool.__init__` | method | 258 | `(self, workers: int=1, *, min_shard: int=2, per_worker: float=2.0, balance: bool=False) -> None` | — |
+| `ActorPool.close` | method | 469 | `(self) -> None` | — |
+| `ActorPool.evaluate_tier1` | method | 288 | `(self, phenos, *, controllers=None, shared=None, buffer=None, **kwargs)` | ``batchroll.evaluate_tier1_batch``, spread over the pool. |
+| `ActorPool.map` | method | 400 | `(self, fn, jobs) -> list` | ``[fn(*job) for job in jobs]``, one job per worker at a time. |
 
 ## `envs.batchroll` — `dytiscidae/envs/batchroll.py`
 

@@ -60,6 +60,7 @@ RolloutBuffer:
   tests:
     - tests.test_ppo::test_the_learners_air_return_carries_the_pair_mean
     - tests.test_search::test_the_learners_air_return_reaches_the_buffer
+    - tests.test_search::test_the_learners_air_return_crosses_the_worker_pool
     - tests.test_ppo::test_gae_matches_an_independent_reference
     - tests.test_ppo::test_one_trajectory_never_bootstraps_off_another
     - tests.test_ppo::test_terminal_rewards_are_scaled_within_their_own_kind

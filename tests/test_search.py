@@ -1763,6 +1763,57 @@ def test_the_learners_air_return_reaches_the_buffer() -> None:
           str([(round(learner_reward(r.segments["air"], "air", 1.0), 4), round(r.segments["air"].competence, 4)) for r in meas]))
 
 
+def test_the_learners_air_return_crosses_the_worker_pool() -> None:
+    """arch53's first launch (2026-10-20) replicated arch52 bit for bit: the
+    parent's buffer carried ``air_turn_reward`` and the worker built its own
+    buffer from the shared spec without it.  Through a two-worker pool, the air
+    terminal rewards must be what ``learner_reward`` says, not the bare
+    competence."""
+    print("\nlearner: the air return crosses the worker pool")
+    from collections import Counter
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.actors import ActorPool
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import MissionSpec, TriphibianEnv
+    from dytiscidae.learning.ppo import AVAILABLE, RolloutBuffer, SharedPolicy, learner_reward
+
+    if needs_batched_evaluator("test_the_learners_air_return_crosses_the_worker_pool"):
+        return
+    if not AVAILABLE:
+        print("  [skip] torch not installed")
+        SKIPS.append("test_the_learners_air_return_crosses_the_worker_pool")
+        return
+    import torch
+
+    p = build(BODY_PLANS["gannet"]())
+    seeds = [3, 4, 5, 6]
+    net = SharedPolicy(TriphibianEnv.OBS_DIM, 6, hidden=16)
+    with torch.no_grad():
+        last = [m for m in net.actor.modules() if isinstance(m, torch.nn.Linear)][-1]
+        last.weight.zero_(); last.bias.zero_()
+        net.log_std.fill_(-12.0)
+    buf = RolloutBuffer(shaping=0.0, air_turn_reward=1.0)
+    ctrls = [Controller(params=TriphibianEnv(p, seed=s).held_still_params()) for s in seeds]
+    pool = ActorPool(2, min_shard=1)
+    try:
+        res = pool.evaluate_tier1([p] * len(seeds), controllers=ctrls, shared=net, buffer=buf,
+                                  spec=MissionSpec(), segment_seconds=8.0, identify_axes=True, seed=seeds)
+    finally:
+        pool.close()
+    air = [t for t in buf.trajectories if t.tag == "air"]
+    got = Counter(round(t.terminal_reward, 9) for t in air)
+    want = Counter()
+    for r in res:
+        want[round(learner_reward(r.segments["air"], "air", 1.0), 9)] += len(air) // max(len(res), 1)
+    meas = [r for r in res if (r.segments["air"].measurements or {}).get("pair_turn_factor", 0.0) > 0.0]
+    check("the pool banked air trajectories", len(air) > 0, f"{len(air)}")
+    check("at least one draw is measurable", len(meas) >= 1, f"{len(meas)}/{len(res)}")
+    check("through the pool the air terminal rewards are learner_reward's, not the bare competence",
+          got == want and any(k < 0 for k in got), f"{dict(got)} vs {dict(want)}")
+
+
 def test_tier2_draws_its_headings() -> None:
     """A verifier fixed at one heading has the defect it is meant to catch."""
     print("\nTier-2 draws the task it verifies")
@@ -7364,6 +7415,7 @@ def main() -> int:
         test_a_crossing_is_commanded_and_a_still_machine_makes_none,
         test_the_heading_pair_cancels_what_the_command_did_not_choose,
         test_the_learners_air_return_reaches_the_buffer,
+        test_the_learners_air_return_crosses_the_worker_pool,
         test_tier2_draws_its_headings,
         test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing,
         test_judge_ladder_is_fixed_and_bar_only_tightens,
