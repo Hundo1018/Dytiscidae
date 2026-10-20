@@ -159,6 +159,14 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_a_still_machine_is_still_from_the_first_step",), item="still machine"),
     # --- the antipodal heading pair (2026-10-06) ----------------------------
     Mutation(
+        id="unpaired-air-half-scores-alone",
+        path="dytiscidae/envs/triphibian.py",
+        find="    if \"turn\" not in partner:\n        return float(signed), 0.0, None\n",
+        replace="    if \"turn\" not in partner:\n        return float(signed), float(factor), None\n",
+        defect="the second half of an air pair whose first half was not measurable "
+               "scores its own turn with nothing to cancel against (arch51: air 0.025 from one half)",
+        suites=("test_physics::test_an_unpaired_air_half_pays_nothing",), item="air pair"),
+    Mutation(
         id="air-height-adds-to-the-turn",
         path="dytiscidae/envs/triphibian.py",
         find="    return float(turn) * (0.5 + 0.5 * float(height))\n",

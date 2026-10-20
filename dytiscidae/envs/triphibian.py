@@ -2188,11 +2188,9 @@ class TriphibianEnv:
                 factor = _served(a, b) * min(a.get("airborne", 1.0), b.get("airborne", 1.0))
                 m["pair_turn"] = float(signed)
                 m["pair_turn_factor"] = float(factor)
-                p = self.pair_partner
-                if p is not None and "turn" in p:
-                    signed = 0.5 * (signed + float(p["turn"]))
-                    factor = min(factor, float(p.get("turn_factor", 0.0)))
-                    m["pair_turn_mean"] = float(signed)
+                signed, factor, mean = paired_turn(signed, factor, self.pair_partner)
+                if mean is not None:
+                    m["pair_turn_mean"] = float(mean)
                 turn = float(np.clip(signed, 0.0, 1.0)) * factor
                 m["turn_response"] = turn
             height = float(np.mean([r.get("vertical", 0.0) * r.get("served", 0.0) for r in (a, b)]))
@@ -3050,6 +3048,28 @@ def air_task(turn: float, height: float) -> float:
     a perfect turn holding height 1.
     """
     return float(turn) * (0.5 + 0.5 * float(height))
+
+
+def paired_turn(signed: float, factor: float, partner: dict | None) -> tuple:
+    """``(signed, factor, mean)`` for the air turn as one half of a mirrored pair.
+
+    On its own (``partner`` None, the first half): this half's numbers and no
+    mean.  As the second half: the mean of the two halves' signed responses,
+    the worse half's factor, and the mean published.  A first half that was not
+    measurable (no ``turn`` in ``partner``: not airborne or not served through
+    both phases) makes the pair unmeasured -- factor 0 -- as ``_paired`` does
+    for water and land.  Until 2026-10-20 the second half then scored alone,
+    with nothing for a drift the command did not choose to cancel against: of
+    arch51's 1,112 fresh air draws one scored 0.025 that way
+    (`experiments/air_turn_bar/README.md`, A §7).  An unpaired half is "could
+    not measure", not a turn (CLAUDE.md rule 4).
+    """
+    if partner is None:
+        return float(signed), float(factor), None
+    if "turn" not in partner:
+        return float(signed), 0.0, None
+    mean = 0.5 * (float(signed) + float(partner["turn"]))
+    return mean, min(float(factor), float(partner.get("turn_factor", 0.0))), mean
 
 
 def pair_partner_of(seg: SegmentResult) -> dict:

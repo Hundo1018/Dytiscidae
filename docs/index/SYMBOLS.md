@@ -890,7 +890,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `air_task` | function | 3044 | `(turn: float, height: float) -> float` | Air's task score: the turn response, qualified by holding height. |
+| `air_task` | function | 3042 | `(turn: float, height: float) -> float` | Air's task score: the turn response, qualified by holding height. |
 | `airworthiness` | function | 342 | `(p: Phenotype) -> list[str]` | Which flight gates a design fails, as reasons.  Empty means none. |
 | `command_statistics` | function | 114 | `(commands) -> tuple[float, float] \| None` | How much, and how erratically, a controller's commands move. |
 | `Domain` | class | 66 | `(str, Enum)` | — |
@@ -898,7 +898,8 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `MissionResult` | class | 183 | — | Aggregate of a whole evaluation, at whatever fidelity produced it. |
 | `MissionSpec` | class | 79 | — | The mission the user specified, with every number left adjustable. |
 | `morphology_channels` | function | 489 | `(*, mass: float, density_ratio: float, wing_area: float, span: float, aspect_ratio: float, wing_loading: float, n_actuated: int, battery_wh: float) -> np.ndarray` | The eight body-identity channels, from scalars rather than a phenotype. |
-| `pair_partner_of` | function | 3055 | `(seg: SegmentResult) -> dict` | What the second half of an antipodal pair needs from the first. |
+| `pair_partner_of` | function | 3075 | `(seg: SegmentResult) -> dict` | What the second half of an antipodal pair needs from the first. |
+| `paired_turn` | function | 3053 | `(signed: float, factor: float, partner: dict \| None) -> tuple` | ``(signed, factor, mean)`` for the air turn as one half of a mirrored pair. |
 | `rotor_lift_ratio` | function | 330 | `(p: Phenotype) -> float` | Static thrust of every propeller at top speed, in air, over the weight. |
 | `SegmentResult` | class | 139 | — | What one stretch of operating in one domain produced. |
 | `TriphibianEnv` | class | 519 | — | A compiled machine in the triphibian world, steppable by a controller. |
@@ -916,7 +917,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `TriphibianEnv.ground_height` | method | 1423 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
 | `TriphibianEnv.ground_heights` | method | 1432 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
 | `TriphibianEnv.held_still_params` | method | 1377 | `(self) -> CPGParams` | The base gait with every actuator held still: the still machine of |
-| `TriphibianEnv.identify` | method | 3004 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.identify` | method | 3002 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
 | `TriphibianEnv.launch_pitch` | property | 920 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
 | `TriphibianEnv.launch_speed` | property | 888 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
 | `TriphibianEnv.level_margin` | method | 1107 | `(self)` | Can this machine hold height *and* speed, with its own actuators? |

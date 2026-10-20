@@ -938,6 +938,26 @@ def test_air_is_scored_on_a_mirrored_turn() -> None:
           and set(PAIRED_MEDIA) == {"air", "water", "land"}, f"{PAIRED_MEDIA}")
 
 
+def test_an_unpaired_air_half_pays_nothing() -> None:
+    """2026-10-20 (experiments/air_turn_bar A §7): the second half of a mirrored
+    air pair whose first half was not measurable scores no turn, as water and
+    land already did; paired, it scores the mean at the worse factor."""
+    print("\nair pair: an unpaired half pays nothing")
+    from dytiscidae.envs.triphibian import paired_turn
+
+    s, f, mean = paired_turn(0.8, 1.0, None)
+    check("the first half keeps its own numbers and publishes no mean",
+          s == 0.8 and f == 1.0 and mean is None, f"{s} {f} {mean}")
+    s, f, mean = paired_turn(1.02, 1.0, {"second": 0.0})
+    check("a second half whose partner was not measurable has factor 0 and no mean",
+          f == 0.0 and mean is None, f"{s} {f} {mean}")
+    s, f, mean = paired_turn(0.6, 1.0, {"turn": -0.2, "turn_factor": 0.4})
+    check("paired: the mean of the two halves at the worse factor, published",
+          abs(s - 0.2) < 1e-12 and f == 0.4 and mean == s, f"{s} {f} {mean}")
+    s, f, mean = paired_turn(0.3, 0.9, {"turn": -0.3, "turn_factor": 1.0})
+    check("a drift the command did not choose cancels exactly", s == 0.0 and mean == 0.0 and f == 0.9, f"{s} {f}")
+
+
 def test_the_render_shows_the_shape_the_solver_reads() -> None:
     """Lifting surfaces must draw with their taper, twist and dihedral, and
     drawing them must not change the dynamics or cost the search anything.
@@ -4736,6 +4756,7 @@ def main() -> int:
         test_a_surface_can_be_told_to_hold_still,
         test_the_seeds_include_something_that_flies,
         test_air_is_scored_on_a_mirrored_turn,
+        test_an_unpaired_air_half_pays_nothing,
         test_the_render_shows_the_shape_the_solver_reads,
         test_machine_does_not_collide_with_itself,
         test_air_segment_can_be_scored,
