@@ -18,9 +18,9 @@ item. Read it before proposing anything.
    the comparability boundaries. Before proposing any threshold, read §"What is
    set by measurement, and what is typed".
 3. The latest run's configuration and pre-registered reads are in
-   `runs/<run>_notes.md` (arch50 is running as of 2026-10-08, launched from the
-   worktree `../arch50-tree` at 2b7bb53: `runs/arch50_notes.md`; the latest
-   finished run is arch49, read in the sweep section). `runs/` is gitignored:
+   `runs/<run>_notes.md` (the latest finished run is arch51, 900 generations
+   on 2026-10-19, read in ROADMAP "2026-10-19 — what arch51 measured"; no run
+   is live as of 2026-10-20). `runs/` is gitignored:
    in a fresh container it does not exist, see `docs/PORTING.md`.
 4. Run the canary (below).
 
@@ -247,7 +247,10 @@ then films (`dytiscidae/viz/film.py`) into `runs/<run>/media/`, embedded in
   0.0 (was 0.30), and Tier-2 no longer caps `fitness`. With
   `--reeval-per-generation > 0` (N11) an elite's recorded scores are those of
   its median draw, not one draw. Per-medium competences, `mission_fraction`
-  and coverage are unchanged by both. The ROADMAP lists each boundary. Write
+  and coverage are unchanged by both. From 2026-10-20 an air half whose
+  mirror was not measurable pays nothing (`paired_turn`); air is not
+  comparable across it for that case only (1 of arch51's 1,112 fresh draws).
+  The ROADMAP lists each boundary. Write
   "not comparable"; do not quote a shrunken difference.
 - `sink_rate` is the difference of two endpoints of the late airborne window, so
   it reads zero for a machine that drops and comes back. `station_keeping` sees
@@ -376,6 +379,21 @@ Each rule below was paid for by a score that rewarded the wrong thing.
    and its mirror (`tasks.mirror`), the turn response on the mean of the two,
    and height paying only through the turn (`triphibian.air_task`), after the
    fixed still machine cleared air on 11 arch49 gannets against the elites' 6.
+9. **A floor must not reject the stepping stone, and a bar can be referenced
+   to the null.** 2026-10-19/20 (`experiments/air_turn_bar/README.md`): under
+   the paired air score a glider that does not turn scores 0, the competence
+   floor (N5) let a zero fill only an empty cell, and arch51's gannet seed was
+   rejected at gen 0 on every island, so for 900 generations nothing was aloft
+   when the turn was commanded (139/139 unmeasured at 8 fresh draws) and air
+   had no gradient. `--floor-tiebreak` (off by default) keeps, among floor
+   members of a cell, the one aloft longer: not a score, fitness stays 0. In 40
+   generations it kept the lineage and produced the first commanded-turn air
+   credit (0.111, reproduced on the other path). The bar that rule 5 admits
+   is statistical but referenced to the null, not the population: under the
+   mirror a non-reader's pair mean is `-0.5|a-b| <= 0` by construction (0
+   positive still draws on three populations), so a positive pair mean over
+   K fresh draws is evidence of reading the command; a population quantile
+   always yields a number and is not a bar.
 
 ## Where things are
 

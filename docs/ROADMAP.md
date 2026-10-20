@@ -1,5 +1,24 @@
 # Roadmap
 
+**2026-10-20: air's bar, the floor's blind spot, and the first commanded turn;
+see [the air turn bar](#2026-10-20--the-air-turn-bar-the-floor-tiebreak-and-the-first-commanded-turn).**
+The user asked whether rule 5 admits a statistical threshold; it does, and the
+one that holds is referenced to the null, not to the population: under the
+mirrored pair a machine that cannot read the command scores <= 0 by
+construction (verified on 3 populations, 0 positive still draws), so a positive
+pair mean over K fresh draws is the air bar. It could not be read on arch51
+because the archive held nothing airborne when the turn was commanded
+(139/139 unmeasured): the gannet seed was rejected at gen 0 on every island
+(air 0 under the paired score, first-come at the floor), 8 gannet evaluations
+in 900 generations. Built, off by default: `--floor-tiebreak` (c7c92f8). In 40
+generations on the air island it kept the gannet lineage (165 evaluations vs
+1) and produced the first air credit under the paired score, 0.111 at gen 27
+from a pair mean of 0.204, reproduced through the other path. Not yet a
+reliable reader: 1 of 7 fresh draws positive, gate `underpowered` at 1/46.
+A gannet airframe can be turned 12% by a linear policy at sigma 0.02 (B'').
+An unpaired air half now pays nothing (`paired_turn`; air not comparable
+across it for that case, 1 draw in 1,112).
+
 **2026-10-19: arch51 (N5 + N11 + paired air) finished, 900 generations; see
 [what arch51 measured](#2026-10-19--what-arch51-measured).** Both pre-registered
 predictions are falsified as written, the mission is 0/0 for a sixth run, and
@@ -217,6 +236,96 @@ it wherever the two disagree.
 
 ---
 
+
+
+## 2026-10-20 — the air turn bar, the floor tiebreak, and the first commanded turn
+
+The whole record, with the frozen designs and every number, is
+`experiments/air_turn_bar/README.md` (stations 0-12 for A, B', B'', C).
+This section is the summary and the decisions it leaves.
+
+**The question (the user, 2026-10-19).** Rule 5 says thresholds come from the
+measured distribution; E2's air L1 bar could not be set from arch51's
+population. Is a statistical, dynamic threshold admissible? Answer: rule 5
+requires one; what it forbids is a bar the inert machine also clears. A
+population quantile always yields a number and so is not a bar. A bar
+referenced to the null is: under `tasks.mirror`, the turn gain is
+`min(v.n, dv.n)` and the mirror flips `n`, so a non-reader's pair mean is
+`-0.5 |a - b| <= 0` (never 0, which also explains the 12/13 negative arch49
+gannets of 10-10: the sign was the statistic's). A positive pair mean is
+evidence the controller read the command. Verified: 0 positive still-machine
+draws on arch51 (3 measurable), arch49's gliders (B', B'': every one <= 0),
+and C-on (30 measurable, max -0.153).
+
+**Why it could not be read on arch51.** 139/139 elites `unmeasured` at 8
+fresh draws (3 of 1,112 draws airborne through the command). Cause: the run
+never held a glider. The gannet seed was `rejected` at gen 0 on every island
+(air 0.0 under the paired score, `at_floor`); F1 lets a floor design fill
+only an empty cell, and its cell was taken by an earlier zero. 8 gannet
+evaluations in arch51 against 1,172 in arch49. The floor (N5) and "no credit
+without a turn" removed the stepping stone before anything could learn to
+turn. This is the N5 result's other half: ranking was fixed (Spearman 0.97)
+and the competent share did not move (22.8%) because the island that needed a
+body to learn on had none.
+
+**Built (c7c92f8, off by default): `--floor-tiebreak`.** Among floor members
+of one cell, an island that reads air keeps the one that stayed aloft through
+more of its air segment (`islands.floor_rank`: `airborne_fraction`, or
+`airborne_seconds` over the duration on the short-hop branch). Not a score:
+fitness stays 0, ranking above the floor is unchanged, a still gannet reads
+1.0 here too. Tests `test_below_the_floor_an_air_island_keeps_the_design_that_stayed_aloft`,
+`test_the_floor_tiebreak_reaches_the_archive`; mutations
+`floor-tiebreak-ignores-rank`, `floor-rank-reads-every-island`,
+`place-forgets-the-floor-rank`, all caught.
+
+**C: 40 generations, air island alone, arch51's configuration, seed 20261019,
+tiebreak off vs on** (`runs/atb_c_off`, `runs/atb_c_on`; 131 and 126 s per
+generation).
+
+| read | off | on |
+|---|---|---|
+| gannet seed at gen 0 | `rejected` | `improved` |
+| gannet evaluations (after gen 8) | 1 (0) | 165 (140) |
+| evaluations with air >= 0.012 | 0 | 3: gens 16, 22, **27 (0.111)**, gannets, no rotors |
+| clean positive reads (pair mean > 0, factor > 0.5, spin < 6.28) | 0 | 3; gen 27: 0.204, airborne 1.0, spin 0.67 |
+| air archive at gen 40 | 52 elites, 0 gannets, max air 0 | 46 elites, 14 gannets, max air 0.111 |
+
+The gen-27 gannet reproduced air 0.111 = 0.111 through the single-machine
+path (post-run film, `runs/atb_c_on/postrun.log`). On 8 fresh draws
+(`screen_c_on.json`) it was airborne through the command on 7 and turned the
+right way on 1 (mean -0.198); 4 of the 14 gannets have >= 1 positive fresh
+draw, 5 positive of 31 measurable draws across them, 0 pass the per-elite sign
+test. The no-model gate on C-on's 46 (`gate_c_on.json`): `comp:air >= 0.012`
+elites 1/46, still 0/46, base 0/46, `underpowered` (not separable at n = 46);
+every air rung still `leak`; reproduction 46/46 in all three media. **So: the
+population now has bodies the bar can be read on, the bar reads a weak and
+unreliable reader, and E2's air L1 (>= 5 certified elites retaining >= 50%)
+is not met.** A run with the tiebreak on is the next arm; its pre-registered
+air read is the screen's pass count and the gate's `comp:air` verdict.
+
+**B'': authority.** 8 arch49 gannet gliders, 32 random linear own policies
+each, one draw, top 3 replicated at 4 draws. Sigma 0.5 and 0.1: 0 bodies with
+a replicated pair mean > 0.1 (most random policies take the glider out of the
+air). **Sigma 0.02: gannet 159 replicates at 0.119 over 4/4 draws**, 18/32
+policies keeping the glide. A gannet can be turned without learning by a
+policy 25x smaller than the search's initialisation; where the policy weight
+scale sits relative to this is an open read for the learner (LEARNER_AUDIT).
+
+**Fixed the same day (rule 4):** the second half of a mirrored air pair whose
+first half was not measurable scored its own turn with nothing to cancel
+against (arch51: one fresh draw at air 0.025 from one half). `paired_turn`
+now gives it factor 0, as `_paired` does for water and land. Air is not
+comparable across this change for that case only (1 of 1,112 draws); every
+other air score is byte-identical. Test `test_an_unpaired_air_half_pays_nothing`,
+mutation `unpaired-air-half-scores-alone`, caught; the GPU heading-pair test
+green.
+
+**Open.** (1) Whether to run the next arm with `--floor-tiebreak` (the user).
+(2) The two C1 lower bounds (re-evaluated elites carry their median draw's
+seed, so 28/15 elites did not match an evaluation). (3) Policy weight scale:
+B'' says 0.02 turns a gannet and 0.5 crashes it. (4) The air rungs below
+`stays_up` leak against the still machine on every population measured; they
+rank nothing and could be retired from the ladder.
 
 ## 2026-10-19 — what arch51 measured
 
@@ -5173,6 +5282,10 @@ to certify. Every air rung an elite clears is `leak` against both controls
 the elites), and `stays_up` and above are `unmeasured` (0/139 elites). Rule 5
 forbids typing a bar, so air L1 stays open, now for a stated reason: the
 search has produced no air behaviour that a still machine cannot match.
+**2026-10-20:** the bar is now defined against the null (a non-reader's pair
+mean is <= 0), and with `--floor-tiebreak` on the air island holds bodies it
+can be read on; see the 2026-10-20 section. Still not met: 1/46 certified-
+candidate, `underpowered`.
 Water and land, same table: `comp:water >= 0.012` 61/139 elites,
 `comp:water >= 0.15` 9, `comp:land >= 0.15` 9, each certified against still
 and base; `land >= 3:stirs` .. `climbs_slope` certified against still only.
