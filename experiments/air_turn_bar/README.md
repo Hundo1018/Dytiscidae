@@ -212,3 +212,63 @@ untested.**
 0.02** on the same 8 bodies, same seeds. R2 predicts 0 bodies > 0.1 at both;
 R1 predicts >= 1 at one of them with measurable draws >= 8/32 (the glide kept).
 Queued after C (one GPU lane).
+
+## B'', appended after the run (2026-10-20, `authority_s0.1.json`, `authority_s0.02.json`)
+
+**6/7.** Same 8 bodies, 32 policies, same seeds. Measurable draws per body
+rose as sigma fell: sigma 0.5 -> 0.1 -> 0.02 gave body 159 0 -> 1 -> 18 of 32,
+body 74 6 -> 14 -> 25, body 80 3 -> 2 -> 19. Every still pair mean <= 0.
+
+**8/9.** Sigma 0.1: 0 bodies with a replicated mean > 0.1 (74: screen 0.294,
+replicated 0.018 at n = 1). **Sigma 0.02: body 159 (recorded air 0.422, rung 7)
+replicated at 0.119 over 4 of 4 fresh draws** with 18/32 measurable on the
+screen; body 80's screen 0.446 replicated at 0.05 (n = 4), body 161's 0.082 at
+n = 1. Against the frozen text: "R1 predicts >= 1 at one of them with
+measurable draws >= 8/32" -- **R1 confirmed at sigma 0.02**, R2 refuted. A
+gannet airframe can be turned 12% of a perfect turn by a linear policy that
+reads the heading error, without learning; the policy scale that does it is
+25x smaller than the search's sigma-0.5 initialisation would suggest.
+
+## C, appended after the run (2026-10-20, units `atb-chain`, `runs/atb_c_off`, `runs/atb_c_on`)
+
+**6.** Both arms ran as designed: `checkpoint.json` provenance has
+`islands ['air']`, `floor_tiebreak` False / True, `gait_gain` True,
+`reeval_per_generation` 4, seed 20261019; 40 generations each, 5,220 s and
+5,023 s (131 and 126 s per generation; arch51 146). Worktree `../atb-tree`
+at 1fc303e.
+
+**7.** C1's archive count matches elites to their evaluation by (gen,
+eval_seed); 28 (off) and 15 (on) elites did not match (re-evaluated elites
+carry their median draw's seed), so C1's counts are lower bounds.
+
+**8/9, against the frozen text.**
+| read | predicted | C-off | C-on | verdict |
+|---|---|---|---|---|
+| C1 archive elites airborne >= 0.5 at gen 40 | on >= 3, off 0 | >= 5 | >= 5 | on half met; off half **missed** (early floor members are airborne too; arch51's 0/139 was the end of 900 gens) |
+| C2 gannet evaluations after gen 8 | on > 8, off <= 8 | 0 (1 in all: the seed, `rejected` at gen 0) | 140 (165 in all; the seed `improved` at gen 0, by the tiebreak) | **both met** |
+| C3 evaluations with air >= 0.012 | reported | 0 | 3: gen 16 (0.014), 22 (0.013), **27 (0.111)**, all gannets, no rotors | first air credit under the paired score |
+| C3 clean positive reads (pair mean > 0, factor > 0.5, spin < 6.28) | reported | 0 | 3, the same three; gen 27: pair mean 0.204, airborne 1.0, spin 0.67, no air gate | |
+| air archive at gen 40 | | 52 elites, 0 gannets, max air 0 | 46 elites, 14 gannets, max air 0.111 | |
+
+The gen-27 gannet (operators `duplicate_part`, `body_field`) is the on arm's
+best elite (fitness 0.5, above the floor). **Cross-validated (station 11):**
+the post-run film re-ran it through the single-machine path at its eval seed
+and reproduced air 0.111 = 0.111, water 0.033, land 0.065 (`runs/atb_c_on/postrun.log`).
+Fresh-draw retention inside the run (N11 re-evaluations of gannet elites):
+gen 11 air 0.147, 19 0.5 -> 0.0, 23 0.5 -> 0.5 (air 0.107), 27 0.0 -> 0.5 (air
+0.097 at a fresh seed), 28 and 29 0.5 -> 0.0. The read is real on some draws
+and absent on others: a weak reader, which is what B'' found (0.119 at sigma
+0.02). The screen (A's K = 8 fresh draws) on this archive is queued
+(`screen_c_on.json`) and the no-model gate on it (`gate_c_on.json`).
+
+**10.** Before: air had no gradient under the paired score because nothing was
+aloft when the command came, and the floor had removed the gliders. After: with
+the tiebreak the glider lineage survives at the floor, and within 27
+generations the search produced a gannet that turns toward the command on a
+fresh seed and holds air 0.111 through the other evaluation path. What would
+move it back: the screen on C-on reading 0 elites with a positive measurable
+draw, or the gate certifying nothing against the still machine.
+
+**12.** Reproducers: `runs/atb_chain.sh` (C), `runs/atb_chain2.sh` (B''),
+`experiments/air_turn_bar/{run,authority}.py`; commits c7c92f8 (code) and
+1fc303e (worktree).

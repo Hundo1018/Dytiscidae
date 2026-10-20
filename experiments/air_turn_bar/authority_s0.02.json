@@ -1,0 +1,158 @@
+{
+ "run": "runs/arch49",
+ "bodies": 8,
+ "policies": 32,
+ "sigma": 0.02,
+ "wall_s": 1057.7610223293304,
+ "bodies_with_replicated_mean_gt_0.1": 1,
+ "summary": [
+  {
+   "body": 159,
+   "recorded_air": 0.422,
+   "rung": 7,
+   "screen_measurable": 18,
+   "screen_best": 0.02428098003476231,
+   "screen_positive": 1,
+   "top": [
+    9,
+    22,
+    1
+   ],
+   "repl_best": [
+    9,
+    0.11868457911777756,
+    4
+   ],
+   "still_repl_max": -0.06826569765076877,
+   "still_measurable": 4
+  },
+  {
+   "body": 74,
+   "recorded_air": 0.365,
+   "rung": 7,
+   "screen_measurable": 25,
+   "screen_best": 0.033066100978715596,
+   "screen_positive": 2,
+   "top": [
+    28,
+    1,
+    18
+   ],
+   "repl_best": [
+    18,
+    -0.1302380125743294,
+    4
+   ],
+   "still_repl_max": -0.04332584726552846,
+   "still_measurable": 4
+  },
+  {
+   "body": 161,
+   "recorded_air": 0.025,
+   "rung": 6,
+   "screen_measurable": 12,
+   "screen_best": -0.02156841360754283,
+   "screen_positive": 0,
+   "top": [
+    18,
+    26,
+    10
+   ],
+   "repl_best": [
+    18,
+    0.08179172796487186,
+    1
+   ],
+   "still_repl_max": -0.2926202623117735,
+   "still_measurable": 1
+  },
+  {
+   "body": 186,
+   "recorded_air": 0.02,
+   "rung": 6,
+   "screen_measurable": 3,
+   "screen_best": -0.08895390112784457,
+   "screen_positive": 0,
+   "top": [
+    11,
+    29,
+    8
+   ],
+   "repl_best": [
+    8,
+    -0.11981519967681462,
+    2
+   ],
+   "still_repl_max": -0.14259998239629335,
+   "still_measurable": 1
+  },
+  {
+   "body": 175,
+   "recorded_air": 0.008,
+   "rung": 6,
+   "screen_measurable": 4,
+   "screen_best": -0.14836299423274651,
+   "screen_positive": 0,
+   "top": [
+    9,
+    14,
+    27
+   ],
+   "repl_best": null,
+   "still_repl_max": null,
+   "still_measurable": 0
+  },
+  {
+   "body": 185,
+   "recorded_air": 0.003,
+   "rung": 6,
+   "screen_measurable": 3,
+   "screen_best": -0.2166862113914507,
+   "screen_positive": 0,
+   "top": [
+    11,
+    10,
+    5
+   ],
+   "repl_best": [
+    5,
+    -0.09791933635725752,
+    1
+   ],
+   "still_repl_max": null,
+   "still_measurable": 0
+  },
+  {
+   "body": 80,
+   "recorded_air": 0.0,
+   "rung": 6,
+   "screen_measurable": 19,
+   "screen_best": 0.44644985846248236,
+   "screen_positive": 3,
+   "top": [
+    9,
+    2,
+    11
+   ],
+   "repl_best": [
+    9,
+    0.04992112764534613,
+    4
+   ],
+   "still_repl_max": -0.03391348710189222,
+   "still_measurable": 4
+  },
+  {
+   "body": 118,
+   "recorded_air": 0.0,
+   "rung": 6,
+   "screen_measurable": 0,
+   "screen_best": null,
+   "screen_positive": 0,
+   "top": [],
+   "repl_best": null,
+   "still_repl_max": null,
+   "still_measurable": 0
+  }
+ ]
+}

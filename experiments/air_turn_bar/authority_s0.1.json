@@ -1,0 +1,129 @@
+{
+ "run": "runs/arch49",
+ "bodies": 8,
+ "policies": 32,
+ "sigma": 0.1,
+ "wall_s": 870.9205803871155,
+ "bodies_with_replicated_mean_gt_0.1": 0,
+ "summary": [
+  {
+   "body": 159,
+   "recorded_air": 0.422,
+   "rung": 7,
+   "screen_measurable": 1,
+   "screen_best": -0.22561088037291488,
+   "screen_positive": 0,
+   "top": [
+    31
+   ],
+   "repl_best": [
+    31,
+    -0.1018481482602788,
+    1
+   ],
+   "still_repl_max": -0.06826569765076877,
+   "still_measurable": 4
+  },
+  {
+   "body": 74,
+   "recorded_air": 0.365,
+   "rung": 7,
+   "screen_measurable": 14,
+   "screen_best": 0.2940628628219739,
+   "screen_positive": 2,
+   "top": [
+    24,
+    4,
+    29
+   ],
+   "repl_best": [
+    4,
+    0.017671819136726913,
+    1
+   ],
+   "still_repl_max": -0.04332584726552846,
+   "still_measurable": 4
+  },
+  {
+   "body": 161,
+   "recorded_air": 0.025,
+   "rung": 6,
+   "screen_measurable": 0,
+   "screen_best": null,
+   "screen_positive": 0,
+   "top": [],
+   "repl_best": null,
+   "still_repl_max": -0.2926202623117735,
+   "still_measurable": 1
+  },
+  {
+   "body": 186,
+   "recorded_air": 0.02,
+   "rung": 6,
+   "screen_measurable": 0,
+   "screen_best": null,
+   "screen_positive": 0,
+   "top": [],
+   "repl_best": null,
+   "still_repl_max": -0.14259998239629335,
+   "still_measurable": 1
+  },
+  {
+   "body": 175,
+   "recorded_air": 0.008,
+   "rung": 6,
+   "screen_measurable": 0,
+   "screen_best": null,
+   "screen_positive": 0,
+   "top": [],
+   "repl_best": null,
+   "still_repl_max": null,
+   "still_measurable": 0
+  },
+  {
+   "body": 185,
+   "recorded_air": 0.003,
+   "rung": 6,
+   "screen_measurable": 1,
+   "screen_best": -0.276828890176985,
+   "screen_positive": 0,
+   "top": [
+    0
+   ],
+   "repl_best": null,
+   "still_repl_max": null,
+   "still_measurable": 0
+  },
+  {
+   "body": 80,
+   "recorded_air": 0.0,
+   "rung": 6,
+   "screen_measurable": 2,
+   "screen_best": -0.122820051326929,
+   "screen_positive": 0,
+   "top": [
+    31,
+    13
+   ],
+   "repl_best": [
+    31,
+    -0.09760924126660497,
+    2
+   ],
+   "still_repl_max": -0.03391348710189222,
+   "still_measurable": 4
+  },
+  {
+   "body": 118,
+   "recorded_air": 0.0,
+   "rung": 6,
+   "screen_measurable": 0,
+   "screen_best": null,
+   "screen_positive": 0,
+   "top": [],
+   "repl_best": null,
+   "still_repl_max": null,
+   "still_measurable": 0
+  }
+ ]
+}
