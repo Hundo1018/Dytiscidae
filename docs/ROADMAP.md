@@ -4,7 +4,10 @@
 section's evidence). arch52 (air island, `--floor-tiebreak`, 300 gens, seed
 20261020, unit `arch52`) runs as the control; arch53 (`runs/arch53_notes.md`:
 arch52's command + `--air-turn-reward 1.0`, same seed) starts when arch52
-reaches gen 100 and is read against it at matched generations.**
+reaches gen 100 and is read against it at matched generations.** arch53's first
+launch was void: the weight did not cross to the workers' buffers (spec), so it
+replicated arch52 bit for bit through gen 50; fixed the same evening, relaunched
+from gen 0 ().
 
 | # | item | what it changes | read by | status |
 |---|---|---|---|---|
