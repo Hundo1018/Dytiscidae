@@ -272,3 +272,16 @@ draw, or the gate certifying nothing against the still machine.
 **12.** Reproducers: `runs/atb_chain.sh` (C), `runs/atb_chain2.sh` (B''),
 `experiments/air_turn_bar/{run,authority}.py`; commits c7c92f8 (code) and
 1fc303e (worktree).
+
+## Exploration read (pre-registered 2026-10-21, before data; air list item 6, the learner's half)
+
+`exploration.py`: the 8 arch49 gannet gliders (as B'), own policy none, the shared
+network's actor output zeroed so only its sampling noise acts, `log_std` in
+{-0.5 (the search's init), -1.5, -2.5, -4.0}, 32 sampled copies per body per value at
+one seed, bases stored. Read: the share of copies aloft through the command
+(`pair_turn_factor` > 0.5) and the share of those with a positive pair mean.
+- Prediction (from B''): at -0.5 (std 0.61) the measurable share is <= 25%; at -2.5
+  (std 0.08) it is >= 50%. *Falsified* if -0.5 reaches 50% or -2.5 stays under 25%.
+- Decision: if confirmed, arch55 starts the shared policy at the log_std whose
+  measurable share first exceeds 50% (an init, not a clamp; PPO still learns it).
+- Positive share is reported, not predicted: noise cannot read the command.
