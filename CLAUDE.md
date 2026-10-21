@@ -385,7 +385,8 @@ Each rule below was paid for by a score that rewarded the wrong thing.
    floor (N5) let a zero fill only an empty cell, and arch51's gannet seed was
    rejected at gen 0 on every island, so for 900 generations nothing was aloft
    when the turn was commanded (139/139 unmeasured at 8 fresh draws) and air
-   had no gradient. `--floor-tiebreak` (off by default) keeps, among floor
+   had no gradient. `--floor-tiebreak` (on by default since 2026-10-21;
+   `--no-floor-tiebreak` restores first-come) keeps, among floor
    members of a cell, the one aloft longer: not a score, fitness stays 0. In 40
    generations it kept the lineage and produced the first commanded-turn air
    credit (0.111, reproduced on the other path). The bar that rule 5 admits

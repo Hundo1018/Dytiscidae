@@ -8,6 +8,12 @@ read: 0 of 145 elites pass the 8-draw sign test, the gate is `underpowered`
 at 3/145, retention 0.203 -> 0.014. 117 of 145 elites are aloft on 0 of 8
 fresh draws, and among measurable draws 8.3% are positive. The next arm goes
 to the learner's exploration and the promotion sigma, not to the score.
+**The user, 2026-10-21:** `--floor-tiebreak` is on by default from this commit
+(`--no-floor-tiebreak` reproduces arch51's admission); `--air-turn-reward`
+stays a flag; the three levers run in order: arch54 = arch53 + `--refine-sigma
+0.02` (running, `runs/arch54_notes.md`), then the learner's exploration read
+(`experiments/air_turn_bar/exploration.py`, queued on the GPU after arch54),
+then K draws per body (IMPL_1010 A6).
 
 
 **2026-10-20, later: the air list, in the order the user set (from the 10-20

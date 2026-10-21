@@ -307,9 +307,11 @@ class SearchConfig:
     #: Below the competence floor, an island that reads air keeps the design
     #: that stayed aloft through more of its air segment (``islands.floor_rank``)
     #: instead of first-come.  Not a score: fitness stays 0 and ranking above
-    #: the floor is untouched.  Off by default: arch51 ran without it and lost
-    #: its only glider at gen 0 (`experiments/air_turn_bar/README.md`).
-    floor_tiebreak: bool = False
+    #: the floor is untouched.  On by default since 2026-10-21 (the user): it
+    #: kept the gannet lineage in arch52-54 at no measured cost, where arch51
+    #: lost its only glider at gen 0 (`experiments/air_turn_bar/README.md`).
+    #: ``--no-floor-tiebreak`` reproduces arch51's admission.
+    floor_tiebreak: bool = True
     #: Lets the search make lifting surfaces flexible: the ``wing_compliance``
     #: operator (``core.genome.OPTIONAL_OPERATORS``) joins every island's
     #: bandit, and it sets ``Part.pitch_compliance``, a passive pitch hinge

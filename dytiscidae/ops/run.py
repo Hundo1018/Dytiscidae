@@ -178,7 +178,7 @@ def search_config_from_args(args, shared: bool):
         descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
         tier2_label_all_media=not args.no_tier2_label_all_media,
         gait_gain=bool(args.gait_gain),
-        floor_tiebreak=bool(args.floor_tiebreak),
+        floor_tiebreak=not args.no_floor_tiebreak,
         wing_compliance=bool(args.wing_compliance),
         segment_seconds=args.segment_seconds,
         controller_refine_steps=args.refine_steps,
@@ -1180,9 +1180,12 @@ def build_parser() -> argparse.ArgumentParser:
                         "commanded amplitude, so stopping and throttling are "
                         "reachable (control.cpg.GAIN_RANGE); off by default")
     p.add_argument("--floor-tiebreak", action="store_true",
-                   help="below the competence floor, an island that reads air "
-                        "keeps the design that stayed aloft longer instead of "
-                        "the first to arrive (islands.floor_rank); off by default")
+                   help="(on by default since 2026-10-21) below the competence "
+                        "floor, an island that reads air keeps the design that "
+                        "stayed aloft longer instead of the first to arrive "
+                        "(islands.floor_rank)")
+    p.add_argument("--no-floor-tiebreak", action="store_true",
+                   help="first-come at the floor, as arch51 and earlier ran")
     p.add_argument("--wing-compliance", action="store_true",
                    help="let the search make lifting surfaces flexible: a "
                         "passive pitch hinge per surface (Part.pitch_compliance, "

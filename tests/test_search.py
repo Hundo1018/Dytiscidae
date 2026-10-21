@@ -1119,7 +1119,7 @@ def test_below_the_floor_an_air_island_keeps_the_design_that_stayed_aloft() -> N
           floor_rank("water", res(airborne_fraction=0.7)) == 0.0
           and floor_rank("land", res(airborne_fraction=0.7)) == 0.0)
     check("no air segment is 0", floor_rank("air", NS(segments={})) == 0.0)
-    check("floor_tiebreak is off by default", SearchConfig().floor_tiebreak is False)
+    check("floor_tiebreak is on by default (2026-10-21)", SearchConfig().floor_tiebreak is True)
 
 
 def test_a_cells_score_is_the_median_of_its_draws() -> None:

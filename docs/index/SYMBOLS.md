@@ -1147,28 +1147,28 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 981 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `draw_key` | function | 925 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
-| `evaluate_candidate` | function | 471 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 596 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 503 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2418 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `median_draw` | function | 930 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
-| `placement_draw_seed` | function | 920 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
-| `run_search` | function | 1620 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2293 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 983 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `draw_key` | function | 927 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
+| `evaluate_candidate` | function | 473 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 598 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 505 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2420 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `median_draw` | function | 932 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
+| `placement_draw_seed` | function | 922 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
+| `run_search` | function | 1622 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2295 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 74 | — | Everything adjustable about a run. |
-| `SearchState` | class | 380 | — | — |
-| `seed_archipelago` | function | 2682 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 520 | `(self)` | — |
-| `GenerationCost.count` | method | 540 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 526 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 533 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 549 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 546 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 440 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 444 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 448 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 382 | — | — |
+| `seed_archipelago` | function | 2684 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `GenerationCost.__init__` | method | 522 | `(self)` | — |
+| `GenerationCost.count` | method | 542 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 528 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 535 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 551 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 548 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 442 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 446 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 450 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1310,7 +1310,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `controller_for_elite` | function | 651 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
 | `launch_postrun` | function | 361 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 32 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 1324 | `(argv=None) -> int` | — |
+| `main` | function | 1327 | `(argv=None) -> int` | — |
 | `merge_config_file` | function | 227 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
 | `search_config_from_args` | function | 159 | `(args, shared: bool)` | The ``SearchConfig`` a ``search`` command line asks for. |
 
