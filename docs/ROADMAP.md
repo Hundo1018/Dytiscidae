@@ -1,5 +1,15 @@
 # Roadmap
 
+**2026-10-21: arch52 and arch53 read; E2's air L1 is not met; see
+[what arch52 and arch53 measured](#2026-10-21--what-arch52-and-arch53-measured).**
+arch53 (tiebreak + `--air-turn-reward 1.0`, air island, 300 gens) beat arch52
+(tiebreak alone) on every gen-100 read (L1-L3 met) and failed every gen-300
+read: 0 of 145 elites pass the 8-draw sign test, the gate is `underpowered`
+at 3/145, retention 0.203 -> 0.014. 117 of 145 elites are aloft on 0 of 8
+fresh draws, and among measurable draws 8.3% are positive. The next arm goes
+to the learner's exploration and the promotion sigma, not to the score.
+
+
 **2026-10-20, later: the air list, in the order the user set (from the 10-20
 section's evidence). arch52 (air island, `--floor-tiebreak`, 300 gens, seed
 20261020, unit `arch52`) runs as the control; arch53 (`runs/arch53_notes.md`:
@@ -286,6 +296,55 @@ it wherever the two disagree.
 ---
 
 
+
+
+## 2026-10-21 — what arch52 and arch53 measured
+
+Both on the air island alone, seed 20261020, arch51's configuration plus
+`--floor-tiebreak`; arch53 also `--air-turn-reward 1.0` (ROADMAP 2026-10-20,
+air list item 1). arch52 stopped at gen 100 for the handover (checkpoint
+kept); arch53 ran 300 (one reboot at gen ~171, resumed from the gen-160
+checkpoint). Notes: `runs/arch52_notes.md`, `runs/arch53_notes.md`.
+
+**Gen 100, arch53 against arch52 (same seed, deterministic replicas until the
+reward differs):**
+
+| read | arch52 | arch53 |
+|---|---|---|
+| PPO air terminal return non-zero, gens 0-50 | 0 of 50 | 25 of 50; positive on 6 of gens 51-100 |
+| clean commanded-turn reads (pair mean > 0, factor > 0.5, spin < 6.28), gens 0-100 | 3 | 26 (max 0.576) |
+| air elites above the floor at gen 100 | 0 of 141 | 7 of 85 (max 0.202) |
+
+L1, L2, L3 as pre-registered: all met. The dense, null-safe reward reaches
+the learner and multiplies the reads.
+
+**Gen 300, arch53 (`experiments/air_turn_bar/gate_arch53.json`,
+`screen_arch53.json`):** R1 0 of 145 pass the 8-draw sign test (17 measurable,
+expected 0.32 under the null); R2 `comp:air >= 0.012` 3/145 vs 0/145 still,
+`underpowered`; R3 the three above the floor retain 0.203 -> 0.014, 0.013 ->
+0, 0.033 -> 0. **All three refuted; E2's air L1 is not met.** The still arm
+reads <= 0 on all 33 measurable bodies (max -0.029): the null holds on a
+fourth population. The archive's above-floor count fell from 7 (gen 100) to 3
+(gen 300) under N11's median-of-draws.
+
+**Failure type.** 117 of 145 elites are aloft on 0 of 8 fresh draws: the
+tiebreak keeps the lineage but the archive's gannets do not stay aloft
+through the command at a fresh seed. Among the draws that are measurable,
+8.3% are positive (arch52's first 50 gens: 11.8%): the learner's air return
+went positive on 10 of its last 50 updates and did not turn that into a
+policy that reads the command. So both halves stand: survival in the air at
+fresh seeds, and learning to read. Neither is a scoring question any more.
+
+**What moves next (for the user).** (1) Promotion refinement's sigma 0.1 is
+B''s crash regime (air list item 6): an air-island sigma of 0.02, read by the
+share of promoted gannets measurable at fresh seeds. (2) The learner's
+exploration: `log_std` -0.5 is 0.6 in twist units on a glider; a read of
+measurable share against the std, as B'' did for the own policy. (3) K draws
+per body before an update (IMPL_1010 A6): one draw per body at 8.3% positive
+is a noisy gradient. (4) Defaults: `--floor-tiebreak` earned its keep on L2/L3
+and has no measured cost; `--air-turn-reward` stays a flag until an arm shows
+a reader. Comparability: air archives and PPO air returns of runs with
+either flag are not comparable with runs without.
 
 ## 2026-10-20 — the air turn bar, the floor tiebreak, and the first commanded turn
 
