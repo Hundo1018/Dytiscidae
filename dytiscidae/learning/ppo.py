@@ -127,7 +127,8 @@ class SharedPolicy(nn.Module if AVAILABLE else object):
     use and can be summed.
     """
 
-    def __init__(self, n_obs: int, n_modes: int, hidden: int = 64):
+    def __init__(self, n_obs: int, n_modes: int, hidden: int = 64,
+                 log_std: float = -0.5):
         if not AVAILABLE:
             raise RuntimeError(f"torch unavailable: {UNAVAILABLE_REASON}")
         super().__init__()
@@ -137,7 +138,10 @@ class SharedPolicy(nn.Module if AVAILABLE else object):
         # State-independent log-std, the usual choice for continuous control:
         # the policy learns how much to explore without having to predict it
         # from an observation that may not contain the answer.
-        self.log_std = nn.Parameter(torch.full((self.n_modes,), -0.5))
+        # The initial value is ``SearchConfig.shared_log_std``: -0.5 (std 0.61 in
+        # twist units) kept 3.5% of sampled gannet rollouts aloft through the
+        # turn command, -2.5 kept 40% (experiments/air_turn_bar, 2026-10-22).
+        self.log_std = nn.Parameter(torch.full((self.n_modes,), float(log_std)))
         # Running observation statistics.  Registered as buffers so they travel
         # in ``state_dict`` -- a normalisation that is not checkpointed makes
         # every stored weight mean something different after a resume.

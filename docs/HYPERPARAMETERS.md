@@ -105,6 +105,7 @@ CLI too.
 |---|---|---|---|---|
 | `use_shared_policy` | True when torch is installed (False until 2026-10-12, B1) | True | switch | On in every run since arch29 (`CLAUDE.md` example command). `experiments/shared_policy_value/` asks whether the network carries weight; arch33 measured -0.0014 +/- 0.0016 in-distribution. No measurement decided the default. |
 | `shared_hidden` | 64 | 64 | typed | `docs/ROADMAP.md` §"2026-10-08 -- the MuscleMimic comparison": "no measurement says width is the limit" (13,133 parameters). |
+| `shared_log_std` | -0.5 | -0.5 | typed | Added 2026-10-22 (`experiments/air_turn_bar/README.md`, exploration read): the shared policy's initial `log_std`, learned from there. -0.5 (std 0.61 in twist units) is every run to arch54; on arch49's gannets it keeps 3.5% of sampled rollouts aloft through the turn command, -1.5 29%, -2.5 40%, -4.0 38%. arch55 runs -2.0, a typed midpoint. `--policy-log-std`. |
 | `shared_lr` | 1e-3 | 0.001 | typed | No sweep found. Annealed by `shared_lr_anneal`. |
 | `shared_epochs` | 10 | 10 | typed | Same section: a 1/2/4/6 sweep was proposed and not run. arch48 telemetry: `stopped_early` 0 of 300, KL median 0.0062 (max 0.0091), so the epoch loop never hit its KL bound. |
 | `shared_minibatch` | 2048 | 2048 | typed | No sweep found. |

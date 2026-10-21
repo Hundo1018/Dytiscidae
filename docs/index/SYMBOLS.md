@@ -1147,28 +1147,29 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batchroll_eval` | function | 983 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `draw_key` | function | 927 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
-| `evaluate_candidate` | function | 473 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 598 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 505 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2420 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `median_draw` | function | 932 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
-| `placement_draw_seed` | function | 922 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
-| `run_search` | function | 1622 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2295 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `batchroll_eval` | function | 988 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `draw_key` | function | 932 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
+| `evaluate_candidate` | function | 478 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 603 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 510 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2432 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `median_draw` | function | 937 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
+| `placement_draw_seed` | function | 927 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
+| `run_search` | function | 1636 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2307 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 74 | — | Everything adjustable about a run. |
-| `SearchState` | class | 382 | — | — |
-| `seed_archipelago` | function | 2684 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `GenerationCost.__init__` | method | 522 | `(self)` | — |
-| `GenerationCost.count` | method | 542 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 528 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 535 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 551 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 548 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 442 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 446 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 450 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 387 | — | — |
+| `seed_archipelago` | function | 2696 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `shared_policy_for` | function | 1627 | `(cfg: SearchConfig)` | The shared policy a run starts from: a body twist (plus the gait gain |
+| `GenerationCost.__init__` | method | 527 | `(self)` | — |
+| `GenerationCost.count` | method | 547 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 533 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 540 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 556 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 553 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 447 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 451 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 455 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1232,31 +1233,31 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `learner_reward` | function | 345 | `(seg, tag: str, air_turn_reward: float=0.0) -> float` | The terminal reward the learner sees for one segment. |
-| `potential_of` | function | 399 | `(obs, domain: str) -> float` | A state's potential, for potential-based reward shaping. |
-| `ppo_update` | function | 575 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None, group_buffer=None) -> dict` | One PPO update over everything the generation collected. |
-| `RolloutBuffer` | class | 439 | — | Trajectories from a whole generation, flattened into a PPO batch. |
-| `SegmentCollector` | class | 536 | — | Records one segment's decisions, per machine, into trajectories. |
+| `learner_reward` | function | 349 | `(seg, tag: str, air_turn_reward: float=0.0) -> float` | The terminal reward the learner sees for one segment. |
+| `potential_of` | function | 403 | `(obs, domain: str) -> float` | A state's potential, for potential-based reward shaping. |
+| `ppo_update` | function | 579 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None, group_buffer=None) -> dict` | One PPO update over everything the generation collected. |
+| `RolloutBuffer` | class | 443 | — | Trajectories from a whole generation, flattened into a PPO batch. |
+| `SegmentCollector` | class | 540 | — | Records one segment's decisions, per machine, into trajectories. |
 | `SharedPolicy` | class | 122 | `(nn.Module if AVAILABLE else object)` | A Gaussian policy and a value head, shared by every morphology. |
-| `Trajectory` | class | 371 | — | One segment's worth of decisions from one machine. |
-| `RolloutBuffer.__init__` | method | 453 | `(self, gamma: float=0.99, lam: float=0.95, shaping: float=0.2, air_turn_reward: float=0.0)` | — |
-| `RolloutBuffer.add` | method | 467 | `(self, traj: Trajectory) -> None` | — |
-| `RolloutBuffer.build` | method | 482 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |
-| `RolloutBuffer.n_transitions` | property | 472 | `(self) -> int` | — |
-| `SegmentCollector.__init__` | method | 544 | `(self, k: int)` | — |
-| `SegmentCollector.finish` | method | 556 | `(self, buffer: RolloutBuffer, rewards, tag: str='', groups=None) -> None` | Attach each machine's segment competence and bank the trajectory. |
-| `SegmentCollector.record` | method | 548 | `(self, m: int, obs, act, logp, val, phi: float=0.0) -> None` | — |
-| `SharedPolicy.__init__` | method | 130 | `(self, n_obs: int, n_modes: int, hidden: int=64)` | — |
-| `SharedPolicy.act` | method | 317 | `(self, obs_np, *, deterministic: bool=False, rng=None)` | One decision, numpy in and numpy out, for use inside a rollout. |
-| `SharedPolicy.act_many` | method | 258 | `(self, obs_np, *, deterministic: bool=False, rngs=None)` | One decision per row, in a single forward pass. |
-| `SharedPolicy.entropy` | method | 212 | `(self, obs)` | Differential entropy of this policy at ``obs``, one-sample estimate. |
-| `SharedPolicy.entropy_of` | method | 242 | `(base)` | The estimator above, on an already-computed ``latent`` distribution. |
-| `SharedPolicy.latent` | method | 181 | `(self, obs)` | The pre-squash Gaussian over intent. |
-| `SharedPolicy.log_prob` | method | 200 | `(self, obs, act)` | Log-density of an already-squashed action, with the tanh Jacobian. |
-| `SharedPolicy.log_prob_and_entropy` | method | 249 | `(self, obs, act)` | Both, from one forward pass through the actor trunk. |
-| `SharedPolicy.normalise` | method | 155 | `(self, obs)` | — |
-| `SharedPolicy.observe` | method | 159 | `(self, obs_np) -> None` | Fold a batch of observations into the running statistics. |
-| `SharedPolicy.value` | method | 197 | `(self, obs)` | — |
+| `Trajectory` | class | 375 | — | One segment's worth of decisions from one machine. |
+| `RolloutBuffer.__init__` | method | 457 | `(self, gamma: float=0.99, lam: float=0.95, shaping: float=0.2, air_turn_reward: float=0.0)` | — |
+| `RolloutBuffer.add` | method | 471 | `(self, traj: Trajectory) -> None` | — |
+| `RolloutBuffer.build` | method | 486 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |
+| `RolloutBuffer.n_transitions` | property | 476 | `(self) -> int` | — |
+| `SegmentCollector.__init__` | method | 548 | `(self, k: int)` | — |
+| `SegmentCollector.finish` | method | 560 | `(self, buffer: RolloutBuffer, rewards, tag: str='', groups=None) -> None` | Attach each machine's segment competence and bank the trajectory. |
+| `SegmentCollector.record` | method | 552 | `(self, m: int, obs, act, logp, val, phi: float=0.0) -> None` | — |
+| `SharedPolicy.__init__` | method | 130 | `(self, n_obs: int, n_modes: int, hidden: int=64, log_std: float=-0.5)` | — |
+| `SharedPolicy.act` | method | 321 | `(self, obs_np, *, deterministic: bool=False, rng=None)` | One decision, numpy in and numpy out, for use inside a rollout. |
+| `SharedPolicy.act_many` | method | 262 | `(self, obs_np, *, deterministic: bool=False, rngs=None)` | One decision per row, in a single forward pass. |
+| `SharedPolicy.entropy` | method | 216 | `(self, obs)` | Differential entropy of this policy at ``obs``, one-sample estimate. |
+| `SharedPolicy.entropy_of` | method | 246 | `(base)` | The estimator above, on an already-computed ``latent`` distribution. |
+| `SharedPolicy.latent` | method | 185 | `(self, obs)` | The pre-squash Gaussian over intent. |
+| `SharedPolicy.log_prob` | method | 204 | `(self, obs, act)` | Log-density of an already-squashed action, with the tanh Jacobian. |
+| `SharedPolicy.log_prob_and_entropy` | method | 253 | `(self, obs, act)` | Both, from one forward pass through the actor trunk. |
+| `SharedPolicy.normalise` | method | 159 | `(self, obs)` | — |
+| `SharedPolicy.observe` | method | 163 | `(self, obs_np) -> None` | Fold a batch of observations into the running statistics. |
+| `SharedPolicy.value` | method | 201 | `(self, obs)` | — |
 
 ## `ops.checkpoint` — `dytiscidae/ops/checkpoint.py`
 
@@ -1291,27 +1292,27 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 641 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `build_parser` | function | 966 | `() -> argparse.ArgumentParser` | — |
-| `child_env` | function | 342 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
-| `cmd_cohort` | function | 582 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_config` | function | 452 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
-| `cmd_dashboard` | function | 911 | `(args) -> int` | — |
-| `cmd_distill` | function | 949 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 470 | `(args) -> int` | — |
-| `cmd_postrun` | function | 418 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 642 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `build_parser` | function | 967 | `() -> argparse.ArgumentParser` | — |
+| `child_env` | function | 343 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
+| `cmd_cohort` | function | 583 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_config` | function | 453 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
+| `cmd_dashboard` | function | 912 | `(args) -> int` | — |
+| `cmd_distill` | function | 950 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 471 | `(args) -> int` | — |
+| `cmd_postrun` | function | 419 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 124 | `(args) -> int` | — |
-| `cmd_render` | function | 918 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
-| `cmd_search` | function | 269 | `(args) -> int` | — |
-| `cmd_showcase` | function | 769 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 477 | `(args) -> int` | — |
-| `cmd_train` | function | 511 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_render` | function | 919 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_search` | function | 270 | `(args) -> int` | — |
+| `cmd_showcase` | function | 770 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 478 | `(args) -> int` | — |
+| `cmd_train` | function | 512 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 117 | `(args) -> int` | — |
-| `controller_for_elite` | function | 651 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 361 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 652 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 362 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 32 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 1327 | `(argv=None) -> int` | — |
-| `merge_config_file` | function | 227 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
+| `main` | function | 1333 | `(argv=None) -> int` | — |
+| `merge_config_file` | function | 228 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
 | `search_config_from_args` | function | 159 | `(args, shared: bool)` | The ``SearchConfig`` a ``search`` command line asks for. |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`

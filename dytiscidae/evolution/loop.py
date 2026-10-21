@@ -235,6 +235,11 @@ class SearchConfig:
     #: not an option -- see learning/ppo.py for the arithmetic.
     use_shared_policy: bool = field(default_factory=_torch_importable)
     shared_hidden: int = 64
+    #: Initial ``log_std`` of the shared policy's Gaussian, learned from there.
+    #: -0.5 (std 0.61) is every run to arch54; on a glider it keeps 3.5% of
+    #: sampled rollouts aloft through the turn command, -2.5 keeps 40%
+    #: (`experiments/air_turn_bar/README.md`, exploration read, 2026-10-22).
+    shared_log_std: float = -0.5
     shared_lr: float = 1e-3
     shared_epochs: int = 10
     shared_minibatch: int = 2048
@@ -1619,6 +1624,15 @@ def _stage_event(state: SearchState, gen: int, log: dict, *, refined: int,
     })
 
 
+def shared_policy_for(cfg: SearchConfig):
+    """The shared policy a run starts from: a body twist (plus the gait gain
+    when on) at ``cfg.shared_hidden`` and ``cfg.shared_log_std``."""
+    from ..learning import ppo as _ppo
+    return _ppo.SharedPolicy(
+        TriphibianEnv.OBS_DIM, TWIST_DIM + (1 if cfg.gait_gain else 0),
+        hidden=cfg.shared_hidden, log_std=cfg.shared_log_std)
+
+
 def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                on_generation=None, should_stop=None) -> SearchState:
     """Run the whole loop.  Returns the final state, checkpointed as it goes.
@@ -1755,9 +1769,7 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         # which is the same six axes on every machine, where a mode index is a
         # private coordinate that means something different on each.
         # Plus one action for the gait gain when the channel is on.
-        state.shared = _ppo.SharedPolicy(
-            TriphibianEnv.OBS_DIM, TWIST_DIM + (1 if cfg.gait_gain else 0),
-            hidden=cfg.shared_hidden)
+        state.shared = shared_policy_for(cfg)
         # eps 1e-5 rather than torch's 1e-8; see ``ppo_update``.
         state.shared_opt = _torch.optim.Adam(
             state.shared.parameters(), lr=cfg.shared_lr, eps=1e-5)

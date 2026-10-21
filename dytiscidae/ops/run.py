@@ -188,6 +188,7 @@ def search_config_from_args(args, shared: bool):
         policy_hidden=args.policy_hidden,
         use_shared_policy=bool(shared),
         shared_hidden=args.shared_hidden,
+        shared_log_std=args.policy_log_std,
         shared_lr=args.shared_lr,
         shared_epochs=args.shared_epochs,
         shared_target_kl=args.shared_target_kl,
@@ -1107,6 +1108,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="rollouts of one body per group (>= 2)")
     p.add_argument("--grpo-bodies", type=int, default=4,
                    help="bodies given a group each generation")
+    p.add_argument("--policy-log-std", type=float, default=-0.5,
+                   help="initial log_std of the shared policy's Gaussian (learned "
+                        "from there); -0.5 keeps 3.5%% of sampled gannet rollouts "
+                        "aloft through the turn command, -2.5 keeps 40%% "
+                        "(experiments/air_turn_bar, 2026-10-22)")
     p.add_argument("--policy-hidden", type=int, default=0,
                    help="hidden units in the policy; 0 is linear (60 weights), "
                         "16 is 308")

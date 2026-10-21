@@ -167,6 +167,13 @@ MUTATIONS: tuple = (
                "scores its own turn with nothing to cancel against (arch51: air 0.025 from one half)",
         suites=("test_physics::test_an_unpaired_air_half_pays_nothing",), item="air pair"),
     Mutation(
+        id="shared-log-std-is-a-constant",
+        path="dytiscidae/evolution/loop.py",
+        find="        hidden=cfg.shared_hidden, log_std=cfg.shared_log_std)",
+        replace="        hidden=cfg.shared_hidden)",
+        defect="--policy-log-std is accepted and the shared policy starts at -0.5 regardless",
+        suites=("test_ppo::test_the_shared_policy_starts_at_the_configured_log_std",), item="shared policy init"),
+    Mutation(
         id="air-turn-reward-pays-the-unmeasurable",
         path="dytiscidae/learning/ppo.py",
         find="        if (m.get(\"pair_turn_factor\") or 0.0) > 0.0 and m.get(\"pair_turn_mean\") is not None:",

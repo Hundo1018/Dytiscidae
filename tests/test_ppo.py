@@ -493,6 +493,25 @@ def test_the_learners_air_return_carries_the_pair_mean() -> None:
     check("and defaults to off", RolloutBuffer().air_turn_reward == 0.0)
 
 
+def test_the_shared_policy_starts_at_the_configured_log_std() -> None:
+    """2026-10-22 (experiments/air_turn_bar, exploration read): the shared
+    policy's initial exploration is a run setting, not a constant."""
+    print("\nshared policy: the initial log_std is configured")
+    import torch
+
+    from dytiscidae.evolution.loop import SearchConfig, shared_policy_for
+
+    net = SharedPolicy(N_OBS, 6, hidden=16)
+    check("the default is -0.5, every run to arch54", torch.allclose(net.log_std, torch.full((6,), -0.5)))
+    net2 = SharedPolicy(N_OBS, 6, hidden=16, log_std=-2.0)
+    check("a given log_std is the start", torch.allclose(net2.log_std, torch.full((6,), -2.0)))
+    cfg = SearchConfig(shared_log_std=-2.0, gait_gain=True, shared_hidden=16)
+    net3 = shared_policy_for(cfg)
+    check("the run's policy starts where the config says, with the gain channel",
+          torch.allclose(net3.log_std, torch.full((7,), -2.0)) and net3.n_modes == 7, f"{net3.log_std.tolist()}")
+    check("SearchConfig defaults to -0.5", SearchConfig().shared_log_std == -0.5)
+
+
 def test_terminal_rewards_are_scaled_within_their_own_kind() -> None:
     """Water competence averaged 0.635 against 0.089 on land; unscaled, water wins.
 
@@ -1507,6 +1526,7 @@ def main() -> int:
     test_potential_shaping_telescopes_to_nothing()
     test_the_return_splits_into_shaping_and_terminal()
     test_terminal_rewards_are_scaled_within_their_own_kind()
+    test_the_shared_policy_starts_at_the_configured_log_std()
     test_the_learners_air_return_carries_the_pair_mean()
 
     test_an_empty_generation_is_skipped_not_crashed_on()

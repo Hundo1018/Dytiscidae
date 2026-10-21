@@ -55,10 +55,12 @@ RolloutBuffer:
   implementation:
     - learning.ppo.RolloutBuffer
     - learning.ppo.learner_reward
+    - evolution.loop.shared_policy_for
     - learning.ppo.Trajectory
     - learning.ppo.SegmentCollector
   tests:
     - tests.test_ppo::test_the_learners_air_return_carries_the_pair_mean
+    - tests.test_ppo::test_the_shared_policy_starts_at_the_configured_log_std
     - tests.test_search::test_the_learners_air_return_reaches_the_buffer
     - tests.test_search::test_the_learners_air_return_crosses_the_worker_pool
     - tests.test_ppo::test_gae_matches_an_independent_reference
