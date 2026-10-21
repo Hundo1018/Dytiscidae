@@ -14,6 +14,16 @@ stays a flag; the three levers run in order: arch54 = arch53 + `--refine-sigma
 0.02` (running, `runs/arch54_notes.md`), then the learner's exploration read
 (`experiments/air_turn_bar/exploration.py`, queued on the GPU after arch54),
 then K draws per body (IMPL_1010 A6).
+**arch54 read (2026-10-22, `runs/arch54_notes.md`):** sigma 0.02 moved every
+survival read the right way and missed the bar: S1 16.8% vs 11.7%; `stays_up`
+certified against the still machine for the first time on any population
+(46/149 vs 24/149); positive share of measurable draws 16% vs 8%; the first
+elite ever to pass the 8-draw sign test (7/8, p = 0.035, retention 0.43);
+R1 1 of >= 5, R2 `underpowered` at 6/149, R3 0 of 6 at >= 0.5. Exploration
+read: the shared policy's `log_std` -0.5 keeps 3.5% of sampled gannet
+rollouts aloft through the command, -1.5 29%, -2.5 40%, -4.0 38%
+(`experiments/air_turn_bar/README.md`). arch55 = arch54 + `--policy-log-std
+-2.0` (a typed midpoint; the 50% rule selected nothing).
 
 
 **2026-10-20, later: the air list, in the order the user set (from the 10-20

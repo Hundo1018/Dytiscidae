@@ -1,0 +1,223 @@
+{
+ "bodies": [
+  {
+   "body": 159,
+   "recorded_air": 0.422,
+   "-0.5": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   },
+   "-1.5": {
+    "measurable": 28,
+    "positive": 8,
+    "n": 32
+   },
+   "-2.5": {
+    "measurable": 32,
+    "positive": 1,
+    "n": 32
+   },
+   "-4.0": {
+    "measurable": 32,
+    "positive": 0,
+    "n": 32
+   }
+  },
+  {
+   "body": 74,
+   "recorded_air": 0.365,
+   "-0.5": {
+    "measurable": 7,
+    "positive": 0,
+    "n": 32
+   },
+   "-1.5": {
+    "measurable": 32,
+    "positive": 4,
+    "n": 32
+   },
+   "-2.5": {
+    "measurable": 32,
+    "positive": 0,
+    "n": 32
+   },
+   "-4.0": {
+    "measurable": 32,
+    "positive": 0,
+    "n": 32
+   }
+  },
+  {
+   "body": 161,
+   "recorded_air": 0.025,
+   "-0.5": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   },
+   "-1.5": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   },
+   "-2.5": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   },
+   "-4.0": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   }
+  },
+  {
+   "body": 186,
+   "recorded_air": 0.02,
+   "-0.5": {
+    "measurable": 1,
+    "positive": 0,
+    "n": 32
+   },
+   "-1.5": {
+    "measurable": 13,
+    "positive": 1,
+    "n": 32
+   },
+   "-2.5": {
+    "measurable": 1,
+    "positive": 0,
+    "n": 32
+   },
+   "-4.0": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   }
+  },
+  {
+   "body": 175,
+   "recorded_air": 0.008,
+   "-0.5": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   },
+   "-1.5": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   },
+   "-2.5": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   },
+   "-4.0": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   }
+  },
+  {
+   "body": 185,
+   "recorded_air": 0.003,
+   "-0.5": {
+    "measurable": 1,
+    "positive": 0,
+    "n": 32
+   },
+   "-1.5": {
+    "measurable": 2,
+    "positive": 0,
+    "n": 32
+   },
+   "-2.5": {
+    "measurable": 6,
+    "positive": 0,
+    "n": 32
+   },
+   "-4.0": {
+    "measurable": 2,
+    "positive": 0,
+    "n": 32
+   }
+  },
+  {
+   "body": 80,
+   "recorded_air": 0.0,
+   "-0.5": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   },
+   "-1.5": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   },
+   "-2.5": {
+    "measurable": 32,
+    "positive": 8,
+    "n": 32
+   },
+   "-4.0": {
+    "measurable": 32,
+    "positive": 0,
+    "n": 32
+   }
+  },
+  {
+   "body": 118,
+   "recorded_air": 0.0,
+   "-0.5": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   },
+   "-1.5": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   },
+   "-2.5": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   },
+   "-4.0": {
+    "measurable": 0,
+    "positive": 0,
+    "n": 32
+   }
+  }
+ ],
+ "by_log_std": {
+  "-0.5": {
+   "measurable": 9,
+   "positive": 0,
+   "n": 256,
+   "measurable_share": 0.03515625
+  },
+  "-1.5": {
+   "measurable": 75,
+   "positive": 13,
+   "n": 256,
+   "measurable_share": 0.29296875
+  },
+  "-2.5": {
+   "measurable": 103,
+   "positive": 9,
+   "n": 256,
+   "measurable_share": 0.40234375
+  },
+  "-4.0": {
+   "measurable": 98,
+   "positive": 0,
+   "n": 256,
+   "measurable_share": 0.3828125
+  }
+ },
+ "wall_s": 2925.0826766490936
+}

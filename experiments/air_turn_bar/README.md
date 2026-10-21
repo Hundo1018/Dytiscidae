@@ -285,3 +285,21 @@ one seed, bases stored. Read: the share of copies aloft through the command
 - Decision: if confirmed, arch55 starts the shared policy at the log_std whose
   measurable share first exceeds 50% (an init, not a clamp; PPO still learns it).
 - Positive share is reported, not predicted: noise cannot read the command.
+
+## Exploration read, appended after the run (2026-10-22, `exploration.json`, 2,930 s)
+
+8 gannets x 32 sampled copies per `log_std`:
+
+| log_std (std) | measurable | positive of measurable | bodies with >= 16/32 measurable |
+|---|---|---|---|
+| -0.5 (0.61), the search's init | 9/256 (3.5%) | 0 | 0 |
+| -1.5 (0.22) | 75/256 (29%) | 13 (17%) | 2 (159, 74) |
+| -2.5 (0.08) | 103/256 (40%) | 9 (9%) | 3 (159, 74, 80) |
+| -4.0 (0.02) | 98/256 (38%) | 0 | 3 |
+
+Against the frozen text: "-0.5 <= 25%" held (3.5%); "-2.5 >= 50%" **missed** (40%);
+neither falsifier fired. Three bodies (161, 175, 118) are measurable at no std: not
+gliders at this seed. The decision rule ("the log_std whose share first exceeds 50%")
+selects nothing; the measurable share saturates at -2.5 and the positive share peaks
+at -1.5. **Decision, typed and said so:** arch55 initialises `log_std` at -2.0, between
+the two, as a `--policy-log-std` flag; PPO still learns the parameter.
