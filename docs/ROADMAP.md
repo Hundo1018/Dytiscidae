@@ -1,5 +1,16 @@
 # Roadmap
 
+**2026-10-23: arch56 (arch54 + a failed air draw earns no floor rank) is the
+best air run on record and still misses E2's air L1; see
+[what arch56 measured](#2026-10-23--what-arch56-measured).** F1/F2/S1 met
+(battery exhaustion in gannet fresh draws 51% -> 16%, rotor share of the air
+archive 59% -> 24%, measurable elites 16.8% -> 23.4%); **R2 met for the first
+time: `comp:air >= 0.012` is certified against the still machine and the base
+gait, 7/111 vs 0/111 vs 0/111**; R3 3 of the 5 elites needed retain >= 0.5;
+R1 0 sign-test passes (16 elites with a positive draw). The remaining gap is
+reliability at 8 draws, not existence.
+
+
 **2026-10-21: arch52 and arch53 read; E2's air L1 is not met; see
 [what arch52 and arch53 measured](#2026-10-21--what-arch52-and-arch53-measured).**
 arch53 (tiebreak + `--air-turn-reward 1.0`, air island, 300 gens) beat arch52
@@ -319,6 +330,45 @@ it wherever the two disagree.
 
 
 
+
+
+## 2026-10-23 — what arch56 measured
+
+arch56 = arch54's configuration (air island, 300 gens, seed 20261020,
+`--floor-tiebreak`, `--air-turn-reward 1.0`, `--refine-sigma 0.02`) on the commit
+where `islands.floor_rank` is 0 for a draw that ended in a failure (0eddc9a).
+Why: arch54's screen showed 51% of gannet fresh draws ending "battery
+exhausted" and 87 of 147 air-archive gannets carrying rotors; the time-aloft
+tiebreak favoured rotor hover, which exhausts the pack (8-15 kW against a 5.25
+kW limit, then a joint runaway booked as consumption).
+`experiments/air_turn_bar/README.md` has the replay; `runs/arch56_notes.md` the
+frozen reads and every number.
+
+| read | arch56 | arch54 | arch53 |
+|---|---|---|---|
+| F1 gannet fresh draws battery exhausted | 16% | 51% | |
+| F2 air-archive gannets with rotors | 24% | 59% | 43% |
+| S1 elites measurable at >= 4/8 draws | 23.4% | 16.8% | 11.7% |
+| positive share of measurable draws | 21.1% | 16.0% | 8.3% |
+| R1 sign-test passes (>= 5) | 0 | 1 | 0 |
+| R2 gate `comp:air >= 0.012` | **certified, 7/111 vs 0 vs 0** | 6/149 underpowered | 3/145 underpowered |
+| R3 retention >= 0.5 (>= 5 elites) | 3 | 0 | 0 |
+
+The null holds on a sixth population (34 measurable still bodies, none
+positive). E2's air L1 needs R1, R2 and R3; R2 is met. The lineage fix did what
+it was built for and moved every read the right way; reliability per elite at
+8 fresh draws (R1) and retention (R3) are the remaining gap. The run did not
+keep improving: measurable share peaked at gens 150-199 (16.0%) and fell to
+9.4%; positives plateaued at ~20 per 50 gens while PPO updates with a positive
+air return rose 5 -> 13 -> 19 per 100. The extension rule says no resume.
+
+**Next (for the user).** (1) K draws per body before an update (IMPL_1010 A6;
+the largest build): one draw per body at a 21% positive share is a noisy
+gradient, and the N11 median over draws is a noisy label. (2) The joint-runaway
+booking in `PowerBudget.step` (MATH_AUDIT): it zeroes every elite that trips it
+and makes 9% of still-machine draws unmeasurable. (3) Whether `floor_rank`'s
+failure rule becomes the default (it is the flag's definition now; arch52-55
+ran without it).
 
 ## 2026-10-21 — what arch52 and arch53 measured
 
