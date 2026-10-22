@@ -303,3 +303,17 @@ gliders at this seed. The decision rule ("the log_std whose share first exceeds 
 selects nothing; the measurable share saturates at -2.5 and the positive share peaks
 at -1.5. **Decision, typed and said so:** arch55 initialises `log_std` at -2.0, between
 the two, as a `--policy-log-std` flag; PPO still learns the parameter.
+
+## Why arch54's elites are unmeasurable (appended 2026-10-22, `elite_power_probe.py`, `screen_arch54.rows.jsonl`)
+
+Of 1,176 gannet-elite fresh draws in the arch54 screen, 604 (51%) ended "battery exhausted"
+(still arm: 9%), 409 were not aloft through the command, 141 were measurable. The exhausting
+lineage is one family (126 of 149 elites share battery_wh 210; energy_margin -0.985). 87 of
+the 147 gannets in arch54's air archive carry rotors (median 14; arch52: 13 of 102, arch53:
+25 of 58): the tiebreak ranks by time aloft, and a rotor body hovers. Replayed on the numpy
+path (three exhausted draws): 8-15 kW mean power against a 5.25 kW pack limit from t = 0 (rotor
+motors at 300-500 rad/s), then a joint runs away to 1,200-2,300 rad/s and the booked draw
+spikes until the pack is flat at 1-2 s of the second half. Fix (`0eddc9a`): `floor_rank` is 0
+for a draw that ended in a failure. Not a physics change; the runaway booking stays an open
+MATH_AUDIT item. arch56 = arch54's configuration on this commit; arch55 (log_std -2.0) is
+read first.
