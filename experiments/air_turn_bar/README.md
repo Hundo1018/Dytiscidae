@@ -317,3 +317,18 @@ spikes until the pack is flat at 1-2 s of the second half. Fix (`0eddc9a`): `flo
 for a draw that ended in a failure. Not a physics change; the runaway booking stays an open
 MATH_AUDIT item. arch56 = arch54's configuration on this commit; arch55 (log_std -2.0) is
 read first.
+
+## Second stage on arch56 (pre-registered 2026-10-23, before data)
+
+The 8-draw screen needs >= 7 of 8 measurable draws positive to reach p < 0.05, so an
+elite that turns the right way on 70% of draws cannot pass it. Stage 2 asks whether any
+arch56 elite reads the command reliably: the 16 elites with >= 1 positive measurable
+screen draw, 24 fresh draws each (seeds 2026102500..23, never used), elite arm and still
+arm. Per elite: one-sided binomial test of positives among measurable draws against a
+fair coin, **Bonferroni over the 16 candidates (p < 0.05/16 = 0.0031)**, needing >= 6
+measurable draws (9 of 9, 10 of 11, ... pass at that level).
+- Prediction: >= 1 elite passes (an arch56 elite with 6/8 positive at screen exists:
+  idx 11, 6/8 draws air > 0). *Falsified* if none passes: then no arch56 elite is a
+  reliable reader at K = 24 and the bar is a learner problem, not a measurement-power one.
+- Reported: the number of elites with positive share >= 50% over >= 10 measurable draws.
+- Still arm on the same draws: must stay <= 0.
