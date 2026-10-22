@@ -350,3 +350,13 @@ Replicate the two nominal results, 32 and 88, on 24 further fresh draws (seeds
 2026102600..23), Bonferroni over 2 (p < 0.025, >= 8 measurable). *Prediction:* both
 replicate if they read the command; a winner's-curse pair regresses to 50%. *Falsified* (for
 that elite) if p >= 0.025. Still arm on the same draws <= 0.
+
+### Stage 3 result (2026-10-23, `stage3_arch56.json`)
+Idx 32: 10 of 23 measurable draws positive (p = 0.80, mean -0.060). Idx 88: 4 measurable
+draws, 0 positive (below the >= 8 floor). Neither replicates: stage 2's two nominal results
+were the winner's curse the design anticipated. Still arm 0 of 36 positive. **Classified:
+refuted. No arch56 elite reads the command reliably at 24 fresh draws; E2's air L1 R1 is
+not a power artifact.** What would move it back: an arm whose elites pass stage 2 at
+Bonferroni level. Belief before: arch56's lineage fix left a reader the screen was too
+weak to find. After: it left a population that is aloft and measurable but whose turn
+response is at chance per draw (best elite 15/24).

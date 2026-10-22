@@ -1,0 +1,89 @@
+{
+ "run": "runs/arch56",
+ "k": 24,
+ "seed_base": 2026102600,
+ "wall_s": 291.38569498062134,
+ "summary": {
+  "label": "repl",
+  "elites": 2,
+  "verdicts": {
+   "fail": 2
+  },
+  "expected_passes_under_null": 0.05,
+  "still_max_abs_mean": 0.7525115061265885,
+  "still_measurable": 36,
+  "passes": [],
+  "mean_of_means": -0.05573700672879444,
+  "share_positive_draws": 0.37037037037037035
+ },
+ "per_elite": {
+  "32:elite": {
+   "index": 32,
+   "arm": "elite",
+   "n_draws": 24,
+   "measurable": 23,
+   "positive": 10,
+   "p_sign": 0.7975635528564453,
+   "mean": -0.06014986213980296,
+   "sd": 0.2211866762308387,
+   "verdict": "fail",
+   "max_abs_still": null,
+   "island": "air",
+   "plan": "gannet",
+   "recorded_air": 0.0,
+   "rung": 6,
+   "bad_qacc": 0
+  },
+  "32:still": {
+   "index": 32,
+   "arm": "still",
+   "n_draws": 24,
+   "measurable": 24,
+   "positive": 0,
+   "p_sign": 1.0,
+   "mean": -0.24741179084206932,
+   "sd": 0.1948197540734258,
+   "verdict": "fail",
+   "max_abs_still": 0.7525115061265885,
+   "island": "air",
+   "plan": "gannet",
+   "recorded_air": 0.0,
+   "rung": 6,
+   "bad_qacc": 0
+  },
+  "88:elite": {
+   "index": 88,
+   "arm": "elite",
+   "n_draws": 24,
+   "measurable": 4,
+   "positive": 0,
+   "p_sign": 1.0,
+   "mean": -0.05132415131778592,
+   "sd": 0.06451632125124028,
+   "verdict": "fail",
+   "max_abs_still": null,
+   "island": "air",
+   "plan": "gannet",
+   "recorded_air": 0.0,
+   "rung": 6,
+   "bad_qacc": 0
+  },
+  "88:still": {
+   "index": 88,
+   "arm": "still",
+   "n_draws": 24,
+   "measurable": 12,
+   "positive": 0,
+   "p_sign": 1.0,
+   "mean": -0.12653747523813635,
+   "sd": 0.0596904341771754,
+   "verdict": "fail",
+   "max_abs_still": 0.24455407577603414,
+   "island": "air",
+   "plan": "gannet",
+   "recorded_air": 0.0,
+   "rung": 6,
+   "bad_qacc": 0
+  }
+ }
+}

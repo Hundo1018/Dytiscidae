@@ -362,6 +362,16 @@ keep improving: measurable share peaked at gens 150-199 (16.0%) and fell to
 9.4%; positives plateaued at ~20 per 50 gens while PPO updates with a positive
 air return rose 5 -> 13 -> 19 per 100. The extension rule says no resume.
 
+**Stage 2 and 3 on arch56 (2026-10-23; `experiments/air_turn_bar/README.md`):** the
+8-draw screen needs 7/8 positive, so I asked whether any elite reads the command
+reliably at more power. The 16 elites with a positive screen draw, 24 fresh draws
+each, Bonferroni over 16: **0 pass**; the closest (idx 32 15/20, idx 88 11/14) did
+not replicate on 24 further draws (10/23 and 0/4). Still arm: 0 positive in 400
+measurable draws. So R1's miss is not a power artifact: arch56's population is aloft
+and measurable but its turn response is at chance per draw (best elite 15 of 24).
+The gap to L1 is a learner gap: the policy is not learning to read the heading
+error, which points at lever (1) below.
+
 **Next (for the user).** (1) K draws per body before an update (IMPL_1010 A6;
 the largest build): one draw per body at a 21% positive share is a noisy
 gradient, and the N11 median over draws is a noisy label. (2) The joint-runaway
