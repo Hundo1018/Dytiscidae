@@ -23,7 +23,13 @@ R1 1 of >= 5, R2 `underpowered` at 6/149, R3 0 of 6 at >= 0.5. Exploration
 read: the shared policy's `log_std` -0.5 keeps 3.5% of sampled gannet
 rollouts aloft through the command, -1.5 29%, -2.5 40%, -4.0 38%
 (`experiments/air_turn_bar/README.md`). arch55 = arch54 + `--policy-log-std
--2.0` (a typed midpoint; the 50% rule selected nothing).
+-2.0` (a typed midpoint; the 50% rule selected nothing). **arch55 read
+(2026-10-22): refuted on every pre-registered read** (X1 3.2% vs 6.0%, S1 8.3% vs
+16.8%, 0 sign-test passes, gate 1/145): lower initial exploration is not the
+lever; the flag stays at -0.5. Why arch54's elites are unmeasurable is a
+lineage, not an exploration, problem: 51% of gannet fresh draws exhaust the
+battery (87 of 147 gannets carry rotors; the tiebreak favoured hover); arch56 =
+arch54 + failed draws earn no floor rank, running (`runs/arch56_notes.md`).
 
 
 **2026-10-20, later: the air list, in the order the user set (from the 10-20
