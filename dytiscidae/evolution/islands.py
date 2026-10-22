@@ -181,6 +181,12 @@ def floor_rank(island: str, result) -> float:
     seg = (getattr(result, "segments", {}) or {}).get("air")
     if seg is None:
         return 0.0
+    # A draw that ended in a failure (battery flat, diverged, unstable) was
+    # not measured to the command: time aloft before it is not rank.  arch54's
+    # tiebreak favoured rotor-hover bodies that ran the pack flat in 51% of
+    # fresh draws (`experiments/air_turn_bar/README.md`, 2026-10-22).
+    if getattr(seg, "failure", ""):
+        return 0.0
     m = getattr(seg, "measurements", None) or {}
     if "airborne_fraction" in m:
         return float(m["airborne_fraction"])

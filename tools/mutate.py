@@ -729,6 +729,14 @@ MUTATIONS: tuple = (
         item="floor tiebreak"),
 
     Mutation(
+        id="floor-rank-pays-a-failed-draw",
+        path="dytiscidae/evolution/islands.py",
+        find="    if getattr(seg, \"failure\", \"\"):\n        return 0.0\n",
+        replace="",
+        defect="a draw that ran the battery flat ranks by the time it was aloft, so rotor-hover "
+               "lineages that cannot be measured to the command win the floor cells (arch54)",
+        suites=("test_search::test_below_the_floor_an_air_island_keeps_the_design_that_stayed_aloft",), item="floor tiebreak"),
+    Mutation(
         id="floor-rank-reads-every-island",
         path="dytiscidae/evolution/islands.py",
         find="    if \"air\" not in island_media(island):\n        return 0.0\n    seg = (getattr(result, \"segments\", {}) or {}).get(\"air\")",

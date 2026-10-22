@@ -1119,6 +1119,10 @@ def test_below_the_floor_an_air_island_keeps_the_design_that_stayed_aloft() -> N
           floor_rank("water", res(airborne_fraction=0.7)) == 0.0
           and floor_rank("land", res(airborne_fraction=0.7)) == 0.0)
     check("no air segment is 0", floor_rank("air", NS(segments={})) == 0.0)
+    failed = NS(segments={"air": NS(measurements={"airborne_fraction": 0.9}, duration=8.0,
+                                    failure="battery exhausted")})
+    check("a draw that ended in a failure earns no rank for the time it was aloft",
+          floor_rank("air", failed) == 0.0)
     check("floor_tiebreak is on by default (2026-10-21)", SearchConfig().floor_tiebreak is True)
 
 

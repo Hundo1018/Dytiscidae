@@ -2,7 +2,7 @@
 
 # Modules
 
-106 modules, 38,684 lines, 1,120 indexed symbols.
+106 modules, 38,690 lines, 1,120 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -120,7 +120,7 @@ is what makes a violation visible while reading.
 | `evolution.curator` | The curator: active management of the search, not just survival of the fittest. | 804 | — | `numpy` | `core.genome`, `evolution.archive` |
 | `evolution.curriculum` | Staged evaluation: learn one medium, then a crossing, then the chain. | 769 | — | `numpy` | — |
 | `evolution.descriptors` | Learned behaviour descriptors, so the archive axes stop being my guesses. | 253 | — | `numpy` | — |
-| `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 504 | — | `numpy` | `evolution.curriculum` |
+| `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 510 | — | `numpy` | `evolution.curriculum` |
 | `evolution.judge` | The judge: a scoring standard that gets stricter as the population improves. | 504 | — | `numpy` | — |
 | `evolution.loop` | The co-evolution loop: morphology and control, curated. | 3148 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.device`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.grpo`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
 | `evolution.scout` | The scout: a network that predicts a lineage's potential, not its score. | 515 | — | `numpy` | — |
