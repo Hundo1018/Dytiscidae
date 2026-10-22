@@ -332,3 +332,21 @@ measurable draws (9 of 9, 10 of 11, ... pass at that level).
   reliable reader at K = 24 and the bar is a learner problem, not a measurement-power one.
 - Reported: the number of elites with positive share >= 50% over >= 10 measurable draws.
 - Still arm on the same draws: must stay <= 0.
+
+### Stage 2 result (2026-10-23, `stage2_arch56.json`, 16 candidates x 24 draws)
+
+Bonferroni passes: **0 of 16** (prediction "at least 1" **falsified**). Still arm: 364
+measurable draws, max -0.001, 0 positive (seventh population). Per elite (measurable /
+positive): idx 32 20/15 (p 0.021, mean +0.045), idx 88 14/11 (p 0.029, mean +0.244), idx 31
+24/15 (p 0.154, +0.066), idx 97 23/11 (+0.023), idx 104 24/13; the other 11 have positive share
+< 50% or negative means (idx 77 3/17, mean -0.237). Four elites have a positive share >= 50%
+over >= 10 measurable draws (31, 32, 88, 104); none survives 16 tests. Two nominal p < 0.05
+out of 16 candidates is not beyond chance (P(>= 2 | 16 tests, alpha 0.05) = 0.19). So: no
+arch56 elite reads the command reliably at K = 24, and the screen's R1 miss was not a
+power artifact. The elites that come closest (32, 88) are stage 3.
+
+### Stage 3 (pre-registered 2026-10-23, before data)
+Replicate the two nominal results, 32 and 88, on 24 further fresh draws (seeds
+2026102600..23), Bonferroni over 2 (p < 0.025, >= 8 measurable). *Prediction:* both
+replicate if they read the command; a winner's-curse pair regresses to 50%. *Falsified* (for
+that elite) if p >= 0.025. Still arm on the same draws <= 0.
