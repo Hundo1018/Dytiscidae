@@ -491,6 +491,10 @@ def test_the_learners_air_return_carries_the_pair_mean() -> None:
     buf = RolloutBuffer(shaping=0.0, air_turn_reward=0.5)
     check("the buffer carries the weight", buf.air_turn_reward == 0.5)
     check("and defaults to off", RolloutBuffer().air_turn_reward == 0.0)
+    from dytiscidae.learning.grpo import GroupRolloutBuffer
+    check("the GRPO buffer carries it too (the loop builds it with the weight)",
+          GroupRolloutBuffer(air_turn_reward=0.5).air_turn_reward == 0.5
+          and GroupRolloutBuffer().air_turn_reward == 0.0)
 
 
 def test_the_shared_policy_starts_at_the_configured_log_std() -> None:

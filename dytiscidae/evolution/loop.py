@@ -264,6 +264,14 @@ class SearchConfig:
     #: ones that passed Tier-0.  Cost is ``grpo_bodies * grpo_group`` extra
     #: machines through one batched Tier-1, with no identification.
     grpo_bodies: int = 4
+    #: Fill the GRPO groups from bodies whose air pair was measurable in this
+    #: generation's evaluation (aloft and served through the turn command)
+    #: before drawing the rest at random.  Off by default: every stored run
+    #: drew uniformly.  On the air island most Tier-0 survivors are not aloft,
+    #: a group of such a body carries no signal about the command, and
+    #: arch56's elites read it at chance per draw (`experiments/air_turn_bar`,
+    #: 2026-10-23).  Learning-only: the archive is untouched.
+    grpo_measurable_first: bool = False
     #: Anneal the learning rate linearly to zero over the run.  arch33's policy
     #: hit the KL ceiling on 88% of its updates past generation 450 and its
     #: parameter trajectory was anti-correlated step to step, which is the
@@ -1514,6 +1522,16 @@ def _check_learner(cfg: SearchConfig) -> None:
 GRPO_STREAM_BASE = 1 << 20
 
 
+def air_pair_measurable(result) -> bool:
+    """True when this evaluation's air pair was measurable: aloft and served
+    through the turn command in both mirrored halves (``pair_turn_factor`` > 0.5)."""
+    seg = (getattr(result, "segments", {}) or {}).get("air")
+    if seg is None or getattr(seg, "failure", ""):
+        return False
+    m = getattr(seg, "measurements", None) or {}
+    return (m.get("pair_turn_factor") or 0.0) > 0.5 and m.get("pair_turn_mean") is not None
+
+
 def _grpo_rollouts(state: SearchState, cfg: SearchConfig, gen: int, evaluated,
                    stage_log: dict, spec):
     """The learning-only rollouts: ``grpo_group`` repeats of a few bodies.
@@ -1545,7 +1563,15 @@ def _grpo_rollouts(state: SearchState, cfg: SearchConfig, gen: int, evaluated,
                        "reason": "no body passed Tier-0 through the batched path"}
     draw = np.random.default_rng([int(cfg.seed) & 0x7FFFFFFF, int(gen), 0x6752])
     n_b = min(int(cfg.grpo_bodies), len(eligible))
-    chosen = sorted(int(j) for j in draw.choice(eligible, size=n_b, replace=False))
+    first = []
+    if getattr(cfg, "grpo_measurable_first", False):
+        first = [j for j in eligible if air_pair_measurable(evaluated[j][1])]
+    take = min(len(first), n_b)
+    chosen = [int(j) for j in (draw.choice(first, size=take, replace=False) if take else [])]
+    rest = [j for j in eligible if j not in set(chosen)]
+    if n_b - take > 0:
+        chosen += [int(j) for j in draw.choice(rest, size=n_b - take, replace=False)]
+    chosen = sorted(chosen)
 
     G = int(cfg.grpo_group)
     phenos, ctrls, groups, streams, draws = [], [], [], [], []

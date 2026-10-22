@@ -80,6 +80,7 @@ GroupRelativeAdvantage:
   implementation:
     - learning.grpo.group_advantages
     - learning.grpo.GroupRolloutBuffer
+    - evolution.loop.air_pair_measurable
     - learning.ppo.ppo_update
     - evolution.loop.SearchConfig
   tests:
@@ -88,6 +89,7 @@ GroupRelativeAdvantage:
     - tests.test_ppo::test_group_rows_are_not_renormalised_with_the_batch
     - tests.test_ppo::test_the_ppo_path_is_bit_identical_without_a_group_buffer
     - tests.test_search::test_grpo_rollouts_never_reach_the_archive
+    - tests.test_search::test_grpo_prefers_the_bodies_aloft_when_asked
   note: GRPO for the shared policy (ROADMAP N), off by default (shared_learner="ppo"); learning-only rollouts of a few bodies, advantage relative to the body's own group
 
 RewardShaping:

@@ -114,6 +114,7 @@ CLI too.
 | `shared_learner` | "ppo" | "ppo" | switch | `docs/LEARNER_AUDIT.md`: "ppo" is every run to date; "grpo" and "ppo+grpo" built 2026-10-03, off. `docs/ROADMAP.md` §"11. N. GRPO" is conditional on the shared policy carrying weight. |
 | `grpo_group` | 4 | 4 | typed | Rollouts of one body per GRPO group (at least 2). Inert while `shared_learner` is "ppo". |
 | `grpo_bodies` | 4 | 4 | typed | Bodies given a group per generation. Inert while `shared_learner` is "ppo". |
+| `grpo_measurable_first` | False | False | switch | Added 2026-10-23 (`docs/ROADMAP.md` 2026-10-23, `experiments/air_turn_bar/README.md`): fill the GRPO groups from bodies whose air pair was measurable in this generation's evaluation (aloft and served through the turn command, no failure) before drawing the rest at random. Learning-only; the archive is untouched. Inert while `shared_learner` is "ppo". `--grpo-measurable-first`. |
 | `shared_lr_anneal` | True | True | switch | `docs/ROADMAP.md` §"Phase 4 -- PPO implementation hygiene, as one arm -- ran, unattributable": arch33's policy hit the KL ceiling on 88% of updates past gen 450. The anneal's own effect was not isolated. |
 
 ## Seeding, output, checkpoints

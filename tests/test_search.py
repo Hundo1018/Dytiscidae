@@ -1818,6 +1818,27 @@ def test_the_learners_air_return_crosses_the_worker_pool() -> None:
           got == want and any(k < 0 for k in got), f"{dict(got)} vs {dict(want)}")
 
 
+def test_grpo_prefers_the_bodies_aloft_when_asked() -> None:
+    """2026-10-23 (experiments/air_turn_bar): with ``grpo_measurable_first`` the
+    learning-only groups are drawn first from bodies whose air pair was
+    measurable, then at random; off, the draw is uniform as in every stored
+    run, and a failed or unmeasured pair never counts as measurable."""
+    print("\nGRPO: bodies aloft first")
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.evolution.loop import SearchConfig, air_pair_measurable
+
+    def res(factor=1.0, mean=-0.2, failure=""):
+        return NS(segments={"air": NS(measurements={"pair_turn_factor": factor, "pair_turn_mean": mean},
+                                       failure=failure)})
+    check("a measurable pair counts", air_pair_measurable(res()))
+    check("factor 0 does not (not aloft or not served)", not air_pair_measurable(res(factor=0.0)))
+    check("a draw that ended in a failure does not", not air_pair_measurable(res(failure="battery exhausted")))
+    check("a missing mean does not", not air_pair_measurable(res(mean=None)))
+    check("no air segment does not", not air_pair_measurable(NS(segments={})))
+    check("off by default", SearchConfig().grpo_measurable_first is False)
+
+
 def test_tier2_draws_its_headings() -> None:
     """A verifier fixed at one heading has the defect it is meant to catch."""
     print("\nTier-2 draws the task it verifies")
@@ -7419,6 +7440,7 @@ def main() -> int:
         test_a_crossing_is_commanded_and_a_still_machine_makes_none,
         test_the_heading_pair_cancels_what_the_command_did_not_choose,
         test_the_learners_air_return_reaches_the_buffer,
+        test_grpo_prefers_the_bodies_aloft_when_asked,
         test_the_learners_air_return_crosses_the_worker_pool,
         test_tier2_draws_its_headings,
         test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing,

@@ -196,6 +196,7 @@ def search_config_from_args(args, shared: bool):
         shared_learner=args.shared_learner,
         grpo_group=args.grpo_group,
         grpo_bodies=args.grpo_bodies,
+        grpo_measurable_first=args.grpo_measurable_first,
         run_dir=args.run,
         tier2_every=args.tier2_every,
         n_reference_seeds=args.reference_seeds,
@@ -1108,6 +1109,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="rollouts of one body per group (>= 2)")
     p.add_argument("--grpo-bodies", type=int, default=4,
                    help="bodies given a group each generation")
+    p.add_argument("--grpo-measurable-first", action="store_true",
+                   help="fill the GRPO groups from bodies whose air pair was "
+                        "measurable this generation before drawing at random "
+                        "(learning-only; the archive is untouched); off by default")
     p.add_argument("--policy-log-std", type=float, default=-0.5,
                    help="initial log_std of the shared policy's Gaussian (learned "
                         "from there); -0.5 keeps 3.5%% of sampled gannet rollouts "

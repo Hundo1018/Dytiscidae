@@ -167,6 +167,20 @@ MUTATIONS: tuple = (
                "scores its own turn with nothing to cancel against (arch51: air 0.025 from one half)",
         suites=("test_physics::test_an_unpaired_air_half_pays_nothing",), item="air pair"),
     Mutation(
+        id="grpo-buffer-drops-the-air-turn-reward",
+        path="dytiscidae/learning/grpo.py",
+        find="        super().__init__(shaping=0.0, air_turn_reward=air_turn_reward)",
+        replace="        super().__init__(shaping=0.0)",
+        defect="the GRPO rows' air return is the bare competence while the ordinary rows carry the pair mean",
+        suites=("test_ppo::test_the_learners_air_return_carries_the_pair_mean",), item="air learner reward"),
+    Mutation(
+        id="grpo-counts-a-failed-pair-as-measurable",
+        path="dytiscidae/evolution/loop.py",
+        find="    if seg is None or getattr(seg, \"failure\", \"\"):\n        return False\n    m = getattr(seg, \"measurements\", None) or {}\n    return (m.get(\"pair_turn_factor\")",
+        replace="    if seg is None:\n        return False\n    m = getattr(seg, \"measurements\", None) or {}\n    return (m.get(\"pair_turn_factor\")",
+        defect="a draw that ran the battery flat is offered to the GRPO groups as an air body",
+        suites=("test_search::test_grpo_prefers_the_bodies_aloft_when_asked",), item="grpo air"),
+    Mutation(
         id="shared-log-std-is-a-constant",
         path="dytiscidae/evolution/loop.py",
         find="        hidden=cfg.shared_hidden, log_std=cfg.shared_log_std)",

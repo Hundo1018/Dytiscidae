@@ -104,8 +104,8 @@ class GroupRolloutBuffer(RolloutBuffer):
     it for these rows).
     """
 
-    def __init__(self):
-        super().__init__(shaping=0.0)
+    def __init__(self, air_turn_reward: float = 0.0):
+        super().__init__(shaping=0.0, air_turn_reward=air_turn_reward)
 
     # ------------------------------------------------------------ the groups
 
