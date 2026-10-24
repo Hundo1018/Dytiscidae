@@ -372,6 +372,33 @@ and measurable but its turn response is at chance per draw (best elite 15 of 24)
 The gap to L1 is a learner gap: the policy is not learning to read the heading
 error, which points at lever (1) below.
 
+**arch57 (2026-10-24, `runs/arch57_notes.md`): lever (1) in its existing form,
+refuted.** GRPO (`learning/grpo.py`, built 10-03) with groups of 8 drawn first
+from the bodies aloft (`--grpo-measurable-first`, new, off by default): 72-81%
+of groups have zero variance in the air (eight rollouts of one body score
+identically), the learner's positive air updates fell (3/6/5 per 50 gens vs
+arch56's 5/13/19 per 100), and every evaluation read fell with them (S1 7.4% vs
+23.4%, gate 1/136, 0 sign-test passes). Repeated rollouts of one body do not
+produce a gradient here because the air outcome is near-deterministic in the
+exploration noise at this scale; the draw that varies is the *task draw*, not
+the policy noise. That is A6's other half (K task draws per body at evaluation,
+IMPL_1010), not GRPO. Also fixed on the way: `GroupRolloutBuffer` did not take
+the air-turn weight the loop passed (any `ppo+grpo` run with `--air-turn-reward`
+would have crashed at gen 0; test and mutation added).
+
+**Standing (2026-10-24).** Best configuration on record is arch56's: tiebreak
+with failed draws unranked, sigma 0.02, air-turn reward 1.0, log_std -0.5,
+learner ppo. It meets R2 (certified 7/111 vs 0 vs 0) and misses R1 (0 of 5) and
+R3 (3 of 5). Three arms after it (log_std -2.0, GRPO) each made it worse. What
+has not been tried and has a measured basis: (a) K task draws per body at
+evaluation (A6), because the per-draw turn response is at chance and the N11
+median over 8 draws is a noisy label; (b) the joint-runaway booking in
+`PowerBudget.step`, which still ends 16% of gannet fresh draws; (c) a longer
+arch56 (its reads fell after gen 150, so the extension rule said no; a second
+seed would separate drift from noise). None is launched: (a) is a build of
+`evolution/loop.py`'s evaluation path, (b) a physics-model decision, (c) 11 h
+of GPU for a replicate; the user picks.
+
 **Next (for the user).** (1) K draws per body before an update (IMPL_1010 A6;
 the largest build): one draw per body at a 21% positive share is a noisy
 gradient, and the N11 median over draws is a noisy label. (2) The joint-runaway
