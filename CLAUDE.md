@@ -67,6 +67,7 @@ stopping are withdrawn.
 | `test_ppo.py` | numpy, torch (last section wants the evaluator) |
 | `test_physics.py` | MuJoCo, no GPU; one function skips without the GPU extension |
 | `test_search.py` | GPU; a few functions skip without it |
+| `test_devroll.py` | `requirements-device.txt` (mujoco-warp, warp) and a CUDA device; the device-path functions skip without them |
 
 `tools/suite_probe.py --all` re-measures this. `.github/workflows/checks.yml`
 runs the first three rows; `test_search.py` is not in CI.

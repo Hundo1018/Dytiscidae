@@ -9,6 +9,7 @@ imageio>=2.34
 imageio-ffmpeg>=0.4.9
 
 # Optional accelerators -- the system runs without them.
+#   requirements-device.txt : the on-device evaluation path (IMPL_1010 A); see that file.
 #   torch          : needed for --shared-policy (learning/ppo.py). CPU build
 #                    is the right one: the network is ~1200 weights, where a
 #                    CUDA launch costs more than the arithmetic.

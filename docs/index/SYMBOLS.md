@@ -751,6 +751,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `gpu_present` | function | 44 | `(root: Path \| str='/') -> tuple` | ``(present, evidence)``.  ``evidence`` names what was found, or what was looked at. |
 | `GpuUnusable` | class | 40 | `(RuntimeError)` | A GPU is present and the kernel cannot run on it.  Not a CPU fallback. |
 
+## `envs.devroll` — `dytiscidae/envs/devroll/__init__.py`
+
+> On-device evaluation path (IMPL_1010 A): MuJoCo Warp plus Warp fluid kernels.
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `usable` | function | 49 | `(timeout: float=180.0) -> tuple` | Return ``(ok, reason)``: can the device path run in this environment? |
+
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
 > Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness.

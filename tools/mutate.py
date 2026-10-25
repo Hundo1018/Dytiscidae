@@ -2033,6 +2033,15 @@ MUTATIONS: tuple = (
         defect="a predicted positive gap raises the cheap score: a second objective",
         suites=("test_search::test_critic_learns_the_exploit_signature",), item="critic bound"),
 
+    # --- device path (IMPL_1010 A0, 2026-10-25) ---------------------------
+    Mutation(
+        id="device-path-hides-why",
+        path="dytiscidae/envs/devroll/__init__.py",
+        find='    UNAVAILABLE_REASON = "MJWarp not importable"',
+        replace='    UNAVAILABLE_REASON = ""',
+        defect="a device stack that does not import reports no reason, so a skip "
+               "reads as a refusal with nothing to act on",
+        suites=("test_devroll",), item="A0 guard"),
     # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
     Mutation(
         id="grpo-advantage-across-the-whole-batch",

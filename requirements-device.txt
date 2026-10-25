@@ -1,0 +1,7 @@
+# Optional: the on-device evaluation path (IMPL_1010 A). Needs an NVIDIA GPU with CUDA >= 12.4.
+# Installed into .venv only after D-M0 is read (docs/IMPL_1010_SPEC.md, F6): mujoco 3.15 is
+# the reference-engine upgrade that D-M0 measures. Nothing imports these unless
+# dytiscidae.envs.devroll finds them; the package runs without them.
+mujoco-warp==3.15.0
+warp-lang==1.18.0
+mujoco==3.15.0

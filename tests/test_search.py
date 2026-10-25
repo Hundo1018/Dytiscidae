@@ -52,6 +52,9 @@ BLOCKED_MARKERS = (
     # succeeded, so this arrived as a traceback where the contract is a skip.
     "Failed to initialize NVML",
     "cannot be constructed",
+    # The device path (IMPL_1010 A) is optional; see tests/test_devroll.py.
+    "MJWarp not importable",
+    "MJWarp not usable",
 )
 
 

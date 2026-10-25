@@ -22,6 +22,15 @@
 # named by no feature at all.  Read this file first when looking for where
 # something is implemented; then SYMBOLS.md; then the source.
 
+# --------------------------------------------- the on-device evaluation path
+
+DeviceEvaluation:
+  implementation:
+    - envs.devroll
+  tests:
+    - tests.test_devroll
+  note: IMPL_1010 A. Only the optional guard exists (A0); A1a onward add the Warp kernels.
+
 # --------------------------------------------------------------- the learner
 
 SharedPolicy:
