@@ -416,9 +416,10 @@ of GPU for a replicate; the user picks.
 the largest build): one draw per body at a 21% positive share is a noisy
 gradient, and the N11 median over draws is a noisy label. (2) The joint-runaway
 booking in `PowerBudget.step` (MATH_AUDIT): it zeroes every elite that trips it
-and makes 9% of still-machine draws unmeasurable. (3) Whether `floor_rank`'s
-failure rule becomes the default (it is the flag's definition now; arch52-55
-ran without it).
+and makes 9% of still-machine draws unmeasurable. (3) `floor_rank`'s failure
+rule is the default: the user, 2026-10-25. A failed draw earns no floor rank under
+`floor_tiebreak` (on by default since 2026-10-21; 0eddc9a added the failure rule).
+arch52-55 ran without the failure rule.
 
 ## 2026-10-21 — what arch52 and arch53 measured
 
