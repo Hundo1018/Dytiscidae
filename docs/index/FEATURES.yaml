@@ -27,9 +27,10 @@
 DeviceEvaluation:
   implementation:
     - envs.devroll
+    - envs.devroll.fluid_wp
   tests:
     - tests.test_devroll
-  note: IMPL_1010 A. Only the optional guard exists (A0); A1a onward add the Warp kernels.
+  note: IMPL_1010 A. The guard (A0) and the quasi-static strip kernel (A1a, first slice; the replay of FluidSolver.apply is not built). A1b onward add the scatter and the rest.
 
 # --------------------------------------------------------------- the learner
 

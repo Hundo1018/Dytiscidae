@@ -2042,6 +2042,22 @@ MUTATIONS: tuple = (
         defect="a device stack that does not import reports no reason, so a skip "
                "reads as a refusal with nothing to act on",
         suites=("test_devroll",), item="A0 guard"),
+    Mutation(
+        id="device-strip-drops-the-fold",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="        alpha = _wp.atan2(sin_a, cos_f + T(1e-12))",
+        replace="        alpha = _wp.atan2(sin_a, _wp.abs(cos_a) + T(1e-12))",
+        defect="the device strip uses the mirror the fold replaced: a reversing stroke "
+               "gets the same lift in both directions",
+        suites=("test_devroll",), item="A1a strip kernel"),
+    Mutation(
+        id="device-strip-drops-the-camber",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="            alpha = alpha + T(2.0) * cam",
+        replace="            alpha = alpha",
+        defect="the device strip ignores camber on attached flow, so a cambered section "
+               "loses its zero-lift shift",
+        suites=("test_devroll",), item="A1a strip kernel"),
     # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
     Mutation(
         id="grpo-advantage-across-the-whole-batch",

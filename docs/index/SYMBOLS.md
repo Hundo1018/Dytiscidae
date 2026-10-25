@@ -759,6 +759,15 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 |---|---|---:|---|---|
 | `usable` | function | 49 | `(timeout: float=180.0) -> tuple` | Return ``(ok, reason)``: can the device path run in this environment? |
 
+## `envs.devroll.fluid_wp` — `dytiscidae/envs/devroll/fluid_wp.py`
+
+> Strip-theory loads on the device (IMPL_1010 A1a, first slice).
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `make_kernels` | function | 34 | `(T)` | Return ``(strip_loads, V)`` for precision ``T`` (``wp.float64`` or ``wp.float32``). |
+| `strip_loads` | function | 191 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
+
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
 > Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness.
