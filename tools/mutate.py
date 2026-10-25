@@ -2045,10 +2045,10 @@ MUTATIONS: tuple = (
     Mutation(
         id="device-strip-drops-the-fold",
         path="dytiscidae/envs/devroll/fluid_wp.py",
-        find="        alpha = _wp.atan2(sin_a, cos_f + T(1e-12))",
+        find="        alpha = _wp.atan2(sin_a, cos_f + T(1e-12))\n        if rev:\n            alpha = -alpha",
         replace="        alpha = _wp.atan2(sin_a, _wp.abs(cos_a) + T(1e-12))",
-        defect="the device strip uses the mirror the fold replaced: a reversing stroke "
-               "gets the same lift in both directions",
+        defect="the device strip uses the mirror the fold replaced (|cos| with no sign flip): "
+               "a reversing stroke gets the same lift in both directions",
         suites=("test_devroll",), item="A1a strip kernel"),
     Mutation(
         id="device-strip-drops-the-camber",
