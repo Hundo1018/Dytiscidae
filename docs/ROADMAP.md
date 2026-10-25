@@ -1,5 +1,17 @@
 # Roadmap
 
+**2026-10-25: the flight criterion is settled; see
+`experiments/air_turn_bar/README.md` "Best flight criterion".** `comp:air >= 0.012`,
+certified against the still machine and the base gait, is the one air measurement
+that passes rules 1, 2, 4, 5 and 8 on measured populations; the rule-8 check it lacked
+is now run (`fresh_existence.py`): on 8 fresh seeds the still machine reaches the bar on
+0 of 5,488 draws across arch53-57 and the elites are certified against it in arch54
+(7/149), arch56 (9/111) and the pool (21/686). It certifies populations, not single
+designs; the command-reading sign test (R1) stays the definition of done for E2 air L1
+and has no replicated pass. `stays_up`, `glides`, `holds_height` are leaks against the
+base gait in every population. arch58/59 finished gen 299 on 2026-10-25; their gate and
+screen are running (`runs/arch5{8,9}_reads.sh`), read with `l1_read.py`.
+
 **2026-10-23: arch56 (arch54 + a failed air draw earns no floor rank) is the
 best air run on record and still misses E2's air L1; see
 [what arch56 measured](#2026-10-23--what-arch56-measured).** F1/F2/S1 met
@@ -352,7 +364,7 @@ frozen reads and every number.
 | positive share of measurable draws | 21.1% | 16.0% | 8.3% |
 | R1 sign-test passes (>= 5) | 0 | 1 | 0 |
 | R2 gate `comp:air >= 0.012` | **certified, 7/111 vs 0 vs 0** | 6/149 underpowered | 3/145 underpowered |
-| R3 retention >= 0.5 (>= 5 elites) | 3 | 0 | 0 |
+| R3 retention >= 0.5 (>= 5 elites) | 3 | 1 (0.017 -> 0.037; the 2026-10-22 table said 0, see `experiments/air_turn_bar/l1_read.py`) | 0 |
 
 The null holds on a sixth population (34 measurable still bodies, none
 positive). E2's air L1 needs R1, R2 and R3; R2 is met. The lineage fix did what

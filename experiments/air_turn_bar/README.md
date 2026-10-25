@@ -360,3 +360,76 @@ not a power artifact.** What would move it back: an arm whose elites pass stage 
 Bonferroni level. Belief before: arch56's lineage fix left a reader the screen was too
 weak to find. After: it left a population that is aloft and measurable but whose turn
 response is at chance per draw (best elite 15/24).
+
+## Best flight criterion (2026-10-25; `fresh_existence.py`, `l1_read.py`)
+
+Question (the user's goal, "找到最佳飛行判斷"): which measurement of air behaviour is
+best by the project's own rules (CLAUDE.md "Designing a measurement" 1-9). Method: the
+gate tables for arch53-57 (`gate_archNN_table.md`), the 8-draw screens on the same
+populations (`screen_archNN.rows.jsonl`, elite and still arms), and the air probes
+(stage 2/3 on arch56, B'' on arch49 gliders). No new threshold is typed here; every
+bar below already exists in the tables or in the pre-registered text above.
+
+### Candidates against the rules
+
+| candidate | rule 1 still reads 0 | rule 2 gate, not coefficient | rule 4 unmeasured != zero | rule 5/9 null-referenced | rule 8 survives a fresh seed | population evidence |
+|---|---|---|---|---|---|---|
+| `rung:air>=6 stays_up` (airborne_fraction >= 0.6) | no (still 0.12-0.27 of bodies) | yes | yes | **no**: leak vs base in arch53-57 | not tested | fails base in all 5 |
+| `rung:air>=7 glides` / `>=8 holds_height` | no | yes | yes | no: leak vs both in every population | not tested | fails both in all 5 |
+| **`comp:air >= 0.012` (existence)** | **yes**: still 0/686 bodies, 0/5,488 draws | yes | yes (`underpowered` is distinct from `leak`) | **yes**: arch56 certified vs still and base at recorded seeds, 7/111 vs 0 vs 0 | **yes** (below): certified vs still on fresh seeds in arch54, arch56 and pooled | certified in 2 of 5 populations alone, and pooled |
+| sign test on `pair_turn_mean` (command reading) | yes (still <= 0 by construction) | yes | yes | **yes** (null <= 0 by the mirror) | **no** so far: arch56 stage 2 0/16; B'' 0.119 -> 0.025 on 8 fresh draws | 0 replicated passes in every probe |
+
+### The fresh-seed check the existence bar lacked (rule 8)
+
+Until today the bar was certified only at each elite's recorded (gen, seed). The screens
+re-score the same bodies on 8 fresh seeds with the actuators driven (elite) and held still
+(still). A body passes when its mean fresh `air` over the 8 draws is >= 0.012; the verdict
+is the gate's own rule (`domain.evidence.no_model_verdict`, one-sided 95% Clopper-Pearson).
+The screens carry no base arm; the base-gait control stays with the recorded-seed gate
+(arch56: 0/111).
+
+| population | elite bodies >= bar | still bodies >= bar | verdict | any draw >= bar (elite vs still) | draws >= bar (elite vs still) |
+|---|---|---|---|---|---|
+| arch53 | 1/145 | 0/145 | underpowered | 5/145 vs 0/145 | 7/1,160 vs 0/1,160 |
+| arch54 | 7/149 (lower 2.2%) | 0/149 (upper 2.0%) | **certified** | 10/149 vs 0/149 | 20/1,192 vs 0/1,192 |
+| arch55 | 2/145 | 0/145 | underpowered | 6/145 vs 0/145 | 9/1,160 vs 0/1,160 |
+| arch56 | 9/111 (lower 4.3%) | 0/111 (upper 2.7%) | **certified** | 14/111 vs 0/111 | 34/888 vs 0/888 |
+| arch57 | 2/136 | 0/136 | underpowered | 4/136 vs 0/136 | 10/1,088 vs 0/1,088 |
+| pooled, 5 populations | 21/686 (lower 2.1%) | 0/686 (upper 0.4%) | **certified** | 39/686 vs 0/686 | 80/5,488 vs 0/5,488 |
+
+The still machine never reaches the bar on any fresh draw (0 of 5,488), so `comp:air >=
+0.012` is not a reading of placement, falling or bouncing (rule 1), and the elites that
+hold it on fresh seeds exist in two populations alone and in the pool (rule 8). What
+stage 2 showed (0/16) was the sign test, not this bar.
+
+### Verdict
+
+**The best flight criterion is `comp:air >= 0.012`, certified against the still machine
+and the base gait (the no-model gate), and confirmed on fresh seeds (mean of 8 fresh draws
+>= 0.012, still 0/686).** It is the only candidate that passes rules 1, 2, 4, 5 and 8 on
+measured populations. Its reading is existence: "this body produces air behaviour the
+physics does not produce for a passive body, and does so on seeds it was not selected on".
+
+Its complement, the **command-reading** criterion (pair-mean sign test on
+`pair_turn_mean`, null <= 0, 8 fresh draws, p < 0.05), is the correct test of "the agent
+flies toward the commanded side" and is null-referenced by construction, but no elite has
+passed it on replication. It stays the pass/fail definition of done for E2 air L1 (R1),
+not the flight criterion: a criterion no design meets is not evidence, and the rungs
+`stays_up`, `glides`, `holds_height` are leaks against the base gait in every population
+and must not be used as flight evidence.
+
+What is and is not claimed: the existence bar certifies populations (arch54, arch56 and
+the pool), not that any single design is a reliable flyer; per-design reliability is R3
+(retention >= 0.5 on fresh draws; arch56 3 of 8 above-floor elites, arch54 1 of 6, see
+note) and is still short of 5. The arch58/59 reads (`l1_read.py`, running 2026-10-25 as
+units `arch58-reads`, `arch59-reads`) are further validation of the same criterion on two
+more populations, appended below when they land; they are not the condition for having
+found it.
+
+Note on arch54 R3: the ROADMAP table says 0 of 6, but `runs/arch54_notes.md` lists six
+above-floor elites including 0.017 -> 0.037 (ratio 2.2), which retains >= 0.5 by the
+frozen definition (mean fresh air / recorded air); `l1_read.py` counts 1 of 6. arch56
+reproduces to the digit (3 of 8). The slip does not change any verdict.
+
+Recorded: 2026-10-25, from gate_arch53..57_table.md, screen_arch53..57.rows.jsonl
+(`fresh_existence.py`), stage2/stage3 arch56, authority_s0.02_rep8.json.
