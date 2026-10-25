@@ -2090,6 +2090,30 @@ MUTATIONS: tuple = (
         defect="every element is in water viscosity, so an element in the air pays water "
                "skin friction and the Reynolds number collapses",
         suites=("test_devroll",), item="A1a medium"),
+    Mutation(
+        id="device-buoyancy-ignores-the-submerged-fraction",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="        f = F_in[i] + V(T(0.0), T(0.0), buoy * vb[i] * subf[i])",
+        replace="        f = F_in[i] + V(T(0.0), T(0.0), buoy * vb[i])",
+        defect="every panel floats its full buoyant volume, so an element in the air pays the "
+               "water's buoyancy and a dry machine is lifted off the beach",
+        suites=("test_devroll",), item="A1a assembly"),
+    Mutation(
+        id="device-finish-drops-the-weight-cancellation",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="        fb_f[b] = fb_f[b] * s + V(T(0.0), T(0.0), m_body[b] * gravity)",
+        replace="        fb_f[b] = fb_f[b] * s",
+        defect="the weight MuJoCo applies to the entrained fluid is not cancelled, so every "
+               "machine carries its added mass as a standing load",
+        suites=("test_devroll",), item="A1a assembly"),
+    Mutation(
+        id="device-finish-limits-the-force-only",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="        fb_t[b] = fb_t[b] * s",
+        replace="        fb_t[b] = fb_t[b]",
+        defect="the limiter scales the force but not the torque, so a clamped machine keeps its "
+               "unbounded moments and tumbles on them",
+        suites=("test_devroll",), item="A1a assembly"),
     # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
     Mutation(
         id="grpo-advantage-across-the-whole-batch",

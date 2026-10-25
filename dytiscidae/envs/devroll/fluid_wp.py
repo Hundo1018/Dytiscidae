@@ -37,7 +37,7 @@ _WAGNER_B = tuple(float(x) for x in WAGNER_B)
 
 def make_kernels(T):
     """Return the kernels for precision ``T`` as a dict (``strip``, ``unsteady``,
-    ``medium``, ``added_mass``) and the 3-vector type ``V``.
+    ``medium``, ``added_mass``, ``assemble``, ``finish``) and the 3-vector type ``V``.
 
     ``V`` is the matching 3-vector type.  Built once per precision and cached.
     """
@@ -292,8 +292,43 @@ def make_kernels(T):
             m_add[i] = ca_eff * r * volume[i] * scale
             m_slam[i] = ca_eff * r * volume[i] * scale
 
+    @_wp.kernel
+    def assemble_panels(
+        pos: _wp.array(dtype=V), F_in: _wp.array(dtype=V), body_id: _wp.array(dtype=_wp.int32),
+        xipos: _wp.array(dtype=V), subf: _wp.array(dtype=T), vb: _wp.array(dtype=T), buoy: T,
+        F_out: _wp.array(dtype=V), fb_f: _wp.array(dtype=V), fb_t: _wp.array(dtype=V),
+        total: _wp.array(dtype=T),
+    ):
+        # Buoyancy into the panel force, then the panel's load onto its body: force, and
+        # torque about the body's centre of mass.  ``total`` is sum |F| over the machine's
+        # panels, which the limiter reads.  Atomic adds reorder against numpy's add.at,
+        # so the parity test is at rounding, not bitwise.
+        i = _wp.tid()
+        b = body_id[i]
+        f = F_in[i] + V(T(0.0), T(0.0), buoy * vb[i] * subf[i])
+        F_out[i] = f
+        arm = pos[i] - xipos[b]
+        _wp.atomic_add(fb_f, b, f)
+        _wp.atomic_add(fb_t, b, _wp.cross(arm, f))
+        _wp.atomic_add(total, 0, _wp.length(f))
+
+    @_wp.kernel
+    def finish_bodies_wp(
+        fb_f: _wp.array(dtype=V), fb_t: _wp.array(dtype=V), m_body: _wp.array(dtype=T),
+        total: _wp.array(dtype=T), limit: T, gravity: T,
+    ):
+        # finish_bodies: scale all six components by limit/total if the machine's total
+        # exceeds the limit, then cancel the weight of the entrained fluid at the CoM.
+        b = _wp.tid()
+        s = T(1.0)
+        if total[0] > limit:
+            s = limit / total[0]
+        fb_f[b] = fb_f[b] * s + V(T(0.0), T(0.0), m_body[b] * gravity)
+        fb_t[b] = fb_t[b] * s
+
     _KERNELS[T] = {"strip": strip_loads, "unsteady": unsteady_update,
-                   "medium": medium_flat, "added_mass": added_mass, "V": V}
+                   "medium": medium_flat, "added_mass": added_mass,
+                   "assemble": assemble_panels, "finish": finish_bodies_wp, "V": V}
     return _KERNELS[T]
 
 
@@ -423,3 +458,40 @@ def medium_and_added_mass(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, 
         m_add, m_slam, vn])
     return {"rho": rho.numpy(), "mu": mu.numpy(), "subf": subf.numpy(), "flow": flow.numpy(),
             "m_add": m_add.numpy(), "m_slam": m_slam.numpy(), "vn": vn.numpy()}
+
+
+def assemble_bodies(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *,
+                    dtype=_wp.float64):
+    """Buoyancy, panel-to-body assembly and ``finish_bodies``, on the device; numpy out.
+
+    ``F (n, 3)`` is the strip load before buoyancy; ``body_id (n,)`` the panel's body;
+    ``xipos (nb, 3)`` each body's centre of mass; ``subf``, ``vb`` per panel;
+    ``m_body (nb,)`` the body masses with the added mass.  Returns ``F`` (the panel
+    force with buoyancy), ``fb (nb, 6)`` (world force then torque, as
+    ``xfrc_applied``) and ``clamped`` (whether the limiter bound).
+    """
+    from dytiscidae.physics.fluid import GRAVITY
+
+    K = make_kernels(dtype)
+    V = K["V"]
+    npdt = _np.float64 if dtype == _wp.float64 else _np.float32
+    n, nb = len(F), len(m_body)
+
+    def vec(a):
+        return _wp.array(_np.ascontiguousarray(a, dtype=npdt), dtype=V)
+
+    def sc(a):
+        return _wp.array(_np.ascontiguousarray(a, dtype=npdt), dtype=dtype)
+
+    F_out = _wp.zeros(n, dtype=V)
+    fb_f = _wp.zeros(nb, dtype=V)
+    fb_t = _wp.zeros(nb, dtype=V)
+    total = _wp.zeros(1, dtype=dtype)
+    _wp.launch(K["assemble"], dim=n, inputs=[
+        vec(pos), vec(F), _wp.array(_np.asarray(body_id, dtype=_np.int32), dtype=_wp.int32),
+        vec(xipos), sc(subf), sc(vb), dtype(rho_w * GRAVITY),
+        F_out, fb_f, fb_t, total])
+    _wp.launch(K["finish"], dim=nb, inputs=[
+        fb_f, fb_t, sc(m_body), total, dtype(limit), dtype(GRAVITY)])
+    fb = _np.concatenate([fb_f.numpy(), fb_t.numpy()], axis=1)
+    return {"F": F_out.numpy(), "fb": fb, "clamped": float(total.numpy()[0]) > limit}

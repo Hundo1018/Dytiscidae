@@ -282,6 +282,63 @@ def test_the_device_medium_and_added_mass_are_the_numpy_ones() -> None:
               worst <= tol, f"worst {worst_name} at {worst:.2e}")
 
 
+def test_the_device_assembly_is_the_numpy_finish_bodies() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("buoyancy, panel-to-body assembly and finish_bodies agree with apply", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.devroll.fluid_wp import assemble_bodies
+    from dytiscidae.physics.fluid import GRAVITY, finish_bodies
+    from dytiscidae.physics.medium import SEAWATER
+
+    rng = np.random.default_rng(11)
+    n, nb = 240, 7
+    body_id = rng.integers(0, nb, n)
+    body_id[:nb] = np.arange(nb)
+    pos = rng.uniform(-0.3, 0.3, size=(n, 3))
+    xipos = rng.uniform(-0.1, 0.1, size=(nb, 3))
+    F = rng.normal(size=(n, 3)) * 5.0
+    subf = rng.uniform(0.0, 1.0, n)
+    vb = rng.uniform(1e-6, 5e-5, n)
+    m_body = rng.uniform(1e-3, 2e-2, nb)
+
+    # numpy reference: apply's buoyancy, accumulation and finish_bodies, verbatim.
+    Fr = F.copy()
+    Fr[:, 2] += SEAWATER.rho * GRAVITY * vb * subf
+    fmag = np.linalg.norm(Fr, axis=1)
+    arm = pos - xipos[body_id]
+    fb_ref = np.zeros((nb, 6))
+    np.add.at(fb_ref[:, :3], body_id, Fr)
+    np.add.at(fb_ref[:, 3:], body_id, np.cross(arm, Fr))
+    fsum = np.zeros(nb)
+    np.add.at(fsum, body_id, fmag)
+    total = float(fsum.sum())
+
+    for case, limit, expect_clamp in (("unclamped", 1e9, False),
+                                      ("clamped", 0.3 * total, True)):
+        fb = fb_ref.copy()
+        clamped_ref = finish_bodies(fb, fsum, m_body, limit)
+        check(f"{case}: the limiter binds on this draw as designed", clamped_ref == expect_clamp)
+        for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+            name = "float64" if dtype == wp.float64 else "float32"
+            out = assemble_bodies(pos, F, body_id, xipos, subf, vb, SEAWATER.rho, m_body,
+                                  limit, dtype=dtype)
+            scale_f = max(float(np.abs(Fr).max()), 1e-30)
+            scale_fb = max(float(np.abs(fb).max()), 1e-30)
+            err_F = float(np.abs(out["F"] - Fr).max()) / scale_f
+            err_fb = float(np.abs(out["fb"] - fb).max()) / scale_fb
+            check(f"{case} {name}: panel force within {tol:g} of its maximum",
+                  err_F <= tol, f"{err_F:.2e}")
+            check(f"{case} {name}: body wrench within {tol:g} of its maximum",
+                  err_fb <= tol, f"{err_fb:.2e}")
+            check(f"{case} {name}: limiter flag agrees with finish_bodies",
+                  out["clamped"] == clamped_ref)
+
+
 def test_the_device_replay_is_not_built_yet() -> None:
     skip("the device fluid replays FluidSolver.apply for 2000 steps (A1a replay)",
          "the Wagner lag, inflow, medium and added mass are A1a and A1b slices, not built")
@@ -292,6 +349,7 @@ def main() -> int:
                  test_the_strip_kernel_is_the_numpy_strip_loads,
                  test_the_wagner_lag_is_the_numpy_unsteady_state,
                  test_the_device_medium_and_added_mass_are_the_numpy_ones,
+                 test_the_device_assembly_is_the_numpy_finish_bodies,
                  test_the_device_replay_is_not_built_yet]
     for fn in functions:
         print(f"{fn.__name__}")
