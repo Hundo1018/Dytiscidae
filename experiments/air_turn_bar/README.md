@@ -433,3 +433,44 @@ reproduces to the digit (3 of 8). The slip does not change any verdict.
 
 Recorded: 2026-10-25, from gate_arch53..57_table.md, screen_arch53..57.rows.jsonl
 (`fresh_existence.py`), stage2/stage3 arch56, authority_s0.02_rep8.json.
+
+## E2 air L1 on arch58 and arch59 (read 2026-10-25, `l1_read.py`, `fresh_existence.py`)
+
+Frozen bars (`runs/arch56_notes.md`, `runs/arch58_notes.md`, `runs/arch59_notes.md`; nothing changed):
+R1 >= 5 sign-test passes; R2 `comp:air >= 0.012` certified against still and base; R3 >= 5
+above-floor elites retaining >= 0.5 on fresh draws.
+
+| read | arch58 (arch56 config, seed 20261024) | arch59 (arch56 config + `--placement-draws 4`, seed 20261020) |
+|---|---|---|
+| S1 elites measurable on >= 4/8 draws | 21/114 = 18.4% (arch56 23.4%) | 11/146 = 7.5% |
+| positive share of measurable draws | 26.2% | 49.2% (on 11 measurable elites) |
+| R1 sign-test passes (>= 5) | **0** (15 elites with a positive draw; null expects 0.34) | **0** (11 elites with a positive draw; null expects 0.21) |
+| R2 gate `comp:air >= 0.012` (recorded seeds) | elite 1/114, still 0/114, base 0/114: **underpowered** | elite 5/146, still 0/146, base 0/146: **underpowered** |
+| R3 retention >= 0.5 | 1 of 1 above-floor elite (0.027 -> 0.030) | 3 of 5 above-floor elites (140: 3.94, 30: 1.81, 52: 1.16) |
+| still arm | 29 measurable bodies, 0 positive, max mean -0.000 | 20 measurable bodies, 0 positive, max mean -0.000 |
+| **L1 (R1 and R2 and R3)** | **not met** | **not met** |
+
+Frozen decision tables:
+- **arch58**: the "configuration is real" row needs R2 certified, and R2 is underpowered
+  (1/114). The row "R2 not certified" applies: arch56's certification was seed luck at this
+  sample size, and the standing best config is unproven. S1 18.4% sits at the lower edge of
+  23.4 +- 5, which does not rescue R2.
+- **arch59**: "R3 <= 3 of 8 AND R1 0" applies (R3 3 of 5 with R1 0), so the placement K-draw
+  is **refuted** by its pre-registered read P1 (retention did not improve over arch56's 3 of 8).
+  Next lever per the notes: (b) `PowerBudget` booking, which is the user's physics decision.
+
+Fresh-seed existence check, now seven populations (`fresh_existence.py`; mean of 8 fresh draws
+>= 0.012, elite vs still): arch58 7/114 vs 0/114 (**certified**); arch59 6/146 vs 0/146
+(underpowered); pooled 34/946 (lower 2.7%) vs 0/946 (upper 0.3%) (**certified**). The still
+machine reaches the bar on 0 of 7,568 fresh draws. This is the criterion's existence part; it
+does not make R1 or R3 pass.
+
+**Result: E2 air L1 is not met on either population.** R1 has no passing elite on either
+population (the command-reading sign test), and R3 is 3 of 5 at best. The agent does not fly
+by the pre-registered definition of done; the existence criterion (`comp:air >= 0.012`) holds on
+the pooled populations, and the command-reading part (R1) remains unpassed.
+
+Notes: arch59's F1/F2 are n/a in `l1_read.py` (its screen rows carry no gannet battery
+failures in the form the script reads; not investigated, not used in any verdict). Recorded
+2026-10-25 from `gate_arch58.json`, `gate_arch59.json`, `screen_arch58.json`,
+`screen_arch59.json`. Not committed.
