@@ -169,6 +169,49 @@ def test_the_strip_kernel_is_the_numpy_strip_loads() -> None:
           near == 0, f"{near} of {len(cos_a)}")
 
 
+def test_the_wagner_lag_is_the_numpy_unsteady_state() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device Wagner lag and LEV travel agree with UnsteadyState.update", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.devroll.fluid_wp import WagnerLag
+    from dytiscidae.physics.fluid import UnsteadyState
+
+    rng = np.random.default_rng(7)
+    n, steps, dt = 60, 400, 0.004
+    worst = {"alpha_e": 0.0, "lev": 0.0}
+    for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+        ref = UnsteadyState(n)
+        dev = WagnerLag(n, dtype=dtype)
+        rng = np.random.default_rng(7)
+        rev = np.zeros(n, bool)
+        worst = {"alpha_e": 0.0, "lev": 0.0}
+        scale = {"alpha_e": 0.0, "lev": 1.0}
+        for step in range(steps):
+            alpha = rng.uniform(-0.6, 0.6, n)
+            flip = rng.uniform(size=n) < 0.02
+            rev = rev ^ flip
+            U = rng.uniform(0.0, 4.0, n)
+            chord = rng.uniform(0.005, 0.05, n)
+            om = rng.normal(size=(n, 3)) * 8.0
+            s_hat = np.tile([0.0, 1.0, 0.0], (n, 1))
+            ae_r, lev_r = ref.update(alpha, rev, U, chord, om, s_hat, dt)
+            ae_d, lev_d = dev.update(alpha, rev, U, chord, om, s_hat, dt)
+            scale["alpha_e"] = max(scale["alpha_e"], float(np.abs(ae_r).max()))
+            worst["alpha_e"] = max(worst["alpha_e"], float(np.abs(ae_d - ae_r).max()))
+            worst["lev"] = max(worst["lev"], float(np.abs(lev_d - lev_r).max()))
+        name = "float64" if dtype == wp.float64 else "float32"
+        rel_ae = worst["alpha_e"] / scale["alpha_e"]
+        check(f"{name}: alpha_e over {steps} steps within {tol:g} of its maximum",
+              rel_ae <= tol, f"worst {rel_ae:.2e}")
+        check(f"{name}: lev over {steps} steps within {tol:g} absolute",
+              worst["lev"] <= tol, f"worst {worst['lev']:.2e}")
+
+
 def test_the_device_replay_is_not_built_yet() -> None:
     skip("the device fluid replays FluidSolver.apply for 2000 steps (A1a replay)",
          "the Wagner lag, inflow, medium and added mass are A1a and A1b slices, not built")
@@ -177,6 +220,7 @@ def test_the_device_replay_is_not_built_yet() -> None:
 def main() -> int:
     functions = [test_the_device_path_reports_why_it_cannot_run,
                  test_the_strip_kernel_is_the_numpy_strip_loads,
+                 test_the_wagner_lag_is_the_numpy_unsteady_state,
                  test_the_device_replay_is_not_built_yet]
     for fn in functions:
         print(f"{fn.__name__}")

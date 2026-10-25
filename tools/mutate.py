@@ -2058,6 +2058,22 @@ MUTATIONS: tuple = (
         defect="the device strip ignores camber on attached flow, so a cambered section "
                "loses its zero-lift shift",
         suites=("test_devroll",), item="A1a strip kernel"),
+    Mutation(
+        id="device-wagner-skips-the-lag",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="        alpha_e[i] = a * (T(1.0) - a1 - a2) + a1 * x0[i] + a2 * x1[i]",
+        replace="        alpha_e[i] = a",
+        defect="the device attached branch sees the quasi-steady incidence, so a flapping "
+               "strip has no circulation lag and the lift is in phase with the stroke",
+        suites=("test_devroll",), item="A1a Wagner lag"),
+    Mutation(
+        id="device-lev-forgets-the-reversal",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="                s_trav[i] = T(0.0)\n        rev_prev[i] = r",
+        replace="        rev_prev[i] = r",
+        defect="the device strip never resets its travel or circulation at a reversal of "
+               "the chordwise flow, so the LEV and lag carry across half-strokes",
+        suites=("test_devroll",), item="A1a Wagner lag"),
     # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
     Mutation(
         id="grpo-advantage-across-the-whole-batch",

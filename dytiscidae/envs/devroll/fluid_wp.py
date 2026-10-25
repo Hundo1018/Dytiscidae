@@ -20,6 +20,8 @@ from dytiscidae.physics.fluid import (
     CN_LEV,
     CN_PLATE,
     SEPARATION_COMPLETE,
+    WAGNER_A,
+    WAGNER_B,
 )
 
 _KERNELS: dict = {}
@@ -29,10 +31,12 @@ _SEP = float(SEPARATION_COMPLETE)
 _CN_PLATE = float(CN_PLATE)
 _CN_LEV = float(CN_LEV)
 _CD_CROSSFLOW = float(CD_CROSSFLOW)
+_WAGNER_A = tuple(float(x) for x in WAGNER_A)
+_WAGNER_B = tuple(float(x) for x in WAGNER_B)
 
 
 def make_kernels(T):
-    """Return ``(strip_loads, V)`` for precision ``T`` (``wp.float64`` or ``wp.float32``).
+    """Return ``(strip_loads, unsteady_update, V)`` for precision ``T``.
 
     ``V`` is the matching 3-vector type.  Built once per precision and cached.
     """
@@ -184,7 +188,38 @@ def make_kernels(T):
         U_out[i] = U
         lev_out[i] = lev
 
-    _KERNELS[T] = (strip_loads, V)
+
+    @_wp.kernel
+    def unsteady_update(
+        alpha: _wp.array(dtype=T), rev: _wp.array(dtype=_wp.int32), U: _wp.array(dtype=T),
+        chord: _wp.array(dtype=T), omega: _wp.array(dtype=V), s_hat: _wp.array(dtype=V),
+        x0: _wp.array(dtype=T), x1: _wp.array(dtype=T), s_trav: _wp.array(dtype=T),
+        rev_prev: _wp.array(dtype=_wp.int32), primed: _wp.int32, dt: T,
+        a1: T, a2: T, b1: T, b2: T, travel_lo: T, travel_hi: T,
+        alpha_e: _wp.array(dtype=T), lev: _wp.array(dtype=T),
+    ):
+        i = _wp.tid()
+        a = alpha[i]
+        r = rev[i]
+        if primed != 0:
+            if r != rev_prev[i]:
+                x0[i] = T(0.0)
+                x1[i] = T(0.0)
+                s_trav[i] = T(0.0)
+        rev_prev[i] = r
+        c = _wp.max(chord[i], T(1e-6))
+        ds = U[i] * dt / c
+        st = s_trav[i] + ds
+        s_trav[i] = st
+        # Exact for a step held over dt: semichords = 2 * chords.
+        x0[i] = x0[i] + (a - x0[i]) * (T(1.0) - _wp.exp(-b1 * T(2.0) * ds))
+        x1[i] = x1[i] + (a - x1[i]) * (T(1.0) - _wp.exp(-b2 * T(2.0) * ds))
+        alpha_e[i] = a * (T(1.0) - a1 - a2) + a1 * x0[i] + a2 * x1[i]
+        t = _wp.clamp((st - travel_lo) / (travel_hi - travel_lo), T(0.0), T(1.0))
+        lev_travel = T(1.0) - t * t * (T(3.0) - T(2.0) * t)
+        lev[i] = _wp.max(rossby_lev(U[i], chord[i], omega[i], s_hat[i]), lev_travel)
+
+    _KERNELS[T] = (strip_loads, unsteady_update, V)
     return _KERNELS[T]
 
 
@@ -196,7 +231,7 @@ def strip_loads(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff,
     integers (``WING`` = 0, ``BLUFF`` = 1 in physics.fluid, so ``is_wing`` here
     is 1 for a lifting strip).  Returns ``F (N,3), D, cl, alpha, U, lev``.
     """
-    kern, V = make_kernels(dtype)
+    kern, _, V = make_kernels(dtype)
     npdt = _np.float64 if dtype == _wp.float64 else _np.float32
 
     def vec(a):
@@ -222,3 +257,52 @@ def strip_loads(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff,
     ])
     return {"F": F.numpy(), "D": D.numpy(), "cl": cl.numpy(), "alpha": al.numpy(),
             "U": U.numpy(), "lev": lev.numpy()}
+
+
+class WagnerLag:
+    """Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel.
+
+    One instance per body's strips.  ``update`` takes the quasi-static incidence
+    of this step and returns ``(alpha_e, lev)`` as numpy arrays, the same pair
+    the numpy class returns.  The state lives on the device between calls.
+    """
+
+    def __init__(self, n: int, dtype=_wp.float64) -> None:
+        from dytiscidae.physics.fluid import LEV_TRAVEL
+
+        _, self._kern, V = make_kernels(dtype)
+        self._dtype = dtype
+        self._V = V
+        self._n = n
+        self._x0 = _wp.zeros(n, dtype=dtype)
+        self._x1 = _wp.zeros(n, dtype=dtype)
+        self._s = _wp.zeros(n, dtype=dtype)
+        self._rev_prev = _wp.zeros(n, dtype=_wp.int32)
+        self._primed = 0
+        self._travel = tuple(float(x) for x in LEV_TRAVEL)
+
+    def update(self, alpha, rev, U, chord, omega, s_hat, dt: float):
+        npdt = _np.float64 if self._dtype == _wp.float64 else _np.float32
+
+        def sc(a):
+            return _wp.array(_np.ascontiguousarray(a, dtype=npdt), dtype=self._dtype)
+
+        def vec(a):
+            return _wp.array(_np.ascontiguousarray(a, dtype=npdt), dtype=self._V)
+
+        n = self._n
+        alpha_e = _wp.zeros(n, dtype=self._dtype)
+        lev = _wp.zeros(n, dtype=self._dtype)
+        _wp.launch(self._kern, dim=n, inputs=[
+            sc(alpha),
+            _wp.array(_np.asarray(rev, dtype=_np.int32), dtype=_wp.int32),
+            sc(U), sc(chord), vec(omega), vec(s_hat),
+            self._x0, self._x1, self._s, self._rev_prev,
+            self._primed, self._dtype(dt),
+            self._dtype(_WAGNER_A[0]), self._dtype(_WAGNER_A[1]),
+            self._dtype(_WAGNER_B[0]), self._dtype(_WAGNER_B[1]),
+            self._dtype(self._travel[0]), self._dtype(self._travel[1]),
+            alpha_e, lev,
+        ])
+        self._primed = 1
+        return alpha_e.numpy(), lev.numpy()

@@ -765,8 +765,11 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `make_kernels` | function | 34 | `(T)` | Return ``(strip_loads, V)`` for precision ``T`` (``wp.float64`` or ``wp.float32``). |
-| `strip_loads` | function | 191 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
+| `make_kernels` | function | 38 | `(T)` | Return ``(strip_loads, unsteady_update, V)`` for precision ``T``. |
+| `strip_loads` | function | 226 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
+| `WagnerLag` | class | 262 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
+| `WagnerLag.__init__` | method | 270 | `(self, n: int, dtype=_wp.float64) -> None` | — |
+| `WagnerLag.update` | method | 284 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
