@@ -2074,6 +2074,22 @@ MUTATIONS: tuple = (
         defect="the device strip never resets its travel or circulation at a reversal of "
                "the chordwise flow, so the LEV and lag carry across half-strokes",
         suites=("test_devroll",), item="A1a Wagner lag"),
+    Mutation(
+        id="device-added-mass-drops-the-tensor",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="            m_add[i] = m_wing * scale",
+        replace="            m_add[i] = ca_mean * r * volume[i] * scale",
+        defect="a wing's entrained mass is the bluff value, so a flapping strip carries the "
+               "same added mass broadside and edge-on (the scalar this project replaced)",
+        suites=("test_devroll",), item="A1a added mass"),
+    Mutation(
+        id="device-medium-ignores-the-blend",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="        mu[i] = _wp.pow(mu_air, T(1.0) - f) * _wp.pow(mu_w, f)",
+        replace="        mu[i] = mu_w",
+        defect="every element is in water viscosity, so an element in the air pays water "
+               "skin friction and the Reynolds number collapses",
+        suites=("test_devroll",), item="A1a medium"),
     # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
     Mutation(
         id="grpo-advantage-across-the-whole-batch",

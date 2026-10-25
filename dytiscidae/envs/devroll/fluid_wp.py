@@ -36,7 +36,8 @@ _WAGNER_B = tuple(float(x) for x in WAGNER_B)
 
 
 def make_kernels(T):
-    """Return ``(strip_loads, unsteady_update, V)`` for precision ``T``.
+    """Return the kernels for precision ``T`` as a dict (``strip``, ``unsteady``,
+    ``medium``, ``added_mass``) and the 3-vector type ``V``.
 
     ``V`` is the matching 3-vector type.  Built once per precision and cached.
     """
@@ -219,7 +220,80 @@ def make_kernels(T):
         lev_travel = T(1.0) - t * t * (T(3.0) - T(2.0) * t)
         lev[i] = _wp.max(rossby_lev(U[i], chord[i], omega[i], s_hat[i]), lev_travel)
 
-    _KERNELS[T] = (strip_loads, unsteady_update, V)
+    @_wp.kernel
+    def medium_flat(
+        pos: _wp.array(dtype=V), half_h: _wp.array(dtype=T), wind: V, current: V,
+        rho_air: T, rho_w: T, mu_air: T, mu_w: T,
+        rho: _wp.array(dtype=T), mu: _wp.array(dtype=T), subf: _wp.array(dtype=T),
+        flow: _wp.array(dtype=V),
+    ):
+        # Flat calm surface at z = 0 (SeaState amplitude 0): depth is -z.
+        i = _wp.tid()
+        h = _wp.max(half_h[i], T(1e-3))
+        f = _wp.clamp(T(0.5) + T(0.5) * (T(0.0) - pos[i][2]) / h, T(0.0), T(1.0))
+        rho[i] = rho_air + f * (rho_w - rho_air)
+        mu[i] = _wp.pow(mu_air, T(1.0) - f) * _wp.pow(mu_w, f)
+        subf[i] = f
+        # Ambient flow: wind above, current below.  MediumField.flow_velocity blends
+        # with a fixed half-height of 1e-2, not the element's own (medium.py).
+        g = _wp.clamp(T(0.5) + T(0.5) * (T(0.0) - pos[i][2]) / T(1e-2), T(0.0), T(1.0))
+        flow[i] = (T(1.0) - g) * wind + g * current
+
+    @_wp.kernel
+    def added_mass(
+        rel: _wp.array(dtype=V), s_hat: _wp.array(dtype=V), c_hat: _wp.array(dtype=V),
+        n_hat: _wp.array(dtype=V), ext: _wp.array(dtype=V), chord: _wp.array(dtype=T),
+        dr: _wp.array(dtype=T), volume: _wp.array(dtype=T), rho: _wp.array(dtype=T),
+        is_wing: _wp.array(dtype=_wp.int32), scale: T,
+        m_add: _wp.array(dtype=T), m_slam: _wp.array(dtype=T), vn: _wp.array(dtype=T),
+    ):
+        # Wing: tensor added mass (chordwise t^2, normal c^2 per unit span), projected
+        # on the direction of motion.  Bluff: directional Ca from the element's extents.
+        i = _wp.tid()
+        s = s_hat[i]
+        c = c_hat[i]
+        n = n_hat[i]
+        v = rel[i]
+        r = rho[i]
+        vn[i] = _wp.dot(v, n)
+        e = ext[i]
+        e0 = _wp.max(e[0], T(1e-4))
+        e1 = _wp.max(e[1], T(1e-4))
+        e2 = _wp.max(e[2], T(1e-4))
+        ca0 = _wp.clamp(T(0.5) * (e1 + e2) / (T(2.0) * e0), T(0.05), T(10.0))
+        ca1 = _wp.clamp(T(0.5) * (e2 + e0) / (T(2.0) * e1), T(0.05), T(10.0))
+        ca2 = _wp.clamp(T(0.5) * (e0 + e1) / (T(2.0) * e2), T(0.05), T(10.0))
+        vl = _wp.length(v)
+        d = v / _wp.max(vl, T(1e-6))
+        ds = _wp.dot(d, s)
+        dcs = ds * ds
+        dcc = _wp.dot(d, c)
+        dcc = dcc * dcc
+        dcn = _wp.dot(d, n)
+        dcn = dcn * dcn
+        moving = dcs + dcc + dcn > T(1e-6)
+        ca_eff = dcs * ca0 + dcc * ca1 + dcn * ca2
+        ca_mean = (ca0 + ca1 + ca2) / T(3.0)
+        if not moving:
+            ca_eff = ca_mean
+        t_wing = _wp.max(e2, T(1e-5))
+        k = r * dr[i] * T(0.7853981633974483)  # rho dr pi/4
+        m0 = T(0.0)
+        m1 = k * t_wing * t_wing
+        m2 = k * chord[i] * chord[i]
+        m_wing = dcs * m0 + dcc * m1 + dcn * m2
+        if not moving:
+            m_wing = (m0 + m1 + m2) / T(3.0)
+        normal_slam = r * T(3.141592653589793) * chord[i] * chord[i] * T(0.25) * dr[i] * scale
+        if is_wing[i] != 0:
+            m_add[i] = m_wing * scale
+            m_slam[i] = normal_slam
+        else:
+            m_add[i] = ca_eff * r * volume[i] * scale
+            m_slam[i] = ca_eff * r * volume[i] * scale
+
+    _KERNELS[T] = {"strip": strip_loads, "unsteady": unsteady_update,
+                   "medium": medium_flat, "added_mass": added_mass, "V": V}
     return _KERNELS[T]
 
 
@@ -231,7 +305,8 @@ def strip_loads(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff,
     integers (``WING`` = 0, ``BLUFF`` = 1 in physics.fluid, so ``is_wing`` here
     is 1 for a lifting strip).  Returns ``F (N,3), D, cl, alpha, U, lev``.
     """
-    kern, _, V = make_kernels(dtype)
+    K = make_kernels(dtype)
+    kern, V = K["strip"], K["V"]
     npdt = _np.float64 if dtype == _wp.float64 else _np.float32
 
     def vec(a):
@@ -270,7 +345,8 @@ class WagnerLag:
     def __init__(self, n: int, dtype=_wp.float64) -> None:
         from dytiscidae.physics.fluid import LEV_TRAVEL
 
-        _, self._kern, V = make_kernels(dtype)
+        K = make_kernels(dtype)
+        self._kern, V = K["unsteady"], K["V"]
         self._dtype = dtype
         self._V = V
         self._n = n
@@ -306,3 +382,44 @@ class WagnerLag:
         ])
         self._primed = 1
         return alpha_e.numpy(), lev.numpy()
+
+
+def medium_and_added_mass(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, ext, chord,
+                          dr, volume, is_wing, scale, *, dtype=_wp.float64):
+    """Flat-calm medium and the strip added mass, on the device; numpy out.
+
+    The medium is ``MediumField`` with a calm sea (``SeaState`` amplitude 0): the
+    surface is z = 0, so the submerged fraction is the ramp through it.  Returns
+    ``rho, mu, subf, flow, m_add, m_slam, vn`` as numpy arrays.  The caller
+    passes the element's own relative velocity ``rel``.
+    """
+    from dytiscidae.physics.medium import AIR, SEAWATER
+
+    K = make_kernels(dtype)
+    V = K["V"]
+    npdt = _np.float64 if dtype == _wp.float64 else _np.float32
+    n = len(chord)
+
+    def vec(a):
+        return _wp.array(_np.ascontiguousarray(a, dtype=npdt), dtype=V)
+
+    def sc(a):
+        return _wp.array(_np.ascontiguousarray(a, dtype=npdt), dtype=dtype)
+
+    rho = _wp.zeros(n, dtype=dtype)
+    mu = _wp.zeros(n, dtype=dtype)
+    subf = _wp.zeros(n, dtype=dtype)
+    flow = _wp.zeros(n, dtype=V)
+    _wp.launch(K["medium"], dim=n, inputs=[
+        vec(pos), sc(half_h), V(*[dtype(x) for x in wind]), V(*[dtype(x) for x in current]),
+        dtype(AIR.rho), dtype(SEAWATER.rho), dtype(AIR.mu), dtype(SEAWATER.mu),
+        rho, mu, subf, flow])
+    m_add = _wp.zeros(n, dtype=dtype)
+    m_slam = _wp.zeros(n, dtype=dtype)
+    vn = _wp.zeros(n, dtype=dtype)
+    _wp.launch(K["added_mass"], dim=n, inputs=[
+        vec(rel), vec(s_hat), vec(c_hat), vec(n_hat), vec(ext), sc(chord), sc(dr), sc(volume),
+        rho, _wp.array(_np.asarray(is_wing, dtype=_np.int32), dtype=_wp.int32), dtype(scale),
+        m_add, m_slam, vn])
+    return {"rho": rho.numpy(), "mu": mu.numpy(), "subf": subf.numpy(), "flow": flow.numpy(),
+            "m_add": m_add.numpy(), "m_slam": m_slam.numpy(), "vn": vn.numpy()}

@@ -212,6 +212,76 @@ def test_the_wagner_lag_is_the_numpy_unsteady_state() -> None:
               worst["lev"] <= tol, f"worst {worst['lev']:.2e}")
 
 
+def added_mass_reference(rel, s, c, n, ext, chord, dr, volume, rho, is_wing, scale):
+    """The strip added mass and slam mass of FluidSolver.apply (lines 1316-1374, tensor on)."""
+    from dytiscidae.physics.fluid import slam_mass
+
+    vn = np.einsum("ni,ni->n", rel, n)
+    e = np.maximum(ext, 1e-4)
+    ca_axis = np.clip(0.5 * (e[:, [1, 2, 0]] + e[:, [2, 0, 1]]) / (2.0 * e), 0.05, 10.0)
+    d_full = rel / np.maximum(np.linalg.norm(rel, axis=1), 1e-6)[:, None]
+    dc = np.stack([np.einsum("ni,ni->n", d_full, s), np.einsum("ni,ni->n", d_full, c),
+                   np.einsum("ni,ni->n", d_full, n)], axis=1) ** 2
+    moving = dc.sum(axis=1) > 1e-6
+    ca_eff = np.einsum("ni,ni->n", dc, ca_axis)
+    ca_eff = np.where(moving, ca_eff, ca_axis.mean(axis=1))
+    t_wing = np.maximum(ext[:, 2], 1e-5)
+    m_axis = (rho * dr)[:, None] * (np.pi * 0.25) * np.stack(
+        [np.zeros(len(chord)), t_wing**2, chord**2], axis=1)
+    m_wing = np.einsum("ni,ni->n", dc, m_axis)
+    m_wing = np.where(moving, m_wing, m_axis.mean(axis=1))
+    m_add = np.where(is_wing != 0, m_wing, ca_eff * rho * volume) * scale
+    m_slam = slam_mass(m_add, rho, chord, dr, is_wing != 0, scale)
+    return {"m_add": m_add, "m_slam": m_slam, "vn": vn}
+
+
+def test_the_device_medium_and_added_mass_are_the_numpy_ones() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device medium and added mass agree with MediumField and apply", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.devroll.fluid_wp import medium_and_added_mass
+    from dytiscidae.physics.medium import MediumField
+
+    field = MediumField()
+    check("the calm sea is flat (SeaState amplitude 0), which the device medium assumes",
+          field.sea_state.amplitude == 0.0)
+    rng = np.random.default_rng(3)
+    n = 300
+    args = _random_strips(n, seed=5)
+    rel, s, c, nrm, om, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho0, mu0, *_ = args
+    pos = rng.uniform(-0.3, 0.3, size=(n, 3))
+    pos[:, 2] = rng.uniform(-0.05, 0.05, n)
+    half_h = rng.uniform(0.002, 0.03, n)
+    wind = rng.normal(size=3) * 2.0
+    current = rng.normal(size=3) * 0.5
+    volume = ext[:, 0] * ext[:, 1] * ext[:, 2]
+    for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+        name = "float64" if dtype == wp.float64 else "float32"
+        out = medium_and_added_mass(pos, half_h, wind, current, rel, s, c, nrm, ext, chord, dr,
+                                    volume, is_wing, 1.0, dtype=dtype)
+        # The numpy medium takes the same wind and current as the device.
+        field.wind = wind
+        field.current = current
+        rho_ref, mu_ref, subf_ref = field.properties(pos, half_h, 0.0)
+        flow_ref = field.flow_velocity(pos, 0.0)
+        ref2 = added_mass_reference(rel, s, c, nrm, ext, chord, dr, volume, rho_ref, is_wing, 1.0)
+        ref2.update({"rho": rho_ref, "mu": mu_ref, "subf": subf_ref, "flow": flow_ref})
+        worst_name, worst = "", 0.0
+        for k in ("rho", "mu", "subf", "flow", "m_add", "m_slam", "vn"):
+            r = np.asarray(ref2[k])
+            scale_k = max(float(np.abs(r).max()), 1e-30)
+            rel_err = float(np.abs(out[k] - r).max()) / scale_k
+            if rel_err > worst:
+                worst_name, worst = k, rel_err
+        check(f"{name}: medium, flow and added mass within {tol:g} of their maxima",
+              worst <= tol, f"worst {worst_name} at {worst:.2e}")
+
+
 def test_the_device_replay_is_not_built_yet() -> None:
     skip("the device fluid replays FluidSolver.apply for 2000 steps (A1a replay)",
          "the Wagner lag, inflow, medium and added mass are A1a and A1b slices, not built")
@@ -221,6 +291,7 @@ def main() -> int:
     functions = [test_the_device_path_reports_why_it_cannot_run,
                  test_the_strip_kernel_is_the_numpy_strip_loads,
                  test_the_wagner_lag_is_the_numpy_unsteady_state,
+                 test_the_device_medium_and_added_mass_are_the_numpy_ones,
                  test_the_device_replay_is_not_built_yet]
     for fn in functions:
         print(f"{fn.__name__}")

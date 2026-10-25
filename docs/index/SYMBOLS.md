@@ -765,11 +765,12 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `make_kernels` | function | 38 | `(T)` | Return ``(strip_loads, unsteady_update, V)`` for precision ``T``. |
-| `strip_loads` | function | 226 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
-| `WagnerLag` | class | 262 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
-| `WagnerLag.__init__` | method | 270 | `(self, n: int, dtype=_wp.float64) -> None` | — |
-| `WagnerLag.update` | method | 284 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
+| `make_kernels` | function | 38 | `(T)` | Return the kernels for precision ``T`` as a dict (``strip``, ``unsteady``, |
+| `medium_and_added_mass` | function | 387 | `(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, ext, chord, dr, volume, is_wing, scale, *, dtype=_wp.float64)` | Flat-calm medium and the strip added mass, on the device; numpy out. |
+| `strip_loads` | function | 300 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
+| `WagnerLag` | class | 337 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
+| `WagnerLag.__init__` | method | 345 | `(self, n: int, dtype=_wp.float64) -> None` | — |
+| `WagnerLag.update` | method | 360 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
