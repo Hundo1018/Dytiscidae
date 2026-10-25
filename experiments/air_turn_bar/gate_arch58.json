@@ -1,0 +1,10481 @@
+{
+ "run": "/home/hundo/Projects/Dytiscidae/dytiscidae/runs/arch58",
+ "n_elites": 114,
+ "of_archive": 114,
+ "arms": [
+  "elite",
+  "still",
+  "base"
+ ],
+ "wall_s": 3050.5317265987396,
+ "skipped_no_controller": [],
+ "reproduction": {
+  "air": {
+   "within_0.005": 114,
+   "n": 114
+  },
+  "water": {
+   "within_0.005": 113,
+   "n": 114
+  },
+  "land": {
+   "within_0.005": 114,
+   "n": 114
+  }
+ },
+ "competence_thresholds": {
+  "0.012": "curriculum.WEAKEST_BARS[1] / three_media / TRIPHIBIAN_FLOOR*2",
+  "0.055": "curriculum.WEAKEST_BARS[0]",
+  "0.15": "evaluate.LEG_COMPETENCE_BAR",
+  "0.25": "curriculum.STAGES single",
+  "0.3": "curriculum.STAGES chain / WEAKEST_BARS[3]",
+  "0.35": "curriculum.STAGES directed, crossing / WEAKEST_BARS[2]"
+ },
+ "plan_counts": {
+  "eel": 67,
+  "gannet": 47
+ },
+ "mean_competence": {
+  "elite": {
+   "air": 0.000254429431339791,
+   "water": 0.0018506309582727793,
+   "land": 0.0040400107699673365
+  },
+  "still": {
+   "air": 0.0,
+   "water": 3.176325569422024e-18,
+   "land": 7.448395354446828e-19
+  },
+  "base": {
+   "air": 0.0,
+   "water": 0.0006098368027294442,
+   "land": 2.462693458732126e-18
+  }
+ },
+ "verdict_counts": {
+  "still": {
+   "leak": 20,
+   "unmeasured": 40,
+   "underpowered": 7,
+   "certified": 1
+  },
+  "base": {
+   "leak": 24,
+   "unmeasured": 40,
+   "underpowered": 3,
+   "certified": 1
+  }
+ },
+ "table": [
+  {
+   "bar": "rung:air>=1:makes_lift",
+   "family": "ladder",
+   "threshold": "lift_margin >= 0.1",
+   "source": "judge.LADDER",
+   "elite": [
+    114,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113
+   ],
+   "still": [
+    114,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113
+   ],
+   "base": [
+    114,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113
+   ],
+   "elite_ci": [
+    0.9740639179863797,
+    1.0
+   ],
+   "still_ci": [
+    0.9740639179863797,
+    1.0
+   ],
+   "base_ci": [
+    0.9740639179863797,
+    1.0
+   ],
+   "elite_share": 1.0,
+   "still_share": 1.0,
+   "base_share": 1.0,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    114
+   ],
+   "still_distinct": [
+    2,
+    114
+   ],
+   "base_distinct": [
+    2,
+    114
+   ]
+  },
+  {
+   "bar": "rung:air>=2:carries_a_third",
+   "family": "ladder",
+   "threshold": "lift_margin >= 0.3",
+   "source": "judge.LADDER",
+   "elite": [
+    113,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113
+   ],
+   "still": [
+    113,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113
+   ],
+   "base": [
+    113,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113
+   ],
+   "elite_ci": [
+    0.9590642494488479,
+    0.9995501600295142
+   ],
+   "still_ci": [
+    0.9590642494488479,
+    0.9995501600295142
+   ],
+   "base_ci": [
+    0.9590642494488479,
+    0.9995501600295142
+   ],
+   "elite_share": 0.9912280701754386,
+   "still_share": 0.9912280701754386,
+   "base_share": 0.9912280701754386,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    113
+   ],
+   "still_distinct": [
+    2,
+    113
+   ],
+   "base_distinct": [
+    2,
+    113
+   ]
+  },
+  {
+   "bar": "rung:air>=3:nearly_flies",
+   "family": "ladder",
+   "threshold": "lift_margin >= 0.6",
+   "source": "judge.LADDER",
+   "elite": [
+    102,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    56,
+    57,
+    58,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    102,
+    103,
+    105,
+    106,
+    108,
+    109,
+    110,
+    111,
+    112
+   ],
+   "still": [
+    102,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    56,
+    57,
+    58,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    102,
+    103,
+    105,
+    106,
+    108,
+    109,
+    110,
+    111,
+    112
+   ],
+   "base": [
+    102,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    56,
+    57,
+    58,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    102,
+    103,
+    105,
+    106,
+    108,
+    109,
+    110,
+    111,
+    112
+   ],
+   "elite_ci": [
+    0.8350342886540767,
+    0.93812957043158
+   ],
+   "still_ci": [
+    0.8350342886540767,
+    0.93812957043158
+   ],
+   "base_ci": [
+    0.8350342886540767,
+    0.93812957043158
+   ],
+   "elite_share": 0.8947368421052632,
+   "still_share": 0.8947368421052632,
+   "base_share": 0.8947368421052632,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    102
+   ],
+   "still_distinct": [
+    2,
+    102
+   ],
+   "base_distinct": [
+    2,
+    102
+   ]
+  },
+  {
+   "bar": "rung:air>=4:carries_itself",
+   "family": "ladder",
+   "threshold": "lift_margin >= 1.0",
+   "source": "judge.LADDER",
+   "elite": [
+    100,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    57,
+    58,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    102,
+    103,
+    105,
+    106,
+    108,
+    109,
+    110,
+    111,
+    112
+   ],
+   "still": [
+    100,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    57,
+    58,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    102,
+    103,
+    105,
+    106,
+    108,
+    109,
+    110,
+    111,
+    112
+   ],
+   "base": [
+    100,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    57,
+    58,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    102,
+    103,
+    105,
+    106,
+    108,
+    109,
+    110,
+    111,
+    112
+   ],
+   "elite_ci": [
+    0.8146939701448699,
+    0.9242052715809093
+   ],
+   "still_ci": [
+    0.8146939701448699,
+    0.9242052715809093
+   ],
+   "base_ci": [
+    0.8146939701448699,
+    0.9242052715809093
+   ],
+   "elite_share": 0.8771929824561403,
+   "still_share": 0.8771929824561403,
+   "base_share": 0.8771929824561403,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    100
+   ],
+   "still_distinct": [
+    2,
+    100
+   ],
+   "base_distinct": [
+    2,
+    100
+   ]
+  },
+  {
+   "bar": "rung:air>=5:leaves_surface",
+   "family": "ladder",
+   "threshold": "airborne_fraction >= 0.1",
+   "source": "judge.LADDER",
+   "elite": [
+    72,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    41,
+    43,
+    45,
+    46,
+    48,
+    49,
+    50,
+    51,
+    55,
+    58,
+    61,
+    63,
+    64,
+    65,
+    66,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    79,
+    80,
+    81,
+    82,
+    83,
+    86,
+    90,
+    95,
+    96,
+    105,
+    106,
+    108,
+    111
+   ],
+   "still": [
+    74,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    30,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    41,
+    42,
+    43,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    55,
+    57,
+    60,
+    61,
+    63,
+    66,
+    68,
+    71,
+    73,
+    74,
+    75,
+    76,
+    79,
+    81,
+    82,
+    83,
+    85,
+    86,
+    87,
+    89,
+    90,
+    94,
+    95,
+    96,
+    97,
+    105,
+    106,
+    109,
+    111
+   ],
+   "base": [
+    71,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    41,
+    43,
+    44,
+    45,
+    46,
+    48,
+    49,
+    50,
+    51,
+    52,
+    54,
+    55,
+    58,
+    61,
+    63,
+    64,
+    65,
+    66,
+    71,
+    73,
+    74,
+    75,
+    76,
+    77,
+    79,
+    80,
+    81,
+    82,
+    83,
+    86,
+    90,
+    95,
+    97,
+    105,
+    106,
+    111
+   ],
+   "elite_ci": [
+    0.5509182646720916,
+    0.7069982023161492
+   ],
+   "still_ci": [
+    0.5688873664461773,
+    0.7234137237455285
+   ],
+   "base_ci": [
+    0.5419725209969917,
+    0.6987510611848757
+   ],
+   "elite_share": 0.631578947368421,
+   "still_share": 0.6491228070175439,
+   "base_share": 0.6228070175438597,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    72
+   ],
+   "still_distinct": [
+    2,
+    74
+   ],
+   "base_distinct": [
+    2,
+    71
+   ]
+  },
+  {
+   "bar": "rung:air>=6:stays_up",
+   "family": "ladder",
+   "threshold": "airborne_fraction >= 0.6",
+   "source": "judge.LADDER",
+   "elite": [
+    27,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    0,
+    3,
+    5,
+    7,
+    8,
+    12,
+    13,
+    14,
+    15,
+    18,
+    22,
+    24,
+    25,
+    28,
+    29,
+    34,
+    37,
+    38,
+    43,
+    46,
+    49,
+    51,
+    66,
+    71,
+    80,
+    86,
+    90
+   ],
+   "still": [
+    22,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    0,
+    3,
+    5,
+    7,
+    10,
+    12,
+    14,
+    15,
+    22,
+    24,
+    25,
+    28,
+    34,
+    38,
+    43,
+    46,
+    51,
+    66,
+    71,
+    85,
+    90,
+    105
+   ],
+   "base": [
+    26,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    0,
+    3,
+    5,
+    7,
+    8,
+    10,
+    12,
+    14,
+    15,
+    22,
+    24,
+    25,
+    26,
+    28,
+    34,
+    37,
+    38,
+    43,
+    46,
+    51,
+    71,
+    80,
+    86,
+    90,
+    97,
+    105
+   ],
+   "elite_ci": [
+    0.17274813833719627,
+    0.31151221692421416
+   ],
+   "still_ci": [
+    0.13441428717432274,
+    0.26395985941146827
+   ],
+   "base_ci": [
+    0.16499772998880496,
+    0.3020820119058465
+   ],
+   "elite_share": 0.23684210526315788,
+   "still_share": 0.19298245614035087,
+   "base_share": 0.22807017543859648,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    27
+   ],
+   "still_distinct": [
+    2,
+    22
+   ],
+   "base_distinct": [
+    2,
+    26
+   ]
+  },
+  {
+   "bar": "rung:air>=7:glides",
+   "family": "ladder",
+   "threshold": "sink_rate <= 3.0",
+   "source": "judge.LADDER",
+   "elite": [
+    8,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    0,
+    3,
+    13,
+    24,
+    25,
+    34,
+    51,
+    71
+   ],
+   "still": [
+    9,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    0,
+    3,
+    22,
+    25,
+    34,
+    38,
+    51,
+    90,
+    105
+   ],
+   "base": [
+    8,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    0,
+    3,
+    22,
+    25,
+    38,
+    51,
+    90,
+    105
+   ],
+   "elite_ci": [
+    0.03539513018207856,
+    0.12305632808675848
+   ],
+   "still_ci": [
+    0.041802323886597215,
+    0.13371956224800985
+   ],
+   "base_ci": [
+    0.03539513018207856,
+    0.12305632808675848
+   ],
+   "elite_share": 0.07017543859649122,
+   "still_share": 0.07894736842105263,
+   "base_share": 0.07017543859649122,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    8
+   ],
+   "still_distinct": [
+    1,
+    9
+   ],
+   "base_distinct": [
+    1,
+    8
+   ]
+  },
+  {
+   "bar": "rung:air>=8:holds_height",
+   "family": "ladder",
+   "threshold": "sink_rate <= 0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    1,
+    114
+   ],
+   "elite_plans": [
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    25
+   ],
+   "still": [
+    3,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    0,
+    3,
+    25
+   ],
+   "base": [
+    2,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    0,
+    25
+   ],
+   "elite_ci": [
+    0.0004498399704857929,
+    0.04093575055116429
+   ],
+   "still_ci": [
+    0.007210315073288676,
+    0.06660805423766253
+   ],
+   "base_ci": [
+    0.0031260760172036875,
+    0.05419487658426851
+   ],
+   "elite_share": 0.008771929824561403,
+   "still_share": 0.02631578947368421,
+   "base_share": 0.017543859649122806,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    1
+   ],
+   "still_distinct": [
+    1,
+    3
+   ],
+   "base_distinct": [
+    1,
+    2
+   ]
+  },
+  {
+   "bar": "rung:air>=9:flaps_forward",
+   "family": "ladder",
+   "threshold": "thrust_margin >= 0.002",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:air>=10:makes_thrust",
+   "family": "ladder",
+   "threshold": "thrust_margin >= 0.01",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:air>=11:pushes_itself",
+   "family": "ladder",
+   "threshold": "thrust_margin >= 0.02",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:air>=12:flies_level",
+   "family": "ladder",
+   "threshold": "level_margin >= 0.7",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:air>=13:holds_station",
+   "family": "ladder",
+   "threshold": "station_keeping >= 0.6",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:air>=14:climbs",
+   "family": "ladder",
+   "threshold": "sink_rate <= -0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:air>=15:manoeuvres",
+   "family": "ladder",
+   "threshold": "turn_response >= 0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:water>=1:submerges",
+   "family": "ladder",
+   "threshold": "depth_gain >= 0.25",
+   "source": "judge.LADDER",
+   "elite": [
+    41,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    0,
+    2,
+    3,
+    4,
+    7,
+    8,
+    10,
+    14,
+    18,
+    19,
+    22,
+    25,
+    28,
+    29,
+    34,
+    35,
+    36,
+    38,
+    40,
+    43,
+    44,
+    48,
+    55,
+    59,
+    62,
+    63,
+    66,
+    73,
+    74,
+    78,
+    79,
+    83,
+    86,
+    90,
+    96,
+    101,
+    104,
+    105,
+    107,
+    109,
+    113
+   ],
+   "still": [
+    81,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    0,
+    2,
+    3,
+    4,
+    7,
+    8,
+    10,
+    14,
+    15,
+    17,
+    18,
+    19,
+    22,
+    23,
+    24,
+    25,
+    26,
+    28,
+    29,
+    30,
+    33,
+    34,
+    35,
+    36,
+    38,
+    39,
+    40,
+    42,
+    43,
+    44,
+    47,
+    48,
+    49,
+    50,
+    53,
+    54,
+    55,
+    57,
+    58,
+    59,
+    60,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    72,
+    73,
+    74,
+    75,
+    77,
+    78,
+    79,
+    81,
+    83,
+    84,
+    85,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    97,
+    99,
+    100,
+    101,
+    103,
+    104,
+    105,
+    107,
+    108,
+    110,
+    112,
+    113
+   ],
+   "base": [
+    51,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    0,
+    2,
+    3,
+    4,
+    7,
+    8,
+    10,
+    14,
+    15,
+    18,
+    19,
+    20,
+    22,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    40,
+    42,
+    43,
+    44,
+    48,
+    55,
+    62,
+    63,
+    66,
+    72,
+    73,
+    74,
+    79,
+    83,
+    87,
+    90,
+    92,
+    96,
+    98,
+    100,
+    103,
+    104,
+    105,
+    107,
+    109,
+    113
+   ],
+   "elite_ci": [
+    0.28478077098700494,
+    0.44011024775139707
+   ],
+   "still_ci": [
+    0.6326426354849248,
+    0.7799883551987143
+   ],
+   "base_ci": [
+    0.3681270451816623,
+    0.5287022086129138
+   ],
+   "elite_share": 0.35964912280701755,
+   "still_share": 0.7105263157894737,
+   "base_share": 0.4473684210526316,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    41
+   ],
+   "still_distinct": [
+    2,
+    81
+   ],
+   "base_distinct": [
+    2,
+    51
+   ]
+  },
+  {
+   "bar": "rung:water>=2:dives",
+   "family": "ladder",
+   "threshold": "depth_gain >= 2.0",
+   "source": "judge.LADDER",
+   "elite": [
+    14,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    2,
+    18,
+    19,
+    29,
+    40,
+    55,
+    62,
+    63,
+    73,
+    74,
+    79,
+    107,
+    109,
+    113
+   ],
+   "still": [
+    43,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    2,
+    18,
+    19,
+    23,
+    29,
+    35,
+    39,
+    40,
+    44,
+    49,
+    50,
+    53,
+    54,
+    55,
+    57,
+    58,
+    59,
+    62,
+    63,
+    64,
+    65,
+    70,
+    72,
+    73,
+    74,
+    75,
+    77,
+    78,
+    79,
+    81,
+    87,
+    88,
+    89,
+    91,
+    92,
+    94,
+    99,
+    100,
+    101,
+    103,
+    108,
+    110,
+    113
+   ],
+   "base": [
+    13,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel"
+   ],
+   "base_passed_indices": [
+    2,
+    18,
+    19,
+    29,
+    33,
+    40,
+    55,
+    62,
+    63,
+    73,
+    74,
+    79,
+    113
+   ],
+   "elite_ci": [
+    0.07579472841910498,
+    0.185306029855147
+   ],
+   "still_ci": [
+    0.3012489388151457,
+    0.45802747900303287
+   ],
+   "base_ci": [
+    0.06878595153239558,
+    0.17517835856374459
+   ],
+   "elite_share": 0.12280701754385964,
+   "still_share": 0.37719298245614036,
+   "base_share": 0.11403508771929824,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    14
+   ],
+   "still_distinct": [
+    2,
+    43
+   ],
+   "base_distinct": [
+    2,
+    13
+   ]
+  },
+  {
+   "bar": "rung:water>=3:reaches_depth",
+   "family": "ladder",
+   "threshold": "depth_gain >= 5.0",
+   "source": "judge.LADDER",
+   "elite": [
+    8,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    2,
+    29,
+    55,
+    62,
+    63,
+    73,
+    74,
+    109
+   ],
+   "still": [
+    26,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    2,
+    18,
+    23,
+    29,
+    39,
+    44,
+    54,
+    55,
+    58,
+    62,
+    63,
+    64,
+    65,
+    72,
+    73,
+    74,
+    75,
+    77,
+    78,
+    81,
+    87,
+    89,
+    94,
+    99,
+    103,
+    108
+   ],
+   "base": [
+    7,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    2,
+    29,
+    55,
+    62,
+    63,
+    73,
+    74
+   ],
+   "elite_ci": [
+    0.03539513018207856,
+    0.12305632808675848
+   ],
+   "still_ci": [
+    0.16499772998880496,
+    0.3020820119058465
+   ],
+   "base_ci": [
+    0.029170306578371975,
+    0.11223699683693267
+   ],
+   "elite_share": 0.07017543859649122,
+   "still_share": 0.22807017543859648,
+   "base_share": 0.06140350877192982,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    8
+   ],
+   "still_distinct": [
+    2,
+    26
+   ],
+   "base_distinct": [
+    2,
+    7
+   ]
+  },
+  {
+   "bar": "rung:water>=4:goes_deep",
+   "family": "ladder",
+   "threshold": "depth_gain >= 8.0",
+   "source": "judge.LADDER",
+   "elite": [
+    5,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    29,
+    55,
+    62,
+    73,
+    74
+   ],
+   "still": [
+    14,
+    114
+   ],
+   "still_plans": [
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    23,
+    55,
+    62,
+    63,
+    64,
+    65,
+    73,
+    74,
+    78,
+    81,
+    87,
+    94,
+    99,
+    103
+   ],
+   "base": [
+    6,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    29,
+    55,
+    62,
+    63,
+    73,
+    74
+   ],
+   "elite_ci": [
+    0.01743864003651374,
+    0.09000392465684517
+   ],
+   "still_ci": [
+    0.07579472841910498,
+    0.185306029855147
+   ],
+   "base_ci": [
+    0.023166329092495545,
+    0.10123279865042584
+   ],
+   "elite_share": 0.043859649122807015,
+   "still_share": 0.12280701754385964,
+   "base_share": 0.05263157894736842,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    5
+   ],
+   "still_distinct": [
+    2,
+    14
+   ],
+   "base_distinct": [
+    2,
+    6
+   ]
+  },
+  {
+   "bar": "rung:water>=5:holds_depth",
+   "family": "ladder",
+   "threshold": "hold_error <= 1.0",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:water>=6:manoeuvres",
+   "family": "ladder",
+   "threshold": "cruise_score >= 0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:land>=1:stays_upright",
+   "family": "ladder",
+   "threshold": "upright >= 0.7",
+   "source": "judge.LADDER",
+   "elite": [
+    98,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    52,
+    53,
+    54,
+    55,
+    57,
+    59,
+    60,
+    62,
+    63,
+    64,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    78,
+    79,
+    80,
+    82,
+    83,
+    84,
+    85,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    109,
+    110,
+    112,
+    113
+   ],
+   "still": [
+    85,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    18,
+    19,
+    21,
+    22,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    40,
+    41,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    52,
+    53,
+    54,
+    55,
+    63,
+    64,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    77,
+    78,
+    79,
+    80,
+    82,
+    83,
+    84,
+    85,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    94,
+    95,
+    96,
+    97,
+    98,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    107,
+    109,
+    112,
+    113
+   ],
+   "base": [
+    98,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    52,
+    53,
+    54,
+    55,
+    59,
+    60,
+    62,
+    63,
+    64,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    77,
+    78,
+    79,
+    80,
+    82,
+    83,
+    84,
+    85,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    96,
+    97,
+    98,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    109,
+    110,
+    112,
+    113
+   ],
+   "elite_ci": [
+    0.7946652563374361,
+    0.9099413592033425
+   ],
+   "still_ci": [
+    0.6697371882704914,
+    0.8116372292094733
+   ],
+   "base_ci": [
+    0.7946652563374361,
+    0.9099413592033425
+   ],
+   "elite_share": 0.8596491228070176,
+   "still_share": 0.7456140350877193,
+   "base_share": 0.8596491228070176,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    98
+   ],
+   "still_distinct": [
+    2,
+    85
+   ],
+   "base_distinct": [
+    2,
+    98
+   ]
+  },
+  {
+   "bar": "rung:land>=2:supports_itself",
+   "family": "ladder",
+   "threshold": "contact_fraction >= 0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    53,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    24,
+    25,
+    27,
+    28,
+    29,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    41,
+    43,
+    45,
+    46,
+    55,
+    62,
+    63,
+    64,
+    66,
+    71,
+    73,
+    74,
+    79,
+    82,
+    83,
+    90,
+    97,
+    105,
+    106
+   ],
+   "still": [
+    54,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    18,
+    19,
+    21,
+    22,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    40,
+    41,
+    43,
+    45,
+    46,
+    48,
+    49,
+    55,
+    63,
+    64,
+    66,
+    68,
+    71,
+    73,
+    79,
+    82,
+    83,
+    85,
+    90,
+    95,
+    97,
+    105
+   ],
+   "base": [
+    54,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    24,
+    25,
+    27,
+    28,
+    29,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    38,
+    40,
+    41,
+    43,
+    45,
+    46,
+    48,
+    55,
+    62,
+    63,
+    64,
+    66,
+    71,
+    73,
+    74,
+    79,
+    82,
+    83,
+    90,
+    97,
+    105,
+    106
+   ],
+   "elite_ci": [
+    0.3850880656659966,
+    0.5461311574677548
+   ],
+   "still_ci": [
+    0.3936039083780284,
+    0.5548104360807928
+   ],
+   "base_ci": [
+    0.3936039083780284,
+    0.5548104360807928
+   ],
+   "elite_share": 0.4649122807017544,
+   "still_share": 0.47368421052631576,
+   "base_share": 0.47368421052631576,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    53
+   ],
+   "still_distinct": [
+    2,
+    54
+   ],
+   "base_distinct": [
+    2,
+    54
+   ]
+  },
+  {
+   "bar": "rung:land>=3:stirs",
+   "family": "ladder",
+   "threshold": "land_peak_speed >= 0.08",
+   "source": "judge.LADDER",
+   "elite": [
+    11,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    2,
+    11,
+    13,
+    15,
+    16,
+    18,
+    27,
+    31,
+    33,
+    55,
+    106
+   ],
+   "still": [
+    8,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    13,
+    15,
+    18,
+    26,
+    48,
+    49,
+    68,
+    85
+   ],
+   "base": [
+    12,
+    114
+   ],
+   "base_plans": [
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    11,
+    13,
+    15,
+    16,
+    17,
+    18,
+    27,
+    33,
+    40,
+    48,
+    55,
+    106
+   ],
+   "elite_ci": [
+    0.05505873200945015,
+    0.15465926706915967
+   ],
+   "still_ci": [
+    0.03539513018207856,
+    0.12305632808675848
+   ],
+   "base_ci": [
+    0.0618704295684335,
+    0.1649657113459399
+   ],
+   "elite_share": 0.09649122807017543,
+   "still_share": 0.07017543859649122,
+   "base_share": 0.10526315789473684,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    11
+   ],
+   "still_distinct": [
+    1,
+    8
+   ],
+   "base_distinct": [
+    2,
+    12
+   ]
+  },
+  {
+   "bar": "rung:land>=4:moves",
+   "family": "ladder",
+   "threshold": "land_speed >= 0.02",
+   "source": "judge.LADDER",
+   "elite": [
+    5,
+    114
+   ],
+   "elite_plans": [
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    11,
+    16,
+    27,
+    33,
+    106
+   ],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    8,
+    114
+   ],
+   "base_plans": [
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel"
+   ],
+   "base_passed_indices": [
+    11,
+    16,
+    18,
+    27,
+    33,
+    40,
+    48,
+    106
+   ],
+   "elite_ci": [
+    0.01743864003651374,
+    0.09000392465684517
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.03539513018207856,
+    0.12305632808675848
+   ],
+   "elite_share": 0.043859649122807015,
+   "still_share": 0.0,
+   "base_share": 0.07017543859649122,
+   "verdict_still": "underpowered",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    5
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    2,
+    8
+   ]
+  },
+  {
+   "bar": "rung:land>=5:climbs_slope",
+   "family": "ladder",
+   "threshold": "slope_climbed >= 0.05",
+   "source": "judge.LADDER",
+   "elite": [
+    5,
+    114
+   ],
+   "elite_plans": [
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    11,
+    16,
+    27,
+    33,
+    106
+   ],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    7,
+    114
+   ],
+   "base_plans": [
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel"
+   ],
+   "base_passed_indices": [
+    11,
+    16,
+    18,
+    27,
+    33,
+    40,
+    106
+   ],
+   "elite_ci": [
+    0.01743864003651374,
+    0.09000392465684517
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.029170306578371975,
+    0.11223699683693267
+   ],
+   "elite_share": 0.043859649122807015,
+   "still_share": 0.0,
+   "base_share": 0.06140350877192982,
+   "verdict_still": "underpowered",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    5
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    2,
+    7
+   ]
+  },
+  {
+   "bar": "rung:land>=6:walks",
+   "family": "ladder",
+   "threshold": "walk_progress >= 0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:takeoff>=1:unweights",
+   "family": "ladder",
+   "threshold": "takeoff_height >= 0.02",
+   "source": "judge.LADDER (defined; not judged by _score_candidate)",
+   "elite": [
+    51,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    2,
+    8,
+    10,
+    11,
+    13,
+    15,
+    16,
+    17,
+    18,
+    20,
+    22,
+    26,
+    27,
+    30,
+    38,
+    40,
+    42,
+    44,
+    48,
+    49,
+    50,
+    52,
+    53,
+    54,
+    57,
+    59,
+    60,
+    62,
+    67,
+    68,
+    69,
+    70,
+    72,
+    74,
+    78,
+    87,
+    88,
+    89,
+    92,
+    93,
+    94,
+    95,
+    96,
+    100,
+    101,
+    102,
+    104,
+    106,
+    107,
+    109,
+    113
+   ],
+   "still": [
+    36,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    8,
+    10,
+    13,
+    15,
+    18,
+    22,
+    35,
+    40,
+    44,
+    47,
+    52,
+    53,
+    54,
+    67,
+    69,
+    70,
+    72,
+    77,
+    78,
+    84,
+    85,
+    87,
+    88,
+    89,
+    91,
+    92,
+    94,
+    95,
+    96,
+    98,
+    100,
+    101,
+    103,
+    104,
+    112,
+    113
+   ],
+   "base": [
+    49,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    8,
+    10,
+    11,
+    13,
+    15,
+    16,
+    17,
+    18,
+    20,
+    22,
+    26,
+    27,
+    30,
+    35,
+    38,
+    39,
+    40,
+    42,
+    44,
+    48,
+    49,
+    50,
+    52,
+    53,
+    54,
+    59,
+    62,
+    67,
+    68,
+    69,
+    70,
+    72,
+    74,
+    77,
+    87,
+    89,
+    92,
+    93,
+    94,
+    96,
+    98,
+    100,
+    101,
+    102,
+    104,
+    106,
+    107,
+    109,
+    113
+   ],
+   "elite_ci": [
+    0.3681270451816623,
+    0.5287022086129138
+   ],
+   "still_ci": [
+    0.24408337468903496,
+    0.3948519392832903
+   ],
+   "base_ci": [
+    0.3512610818516855,
+    0.5111787141691204
+   ],
+   "elite_share": 0.4473684210526316,
+   "still_share": 0.3157894736842105,
+   "base_share": 0.4298245614035088,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    51
+   ],
+   "still_distinct": [
+    2,
+    36
+   ],
+   "base_distinct": [
+    2,
+    49
+   ]
+  },
+  {
+   "bar": "rung:takeoff>=2:hops",
+   "family": "ladder",
+   "threshold": "takeoff_height >= 0.1",
+   "source": "judge.LADDER (defined; not judged by _score_candidate)",
+   "elite": [
+    35,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    10,
+    11,
+    13,
+    15,
+    16,
+    17,
+    18,
+    20,
+    27,
+    30,
+    42,
+    50,
+    53,
+    54,
+    57,
+    60,
+    62,
+    68,
+    70,
+    72,
+    74,
+    87,
+    88,
+    89,
+    94,
+    95,
+    96,
+    100,
+    101,
+    102,
+    104,
+    106,
+    107,
+    109,
+    113
+   ],
+   "still": [
+    29,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    10,
+    15,
+    18,
+    35,
+    44,
+    47,
+    53,
+    54,
+    67,
+    69,
+    70,
+    72,
+    77,
+    78,
+    85,
+    87,
+    88,
+    89,
+    91,
+    92,
+    94,
+    96,
+    98,
+    100,
+    101,
+    103,
+    104,
+    112,
+    113
+   ],
+   "base": [
+    34,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    10,
+    11,
+    13,
+    15,
+    16,
+    17,
+    18,
+    20,
+    27,
+    30,
+    35,
+    39,
+    42,
+    50,
+    53,
+    54,
+    62,
+    68,
+    70,
+    72,
+    74,
+    77,
+    87,
+    89,
+    94,
+    96,
+    100,
+    101,
+    102,
+    104,
+    106,
+    107,
+    109,
+    113
+   ],
+   "elite_ci": [
+    0.23602925457513108,
+    0.38571659453767504
+   ],
+   "still_ci": [
+    0.18836277079053926,
+    0.33026281172953287
+   ],
+   "base_ci": [
+    0.22800509113614947,
+    0.3765519698400971
+   ],
+   "elite_share": 0.30701754385964913,
+   "still_share": 0.2543859649122807,
+   "base_share": 0.2982456140350877,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    35
+   ],
+   "still_distinct": [
+    2,
+    29
+   ],
+   "base_distinct": [
+    2,
+    34
+   ]
+  },
+  {
+   "bar": "rung:takeoff>=3:clears",
+   "family": "ladder",
+   "threshold": "takeoff_height >= 0.3",
+   "source": "judge.LADDER (defined; not judged by _score_candidate)",
+   "elite": [
+    21,
+    114
+   ],
+   "elite_plans": [
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    11,
+    18,
+    20,
+    27,
+    30,
+    42,
+    57,
+    60,
+    68,
+    70,
+    72,
+    89,
+    94,
+    95,
+    96,
+    102,
+    104,
+    106,
+    107,
+    109,
+    113
+   ],
+   "still": [
+    16,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    18,
+    35,
+    47,
+    54,
+    67,
+    70,
+    88,
+    91,
+    92,
+    96,
+    98,
+    100,
+    101,
+    104,
+    112,
+    113
+   ],
+   "base": [
+    21,
+    114
+   ],
+   "base_plans": [
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    11,
+    18,
+    20,
+    27,
+    30,
+    35,
+    39,
+    42,
+    54,
+    68,
+    70,
+    72,
+    77,
+    89,
+    94,
+    96,
+    102,
+    104,
+    106,
+    109,
+    113
+   ],
+   "elite_ci": [
+    0.12688321863993174,
+    0.25431973042568323
+   ],
+   "still_ci": [
+    0.09005864079667258,
+    0.20533474366258186
+   ],
+   "base_ci": [
+    0.12688321863993174,
+    0.25431973042568323
+   ],
+   "elite_share": 0.18421052631578946,
+   "still_share": 0.14035087719298245,
+   "base_share": 0.18421052631578946,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    21
+   ],
+   "still_distinct": [
+    2,
+    16
+   ],
+   "base_distinct": [
+    2,
+    21
+   ]
+  },
+  {
+   "bar": "rung:takeoff>=4:climbs_out",
+   "family": "ladder",
+   "threshold": "takeoff_height >= 0.8",
+   "source": "judge.LADDER (defined; not judged by _score_candidate)",
+   "elite": [
+    15,
+    114
+   ],
+   "elite_plans": [
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    20,
+    30,
+    42,
+    57,
+    60,
+    68,
+    72,
+    89,
+    94,
+    95,
+    96,
+    102,
+    107,
+    109,
+    113
+   ],
+   "still": [
+    13,
+    114
+   ],
+   "still_plans": [
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "still_passed_indices": [
+    35,
+    54,
+    67,
+    70,
+    88,
+    91,
+    92,
+    98,
+    100,
+    101,
+    104,
+    112,
+    113
+   ],
+   "base": [
+    14,
+    114
+   ],
+   "base_plans": [
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "gannet",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel",
+    "eel"
+   ],
+   "base_passed_indices": [
+    20,
+    30,
+    35,
+    39,
+    42,
+    54,
+    72,
+    77,
+    89,
+    94,
+    96,
+    102,
+    109,
+    113
+   ],
+   "elite_ci": [
+    0.08288805068945501,
+    0.19535608577345392
+   ],
+   "still_ci": [
+    0.06878595153239558,
+    0.17517835856374459
+   ],
+   "base_ci": [
+    0.07579472841910498,
+    0.185306029855147
+   ],
+   "elite_share": 0.13157894736842105,
+   "still_share": 0.11403508771929824,
+   "base_share": 0.12280701754385964,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    15
+   ],
+   "still_distinct": [
+    1,
+    13
+   ],
+   "base_distinct": [
+    2,
+    14
+   ]
+  },
+  {
+   "bar": "rung:transition>=1:crosses",
+   "family": "ladder",
+   "threshold": "crossed_fraction >= 0.34",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=2:stays_controlled",
+   "family": "ladder",
+   "threshold": "control >= 0.2",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=3:arrives_usable",
+   "family": "ladder",
+   "threshold": "exit_state >= 0.3",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=4:arrives_well",
+   "family": "ladder",
+   "threshold": "exit_state >= 0.37",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=5:crosses_three",
+   "family": "ladder",
+   "threshold": "crossed_fraction >= 0.6",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=6:crosses_efficiently",
+   "family": "ladder",
+   "threshold": "economy >= 0.75",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=7:survives_entry",
+   "family": "ladder",
+   "threshold": "shock >= 0.5",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "rung:transition>=8:crosses_all",
+   "family": "ladder",
+   "threshold": "crossed_fraction >= 0.99",
+   "source": "judge.LADDER",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:air>=0.012",
+   "family": "competence",
+   "threshold": "competence >= 0.012",
+   "source": "curriculum.WEAKEST_BARS[1] / three_media / TRIPHIBIAN_FLOOR*2",
+   "elite": [
+    1,
+    114
+   ],
+   "elite_plans": [
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    7
+   ],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0004498399704857929,
+    0.04093575055116429
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.008771929824561403,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "underpowered",
+   "verdict_base": "underpowered",
+   "elite_distinct": [
+    1,
+    1
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:air>=0.055",
+   "family": "competence",
+   "threshold": "competence >= 0.055",
+   "source": "curriculum.WEAKEST_BARS[0]",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:air>=0.15",
+   "family": "competence",
+   "threshold": "competence >= 0.15",
+   "source": "evaluate.LEG_COMPETENCE_BAR",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:air>=0.25",
+   "family": "competence",
+   "threshold": "competence >= 0.25",
+   "source": "curriculum.STAGES single",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:air>=0.3",
+   "family": "competence",
+   "threshold": "competence >= 0.3",
+   "source": "curriculum.STAGES chain / WEAKEST_BARS[3]",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:air>=0.35",
+   "family": "competence",
+   "threshold": "competence >= 0.35",
+   "source": "curriculum.STAGES directed, crossing / WEAKEST_BARS[2]",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:water>=0.012",
+   "family": "competence",
+   "threshold": "competence >= 0.012",
+   "source": "curriculum.WEAKEST_BARS[1] / three_media / TRIPHIBIAN_FLOOR*2",
+   "elite": [
+    4,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "eel",
+    "eel"
+   ],
+   "elite_passed_indices": [
+    9,
+    22,
+    74,
+    76
+   ],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    1,
+    114
+   ],
+   "base_plans": [
+    "gannet"
+   ],
+   "base_passed_indices": [
+    42
+   ],
+   "elite_ci": [
+    0.012072353451924842,
+    0.07849244973200639
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0004498399704857929,
+    0.04093575055116429
+   ],
+   "elite_share": 0.03508771929824561,
+   "still_share": 0.0,
+   "base_share": 0.008771929824561403,
+   "verdict_still": "underpowered",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    2,
+    4
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    1,
+    1
+   ]
+  },
+  {
+   "bar": "comp:water>=0.055",
+   "family": "competence",
+   "threshold": "competence >= 0.055",
+   "source": "curriculum.WEAKEST_BARS[0]",
+   "elite": [
+    1,
+    114
+   ],
+   "elite_plans": [
+    "eel"
+   ],
+   "elite_passed_indices": [
+    76
+   ],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    1,
+    114
+   ],
+   "base_plans": [
+    "gannet"
+   ],
+   "base_passed_indices": [
+    42
+   ],
+   "elite_ci": [
+    0.0004498399704857929,
+    0.04093575055116429
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0004498399704857929,
+    0.04093575055116429
+   ],
+   "elite_share": 0.008771929824561403,
+   "still_share": 0.0,
+   "base_share": 0.008771929824561403,
+   "verdict_still": "underpowered",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    1
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    1,
+    1
+   ]
+  },
+  {
+   "bar": "comp:water>=0.15",
+   "family": "competence",
+   "threshold": "competence >= 0.15",
+   "source": "evaluate.LEG_COMPETENCE_BAR",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:water>=0.25",
+   "family": "competence",
+   "threshold": "competence >= 0.25",
+   "source": "curriculum.STAGES single",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:water>=0.3",
+   "family": "competence",
+   "threshold": "competence >= 0.3",
+   "source": "curriculum.STAGES chain / WEAKEST_BARS[3]",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:water>=0.35",
+   "family": "competence",
+   "threshold": "competence >= 0.35",
+   "source": "curriculum.STAGES directed, crossing / WEAKEST_BARS[2]",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:land>=0.012",
+   "family": "competence",
+   "threshold": "competence >= 0.012",
+   "source": "curriculum.WEAKEST_BARS[1] / three_media / TRIPHIBIAN_FLOOR*2",
+   "elite": [
+    14,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "eel",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    0,
+    7,
+    8,
+    10,
+    11,
+    12,
+    15,
+    18,
+    34,
+    51,
+    66,
+    71,
+    83,
+    105
+   ],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.07579472841910498,
+    0.185306029855147
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.12280701754385964,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "certified",
+   "verdict_base": "certified",
+   "elite_distinct": [
+    2,
+    14
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:land>=0.055",
+   "family": "competence",
+   "threshold": "competence >= 0.055",
+   "source": "curriculum.WEAKEST_BARS[0]",
+   "elite": [
+    1,
+    114
+   ],
+   "elite_plans": [
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    10
+   ],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0004498399704857929,
+    0.04093575055116429
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.008771929824561403,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "underpowered",
+   "verdict_base": "underpowered",
+   "elite_distinct": [
+    1,
+    1
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:land>=0.15",
+   "family": "competence",
+   "threshold": "competence >= 0.15",
+   "source": "evaluate.LEG_COMPETENCE_BAR",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:land>=0.25",
+   "family": "competence",
+   "threshold": "competence >= 0.25",
+   "source": "curriculum.STAGES single",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:land>=0.3",
+   "family": "competence",
+   "threshold": "competence >= 0.3",
+   "source": "curriculum.STAGES chain / WEAKEST_BARS[3]",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "comp:land>=0.35",
+   "family": "competence",
+   "threshold": "competence >= 0.35",
+   "source": "curriculum.STAGES directed, crossing / WEAKEST_BARS[2]",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "weakest:c2>=0.055",
+   "family": "weakest",
+   "threshold": "2nd-best medium >= 0.055",
+   "source": "curriculum.WEAKEST_BARS[0]",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "weakest:c3>=0.012",
+   "family": "weakest",
+   "threshold": "weakest medium >= 0.012 (three_media)",
+   "source": "curriculum.WEAKEST_BARS[1]; loop.py three_media",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "stage0:pass",
+   "family": "curriculum",
+   "threshold": "stage_score >= island's own bar (std 0.25 / weakest 0.055)",
+   "source": "curriculum.Curriculum.bar via islands.curriculum_for",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "stage1:pass",
+   "family": "curriculum",
+   "threshold": "stage_score >= island's own bar (std 0.35 / weakest 0.012)",
+   "source": "curriculum.Curriculum.bar via islands.curriculum_for",
+   "elite": [
+    26,
+    114
+   ],
+   "elite_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    0,
+    1,
+    3,
+    7,
+    8,
+    10,
+    12,
+    13,
+    14,
+    15,
+    22,
+    24,
+    25,
+    26,
+    32,
+    34,
+    38,
+    43,
+    46,
+    48,
+    49,
+    51,
+    66,
+    71,
+    90,
+    105
+   ],
+   "still": [
+    27,
+    114
+   ],
+   "still_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "still_passed_indices": [
+    0,
+    1,
+    3,
+    7,
+    10,
+    12,
+    13,
+    14,
+    15,
+    22,
+    24,
+    25,
+    26,
+    32,
+    34,
+    38,
+    43,
+    46,
+    48,
+    49,
+    51,
+    66,
+    68,
+    71,
+    85,
+    90,
+    105
+   ],
+   "base": [
+    25,
+    114
+   ],
+   "base_plans": [
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet",
+    "gannet"
+   ],
+   "base_passed_indices": [
+    0,
+    1,
+    3,
+    7,
+    8,
+    10,
+    12,
+    13,
+    14,
+    15,
+    22,
+    24,
+    25,
+    26,
+    32,
+    34,
+    38,
+    43,
+    46,
+    48,
+    49,
+    51,
+    71,
+    90,
+    105
+   ],
+   "elite_ci": [
+    0.16499772998880496,
+    0.3020820119058465
+   ],
+   "still_ci": [
+    0.17274813833719627,
+    0.31151221692421416
+   ],
+   "base_ci": [
+    0.1572873058622799,
+    0.2926133375766331
+   ],
+   "elite_share": 0.22807017543859648,
+   "still_share": 0.23684210526315788,
+   "base_share": 0.21929824561403508,
+   "verdict_still": "leak",
+   "verdict_base": "leak",
+   "elite_distinct": [
+    1,
+    26
+   ],
+   "still_distinct": [
+    1,
+    27
+   ],
+   "base_distinct": [
+    1,
+    25
+   ]
+  },
+  {
+   "bar": "stage2:pass",
+   "family": "curriculum",
+   "threshold": "stage_score >= island's own bar (std 0.35 / weakest 0.35)",
+   "source": "curriculum.Curriculum.bar via islands.curriculum_for",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "stage3:pass",
+   "family": "curriculum",
+   "threshold": "stage_score >= island's own bar (std 0.3 / weakest 0.3)",
+   "source": "curriculum.Curriculum.bar via islands.curriculum_for",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "stage4:mission>0",
+   "family": "curriculum",
+   "threshold": "mission_fraction > 0 (stage-4 bar is 0.0)",
+   "source": "curriculum.STAGES mission",
+   "elite": [
+    1,
+    114
+   ],
+   "elite_plans": [
+    "gannet"
+   ],
+   "elite_passed_indices": [
+    7
+   ],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0004498399704857929,
+    0.04093575055116429
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.008771929824561403,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "underpowered",
+   "verdict_base": "underpowered",
+   "elite_distinct": [
+    1,
+    1
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "crossed:air_to_water",
+   "family": "transition",
+   "threshold": "crossed",
+   "source": "transitions.CrossingTracker",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "crossed:water_to_air",
+   "family": "transition",
+   "threshold": "crossed",
+   "source": "transitions.CrossingTracker",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "crossed:water_to_land",
+   "family": "transition",
+   "threshold": "crossed",
+   "source": "transitions.CrossingTracker",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  },
+  {
+   "bar": "crossed:land_to_air",
+   "family": "transition",
+   "threshold": "crossed",
+   "source": "transitions.CrossingTracker",
+   "elite": [
+    0,
+    114
+   ],
+   "elite_plans": [],
+   "elite_passed_indices": [],
+   "still": [
+    0,
+    114
+   ],
+   "still_plans": [],
+   "still_passed_indices": [],
+   "base": [
+    0,
+    114
+   ],
+   "base_plans": [],
+   "base_passed_indices": [],
+   "elite_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "still_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "base_ci": [
+    0.0,
+    0.025936082013628445
+   ],
+   "elite_share": 0.0,
+   "still_share": 0.0,
+   "base_share": 0.0,
+   "verdict_still": "unmeasured",
+   "verdict_base": "unmeasured",
+   "elite_distinct": [
+    0,
+    0
+   ],
+   "still_distinct": [
+    0,
+    0
+   ],
+   "base_distinct": [
+    0,
+    0
+   ]
+  }
+ ],
+ "per_island": {
+  "air": {
+   "rung:air>=1:makes_lift": {
+    "elite": [
+     114,
+     114
+    ],
+    "still": [
+     114,
+     114
+    ],
+    "base": [
+     114,
+     114
+    ]
+   },
+   "rung:air>=2:carries_a_third": {
+    "elite": [
+     113,
+     114
+    ],
+    "still": [
+     113,
+     114
+    ],
+    "base": [
+     113,
+     114
+    ]
+   },
+   "rung:air>=3:nearly_flies": {
+    "elite": [
+     102,
+     114
+    ],
+    "still": [
+     102,
+     114
+    ],
+    "base": [
+     102,
+     114
+    ]
+   },
+   "rung:air>=4:carries_itself": {
+    "elite": [
+     100,
+     114
+    ],
+    "still": [
+     100,
+     114
+    ],
+    "base": [
+     100,
+     114
+    ]
+   },
+   "rung:air>=5:leaves_surface": {
+    "elite": [
+     72,
+     114
+    ],
+    "still": [
+     74,
+     114
+    ],
+    "base": [
+     71,
+     114
+    ]
+   },
+   "rung:air>=6:stays_up": {
+    "elite": [
+     27,
+     114
+    ],
+    "still": [
+     22,
+     114
+    ],
+    "base": [
+     26,
+     114
+    ]
+   },
+   "rung:air>=7:glides": {
+    "elite": [
+     8,
+     114
+    ],
+    "still": [
+     9,
+     114
+    ],
+    "base": [
+     8,
+     114
+    ]
+   },
+   "rung:air>=8:holds_height": {
+    "elite": [
+     1,
+     114
+    ],
+    "still": [
+     3,
+     114
+    ],
+    "base": [
+     2,
+     114
+    ]
+   },
+   "rung:air>=9:flaps_forward": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:air>=10:makes_thrust": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:air>=11:pushes_itself": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:air>=12:flies_level": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:air>=13:holds_station": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:air>=14:climbs": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:air>=15:manoeuvres": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:water>=1:submerges": {
+    "elite": [
+     41,
+     114
+    ],
+    "still": [
+     81,
+     114
+    ],
+    "base": [
+     51,
+     114
+    ]
+   },
+   "rung:water>=2:dives": {
+    "elite": [
+     14,
+     114
+    ],
+    "still": [
+     43,
+     114
+    ],
+    "base": [
+     13,
+     114
+    ]
+   },
+   "rung:water>=3:reaches_depth": {
+    "elite": [
+     8,
+     114
+    ],
+    "still": [
+     26,
+     114
+    ],
+    "base": [
+     7,
+     114
+    ]
+   },
+   "rung:water>=4:goes_deep": {
+    "elite": [
+     5,
+     114
+    ],
+    "still": [
+     14,
+     114
+    ],
+    "base": [
+     6,
+     114
+    ]
+   },
+   "rung:water>=5:holds_depth": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:water>=6:manoeuvres": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:land>=1:stays_upright": {
+    "elite": [
+     98,
+     114
+    ],
+    "still": [
+     85,
+     114
+    ],
+    "base": [
+     98,
+     114
+    ]
+   },
+   "rung:land>=2:supports_itself": {
+    "elite": [
+     53,
+     114
+    ],
+    "still": [
+     54,
+     114
+    ],
+    "base": [
+     54,
+     114
+    ]
+   },
+   "rung:land>=3:stirs": {
+    "elite": [
+     11,
+     114
+    ],
+    "still": [
+     8,
+     114
+    ],
+    "base": [
+     12,
+     114
+    ]
+   },
+   "rung:land>=4:moves": {
+    "elite": [
+     5,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     8,
+     114
+    ]
+   },
+   "rung:land>=5:climbs_slope": {
+    "elite": [
+     5,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     7,
+     114
+    ]
+   },
+   "rung:land>=6:walks": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:takeoff>=1:unweights": {
+    "elite": [
+     51,
+     114
+    ],
+    "still": [
+     36,
+     114
+    ],
+    "base": [
+     49,
+     114
+    ]
+   },
+   "rung:takeoff>=2:hops": {
+    "elite": [
+     35,
+     114
+    ],
+    "still": [
+     29,
+     114
+    ],
+    "base": [
+     34,
+     114
+    ]
+   },
+   "rung:takeoff>=3:clears": {
+    "elite": [
+     21,
+     114
+    ],
+    "still": [
+     16,
+     114
+    ],
+    "base": [
+     21,
+     114
+    ]
+   },
+   "rung:takeoff>=4:climbs_out": {
+    "elite": [
+     15,
+     114
+    ],
+    "still": [
+     13,
+     114
+    ],
+    "base": [
+     14,
+     114
+    ]
+   },
+   "rung:transition>=1:crosses": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:transition>=2:stays_controlled": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:transition>=3:arrives_usable": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:transition>=4:arrives_well": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:transition>=5:crosses_three": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:transition>=6:crosses_efficiently": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:transition>=7:survives_entry": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "rung:transition>=8:crosses_all": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:air>=0.012": {
+    "elite": [
+     1,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:air>=0.055": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:air>=0.15": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:air>=0.25": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:air>=0.3": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:air>=0.35": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:water>=0.012": {
+    "elite": [
+     4,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     1,
+     114
+    ]
+   },
+   "comp:water>=0.055": {
+    "elite": [
+     1,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     1,
+     114
+    ]
+   },
+   "comp:water>=0.15": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:water>=0.25": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:water>=0.3": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:water>=0.35": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:land>=0.012": {
+    "elite": [
+     14,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:land>=0.055": {
+    "elite": [
+     1,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:land>=0.15": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:land>=0.25": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:land>=0.3": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "comp:land>=0.35": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "weakest:c2>=0.055": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "weakest:c3>=0.012": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "stage0:pass": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "stage1:pass": {
+    "elite": [
+     26,
+     114
+    ],
+    "still": [
+     27,
+     114
+    ],
+    "base": [
+     25,
+     114
+    ]
+   },
+   "stage2:pass": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "stage3:pass": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "stage4:mission>0": {
+    "elite": [
+     1,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "crossed:air_to_water": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "crossed:water_to_air": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "crossed:water_to_land": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   },
+   "crossed:land_to_air": {
+    "elite": [
+     0,
+     114
+    ],
+    "still": [
+     0,
+     114
+    ],
+    "base": [
+     0,
+     114
+    ]
+   }
+  }
+ }
+}

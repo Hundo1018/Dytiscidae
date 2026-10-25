@@ -27,10 +27,15 @@ def read(run):
     arch = json.load(open(ROOT / "runs" / run / "archive_air.json"))["elites"]
 
     el = [r for r in rows if r["arm"] == "elite"]
+    # F1/F2 are defined on gannet bodies (arch56's population). A population with
+    # no gannets (arch59: eel and teal) reports the same counts over every plan, and
+    # the plan mix is printed so the change of population is visible.
     gan = [r for r in el if r["plan"] == "gannet"]
-    f1 = (sum("battery" in (r["failure"] or "").lower() for r in gan), len(gan))
-    ag = [e for e in arch if e["meta"].get("body_plan") == "gannet"]
+    use = gan if gan else el
+    f1 = (sum("battery" in (r["failure"] or "").lower() for r in use), len(use))
+    ag = [e for e in arch if e["meta"].get("body_plan") == "gannet"] or arch
     f2 = (sum((e["meta"].get("n_rotors") or 0) > 0 for e in ag), len(ag))
+    plans = dict(collections.Counter(e["meta"].get("body_plan") for e in arch))
 
     per = screen["per_elite"]
     elites = [v for v in per.values() if v["arm"] == "elite"]
@@ -61,7 +66,7 @@ def read(run):
     still_max = max((v["mean"] for v in still), default=float("nan"))
 
     return {
-        "run": run, "F1": f1, "F2": f2, "S1": s1, "positive_share": pos_share,
+        "run": run, "F1": f1, "F1_scope": "gannet" if gan else "all plans", "F2_scope": "gannet" if any(e["meta"].get("body_plan")=="gannet" for e in arch) else "all plans", "plans": plans, "F2": f2, "S1": s1, "positive_share": pos_share,
         "R1_passes": len(r1), "elites_with_positive_draw": with_pos,
         "expected_passes_under_null": screen["summary"]["expected_passes_under_null"],
         "R2": r2, "R2_met": r2_ok, "R3": r3, "R3_of": len(ret), "retention": ret,
@@ -77,8 +82,8 @@ def fmt(d):
     lines = [
         f"## {d['run']}",
         "| read | value | bar | verdict |", "|---|---|---|---|",
-        f"| F1 gannet fresh draws battery exhausted | {pct(*f1)} | (reported) | |",
-        f"| F2 air-archive gannets with rotors | {pct(*f2)} | (reported) | |",
+        f"| F1 {d['F1_scope']} fresh draws battery exhausted | {pct(*f1)} | (reported) | |",
+        f"| F2 {d['F2_scope']} air-archive bodies with rotors | {pct(*f2)} | (reported) | plan mix {d['plans']} |",
         f"| S1 elites measurable on >= {MEASURABLE}/8 draws | {pct(*s1)} | arch56 23.4% | |",
         f"| positive share of measurable draws | {100 * d['positive_share']:.1f}% | arch56 21.1% | |",
         f"| R1 sign-test passes | {d['R1_passes']} ({d['elites_with_positive_draw']} elites with a positive draw, "

@@ -42,7 +42,8 @@ survival read the right way and missed the bar: S1 16.8% vs 11.7%; `stays_up`
 certified against the still machine for the first time on any population
 (46/149 vs 24/149); positive share of measurable draws 16% vs 8%; the first
 elite ever to pass the 8-draw sign test (7/8, p = 0.035, retention 0.43);
-R1 1 of >= 5, R2 `underpowered` at 6/149, R3 0 of 6 at >= 0.5. Exploration
+R1 1 of >= 5, R2 `underpowered` at 6/149, R3 1 of 6 at >= 0.5 (0.017 -> 0.037; corrected 2026-10-25, see
+`experiments/air_turn_bar/README.md`). Exploration
 read: the shared policy's `log_std` -0.5 keeps 3.5% of sampled gannet
 rollouts aloft through the command, -1.5 29%, -2.5 40%, -4.0 38%
 (`experiments/air_turn_bar/README.md`). arch55 = arch54 + `--policy-log-std

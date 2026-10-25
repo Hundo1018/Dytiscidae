@@ -1,0 +1,30 @@
+{
+ "run": "runs/arch49",
+ "bodies": 1,
+ "policies": 32,
+ "sigma": 0.02,
+ "wall_s": 398.25531911849976,
+ "bodies_with_replicated_mean_gt_0.1": 0,
+ "summary": [
+  {
+   "body": 159,
+   "recorded_air": 0.422,
+   "rung": 7,
+   "screen_measurable": 18,
+   "screen_best": 0.02428098003476231,
+   "screen_positive": 1,
+   "top": [
+    9,
+    22,
+    1
+   ],
+   "repl_best": [
+    9,
+    0.025103419270232758,
+    6
+   ],
+   "still_repl_max": -0.17300729177763108,
+   "still_measurable": 6
+  }
+ ]
+}

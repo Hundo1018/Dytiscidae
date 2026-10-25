@@ -474,3 +474,22 @@ Notes: arch59's F1/F2 are n/a in `l1_read.py` (its screen rows carry no gannet b
 failures in the form the script reads; not investigated, not used in any verdict). Recorded
 2026-10-25 from `gate_arch58.json`, `gate_arch59.json`, `screen_arch58.json`,
 `screen_arch59.json`. Not committed.
+
+## Joint-runaway booking, measured (2026-10-25; screen rows, no code change)
+
+Lever (b) of ROADMAP "Standing (2026-10-24)": the joint-runaway booking in `PowerBudget.step`
+ends a draw as "battery exhausted". A still machine should spend almost nothing, so a
+still-arm exhaustion is a booking artefact, not a physical outcome. Share of 8-draw screen
+rows ending "battery exhausted", by population and arm (`screen_archNN.rows.jsonl`):
+
+| population | still arm | elite arm |
+|---|---|---|
+| arch54 | 112/1,192 = 9.4% | 620/1,192 = 52.0% |
+| arch56 | 0/888 = 0.0% | 174/888 = 19.6% |
+| arch58 | 368/912 = 40.4% | 421/912 = 46.2% |
+| arch59 | 256/1,168 = 21.9% | 591/1,168 = 50.6% |
+
+The still-arm share is not stable across populations (0% to 40%), and on arch58 it is almost as
+high as the elites'. A booking that exhausts a machine that does not move is a model defect for
+any reading that depends on the battery. The change to `PowerBudget.step` is a physics-model
+decision and is not made here; it is the user's to decide (see the 2026-10-25 note in ROADMAP).
