@@ -32,12 +32,20 @@ DeviceEvaluation:
     - envs.devroll.scatter_wp.DeviceRotors
     - envs.devroll.scatter_wp.DevicePower
     - envs.devroll.scatter_wp.servo_command
+    - envs.devroll.scatter_wp.DeviceJets
+    - envs.devroll.scatter_wp.DeviceInflow
+    - envs.devroll.scatter_wp.DeviceDamping
+    - envs.devroll.scatter_wp.added_mass_into_model
   tests:
     - tests.test_devroll
     - tests.test_devroll::test_the_device_rotors_are_the_rotor_batch
     - tests.test_devroll::test_the_device_power_budget_is_the_power_budget
     - tests.test_devroll::test_the_device_servo_command_is_servo_command
-  note: IMPL_1010 A. The guard (A0), the A1a fluid kernels (strip loads, Wagner lag, medium, added mass, assembly) and A1b's entrainment, rotors, power budget and servo command, each held to its numpy code; the replay of FluidSolver.apply and the rest of A1b's scatter are not built.
+    - tests.test_devroll::test_the_device_jets_are_the_jet_set
+    - tests.test_devroll::test_the_device_inflow_is_induced_flow
+    - tests.test_devroll::test_the_device_damping_is_implicit_aero_damping
+    - tests.test_devroll::test_the_device_added_mass_is_each_worlds_own
+  note: IMPL_1010 A. The guard (A0), the A1a fluid kernels (strip loads, Wagner lag, medium, added mass, assembly) and A1b's entrainment, rotors, power budget, servo command, jets, induced flow, implicit damping split and per-world added-mass write, each held to its numpy code; A1b's diagnostics (clamped, mean_submerged, added_mass, slam) and the replay of FluidSolver.apply in an MJWarp step (needs A2) are not built.
 
 # --------------------------------------------------------------- the learner
 

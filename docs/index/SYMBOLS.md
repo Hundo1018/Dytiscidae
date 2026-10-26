@@ -776,19 +776,35 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 ## `envs.devroll.scatter_wp` — `dytiscidae/envs/devroll/scatter_wp.py`
 
-> Rotors, the power budget and the servo command on the device (IMPL_1010 A1b).
+> The scatter between two ``mj_step``s on the device (IMPL_1010 A1b).
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `DevicePower` | class | 335 | — | ``BatchedPower`` with its state on the device: one row per world's machine. |
-| `DeviceRotors` | class | 248 | — | The rotor tables of several ``RotorSet``s on the device, and their kernel. |
-| `make_kernels` | function | 34 | `(T)` | Return the kernels for precision ``T`` (``rotor``, ``power_terms``, |
-| `servo_command` | function | 404 | `(target, rate, lead, world, has_rate, *, dtype=_wp.float64)` | ``TriphibianEnv.servo_command`` for many worlds; numpy in, numpy out. |
-| `DevicePower.__init__` | method | 348 | `(self, envs, *, dtype=_wp.float64) -> None` | — |
-| `DevicePower.state` | method | 398 | `(self) -> dict` | — |
-| `DevicePower.step` | method | 382 | `(self, force, velocity) -> None` | ``force``, ``velocity``: every machine's first ``n`` actuator forces and |
-| `DeviceRotors.__init__` | method | 256 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
-| `DeviceRotors.loads` | method | 288 | `(self, xmat, omega, cvel, xipos, com, dt, wind, current)` | One step of every rotor; numpy in, numpy out. |
+| `added_mass_into_model` | function | 952 | `(dry_mass, dry_inertia, m_body, lever2, boff, *, dtype=_wp.float64)` | batchroll.finish's added-mass write for many worlds; numpy in, numpy out. |
+| `DeviceDamping` | class | 823 | — | ``ImplicitAeroDamping`` for several machines, its state on the device. |
+| `DeviceInflow` | class | 757 | — | ``InducedFlow`` for one machine per world, its state ``w`` on the device. |
+| `DeviceJets` | class | 655 | — | ``JetSet.apply`` for several machines' bells on the device. |
+| `DevicePower` | class | 586 | — | ``BatchedPower`` with its state on the device: one row per world's machine. |
+| `DeviceRotors` | class | 499 | — | The rotor tables of several ``RotorSet``s on the device, and their kernel. |
+| `make_kernels` | function | 41 | `(T)` | Return the kernels for precision ``T`` (``rotor``, ``power_terms``, |
+| `servo_command` | function | 979 | `(target, rate, lead, world, has_rate, *, dtype=_wp.float64)` | ``TriphibianEnv.servo_command`` for many worlds; numpy in, numpy out. |
+| `DeviceDamping.__init__` | method | 841 | `(self, dampers, body_ids, *, dtype=_wp.float64) -> None` | — |
+| `DeviceDamping.reset` | method | 885 | `(self) -> None` | ``ImplicitAeroDamping.reset`` for every world. |
+| `DeviceDamping.step` | method | 897 | `(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com, cdof, qvel, enabled=None) -> dict` | One step; numpy in, numpy out. |
+| `DeviceInflow.__init__` | method | 771 | `(self, spans, *, dtype=_wp.float64) -> None` | — |
+| `DeviceInflow.due` | method | 786 | `(self)` | — |
+| `DeviceInflow.reset` | method | 792 | `(self, mask=None) -> None` | — |
+| `DeviceInflow.tick` | method | 789 | `(self, mask=None) -> None` | — |
+| `DeviceInflow.update` | method | 799 | `(self, F, Vf, rho, dt, due=None)` | Update the worlds in ``due`` (default: ``self.due()``); returns ``w``. |
+| `DeviceInflow.w` | property | 815 | `(self)` | — |
+| `DeviceJets.__init__` | method | 669 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
+| `DeviceJets.host_inputs` | method | 704 | `(self, datas) -> dict` | ``theta``, ``omega``, ``xmat``, ``xpos`` per bell row, read from each |
+| `DeviceJets.loads` | method | 718 | `(self, theta, omega, xmat, xpos, wind, current) -> dict` | One step of every bell; numpy in, numpy out (see the class docstring). |
+| `DevicePower.__init__` | method | 599 | `(self, envs, *, dtype=_wp.float64) -> None` | — |
+| `DevicePower.state` | method | 649 | `(self) -> dict` | — |
+| `DevicePower.step` | method | 633 | `(self, force, velocity) -> None` | ``force``, ``velocity``: every machine's first ``n`` actuator forces and |
+| `DeviceRotors.__init__` | method | 507 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
+| `DeviceRotors.loads` | method | 539 | `(self, xmat, omega, cvel, xipos, com, dt, wind, current)` | One step of every rotor; numpy in, numpy out. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 

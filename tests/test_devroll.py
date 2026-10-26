@@ -609,9 +609,300 @@ def test_the_device_servo_command_is_servo_command() -> None:
         check(f"{name}: ctrl within {tol:g} of its maximum", err <= tol, f"{err:.2e}")
 
 
+def _medusas(k=2):
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    envs = []
+    for s in range(k):
+        e = TriphibianEnv(build(BODY_PLANS["medusa"]()), seed=s)
+        e.reset(Domain.WATER, randomise=False)
+        envs.append(e)
+    return envs
+
+
+def test_the_device_jets_are_the_jet_set() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device jets agree with JetSet.apply", reason)
+        return
+    import mujoco
+    import warp as wp
+
+    from dytiscidae.envs.devroll.scatter_wp import DeviceJets
+
+    rng = np.random.default_rng(31)
+    envs = _medusas(2)
+    med = envs[0].medium
+    check("the fixture carries bells, driven and undriven",
+          all(e.jets.n > 0 for e in envs)
+          and all(bool((e.jets.joint_id >= 0).any() and (e.jets.joint_id < 0).any())
+                  for e in envs), str(envs[0].jets.joint_id.tolist()))
+    cases, fracs, qs, states = [], [], [], []
+    for z in (-0.5, 0.6, 0.0, -0.05):
+        for e in envs:
+            d, m = e.data, e.model
+            d.qvel[:] = rng.normal(0.0, 6.0, m.nv)
+            mujoco.mj_forward(m, d)
+            d.qpos[2] += z - d.xpos[1, 2]
+            mujoco.mj_forward(m, d)
+        ref = []
+        for e in envs:
+            m, d, js = e.model, e.data, e.jets
+            states.append((d.qpos.copy(), d.qvel.copy()))
+            base = m.dof_damping.copy()
+            js.reset(None)
+            d.xfrc_applied[:] = 0.0
+            total = js.apply(m, d, e.medium, d.time, e.timestep)
+            ref.append({"f": d.xfrc_applied[:, :3].copy(), "c": m.dof_damping - base,
+                        "total": total, "pump": js.last_pump_power})
+            m.dof_damping[:] = base
+            fracs += list(e.medium.properties(
+                d.xpos[js.body_id], np.cbrt(js.volume) * 0.5, d.time)[2])
+            om = np.array([d.qvel[m.jnt_dofadr[j]] if j >= 0 else 0.0 for j in js.joint_id])
+            qs += list(om)
+        cases.append(ref)
+    fracs, qs = np.array(fracs), np.array(qs)
+    check("the fixture has bells in air, in water and across the surface",
+          bool((fracs == 0).any() and (fracs == 1).any() and ((fracs > 0) & (fracs < 1)).any()))
+    check("the fixture has bells expelling and refilling", bool((qs > 0).any() and (qs < 0).any()))
+    check("and the bells make thrust and load the joints: the comparison is not of zeros",
+          max(r["total"] for c in cases for r in c) > 1e-3
+          and max(r["pump"] for c in cases for r in c) > 1e-6)
+    # Replay the same states on the device.
+    for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+        name = "float64" if dtype == wp.float64 else "float32"
+        dev = DeviceJets([(e.jets, e.model) for e in envs], med.air, med.water, dtype=dtype)
+        worst_name, worst = "", 0.0
+        for c_i, ref in enumerate(cases):
+            for w, e in enumerate(envs):
+                qp, qv = states[c_i * len(envs) + w]
+                e.data.qpos[:], e.data.qvel[:] = qp, qv
+                mujoco.mj_forward(e.model, e.data)
+            x = dev.host_inputs([e.data for e in envs])
+            out = dev.loads(x["theta"], x["omega"], x["xmat"], x["xpos"], med.wind, med.current)
+            for w, (e, r) in enumerate(zip(envs, ref)):
+                a, b = dev.off_np[w], dev.off_np[w + 1]
+                f = np.zeros_like(r["f"])
+                np.add.at(f, dev.body_id[a:b], out["f"][a:b])
+                c = np.zeros(e.model.nv)
+                drv = dev.dofadr[a:b] >= 0
+                np.add.at(c, dev.dofadr[a:b][drv], out["c_pump"][a:b][drv])
+                for k, got, want in (("f", f, r["f"]), ("c_pump", c, r["c"]),
+                                     ("total", out["total"][w], r["total"]),
+                                     ("pump", out["pump"][w], r["pump"])):
+                    err = float(np.abs(np.asarray(got) - want).max()) / max(
+                        float(np.abs(want).max()), 1e-30)
+                    if err > worst:
+                        worst_name, worst = k, err
+        check(f"{name}: jet force, pumping load, thrust total and pump power within {tol:g} "
+              "of their maxima", worst <= tol, f"worst {worst_name} at {worst:.2e}")
+
+
+def test_the_device_inflow_is_induced_flow() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device induced flow agrees with InducedFlow.update", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.devroll.scatter_wp import DeviceInflow
+    from dytiscidae.physics.fluid import InducedFlow
+
+    # Four worlds: a hovering disc, forward flight, a disc with no span, and a
+    # disc whose flow runs against its force; forces off and water density on
+    # some steps.
+    spans = [0.89, 0.35, 0.0, 1.2]
+    steps, dt = 160, 0.004 * InducedFlow.UPDATE_EVERY
+    rng = np.random.default_rng(41)
+    draws = []
+    for step in range(steps):
+        F = rng.normal(0.0, 1.0, (4, 3)) * np.array([[0.5, 0.5, 6.0]])
+        Vf = np.stack([rng.normal(0.0, 0.02, 3),                     # hover
+                       np.array([-9.0, 0.0, 0.5]) + rng.normal(0.0, 1.0, 3),
+                       rng.normal(0.0, 3.0, 3),
+                       -2.0 * F[3] / np.linalg.norm(F[3]) + rng.normal(0.0, 0.3, 3)])
+        rho = np.where(rng.uniform(size=4) < 0.3, 1025.0, 1.2)
+        if step % 17 == 5:
+            F[1] = 0.0                                                # no lift this step
+        if step % 23 == 7:
+            rho[3] = 0.0
+        draws.append((F, Vf, rho))
+    refs = [InducedFlow(s) for s in spans]
+    want = []
+    for F, Vf, rho in draws:
+        for i, r in enumerate(refs):
+            if r.due():
+                r.update(F[i], Vf[i], float(rho[i]), dt)
+            r.tick()
+        want.append(np.stack([r.w.copy() for r in refs]))
+    want = np.array(want)
+    scale = float(np.abs(want).max())
+    check("the fixture's inflow is not zero, and the spanless disc's is",
+          scale > 0.05 and float(np.abs(want[:, 2]).max()) == 0.0, f"max |w| {scale:.3f}")
+    for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+        name = "float64" if dtype == wp.float64 else "float32"
+        dev = DeviceInflow(spans, dtype=dtype)
+        worst = 0.0
+        for (F, Vf, rho), wt in zip(draws, want):
+            dev.update(F, Vf, rho, dt)
+            dev.tick()
+            worst = max(worst, float(np.abs(dev.w - wt).max()) / scale)
+        check(f"{name}: inflow over {steps} steps within {tol:g} of its maximum",
+              worst <= tol, f"worst {worst:.2e}")
+
+
+def _strip_positions(e):
+    p, d = e.solver.panels, e.data
+    R = d.xmat.reshape(-1, 3, 3)[p.body_id]
+    return d.xpos[p.body_id] + np.einsum("nij,nj->ni", R, p.pos_local)
+
+
+def test_the_device_damping_is_implicit_aero_damping() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device damping split agrees with ImplicitAeroDamping", reason)
+        return
+    import mujoco
+    import warp as wp
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.devroll.scatter_wp import DeviceDamping
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+    from dytiscidae.physics.fluid import WING, ImplicitAeroDamping, strip_damping
+
+    # eel and ray descend through the free surface; a second eel has the split off.
+    envs = []
+    for k, plan in enumerate(("eel", "ray", "eel")):
+        e = TriphibianEnv(build(BODY_PLANS[plan]()), seed=k)
+        e.reset(Domain.WATER, randomise=False)
+        envs.append(e)
+    enabled = [1, 1, 0]
+    lift_scale = [1.0, 0.7, 1.0]
+    dampers = [ImplicitAeroDamping(e.model, e.medium, e.solver.panels.half_height)
+               for e in envs]
+    rng = np.random.default_rng(43)
+    steps = 48
+    z_path = np.linspace(0.25, -0.25, steps) + 0.004 * np.sin(np.arange(steps))
+    frames, want = [], []
+    for t in range(steps):
+        frame, ref = [], []
+        for w, (e, dmp) in enumerate(zip(envs, dampers)):
+            m, d, pn = e.model, e.data, e.solver.panels
+            d.qvel[:] = rng.normal(0.0, 1.5, m.nv)
+            mujoco.mj_forward(m, d)
+            d.qpos[2] += z_path[t] + 0.03 * w - d.xpos[1, 2]
+            mujoco.mj_forward(m, d)
+            n = pn.n
+            x = {"pos": _strip_positions(e), "q": rng.uniform(0.0, 40.0, n),
+                 "area": np.asarray(pn.area, float), "lift": rng.normal(0.0, 2.0, n),
+                 "drag": np.abs(rng.normal(0.0, 1.0, n)),
+                 "rho": np.where(rng.uniform(size=n) < 0.5, 1025.0, 1.2),
+                 "ar": rng.uniform(1.0, 8.0, n), "is_wing": (pn.kind == WING).astype(int),
+                 "com": d.subtree_com.copy(), "cdof": d.cdof.copy(), "qvel": d.qvel.copy()}
+            frame.append(x)
+            if enabled[w]:
+                due = dmp.due()
+                b = (strip_damping(x["q"], x["area"], x["lift"], x["drag"], x["rho"], x["ar"],
+                                   x["is_wing"] == 1, lift_scale[w]) if due else None)
+                dmp.apply(d, x["pos"], pn.body_id, b)
+            else:
+                due = False
+                dmp.clear(d)
+            ref.append({"dd": m.dof_damping.copy(), "qf": d.qfrc_applied.copy(), "due": due})
+            m.dof_damping[:] = dmp.base
+        frames.append(frame)
+        want.append(ref)
+    dues = np.array([[r["due"] for r in ref[:2]] for ref in want])
+    off_cadence = [(t, w) for t in range(steps) for w in range(2)
+                   if dues[t, w] and t % ImplicitAeroDamping.REFRESH_EVERY != 0]
+    check("the descent wets strips between refreshes: B is refreshed off its cadence",
+          len(off_cadence) > 0, f"{len(off_cadence)} off-cadence refreshes")
+    qf_scale = max(float(np.abs(r["qf"]).max()) for ref in want for r in ref)
+    dd_scale = max(float(np.abs(r["dd"]).max()) for ref in want for r in ref)
+    check("and the split is not zero: B and its compensation carry load",
+          qf_scale > 1e-3 and max(float(np.abs(r["dd"] - dmp.base).max())
+                                  for ref in want for r, dmp in zip(ref, dampers)) > 1e-6)
+    for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+        name = "float64" if dtype == wp.float64 else "float32"
+        dev = DeviceDamping(dampers, [e.solver.panels.body_id for e in envs], dtype=dtype)
+        err = {"dof_damping": 0.0, "qfrc_applied": 0.0}
+        due_ok = True
+        for frame, ref in zip(frames, want):
+            cat = lambda k: np.concatenate([x[k] for x in frame])
+            out = dev.step(cat("pos"), cat("q"), cat("area"), cat("lift"), cat("drag"),
+                           cat("rho"), cat("ar"), cat("is_wing"), lift_scale, cat("com"),
+                           cat("cdof"), cat("qvel"), enabled=enabled)
+            due_ok &= [bool(v) for v in out["due"][:2]] == [r["due"] for r in ref[:2]]
+            err["dof_damping"] = max(err["dof_damping"], float(np.abs(
+                out["dof_damping"] - np.concatenate([r["dd"] for r in ref])).max()) / dd_scale)
+            err["qfrc_applied"] = max(err["qfrc_applied"], float(np.abs(
+                out["qfrc_applied"] - np.concatenate([r["qf"] for r in ref])).max()) / qf_scale)
+        check(f"{name}: B is formed on the same steps (cadence and wet-set staleness)", due_ok)
+        worst = max(err, key=err.get)
+        check(f"{name}: dof_damping and qfrc_applied over {steps} steps within {tol:g} of "
+              "their maxima", err[worst] <= tol, f"worst {worst} at {err[worst]:.2e}")
+
+
+def test_the_device_added_mass_is_each_worlds_own() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device added-mass write agrees with FluidSolver.apply per world", reason)
+        return
+    import mujoco
+    import warp as wp
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.devroll.scatter_wp import added_mass_into_model
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    # Two worlds of one body at different depths, then a ray: each world's mass is its own.
+    rng = np.random.default_rng(47)
+    envs, ref = [], []
+    for k, (plan, z) in enumerate((("eel", -0.4), ("eel", 0.0), ("ray", -0.2))):
+        e = TriphibianEnv(build(BODY_PLANS[plan]()), seed=k)
+        e.reset(Domain.WATER, randomise=False)
+        m, d = e.model, e.data
+        d.qvel[:] = rng.normal(0.0, 1.0, m.nv)
+        mujoco.mj_forward(m, d)
+        d.qpos[2] += z - d.xpos[1, 2]
+        mujoco.mj_forward(m, d)
+        e.solver.apply(d, d.time)          # the numpy write: body_mass, body_inertia
+        sol = e.solver
+        ref.append({"mb": m.body_mass - sol._dry_mass, "bm": m.body_mass.copy(),
+                    "bi": m.body_inertia.copy(), "dry": sol._dry_mass.copy(),
+                    "dry_i": sol._dry_inertia.copy(), "lever2": sol._lever2.copy()})
+        envs.append(e)
+    check("the two eel worlds carry different added mass",
+          float(np.abs(ref[0]["mb"] - ref[1]["mb"]).max()) > 1e-4
+          and float(ref[0]["mb"].sum()) > 1e-3)
+    boff = np.cumsum([0] + [len(r["bm"]) for r in ref])
+    cat = lambda k: np.concatenate([r[k] for r in ref])
+    for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+        name = "float64" if dtype == wp.float64 else "float32"
+        bm, bi = added_mass_into_model(cat("dry"), cat("dry_i"), cat("mb"), cat("lever2"), boff,
+                                       dtype=dtype)
+        e_m = float(np.abs(bm - cat("bm")).max()) / float(np.abs(cat("bm")).max())
+        e_i = float(np.abs(bi - cat("bi")).max()) / float(np.abs(cat("bi")).max())
+        check(f"{name}: body_mass and body_inertia per world within {tol:g} of their maxima",
+              max(e_m, e_i) <= tol, f"mass {e_m:.2e}, inertia {e_i:.2e}")
+
+
 def test_the_device_replay_is_not_built_yet() -> None:
     skip("the device fluid replays FluidSolver.apply for 2000 steps (A1a replay)",
-         "the Wagner lag, inflow, medium and added mass are A1a and A1b slices, not built")
+         "every A1a and A1b slice is parity-tested on its own; the replay that runs them "
+         "in sequence inside an MJWarp step needs A2's model and step graph")
 
 
 def main() -> int:
@@ -624,6 +915,10 @@ def main() -> int:
                  test_the_device_rotors_are_the_rotor_batch,
                  test_the_device_power_budget_is_the_power_budget,
                  test_the_device_servo_command_is_servo_command,
+                 test_the_device_jets_are_the_jet_set,
+                 test_the_device_inflow_is_induced_flow,
+                 test_the_device_damping_is_implicit_aero_damping,
+                 test_the_device_added_mass_is_each_worlds_own,
                  test_the_device_replay_is_not_built_yet]
     for fn in functions:
         print(f"{fn.__name__}")

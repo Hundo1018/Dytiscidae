@@ -2138,6 +2138,46 @@ MUTATIONS: tuple = (
         defect="the rotor kernel never runs, so a rotorcraft on the device has no thrust, no "
                "drag torque and no damping split, and a quad cannot leave the ground",
         suites=("test_devroll",), item="A1b rotors"),
+    Mutation(
+        id="device-jets-skipped",
+        path="dytiscidae/envs/devroll/scatter_wp.py",
+        find='            _wp.launch(K["jets"], dim=n, inputs=[',
+        replace='            _wp.launch(K["jets"], dim=0, inputs=[',
+        defect="the jet kernel never runs, so a medusa on the device has no thrust and its "
+               "bell muscles pump for free",
+        suites=("test_devroll",), item="A1b jets"),
+    Mutation(
+        id="device-induced-flow-frozen",
+        path="dytiscidae/envs/devroll/scatter_wp.py",
+        find="        w[m] = w[m] + (tgt - w[m]) * a",
+        replace="        pass",
+        defect="the device inflow never updates, so wings fly with no downwash: the 2D lift "
+               "slope with no induced angle, a lifting system with no induced drag",
+        suites=("test_devroll",), item="A1b inflow"),
+    Mutation(
+        id="device-damping-not-compensated",
+        path="dytiscidae/envs/devroll/scatter_wp.py",
+        find="        qfrc[k] = lb * qvel[k]",
+        replace="        pass",
+        defect="the damping split goes into dof_damping without its +B qvel compensation, so "
+               "the implicit integrator adds a drag B that the fluid never applied",
+        suites=("test_devroll",), item="A1b damping"),
+    Mutation(
+        id="device-damping-ignores-the-surface",
+        path="dytiscidae/envs/devroll/scatter_wp.py",
+        find="                st = 1",
+        replace="                st = 0",
+        defect="B is refreshed on its cadence only, so a strip that first wets between "
+               "refreshes runs up to three steps of water loads against an air B (ROADMAP AK)",
+        suites=("test_devroll",), item="A1b damping"),
+    Mutation(
+        id="device-added-mass-shared-world",
+        path="dytiscidae/envs/devroll/scatter_wp.py",
+        find="        body_mass[g] = dry_mass[g] + m_body[g]",
+        replace="        body_mass[g - boff[body_world[g]]] = dry_mass[g] + m_body[g]",
+        defect="every world's added mass is written at world 0's bodies, so all worlds but one "
+               "run on their dry mass and world 0 on whichever world wrote last",
+        suites=("test_devroll",), item="A1b added mass"),
     # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
     Mutation(
         id="grpo-advantage-across-the-whole-batch",

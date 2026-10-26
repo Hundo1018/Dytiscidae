@@ -1,11 +1,15 @@
-"""Rotors, the power budget and the servo command on the device (IMPL_1010 A1b).
+"""The scatter between two ``mj_step``s on the device (IMPL_1010 A1b).
 
-This slice of A1b: ``RotorBatch.apply`` (physics/rotor.py), ``BatchedPower.step``
-(physics/energy.py) and ``TriphibianEnv.servo_command`` (envs/triphibian.py), as
-Warp kernels over flat arrays.  A row is one rotor, one actuator or one world's
-machine; the caller lays worlds out back to back and passes each row's index into
-its world's arrays.  The rotor kernel returns per-rotor loads; writing them into
-``xfrc_applied``, ``dof_damping`` and ``qfrc_applied`` is A2's job.
+``RotorBatch.apply`` (physics/rotor.py), ``BatchedPower.step`` (physics/energy.py),
+``TriphibianEnv.servo_command`` (envs/triphibian.py), ``JetSet.apply``
+(physics/jet.py), ``InducedFlow.update``, ``ImplicitAeroDamping`` (its strip
+damping, projection, cadence, wet-set staleness and compensation) and the added
+mass into ``body_mass``/``body_inertia`` (batchroll.py:538-540), as Warp kernels
+over flat arrays.  A row is one rotor, bell, strip, body, dof, actuator or one
+world's machine; the caller lays worlds out back to back and passes each row's
+index into its world's arrays.  The kernels return loads and model fields;
+writing them into the MJWarp ``Model`` and ``Data`` (``xfrc_applied``,
+``dof_damping``, ``qfrc_applied``, ``body_mass``, ``body_inertia``) is A2's job.
 
 What stays on the host: the rotor tables (``rotor_table`` builds them once per
 rotor and medium, they are constants on the device), and whether the CPG left a
@@ -20,6 +24,8 @@ import numpy as _np
 import warp as _wp
 
 from dytiscidae.envs.devroll import fluid_wp as _fluid_wp
+from dytiscidae.physics.fluid import ImplicitAeroDamping as _ImplicitAeroDamping
+from dytiscidae.physics.fluid import InducedFlow as _InducedFlow
 from dytiscidae.physics.rotor import TABLE_J, TABLE_MU, TABLE_TIP_SPEEDS, rotor_table
 
 _KERNELS: dict = {}
@@ -29,6 +35,7 @@ _NJ = len(TABLE_J)
 _NM = len(TABLE_MU)
 _TIP_LO = float(TABLE_TIP_SPEEDS[0])
 _TIP_HI = float(TABLE_TIP_SPEEDS[-1])
+_REFRESH = _wp.constant(int(_ImplicitAeroDamping.REFRESH_EVERY))
 
 
 def make_kernels(T):
@@ -236,8 +243,252 @@ def make_kernels(T):
         else:
             ctrl[i] = target[i]
 
+    @_wp.kernel
+    def jets_wp(
+        theta: _wp.array(dtype=T), omega: _wp.array(dtype=T), lo: _wp.array(dtype=T),
+        hi: _wp.array(dtype=T), volume: _wp.array(dtype=T), stroke: _wp.array(dtype=T),
+        orifice: _wp.array(dtype=T), refill: _wp.array(dtype=T), xmat: _wp.array(dtype=M),
+        axis: _wp.array(dtype=V), rho: _wp.array(dtype=T), subf: _wp.array(dtype=T),
+        f_out: _wp.array(dtype=V), thrust_out: _wp.array(dtype=T), c_pump_out: _wp.array(dtype=T),
+    ):
+        # JetSet.apply for one bell: the thrust along -axis and the pumping
+        # load as a damping coefficient on the driving joint.
+        j = _wp.tid()
+        span = _wp.max(hi[j] - lo[j], T(1e-6))
+        q = volume[j] * stroke[j] * (omega[j] / span)        # -dV/dt, + while expelling
+        coeff = refill[j]
+        if q > T(0.0):
+            coeff = T(1.0)
+        area = _wp.max(orifice[j], T(1e-6))
+        thrust = coeff * rho[j] * q * _wp.abs(q) / area * subf[j]
+        f_out[j] = -thrust * (xmat[j] * axis[j])
+        thrust_out[j] = thrust
+        dv = volume[j] * stroke[j] / span
+        c_pump_out[j] = (coeff * T(0.5) * rho[j] * dv * dv * dv * _wp.abs(omega[j]) * subf[j]
+                         / (area * area))
+
+    @_wp.kernel
+    def jet_sums(
+        off: _wp.array(dtype=int), thrust: _wp.array(dtype=T), c_pump: _wp.array(dtype=T),
+        omega: _wp.array(dtype=T), driven: _wp.array(dtype=int),
+        total_out: _wp.array(dtype=T), pump_out: _wp.array(dtype=T),
+    ):
+        # Per world: apply's return value (sum |thrust|) and last_pump_power.
+        m = _wp.tid()
+        tot = T(0.0)
+        pump = T(0.0)
+        for j in range(off[m], off[m + 1]):
+            tot = tot + _wp.abs(thrust[j])
+            if driven[j] != 0:
+                pump = pump + c_pump[j] * omega[j] * omega[j]
+        total_out[m] = tot
+        pump_out[m] = pump
+
+    @_wp.func
+    def disc_g(x: T, vp2: T, v_par: T, k: T) -> V2:
+        # InducedFlow.update's g: the residual and its derivative.
+        sq = _wp.sqrt(vp2 + (v_par - x) * (v_par - x))
+        return V2(x * sq - k, sq + x * (x - v_par) / _wp.max(sq, T(1e-12)))
+
+    @_wp.kernel
+    def inflow_wp(
+        F: _wp.array(dtype=V), Vf: _wp.array(dtype=V), rho: _wp.array(dtype=T),
+        dt: _wp.array(dtype=T), span: _wp.array(dtype=T), area: _wp.array(dtype=T),
+        due: _wp.array(dtype=int), w: _wp.array(dtype=_wp.vec3d),
+    ):
+        # InducedFlow.update for one world's machine, on the steps the host's
+        # cadence marks due.  The lagged state w is float64 at every precision.
+        m = _wp.tid()
+        if due[m] == 0:
+            return
+        zero = T(0.0)
+        Tm = _wp.length(F[m])
+        target = V(zero, zero, zero)
+        if not (area[m] <= T(1e-9) or Tm < T(1e-9) or rho[m] <= zero):
+            f = F[m] / Tm
+            k = Tm / (T(2.0) * rho[m] * area[m])
+            v_par = _wp.dot(Vf[m], f)
+            vp2 = _wp.max(_wp.dot(Vf[m], Vf[m]) - v_par * v_par, zero)
+            lo = zero
+            hi = _wp.max(T(1.0), _wp.sqrt(k)) * T(4.0) + _wp.abs(v_par) + _wp.sqrt(vp2)
+            while disc_g(hi, vp2, v_par, k)[0] < zero:
+                hi = hi * T(2.0)
+            wd = w[m]
+            x = _wp.min(_wp.max(T(_wp.length(wd)), lo), hi)
+            if x == zero:
+                x = T(0.5) * hi
+            for _it in range(60):
+                g = disc_g(x, vp2, v_par, k)
+                if g[0] < zero:
+                    lo = x
+                else:
+                    hi = x
+                if hi - lo < T(1e-12) * _wp.max(hi, T(1.0)):
+                    break
+                xn = T(0.5) * (lo + hi)
+                if g[1] > zero:
+                    xn = x - g[0] / g[1]
+                if lo < xn and xn < hi:
+                    x = xn
+                else:
+                    x = T(0.5) * (lo + hi)
+            target = -f * x
+        through = _wp.length(Vf[m] + target)
+        tau = T(0.5) * span[m] / _wp.max(through, T(0.05))
+        a = _wp.float64(T(1.0) - _wp.exp(-dt[m] / _wp.max(tau, T(1e-6))))
+        tgt = _wp.vec3d(_wp.float64(target[0]), _wp.float64(target[1]), _wp.float64(target[2]))
+        w[m] = w[m] + (tgt - w[m]) * a
+
+    # --- ImplicitAeroDamping -------------------------------------------
+    # Worlds back to back: strips [poff[w], poff[w+1]), bodies [boff..), dofs
+    # [voff..); a strip's body and root are global body indices; ``anc`` is each
+    # world's (nbody, nv) mask flattened from aoff[w].
+
+    @_wp.kernel
+    def damp_due(count: _wp.array(dtype=int), stale: _wp.array(dtype=int),
+                 due: _wp.array(dtype=int)):
+        # ImplicitAeroDamping.due, read before apply as the batched path reads it.
+        w = _wp.tid()
+        due[w] = 0
+        if stale[w] != 0 or count[w] % _REFRESH == 0:
+            due[w] = 1
+
+    @_wp.kernel
+    def strip_b(q: _wp.array(dtype=T), area: _wp.array(dtype=T), lift: _wp.array(dtype=T),
+                drag: _wp.array(dtype=T), rho: _wp.array(dtype=T), ar: _wp.array(dtype=T),
+                is_wing: _wp.array(dtype=int), lift_scale: _wp.array(dtype=T),
+                world: _wp.array(dtype=int), b: _wp.array(dtype=T)):
+        # strip_damping: 2|F|/U + q S CL_alpha / U, zero below U = 1e-3.
+        i = _wp.tid()
+        U = _wp.sqrt(T(2.0) * _wp.max(q[i], T(0.0)) / _wp.max(rho[i], T(1e-9)))
+        slope = T(0.0)
+        if is_wing[i] != 0:
+            slope = T(2.0) * T(_wp.pi) / (T(1.0) + T(2.0) / _wp.max(ar[i], T(0.1)))
+        slope = slope * lift_scale[world[i]]
+        fa = _wp.sqrt(lift[i] * lift[i] + drag[i] * drag[i])
+        b[i] = T(0.0)
+        if U > T(1e-3):
+            b[i] = (T(2.0) * fa + q[i] * area[i] * slope) / _wp.max(U, T(1e-3))
+
+    @_wp.kernel
+    def body_moments(poff: _wp.array(dtype=int), body_world: _wp.array(dtype=int),
+                     due: _wp.array(dtype=int), strip_body: _wp.array(dtype=int),
+                     strip_root: _wp.array(dtype=int), pos: _wp.array(dtype=V),
+                     com: _wp.array(dtype=V), b: _wp.array(dtype=T),
+                     B0: _wp.array(dtype=T), B1: _wp.array(dtype=V), B2: _wp.array(dtype=M)):
+        # projected's per-body moments: sum b, sum b r, sum b (|r|^2 I - r r^T).
+        g = _wp.tid()
+        w = body_world[g]
+        if due[w] == 0:
+            return
+        s0 = T(0.0)
+        s1 = V(T(0.0), T(0.0), T(0.0))
+        s2 = M(T(0.0), T(0.0), T(0.0), T(0.0), T(0.0), T(0.0), T(0.0), T(0.0), T(0.0))
+        for i in range(poff[w], poff[w + 1]):
+            if strip_body[i] == g:
+                r = pos[i] - com[strip_root[i]]
+                s0 = s0 + b[i]
+                s1 = s1 + b[i] * r
+                s2 = s2 + b[i] * (_wp.dot(r, r) * _wp.identity(n=3, dtype=T)
+                                  - _wp.outer(r, r))
+        B0[g] = s0
+        B1[g] = s1
+        B2[g] = s2
+
+    @_wp.kernel
+    def dof_project(boff: _wp.array(dtype=int), voff: _wp.array(dtype=int),
+                    aoff: _wp.array(dtype=int), dof_world: _wp.array(dtype=int),
+                    due: _wp.array(dtype=int), anc: _wp.array(dtype=int),
+                    rot: _wp.array(dtype=V), lin: _wp.array(dtype=V),
+                    B0: _wp.array(dtype=T), B1: _wp.array(dtype=V), B2: _wp.array(dtype=M),
+                    last_b: _wp.array(dtype=T)):
+        # B_k = sum over bodies dof k moves of B0|lin|^2 + 2 B1.(lin x rot) + rot.B2 rot.
+        k = _wp.tid()
+        w = dof_world[k]
+        if due[w] == 0:
+            return
+        nv = voff[w + 1] - voff[w]
+        kl = k - voff[w]
+        nb = boff[w + 1] - boff[w]
+        rt = rot[k]
+        ln = lin[k]
+        lxw = _wp.cross(ln, rt)
+        val = T(0.0)
+        for j in range(nb):
+            if anc[aoff[w] + j * nv + kl] != 0:
+                g = boff[w] + j
+                val = val + (B0[g] * _wp.dot(ln, ln) + T(2.0) * _wp.dot(B1[g], lxw)
+                             + _wp.dot(rt, B2[g] * rt))
+        last_b[k] = val
+
+    @_wp.func
+    def wet_at(p: V, h: T) -> int:
+        # MediumField.depth on the flat calm sea: depth = -z; wet if depth > -half.
+        if -p[2] > -h:
+            return 1
+        return 0
+
+    @_wp.kernel
+    def wet_stale(poff: _wp.array(dtype=int), due: _wp.array(dtype=int),
+                  pos: _wp.array(dtype=V), half: _wp.array(dtype=T),
+                  wet_ref: _wp.array(dtype=int), prev_pos: _wp.array(dtype=V),
+                  have_ref: _wp.array(dtype=int), have_prev: _wp.array(dtype=int),
+                  stale: _wp.array(dtype=int), count: _wp.array(dtype=int)):
+        # The wet set B was formed on, and whether this step or the next one on
+        # this step's motion leaves it (apply, fluid.py:727-743); then the count.
+        w = _wp.tid()
+        st = int(0)
+        for i in range(poff[w], poff[w + 1]):
+            wet = wet_at(pos[i], half[i])
+            if due[w] != 0:
+                wet_ref[i] = wet
+            ahead = wet
+            if have_prev[w] != 0:
+                ahead = wet_at(T(2.0) * pos[i] - prev_pos[i], half[i])
+            if wet != wet_ref[i] or ahead != wet_ref[i]:
+                st = 1
+            prev_pos[i] = pos[i]
+        if due[w] != 0:
+            have_ref[w] = 1
+        if have_ref[w] == 0:
+            st = 0
+        stale[w] = st
+        have_prev[w] = 1
+        count[w] = count[w] + 1
+
+    @_wp.kernel
+    def damp_out(dof_world: _wp.array(dtype=int), enabled: _wp.array(dtype=int),
+                 base: _wp.array(dtype=T), last_b: _wp.array(dtype=T),
+                 qvel: _wp.array(dtype=T), dof_damping: _wp.array(dtype=T),
+                 qfrc: _wp.array(dtype=T)):
+        # dof_damping = base + B, and the compensation qfrc_applied = B qvel that
+        # makes the split force-neutral at the current state; ``clear`` when off.
+        k = _wp.tid()
+        lb = T(0.0)
+        if enabled[dof_world[k]] != 0:
+            lb = last_b[k]
+        dof_damping[k] = base[k] + lb
+        qfrc[k] = lb * qvel[k]
+
+    @_wp.kernel
+    def added_mass_into_model(
+        boff: _wp.array(dtype=int), body_world: _wp.array(dtype=int),
+        dry_mass: _wp.array(dtype=T), dry_inertia: _wp.array(dtype=V),
+        m_body: _wp.array(dtype=T), lever2: _wp.array(dtype=T),
+        body_mass: _wp.array(dtype=T), body_inertia: _wp.array(dtype=V),
+    ):
+        # batchroll.finish:538-540, per world: the added mass into the model's
+        # mass and, at its lever arm, into the principal inertia.
+        g = _wp.tid()
+        body_mass[g] = dry_mass[g] + m_body[g]
+        body_inertia[g] = dry_inertia[g] + (m_body[g] * lever2[g]) * V(T(1.0), T(1.0), T(1.0))
+
     _KERNELS[T] = {"rotor": rotor_wp, "power_terms": power_terms,
-                   "power_charge": power_charge, "servo": servo_wp, "V": V, "M": M}
+                   "power_charge": power_charge, "servo": servo_wp,
+                   "jets": jets_wp, "jet_sums": jet_sums, "inflow": inflow_wp,
+                   "damp_due": damp_due, "strip_b": strip_b, "body_moments": body_moments,
+                   "dof_project": dof_project, "wet_stale": wet_stale, "damp_out": damp_out,
+                   "added_mass": added_mass_into_model, "V": V, "M": M}
     return _KERNELS[T]
 
 
@@ -399,6 +650,330 @@ class DevicePower:
         out = {k: v.numpy().astype(float) for k, v in self._state.items()}
         out["active"] = self.active.numpy().astype(bool)
         return out
+
+
+class DeviceJets:
+    """``JetSet.apply`` for several machines' bells on the device.
+
+    ``sets`` are ``(JetSet, model)`` pairs in world order.  Per bell row it
+    returns the world force to add to the bell body's ``xfrc_applied[:3]``
+    (``f``; jets add no torque) and the pumping load ``c_pump`` to add to
+    ``dof_damping`` at the driving dof (``dofadr``, -1 for an undriven bell);
+    per world, ``JetSet.apply``'s return value (``total``, sum of |thrust|) and
+    ``last_pump_power`` (``pump``).  The add-on-top-and-take-back bookkeeping of
+    ``JetSet._unapply`` is host array ownership and stays out: on the device
+    ``dof_damping`` is rebuilt every step from base, damping split, rotors and
+    jets, so nothing accumulates to take back.
+    """
+
+    def __init__(self, sets, air, water, *, dtype=_wp.float64) -> None:
+        npdt = _np_dtype(dtype)
+        self._dtype = dtype
+        self.sets = [s for s, _ in sets]
+        self.off_np = _np.asarray(_np.cumsum([0] + [s.n for s in self.sets]), dtype=_np.int32)
+        self.n = int(self.off_np[-1])
+        self.air, self.water = air, water
+
+        def sc(a):
+            return _wp.array(_np.ascontiguousarray(a, dtype=npdt), dtype=dtype)
+
+        self._sc = sc
+        cat = lambda f: _np.concatenate([_np.asarray(f(s), float) for s in self.sets]) \
+            if self.n else _np.zeros(0)
+        self.qposadr = _np.concatenate(
+            [[int(m.jnt_qposadr[j]) if j >= 0 else -1 for j in s.joint_id] for s, m in sets]
+        ).astype(int) if self.n else _np.zeros(0, int)
+        self.dofadr = _np.concatenate(
+            [[int(m.jnt_dofadr[j]) if j >= 0 else -1 for j in s.joint_id] for s, m in sets]
+        ).astype(int) if self.n else _np.zeros(0, int)
+        self.body_id = _np.concatenate([s.body_id for s in self.sets]).astype(int) \
+            if self.n else _np.zeros(0, int)
+        rng = _np.concatenate([s.joint_range for s in self.sets]).reshape(-1, 2) \
+            if self.n else _np.zeros((0, 2))
+        self._lo, self._hi = sc(rng[:, 0]), sc(rng[:, 1])
+        vol = cat(lambda s: s.volume)
+        self._volume = sc(vol)
+        self._stroke = sc(cat(lambda s: s.stroke_fraction))
+        self._orifice = sc(cat(lambda s: s.orifice_area))
+        self._refill = sc(cat(lambda s: _np.full(s.n, s.refill_efficiency)))
+        self._axis = cat(lambda s: s.axis_local).reshape(-1, 3)
+        self._half = sc(_np.cbrt(_np.maximum(vol, 1e-9)) * 0.5)
+        self._driven = _wp.array((self.dofadr >= 0).astype(_np.int32), dtype=int)
+        self._off = _wp.array(self.off_np, dtype=int)
+
+    def host_inputs(self, datas) -> dict:
+        """``theta``, ``omega``, ``xmat``, ``xpos`` per bell row, read from each
+        world's ``MjData`` as ``JetSet.apply`` reads them (0 for an undriven bell)."""
+        th, om, xm, xp = [], [], [], []
+        for w, d in enumerate(datas):
+            a, b = self.off_np[w], self.off_np[w + 1]
+            qa, va, bid = self.qposadr[a:b], self.dofadr[a:b], self.body_id[a:b]
+            th.append(_np.where(qa >= 0, d.qpos[_np.maximum(qa, 0)], 0.0))
+            om.append(_np.where(va >= 0, d.qvel[_np.maximum(va, 0)], 0.0))
+            xm.append(d.xmat.reshape(-1, 9)[bid])
+            xp.append(d.xpos[bid])
+        return {"theta": _np.concatenate(th), "omega": _np.concatenate(om),
+                "xmat": _np.concatenate(xm), "xpos": _np.concatenate(xp)}
+
+    def loads(self, theta, omega, xmat, xpos, wind, current) -> dict:
+        """One step of every bell; numpy in, numpy out (see the class docstring)."""
+        dtype = self._dtype
+        K = make_kernels(dtype)
+        Km = _fluid_wp.make_kernels(dtype)
+        V, M = K["V"], K["M"]
+        npdt = _np_dtype(dtype)
+        n, sc = self.n, self._sc
+        nw = len(self.sets)
+        out = {"f": _wp.zeros(max(n, 1), dtype=V), "thrust": _wp.zeros(max(n, 1), dtype=dtype),
+               "c_pump": _wp.zeros(max(n, 1), dtype=dtype),
+               "total": _wp.zeros(nw, dtype=dtype), "pump": _wp.zeros(nw, dtype=dtype)}
+        if n:
+            def vec(a):
+                return _wp.array(_np.ascontiguousarray(a, dtype=npdt).reshape(-1, 3), dtype=V)
+
+            pos = vec(xpos)
+            rho = _wp.zeros(n, dtype=dtype)
+            mu = _wp.zeros(n, dtype=dtype)
+            subf = _wp.zeros(n, dtype=dtype)
+            flow = _wp.zeros(n, dtype=V)
+            _wp.launch(Km["medium"], dim=n, inputs=[
+                pos, self._half, V(*[dtype(x) for x in wind]), V(*[dtype(x) for x in current]),
+                dtype(self.air.rho), dtype(self.water.rho), dtype(self.air.mu),
+                dtype(self.water.mu), rho, mu, subf, flow])
+            om = sc(omega)
+            _wp.launch(K["jets"], dim=n, inputs=[
+                sc(theta), om, self._lo, self._hi, self._volume, self._stroke, self._orifice,
+                self._refill,
+                _wp.array(_np.ascontiguousarray(xmat, dtype=npdt).reshape(n, 3, 3), dtype=M),
+                vec(self._axis), rho, subf, out["f"], out["thrust"], out["c_pump"]])
+            _wp.launch(K["jet_sums"], dim=nw, inputs=[
+                self._off, out["thrust"], out["c_pump"], om, self._driven,
+                out["total"], out["pump"]])
+        res = {k: v.numpy()[:n] if k in ("f", "thrust", "c_pump") else v.numpy()
+               for k, v in out.items()}
+        return res
+
+
+class DeviceInflow:
+    """``InducedFlow`` for one machine per world, its state ``w`` on the device.
+
+    ``spans`` are the machines' disc spans (``InducedFlow.span``).  The cadence
+    stays on the host, as ``InducedFlow`` keeps it: ``due()`` is the per-world
+    mask of steps that update, ``tick()`` advances it.  ``update`` takes per
+    world the wing force (minus buoyancy), the machine's flow, the mean wing
+    density and the interval, and updates only the worlds marked due.  ``w`` is
+    float64 at every precision: it is a lagged state integrated over the whole
+    rollout, and the solve that feeds it runs in the kernel's precision.
+    """
+
+    UPDATE_EVERY = _InducedFlow.UPDATE_EVERY
+
+    def __init__(self, spans, *, dtype=_wp.float64) -> None:
+        npdt = _np_dtype(dtype)
+        self._dtype = dtype
+        spans = _np.maximum(_np.asarray(spans, float), 0.0)
+        self.nw = len(spans)
+
+        def sc(a):
+            return _wp.array(_np.ascontiguousarray(a, dtype=npdt), dtype=dtype)
+
+        self._sc = sc
+        self._span = sc(spans)
+        self._area = sc(_np.pi * spans**2 / 4.0)
+        self._w = _wp.zeros(self.nw, dtype=_wp.vec3d)
+        self._count = _np.zeros(self.nw, dtype=_np.int64)
+
+    def due(self):
+        return self._count % self.UPDATE_EVERY == 0
+
+    def tick(self, mask=None) -> None:
+        self._count += 1 if mask is None else _np.asarray(mask, _np.int64)
+
+    def reset(self, mask=None) -> None:
+        m = _np.ones(self.nw, bool) if mask is None else _np.asarray(mask, bool)
+        w = self._w.numpy()
+        w[m] = 0.0
+        self._w = _wp.array(w, dtype=_wp.vec3d)
+        self._count[m] = 0
+
+    def update(self, F, Vf, rho, dt, due=None):
+        """Update the worlds in ``due`` (default: ``self.due()``); returns ``w``."""
+        K = make_kernels(self._dtype)
+        npdt = _np_dtype(self._dtype)
+        V = K["V"]
+
+        def vec(a):
+            return _wp.array(_np.ascontiguousarray(a, dtype=npdt).reshape(-1, 3), dtype=V)
+
+        due = self.due() if due is None else _np.asarray(due, bool)
+        _wp.launch(K["inflow"], dim=self.nw, inputs=[
+            vec(F), vec(Vf), self._sc(rho), self._sc(_np.broadcast_to(dt, (self.nw,))),
+            self._span, self._area, _wp.array(due.astype(_np.int32), dtype=int), self._w])
+        return self.w
+
+    @property
+    def w(self):
+        return self._w.numpy().astype(float)
+
+
+def _ints(a):
+    return _wp.array(_np.ascontiguousarray(a, dtype=_np.int32), dtype=int)
+
+
+class DeviceDamping:
+    """``ImplicitAeroDamping`` for several machines, its state on the device.
+
+    ``dampers`` are the machines' ``ImplicitAeroDamping`` in world order (its
+    ``anc``, ``base`` and strip half-heights are read from them, not rebuilt);
+    ``body_ids`` each machine's strip-to-body map (``panels.body_id``).  One
+    ``step`` is what the batched path does between two ``mj_step``s
+    (batchroll.py:490-500): ``due()`` read before ``apply``, the strip damping
+    ``b`` formed, B projected onto the dofs on due worlds only, the wet set and
+    its staleness, the count, and the outputs ``dof_damping = base + B`` and
+    ``qfrc_applied = B qvel`` (``clear`` on a world whose ``enabled`` is 0).
+    Jets and rotors add to both after it, as on the host.
+
+    The sea is the flat calm one of ``fluid_wp``: ``depth = -z``, so the wet
+    test does not read the time.  ``last_b`` is recomputed, not accumulated,
+    and is kept in the kernel's precision.
+    """
+
+    def __init__(self, dampers, body_ids, *, dtype=_wp.float64) -> None:
+        npdt = _np_dtype(dtype)
+        self._dtype = dtype
+        self.dampers = list(dampers)
+        nw = self.nw = len(self.dampers)
+        models = [d.model for d in self.dampers]
+        body_ids = [_np.asarray(b, int) for b in body_ids]
+        self.poff = _np.cumsum([0] + [len(b) for b in body_ids]).astype(_np.int32)
+        self.boff = _np.cumsum([0] + [m.nbody for m in models]).astype(_np.int32)
+        self.voff = _np.cumsum([0] + [m.nv for m in models]).astype(_np.int32)
+        self.aoff = _np.cumsum([0] + [m.nbody * m.nv for m in models]).astype(_np.int32)
+        self.n, self.nb, self.nv = int(self.poff[-1]), int(self.boff[-1]), int(self.voff[-1])
+
+        def sc(a):
+            return _wp.array(_np.ascontiguousarray(a, dtype=npdt), dtype=dtype)
+
+        self._sc = sc
+        world = _np.concatenate([_np.full(len(b), w) for w, b in enumerate(body_ids)])
+        sbody = _np.concatenate([self.boff[w] + b for w, b in enumerate(body_ids)])
+        sroot = _np.concatenate([self.boff[w] + models[w].body_rootid[b]
+                                 for w, b in enumerate(body_ids)])
+        for d, b in zip(self.dampers, body_ids):
+            if d._medium is None or d._half is None or len(d._half) != len(b):
+                raise ValueError("DeviceDamping needs each damper's medium and one "
+                                 "half-height per strip, as FluidSolver builds it")
+        self._world = _ints(world)
+        self._sbody, self._sroot = _ints(sbody), _ints(sroot)
+        self._body_world = _ints(_np.repeat(_np.arange(nw), _np.diff(self.boff)))
+        self._dof_world = _ints(_np.repeat(_np.arange(nw), _np.diff(self.voff)))
+        self._poff, self._boff = _ints(self.poff), _ints(self.boff)
+        self._voff, self._aoff = _ints(self.voff), _ints(self.aoff)
+        self._anc = _ints(_np.concatenate([d.anc.astype(_np.int32).ravel()
+                                           for d in self.dampers]))
+        self._base = sc(_np.concatenate([d.base for d in self.dampers]))
+        self._half = sc(_np.concatenate([d._half for d in self.dampers]))
+        K = make_kernels(dtype)
+        V, M = K["V"], K["M"]
+        self._V = V
+        self._B0 = _wp.zeros(max(self.nb, 1), dtype=dtype)
+        self._B1 = _wp.zeros(max(self.nb, 1), dtype=V)
+        self._B2 = _wp.zeros(max(self.nb, 1), dtype=M)
+        self._b = _wp.zeros(max(self.n, 1), dtype=dtype)
+        self.reset()
+
+    def reset(self) -> None:
+        """``ImplicitAeroDamping.reset`` for every world."""
+        nw = self.nw
+        self._count = _wp.zeros(nw, dtype=int)
+        self._stale = _wp.zeros(nw, dtype=int)
+        self._have_ref = _wp.zeros(nw, dtype=int)
+        self._have_prev = _wp.zeros(nw, dtype=int)
+        self._due = _wp.zeros(nw, dtype=int)
+        self._wet_ref = _wp.zeros(max(self.n, 1), dtype=int)
+        self._prev_pos = _wp.zeros(max(self.n, 1), dtype=self._V)
+        self._last_b = _wp.zeros(max(self.nv, 1), dtype=self._dtype)
+
+    def step(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale,
+             subtree_com, cdof, qvel, enabled=None) -> dict:
+        """One step; numpy in, numpy out.
+
+        Per strip (worlds back to back): ``pos`` world position, ``q``,
+        ``area``, ``lift``, ``drag`` (``fluid_wp.strip_loads``' ``D``, which already
+        carries the bluff term: the Mojo path's ``drag + d_bluff``), ``rho``,
+        ``ar``, ``is_wing``.  Per world: ``lift_scale``,
+        ``enabled`` (``implicit_damping``; default all on).  Per body:
+        ``subtree_com``; per dof: ``cdof (nv, 6)``, ``qvel``.  Returns
+        ``dof_damping``, ``qfrc_applied``, ``due`` (whether each world formed B
+        this step) and ``last_b``.
+        """
+        dtype = self._dtype
+        K = make_kernels(dtype)
+        V = self._V
+        npdt = _np_dtype(dtype)
+        sc = self._sc
+
+        def vec(a):
+            return _wp.array(_np.ascontiguousarray(a, dtype=npdt).reshape(-1, 3), dtype=V)
+
+        nw, n, nb, nv = self.nw, self.n, self.nb, self.nv
+        en = _np.ones(nw, _np.int32) if enabled is None else _np.asarray(enabled, _np.int32)
+        cdof = _np.asarray(cdof, float).reshape(-1, 6)
+        p = vec(pos)
+        _wp.launch(K["damp_due"], dim=nw, inputs=[self._count, self._stale, self._due])
+        if n:
+            _wp.launch(K["strip_b"], dim=n, inputs=[
+                sc(q), sc(area), sc(lift), sc(drag), sc(rho), sc(ar),
+                _ints(_np.asarray(is_wing) != 0), sc(_np.broadcast_to(lift_scale, (nw,))),
+                self._world, self._b])
+        if nb:
+            _wp.launch(K["body_moments"], dim=nb, inputs=[
+                self._poff, self._body_world, self._due, self._sbody, self._sroot, p,
+                vec(subtree_com), self._b, self._B0, self._B1, self._B2])
+        dd = _wp.zeros(max(nv, 1), dtype=dtype)
+        qf = _wp.zeros(max(nv, 1), dtype=dtype)
+        if nv:
+            _wp.launch(K["dof_project"], dim=nv, inputs=[
+                self._boff, self._voff, self._aoff, self._dof_world, self._due, self._anc,
+                vec(cdof[:, :3]), vec(cdof[:, 3:]), self._B0, self._B1, self._B2,
+                self._last_b])
+        # A read back for the parity test's due sequence; A2's step graph drops it.
+        due = self._due.numpy().astype(bool)
+        _wp.launch(K["wet_stale"], dim=nw, inputs=[
+            self._poff, self._due, p, self._half, self._wet_ref, self._prev_pos,
+            self._have_ref, self._have_prev, self._stale, self._count])
+        if nv:
+            _wp.launch(K["damp_out"], dim=nv, inputs=[
+                self._dof_world, _ints(en), self._base, self._last_b, sc(qvel), dd, qf])
+        return {"dof_damping": dd.numpy()[:nv], "qfrc_applied": qf.numpy()[:nv],
+                "due": due, "last_b": self._last_b.numpy()[:nv]}
+
+
+def added_mass_into_model(dry_mass, dry_inertia, m_body, lever2, boff, *, dtype=_wp.float64):
+    """batchroll.finish's added-mass write for many worlds; numpy in, numpy out.
+
+    Per body, worlds back to back from ``boff``: ``dry_mass``, ``dry_inertia
+    (nb, 3)``, ``m_body`` (the step's added mass) and ``lever2``.  Returns
+    ``body_mass`` and ``body_inertia``, each world's own: A2 writes them into
+    the per-world (batched) ``Model`` fields.
+    """
+    K = make_kernels(dtype)
+    V = K["V"]
+    npdt = _np_dtype(dtype)
+
+    def sc(a):
+        return _wp.array(_np.ascontiguousarray(a, dtype=npdt), dtype=dtype)
+
+    boff = _np.asarray(boff, _np.int32)
+    nb = int(boff[-1])
+    bm = _wp.zeros(nb, dtype=dtype)
+    bi = _wp.zeros(nb, dtype=V)
+    _wp.launch(K["added_mass"], dim=nb, inputs=[
+        _ints(boff), _ints(_np.repeat(_np.arange(len(boff) - 1), _np.diff(boff))),
+        sc(dry_mass), _wp.array(_np.ascontiguousarray(dry_inertia, dtype=npdt).reshape(-1, 3),
+                                dtype=V),
+        sc(m_body), sc(lever2), bm, bi])
+    return bm.numpy(), bi.numpy()
 
 
 def servo_command(target, rate, lead, world, has_rate, *, dtype=_wp.float64):
