@@ -765,13 +765,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `assemble_bodies` | function | 463 | `(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *, dtype=_wp.float64)` | Buoyancy, panel-to-body assembly and ``finish_bodies``, on the device; numpy out. |
+| `assemble_bodies` | function | 477 | `(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *, dtype=_wp.float64)` | Buoyancy, panel-to-body assembly and ``finish_bodies``, on the device; numpy out. |
+| `entrain_bodies` | function | 514 | `(fb, m_new, m_old, lever2, vel, h, *, dtype=_wp.float64)` | ``entrainment_reaction`` on the device; returns the new ``fb (nb, 6)``. |
 | `make_kernels` | function | 38 | `(T)` | Return the kernels for precision ``T`` as a dict (``strip``, ``unsteady``, |
-| `medium_and_added_mass` | function | 422 | `(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, ext, chord, dr, volume, is_wing, scale, *, dtype=_wp.float64)` | Flat-calm medium and the strip added mass, on the device; numpy out. |
-| `strip_loads` | function | 335 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
-| `WagnerLag` | class | 372 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
-| `WagnerLag.__init__` | method | 380 | `(self, n: int, dtype=_wp.float64) -> None` | — |
-| `WagnerLag.update` | method | 395 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
+| `medium_and_added_mass` | function | 436 | `(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, ext, chord, dr, volume, is_wing, scale, *, dtype=_wp.float64)` | Flat-calm medium and the strip added mass, on the device; numpy out. |
+| `strip_loads` | function | 349 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
+| `WagnerLag` | class | 386 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
+| `WagnerLag.__init__` | method | 394 | `(self, n: int, dtype=_wp.float64) -> None` | — |
+| `WagnerLag.update` | method | 409 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 

@@ -326,9 +326,23 @@ def make_kernels(T):
         fb_f[b] = fb_f[b] * s + V(T(0.0), T(0.0), m_body[b] * gravity)
         fb_t[b] = fb_t[b] * s
 
+    @_wp.kernel
+    def entrain_wp(
+        fb_f: _wp.array(dtype=V), fb_t: _wp.array(dtype=V), m_new: _wp.array(dtype=T),
+        m_old: _wp.array(dtype=T), lever2: _wp.array(dtype=T), w: _wp.array(dtype=V),
+        v: _wp.array(dtype=V), h: T,
+    ):
+        # entrainment_reaction: the -dm/dt v half of -d(m_a v)/dt, one-sided (growth only).
+        # ``w`` and ``v`` are the body's angular and linear velocity at its centre of mass.
+        b = _wp.tid()
+        dm = _wp.max(m_new[b] - m_old[b], T(0.0)) / h
+        fb_f[b] = fb_f[b] - dm * v[b]
+        fb_t[b] = fb_t[b] - (dm * lever2[b]) * w[b]
+
     _KERNELS[T] = {"strip": strip_loads, "unsteady": unsteady_update,
                    "medium": medium_flat, "added_mass": added_mass,
-                   "assemble": assemble_panels, "finish": finish_bodies_wp, "V": V}
+                   "assemble": assemble_panels, "finish": finish_bodies_wp,
+                   "entrain": entrain_wp, "V": V}
     return _KERNELS[T]
 
 
@@ -495,3 +509,30 @@ def assemble_bodies(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *,
         fb_f, fb_t, sc(m_body), total, dtype(limit), dtype(GRAVITY)])
     fb = _np.concatenate([fb_f.numpy(), fb_t.numpy()], axis=1)
     return {"F": F_out.numpy(), "fb": fb, "clamped": float(total.numpy()[0]) > limit}
+
+
+def entrain_bodies(fb, m_new, m_old, lever2, vel, h, *, dtype=_wp.float64):
+    """``entrainment_reaction`` on the device; returns the new ``fb (nb, 6)``.
+
+    ``vel (nb, 6)`` is angular then linear at each body's centre of mass, as in
+    physics.fluid.  The input ``fb`` is not modified.
+    """
+    K = make_kernels(dtype)
+    V = K["V"]
+    npdt = _np.float64 if dtype == _wp.float64 else _np.float32
+    nb = len(m_new)
+
+    def vec(a):
+        return _wp.array(_np.ascontiguousarray(a, dtype=npdt), dtype=V)
+
+    def sc(a):
+        return _wp.array(_np.ascontiguousarray(a, dtype=npdt), dtype=dtype)
+
+    fb = _np.asarray(fb, dtype=npdt)
+    vel = _np.asarray(vel, dtype=npdt)
+    fb_f = vec(fb[:, :3])
+    fb_t = vec(fb[:, 3:])
+    _wp.launch(K["entrain"], dim=nb, inputs=[
+        fb_f, fb_t, sc(m_new), sc(m_old), sc(lever2), vec(vel[:, :3]), vec(vel[:, 3:]),
+        dtype(h)])
+    return _np.concatenate([fb_f.numpy(), fb_t.numpy()], axis=1)

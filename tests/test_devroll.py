@@ -339,6 +339,41 @@ def test_the_device_assembly_is_the_numpy_finish_bodies() -> None:
                   out["clamped"] == clamped_ref)
 
 
+def test_the_device_entrainment_is_the_numpy_entrainment_reaction() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the entrainment reaction agrees with physics.fluid.entrainment_reaction", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.devroll.fluid_wp import entrain_bodies
+    from dytiscidae.physics.fluid import entrainment_reaction
+
+    rng = np.random.default_rng(23)
+    nb = 9
+    m_old = rng.uniform(1e-3, 2e-2, nb)
+    # Growth on some bodies, shedding on others: the one-sided max must drop the shedding.
+    m_new = m_old + rng.normal(0.0, 3e-3, nb)
+    lever2 = rng.uniform(1e-4, 1e-2, nb)
+    vel = rng.normal(size=(nb, 6)) * 2.0
+    fb = rng.normal(size=(nb, 6))
+    h = 0.004
+
+    ref = fb.copy()
+    entrainment_reaction(ref, m_new, m_old, lever2, vel, h)
+    check("the draw has both growth and shedding", bool(np.any(m_new > m_old))
+          and bool(np.any(m_new < m_old)))
+    for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+        name = "float64" if dtype == wp.float64 else "float32"
+        out = entrain_bodies(fb, m_new, m_old, lever2, vel, h, dtype=dtype)
+        scale = max(float(np.abs(ref).max()), 1e-30)
+        err = float(np.abs(out - ref).max()) / scale
+        check(f"{name}: entrainment wrench within {tol:g} of its maximum",
+              err <= tol, f"{err:.2e}")
+
+
 def test_the_device_replay_is_not_built_yet() -> None:
     skip("the device fluid replays FluidSolver.apply for 2000 steps (A1a replay)",
          "the Wagner lag, inflow, medium and added mass are A1a and A1b slices, not built")
@@ -350,6 +385,7 @@ def main() -> int:
                  test_the_wagner_lag_is_the_numpy_unsteady_state,
                  test_the_device_medium_and_added_mass_are_the_numpy_ones,
                  test_the_device_assembly_is_the_numpy_finish_bodies,
+                 test_the_device_entrainment_is_the_numpy_entrainment_reaction,
                  test_the_device_replay_is_not_built_yet]
     for fn in functions:
         print(f"{fn.__name__}")

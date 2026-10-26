@@ -2114,6 +2114,22 @@ MUTATIONS: tuple = (
         defect="the limiter scales the force but not the torque, so a clamped machine keeps its "
                "unbounded moments and tumbles on them",
         suites=("test_devroll",), item="A1a assembly"),
+    Mutation(
+        id="device-entrainment-is-two-sided",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="        dm = _wp.max(m_new[b] - m_old[b], T(0.0)) / h",
+        replace="        dm = (m_new[b] - m_old[b]) / h",
+        defect="shed mass is reacted too, so a surfacing body is pushed out of the water by its "
+               "own density blend (the two-sided form ran the eel to 1.1e6 m/s)",
+        suites=("test_devroll",), item="A1b entrainment"),
+    Mutation(
+        id="device-entrainment-swaps-the-velocity",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="        fb_f[b] = fb_f[b] - dm * v[b]",
+        replace="        fb_f[b] = fb_f[b] - dm * w[b]",
+        defect="the entrained momentum is reacted at the angular velocity, so a translating body "
+               "gets no linear reaction",
+        suites=("test_devroll",), item="A1b entrainment"),
     # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
     Mutation(
         id="grpo-advantage-across-the-whole-batch",
