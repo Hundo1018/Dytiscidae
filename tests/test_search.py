@@ -4258,6 +4258,126 @@ def test_a_reevaluation_runs_at_the_stored_basis_cpu() -> None:
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_device_scores_are_pooled_draw_means() -> None:
+    """IMPL_1010 A6 (CPU, stub device evaluator; §D answer 3): under
+    ``evaluator == "device"`` a candidate is placed on the pooled mean of its
+    ``k_mean`` draws, a re-evaluation adds ``k_mean`` more to the elite's
+    ``draw_stats`` and re-places it on the new pooled mean, and M3 refuses to
+    combine with it.  The stub stands in for ``loop._device_eval`` only: the
+    pooling (``_device_score``, ``add_draw_stats``, ``pooled_result``), the
+    placement and the re-evaluation are the loop's own.
+
+    Bars, written before the first run: (a) the elite's water score is the mean
+    of the draws fed (not draw 0), its ``draw_stats`` n is k_mean, and after a
+    re-evaluation its fitness and obj[0] equal ``_score_candidate`` of
+    ``pooled_result`` rebuilt from its ``draw_stats``, exactly; (b) an incumbent
+    entered on lucky draws (mean 0.9) rejects a challenger at 0.7, a
+    re-evaluation at 0.3 takes it to n = 2 k_mean and a pooled 0.6 (the mean of
+    all eight draws fed), and the same challenger is then accepted and holds the
+    cell; (c) ``placement_draws=3`` with ``evaluator="device"`` raises
+    ``ValueError``."""
+    print("\nloop: device scores are pooled draw means, and incumbents keep being "
+          "re-evaluated (stub device evaluator)")
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.evolution import loop
+
+    K = 4
+
+    def fake_dev(phenos, ctrls, cfg, *, spec, seeds, shared):
+        out = []
+        for p, s in zip(phenos, seeds):
+            vals = FEED[p]
+            draws = [{"seed": int(s) + d, "water": NS(competence=v), "air": NS(competence=0.0)}
+                     for d, v in enumerate(vals)]
+            out.append(NS(k_mean=cfg.k_mean, draws=draws, notes=[],
+                          stats=lambda m, _d=draws, _k=cfg.k_mean: loop.draw_stats(
+                              [x[m].competence for x in _d[:_k]])))
+        return out
+
+    FEED = {"inc": [0.95, 0.85, 0.9, 0.9], "inc-re": [0.3, 0.3, 0.3, 0.3],
+            "chal": [0.7, 0.7, 0.7, 0.7]}
+    saved = {k: getattr(loop, k) for k in (
+        "episode_features", "behaviour_descriptor", "objectives",
+        "_meta_light", "critic_features", "_meta", "_device_eval")}
+    loop.episode_features = lambda r, p: np.zeros(16)
+    loop.behaviour_descriptor = lambda p, r: np.array([0.5, 0.5])
+    loop.objectives = lambda p, r: np.array([0.0, 3.0, 2.0])
+    loop._meta_light = lambda p, r: {}
+    loop.critic_features = lambda m, r: np.zeros(4)
+    loop._meta = lambda p, r, c: {"air": 0.0, "water": r.segments["water"].competence,
+                                  "land": 0.0, "eval_seed": r.eval_seed}
+    loop._device_eval = fake_dev
+    try:
+        state, _events = _floor_state(loop)
+        state.config = loop.SearchConfig(evaluator="device", k_mean=K, k_sampled=0,
+                                         reeval_per_generation=4)
+        for k in range(1, 41):
+            state.curriculum.observe_blend((k / 40) ** 1.5, k / 40, 0)
+        state.archive.generation = 3
+
+        def scored(tag, seed):
+            r = _floor_result(FEED[tag][0])
+            r.eval_seed = seed
+            return loop._device_score([tag], [None], [r], state.config, spec=None,
+                                      seeds=[seed], shared=None)[0]
+
+        inc = scored("inc", 11)
+        st = loop._place(state, "inc", None, inc, None, None, ["random"])
+        elite = state.archive.cells[next(iter(state.archive.cells))]
+        ds = elite.meta.get("draw_stats", {}).get("water", {})
+        check("(a) the candidate enters on the mean of its k_mean draws, not draw 0",
+              st == "new" and ds.get("n") == K
+              and abs(elite.meta["water"] - float(np.mean(FEED["inc"]))) < 1e-12
+              and elite.meta["water"] != FEED["inc"][0],
+              f"{st}; water {elite.meta.get('water')} n {ds.get('n')} draw0 {FEED['inc'][0]}")
+        check("(a) and carries no N11 median buffer under the device path",
+              "draws" not in elite.meta and elite.meta.get("scored_by") == {"water": "device"},
+              f"{sorted(elite.meta)}")
+
+        chal = scored("chal", 22)
+        before = loop._dry_status(state, None, chal, None)
+        check("(b) while the incumbent's lucky draws stand, the challenger at 0.7 is rejected",
+              before == "rejected", f"{before}; incumbent fitness {elite.fitness:.4f}")
+
+        re = scored("inc-re", 33)
+        win = sum(len(w) for w in state.curriculum._recent.values())
+        out = loop._reevaluate_pooled(state, elite, None, re, None)
+        ds = elite.meta["draw_stats"]["water"]
+        fed = FEED["inc"] + FEED["inc-re"]
+        check("(b) a re-evaluation adds exactly k_mean draws and re-places on the pooled mean "
+              "of every draw fed",
+              out == "recorded" and ds["n"] == 2 * K
+              and abs(elite.meta["water"] - float(np.mean(fed))) < 1e-12,
+              f"{out}; n {ds['n']}; water {elite.meta['water']} vs {np.mean(fed)}")
+        again = loop._score_candidate(state, None,
+                                      loop.pooled_result(re, elite.meta["draw_stats"]),
+                                      elite, commit=False, at_cell=elite.cell)
+        check("(a) fitness and obj[0] equal the score of the pooled mean rebuilt from draw_stats",
+              elite.fitness == again["fit"] and float(elite.objectives[0]) == float(again["obj"][0]),
+              f"fit {elite.fitness} vs {again['fit']}; obj0 {elite.objectives[0]} vs {again['obj'][0]}")
+        check("(b) the re-evaluation fed no window",
+              win == sum(len(w) for w in state.curriculum._recent.values()))
+        st2 = loop._place(state, "chal", None, chal, None, None, ["random"])
+        holder = state.archive.cells[elite.cell]
+        check("(b) once the incumbent's pooled mean falls below it, the challenger takes the cell",
+              st2 in ("improved", "new") and holder.genome == "chal",
+              f"{st2}; cell held by {holder.genome}; fronts "
+              f"{[(e.genome, round(e.fitness, 4)) for e in state.archive.fronts[elite.cell]]}")
+    finally:
+        for k, v in saved.items():
+            setattr(loop, k, v)
+    try:
+        loop.SearchConfig(evaluator="device", placement_draws=3)
+        raised = False
+    except ValueError:
+        raised = True
+    check("(c) placement_draws=3 with evaluator='device' raises ValueError", raised)
+    check("and the default evaluator is still the batched one, at K_m 50, K_s 10",
+          (loop.SearchConfig().evaluator, loop.SearchConfig().k_mean,
+           loop.SearchConfig().k_sampled) == ("batched", 50, 10))
+
+
 def test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median() -> None:
     """ARCH51_SPEC L9 (GPU): a real, sharded search re-runs archived
     representatives at fresh seeds; the re-runs feed no window, and an elite
@@ -7474,6 +7594,7 @@ def main() -> int:
         test_verification_offers_designs_not_yet_verified,
         test_an_archived_elite_is_re_run_at_a_fresh_seed_and_kept_at_its_median_cpu,
         test_a_reevaluation_runs_at_the_stored_basis_cpu,
+        test_device_scores_are_pooled_draw_means,
         test_an_elite_is_re_measured_at_fresh_draws_and_kept_at_its_median,
         test_the_refinement_funnel_refines_only_what_it_selects,
         test_the_distance_curriculum_steps_back_only_on_evidence,

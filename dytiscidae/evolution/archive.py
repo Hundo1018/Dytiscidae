@@ -368,6 +368,17 @@ class Archive:
         removed = self._settle(elite.cell)
         return {"n": len(draws), "median_base": float(med["base"]), "removed": removed}
 
+    def rescore(self, elite: Elite, fitness: float, objectives, at_floor: bool,
+                meta: dict | None = None) -> list:
+        """``elite``'s score replaced (the same object: its lineage counts and
+        identity stay) and its cell's front re-settled by dominance; returns the
+        members removed.  IMPL_1010 A6's re-evaluation on the pooled mean."""
+        elite.fitness = float(fitness)
+        elite.objectives = np.asarray(objectives, float)
+        elite.at_floor = bool(at_floor)
+        elite.meta.update(meta or {})
+        return self._settle(elite.cell)
+
     def _settle(self, cell) -> list:
         """Re-establish a front among its own members after a score changed."""
         front = self.fronts.get(cell) or []

@@ -176,6 +176,19 @@ class SearchConfig:
     reeval_per_generation: int = 0
     #: Draws an elite's buffer keeps; its score is the lower median (N11).
     reeval_depth: int = 8
+    #: Which path scores Tier-1 (IMPL_1010 A6).  "batched": ``evaluate_tier1_batch``
+    #: at one draw, every run to date.  "device": air and water also run on the
+    #: MJWarp path at ``k_mean`` draws at the policy mean (+ ``k_sampled``
+    #: sampled), placed on the pooled mean of every draw the design has had
+    #: (§D answer 3); land and the crossings stay on the batched pass at K = 1
+    #: until A4b, and each result records which path scored each medium.
+    evaluator: str = "batched"
+    #: Draws at the policy mean per candidate and per re-evaluation ("device").
+    k_mean: int = 50
+    #: Sampled draws per candidate ("device"); recorded, not yet fed to PPO.
+    k_sampled: int = 10
+    #: CUDA streams the device bodies are launched on (D-A5 pending).
+    device_streams: int = 4
 
     # Controller refinement.  Each step is one extra batched Tier-1 for the
     # whole generation, so a generation costs (1 + steps) evaluations.
@@ -389,6 +402,14 @@ class SearchConfig:
         if int(self.placement_draws or 1) > 1 and int(self.controller_refine_steps or 0) > 0:
             raise ValueError("placement_draws > 1 with controller_refine_steps > 0 is "
                              "not built: refinement's trials are scored on one draw")
+        if self.evaluator not in ("batched", "device"):
+            raise ValueError(f"evaluator must be 'batched' or 'device', not {self.evaluator!r}")
+        if self.evaluator == "device":
+            if int(self.placement_draws or 1) > 1:
+                raise ValueError("placement_draws > 1 with evaluator 'device' is not built: "
+                                 "the device places on the pooled mean of its k_mean draws")
+            if int(self.k_mean) < 1 or int(self.k_sampled) < 0:
+                raise ValueError("evaluator 'device' needs k_mean >= 1 and k_sampled >= 0")
 
 
 @dataclass(eq=False)
@@ -732,6 +753,20 @@ def evaluate_candidates(
     if log is not None and "pre" in log:
         log["pre"] = {i: log["pre"][slot] for slot, i in enumerate(passed)}
 
+    if getattr(cfg, "evaluator", "batched") == "device":
+        # IMPL_1010 A6: air and water at k_mean + k_sampled draws on the device,
+        # on the bases the batched pass above identified (or was handed), each
+        # candidate's draw 0 its own eval_seed.  The batched pass stays: it
+        # identifies, feeds the PPO buffer, and scores land and the crossings.
+        t0 = _time.perf_counter()
+        with _phase(cost, "evaluate.device"):
+            results = _device_score(
+                [phenos[i] for i in passed], ctrls, results, cfg, spec=spec,
+                seeds=(draw if isinstance(draw, list) else [draw] * len(passed)),
+                shared=shared)
+        if log is not None:
+            log["device_wall"] = round(_time.perf_counter() - t0, 3)
+
     for slot, i in enumerate(passed):
         out[i] = (phenos[i], results[slot], ctrls[slot])
     return out
@@ -946,6 +981,132 @@ def median_draw(results: list):
     """The result of the median draw by ``draw_key`` (the lower one of two)."""
     order = sorted(range(len(results)), key=lambda i: (draw_key(results[i]), i))
     return results[order[(len(results) - 1) // 2]]
+
+
+# ------------------------------------------------- K-draw scoring (IMPL_1010 A6)
+#
+# Placement under ``evaluator == "device"`` is on the pooled mean of every draw
+# a design has had: ``k_mean`` at entry, ``k_mean`` more per re-evaluation, no
+# lower bound (§D answer 3; Flageat & Cully, arXiv 2302.00463; Extract-QD,
+# arXiv 2502.06585).  An elite keeps the sufficient statistics per medium
+# (``meta["draw_stats"]``), not the draws.
+
+#: The media the device path scores (A4a); land and the crossings are scored on
+#: the batched pass at K = 1 until A4b.
+DEVICE_MEDIA = ("air", "water")
+
+#: ``finalise_tier1``'s two clamp outcomes, read back to recompute a pooled
+#: result's mission fraction (the batched result does not store ``clamped_any``).
+_CLAMP_NOTE = "force limiter engaged (penalised, not disqualified)"
+_CLAMP_EXPLOIT = "scored well while outside the fluid model's valid envelope"
+
+
+def draw_stats(values) -> dict:
+    """Sufficient statistics of one medium's draws: ``n``, ``sum``, ``sum_sq``."""
+    xs = [float(v) for v in values]
+    return {"n": len(xs), "sum": float(sum(xs)), "sum_sq": float(sum(x * x for x in xs))}
+
+
+def add_draw_stats(a: dict, b: dict) -> dict:
+    """Per medium, the statistics of ``a``'s draws and ``b``'s together."""
+    out = {}
+    for m in sorted(set(a or {}) | set(b or {})):
+        x, y = (a or {}).get(m), (b or {}).get(m)
+        if x is None or y is None:
+            out[m] = dict(x if y is None else y)
+            continue
+        out[m] = {"n": int(x["n"]) + int(y["n"]), "sum": float(x["sum"]) + float(y["sum"]),
+                  "sum_sq": float(x["sum_sq"]) + float(y["sum_sq"])}
+    return out
+
+
+def pooled_mean(s: dict) -> float:
+    """A medium's pooled mean from its statistics; 0 with no draws."""
+    return float(s["sum"]) / int(s["n"]) if s and int(s["n"]) > 0 else 0.0
+
+
+def pooled_se(s: dict) -> float:
+    """Standard error of the pooled mean, ``sd / sqrt(n)`` (sd with n - 1)."""
+    n = int(s["n"]) if s else 0
+    if n < 2:
+        return 0.0
+    var = max(float(s["sum_sq"]) - float(s["sum"]) ** 2 / n, 0.0) / (n - 1)
+    return float(np.sqrt(var / n))
+
+
+def result_draw_stats(result) -> dict:
+    """The draws ``result`` carries: its ``draw_stats`` when the device scored it,
+    otherwise one draw per medium from its segments."""
+    st = getattr(result, "draw_stats", None)
+    if st:
+        return {m: dict(v) for m, v in st.items()}
+    return {m: draw_stats([float(s.competence)]) for m, s in (result.segments or {}).items()}
+
+
+def pooled_result(result, stats: dict):
+    """``result`` with each medium's competence the pooled mean of ``stats``, and
+    its mission fraction recomputed from them by ``finalise_tier1`` (the same
+    rule the evaluators use).  The other numbers are ``result``'s own draw's."""
+    import copy as _copy
+
+    from ..envs.triphibian import MissionResult
+
+    out = _copy.copy(result)
+    out.segments = {m: _copy.copy(s) for m, s in (result.segments or {}).items()}
+    for m, s in out.segments.items():
+        if m in stats:
+            s.competence = pooled_mean(stats[m])
+    out.draw_stats = {m: dict(v) for m, v in stats.items()}
+    if isinstance(out, MissionResult) and out.tier > 0:
+        from ..envs.evaluate import finalise_tier1
+        clamped = _CLAMP_NOTE in (result.notes or []) or result.exploit == _CLAMP_EXPLOIT
+        out.notes = [n for n in (result.notes or []) if n != _CLAMP_NOTE]
+        out.exploit = ""
+        finalise_tier1(out, clamped)
+    return out
+
+
+def _device_eval(phenos, ctrls, cfg, *, spec, seeds, shared):
+    """``evaluate_tier1_device`` at the config's K; one ``DeviceDraws`` per body."""
+    from ..envs.devroll.rollout_wp import evaluate_tier1_device
+    return evaluate_tier1_device(
+        phenos, controllers=ctrls, seeds=[int(s) for s in seeds], k_mean=int(cfg.k_mean),
+        k_sampled=int(cfg.k_sampled), spec=spec, segment_seconds=cfg.segment_seconds,
+        shared=shared, streams=int(getattr(cfg, "device_streams", 1)))
+
+
+def _device_score(phenos, ctrls, results, cfg, *, spec, seeds, shared):
+    """The batched results with air and water replaced by the pooled mean of the
+    device's ``k_mean`` draws (draw 0 = each candidate's own seed).  Each result
+    carries ``draw_stats`` (device media ``k_mean`` draws, the others the one
+    batched draw), ``draws`` (n, per-medium mean and standard error, the median
+    draw by ``draw_key`` and its seed) and ``scored_by`` per medium."""
+    from types import SimpleNamespace as _NS
+
+    live = [j for j, r in enumerate(results) if r is not None and r.tier > 0]
+    if not live:
+        return results
+    dev = _device_eval([phenos[j] for j in live], [ctrls[j] for j in live], cfg,
+                       spec=spec, seeds=[seeds[j] for j in live], shared=shared)
+    out = list(results)
+    for j, dd in zip(live, dev):
+        stats = result_draw_stats(results[j])
+        for m in DEVICE_MEDIA:
+            if m in (results[j].segments or {}):
+                stats[m] = dd.stats(m)
+        pooled = pooled_result(results[j], stats)
+        rows = dd.draws[:dd.k_mean]
+        med = median_draw([_NS(segments={m: r[m] for m in DEVICE_MEDIA if m in r}, seed=r["seed"])
+                           for r in rows])
+        pooled.draws = {"n": int(dd.k_mean), "k_sampled": int(cfg.k_sampled),
+                        "mean": {m: round(pooled_mean(stats[m]), 6) for m in stats},
+                        "se": {m: round(pooled_se(stats[m]), 6) for m in stats},
+                        "median_seed": int(med.seed)}
+        pooled.scored_by = {m: ("device" if m in DEVICE_MEDIA else "batched")
+                            for m in (results[j].segments or {})}
+        pooled.notes = list(pooled.notes) + list(dd.notes)
+        out[j] = pooled
+    return out
 
 
 def _place_on_median_draw(phenos, ctrls, results, cfg, n_draws, *, spec, seed,
@@ -1361,7 +1522,14 @@ def _place(state: SearchState, genome, pheno, result, ctrl, parent, operators) -
         )
         meta["scout_features"] = [float(x) for x in sfeat]
 
-    if int(getattr(cfg, "reeval_per_generation", 0)) > 0:
+    device = getattr(cfg, "evaluator", "batched") == "device"
+    if device:
+        # A6: the candidate enters with its draws' statistics; its competences
+        # (and so ``fit`` and ``obj[0]``) are already their pooled means.
+        meta["draw_stats"] = result_draw_stats(result)
+        meta["device_draws"] = dict(getattr(result, "draws", None) or {})
+        meta["scored_by"] = dict(getattr(result, "scored_by", None) or {})
+    if int(getattr(cfg, "reeval_per_generation", 0)) > 0 and not device:
         meta["draws"] = [{"base": base, "fit": fit, "obj": [float(x) for x in obj],
                           "at_floor": bool(sc["at_floor"]),
                           "meta": {k: meta[k] for k in SCORED_KEYS if k in meta}}]
@@ -1412,6 +1580,38 @@ def _reevaluate(state, elite, pheno, result, ctrl) -> str:
                                "cell": cell, "status": "exploit", "reason": result.exploit})
         return "exploit"
     sc = _score_candidate(state, pheno, result, elite, commit=False, at_cell=elite.cell)
+    meta = _rescored_meta(state, elite, pheno, result, ctrl, sc, gen)
+    draw = {"base": sc["base"], "fit": sc["fit"], "obj": [float(x) for x in sc["obj"]],
+            "at_floor": bool(sc["at_floor"]), "meta": {k: meta[k] for k in SCORED_KEYS if k in meta}}
+    # The buffer's first entry is the elite's own draw.  ``record_draw`` would
+    # synthesise it with an empty ``meta``, and if it later became the median its
+    # eval_seed, gen, media and policy would not come back; so seed it here with
+    # the scored keys the elite carries now (an archive restored from before N11,
+    # or a seed elite, has no buffer yet).
+    if not elite.meta.get("draws"):
+        elite.meta["draws"] = [{
+            "base": float((elite.meta.get("score_parts") or {}).get("blend", elite.fitness)),
+            "fit": float(elite.fitness),
+            "obj": [float(x) for x in elite.objectives],
+            "at_floor": bool(elite.at_floor),
+            "meta": {k: elite.meta[k] for k in SCORED_KEYS if k in elite.meta}}]
+    first = (elite.meta["draws"][0].get("meta") or {}).get("eval_seed", elite.meta.get("eval_seed"))
+    before = float(elite.fitness)
+    out = state.archive.record_draw(elite, draw)
+    state.telemetry.event({"kind": "reevaluate", "gen": gen, "island": state.island,
+                           "cell": cell, "status": "recorded", "draws": out["n"],
+                           "fitness_before": round(before, 4),
+                           "fitness_after": round(float(elite.fitness), 4),
+                           "eval_seed": meta.get("eval_seed"), "first_eval_seed": first,
+                           "median_eval_seed": elite.meta.get("eval_seed"),
+                           "removed": len(out["removed"]),
+                           **{m: meta.get(m) for m in ("air", "water", "land")}})
+    return "recorded"
+
+
+def _rescored_meta(state, elite, pheno, result, ctrl, sc, gen) -> dict:
+    """The scored keys of a re-evaluation of ``elite``: ``_meta`` plus what
+    ``_place`` writes beyond it, from the scoring ``sc``."""
     meta = _meta(pheno, result, ctrl)
     # A draw at the stored basis identified nothing, so ``result.mobility`` is
     # empty; keep the elite's own identification record (IMPL_1010 P1, F11).
@@ -1441,30 +1641,51 @@ def _reevaluate(state, elite, pheno, result, ctrl) -> str:
         "mission_weight": round(sc["mw"], 4), "blend": round(sc["base"], 4),
         "at_floor": bool(sc["at_floor"]),
     }
-    draw = {"base": sc["base"], "fit": sc["fit"], "obj": [float(x) for x in sc["obj"]],
-            "at_floor": bool(sc["at_floor"]), "meta": {k: meta[k] for k in SCORED_KEYS if k in meta}}
-    # The buffer's first entry is the elite's own draw.  ``record_draw`` would
-    # synthesise it with an empty ``meta``, and if it later became the median its
-    # eval_seed, gen, media and policy would not come back; so seed it here with
-    # the scored keys the elite carries now (an archive restored from before N11,
-    # or a seed elite, has no buffer yet).
-    if not elite.meta.get("draws"):
-        elite.meta["draws"] = [{
-            "base": float((elite.meta.get("score_parts") or {}).get("blend", elite.fitness)),
-            "fit": float(elite.fitness),
-            "obj": [float(x) for x in elite.objectives],
-            "at_floor": bool(elite.at_floor),
-            "meta": {k: elite.meta[k] for k in SCORED_KEYS if k in elite.meta}}]
-    first = (elite.meta["draws"][0].get("meta") or {}).get("eval_seed", elite.meta.get("eval_seed"))
+    return meta
+
+
+def _reevaluate_pooled(state, elite, pheno, result, ctrl) -> str:
+    """A re-evaluation under ``evaluator == "device"`` (IMPL_1010 A6, N11's
+    meaning on that path): ``result`` carries ``k_mean`` fresh draws at the
+    stored basis; they are added to the elite's ``draw_stats``, and the elite is
+    re-scored on the new pooled mean and re-settled in its cell by dominance, so
+    an incumbent whose first draws were lucky loses its place once its pooled
+    mean falls.  Feeds no window."""
+    gen = int(state.archive.generation)
+    cell = list(elite.cell)
+    if result.tier == 0 or not any(m is elite for m in state.archive.fronts.get(elite.cell) or []):
+        state.telemetry.event({"kind": "reevaluate", "gen": gen, "island": state.island,
+                               "cell": cell, "status": "orphan"})
+        return "orphan"
+    if result.exploit:
+        state.curator.quarantine(elite.descriptor, result.exploit, elite.genome)
+        state.telemetry.event({"kind": "reevaluate", "gen": gen, "island": state.island,
+                               "cell": cell, "status": "exploit", "reason": result.exploit})
+        return "exploit"
+    held = elite.meta.get("draw_stats") or {
+        m: draw_stats([float(elite.meta[m])]) for m in ("air", "water", "land")
+        if elite.meta.get(m) is not None}
+    fresh = result_draw_stats(result)
+    merged = add_draw_stats(held, fresh)
+    pooled = pooled_result(result, merged)
+    sc = _score_candidate(state, pheno, pooled, elite, at_cell=elite.cell, commit=False)
+    meta = _rescored_meta(state, elite, pheno, pooled, ctrl, sc, gen)
+    # The elite's record of where it came from stays: its birth draw's seed and
+    # generation (land and the crossings are reproduced at that seed).
+    for key in ("eval_seed", "gen"):
+        meta.pop(key, None)
+    meta["draw_stats"] = merged
+    meta["device_draws"] = dict(getattr(result, "draws", None) or {})
+    meta["scored_by"] = dict(getattr(result, "scored_by", None) or {})
     before = float(elite.fitness)
-    out = state.archive.record_draw(elite, draw)
+    removed = state.archive.rescore(elite, sc["fit"], sc["obj"], sc["at_floor"], meta)
     state.telemetry.event({"kind": "reevaluate", "gen": gen, "island": state.island,
-                           "cell": cell, "status": "recorded", "draws": out["n"],
+                           "cell": cell, "status": "recorded",
+                           "draws": {m: int(s["n"]) for m, s in merged.items()},
                            "fitness_before": round(before, 4),
                            "fitness_after": round(float(elite.fitness), 4),
-                           "eval_seed": meta.get("eval_seed"), "first_eval_seed": first,
-                           "median_eval_seed": elite.meta.get("eval_seed"),
-                           "removed": len(out["removed"]),
+                           "eval_seed": getattr(result, "eval_seed", None),
+                           "removed": len(removed),
                            **{m: meta.get(m) for m in ("air", "water", "land")}})
     return "recorded"
 
@@ -1659,6 +1880,16 @@ def shared_policy_for(cfg: SearchConfig):
         hidden=cfg.shared_hidden, log_std=cfg.shared_log_std)
 
 
+def _device_usable(devroll) -> tuple:
+    """``devroll.usable()`` plus the batched kernel, which still scores land and
+    the crossings under ``evaluator == "device"``."""
+    from ..envs import batchroll as _br
+    ok, why = devroll.usable()
+    if ok and not _br.AVAILABLE:
+        return False, f"the batched pass is on the CPU: {_br.UNAVAILABLE_REASON}"
+    return ok, why
+
+
 def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
                on_generation=None, should_stop=None) -> SearchState:
     """Run the whole loop.  Returns the final state, checkpointed as it goes.
@@ -1709,6 +1940,13 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
     if _backend == "cpu":
         _br.AVAILABLE = False
         _br.UNAVAILABLE_REASON = _why
+    # IMPL_1010 A6: the device path is asked for by name; refuse at t=0 rather
+    # than fall back to the batched path and score a different quantity.
+    if cfg.evaluator == "device":
+        from ..envs import devroll as _devroll
+        _dok, _dwhy = _device_usable(_devroll)
+        if not _dok:
+            raise RuntimeError(f"evaluator='device' but the device path is not usable: {_dwhy}")
 
     # Pin the commit the checkpoints will name to the one this process started
     # from; see ``ops.checkpoint._git_sha``.
@@ -1954,7 +2192,10 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
             gen_diverged += result.diverged_rollouts
             gen_rollouts += result.n_rollouts
             if operators == ["reeval"]:
-                _reevaluate(state, parent, pheno, result, ctrl)
+                if cfg.evaluator == "device":
+                    _reevaluate_pooled(state, parent, pheno, result, ctrl)
+                else:
+                    _reevaluate(state, parent, pheno, result, ctrl)
                 continue
             # AK: would this design have landed differently without the
             # refinement steps?  Only a design a step changed can differ, and

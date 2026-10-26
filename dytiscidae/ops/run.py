@@ -174,6 +174,10 @@ def search_config_from_args(args, shared: bool):
         placement_draws=args.placement_draws,
         reeval_per_generation=args.reeval_per_generation,
         reeval_depth=args.reeval_depth,
+        evaluator=args.evaluator,
+        k_mean=args.k_mean,
+        k_sampled=args.k_sampled,
+        device_streams=args.device_streams,
         action_rate_penalty=args.action_rate_penalty,
         descriptor_keep_if_overlap=args.descriptor_keep_if_overlap,
         tier2_label_all_media=not args.no_tier2_label_all_media,
@@ -1015,6 +1019,18 @@ def build_parser() -> argparse.ArgumentParser:
                         "each generation, taken from the batch (ROADMAP N11, "
                         "ARCH51 L9). 0 (default) is off, every run to arch50; "
                         "arch51 uses 4 of batch 16")
+    p.add_argument("--evaluator", choices=("batched", "device"), default="batched",
+                   help="Tier-1 path (IMPL_1010 A6). batched (default) is every run "
+                        "to date; device also scores air and water on MJWarp at "
+                        "--k-mean draws, placed on the pooled mean, land and the "
+                        "crossings on the batched pass at one draw")
+    p.add_argument("--k-mean", type=int, default=50,
+                   help="device draws at the policy mean per candidate and per "
+                        "re-evaluation (IMPL_1010 §D answer 2)")
+    p.add_argument("--k-sampled", type=int, default=10,
+                   help="device sampled draws per candidate (§D answer 2)")
+    p.add_argument("--device-streams", type=int, default=4,
+                   help="CUDA streams for the device bodies (D-A5 pending)")
     p.add_argument("--reeval-depth", type=int, default=8,
                    help="draws an elite keeps; it is placed at the median one "
                         "(ARCH51 L9)")

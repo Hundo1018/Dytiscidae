@@ -155,3 +155,20 @@ CLI too.
 | `reeval_per_generation` | 0 | not recorded | int | Added 2026-10-10 (`docs/ARCH51_SPEC.md` L9, `docs/ROADMAP.md` N11). Slots of each generation's `batch` spent re-running uniformly chosen non-tainted representatives of the visited island at a fresh seed; 0 is off and every run to arch50 ran with it off (no `rng` draw is made, so a run with it off reproduces bit for bit). arch51 sets 4 of batch 16 (Extract-ME's 25%). With it on, an elite's score is the lower median of its draws, so archive scores are not comparable across it. |
 | `reeval_depth` | 8 | not recorded | int | Added 2026-10-10 (`docs/ARCH51_SPEC.md` L9, N11). Draws an elite's buffer keeps (`meta["draws"]`), oldest dropped first; Extract-ME's depth 8 (arXiv 2502.06585). Read only while `reeval_per_generation > 0`. |
 | `placement_draws` | 1 | not recorded | switch | Added 2026-10-08 (`docs/ROADMAP.md` M3). Draws each candidate is scored at before placement; the median one by summed medium competence is placed. Off because C2's rows show the median buys little (Spearman vs an independent mean: water 0.36 -> 0.48, land 0.30 -> 0.36); its form is an open question. |
+
+## Device evaluation (IMPL_1010 A6)
+
+Added 2026-10-26. Read only with `evaluator = "device"`; the batched default
+reads none of them. With it, every Tier-1 air and water score is the pooled mean
+over every draw the design has had (`k_mean` at entry, `k_mean` more per N11
+re-evaluation; no lower bound), and an elite keeps `meta["draw_stats"]`
+(`n`, `sum`, `sum_sq` per medium). Land and the crossings are scored on the
+batched pass at one draw until A4b, and `meta["scored_by"]` says which path
+scored each medium. Not comparable with any earlier run (IMPL_1010 A7).
+
+| field | default | arch48 | set by | source |
+|---|---|---|---|---|
+| `evaluator` | "batched" | not recorded | switch | `docs/IMPL_1010_SPEC.md` A6. "batched" is every run to date; "device" adds the MJWarp K-draw score for air and water (`loop._device_score`). No device arm has run, so nothing measured the switch; the first device arm is its read. |
+| `k_mean` | 50 | not recorded | measured | `docs/IMPL_1010_SPEC.md` §D answer 2 (2026-10-10): Q5's K for reliability 0.9 is air 66, water 36, land 18 (ROADMAP:3830), so 50 covers water and land and leaves air at about 0.87; the §3 cost table puts (50, 10) at 147 s per generation against arch50's 168 s, and (100, 10) at 1.51x the wall. D-A7 adds the point (64, 10); if it holds within 1.5x of its prediction and under 1.2x arch50's wall, this becomes 64. |
+| `k_sampled` | 10 | not recorded | typed | `docs/IMPL_1010_SPEC.md` §D answer 2: sampled draws per body for the learner; K_s = K_m costs 233 s at K_m = 50 (§3 table), so 10 was chosen on cost. No measurement of the learner's need for it. The sampled worlds are recorded but do not feed `RolloutBuffer` yet (A6 learner part not built). |
+| `device_streams` | 4 | not recorded | typed | `docs/IMPL_1010_SPEC.md` A6: "set by D-A5", which has not run. Wall only; it is a job resource, not a plan field. |

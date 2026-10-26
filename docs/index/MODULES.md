@@ -2,7 +2,7 @@
 
 # Modules
 
-112 modules, 43,147 lines, 1,215 indexed symbols.
+112 modules, 43,422 lines, 1,223 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -46,7 +46,7 @@ is what makes a violation visible while reading.
 | `adapters.sqlite` | The SQLite DB adapter from the architecture diagram. | 20 | — | — | `adapters.sqlite.store` |
 | `adapters.sqlite.store` | SQLite adapters for ``ExperimentStore`` and ``JobStore``. | 338 | — | — | `domain.errors`, `domain.experiment`, `domain.ids`, `domain.job`, `domain.state` |
 | `adapters.trainers` | The trainer registry: names in, ``Trainer`` implementations out. | 142 | — | — | `adapters.trainers.search`, `adapters.trainers.synthetic`, `ports.trainer` |
-| `adapters.trainers.search` | The real trainer: this project's MAP-Elites design search, behind the port. | 440 | — | `torch` | `domain.checkpoint`, `domain.job`, `envs.triphibian`, `evolution.loop`, `ops`, `ops.checkpoint`, `ops.run`, `ports.trainer` |
+| `adapters.trainers.search` | The real trainer: this project's MAP-Elites design search, behind the port. | 441 | — | `torch` | `domain.checkpoint`, `domain.job`, `envs.triphibian`, `evolution.loop`, `ops`, `ops.checkpoint`, `ops.run`, `ports.trainer` |
 | `adapters.trainers.synthetic` | A trainer that implements the whole contract and computes nothing real. | 209 | — | — | `domain.checkpoint`, `domain.job`, `ports.trainer` |
 
 ## `application`  (inner)
@@ -105,7 +105,7 @@ is what makes a violation visible while reading.
 | `envs.devroll.control_wp` | The controller at a decision step and the CPG every step, on the device (IMPL_1010 A3). | 964 | — | `numpy`, `torch` | `control.cpg`, `core.mjcf`, `envs.tasks`, `envs.triphibian` |
 | `envs.devroll.fluid_wp` | Strip-theory loads on the device (IMPL_1010 A1a). | 618 | — | `numpy` | `physics.fluid`, `physics.medium` |
 | `envs.devroll.model_wp` | One body on the device: its MJWarp ``Model`` and ``Data`` over W worlds, and the | 965 | — | `mujoco`, `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `envs.devroll.scatter_wp`, `physics.fluid` |
-| `envs.devroll.rollout_wp` | Air and water segments on the device, scored on the host (IMPL_1010 A4a). | 665 | — | `numpy` | `envs.batchroll`, `envs.devroll`, `envs.devroll.control_wp`, `envs.devroll.model_wp`, `envs.evaluate`, `envs.tasks`, `envs.triphibian`, `evolution.loop` |
+| `envs.devroll.rollout_wp` | Air and water segments on the device, scored on the host (IMPL_1010 A4a). | 671 | — | `numpy` | `envs.batchroll`, `envs.devroll`, `envs.devroll.control_wp`, `envs.devroll.model_wp`, `envs.evaluate`, `envs.tasks`, `envs.triphibian`, `evolution.loop` |
 | `envs.devroll.scatter_wp` | The scatter between two ``mj_step``s on the device (IMPL_1010 A1b). | 1119 | — | `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `physics.energy`, `physics.fluid`, `physics.rotor` |
 | `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 753 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 72 | — | — | — |
@@ -119,7 +119,7 @@ is what makes a violation visible while reading.
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
-| `evolution.archive` | The MAP-Elites archive: a map of what is achievable, not a single winner. | 551 | — | `numpy` | — |
+| `evolution.archive` | The MAP-Elites archive: a map of what is achievable, not a single winner. | 562 | — | `numpy` | — |
 | `evolution.auditor` | The third party: a check on both the designs and the judge. | 442 | — | `numpy` | — |
 | `evolution.cmaes` | CMA-ES for controller weights. | 231 | — | `numpy` | — |
 | `evolution.critic` | The critic: a learned adversary trained to catch what cheap evaluation misses. | 435 | — | `numpy` | — |
@@ -128,7 +128,7 @@ is what makes a violation visible while reading.
 | `evolution.descriptors` | Learned behaviour descriptors, so the archive axes stop being my guesses. | 253 | — | `numpy` | — |
 | `evolution.islands` | Islands: specialists and generalists evolved in parallel, and crossed. | 510 | — | `numpy` | `evolution.curriculum` |
 | `evolution.judge` | The judge: a scoring standard that gets stricter as the population improves. | 504 | — | `numpy` | — |
-| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 3174 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.device`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.grpo`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
+| `evolution.loop` | The co-evolution loop: morphology and control, curated. | 3415 | — | `numpy`, `torch` | `control.cpg`, `core.bodyplans`, `core.genome`, `core.phenotype`, `envs`, `envs.actors`, `envs.batchroll`, `envs.device`, `envs.devroll`, `envs.devroll.rollout_wp`, `envs.evaluate`, `envs.transitions`, `envs.triphibian`, `evolution.archive`, `evolution.auditor`, `evolution.critic`, `evolution.curator`, `evolution.curriculum`, `evolution.descriptors`, `evolution.islands`, `evolution.judge`, `evolution.scout`, `learning`, `learning.grpo`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.telemetry` |
 | `evolution.scout` | The scout: a network that predicts a lineage's potential, not its score. | 515 | — | `numpy` | — |
 
 ## `learning`
@@ -145,7 +145,7 @@ is what makes a violation visible while reading.
 |---|---|---:|---|---|---|
 | `ops.checkpoint` | A run's finished state as one portable artefact. | 398 | — | `numpy`, `torch` | `envs.kernel`, `evolution.judge`, `learning`, `learning.ppo` |
 | `ops.postrun_status` | What a finished run's post-run left behind, readable without numpy. | 32 | — | — | — |
-| `ops.run` | Command-line entry point. | 1344 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.islands`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.postrun_status`, `viz.dashboard`, `viz.film`, `viz.render`, `viz.showcase` |
+| `ops.run` | Command-line entry point. | 1360 | script + main() | `numpy`, `torch` | `adapters`, `adapters.cli`, `control.cpg`, `control.train`, `core.bodyplans`, `core.mjcf`, `core.phenotype`, `core.reference`, `envs.evaluate`, `envs.skills`, `envs.triphibian`, `evolution.archive`, `evolution.curator`, `evolution.islands`, `evolution.loop`, `learning`, `learning.distill`, `learning.ppo`, `ops`, `ops.checkpoint`, `ops.postrun_status`, `viz.dashboard`, `viz.film`, `viz.render`, `viz.showcase` |
 | `ops.telemetry` | Structured telemetry. | 111 | — | `numpy` | — |
 
 ## `physics`

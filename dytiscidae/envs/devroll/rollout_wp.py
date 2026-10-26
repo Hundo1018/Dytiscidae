@@ -531,6 +531,12 @@ class DeviceDraws:
         xs = [float(d[medium].competence) for d in self.draws[:self.k_mean]]
         return float(_np.mean(xs)) if xs else 0.0
 
+    def stats(self, medium: str) -> dict:
+        """The medium's ``loop.draw_stats`` over the ``k_mean`` draws at the mean
+        (the sampled draws do not score; IMPL_1010 A6)."""
+        from dytiscidae.evolution.loop import draw_stats
+        return draw_stats([float(d[medium].competence) for d in self.draws[:self.k_mean]])
+
 
 def body_worlds(p, ctrl, seeds, *, media=MEDIA, spec=None, still: bool = False,
                 sea_state=None, perturb=None):

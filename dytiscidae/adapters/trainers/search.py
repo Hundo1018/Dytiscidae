@@ -72,6 +72,7 @@ _CONFIG_FIELDS = (
     "event_sample", "n_reference_seeds", "n_random_seeds", "islands",
     "descriptor_keep_if_overlap", "tier2_label_all_media", "draw_per_candidate",
     "placement_draws", "reeval_per_generation", "reeval_depth",
+    "evaluator", "k_mean", "k_sampled",
 )
 #: Accepted from the job's ``resources`` rather than its plan, because they are
 #: properties of the machine and not of the experiment.  This project measured
@@ -79,7 +80,7 @@ _CONFIG_FIELDS = (
 #: changes wall time by 3x and the result by nothing, so it must not enter the
 #: plan digest.
 _RESOURCE_FIELDS = ("workers", "min_shard", "pool_per_worker", "pool_balance",
-                    "memory_ceiling_mb")
+                    "memory_ceiling_mb", "device_streams")
 
 #: Mission settings, which are a property of the task rather than of the search.
 _SPEC_FIELDS = ("cycles", "seconds_per_domain", "target_depth")

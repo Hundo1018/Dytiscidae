@@ -2573,6 +2573,55 @@ MUTATIONS: tuple = (
                "trajectories are dropped from GRPO and the stage buys nothing",
         suites=("test_search::test_grpo_group_ids_survive_the_shard_split",),
         item="N pool"),
+
+    # --- A6: K-draw scoring on the device (IMPL_1010) -----------------------
+    Mutation(
+        id="device-kdraw-reeval-replaces-the-draws",
+        path="dytiscidae/evolution/loop.py",
+        find="    merged = add_draw_stats(held, fresh)\n",
+        replace="    merged = fresh\n",
+        defect="a re-evaluation overwrites the elite's draw_stats with its own k_mean draws "
+               "instead of adding to them, so the score is the latest k_mean draws",
+        suites=("test_search::test_device_scores_are_pooled_draw_means",), item="A6 pooled mean"),
+    Mutation(
+        id="device-kdraw-places-on-the-first-draws",
+        path="dytiscidae/evolution/loop.py",
+        find="    pooled = pooled_result(result, merged)\n",
+        replace="    pooled = pooled_result(result, held)\n",
+        defect="obj[0] and fitness stay on the candidate's first k_mean draws, ignoring "
+               "every re-evaluation, so a lucky incumbent holds its cell",
+        suites=("test_search::test_device_scores_are_pooled_draw_means",), item="A6 pooled mean"),
+    Mutation(
+        id="device-kdraw-pool-miscounts",
+        path="dytiscidae/evolution/loop.py",
+        find='        out[m] = {"n": int(x["n"]) + int(y["n"]), "sum": float(x["sum"]) + float(y["sum"]),',
+        replace='        out[m] = {"n": int(y["n"]), "sum": float(x["sum"]) + float(y["sum"]),',
+        defect="pooling adds the sums but keeps the newer count, so the pooled mean is "
+               "inflated by every re-evaluation",
+        suites=("test_search::test_device_scores_are_pooled_draw_means",), item="A6 pooled mean"),
+    Mutation(
+        id="device-kdraw-reeval-not-resettled",
+        path="dytiscidae/evolution/loop.py",
+        find="    removed = state.archive.rescore(elite, sc[\"fit\"], sc[\"obj\"], sc[\"at_floor\"], meta)\n",
+        replace="    removed = []\n    elite.meta.update(meta)\n",
+        defect="a re-evaluation records the draws but never re-scores or re-places the "
+               "elite, so its fitness stays its first k_mean draws'",
+        suites=("test_search::test_device_scores_are_pooled_draw_means",), item="A6 re-evaluation"),
+    Mutation(
+        id="device-kdraw-enters-on-draw-zero",
+        path="dytiscidae/evolution/loop.py",
+        find="        pooled = pooled_result(results[j], stats)\n",
+        replace="        pooled = pooled_result(results[j], result_draw_stats(results[j]))\n",
+        defect="a candidate enters on its batched draw 0 and the device draws are ignored",
+        suites=("test_search::test_device_scores_are_pooled_draw_means",), item="A6 pooled mean"),
+    Mutation(
+        id="device-kdraw-mean-takes-the-sampled-draws",
+        path="dytiscidae/envs/devroll/rollout_wp.py",
+        find="        return draw_stats([float(d[medium].competence) for d in self.draws[:self.k_mean]])",
+        replace="        return draw_stats([float(d[medium].competence) for d in self.draws])",
+        defect="the k_sampled draws (policy noise on) enter the pooled mean",
+        suites=("test_devroll::test_device_draws_pool_only_the_mean_draws",),
+        item="A6 pooled mean"),
 )
 
 

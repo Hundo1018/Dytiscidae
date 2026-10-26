@@ -200,15 +200,15 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Progress` | class | 303 | — | Turns the loop's per-generation callback into job state. |
-| `SearchTrainer` | class | 88 | — | ``ports.Trainer`` over ``evolution.loop.run_search``. |
-| `_Progress.__init__` | method | 311 | `(self, context: TrainingContext, workspace: Path, *, publish_every: int, checkpoint_every: int) -> None` | — |
-| `_Progress.on_generation` | method | 332 | `(self, state, report: Mapping[str, Any]) -> None` | Progress only.  Called *before* the loop writes its checkpoint. |
-| `_Progress.publish` | method | 371 | `(self, step: int, kind: CheckpointKind, *, force: bool=False)` | Copy the run directory's portable checkpoint into the store. |
-| `_Progress.should_stop` | method | 349 | `(self, generation: int, report: Mapping[str, Any])` | Publish if the loop has just checkpointed, then poll the stop flag. |
-| `SearchTrainer.capabilities` | method | 93 | `(self) -> TrainerCapabilities` | — |
-| `SearchTrainer.export` | method | 138 | `(self, record: CheckpointRecord, payload: CheckpointPayload, *, destination: str, fmt: str) -> dict` | Write the portable checkpoint out as files. |
-| `SearchTrainer.train` | method | 112 | `(self, context: TrainingContext) -> TrainingOutcome` | — |
+| `_Progress` | class | 304 | — | Turns the loop's per-generation callback into job state. |
+| `SearchTrainer` | class | 89 | — | ``ports.Trainer`` over ``evolution.loop.run_search``. |
+| `_Progress.__init__` | method | 312 | `(self, context: TrainingContext, workspace: Path, *, publish_every: int, checkpoint_every: int) -> None` | — |
+| `_Progress.on_generation` | method | 333 | `(self, state, report: Mapping[str, Any]) -> None` | Progress only.  Called *before* the loop writes its checkpoint. |
+| `_Progress.publish` | method | 372 | `(self, step: int, kind: CheckpointKind, *, force: bool=False)` | Copy the run directory's portable checkpoint into the store. |
+| `_Progress.should_stop` | method | 350 | `(self, generation: int, report: Mapping[str, Any])` | Publish if the loop has just checkpointed, then poll the stop flag. |
+| `SearchTrainer.capabilities` | method | 94 | `(self) -> TrainerCapabilities` | — |
+| `SearchTrainer.export` | method | 139 | `(self, record: CheckpointRecord, payload: CheckpointPayload, *, destination: str, fmt: str) -> dict` | Write the portable checkpoint out as files. |
+| `SearchTrainer.train` | method | 113 | `(self, context: TrainingContext) -> TrainingOutcome` | — |
 
 ## `adapters.trainers.synthetic` — `dytiscidae/adapters/trainers/synthetic.py`
 
@@ -826,16 +826,17 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `body_worlds` | function | 535 | `(p, ctrl, seeds, *, media=MEDIA, spec=None, still: bool=False, sea_state=None, perturb=None)` | The worlds of one body: per draw seed, per medium, the two halves, with |
+| `body_worlds` | function | 541 | `(p, ctrl, seeds, *, media=MEDIA, spec=None, still: bool=False, sea_state=None, perturb=None)` | The worlds of one body: per draw seed, per medium, the two halves, with |
 | `decisions_per_segment` | function | 107 | `(seconds: float, control_hz: float=25.0, timestep: float=0.004) -> int` | Decisions one world makes in a segment: ``ceil(n_steps / control_every)``, |
 | `DeviceDraws` | class | 517 | — | One body's device evaluation: per draw the air and water results (the |
 | `DeviceSegments` | class | 282 | — | One segment on each of W worlds of one body (see the module docstring). |
-| `evaluate_tier1_device` | function | 570 | `(phenos, *, controllers=None, seeds=0, k_mean: int=1, k_sampled: int=0, spec=None, segment_seconds: float=8.0, shared=None, buffer=None, identify_axes=False, dtype=_wp.float32, still: bool=False, streams: int=1, graph: bool=True, sea_state=None, perturb=None) -> list` | Air and water for each body on the device, one ``DeviceDraws`` per body. |
+| `evaluate_tier1_device` | function | 576 | `(phenos, *, controllers=None, seeds=0, k_mean: int=1, k_sampled: int=0, spec=None, segment_seconds: float=8.0, shared=None, buffer=None, identify_axes=False, dtype=_wp.float32, still: bool=False, streams: int=1, graph: bool=True, sea_state=None, perturb=None) -> list` | Air and water for each body on the device, one ``DeviceDraws`` per body. |
 | `make_kernels` | function | 117 | `(T)` | The A4a record, check and freeze kernels for precision ``T``, cached. |
 | `repeatable` | function | 92 | `(on: bool=True) -> None` | Warp's ``RUN_TO_RUN`` determinism for the device path's own modules (their |
-| `run_bodies` | function | 641 | `(runs, *, streams: int=1, graph: bool=True) -> None` | Every armed ``DeviceSegments`` to its segment's end, the bodies launched |
+| `run_bodies` | function | 647 | `(runs, *, streams: int=1, graph: bool=True) -> None` | Every armed ``DeviceSegments`` to its segment's end, the bodies launched |
 | `start_world` | function | 480 | `(p, seed: int, dom, half: int, params=None, *, spec=None, sea_state=None, perturb=None)` | A machine at the start of one half of ``dom``'s segment for eval seed |
 | `DeviceDraws.mean` | method | 529 | `(self, medium: str) -> float` | The medium's competence, mean over the ``k_mean`` draws at the mean. |
+| `DeviceDraws.stats` | method | 534 | `(self, medium: str) -> dict` | The medium's ``loop.draw_stats`` over the ``k_mean`` draws at the mean |
 | `DeviceSegments.__init__` | method | 292 | `(self, envs, *, seconds: float, dtype=_wp.float32, shared=None, policies=None, bases=None, control_hz: float=25.0, njmax: int=_model_wp.NJMAX, nconmax: int=_model_wp.NCONMAX, record=None) -> None` | — |
 | `DeviceSegments.arm` | method | 326 | `(self, domains, params_list, *, sampled=None, seeds=None) -> None` | Start the segment: the fluid reset, each machine's MuJoCo state and |
 | `DeviceSegments.capture` | method | 393 | `(self)` | The step as one CUDA graph (call after one direct :meth:`step`, which |
@@ -1085,18 +1086,19 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `Archive.capacity` | property | 132 | `(self) -> int` | — |
 | `Archive.cell_of` | method | 152 | `(self, descriptor: np.ndarray) -> tuple[int, ...]` | — |
 | `Archive.coverage` | property | 136 | `(self) -> float` | — |
-| `Archive.export_json` | method | 525 | `(self, path: str \| Path) -> None` | Human- and browser-readable dump for the dashboard. |
+| `Archive.export_json` | method | 536 | `(self, path: str \| Path) -> None` | Human- and browser-readable dump for the dashboard. |
 | `Archive.front` | method | 197 | `(self, cell: tuple[int, ...]) -> list['Elite']` | The non-dominated set occupying a cell. |
 | `Archive.front_size` | property | 202 | `(self) -> int` | Total designs held across all cells, fronts included. |
-| `Archive.load` | method | 514 | `(path: str \| Path) -> 'Archive'` | — |
-| `Archive.neighbour_density` | method | 441 | `(self, cell: tuple[int, ...], radius: int=1) -> int` | How crowded the neighbourhood of a cell is. |
-| `Archive.project` | method | 454 | `(self, ax_x: int, ax_y: int) -> tuple[np.ndarray, np.ndarray]` | 2D projection for plotting: max fitness and occupancy per (x, y) bin. |
+| `Archive.load` | method | 525 | `(path: str \| Path) -> 'Archive'` | — |
+| `Archive.neighbour_density` | method | 452 | `(self, cell: tuple[int, ...], radius: int=1) -> int` | How crowded the neighbourhood of a cell is. |
+| `Archive.project` | method | 465 | `(self, ax_x: int, ax_y: int) -> tuple[np.ndarray, np.ndarray]` | 2D projection for plotting: max fitness and occupancy per (x, y) bin. |
 | `Archive.qd_score` | property | 140 | `(self) -> float` | Sum of elite fitnesses: the standard scalar summary of a QD run. |
-| `Archive.rebin` | method | 386 | `(self, axes: list[tuple[str, float, float, int]], reproject, priority=None) -> dict` | Rebuild the grid under new axes, re-placing every elite. |
+| `Archive.rebin` | method | 397 | `(self, axes: list[tuple[str, float, float, int]], reproject, priority=None) -> dict` | Rebuild the grid under new axes, re-placing every elite. |
 | `Archive.record_draw` | method | 346 | `(self, elite: Elite, draw: dict, depth: int \| None=None) -> dict` | One more evaluation of ``elite``; its score becomes its lower-median draw. |
 | `Archive.remove` | method | 330 | `(self, cell: tuple[int, ...]) -> bool` | Empty a cell completely. |
-| `Archive.save` | method | 487 | `(self, path: str \| Path) -> None` | Write the archive, atomically. |
-| `Archive.snapshot` | method | 466 | `(self) -> dict` | A JSON-safe summary, recorded once per generation for the dashboard. |
+| `Archive.rescore` | method | 371 | `(self, elite: Elite, fitness: float, objectives, at_floor: bool, meta: dict \| None=None) -> list` | ``elite``'s score replaced (the same object: its lineage counts and |
+| `Archive.save` | method | 498 | `(self, path: str \| Path) -> None` | Write the archive, atomically. |
+| `Archive.snapshot` | method | 477 | `(self) -> dict` | A JSON-safe summary, recorded once per generation for the dashboard. |
 | `Archive.would_add` | method | 257 | `(self, fitness: float, descriptor, objectives=None, at_floor: bool=False, floor_rank: float=0.0) -> str` | What ``add`` would return for this candidate, changing nothing. |
 | `Elite.curiosity` | property | 96 | `(self) -> float` | — |
 
@@ -1283,30 +1285,36 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `air_pair_measurable` | function | 1525 | `(result) -> bool` | True when this evaluation's air pair was measurable: aloft and served |
-| `batchroll_eval` | function | 996 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
-| `draw_key` | function | 940 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
-| `evaluate_candidate` | function | 486 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
-| `evaluate_candidates` | function | 611 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
-| `GenerationCost` | class | 518 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2458 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
-| `median_draw` | function | 945 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
-| `placement_draw_seed` | function | 935 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
-| `run_search` | function | 1662 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2333 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `add_draw_stats` | function | 1010 | `(a: dict, b: dict) -> dict` | Per medium, the statistics of ``a``'s draws and ``b``'s together. |
+| `air_pair_measurable` | function | 1746 | `(result) -> bool` | True when this evaluation's air pair was measurable: aloft and served |
+| `batchroll_eval` | function | 1157 | `(phenos, ctrls, cfg, *, spec, seed, shared=None, pool=None)` | One batched Tier-1 with given controllers and no axis identification. |
+| `draw_key` | function | 975 | `(result) -> float` | What the median draw is chosen on: the summed medium competences. |
+| `draw_stats` | function | 1004 | `(values) -> dict` | Sufficient statistics of one medium's draws: ``n``, ``sum``, ``sum_sq``. |
+| `evaluate_candidate` | function | 507 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
+| `evaluate_candidates` | function | 632 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
+| `GenerationCost` | class | 539 | — | Where one generation's wall time and physics steps went. |
+| `load_state` | function | 2699 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `median_draw` | function | 980 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
+| `placement_draw_seed` | function | 970 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
+| `pooled_mean` | function | 1023 | `(s: dict) -> float` | A medium's pooled mean from its statistics; 0 with no draws. |
+| `pooled_result` | function | 1046 | `(result, stats: dict)` | ``result`` with each medium's competence the pooled mean of ``stats``, and |
+| `pooled_se` | function | 1028 | `(s: dict) -> float` | Standard error of the pooled mean, ``sd / sqrt(n)`` (sd with n - 1). |
+| `result_draw_stats` | function | 1037 | `(result) -> dict` | The draws ``result`` carries: its ``draw_stats`` when the device scored it, |
+| `run_search` | function | 1893 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
+| `save_state` | function | 2574 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 74 | — | Everything adjustable about a run. |
-| `SearchState` | class | 395 | — | — |
-| `seed_archipelago` | function | 2722 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
-| `shared_policy_for` | function | 1653 | `(cfg: SearchConfig)` | The shared policy a run starts from: a body twist (plus the gait gain |
-| `GenerationCost.__init__` | method | 535 | `(self)` | — |
-| `GenerationCost.count` | method | 555 | `(self, call: str, results) -> None` | — |
-| `GenerationCost.lap` | method | 541 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
-| `GenerationCost.phase` | method | 548 | `(self, name: str)` | — |
-| `GenerationCost.report` | method | 564 | `(self, wall: float \| None=None) -> dict` | — |
-| `GenerationCost.size` | method | 561 | `(self, pheno) -> None` | — |
-| `SearchState.archive` | property | 455 | `(self) -> Archive` | — |
-| `SearchState.curator` | property | 459 | `(self) -> Curator` | — |
-| `SearchState.curriculum` | property | 463 | `(self) -> Curriculum` | — |
+| `SearchState` | class | 416 | — | — |
+| `seed_archipelago` | function | 2963 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `shared_policy_for` | function | 1874 | `(cfg: SearchConfig)` | The shared policy a run starts from: a body twist (plus the gait gain |
+| `GenerationCost.__init__` | method | 556 | `(self)` | — |
+| `GenerationCost.count` | method | 576 | `(self, call: str, results) -> None` | — |
+| `GenerationCost.lap` | method | 562 | `(self, name: str) -> None` | Charge the time since the previous lap (or the start) to ``name``. |
+| `GenerationCost.phase` | method | 569 | `(self, name: str)` | — |
+| `GenerationCost.report` | method | 585 | `(self, wall: float \| None=None) -> dict` | — |
+| `GenerationCost.size` | method | 582 | `(self, pheno) -> None` | — |
+| `SearchState.archive` | property | 476 | `(self) -> Archive` | — |
+| `SearchState.curator` | property | 480 | `(self) -> Curator` | — |
+| `SearchState.curriculum` | property | 484 | `(self) -> Curriculum` | — |
 
 ## `evolution.scout` — `dytiscidae/evolution/scout.py`
 
@@ -1429,27 +1437,27 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `_Cached` | class | 643 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
-| `build_parser` | function | 968 | `() -> argparse.ArgumentParser` | — |
-| `child_env` | function | 344 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
-| `cmd_cohort` | function | 584 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
-| `cmd_config` | function | 454 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
-| `cmd_dashboard` | function | 913 | `(args) -> int` | — |
-| `cmd_distill` | function | 951 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
-| `cmd_film` | function | 472 | `(args) -> int` | — |
-| `cmd_postrun` | function | 420 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
+| `_Cached` | class | 647 | `(Exception)` | Control flow only: the run's shared network is already loaded. |
+| `build_parser` | function | 972 | `() -> argparse.ArgumentParser` | — |
+| `child_env` | function | 348 | `() -> dict` | The environment for a child Python: ``os.environ``, passed explicitly. |
+| `cmd_cohort` | function | 588 | `(args) -> int` | Approve a cohort from an archive, and optionally film each member. |
+| `cmd_config` | function | 458 | `(args) -> int` | Print (or write) the configuration a run recorded, for ``search --config``. |
+| `cmd_dashboard` | function | 917 | `(args) -> int` | — |
+| `cmd_distill` | function | 955 | `(args) -> int` | Is a shared controller reachable at all?  Answered from stored policies. |
+| `cmd_film` | function | 476 | `(args) -> int` | — |
+| `cmd_postrun` | function | 424 | `(args) -> int` | Everything a finished run should leave behind, in one call. |
 | `cmd_reference` | function | 124 | `(args) -> int` | — |
-| `cmd_render` | function | 920 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
-| `cmd_search` | function | 271 | `(args) -> int` | — |
-| `cmd_showcase` | function | 771 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
-| `cmd_skills` | function | 479 | `(args) -> int` | — |
-| `cmd_train` | function | 513 | `(args) -> int` | Train a controller for one design and render what it learned. |
+| `cmd_render` | function | 924 | `(args) -> int` | The top elites, each filmed as it was evaluated. |
+| `cmd_search` | function | 275 | `(args) -> int` | — |
+| `cmd_showcase` | function | 775 | `(args) -> int` | Train a controller and film one continuous mission with flow and stress. |
+| `cmd_skills` | function | 483 | `(args) -> int` | — |
+| `cmd_train` | function | 517 | `(args) -> int` | Train a controller for one design and render what it learned. |
 | `cmd_verify` | function | 117 | `(args) -> int` | — |
-| `controller_for_elite` | function | 653 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
-| `launch_postrun` | function | 363 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
+| `controller_for_elite` | function | 657 | `(design_dir, elite, p, seed: int, *, log=print)` | The control law an archived elite's scores were earned under, rebuilt. |
+| `launch_postrun` | function | 367 | `(run_dir, *, timeout: float=3600.0) -> int` | Run ``postrun`` for a finished run, in its own process. |
 | `load_run_archive` | function | 32 | `(run_dir, island: str \| None=None)` | The archive of a run, however that run stored it. |
-| `main` | function | 1338 | `(argv=None) -> int` | — |
-| `merge_config_file` | function | 229 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
+| `main` | function | 1354 | `(argv=None) -> int` | — |
+| `merge_config_file` | function | 233 | `(cfg, path, shared: bool, shared_explicit: bool=False)` | ``cfg`` with every field taken from a config export (ROADMAP B4), except |
 | `search_config_from_args` | function | 159 | `(args, shared: bool)` | The ``SearchConfig`` a ``search`` command line asks for. |
 
 ## `ops.telemetry` — `dytiscidae/ops/telemetry.py`

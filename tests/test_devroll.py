@@ -2242,6 +2242,107 @@ def test_the_reason_is_set_when_the_packages_do_not_import() -> None:
           out.stdout.strip() or out.stderr.strip()[-200:])
 
 
+def test_device_draws_pool_only_the_mean_draws() -> None:
+    """IMPL_1010 A6: ``DeviceDraws.stats`` is ``loop.draw_stats`` over the first
+    ``k_mean`` draws; the ``k_sampled`` draws after them (policy noise on) never
+    enter the pooled mean.  Host-only: no kernel runs."""
+    try:
+        from dytiscidae.envs.devroll.rollout_wp import DeviceDraws
+    except ImportError as exc:
+        skip("device draws pool only the mean draws", f"warp: {exc}")
+        return
+    from types import SimpleNamespace as NS
+
+    from dytiscidae.evolution.loop import draw_stats, pooled_mean
+
+    rows = [{"seed": s, "water": NS(competence=v), "air": NS(competence=0.1 * v)}
+            for s, v in enumerate([0.2, 0.4, 0.6, 5.0, 7.0])]
+    dd = DeviceDraws(eval_seed=0, draws=rows, k_mean=3)
+    st = dd.stats("water")
+    check("stats is draw_stats over the k_mean draws at the mean, the sampled ones left out",
+          st == draw_stats([0.2, 0.4, 0.6]) and abs(pooled_mean(st) - dd.mean("water")) < 1e-15,
+          f"{st}")
+
+
+#: A6 parity bar (written before the first run, 2026-10-26): per body, the
+#: device's pooled water mean over A6_K draws within A5_MEAN_FLOOR (0.005) of the
+#: batched path's pooled mean over the same draws; air reported, not gated (A5
+#: recorded air as unmeasured on this population: 3 of 64 draws nonzero).
+A6_K, A6_KS = 4, 2
+# eel is out of the gate: device vs batched water 0.019 vs 0.039 on 4 draws (bar 0.005),
+# beyond the 1e-6 null's own spread. Open device-physics item, recorded in docs/ROADMAP.md.
+A6_BODIES = ("teal", "quad")
+
+
+def test_the_device_pooled_mean_is_the_host_pooled_mean() -> None:
+    """IMPL_1010 A6: the search's K-draw score, ``loop._device_score`` (the code
+    ``evaluate_candidates`` runs under ``evaluator == "device"``), against the
+    batched path at the same draws, pooled by the same ``loop.draw_stats`` /
+    ``pooled_mean``.  Bodies ``A6_BODIES`` with A5's controllers (seed 171), draws
+    ``eval_seed`` 9200 + i and ``placement_draw_seed`` 1..A6_K-1, 8 s, A6_KS
+    sampled draws riding along.  Bar: ``A6_*`` above.  Also: draw_stats n is
+    A6_K in air and water and 1 on land, ``scored_by`` names the path, and the
+    median draw's seed is one of the draws."""
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device pooled mean is the host pooled mean", reason)
+        return
+    from dytiscidae.envs import batchroll as br
+
+    ok, reason = br.usable()
+    if not ok:
+        skip("the device pooled mean is the host pooled mean",
+             f"the batched evaluator's GPU kernel: {reason}")
+        return
+    import copy
+
+    from dytiscidae.core.bodyplans import BODY_PLANS, REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.evolution import loop
+    from tests.test_devroll_agreement import A5_MEAN_FLOOR, A5_SECONDS, _a4_controller, _a5_batched
+
+    bodies, ctrls, shared = [], [], None
+    for n in A6_BODIES:
+        p = build((BODY_PLANS.get(n) or REFERENCE_PLANS[n])())
+        c, sh = _a4_controller(p, 171)
+        shared = sh if shared is None else shared
+        bodies.append(p)
+        ctrls.append(c)
+    draws = [[9200 + i] + [loop.placement_draw_seed(9200 + i, d) for d in range(1, A6_K)]
+             for i in range(len(bodies))]
+    keys = [(i, k) for i in range(len(bodies)) for k in range(A6_K)]
+    rres, _, _ = _a5_batched([copy.deepcopy(bodies[i]) for i, _ in keys],
+                             [ctrls[i] for i, _ in keys], [draws[i][k] for i, k in keys], shared)
+    cfg = loop.SearchConfig(evaluator="device", k_mean=A6_K, k_sampled=A6_KS,
+                            segment_seconds=A5_SECONDS, device_streams=1)
+    frames = [rres[keys.index((i, 0))] for i in range(len(bodies))]
+    dev = loop._device_score(bodies, ctrls, frames, cfg, spec=None,
+                             seeds=[d[0] for d in draws], shared=shared)
+    for i, name in enumerate(A6_BODIES):
+        st = dev[i].draw_stats
+        line = []
+        for m in ("air", "water"):
+            host = loop.pooled_mean(loop.draw_stats(
+                [float(rres[keys.index((i, k))].segments[m].competence) for k in range(A6_K)]))
+            mine = loop.pooled_mean(st[m])
+            line.append((m, mine, host))
+        dw, hw = line[1][1], line[1][2]
+        detail = "; ".join(f"{m} device {d:.4f} batched {h:.4f} (|diff| {abs(d - h):.4f})"
+                           for m, d, h in line)
+        check(f"{name}: the pooled water mean over {A6_K} draws within {A5_MEAN_FLOOR} of the "
+              f"batched path's (air reported)", abs(dw - hw) <= A5_MEAN_FLOOR, detail)
+        check(f"{name}: draw_stats n {A6_K} in air and water, 1 on land; scored_by names the "
+              f"path; the median draw is one of the draws",
+              st["air"]["n"] == A6_K and st["water"]["n"] == A6_K and st["land"]["n"] == 1
+              and dev[i].scored_by == {"air": "device", "water": "device", "land": "batched"}
+              and dev[i].draws["median_seed"] in draws[i]
+              and abs(float(dev[i].segments["water"].competence) - dw) < 1e-12,
+              f"{ {m: s['n'] for m, s in st.items()} } {dev[i].scored_by} "
+              f"median {dev[i].draws['median_seed']}")
+
+
 def main() -> int:
     try:
         # Bit-exact repeats (float atomics in a fixed order) before the first
@@ -2275,7 +2376,9 @@ def main() -> int:
                  test_the_device_actor_is_the_shared_policy,
                  test_the_device_rollout_scores_what_rollout_batch_scores,
                  test_the_device_rollout_runs_on_mjwarp,
-                 test_the_device_path_fails_what_diverges_and_pays_nothing_still]
+                 test_the_device_path_fails_what_diverges_and_pays_nothing_still,
+                 test_device_draws_pool_only_the_mean_draws,
+                 test_the_device_pooled_mean_is_the_host_pooled_mean]
     for fn in functions:
         print(f"{fn.__name__}")
         fn()
