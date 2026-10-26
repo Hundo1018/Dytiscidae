@@ -1148,8 +1148,8 @@ MUTATIONS: tuple = (
     Mutation(
         id="batched-never-records-the-gain",
         path="dytiscidae/envs/batchroll.py",
-        find="            if r[\"gain\"] is not None:\n                r[\"gains\"].append(r[\"gain\"])",
-        replace="            pass",
+        find="    if r[\"gain\"] is not None:\n        r[\"gains\"].append(r[\"gain\"])",
+        replace="    pass",
         defect="the path that scores the archive publishes no gain, so a run cannot "
                "see whether its controllers throttle when told to stop",
         suites=("test_search::test_the_gait_gain_drives_the_same_on_every_path",),
@@ -2191,9 +2191,11 @@ MUTATIONS: tuple = (
         id="device-step-callback-order",
         path="dytiscidae/envs/devroll/model_wp.py",
         find="        if gather:\n            self.gather()\n        self.fluid_and_scatter()\n"
+             "        if alive is not None:\n            self.hold(alive)\n"
              "        _mjw.step(self.m, self.d)",
         replace="        _mjw.step(self.m, self.d)\n        if gather:\n            self.gather()\n"
-                "        self.fluid_and_scatter()",
+                "        self.fluid_and_scatter()\n"
+                "        if alive is not None:\n            self.hold(alive)",
         defect="the fluid runs after mjw.step, so every step integrates the previous step's "
                "loads and the fluid reads a state the host path has not reached",
         suites=("test_devroll::test_the_device_step_replays_step_batch",), item="A2 step"),
@@ -2374,6 +2376,93 @@ MUTATIONS: tuple = (
                "per step, and a rollout step that cannot be captured into a graph",
         suites=("test_devroll::test_the_device_controller_reads_nothing_back",),
         item="A3 no sync"),
+    # --- device air and water segments (IMPL_1010 A4a, 2026-10-26) ----------
+    Mutation(
+        id="device-rollout-divergence-ignored",
+        path="dytiscidae/envs/devroll/rollout_wp.py",
+        find="        if code != 0:\n            fail[w] = code",
+        replace="        if code != 0 and nv < 0:\n            fail[w] = code",
+        defect="the divergence check never flags: MJWarp does not reset a bad qacc, so a "
+               "world that blew up is recorded and scored as if it had flown",
+        suites=("test_devroll::test_the_device_path_fails_what_diverges_and_pays_nothing_still",), item="A4a divergence"),
+    Mutation(
+        id="device-rollout-failed-world-keeps-stepping",
+        path="dytiscidae/envs/devroll/rollout_wp.py",
+        find="            fail[w] = code\n            survived[w] = 0\n            alive[w] = 0\n",
+        replace="            fail[w] = code\n            survived[w] = 0\n",
+        defect="a world that failed is marked and not frozen: it keeps being stepped and "
+               "loaded on its NaN state, which the host never does",
+        suites=("test_devroll::test_the_device_path_fails_what_diverges_and_pays_nothing_still",), item="A4a freeze"),
+    Mutation(
+        id="device-rollout-still-rotor-spins",
+        path="dytiscidae/envs/devroll/rollout_wp.py",
+        find="                    par = probe.held_still_params()",
+        replace="                    par = probe.cpg.base.__class__(amplitude=_np.zeros(probe.cpg.n), "
+                "phase=probe.cpg.base.phase, offset=probe.cpg.base.offset, "
+                "frequency=probe.cpg.base.frequency)",
+        defect="the still machine zeroes stroke amplitude only and leaves every rotor at its "
+               "throttle (CLAUDE.md rule 7)",
+        suites=("test_devroll::test_the_device_path_fails_what_diverges_and_pays_nothing_still",), item="A4a still machine"),
+    Mutation(
+        id="device-rollout-pair-without-partner",
+        path="dytiscidae/envs/devroll/rollout_wp.py",
+        find="                partners[w] = pair_partner_of(allres[index[(k, m, 0)]])",
+        replace="                partners[w] = None",
+        defect="the second half is scored alone, so motion the command did not choose no "
+               "longer cancels against the first half (the antipode and the mirror)",
+        suites=("test_devroll::test_the_device_rollout_runs_on_mjwarp",), item="A4a pairs"),
+    Mutation(
+        id="device-rollout-worlds-share-a-battery",
+        path="dytiscidae/envs/devroll/rollout_wp.py",
+        find="    e.budget.battery = copy.deepcopy(e.budget.battery)\n",
+        replace="",
+        defect="the worlds of one phenotype share its Battery object, so every world starts "
+               "at the last world's scattered charge",
+        suites=("test_devroll::test_the_device_rollout_runs_on_mjwarp",), item="A4a start state"),
+    Mutation(
+        id="device-rollout-record-drops-silently",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="        if int(made.max(initial=0)) > self.cap:",
+        replace="        if False:",
+        defect="a world that made more decisions than the record holds returns the first ones "
+               "and drops the rest without a word (the 256 cap of A3)",
+        suites=("test_devroll::test_the_device_path_fails_what_diverges_and_pays_nothing_still",), item="A4a record cap"),
+    Mutation(
+        id="device-rollout-counter-on-host",
+        path="dytiscidae/envs/devroll/model_wp.py",
+        find="            int(InducedFlow.UPDATE_EVERY), self.count, bf[\"inflow_due\"],\n"
+             "            self._unsteady_primed])\n",
+        replace="            int(InducedFlow.UPDATE_EVERY), self.count, bf[\"inflow_due\"],\n"
+                "            self._unsteady_primed])\n"
+                "        bf[\"inflow_due\"].fill_(int(int(self.count.numpy()[0]) "
+                "% InducedFlow.UPDATE_EVERY == 0))\n",
+        defect="the inflow cadence is kept on the host: a read-back every step, and a step "
+               "that cannot be captured, or a captured one that replays one step's cadence",
+        suites=("test_devroll::test_the_device_path_fails_what_diverges_and_pays_nothing_still",), item="A4a counters"),
+    Mutation(
+        id="device-rollout-rearm-keeps-the-added-mass",
+        path="dytiscidae/envs/devroll/model_wp.py",
+        find="        self.hold(self._all_held)\n        _mjw.forward(self.m, self.d)",
+        replace="        _mjw.forward(self.m, self.d)",
+        defect="a re-armed world's first forward runs at the last segment's added mass and "
+               "loads, so its subtree_com, and the first step, differ from a fresh world's",
+        suites=("test_devroll::test_the_device_path_fails_what_diverges_and_pays_nothing_still",), item="A4a reset"),
+    Mutation(
+        id="device-rollout-contacts-uncounted",
+        path="dytiscidae/envs/devroll/rollout_wp.py",
+        find="            _wp.atomic_add(seen, w, 1)",
+        replace="            _wp.atomic_add(seen, w, 0)",
+        defect="no contact is ever counted, so an air or water segment that touched the "
+               "ground (T9) is reported clean",
+        suites=("test_devroll::test_the_device_path_fails_what_diverges_and_pays_nothing_still",), item="A4a contacts"),
+    Mutation(
+        id="device-rollout-overflow-ignored",
+        path="dytiscidae/envs/devroll/rollout_wp.py",
+        find="        elif overflow[w] != 0:",
+        replace="        elif overflow[w] < 0:",
+        defect="MJWarp's overflow flags are not read, so a world whose constraints or "
+               "contacts were dropped is scored on the truncated physics",
+        suites=("test_devroll::test_the_device_path_fails_what_diverges_and_pays_nothing_still",), item="A4a overflow"),
     # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
     Mutation(
         id="grpo-advantage-across-the-whole-batch",
@@ -2461,8 +2550,13 @@ MUTATIONS: tuple = (
 
 
 def copy_tree(dest: Path) -> None:
-    """Every tracked file, including uncommitted edits to tracked files."""
-    names = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"],
+    """Every tracked file, including uncommitted edits to tracked files, and every
+    untracked file git does not ignore: a new module is mutation-tested before
+    its first commit (2026-10-26: without it, every mutation of a new
+    ``rollout_wp.py`` was "MISAPPLIED" and the suite, missing the module, read
+    as catching the others)."""
+    names = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z", "--cached", "--others",
+                            "--exclude-standard"],
                            capture_output=True, check=True).stdout
     dest.mkdir(parents=True, exist_ok=True)
     tar = subprocess.Popen(

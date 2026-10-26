@@ -672,6 +672,28 @@ class DevicePower:
         }
         self.active = _wp.array(_np.ones(len(envs), dtype=_np.int32), dtype=int)
 
+    def load(self, envs, mask=None) -> None:
+        """Each world's battery and ledger from its machine's ``PowerBudget``
+        (``scatter`` draws the starting charge), and the pack live again, for the
+        worlds in ``mask`` (default all).  In place: a captured graph keeps the
+        arrays' addresses."""
+        envs = list(envs)
+        m = _np.ones(len(envs), bool) if mask is None else _np.asarray(mask, bool)
+        bud = [e.budget for e in envs]
+        vals = {"energy_j": [b.battery.energy_j for b in bud], "total_j": [b.total_j for b in bud],
+                "actuator_j": [b.actuator_j for b in bud],
+                "avionics_j": [b.avionics_j for b in bud], "t": [b.t for b in bud],
+                "max_overload": [b.max_overload for b in bud],
+                "peak_draw": [b.battery.peak_draw for b in bud],
+                "overdraw_time": [b.battery.overdraw_time for b in bud]}
+        for k, v in vals.items():
+            x = self._state[k].numpy()
+            x[:len(m)][m] = _np.asarray(v, float)[m]
+            self._state[k].assign(x)
+        a = self.active.numpy()
+        a[:len(m)][m] = 1
+        self.active.assign(a)
+
     def step(self, force, velocity) -> None:
         """``force``, ``velocity``: every machine's first ``n`` actuator forces and
         velocities, concatenated in world order (``BatchedPower``'s layout)."""
@@ -952,13 +974,26 @@ class DeviceDamping:
         self._b = _wp.zeros(max(self.n, 1), dtype=dtype)
         self.reset()
 
-    def reset(self) -> None:
-        """``ImplicitAeroDamping.reset`` for every world, in place (a captured
-        graph holds these arrays' addresses)."""
+    def reset(self, mask=None) -> None:
+        """``ImplicitAeroDamping.reset`` for every world, or the worlds in ``mask``
+        (one bool per world), in place (a captured graph holds these arrays'
+        addresses)."""
         if hasattr(self, "_count"):
-            for a in (self._count, self._stale, self._have_ref, self._have_prev, self._due,
-                      self._wet_ref, self._prev_pos, self._last_b):
-                a.zero_()
+            if mask is None:
+                for a in (self._count, self._stale, self._have_ref, self._have_prev,
+                          self._due, self._wet_ref, self._prev_pos, self._last_b):
+                    a.zero_()
+                return
+            m = _np.asarray(mask, bool)
+            rows = lambda off: _np.repeat(m, _np.diff(off))  # noqa: E731
+            for a, sel in ((self._count, m), (self._stale, m), (self._have_ref, m),
+                           (self._have_prev, m), (self._due, m),
+                           (self._wet_ref, rows(self.poff)), (self._prev_pos, rows(self.poff)),
+                           (self._last_b, rows(self.voff))):
+                if sel.any():
+                    x = a.numpy()
+                    x[:len(sel)][sel] = 0
+                    a.assign(x)
             return
         nw = self.nw
         self._count = _wp.zeros(nw, dtype=int)

@@ -28,9 +28,14 @@ assembly, the damping split, the limiter and weight cancellation, the
 entrainment reaction); jets; rotors; the added mass into ``body_mass`` and
 ``body_inertia``; the four diagnostics batchroll keeps (``clamped``,
 ``mean_submerged``, ``added_mass``, ``slam``); then ``mjw.step``; then the power
-budget.  No kernel launch in it reads anything back to the host.  The host keeps
-only what every world shares in lockstep: the step count that sets the inflow
-cadence and whether the Wagner lag is primed.
+budget.  No kernel launch in it reads anything back to the host, and nothing in
+it is host state baked into a launch: each world's step count since its reset
+(``count``) is a device array, and the inflow cadence and whether the Wagner lag
+and the slam difference are primed are read from it on the device, so one
+captured graph serves the first step of a segment and every later one
+(IMPL_1010 A4a).  ``reset(mask)`` resets the fluid state of the worlds in
+``mask`` only; ``step(alive=...)`` holds a dead world's loads, mass and damping
+at the dry, unloaded values so a world frozen after a failure stays finite.
 
 Precision: the fluid and scatter run in ``dtype`` (float64 or float32); MJWarp
 is float32 only, so its state is read in float32 and every field written into
@@ -296,13 +301,88 @@ def make_kernels(T):
         force[i] = T(force_d[row_world[i], row_act[i]])
         vel[i] = T(vel_d[row_world[i], row_act[i]])
 
-    _KERNELS[T] = {"gather_bodies": gather_bodies, "gather_dofs": gather_dofs,
+    @_wp.kernel
+    def cadence(every: int, count: _wp.array(dtype=int), due: _wp.array(dtype=int),
+                primed: _wp.array(dtype=int)):
+        # InducedFlow's cadence (update on the reset step and every ``every``
+        # after it) and UnsteadyState's first-call flag, per world, from the
+        # world's own step count.
+        w = _wp.tid()
+        due[w] = 0
+        if count[w] % every == 0:
+            due[w] = 1
+        primed[w] = 0
+        if count[w] > 0:
+            primed[w] = 1
+
+    @_wp.kernel
+    def count_tick(count: _wp.array(dtype=int)):
+        w = _wp.tid()
+        count[w] = count[w] + 1
+
+    @_wp.kernel
+    def hold_bodies(
+        nb: int, alive: _wp.array(dtype=int), dry_mass: _wp.array(dtype=T),
+        dry_inertia: _wp.array(dtype=V), xfrc_applied: _wp.array2d(dtype=_wp.spatial_vector),
+        body_mass: _wp.array2d(dtype=f32), body_inertia: _wp.array2d(dtype=_wp.vec3),
+    ):
+        # A world that failed is not stepped on the host.  On the device it is
+        # stepped unloaded at its dry mass, so a NaN in its fluid state cannot
+        # reach MJWarp's solve (and the contact pool every world shares).
+        g = _wp.tid()
+        w = g // nb
+        if alive[w] != 0:
+            return
+        b = g - w * nb
+        unloaded = _wp.spatial_vector(f32(0.0), f32(0.0), f32(0.0), f32(0.0), f32(0.0),
+                                      f32(0.0))
+        xfrc_applied[w, b] = unloaded
+        body_mass[w, b] = f32(dry_mass[g])
+        i = dry_inertia[g]
+        body_inertia[w, b] = _wp.vec3(f32(i[0]), f32(i[1]), f32(i[2]))
+
+    @_wp.kernel
+    def hold_dofs(
+        nv: int, alive: _wp.array(dtype=int), base: _wp.array(dtype=T),
+        dof_damping: _wp.array2d(dtype=f32), qfrc_applied: _wp.array2d(dtype=f32),
+    ):
+        k = _wp.tid()
+        w = k // nv
+        if alive[w] != 0:
+            return
+        j = k - w * nv
+        dof_damping[w, j] = f32(base[k])
+        qfrc_applied[w, j] = f32(0.0)
+
+    @_wp.kernel
+    def hold_ctrl(nact: int, alive: _wp.array(dtype=int), ctrl: _wp.array2d(dtype=f32)):
+        i = _wp.tid()
+        w = i // nact
+        if alive[w] != 0:
+            return
+        ctrl[w, i - w * nact] = f32(0.0)
+
+    _KERNELS[T] = {"cadence": cadence, "count_tick": count_tick, "hold_bodies": hold_bodies,
+                   "hold_dofs": hold_dofs, "hold_ctrl": hold_ctrl,
+                   "gather_bodies": gather_bodies, "gather_dofs": gather_dofs,
                    "gather_rows": gather_rows, "m_body": m_body_sum, "pick_root": pick_root,
                    "inflow_reduce": inflow_reduce, "diagnostics": diagnostics,
                    "scatter_rows": scatter_rows, "write_bodies": write_bodies,
                    "write_dofs": write_dofs, "write_ctrl": write_ctrl,
                    "gather_power": gather_power, "V": V, "M": M}
     return _KERNELS[T]
+
+
+def _masked_fill(arr, per: int, mask, value=0) -> None:
+    """``arr``'s ``per`` rows of every world in ``mask`` set to ``value``, in place
+    (a captured graph keeps the array's address).  Host-side: a reset runs between
+    segments, outside any graph."""
+    if per <= 0:
+        return
+    a = arr.numpy()
+    m = _np.repeat(_np.asarray(mask, bool), per)
+    a[:len(m)][m] = value
+    arr.assign(a)
 
 
 def device_model(mjm, nworld: int):
@@ -496,6 +576,11 @@ class DeviceBody:
                      "slam": z(W)}
         self._prev_ms = z(P)
         self._slam_primed = z(W, int)
+        # Each world's steps since its reset, and the Wagner lag's primed flag
+        # derived from it: device state, so a graph needs no host counter.
+        self.count = z(W, int)
+        self._unsteady_primed = z(W, int)
+        self._all_held = z(W, int)
         # Wagner lag and LEV travel (UnsteadyState), per panel; the chords
         # travelled are float64 at every precision.
         self._x0, self._x1 = z(P), z(P)
@@ -523,27 +608,51 @@ class DeviceBody:
 
     # ------------------------------------------------------------------ state
 
-    def reset(self) -> None:
-        """``FluidSolver.reset`` for every world (the MuJoCo state is not touched)."""
-        self.steps = 0
-        self._unsteady_primed = 0
-        self._x0.zero_()
-        self._x1.zero_()
-        self._s_trav.zero_()
-        self._rev_prev.zero_()
-        self.inflow.reset()
-        self.damping.reset()
-        self.buf["prev_mbody"].fill_(_NO_PREVIOUS_MASS)
-        self._prev_ms.zero_()
-        self._slam_primed.zero_()
+    def reset(self, mask=None) -> None:
+        """``FluidSolver.reset`` for every world, or for the worlds in ``mask``
+        (one bool per world); the others keep their state.  The MuJoCo state is
+        not touched."""
+        if mask is None:
+            self._x0.zero_()
+            self._x1.zero_()
+            self._s_trav.zero_()
+            self._rev_prev.zero_()
+            self.inflow.reset()
+            self.damping.reset()
+            self.buf["prev_mbody"].fill_(_NO_PREVIOUS_MASS)
+            self._prev_ms.zero_()
+            self._slam_primed.zero_()
+            self.count.zero_()
+            self._unsteady_primed.zero_()
+            return
+        mask = _np.asarray(mask, bool)
+        if mask.shape != (self.W,):
+            raise ValueError(f"reset takes one flag per world ({self.W})")
+        for a in (self._x0, self._x1, self._s_trav, self._rev_prev, self._prev_ms):
+            _masked_fill(a, self.npan, mask)
+        _masked_fill(self.buf["prev_mbody"], self.nb, mask, _NO_PREVIOUS_MASS)
+        for a in (self._slam_primed, self.count, self._unsteady_primed):
+            _masked_fill(a, 1, mask)
+        self.inflow.reset(mask)
+        self.damping.reset(mask)
 
     def load_state(self, datas) -> None:
-        """Each world's ``qpos``, ``qvel`` and ``time`` from its ``MjData``, then
-        ``mjw.forward``: the worlds start where the host machines are."""
+        """Each world's ``qpos``, ``qvel``, ``time`` and the solver's warm start
+        from its ``MjData``, then ``mjw.forward``: the worlds start where the host
+        machines are.  The warm start matters: left from a previous segment it
+        moved the first step's qpos by up to 3e-4 m against a fresh one (eel,
+        2026-10-26); the host's ``reset`` zeroes it (``mj_resetData``)."""
         f32 = _np.float32
         self.d.qpos.assign(_np.stack([d.qpos for d in datas]).astype(f32))
         self.d.qvel.assign(_np.stack([d.qvel for d in datas]).astype(f32))
         self.d.time.assign(_np.array([d.time for d in datas], dtype=f32))
+        self.d.qacc_warmstart.assign(_np.stack([d.qacc_warmstart for d in datas]).astype(f32))
+        # The dry mass, inertia and damping and no load, as ``FluidSolver.reset``
+        # leaves the host model before its ``mj_forward``: the forward's
+        # subtree_com (the fluid's and the twist's reference point) is
+        # mass-weighted, and a previous segment's last added mass moved the first
+        # step of the next by 2e-4 rad/s (eel, 2026-10-26).
+        self.hold(self._all_held)
         _mjw.forward(self.m, self.d)
 
     def gather(self) -> None:
@@ -589,20 +698,36 @@ class DeviceBody:
 
     # ------------------------------------------------------------------- step
 
-    def step(self, *, gather: bool = True) -> None:
+    def step(self, *, gather: bool = True, alive=None) -> None:
         """One ``step_batch`` step for every world (see the module docstring).
 
         ``targets`` (and ``rate``, ``has_rate``) must already hold this step's
         servo targets.  ``gather`` False keeps the ``state`` the caller loaded
-        (``host_state``) instead of reading MJWarp's."""
+        (``host_state``) instead of reading MJWarp's.  ``alive`` (a device int
+        array, one per world) holds the worlds marked 0 unloaded at their dry
+        mass and damping, with no control, before ``mjw.step``."""
         if gather:
             self.gather()
         self.fluid_and_scatter()
+        if alive is not None:
+            self.hold(alive)
         _mjw.step(self.m, self.d)
         self._charge()
-        self.steps += 1
-        self._unsteady_primed = 1
-        self.inflow.tick()
+        _wp.launch(make_kernels(self.dtype)["count_tick"], dim=self.W, inputs=[self.count])
+
+    def hold(self, alive) -> None:
+        """The dead worlds' loads, mass, damping and control at their dry,
+        unloaded values (see :meth:`step`)."""
+        K = make_kernels(self.dtype)
+        _wp.launch(K["hold_bodies"], dim=self.W * self.nb, inputs=[
+            self.nb, alive, self._dry_mass, self._dry_inertia, self.d.xfrc_applied,
+            self.m.body_mass, self.m.body_inertia])
+        if self.nv:
+            _wp.launch(K["hold_dofs"], dim=self.W * self.nv, inputs=[
+                self.nv, alive, self.damping._base, self.m.dof_damping, self.d.qfrc_applied])
+        if self.nact:
+            _wp.launch(K["hold_ctrl"], dim=self.W * self.nact, inputs=[
+                self.nact, alive, self.d.ctrl])
 
     def fluid_and_scatter(self) -> None:
         """Everything before ``mjw.step``: servo, fluid, damping, jets, rotors,
@@ -613,6 +738,11 @@ class DeviceBody:
         P, B, D_ = W * npan, W * nb, W * nv
         st, bf = self.state, self.buf
         h = T(self.timestep)
+
+        # Each world's cadence from its own step count (device state).
+        _wp.launch(K["cadence"], dim=W, inputs=[
+            int(InducedFlow.UPDATE_EVERY), self.count, bf["inflow_due"],
+            self._unsteady_primed])
 
         # Servo: ctrl for the targets (TriphibianEnv.servo_command).
         if self.nact:
@@ -649,15 +779,14 @@ class DeviceBody:
             b1, b2 = (float(x) for x in WAGNER_B)
             _wp.launch(Kf["unsteady"], dim=P, inputs=[
                 bf["alpha"], bf["rev"], bf["U"], self._chord, bf["omega"], bf["s"],
-                self._x0, self._x1, self._s_trav, self._rev_prev, int(self._unsteady_primed),
-                h, T(a1), T(a2), T(b1), T(b2), T(self._travel[0]), T(self._travel[1]),
+                self._x0, self._x1, self._s_trav, self._rev_prev, self._machine,
+                self._unsteady_primed, h, T(a1), T(a2), T(b1), T(b2), T(self._travel[0]), T(self._travel[1]),
                 bf["alpha_e"], bf["lev_u"]])
             strip(1)
 
-        # The induced flow, every UPDATE_EVERY steps (the host count is shared by
-        # every world in lockstep), on this step's lifting force.
+        # The induced flow, every UPDATE_EVERY steps of each world's own count
+        # (``cadence`` above), on this step's lifting force.
         if self.live_inflow:
-            bf["inflow_due"].fill_(1 if self.steps % InducedFlow.UPDATE_EVERY == 0 else 0)
             _wp.launch(K["pick_root"], dim=W, inputs=[nb, st["xipos"], bf["root_pos"]])
             _wp.launch(Kf["medium"], dim=W, inputs=[
                 bf["root_pos"], self._root_half, self._wind, self._current, *self._fl,

@@ -33,8 +33,12 @@ frequency and time) and the battery read are float64 at every precision: an
 8 s clock in float32 resolves 0.5 us, and ``2 pi f t`` at 20 Hz then carries
 6e-5 rad of rounding into every angle.
 
-Not here (A4): resetting single worlds, freezing a world that failed, the
-per-step record of the segment, the divergence and contact-overflow kernels.
+The segment around this -- resetting single worlds, freezing a world that
+failed, the per-step record, the divergence and contact-overflow checks -- is
+``rollout_wp`` (A4a).  ``arm`` takes one domain per world, so the air and water
+worlds of one body share a launch.  ``records()`` refuses a world that made
+more decisions than ``record`` holds instead of returning the first ``record``
+of them.
 """
 
 # No ``from __future__ import annotations``: Warp reads the kernel annotations.
@@ -702,14 +706,18 @@ class DeviceControl:
         """Start a segment on every world: ``TriphibianEnv._arm_task`` on the host
         machines (the same call ``rollout_batch`` makes) and its schedule, clock,
         height reference and command uploaded; the base parameters; the CPG's
-        phase state and offset; the starting wetness and battery.  ``sampled``
-        (per world) selects the worlds that explore, ``seeds`` their noise."""
+        phase state and offset; the starting wetness and battery.  ``domain`` is
+        one ``Domain`` or one per world.  ``sampled`` (per world) selects the
+        worlds that explore, ``seeds`` their noise."""
         from dytiscidae.envs.tasks import CRUISE, TASK_SPEED
         from dytiscidae.envs.triphibian import DOMAIN_CYCLE
 
         W, P, npdt = self.W, self.P, self.npdt
-        for e in self.envs:
-            e._arm_task(domain, duration)
+        doms = list(domain) if isinstance(domain, (list, tuple)) else [domain] * W
+        if len(doms) != W:
+            raise ValueError(f"arm takes one domain or one per world ({W})")
+        for e, dom in zip(self.envs, doms):
+            e._arm_task(dom, duration)
         start = _np.zeros((W, MAX_PHASES))
         cru = _np.zeros((W, MAX_PHASES), _np.int32)
         spd, hdg, dep = (_np.zeros((W, MAX_PHASES)) for _ in range(3))
@@ -738,7 +746,7 @@ class DeviceControl:
         tk["is_air"].assign(_np.array([int(e._active_task.domain == "air")
                                        for e in self.envs], _np.int32))
         tk["height_ref"].assign(_np.array([e._height_ref for e in self.envs], npdt))
-        tk["cmd"].assign(_np.full(W, DOMAIN_CYCLE.index(domain), _np.int32))
+        tk["cmd"].assign(_np.array([DOMAIN_CYCLE.index(d) for d in doms], _np.int32))
         self.base.assign(_np.concatenate([_np.asarray(p.flat(), float)
                                           for p in params_list]).astype(npdt))
         self.cur.assign(self.base.numpy())
@@ -746,6 +754,9 @@ class DeviceControl:
         self.count.zero_()
         self.ndec.zero_()
         self.diverged.zero_()
+        # No gain intent until this segment's first decision sets one.
+        self.gain.fill_(1.0)
+        self.has_gain.zero_()
         self.active.assign(_np.ones(W, _np.int32))
         self.sampled.assign(_np.zeros(W, _np.int32) if sampled is None
                             else _np.asarray(sampled, _np.int32))
@@ -884,7 +895,12 @@ class DeviceControl:
         """Per world, the decisions made so far (up to ``record``): ``obs``,
         ``act`` and the pre-squash ``u``, for the host's ``log_prob``, value and
         potential."""
-        nd = _np.minimum(self.ndec.numpy()[:self.W], self.cap)
+        made = self.ndec.numpy()[:self.W]
+        if int(made.max(initial=0)) > self.cap:
+            raise RuntimeError(f"a world made {int(made.max())} decisions and the record "
+                               f"holds {self.cap}: size record to the segment "
+                               "(rollout_wp.decisions_per_segment)")
+        nd = _np.minimum(made, self.cap)
         W, cap, NO = self.W, self.cap, max(self.NO, 1)
         ob = self.rec_obs.numpy()[:W * cap * OBS].reshape(W, cap, OBS)
         ac = self.rec_act.numpy()[:W * cap * NO].reshape(W, cap, NO)

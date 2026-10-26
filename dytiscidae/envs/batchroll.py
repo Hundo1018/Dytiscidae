@@ -939,49 +939,68 @@ def rollout_batch(envs, bf: BatchedFluid, duration: float, params_list,
                 res[m].failure = "diverged"
                 active[m] = False
                 continue
-            r = rec[m]
-            r["depths"].append(e.medium.depth(pos[None, :], e.data.time)[0])
-            r["clears"].append(e.clearance())
-            r["alts"].append(pos[2])
-            R = e.data.xmat[e.root_body].reshape(3, 3)
-            r["ups"].append(float(R[2, 2]))
-            r["contacts"].append(1.0 if e._touching_ground() else 0.0)
-            tw = e.body_twist()                # once: the state has not moved
-            r["spins"].append(float(np.linalg.norm(tw[3:])))
-            r["vzs"].append(float(tw[2]))
-            if r["gain"] is not None:
-                r["gains"].append(r["gain"])
-            r["xys"].append(pos[:2].copy())
-            r["slam"] = max(r["slam"], e.solver.diag.slam)
+            _record_step(e, rec[m], pos)
 
         if not active.any():
             break
 
     for m, e in enumerate(envs):
-        r = rec[m]
-        end = e.root_pos().copy()
-        res[m].bad_qacc = int(e.data.warning[
-            e._mj.mjtWarning.mjWARN_BADQACC].number) - bad0[m]
-        if res[m].bad_qacc > 0 and res[m].survived:
-            res[m].survived = False
-            res[m].failure = res[m].failure or "unstable"
-        res[m].distance = float(np.linalg.norm((end - starts[m])[:2]))
-        res[m].mean_speed = res[m].distance / max(duration, 1e-6)
-        res[m].mean_power = e.budget.mean_power
-        res[m].peak_slam = r["slam"]
-        res[m].max_actuator_overload = e.budget.max_overload
-        res[m].attitude_rms = float(np.std(r["ups"])) if r["ups"] else 1.0
-        res[m].ground_contact_fraction = (
-            float(np.mean(r["contacts"])) if r["contacts"] else 0.0)
-        res[m].max_depth = float(max(r["depths"])) if r["depths"] else 0.0
-        res[m].competence = e._score_segment(
-            domain, res[m], np.array(r["depths"]), np.array(r["alts"]),
-            np.array(r["ups"]), np.array(r["contacts"]), np.array(r["clears"]),
-            spins=np.array(r["spins"]), commands=r["cmds"],
-            responses=r["resp"], vzs=np.array(r["vzs"]),
-            xys=np.array(r["xys"]), gains=r["gains"])
+        bad = int(e.data.warning[e._mj.mjtWarning.mjWARN_BADQACC].number) - bad0[m]
+        finish_segment(e, domain, res[m], rec[m], starts[m], e.root_pos().copy(), bad,
+                       duration, e.budget.mean_power, e.budget.max_overload)
     for e in envs:
         e._active_task = None
+    return res
+
+
+def _record_step(e, r: dict, pos) -> None:
+    """What `rollout_batch` records of one machine after a step, into ``r``
+    (one entry per list; the slam is a running maximum).  ``pos`` is the root
+    position it has already checked."""
+    r["depths"].append(e.medium.depth(pos[None, :], e.data.time)[0])
+    r["clears"].append(e.clearance())
+    r["alts"].append(pos[2])
+    R = e.data.xmat[e.root_body].reshape(3, 3)
+    r["ups"].append(float(R[2, 2]))
+    r["contacts"].append(1.0 if e._touching_ground() else 0.0)
+    tw = e.body_twist()                # once: the state has not moved
+    r["spins"].append(float(np.linalg.norm(tw[3:])))
+    r["vzs"].append(float(tw[2]))
+    if r["gain"] is not None:
+        r["gains"].append(r["gain"])
+    r["xys"].append(pos[:2].copy())
+    r["slam"] = max(r["slam"], e.solver.diag.slam)
+
+
+def finish_segment(e, domain, res, r: dict, start, end, bad_qacc: int, duration: float,
+                   mean_power: float, max_overload: float):
+    """A segment's `SegmentResult` from what was recorded (``r``, the lists
+    `rollout_batch` keeps), scored by the machine's own `_score_segment`.
+
+    One definition for the batched path and the device path
+    (`envs.devroll.rollout_wp`), so the two cannot come to fill a result
+    differently.  ``e`` must still have the segment's task armed; the power
+    ledger is passed in because the device path keeps it on the device.
+    """
+    res.bad_qacc = int(bad_qacc)
+    if res.bad_qacc > 0 and res.survived:
+        res.survived = False
+        res.failure = res.failure or "unstable"
+    res.distance = float(np.linalg.norm((np.asarray(end) - np.asarray(start))[:2]))
+    res.mean_speed = res.distance / max(duration, 1e-6)
+    res.mean_power = float(mean_power)
+    res.peak_slam = r["slam"]
+    res.max_actuator_overload = float(max_overload)
+    res.attitude_rms = float(np.std(r["ups"])) if len(r["ups"]) else 1.0
+    res.ground_contact_fraction = (
+        float(np.mean(r["contacts"])) if len(r["contacts"]) else 0.0)
+    res.max_depth = float(max(r["depths"])) if len(r["depths"]) else 0.0
+    res.competence = e._score_segment(
+        domain, res, np.array(r["depths"]), np.array(r["alts"]),
+        np.array(r["ups"]), np.array(r["contacts"]), np.array(r["clears"]),
+        spins=np.array(r["spins"]), commands=r["cmds"],
+        responses=r["resp"], vzs=np.array(r["vzs"]),
+        xys=np.array(r["xys"]), gains=r["gains"])
     return res
 
 

@@ -216,14 +216,18 @@ def make_kernels(T):
         alpha: _wp.array(dtype=T), rev: _wp.array(dtype=_wp.int32), U: _wp.array(dtype=T),
         chord: _wp.array(dtype=T), omega: _wp.array(dtype=V), s_hat: _wp.array(dtype=V),
         x0: _wp.array(dtype=T), x1: _wp.array(dtype=T), s_trav: _wp.array(dtype=_wp.float64),
-        rev_prev: _wp.array(dtype=_wp.int32), primed: _wp.int32, dt: T,
+        rev_prev: _wp.array(dtype=_wp.int32), machine: _wp.array(dtype=_wp.int32),
+        primed: _wp.array(dtype=int), dt: T,
         a1: T, a2: T, b1: T, b2: T, travel_lo: T, travel_hi: T,
         alpha_e: _wp.array(dtype=T), lev: _wp.array(dtype=T),
     ):
+        # ``primed`` is per world (``machine[i]`` is the strip's world): whether
+        # the world has stepped since its reset, a device flag so one captured
+        # graph serves the first step and every later one (IMPL_1010 A4a).
         i = _wp.tid()
         a = alpha[i]
         r = rev[i]
-        if primed != 0:
+        if primed[machine[i]] != 0:
             if r != rev_prev[i]:
                 x0[i] = T(0.0)
                 x1[i] = T(0.0)
@@ -477,7 +481,8 @@ class WagnerLag:
         self._x1 = _wp.zeros(n, dtype=dtype)
         self._s = _wp.zeros(n, dtype=_wp.float64)
         self._rev_prev = _wp.zeros(n, dtype=_wp.int32)
-        self._primed = 0
+        self._machine = _wp.zeros(n, dtype=_wp.int32)
+        self._primed = _wp.zeros(1, dtype=int)
         self._travel = tuple(float(x) for x in LEV_TRAVEL)
 
     def update(self, alpha, rev, U, chord, omega, s_hat, dt: float):
@@ -497,13 +502,13 @@ class WagnerLag:
             _wp.array(_np.asarray(rev, dtype=_np.int32), dtype=_wp.int32),
             sc(U), sc(chord), vec(omega), vec(s_hat),
             self._x0, self._x1, self._s, self._rev_prev,
-            self._primed, self._dtype(dt),
+            self._machine, self._primed, self._dtype(dt),
             self._dtype(_WAGNER_A[0]), self._dtype(_WAGNER_A[1]),
             self._dtype(_WAGNER_B[0]), self._dtype(_WAGNER_B[1]),
             self._dtype(self._travel[0]), self._dtype(self._travel[1]),
             alpha_e, lev,
         ])
-        self._primed = 1
+        self._primed.fill_(1)
         return alpha_e.numpy(), lev.numpy()
 
 

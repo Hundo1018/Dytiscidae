@@ -1,7 +1,8 @@
 """Device evaluation path (IMPL_1010 A): the guard (A0), the fluid and scatter
 kernels each against its numpy code (A1a, A1b), the per-body MJWarp model and
-the device step replayed against ``step_batch`` (A2), and the controller
-replayed inside ``rollout_batch`` (A3).
+the device step replayed against ``step_batch`` (A2), the controller
+replayed inside ``rollout_batch`` (A3), and the air and water segments with
+their record, checks, freezing and pairs (A4a).
 
 The device path is optional.  The guard checks run wherever the project runs.
 The kernel checks need MuJoCo Warp, warp and a CUDA device, and skip with a
@@ -1664,6 +1665,503 @@ def test_the_device_actor_is_the_shared_policy() -> None:
     check("sampled: every row draws its own noise", distinct > N * 0.99, f"{distinct}/{N}")
 
 
+# --- A4a: air and water segments ----------------------------------------------
+
+
+#: Every number a SegmentResult carries, compared by the A4a tests.
+_SEG_FIELDS = ("competence", "distance", "mean_speed", "mean_power", "peak_slam",
+               "max_actuator_overload", "attitude_rms", "ground_contact_fraction", "max_depth")
+
+
+def _segment_error(dev, host, *, power=True) -> tuple:
+    """(worst quantity, error) between two SegmentResults: each number's error over
+    max(|host|, 1) (absolute below 1, relative above), the measurements and parts
+    included; a different survival, failure or set of measurements is infinite."""
+    if (dev.survived, dev.failure, dev.bad_qacc) != (host.survived, host.failure, host.bad_qacc):
+        return (f"outcome {dev.survived, dev.failure, dev.bad_qacc} vs "
+                f"{host.survived, host.failure, host.bad_qacc}", float("inf"))
+    if set(dev.measurements) != set(host.measurements):
+        return (f"measurements {sorted(set(dev.measurements) ^ set(host.measurements))}",
+                float("inf"))
+    pairs = [(k, getattr(dev, k), getattr(host, k)) for k in _SEG_FIELDS
+             if power or k not in ("mean_power", "max_actuator_overload")]
+    pairs += [(f"m:{k}", dev.measurements[k], v) for k, v in host.measurements.items()]
+    pairs += [(f"p:{k}", dev.parts.get(k, np.nan), v) for k, v in host.parts.items()]
+    worst = ("", 0.0)
+    for k, a, b in pairs:
+        try:
+            a, b = float(a), float(b)
+        except (TypeError, ValueError):
+            if a != b:
+                return (k, float("inf"))
+            continue
+        if not (np.isfinite(a) and np.isfinite(b)):
+            if not (a == b or (np.isnan(a) and np.isnan(b))):
+                return (k, float("inf"))
+            continue
+        e = abs(a - b) / max(abs(b), 1.0)
+        if e > worst[1]:
+            worst = (k, e)
+    return worst
+
+
+def _a4_controller(p, seed):
+    """A Controller for body ``p`` with one random basis per medium and a per-design
+    policy (``_controllers``), and the shared policy."""
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import TriphibianEnv
+
+    probe = [TriphibianEnv(p, seed=0) for _ in range(2)]
+    # level_margin's rig leaves its machine's stroke phase offset at 0 and caches
+    # its result on the phenotype: measured once here, so neither scoring of a
+    # replayed machine runs it and shifts the 16-phase flap_travel the other reads.
+    probe[0].level_margin()
+    bases, pols, shared = _controllers(probe, seed)
+    return Controller(params=None, policy=pols[1], bases={"air": bases[0], "water": bases[1]}), \
+        shared
+
+
+def _a4_fixtures():
+    """(name, phenotype): a teal and a gannet (fliers), an eel and a medusa (jets)
+    in the water, and the rotor quad."""
+    from dytiscidae.core.bodyplans import BODY_PLANS, REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+
+    return [("teal", lambda: build(BODY_PLANS["teal"]())),
+            ("eel", lambda: build(BODY_PLANS["eel"]())),
+            ("medusa", lambda: build(BODY_PLANS["medusa"]())),
+            ("quad", lambda: build(REFERENCE_PLANS["quad"]()))]
+
+
+def test_the_device_rollout_scores_what_rollout_batch_scores() -> None:
+    """``rollout_batch`` itself drives the machines (``step_batch`` wrapped, as the
+    A3 replay): before each step the device controller decides on the host state
+    and records the decision; after it the device senses the host state and runs
+    its check and record kernel on it.  The device's record is then scored by
+    ``batchroll.finish_segment`` on each world and held to ``rollout_batch``'s own
+    result: every SegmentResult number, its measurements and parts, within 1e-9
+    in float64 and 2e-4 in float32 (over max(|value|, 1)).  Each medium runs both
+    halves from ``start_world``'s machines, the second scored with
+    ``pair_partner_of`` its first, the host's with the host's, so the mirror
+    (air) and the antipode (water) are exercised.  The power ledger is the
+    host's here (the device's is charged from MJWarp's own forces, which the
+    free-running test reads)."""
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device rollout's record scores what rollout_batch scores", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs import batchroll as br
+    from dytiscidae.envs.devroll import rollout_wp as R
+    from dytiscidae.envs.triphibian import Domain, pair_partner_of
+
+    for name, make in _a4_fixtures():
+        p = make()
+        ctrl, shared = _a4_controller(p, 171)
+        for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+            pname = "float64" if dtype == wp.float64 else "float32"
+            host_shared = _SharedFloat64(shared) if dtype == wp.float64 else shared
+            for med in R.MEDIA:
+                dom = Domain(med)
+                # The air pair is measured only after 2.8 s aloft in both phases
+                # (MEASURABLE_AIR_SECONDS): the teal glides for 6 s.
+                long_air = name == "teal" and med == "air"
+                seconds = 6.0 if long_air else 0.8
+                firsts = None
+                worst, ran, keys = ("", 0.0), [], set()
+                for half in (0, 1):
+                    seeds = (11, 12)
+                    envs = [R.start_world(p, s, dom, half) for s in seeds]
+                    params = [e.cpg.base for e in envs]
+                    pols = [ctrl.policy] * len(envs)
+                    bases = [ctrl.basis_for(dom)] * len(envs)
+                    seg = R.DeviceSegments(envs, seconds=seconds, dtype=dtype, shared=shared,
+                                           policies=pols, bases=bases)
+                    seg.arm([dom] * len(envs), params)
+                    if half:
+                        for e, f in zip(envs, firsts[1]):
+                            e.pair_partner = pair_partner_of(f)
+                    armed = {}
+                    real = br.step_batch
+                    count = {"i": 0}
+
+                    def wrapped(envs_, angles, bf_, live=None, seg=seg, armed=armed,
+                                real=real, count=count):
+                        if not armed:
+                            armed.update({id(e): (e._active_task, e._seg_t0, e._seg_T,
+                                                  e._height_ref) for e in envs_})
+                        seg.ctl.sense_host(envs_)
+                        seg.decide()
+                        out = real(envs_, angles, bf_, live)
+                        seg.ctl.tick()
+                        seg.ctl.sense_host(envs_)
+                        npdt = np.float64 if seg.dtype == wp.float64 else np.float32
+                        seg.body.diag["slam"].assign(
+                            np.array([e.solver.diag.slam for e in envs_], npdt))
+                        seg.body.power.active.assign(np.asarray(out, np.int32))
+                        seg.body.d.qacc.assign(np.stack([e.data.qacc for e in envs_])
+                                               .astype(np.float32))
+                        seg.check()
+                        count["i"] += 1
+                        return out
+
+                    br.step_batch = wrapped
+                    try:
+                        host = br.rollout_batch(envs, br.HostFluid(envs), seconds, params, dom,
+                                                policies=pols, bases=bases, shared=host_shared)
+                    finally:
+                        br.step_batch = real
+                    for e in envs:
+                        (e._active_task, e._seg_t0, e._seg_T, e._height_ref) = armed[id(e)]
+                    data = seg.download()
+                    data["mean_power"] = np.array([e.budget.mean_power for e in envs])
+                    data["max_overload"] = np.array([e.budget.max_overload for e in envs])
+                    partners = (None if not half else
+                                [pair_partner_of(f) for f in firsts[0]])
+                    dev = seg.results(partners=partners, data=data)
+                    for d_, h_ in zip(dev, host):
+                        k, err = _segment_error(d_, h_)
+                        if err > worst[1]:
+                            worst = (f"half {half}: {k}", err)
+                        keys |= set(h_.measurements)
+                    ran.append((count["i"], int(data["nrec"].min()), int(data["ndec"].min()),
+                                all(h_.survived for h_ in host)))
+                    if not half:
+                        firsts = (dev, host)
+                n_steps = int(seconds / 0.004)
+                check(f"{name} {med} {pname}: both halves ran every step and decision "
+                      "and survived",
+                      all(r == (n_steps, n_steps, n_steps // 10, True) for r in ran),
+                      f"{ran}")
+                paired_key = "pair_turn_mean" if med == "air" else "pair_along_mean"
+                check(f"{name} {med} {pname}: every SegmentResult number, measurement and "
+                      f"part within {tol:g} of rollout_batch's, both halves",
+                      worst[1] <= tol, f"worst {worst[0]} {worst[1]:.2e}; second half "
+                      f"paired ({paired_key} published): {paired_key in keys}")
+                if med == "water" or long_air:
+                    check(f"{name} {med} {pname}: the second half is scored as a pair "
+                          f"({paired_key} published)", paired_key in keys)
+
+
+def _host_segments(p, ctrl, seed, seconds):
+    """``evaluate_tier1``'s air and water segments for one body (``run_segment`` on
+    one machine, air first), with each half's start state, task and per-step
+    record (``batchroll._record_step`` on the machine after every step)."""
+    from dytiscidae.envs import batchroll as br
+    from dytiscidae.envs.evaluate import _scatter_seed, run_segment
+    from dytiscidae.envs.tasks import schedule_for, task_seed
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(p, seed=seed)
+    halves = []
+    real = env.rollout
+
+    def rollout(*a, **k):
+        r = dict(depths=[], alts=[], ups=[], contacts=[], clears=[], slam=0.0, spins=[],
+                 cmds=[], resp=[], vzs=[], xys=[], gains=[], gain=None)
+        halves.append({"rec": r, "qpos": env.data.qpos.copy(), "qvel": env.data.qvel.copy(),
+                       "time": float(env.data.time), "energy": env.budget.battery.energy_j,
+                       "phase": env.cpg.phase_offset, "task": env.task})
+        k["on_step"] = lambda e, i: br._record_step(e, r, e.root_pos())
+        return real(*a, **k)
+
+    env.rollout = rollout
+    out = {}
+    for dom in (Domain.AIR, Domain.WATER):
+        ss = _scatter_seed(seed, dom)
+        out[dom.value] = run_segment(env, dom, seconds, ctrl, scatter_seed=ss,
+                                     task=schedule_for(dom, np.random.default_rng(task_seed(ss))))
+    return out, halves
+
+
+def test_the_device_rollout_runs_on_mjwarp() -> None:
+    """``evaluate_tier1_device`` end to end on MJWarp against ``evaluate_tier1``'s own
+    segments (``run_segment``, air then water on one machine, per-design policy
+    and bases), 0.8 s, one draw.  Exact: every half starts from the host's state
+    (qpos, qvel, clock, battery, stroke phase) and faces the host's task, and
+    makes the host's number of decisions; the paired result publishes the host's
+    measurements (the second half scored with its partner).  On the float32
+    integrator: the first integrated step's position and attitude within 2e-4 of
+    their maxima, the first 25 steps within 1e-3; later steps and the scores are
+    reported, not gated (score agreement over draws is A5's)."""
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device rollout runs air and water on MJWarp", reason)
+        return
+    import dataclasses
+
+    import warp as wp
+
+    from dytiscidae.envs.devroll import rollout_wp
+    rollout_wp.repeatable()      # bit-exact repeats; a no-op when main() has set it
+
+    from dytiscidae.envs.devroll import rollout_wp as R
+
+    seconds, seed = 0.8, 21
+    for name, make in _a4_fixtures():
+        p = make()
+        ctrl, _ = _a4_controller(p, 171)
+        dev = R.evaluate_tier1_device([p], controllers=[ctrl], seeds=[seed],
+                                      segment_seconds=seconds, dtype=wp.float32)[0]
+        host, halves = _host_segments(p, ctrl, seed, seconds)
+        envs, _, _, _, _, index = R.body_worlds(p, ctrl, [seed])
+        start_err, task_same, dec_ok = 0.0, True, True
+        e1, e25, e200 = ("", 0.0), ("", 0.0), []
+        n_steps = int(seconds / 0.004)
+        for (k, med, half), w in sorted(index.items(), key=lambda kv: kv[1]):
+            h = halves[w]                      # air 0, air 1, water 0, water 1
+            e = envs[w]
+            start_err = max(start_err, float(np.abs(e.data.qpos - h["qpos"]).max()),
+                            float(np.abs(e.data.qvel - h["qvel"]).max()),
+                            abs(e.data.time - h["time"]),
+                            abs(e.budget.battery.energy_j - h["energy"]),
+                            abs(e.cpg.phase_offset - h["phase"]))
+            task_same &= dataclasses.astuple(e.task) == dataclasses.astuple(h["task"])
+            rd = dev.recorded[(k, med, half)]
+            dec_ok &= rd["decisions"] == n_steps // 10 and rd["steps"] == n_steps
+            for ch in ("alts", "depths", "ups", "xys"):
+                a, b = np.asarray(rd[ch], float), np.asarray(h["rec"][ch], float)
+                for n, slot in ((2, 1), (25, 25), (n_steps, 0)):
+                    err = float(np.abs(a[:n] - b[:n]).max()) / max(float(np.abs(b[:n]).max()),
+                                                                 1e-9)
+                    tag = f"{med} {half} {ch}"
+                    if slot == 1 and err > e1[1]:
+                        e1 = (tag, err)
+                    elif slot == 25 and err > e25[1]:
+                        e25 = (tag, err)
+                    elif slot == 0:
+                        e200.append(err)
+        check(f"{name}: every half starts at the host's state and faces the host's task",
+              start_err == 0.0 and task_same, f"state {start_err:.1e}, task same {task_same}")
+        check(f"{name}: every world ran {n_steps} steps and {n_steps // 10} decisions", dec_ok)
+        check(f"{name}: the first integrated step's position and attitude within 2e-4 of "
+              "their maxima; the first 25 steps within 1e-3",
+              e1[1] <= 2e-4 and e25[1] <= 1e-3,
+              f"step 1 worst {e1[0]} {e1[1]:.1e}; 25 steps worst {e25[0]} {e25[1]:.1e}; "
+              f"{n_steps} steps {max(e200):.1e} (not gated)")
+        for med in R.MEDIA:
+            d_, h_ = dev.draws[0][med], host[med]
+            check(f"{name} {med}: the paired result publishes the host's measurements",
+                  set(d_.measurements) == set(h_.measurements)
+                  and (med == "air" or "pair_along_mean" in d_.measurements),
+                  f"differ {sorted(set(d_.measurements) ^ set(h_.measurements))}; competence "
+                  f"device {d_.competence:.4f} host {h_.competence:.4f} (not gated)")
+        check(f"{name}: no contact in the air or the water (T9)", not dev.notes,
+              "; ".join(dev.notes))
+
+
+def test_the_device_path_fails_what_diverges_and_pays_nothing_still() -> None:
+    """(a) The still machine (``held_still_params``: no stroke, rotors at zero
+    speed) on the seven seed plans and the rotor quad x 4 seeds, 8 s: device air
+    competence 0, water at most the batched path's still value + 0.005, no
+    contacts; the quad's rotors are commanded zero speed and stop.  (b) An eel
+    world thrown at 1e6 m/s and spun at 1e9 rad/s fails unstable or diverged, stops
+    recording, is held finite at its start pose, and the other worlds of its
+    launch are bit for bit what they are without it.  (c) Two bodies launched on
+    two streams give what each gives alone, and a captured graph what direct
+    steps give.  (d) A beetle resting on the beach counts its contacts, and with
+    ``njmax`` 1 fails as a contact overflow.  (e) The record is sized to the
+    segment and a smaller one is refused."""
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device path fails what diverges and pays nothing still", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.devroll import rollout_wp
+    rollout_wp.repeatable()      # bit-exact repeats; a no-op when main() has set it
+
+    from dytiscidae.core.bodyplans import BODY_PLANS, REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import batchroll as br
+    from dytiscidae.envs.devroll import rollout_wp as R
+    from dytiscidae.envs.devroll.control_wp import DeviceControl
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv, pair_partner_of
+
+    # (a) the still machine
+    seconds, seeds = 8.0, [31, 32, 33, 34]
+    plans = [(n, build(BODY_PLANS[n]())) for n in BODY_PLANS] \
+        + [("quad", build(REFERENCE_PLANS["quad"]()))]
+    air_pos, water_over, contacts, rows, notes = [], [], 0, [], []
+    for name, p in plans:
+        dev = R.evaluate_tier1_device([p], seeds=[seeds[0]], k_mean=len(seeds),
+                                      segment_seconds=seconds, still=True)[0]
+        by_med = {m: sum(r["contacts"] > 0 for (k, m_, h), r in dev.recorded.items()
+                         if m_ == m) for m in R.MEDIA}
+        touched = sum(by_med.values())
+        contacts += int(touched > 0) != len(dev.notes)        # a contact without its note
+        if touched:
+            notes.append(f"{name} " + " ".join(f"{m} {n}/{2 * len(seeds)}"
+                                               for m, n in by_med.items()))
+        draw_seeds = [d["seed"] for d in dev.draws]
+        # The batched path's still water: rollout_batch on the same machines,
+        # the second half paired with the first.
+        firsts = []
+        for half in (0, 1):
+            envs = [R.start_world(p, s, Domain.WATER, half,
+                                  TriphibianEnv(p, seed=s).held_still_params())
+                    for s in draw_seeds]
+            for e, f in zip(envs, firsts):
+                e.pair_partner = pair_partner_of(f)
+            res = br.rollout_batch(envs, br.HostFluid(envs), seconds,
+                                   [e.held_still_params() for e in envs], Domain.WATER)
+            if not half:
+                firsts = res
+        host_w = [b if a.survived else a for a, b in zip(firsts, res)]
+        for d, h in zip(dev.draws, host_w):
+            if d["air"].competence != 0.0:
+                air_pos.append(f"{name}:{d['seed']} {d['air'].competence:.4f}")
+            if d["water"].competence > h.competence + 0.005:
+                water_over.append(f"{name}:{d['seed']} {d['water'].competence:.4f} > "
+                                  f"{h.competence:.4f}")
+        rows.append(f"{name} water {max(d['water'].competence for d in dev.draws):.4f}")
+    check(f"(a) the still machine: device air competence 0 on {len(plans)} bodies x "
+          f"{len(seeds)} seeds", not air_pos, ", ".join(air_pos))
+    check("(a) the still machine: device water competence at most the batched path's + 0.005",
+          not water_over, ", ".join(water_over) or "; ".join(rows))
+    # T9 ("air and water have no contacts") holds on the 0.8 s controlled
+    # segments (test_the_device_rollout_runs_on_mjwarp) and not here: a still
+    # machine falls the 8 s air segment onto the ground.  Counted and noted, not
+    # gated (A4b owns contacts); the worlds that touched are reported.
+    check("(a) the still machine: every contact in the air or the water is counted and noted "
+          "(reported: worlds that touched)", contacts == 0, "; ".join(notes) or "none")
+
+    quad = build(REFERENCE_PLANS["quad"]())
+    envs, doms, params, pols, bases, _ = R.body_worlds(quad, None, [31], still=True)
+    seg = R.DeviceSegments(envs, seconds=0.4, policies=pols, bases=bases)
+    seg.arm(doms, params)
+    seg.run()
+    tg, _ = seg.ctl.targets()
+    dofs = envs[0].rotors.dof
+    spin = float(np.abs(seg.body.d.qvel.numpy()[:, dofs]).max())
+    check("(a) the still quad's rotors are commanded zero speed and stop",
+          float(np.abs(tg).max()) == 0.0 and spin < 5.0,
+          f"targets {float(np.abs(tg).max()):.1f}, rotor speed {spin:.2f} rad/s")
+
+    # (b) one world explodes: thrown at 1e6 m/s and spun at 1e9 rad/s (the
+    # joints untouched: a joint at 1e5 rad/s flattens the pack on the first
+    # step, which the host reads as "battery exhausted", as the device does).
+    eel = build(BODY_PLANS["eel"]())
+
+    def eel_run(explode):
+        envs, doms, params, pols, bases, _ = R.body_worlds(eel, None, [41])
+        if explode:
+            e = envs[1]
+            e.data.qvel[:3] = 1e6
+            e.data.qvel[3:6] = 1e9
+            import mujoco
+            mujoco.mj_forward(e.model, e.data)
+        seg = R.DeviceSegments(envs, seconds=0.4, policies=pols, bases=bases)
+        seg.arm(doms, params)
+        seg.run()
+        return seg, seg.download(), seg.results()
+
+    seg_x, dx, rx = eel_run(True)
+    _, d0, _ = eel_run(False)
+    q = seg_x.body.d.qpos.numpy()
+    q0 = seg_x.q0.numpy()
+    others = [0, 2, 3]
+    same = all(np.array_equal(dx[k][others], d0[k][others])
+               for k in ("alt", "x", "y", "up", "spin", "vz", "clear", "depth", "end", "slam",
+                         "nrec", "cmds", "mean_power"))
+    check("(b) the exploding world fails as unstable or diverged, with its bad qacc counted "
+          "or its divergence",
+          rx[1].failure in ("unstable", "diverged") and not rx[1].survived
+          and (rx[1].bad_qacc > 0 or rx[1].failure == "diverged"),
+          f"{rx[1].failure!r}, bad_qacc {rx[1].bad_qacc}, survived {rx[1].survived}")
+    check("(b) it stopped recording and is held finite at its start pose",
+          int(dx["nrec"][1]) < seg_x.n_steps and np.array_equal(q[1], q0[1])
+          and bool(np.isfinite(q).all()),
+          f"recorded {int(dx['nrec'][1])} of {seg_x.n_steps}")
+    check("(b) the other worlds of the launch are bit for bit what they are without it", same)
+
+    # (c) streams and graphs
+    teal = build(BODY_PLANS["teal"]())
+
+    def armed(p, seed):
+        envs, doms, params, pols, bases, _ = R.body_worlds(p, None, [seed])
+        seg = R.DeviceSegments(envs, seconds=0.4, policies=pols, bases=bases)
+        seg.arm(doms, params)
+        return seg
+
+    alone = []
+    for p_, s_ in ((eel, 51), (teal, 52)):
+        sg = armed(p_, s_)
+        R.run_bodies([sg])
+        alone.append(sg.download())
+    both = [armed(eel, 51), armed(teal, 52)]
+    R.run_bodies(both, streams=2)
+    keys = ("alt", "x", "y", "up", "spin", "vz", "end", "nrec", "cmds", "mean_power")
+    check("(c) two bodies on two streams give what each gives alone, bit for bit",
+          all(np.array_equal(a[k], b.download()[k]) for a, b in zip(alone, both) for k in keys))
+    sg = armed(eel, 51)
+    try:
+        sg.run(graph=False)
+        direct = sg.download()
+        sg.arm(sg.domains, [e.cpg.base for e in sg.envs])
+        sg.run(graph=True)
+        graphed, why = sg.download(), ""
+        same = all(np.array_equal(direct[k], graphed[k]) for k in keys)
+    except Exception as exc:  # noqa: BLE001 - a capture failure is the finding
+        same, why = False, f"{type(exc).__name__}: {str(exc)[:160]}"
+    check("(c) one captured graph per body runs the segment bit for bit as direct steps do "
+          "(the cadence and priming are device counters)", same, why)
+
+    # (d) contacts and overflow, on a beetle resting on the beach
+    beetle = build(BODY_PLANS["beetle"]())
+
+    def beach(njmax):
+        envs = [R.start_world(beetle, 61, Domain.LAND, 0)]
+        seg = R.DeviceSegments(envs, seconds=0.2, njmax=njmax)
+        seg.arm([Domain.AIR], [envs[0].cpg.base])
+        seg.run()
+        return seg.download(), seg.results()
+
+    dc, _ = beach(512)
+    do, ro = beach(1)
+    check("(d) a machine on the beach counts its contacts (the air and water count is not "
+          "blind)", int(dc["contacts"][0]) > 0 and int(dc["fail"][0]) == 0,
+          f"{int(dc['contacts'][0])} contacts")
+    check("(d) with njmax 1 it fails as a contact overflow", ro[0].failure == "contact overflow"
+          and not ro[0].survived, f"{ro[0].failure!r}")
+
+    # (e) the record
+    check("(e) decisions per segment at the host's defaults: 8 s 200, 10 s 250 (within 256)",
+          R.decisions_per_segment(8.0) == 200 and R.decisions_per_segment(10.0) == 250)
+    try:
+        R.DeviceSegments([R.start_world(eel, 1, Domain.WATER, 0)], seconds=8.0, record=199)
+        refused = False
+    except ValueError:
+        refused = True
+    envs = [R.start_world(eel, 1, Domain.WATER, 0)]
+    from dytiscidae.envs.devroll.model_wp import DeviceBody
+    from dytiscidae.envs.evaluate import Controller
+    ctrl, _ = _a4_controller(eel, 173)
+    body = DeviceBody(envs, dtype=wp.float32)
+    ctl = DeviceControl(body, policies=[ctrl.policy], bases=[ctrl.basis_for(Domain.WATER)],
+                        record=2)
+    body.load_state([e.data for e in envs])
+    ctl.arm(Domain.WATER, 0.2, [envs[0].cpg.base])
+    for _ in range(3 * ctl.every):
+        ctl.step()
+    try:
+        ctl.records()
+        raised = False
+    except RuntimeError:
+        raised = True
+    check("(e) a record smaller than the segment is refused, and a world that outran its "
+          "record raises rather than drops", refused and raised,
+          f"refused {refused}, raised {raised}")
+    del Controller
+
+
 def test_the_reason_is_set_when_the_packages_do_not_import() -> None:
     # The guard runs at import, so a GPU machine never reaches its except branch.
     # Force the import to fail in a child process and read the reason it leaves.
@@ -1679,6 +2177,13 @@ def test_the_reason_is_set_when_the_packages_do_not_import() -> None:
 
 
 def main() -> int:
+    try:
+        # Bit-exact repeats (float atomics in a fixed order) before the first
+        # kernel loads: the A4a checks compare launches bit for bit.
+        from dytiscidae.envs.devroll import rollout_wp
+        rollout_wp.repeatable()
+    except ImportError:
+        pass
     functions = [test_the_device_path_reports_why_it_cannot_run,
                  test_the_reason_is_set_when_the_packages_do_not_import,
                  test_the_strip_kernel_is_the_numpy_strip_loads,
@@ -1700,7 +2205,10 @@ def main() -> int:
                  test_the_device_controller_fails_a_non_finite_observation,
                  test_the_device_controller_senses_mjwarp,
                  test_the_device_controller_reads_nothing_back,
-                 test_the_device_actor_is_the_shared_policy]
+                 test_the_device_actor_is_the_shared_policy,
+                 test_the_device_rollout_scores_what_rollout_batch_scores,
+                 test_the_device_rollout_runs_on_mjwarp,
+                 test_the_device_path_fails_what_diverges_and_pays_nothing_still]
     for fn in functions:
         print(f"{fn.__name__}")
         fn()

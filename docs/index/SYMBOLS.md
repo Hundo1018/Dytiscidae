@@ -720,12 +720,13 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 |---|---|---:|---|---|
 | `batched_fluid` | function | 634 | `(envs)` | The fluid for a batch: the Mojo kernel when it imports, else `HostFluid`. |
 | `BatchedFluid` | class | 229 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 988 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `evaluate_tier1_batch` | function | 1007 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `finish_segment` | function | 975 | `(e, domain, res, r: dict, start, end, bad_qacc: int, duration: float, mean_power: float, max_overload: float)` | A segment's `SegmentResult` from what was recorded (``r``, the lists |
 | `HostFluid` | class | 584 | — | `BatchedFluid`'s interface over each machine's own numpy `FluidSolver`. |
 | `identify_batch` | function | 718 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
 | `observation_finite` | function | 642 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
 | `rollout_batch` | function | 799 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 1265 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 1284 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
 | `step_batch` | function | 663 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 104 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
 | `BatchedFluid.__init__` | method | 240 | `(self, envs)` | — |
@@ -765,21 +766,21 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `DeviceControl` | class | 520 | — | The controller of the W worlds of one ``DeviceBody`` (see the module docstring). |
-| `make_kernels` | function | 60 | `(T)` | The A3 kernels for precision ``T``, cached. |
-| `sample_actions` | function | 911 | `(shared, obs, seeds, decision: int=0, *, sampled=True, dtype=_wp.float32) -> tuple` | The device actor on ``obs (N, 33)``, one row per world; numpy in, numpy out. |
-| `DeviceControl.__init__` | method | 534 | `(self, body, *, shared=None, policies=None, bases=None, control_hz: float=25.0, record: int=256) -> None` | — |
-| `DeviceControl.arm` | method | 701 | `(self, domain, duration: float, params_list, *, sampled=None, seeds=None) -> None` | Start a segment on every world: ``TriphibianEnv._arm_task`` on the host |
-| `DeviceControl.control` | method | 820 | `(self) -> None` | The decision (on decision steps) and the CPG command, no host transfer. |
-| `DeviceControl.decision` | method | 896 | `(self) -> dict` | The last decision per world: ``cur`` (the commanded CPG parameters, |
-| `DeviceControl.observation` | method | 874 | `(self)` | The last decision's observation per world, ``(W, 33)``. |
-| `DeviceControl.records` | method | 883 | `(self) -> dict` | Per world, the decisions made so far (up to ``record``): ``obs``, |
-| `DeviceControl.sense` | method | 793 | `(self) -> None` | The sensing from MJWarp's state (float32) and the body's own wetness |
-| `DeviceControl.sense_host` | method | 767 | `(self, envs) -> None` | The sensing from host machines at this precision, for the parity tests: |
-| `DeviceControl.set_shared` | method | 685 | `(self, shared) -> None` | The shared policy's current weights and normalisation into the device |
-| `DeviceControl.step` | method | 864 | `(self) -> None` | One rollout step on the device: sense, decide, command, the body's |
-| `DeviceControl.targets` | method | 878 | `(self)` | — |
-| `DeviceControl.tick` | method | 858 | `(self) -> None` | After the body's step: the clock and the step count. |
+| `DeviceControl` | class | 524 | — | The controller of the W worlds of one ``DeviceBody`` (see the module docstring). |
+| `make_kernels` | function | 64 | `(T)` | The A3 kernels for precision ``T``, cached. |
+| `sample_actions` | function | 927 | `(shared, obs, seeds, decision: int=0, *, sampled=True, dtype=_wp.float32) -> tuple` | The device actor on ``obs (N, 33)``, one row per world; numpy in, numpy out. |
+| `DeviceControl.__init__` | method | 538 | `(self, body, *, shared=None, policies=None, bases=None, control_hz: float=25.0, record: int=256) -> None` | — |
+| `DeviceControl.arm` | method | 705 | `(self, domain, duration: float, params_list, *, sampled=None, seeds=None) -> None` | Start a segment on every world: ``TriphibianEnv._arm_task`` on the host |
+| `DeviceControl.control` | method | 831 | `(self) -> None` | The decision (on decision steps) and the CPG command, no host transfer. |
+| `DeviceControl.decision` | method | 912 | `(self) -> dict` | The last decision per world: ``cur`` (the commanded CPG parameters, |
+| `DeviceControl.observation` | method | 885 | `(self)` | The last decision's observation per world, ``(W, 33)``. |
+| `DeviceControl.records` | method | 894 | `(self) -> dict` | Per world, the decisions made so far (up to ``record``): ``obs``, |
+| `DeviceControl.sense` | method | 804 | `(self) -> None` | The sensing from MJWarp's state (float32) and the body's own wetness |
+| `DeviceControl.sense_host` | method | 778 | `(self, envs) -> None` | The sensing from host machines at this precision, for the parity tests: |
+| `DeviceControl.set_shared` | method | 689 | `(self, shared) -> None` | The shared policy's current weights and normalisation into the device |
+| `DeviceControl.step` | method | 875 | `(self) -> None` | One rollout step on the device: sense, decide, command, the body's |
+| `DeviceControl.targets` | method | 889 | `(self)` | — |
+| `DeviceControl.tick` | method | 869 | `(self) -> None` | After the body's step: the clock and the step count. |
 
 ## `envs.devroll.fluid_wp` — `dytiscidae/envs/devroll/fluid_wp.py`
 
@@ -787,14 +788,14 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `assemble_bodies` | function | 551 | `(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *, dtype=_wp.float64)` | Buoyancy, panel-to-body assembly and ``finish_bodies``, on the device; numpy out. |
-| `entrain_bodies` | function | 589 | `(fb, m_new, m_old, lever2, vel, h, *, dtype=_wp.float64)` | ``entrainment_reaction`` on the device; returns the new ``fb (nb, 6)``. |
+| `assemble_bodies` | function | 556 | `(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *, dtype=_wp.float64)` | Buoyancy, panel-to-body assembly and ``finish_bodies``, on the device; numpy out. |
+| `entrain_bodies` | function | 594 | `(fb, m_new, m_old, lever2, vel, h, *, dtype=_wp.float64)` | ``entrainment_reaction`` on the device; returns the new ``fb (nb, 6)``. |
 | `make_kernels` | function | 40 | `(T)` | Return the kernels for precision ``T`` as a dict (``strip``, ``unsteady``, |
-| `medium_and_added_mass` | function | 510 | `(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, ext, chord, dr, volume, is_wing, scale, *, dtype=_wp.float64)` | Flat-calm medium and the strip added mass, on the device; numpy out. |
-| `strip_loads` | function | 420 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
-| `WagnerLag` | class | 460 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
-| `WagnerLag.__init__` | method | 468 | `(self, n: int, dtype=_wp.float64) -> None` | — |
-| `WagnerLag.update` | method | 483 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
+| `medium_and_added_mass` | function | 515 | `(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, ext, chord, dr, volume, is_wing, scale, *, dtype=_wp.float64)` | Flat-calm medium and the strip added mass, on the device; numpy out. |
+| `strip_loads` | function | 424 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
+| `WagnerLag` | class | 464 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
+| `WagnerLag.__init__` | method | 472 | `(self, n: int, dtype=_wp.float64) -> None` | — |
+| `WagnerLag.update` | method | 488 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
 
 ## `envs.devroll.model_wp` — `dytiscidae/envs/devroll/model_wp.py`
 
@@ -802,20 +803,48 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `device_model` | function | 308 | `(mjm, nworld: int)` | ``mjw.put_model`` of a copy of ``mjm`` with MULTICCD and NATIVECCD disabled |
-| `DeviceBody` | class | 319 | — | W worlds of one body on the device; see the module docstring. |
-| `make_kernels` | function | 68 | `(T)` | The A2 gather, reduction, diagnostic and write kernels for precision ``T``. |
-| `DeviceBody.__init__` | method | 328 | `(self, envs, *, dtype=_wp.float64, njmax: int=NJMAX, nconmax: int=NCONMAX) -> None` | — |
-| `DeviceBody.diagnostics` | method | 797 | `(self) -> dict` | — |
-| `DeviceBody.fluid_and_scatter` | method | 607 | `(self) -> None` | Everything before ``mjw.step``: servo, fluid, damping, jets, rotors, |
-| `DeviceBody.gather` | method | 549 | `(self) -> None` | The step's kinematic inputs from MJWarp's state (float32) into ``state``. |
-| `DeviceBody.host_state` | method | 561 | `(self, datas) -> None` | ``state`` from host ``MjData`` in this precision, for the parity tests: |
-| `DeviceBody.load_state` | method | 540 | `(self, datas) -> None` | Each world's ``qpos``, ``qvel`` and ``time`` from its ``MjData``, then |
-| `DeviceBody.reset` | method | 526 | `(self) -> None` | ``FluidSolver.reset`` for every world (the MuJoCo state is not touched). |
-| `DeviceBody.resident` | method | 789 | `(self) -> dict` | The same five fields read from the MJWarp ``Model`` and ``Data``. |
-| `DeviceBody.set_targets` | method | 762 | `(self, angles_list, rates=None) -> None` | Host targets (one array per world) into ``targets``: a test and |
-| `DeviceBody.staged` | method | 777 | `(self) -> dict` | What the last step wrote, at the step's precision, per world: |
-| `DeviceBody.step` | method | 592 | `(self, *, gather: bool=True) -> None` | One ``step_batch`` step for every world (see the module docstring). |
+| `device_model` | function | 388 | `(mjm, nworld: int)` | ``mjw.put_model`` of a copy of ``mjm`` with MULTICCD and NATIVECCD disabled |
+| `DeviceBody` | class | 399 | — | W worlds of one body on the device; see the module docstring. |
+| `make_kernels` | function | 73 | `(T)` | The A2 gather, reduction, diagnostic and write kernels for precision ``T``. |
+| `DeviceBody.__init__` | method | 408 | `(self, envs, *, dtype=_wp.float64, njmax: int=NJMAX, nconmax: int=NCONMAX) -> None` | — |
+| `DeviceBody.diagnostics` | method | 926 | `(self) -> dict` | — |
+| `DeviceBody.fluid_and_scatter` | method | 732 | `(self) -> None` | Everything before ``mjw.step``: servo, fluid, damping, jets, rotors, |
+| `DeviceBody.gather` | method | 658 | `(self) -> None` | The step's kinematic inputs from MJWarp's state (float32) into ``state``. |
+| `DeviceBody.hold` | method | 718 | `(self, alive) -> None` | The dead worlds' loads, mass, damping and control at their dry, |
+| `DeviceBody.host_state` | method | 670 | `(self, datas) -> None` | ``state`` from host ``MjData`` in this precision, for the parity tests: |
+| `DeviceBody.load_state` | method | 639 | `(self, datas) -> None` | Each world's ``qpos``, ``qvel``, ``time`` and the solver's warm start |
+| `DeviceBody.reset` | method | 611 | `(self, mask=None) -> None` | ``FluidSolver.reset`` for every world, or for the worlds in ``mask`` |
+| `DeviceBody.resident` | method | 918 | `(self) -> dict` | The same five fields read from the MJWarp ``Model`` and ``Data``. |
+| `DeviceBody.set_targets` | method | 891 | `(self, angles_list, rates=None) -> None` | Host targets (one array per world) into ``targets``: a test and |
+| `DeviceBody.staged` | method | 906 | `(self) -> dict` | What the last step wrote, at the step's precision, per world: |
+| `DeviceBody.step` | method | 701 | `(self, *, gather: bool=True, alive=None) -> None` | One ``step_batch`` step for every world (see the module docstring). |
+
+## `envs.devroll.rollout_wp` — `dytiscidae/envs/devroll/rollout_wp.py`
+
+> Air and water segments on the device, scored on the host (IMPL_1010 A4a).
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `body_worlds` | function | 535 | `(p, ctrl, seeds, *, media=MEDIA, spec=None, still: bool=False, sea_state=None, perturb=None)` | The worlds of one body: per draw seed, per medium, the two halves, with |
+| `decisions_per_segment` | function | 107 | `(seconds: float, control_hz: float=25.0, timestep: float=0.004) -> int` | Decisions one world makes in a segment: ``ceil(n_steps / control_every)``, |
+| `DeviceDraws` | class | 517 | — | One body's device evaluation: per draw the air and water results (the |
+| `DeviceSegments` | class | 282 | — | One segment on each of W worlds of one body (see the module docstring). |
+| `evaluate_tier1_device` | function | 570 | `(phenos, *, controllers=None, seeds=0, k_mean: int=1, k_sampled: int=0, spec=None, segment_seconds: float=8.0, shared=None, buffer=None, identify_axes=False, dtype=_wp.float32, still: bool=False, streams: int=1, graph: bool=True, sea_state=None, perturb=None) -> list` | Air and water for each body on the device, one ``DeviceDraws`` per body. |
+| `make_kernels` | function | 117 | `(T)` | The A4a record, check and freeze kernels for precision ``T``, cached. |
+| `repeatable` | function | 92 | `(on: bool=True) -> None` | Warp's ``RUN_TO_RUN`` determinism for the device path's own modules (their |
+| `run_bodies` | function | 641 | `(runs, *, streams: int=1, graph: bool=True) -> None` | Every armed ``DeviceSegments`` to its segment's end, the bodies launched |
+| `start_world` | function | 480 | `(p, seed: int, dom, half: int, params=None, *, spec=None, sea_state=None, perturb=None)` | A machine at the start of one half of ``dom``'s segment for eval seed |
+| `DeviceDraws.mean` | method | 529 | `(self, medium: str) -> float` | The medium's competence, mean over the ``k_mean`` draws at the mean. |
+| `DeviceSegments.__init__` | method | 292 | `(self, envs, *, seconds: float, dtype=_wp.float32, shared=None, policies=None, bases=None, control_hz: float=25.0, njmax: int=_model_wp.NJMAX, nconmax: int=_model_wp.NCONMAX, record=None) -> None` | — |
+| `DeviceSegments.arm` | method | 326 | `(self, domains, params_list, *, sampled=None, seeds=None) -> None` | Start the segment: the fluid reset, each machine's MuJoCo state and |
+| `DeviceSegments.capture` | method | 393 | `(self)` | The step as one CUDA graph (call after one direct :meth:`step`, which |
+| `DeviceSegments.check` | method | 380 | `(self) -> None` | After the step and the sensing of its state: the failure checks and |
+| `DeviceSegments.decide` | method | 369 | `(self) -> None` | Before the body's step, on the sensed state: the controller, a failed |
+| `DeviceSegments.download` | method | 417 | `(self) -> dict` | Everything the segment recorded, per world, in one transfer. |
+| `DeviceSegments.recorded` | method | 437 | `(self, w: int, data: dict) -> dict` | World ``w``'s record in ``rollout_batch``'s shape (``batchroll._record_step``). |
+| `DeviceSegments.results` | method | 451 | `(self, partners=None, data=None) -> list` | One ``SegmentResult`` per world, filled and scored by |
+| `DeviceSegments.run` | method | 401 | `(self, *, graph: bool=True) -> None` | The whole segment: the first step direct, the rest from one captured |
+| `DeviceSegments.step` | method | 355 | `(self) -> None` | One step for every world, no host transfer (see the module docstring). |
 
 ## `envs.devroll.scatter_wp` — `dytiscidae/envs/devroll/scatter_wp.py`
 
@@ -823,34 +852,35 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `added_mass_into_model` | function | 1039 | `(dry_mass, dry_inertia, m_body, lever2, boff, *, dtype=_wp.float64)` | batchroll.finish's added-mass write for many worlds; numpy in, numpy out. |
-| `DeviceDamping` | class | 893 | — | ``ImplicitAeroDamping`` for several machines, its state on the device. |
-| `DeviceInflow` | class | 820 | — | ``InducedFlow`` for one machine per world, its state ``w`` on the device. |
-| `DeviceJets` | class | 703 | — | ``JetSet.apply`` for several machines' bells on the device. |
+| `added_mass_into_model` | function | 1074 | `(dry_mass, dry_inertia, m_body, lever2, boff, *, dtype=_wp.float64)` | batchroll.finish's added-mass write for many worlds; numpy in, numpy out. |
+| `DeviceDamping` | class | 915 | — | ``ImplicitAeroDamping`` for several machines, its state on the device. |
+| `DeviceInflow` | class | 842 | — | ``InducedFlow`` for one machine per world, its state ``w`` on the device. |
+| `DeviceJets` | class | 725 | — | ``JetSet.apply`` for several machines' bells on the device. |
 | `DevicePower` | class | 628 | — | ``BatchedPower`` with its state on the device: one row per world's machine. |
 | `DeviceRotors` | class | 519 | — | The rotor tables of several ``RotorSet``s on the device, and their kernel. |
 | `make_kernels` | function | 47 | `(T)` | Return the kernels for precision ``T`` (``rotor``, ``power_terms``, |
-| `servo_command` | function | 1066 | `(target, rate, lead, world, has_rate, *, dtype=_wp.float64)` | ``TriphibianEnv.servo_command`` for many worlds; numpy in, numpy out. |
-| `DeviceDamping.__init__` | method | 911 | `(self, dampers, body_ids, *, dtype=_wp.float64) -> None` | — |
-| `DeviceDamping.launch` | method | 1010 | `(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com, cdof_rot, cdof_lin, qvel, enabled, dof_damping, qfrc_applied) -> None` | :meth:`step` on device arrays, no host transfer: ``is_wing`` and |
-| `DeviceDamping.reset` | method | 955 | `(self) -> None` | ``ImplicitAeroDamping.reset`` for every world, in place (a captured |
-| `DeviceDamping.step` | method | 973 | `(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com, cdof, qvel, enabled=None) -> dict` | One step; numpy in, numpy out. |
-| `DeviceInflow.__init__` | method | 834 | `(self, spans, *, dtype=_wp.float64) -> None` | — |
-| `DeviceInflow.due` | method | 849 | `(self)` | — |
-| `DeviceInflow.launch` | method | 877 | `(self, F, Vf, rho, dt, due) -> None` | :meth:`update` on device arrays (``due`` an int array per world), no |
-| `DeviceInflow.reset` | method | 855 | `(self, mask=None) -> None` | — |
-| `DeviceInflow.tick` | method | 852 | `(self, mask=None) -> None` | — |
-| `DeviceInflow.update` | method | 863 | `(self, F, Vf, rho, dt, due=None)` | Update the worlds in ``due`` (default: ``self.due()``); returns ``w``. |
-| `DeviceInflow.w` | property | 885 | `(self)` | — |
-| `DeviceJets.__init__` | method | 717 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
-| `DeviceJets.host_inputs` | method | 751 | `(self, datas) -> dict` | ``omega``, ``xmat``, ``xpos`` per bell row, read from each world's |
-| `DeviceJets.launch` | method | 804 | `(self, omega, xmat, rho, subf, out) -> None` | One step on device arrays, no host transfer: per bell row ``omega``, |
-| `DeviceJets.loads` | method | 766 | `(self, omega, xmat, xpos, wind, current) -> dict` | One step of every bell; numpy in, numpy out (see the class docstring). |
-| `DeviceJets.outputs` | method | 795 | `(self) -> dict` | Device arrays for :meth:`launch` to write: per bell ``f``, ``thrust``, |
+| `servo_command` | function | 1101 | `(target, rate, lead, world, has_rate, *, dtype=_wp.float64)` | ``TriphibianEnv.servo_command`` for many worlds; numpy in, numpy out. |
+| `DeviceDamping.__init__` | method | 933 | `(self, dampers, body_ids, *, dtype=_wp.float64) -> None` | — |
+| `DeviceDamping.launch` | method | 1045 | `(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com, cdof_rot, cdof_lin, qvel, enabled, dof_damping, qfrc_applied) -> None` | :meth:`step` on device arrays, no host transfer: ``is_wing`` and |
+| `DeviceDamping.reset` | method | 977 | `(self, mask=None) -> None` | ``ImplicitAeroDamping.reset`` for every world, or the worlds in ``mask`` |
+| `DeviceDamping.step` | method | 1008 | `(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com, cdof, qvel, enabled=None) -> dict` | One step; numpy in, numpy out. |
+| `DeviceInflow.__init__` | method | 856 | `(self, spans, *, dtype=_wp.float64) -> None` | — |
+| `DeviceInflow.due` | method | 871 | `(self)` | — |
+| `DeviceInflow.launch` | method | 899 | `(self, F, Vf, rho, dt, due) -> None` | :meth:`update` on device arrays (``due`` an int array per world), no |
+| `DeviceInflow.reset` | method | 877 | `(self, mask=None) -> None` | — |
+| `DeviceInflow.tick` | method | 874 | `(self, mask=None) -> None` | — |
+| `DeviceInflow.update` | method | 885 | `(self, F, Vf, rho, dt, due=None)` | Update the worlds in ``due`` (default: ``self.due()``); returns ``w``. |
+| `DeviceInflow.w` | property | 907 | `(self)` | — |
+| `DeviceJets.__init__` | method | 739 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
+| `DeviceJets.host_inputs` | method | 773 | `(self, datas) -> dict` | ``omega``, ``xmat``, ``xpos`` per bell row, read from each world's |
+| `DeviceJets.launch` | method | 826 | `(self, omega, xmat, rho, subf, out) -> None` | One step on device arrays, no host transfer: per bell row ``omega``, |
+| `DeviceJets.loads` | method | 788 | `(self, omega, xmat, xpos, wind, current) -> dict` | One step of every bell; numpy in, numpy out (see the class docstring). |
+| `DeviceJets.outputs` | method | 817 | `(self) -> dict` | Device arrays for :meth:`launch` to write: per bell ``f``, ``thrust``, |
 | `DevicePower.__init__` | method | 641 | `(self, envs, *, dtype=_wp.float64) -> None` | — |
-| `DevicePower.launch` | method | 680 | `(self, force, velocity) -> None` | :meth:`step` on device arrays, no host transfer. |
-| `DevicePower.state` | method | 697 | `(self) -> dict` | — |
-| `DevicePower.step` | method | 675 | `(self, force, velocity) -> None` | ``force``, ``velocity``: every machine's first ``n`` actuator forces and |
+| `DevicePower.launch` | method | 702 | `(self, force, velocity) -> None` | :meth:`step` on device arrays, no host transfer. |
+| `DevicePower.load` | method | 675 | `(self, envs, mask=None) -> None` | Each world's battery and ledger from its machine's ``PowerBudget`` |
+| `DevicePower.state` | method | 719 | `(self) -> dict` | — |
+| `DevicePower.step` | method | 697 | `(self, force, velocity) -> None` | ``force``, ``velocity``: every machine's first ``n`` actuator forces and |
 | `DeviceRotors.__init__` | method | 527 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
 | `DeviceRotors.launch` | method | 609 | `(self, xmat, omega, ang, lin, xipos, com, subf, flow, dt, out) -> None` | One step on device arrays, no host transfer.  Per rotor row: ``xmat`` |
 | `DeviceRotors.loads` | method | 561 | `(self, xmat, omega, cvel, xipos, com, dt, wind, current)` | One step of every rotor; numpy in, numpy out. |
