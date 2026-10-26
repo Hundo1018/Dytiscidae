@@ -7,3 +7,6 @@ runs/
 .venv/
 MUJOCO_LOG.TXT
 experiments/_cache/
+
+# run transcripts; the results they print are the .json and .rows.jsonl beside them
+experiments/**/*.log

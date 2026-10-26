@@ -1,5 +1,19 @@
 # Roadmap
 
+**2026-10-26: arch58 and arch59 read against the frozen table (`runs/arch58_notes.md`,
+`runs/arch59_notes.md`; `l1_read.py arch56 arch58 arch59`). Neither is L1.** arch58 is
+arch56's configuration on a second seed (20261024). Its R2 is not certified: elite 1/114,
+still and base both `underpowered` at 0/114. S1 18.4% (arch56 23.4%, inside the +-5 band
+only at its edge), positive share 26.2%, R1 0, R3 1 of 1. The table's branch for an
+uncertified R2 is that arch56 was seed luck: the standing best configuration is unproven
+and is no longer called the baseline. arch59 (placement draws 4, seed 20261020) reads
+S1 7.5%, positive share 49.2%, R2 elite 5/146 with both controls `underpowered`, R1 0,
+R3 3 of 5 above-floor elites retaining >= 0.5. It has 5 above-floor elites, not 8, so the
+table's refuted row ("3 of 8 AND R1 0") does not strictly apply, and the inconclusive row
+("R3 in 4") does not either: the verdict is not met, with the denominator named. No
+threshold changed. Pooled with arch56, the configuration has one replicate that
+certified and one that did not.
+
 **2026-10-25: the flight criterion is settled; see
 `experiments/air_turn_bar/README.md` "Best flight criterion".** `comp:air >= 0.012`,
 certified against the still machine and the base gait, is the one air measurement
