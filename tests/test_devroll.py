@@ -1,4 +1,6 @@
-"""Device evaluation path (IMPL_1010 A): the guard, and the first fluid kernel.
+"""Device evaluation path (IMPL_1010 A): the guard (A0), the fluid and scatter
+kernels each against its numpy code (A1a, A1b), and the per-body MJWarp model and
+the device step replayed against ``step_batch`` (A2).
 
 The device path is optional.  The guard checks run wherever the project runs.
 The kernel checks need MuJoCo Warp, warp and a CUDA device, and skip with a
@@ -374,6 +376,46 @@ def test_the_device_entrainment_is_the_numpy_entrainment_reaction() -> None:
               err <= tol, f"{err:.2e}")
 
 
+def _rotor_machine(k0):
+    """test_physics' rotor fixture: four different rotors per machine, so a lookup
+    that reads one rotor's table for another's cannot agree."""
+    import mujoco
+
+    from dytiscidae.core.bodyplans import REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+    from dytiscidae.physics.rotor import RotorSet, RotorSpec
+
+    env = TriphibianEnv(build(REFERENCE_PLANS["quad"]()), seed=0)
+    env.reset(Domain.WATER, randomise=False)
+    names = [mujoco.mj_id2name(env.model, mujoco.mjtObj.mjOBJ_BODY, b)
+             for b in env.rotors.body]
+    specs = {nm: RotorSpec(radius=0.08 + 0.03 * ((j + k0) % 4),
+                           pitch=0.06 + 0.025 * ((j + 2 * k0) % 3),
+                           blades=2 + (j % 2), handed=(1 if j % 2 else -1))
+             for j, nm in enumerate(names)}
+    env.rotors = RotorSet(env.model, specs)
+    return env
+
+
+def _place_rotor_machine(env, depth_of_first, rng):
+    """Tilt the machine, put its first rotor at ``depth_of_first`` below the
+    surface, and spin its rotors idle, reversed, forward, forward."""
+    import math
+
+    import mujoco
+
+    d, m = env.data, env.model
+    d.qpos[3:7] = [math.cos(0.2), math.sin(0.2), 0.0, 0.0]
+    mujoco.mj_forward(m, d)
+    z = d.xipos[env.rotors.body, 2]
+    d.qpos[2] += -depth_of_first - z[0]
+    d.qvel[:] = rng.normal(0.0, 2.0, m.nv)
+    for j, k in enumerate(env.rotors.dof):
+        d.qvel[k] = (0.0, -450.0, 700.0, 300.0)[j % 4] * (1.0 + 0.1 * rng.random())
+    mujoco.mj_forward(m, d)
+
+
 def test_the_device_rotors_are_the_rotor_batch() -> None:
     from dytiscidae.envs import devroll
 
@@ -381,44 +423,16 @@ def test_the_device_rotors_are_the_rotor_batch() -> None:
     if not ok:
         skip("the device rotors agree with RotorBatch.apply", reason)
         return
-    import math
-
-    import mujoco
     import warp as wp
 
-    from dytiscidae.core.bodyplans import REFERENCE_PLANS
-    from dytiscidae.core.phenotype import build
     from dytiscidae.envs.devroll.scatter_wp import DeviceRotors
-    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
-    from dytiscidae.physics.rotor import RotorBatch, RotorSet, RotorSpec
+    from dytiscidae.physics.rotor import RotorBatch
 
     rng = np.random.default_rng(13)
-
-    def machine(k0):
-        # test_physics' rotor fixture: four different rotors per machine, so a
-        # lookup that reads one rotor's table for another's cannot agree.
-        env = TriphibianEnv(build(REFERENCE_PLANS["quad"]()), seed=0)
-        env.reset(Domain.WATER, randomise=False)
-        names = [mujoco.mj_id2name(env.model, mujoco.mjtObj.mjOBJ_BODY, b)
-                 for b in env.rotors.body]
-        specs = {nm: RotorSpec(radius=0.08 + 0.03 * ((j + k0) % 4),
-                               pitch=0.06 + 0.025 * ((j + 2 * k0) % 3),
-                               blades=2 + (j % 2), handed=(1 if j % 2 else -1))
-                 for j, nm in enumerate(names)}
-        env.rotors = RotorSet(env.model, specs)
-        return env
+    machine = _rotor_machine
 
     def place(env, depth_of_first):
-        d, m = env.data, env.model
-        d.qpos[3:7] = [math.cos(0.2), math.sin(0.2), 0.0, 0.0]
-        mujoco.mj_forward(m, d)
-        z = d.xipos[env.rotors.body, 2]
-        d.qpos[2] += -depth_of_first - z[0]
-        d.qvel[:] = rng.normal(0.0, 2.0, m.nv)
-        for j, k in enumerate(env.rotors.dof):
-            # idle, reversed, forward, forward
-            d.qvel[k] = (0.0, -450.0, 700.0, 300.0)[j % 4] * (1.0 + 0.1 * rng.random())
-        mujoco.mj_forward(m, d)
+        _place_rotor_machine(env, depth_of_first, rng)
 
     # Two machines laid out as two worlds of one batch.
     envs = [machine(0), machine(1)]
@@ -683,7 +697,7 @@ def test_the_device_jets_are_the_jet_set() -> None:
                 e.data.qpos[:], e.data.qvel[:] = qp, qv
                 mujoco.mj_forward(e.model, e.data)
             x = dev.host_inputs([e.data for e in envs])
-            out = dev.loads(x["theta"], x["omega"], x["xmat"], x["xpos"], med.wind, med.current)
+            out = dev.loads(x["omega"], x["xmat"], x["xpos"], med.wind, med.current)
             for w, (e, r) in enumerate(zip(envs, ref)):
                 a, b = dev.off_np[w], dev.off_np[w + 1]
                 f = np.zeros_like(r["f"])
@@ -899,10 +913,322 @@ def test_the_device_added_mass_is_each_worlds_own() -> None:
               max(e_m, e_i) <= tol, f"mass {e_m:.2e}, inertia {e_i:.2e}")
 
 
-def test_the_device_replay_is_not_built_yet() -> None:
-    skip("the device fluid replays FluidSolver.apply for 2000 steps (A1a replay)",
-         "every A1a and A1b slice is parity-tested on its own; the replay that runs them "
-         "in sequence inside an MJWarp step needs A2's model and step graph")
+def test_the_device_model_is_the_cpu_model() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the MJWarp model of a body steps as CPU MuJoCo and keeps per-world fields",
+             reason)
+        return
+    import copy
+
+    import mujoco
+    import mujoco_warp as mjw
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.devroll.model_wp import NJMAX, device_model
+    from dytiscidae.envs.triphibian import TriphibianEnv
+
+    # (a) every seed plan, margin zeroed on both sides, gravity on, no fluid, zero
+    # ctrl: the device qpos stays within 1e-4 of CPU MuJoCo for 300 steps.
+    worst, names = 0.0, []
+    for plan in sorted(BODY_PLANS):
+        e = TriphibianEnv(build(BODY_PLANS[plan]()), seed=0)
+        m, _, mjm = device_model(e.model, 1)
+        d = mjw.put_data(mjm, mujoco.MjData(mjm), nworld=1, njmax=NJMAX)
+        ref = mujoco.MjData(mjm)
+        for _ in range(300):
+            mujoco.mj_step(mjm, ref)
+            mjw.step(m, d)
+        err = float(np.abs(d.qpos.numpy()[0] - ref.qpos).max())
+        names.append(f"{plan} {err:.1e}")
+        worst = max(worst, err)
+    check(f"(a) {len(names)} seed plans: device qpos within 1e-4 of CPU MuJoCo over 300 steps",
+          worst <= 1e-4, ", ".join(names))
+    # (b) a different body_mass per world gives a different qacc per world, and
+    # world 0 is unchanged by the others' writes.
+    e = TriphibianEnv(build(BODY_PLANS["eel"]()), seed=0)
+    W = 3
+    m, zeroed, mjm = device_model(e.model, W)
+    check("the eel's 1 mm margin is zeroed on the device copy, not on the host model",
+          zeroed and float(np.abs(e.model.geom_margin).max()) > 0.0)
+    for k in ("body_mass", "body_inertia", "dof_damping"):
+        check(f"(c) {k} has leading dimension W = {W} after put_model",
+              getattr(m, k).shape[0] == W, str(getattr(m, k).shape))
+
+    def qacc_after(scales):
+        d = mjw.put_data(mjm, mujoco.MjData(mjm), nworld=W, njmax=NJMAX)
+        bm = np.tile(mjm.body_mass.astype(np.float32), (W, 1))
+        for w, sc_ in enumerate(scales):
+            bm[w, 1:] *= sc_
+        m.body_mass.assign(bm)
+        # Free fall alone is mass-blind; the actuators' torque is not.
+        d.ctrl.assign(np.full((W, mjm.nu), 0.3, dtype=np.float32))
+        mjw.forward(m, d)
+        return d.qacc.numpy().astype(float)
+
+    base = qacc_after([1.0, 1.0, 1.0])
+    moved = qacc_after([1.0, 3.0, 0.5])
+    check("(b) a heavier and a lighter world accelerate differently from the base",
+          float(np.abs(moved[1] - base[1]).max()) > 1e-3
+          and float(np.abs(moved[2] - base[2]).max()) > 1e-3)
+    check("(b) world 0 is unchanged by the other worlds' body_mass",
+          float(np.abs(moved[0] - base[0]).max()) == 0.0)
+    del copy
+
+
+def _replay_fixtures():
+    """(name, envs, rng seed) for the replay: an eel in the water and across the
+    surface, the rotor fixture (two worlds of one rotor set) and a medusa."""
+    import mujoco
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    def plan_worlds(plan, depths, seed):
+        rng = np.random.default_rng(seed)
+        envs = []
+        for k, z in enumerate(depths):
+            e = TriphibianEnv(build(BODY_PLANS[plan]()), seed=k)
+            e.reset(Domain.WATER, randomise=False)
+            d, m = e.data, e.model
+            d.qvel[:] = rng.normal(0.0, 1.5, m.nv)
+            mujoco.mj_forward(m, d)
+            d.qpos[2] += z - d.xpos[1, 2]
+            envs.append(e)
+        return envs
+
+    def rotor_worlds(depths, seed):
+        rng = np.random.default_rng(seed)
+        envs = []
+        for z in depths:
+            e = _rotor_machine(0)
+            _place_rotor_machine(e, z, rng)
+            envs.append(e)
+        return envs
+
+    return [("eel", lambda: plan_worlds("eel", (-0.3, 0.02), 61)),
+            ("rotor fixture", lambda: rotor_worlds((0.004, -0.5), 67)),
+            ("medusa", lambda: plan_worlds("medusa", (-0.4, 0.05), 71))]
+
+
+def _round_to_float32(envs):
+    """Put every machine at a float32 state: MJWarp holds its state in float32, so
+    the host reference starts where the device worlds start."""
+    import mujoco
+
+    for e in envs:
+        e.model.geom_margin[:] = 0.0
+        e.data.qpos[:] = e.data.qpos.astype(np.float32)
+        e.data.qvel[:] = e.data.qvel.astype(np.float32)
+        e.data.time = float(np.float32(e.data.time))
+        mujoco.mj_forward(e.model, e.data)
+
+
+REPLAY_FIELDS = ("xfrc", "qfrc_applied", "dof_damping", "body_mass", "body_inertia")
+
+
+def _host_fields(envs):
+    return {"xfrc": np.stack([e.data.xfrc_applied for e in envs]),
+            "qfrc_applied": np.stack([e.data.qfrc_applied for e in envs]),
+            "dof_damping": np.stack([e.model.dof_damping for e in envs]),
+            "body_mass": np.stack([e.model.body_mass for e in envs]),
+            "body_inertia": np.stack([e.model.body_inertia for e in envs])}
+
+
+def _worst(got, want):
+    errs = {k: float(np.abs(np.asarray(got[k], float) - want[k]).max())
+            / max(float(np.abs(want[k]).max()), 1e-30) for k in want}
+    k = max(errs, key=errs.get)
+    return k, errs[k]
+
+
+def test_the_device_step_replays_step_batch() -> None:
+    """The device step against ``step_batch`` with ``HostFluid`` (FluidSolver.apply,
+    jets, rotors, mj_step, BatchedPower) on the same machines, step by step.
+
+    Two device runs ride along with the host reference.  The *host-state* run
+    reads each step's kinematics from the host machines (``host_state``), so its
+    staged outputs are held at the precision's tolerance (float64 1e-9, float32
+    2e-4) over every step, and what it wrote into MJWarp at 2e-4 (MJWarp is
+    float32).  The *device* run reads MJWarp's own state (``gather``) and steps
+    on it: end to end, at 2e-4, on the first step, where both start from the
+    same float32 state; its later steps are reported, not gated, because the
+    float32 integrator has drifted from the float64 one by then.
+    """
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device step replays step_batch (fluid, scatter, MJWarp step, power)", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.batchroll import HostFluid, step_batch
+    from dytiscidae.envs.devroll.model_wp import DeviceBody
+
+    steps = 6
+    for name, make in _replay_fixtures():
+        for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+            pname = "float64" if dtype == wp.float64 else "float32"
+            envs = make()
+            _round_to_float32(envs)
+            W = len(envs)
+            rng = np.random.default_rng(5)
+            host = DeviceBody(envs, dtype=dtype)
+            dev = DeviceBody(envs, dtype=dtype)
+            dev.load_state([e.data for e in envs])
+            host.load_state([e.data for e in envs])
+            bf = HostFluid(envs)
+            worst_h = ("", 0.0)
+            worst_r = ("", 0.0)
+            worst_diag = ("", 0.0)
+            dev_first, dev_later, qpos_err = ("", 0.0), [], 0.0
+            ever_clamped = np.zeros(W, bool)
+            e_start = np.array([e.budget.battery.energy_j for e in envs])
+            worst_pw, drawn_1, pw_later = 0.0, 0.0, []
+            for t in range(steps):
+                q_before = np.stack([e.data.qpos.copy() for e in envs])
+                angles = [rng.uniform(-0.3, 0.3, len(e.act_names)) for e in envs]
+                host.set_targets(angles)
+                dev.set_targets(angles)
+                host.host_state([e.data for e in envs])
+                host.step(gather=False)
+                dev.step(gather=True)
+                step_batch(envs, angles, bf)
+                want = _host_fields(envs)
+                k, err = _worst(host.staged(), want)
+                if err > worst_h[1]:
+                    worst_h = (f"{k} at step {t}", err)
+                k, err = _worst(host.resident(), want)
+                if err > worst_r[1]:
+                    worst_r = (f"{k} at step {t}", err)
+                k, err = _worst(dev.resident(), want)
+                if t == 0:
+                    dev_first = (k, err)
+                    q_ref = np.stack([e.data.qpos for e in envs])
+                    qpos_err = float(np.abs(dev.d.qpos.numpy() - q_ref).max()) / max(
+                        float(np.abs(q_ref - q_before).max()), 1e-30)
+                else:
+                    dev_later.append(err)
+                # The diagnostics, the induced flow and the battery, from the host run.
+                dg = host.diagnostics()
+                ref = {"mean_submerged": [e.solver.diag.mean_submerged for e in envs],
+                       "added_mass": [e.solver.diag.added_mass for e in envs],
+                       "slam": [e.solver.diag.slam for e in envs],
+                       "inflow w": np.stack([e.solver._inflow.w for e in envs])}
+                got = {"mean_submerged": dg["mean_submerged"], "added_mass": dg["added_mass"],
+                       "slam": dg["slam"], "inflow w": host.inflow.w}
+                # The battery is charged from MJWarp's actuator forces, float32 whatever
+                # the step's precision, on MJWarp's own state, which drifts from the
+                # host's after the first step: the energy drawn on step 1, at 2e-4.
+                drawn_ref = e_start - np.array([e.budget.battery.energy_j for e in envs])
+                drawn = e_start - host.power.state()["energy_j"]
+                err_pw = float(np.abs(drawn - drawn_ref).max()) / max(
+                    float(np.abs(drawn_ref).max()), 1e-30)
+                if t == 0:
+                    worst_pw, drawn_1 = err_pw, float(np.abs(drawn_ref).max())
+                else:
+                    pw_later.append(err_pw)
+                ref = {k_: np.asarray(v, float) for k_, v in ref.items()}
+                # slam differences the entrained mass between steps; where it barely
+                # changes, the difference is rounding, so its scale is that of the
+                # terms it differences, not of its own value.
+                bfd = host.buf
+                slam_scale = float(np.abs(bfd["m_slam"].numpy()).max()
+                                   * np.abs(bfd["vn"].numpy()).max()) / host.timestep
+                got["slam"] = np.append(got["slam"], 0.0)
+                ref["slam"] = np.append(ref["slam"], slam_scale)
+                got["slam"][-1] = slam_scale
+                k, err = _worst(got, ref)
+                if err > worst_diag[1]:
+                    worst_diag = (f"{k} at step {t}", err)
+                # FluidSolver's diag.clamped is sticky until reset; the device keeps
+                # batchroll's per-step flag, so the host flag is the device's OR.
+                ever_clamped |= dg["clamped"]
+                if [bool(c) for c in ever_clamped] != [bool(e.solver.diag.clamped) for e in envs]:
+                    worst_diag = (f"clamped at step {t}", float("inf"))
+            check(f"{name} {pname}: the replay is not of zeros (fluid, damping and added mass "
+                  "all carry load)",
+                  all(float(np.abs(v).max()) > 1e-6 for v in want.values())
+                  and float(np.abs(want["dof_damping"] - np.stack(
+                      [e.solver._damping.base for e in envs])).max()) > 1e-6
+                  and float(np.abs(want["body_mass"] - np.stack(
+                      [e.solver._dry_mass for e in envs])).max()) > 1e-6)
+            check(f"{name} {pname}: {steps} steps, staged xfrc, qfrc_applied, dof_damping, "
+                  f"body_mass, body_inertia within {tol:g} of their maxima",
+                  worst_h[1] <= tol, f"worst {worst_h[0]} {worst_h[1]:.2e}")
+            check(f"{name} {pname}: and as written into the MJWarp Model and Data, within 2e-4",
+                  worst_r[1] <= 2e-4, f"worst {worst_r[0]} {worst_r[1]:.2e}")
+            check(f"{name} {pname}: diagnostics (mean_submerged, added_mass, slam, clamped) "
+                  f"and the induced flow agree within {tol:g}", worst_diag[1] <= tol,
+                  f"worst {worst_diag[0]} {worst_diag[1]:.2e}")
+            check(f"{name} {pname}: the battery's energy drawn on step 1 within 2e-4 (MJWarp's "
+                  "float32 actuator forces)", worst_pw <= 2e-4 and drawn_1 > 0.0,
+                  f"{worst_pw:.2e}; steps 2-{steps}: "
+                  f"{', '.join(f'{x:.1e}' for x in pw_later)} (not gated)")
+            # qpos after the MJWarp step: a layout error in what was written (force
+            # and torque swapped, a world's row in another's) moves it by the order
+            # of the step itself; the float32 solve on the fluid's added mass moved
+            # it by up to 8.3e-4 of the step on the medusa (2026-10-26).
+            check(f"{name} {pname}: end to end on MJWarp's own state, step 1 within 2e-4; "
+                  "qpos after it within 1e-2 of the step's largest change",
+                  dev_first[1] <= 2e-4 and qpos_err <= 1e-2,
+                  f"worst {dev_first[0]} {dev_first[1]:.2e}, qpos {qpos_err:.1e}; steps 2-"
+                  f"{steps}: {', '.join(f'{x:.1e}' for x in dev_later)} (not gated)")
+            del W
+
+
+def test_the_device_step_reads_nothing_back() -> None:
+    """The fluid-and-scatter step and ``mjw.step`` capture into one CUDA graph: a
+    host read-back anywhere in them (a ``.numpy()``, a synchronize) makes the
+    capture fail.  The captured replay writes what a direct step writes."""
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device step captures into a CUDA graph (no host read-back)", reason)
+        return
+    import mujoco_warp as mjw
+    import warp as wp
+
+    from dytiscidae.envs.devroll.model_wp import DeviceBody
+
+    for name, make in _replay_fixtures()[:2]:
+        envs = make()
+        _round_to_float32(envs)
+        body = DeviceBody(envs, dtype=wp.float32)
+        body.load_state([e.data for e in envs])
+        body.step()                          # compile and load every module first
+
+        def fresh():
+            body.reset()
+            body.load_state([e.data for e in envs])
+            body.gather()
+        fresh()
+        try:
+            with wp.ScopedCapture() as cap:
+                body.fluid_and_scatter()
+                mjw.step(body.m, body.d)
+            captured, why = True, ""
+        except Exception as exc:  # noqa: BLE001 - any capture failure is the finding
+            captured, why = False, f"{type(exc).__name__}: {str(exc)[:160]}"
+        check(f"{name}: the device step captures into a graph", captured, why)
+        if not captured:
+            continue
+        fresh()
+        wp.capture_launch(cap.graph)
+        a = body.staged()
+        fresh()
+        body.fluid_and_scatter()
+        mjw.step(body.m, body.d)
+        b = body.staged()
+        k, err = _worst(a, b)
+        check(f"{name}: the captured step writes what the direct step writes",
+              err <= 2e-4, f"worst {k} {err:.2e}")
 
 
 def test_the_reason_is_set_when_the_packages_do_not_import() -> None:
@@ -934,7 +1260,9 @@ def main() -> int:
                  test_the_device_inflow_is_induced_flow,
                  test_the_device_damping_is_implicit_aero_damping,
                  test_the_device_added_mass_is_each_worlds_own,
-                 test_the_device_replay_is_not_built_yet]
+                 test_the_device_model_is_the_cpu_model,
+                 test_the_device_step_replays_step_batch,
+                 test_the_device_step_reads_nothing_back]
     for fn in functions:
         print(f"{fn.__name__}")
         fn()

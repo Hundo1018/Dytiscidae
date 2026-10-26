@@ -36,6 +36,9 @@ DeviceEvaluation:
     - envs.devroll.scatter_wp.DeviceInflow
     - envs.devroll.scatter_wp.DeviceDamping
     - envs.devroll.scatter_wp.added_mass_into_model
+    - envs.devroll.model_wp
+    - envs.devroll.model_wp.DeviceBody
+    - envs.devroll.model_wp.device_model
   tests:
     - tests.test_devroll
     - tests.test_devroll::test_the_device_rotors_are_the_rotor_batch
@@ -45,7 +48,10 @@ DeviceEvaluation:
     - tests.test_devroll::test_the_device_inflow_is_induced_flow
     - tests.test_devroll::test_the_device_damping_is_implicit_aero_damping
     - tests.test_devroll::test_the_device_added_mass_is_each_worlds_own
-  note: IMPL_1010 A. The guard (A0), the A1a fluid kernels (strip loads, Wagner lag, medium, added mass, assembly) and A1b's entrainment, rotors, power budget, servo command, jets, induced flow, implicit damping split and per-world added-mass write, each held to its numpy code; A1b's diagnostics (clamped, mean_submerged, added_mass, slam) and the replay of FluidSolver.apply in an MJWarp step (needs A2) are not built.
+    - tests.test_devroll::test_the_device_model_is_the_cpu_model
+    - tests.test_devroll::test_the_device_step_replays_step_batch
+    - tests.test_devroll::test_the_device_step_reads_nothing_back
+  note: IMPL_1010 A. The guard (A0), the A1a fluid kernels (kinematics, strip loads on the Wagner-lagged incidence, medium, added mass, assembly) and A1b's entrainment, rotors, power budget, servo command, jets, induced flow, implicit damping split and per-world added-mass write, each held to its numpy code; A2's per-body MJWarp Model and Data (per-world body_mass, body_inertia, dof_damping; margin zeroed on the device copy) and DeviceBody.step, step_batch with HostFluid on W worlds with the four diagnostics, replayed against it step by step (float64 1e-9 on the staged writes; MJWarp itself is float32) and captured into a CUDA graph with no host read-back. Not built: the controller on the device (A3), the rollout and recording (A4), per-world resets and the active mask.
 
 # --------------------------------------------------------------- the learner
 

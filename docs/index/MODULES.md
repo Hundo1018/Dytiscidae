@@ -2,7 +2,7 @@
 
 # Modules
 
-109 modules, 40,332 lines, 1,155 indexed symbols.
+110 modules, 41,290 lines, 1,176 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -102,8 +102,9 @@ is what makes a violation visible while reading.
 | `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1416 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor` |
 | `envs.device` | Which device a search scores on, and the one condition that allows the CPU. | 98 | — | — | — |
 | `envs.devroll` | On-device evaluation path (IMPL_1010 A): MuJoCo Warp plus Warp fluid kernels. | 76 | — | — | — |
-| `envs.devroll.fluid_wp` | Strip-theory loads on the device (IMPL_1010 A1a, first slice). | 538 | — | `numpy` | `physics.fluid`, `physics.medium` |
-| `envs.devroll.scatter_wp` | The scatter between two ``mj_step``s on the device (IMPL_1010 A1b). | 997 | — | `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `physics.energy`, `physics.fluid`, `physics.rotor` |
+| `envs.devroll.fluid_wp` | Strip-theory loads on the device (IMPL_1010 A1a). | 613 | — | `numpy` | `physics.fluid`, `physics.medium` |
+| `envs.devroll.model_wp` | One body on the device: its MJWarp ``Model`` and ``Data`` over W worlds, and the | 799 | — | `mujoco`, `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `envs.devroll.scatter_wp`, `physics.fluid` |
+| `envs.devroll.scatter_wp` | The scatter between two ``mj_step``s on the device (IMPL_1010 A1b). | 1081 | — | `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `physics.energy`, `physics.fluid`, `physics.rotor` |
 | `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 753 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 72 | — | — | — |
 | `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 336 | — | `numpy` | `envs.triphibian` |

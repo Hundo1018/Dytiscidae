@@ -2069,7 +2069,7 @@ MUTATIONS: tuple = (
     Mutation(
         id="device-lev-forgets-the-reversal",
         path="dytiscidae/envs/devroll/fluid_wp.py",
-        find="                s_trav[i] = T(0.0)\n        rev_prev[i] = r",
+        find="                s_trav[i] = _wp.float64(0.0)\n        rev_prev[i] = r",
         replace="        rev_prev[i] = r",
         defect="the device strip never resets its travel or circulation at a reversal of "
                "the chordwise flow, so the LEV and lag carry across half-strokes",
@@ -2178,6 +2178,75 @@ MUTATIONS: tuple = (
         defect="every world's added mass is written at world 0's bodies, so all worlds but one "
                "run on their dry mass and world 0 on whichever world wrote last",
         suites=("test_devroll",), item="A1b added mass"),
+    # --- device model and step (IMPL_1010 A2, 2026-10-26) ------------------
+    Mutation(
+        id="device-model-shared-mass",
+        path="dytiscidae/envs/devroll/model_wp.py",
+        find='    m = _mjw.put_model(mjm, batch_sizes={"body_mass": nworld, "body_inertia": nworld,',
+        replace='    m = _mjw.put_model(mjm, batch_sizes={"body_inertia": nworld,',
+        defect="body_mass is one row shared by every world, so each world's added mass "
+               "overwrites the others' and W-1 worlds step on another world's mass",
+        suites=("test_devroll::test_the_device_model_is_the_cpu_model",), item="A2 model"),
+    Mutation(
+        id="device-step-callback-order",
+        path="dytiscidae/envs/devroll/model_wp.py",
+        find="        if gather:\n            self.gather()\n        self.fluid_and_scatter()\n"
+             "        _mjw.step(self.m, self.d)",
+        replace="        _mjw.step(self.m, self.d)\n        if gather:\n            self.gather()\n"
+                "        self.fluid_and_scatter()",
+        defect="the fluid runs after mjw.step, so every step integrates the previous step's "
+               "loads and the fluid reads a state the host path has not reached",
+        suites=("test_devroll::test_the_device_step_replays_step_batch",), item="A2 step"),
+    Mutation(
+        id="device-replay-writes-world-zero-only",
+        path="dytiscidae/envs/devroll/model_wp.py",
+        find="        xfrc_applied[w, b] = _wp.spatial_vector(",
+        replace="        xfrc_applied[0, b] = _wp.spatial_vector(",
+        defect="every world's fluid load is written into world 0's xfrc_applied, so the other "
+               "worlds fly with no fluid and world 0 with whichever world wrote last",
+        suites=("test_devroll::test_the_device_step_replays_step_batch",), item="A2 step"),
+    Mutation(
+        id="device-damping-reads-due-back",
+        path="dytiscidae/envs/devroll/scatter_wp.py",
+        find='        _wp.launch(K["wet_stale"], dim=nw, inputs=[\n            self._poff, self._due, pos,',
+        replace='        self._due.numpy()\n        _wp.launch(K["wet_stale"], dim=nw, inputs=[\n'
+                '            self._poff, self._due, pos,',
+        defect="the device step reads the damping's due mask back to the host every step: a "
+               "sync per step, and a step that cannot be captured into a graph",
+        suites=("test_devroll::test_the_device_step_reads_nothing_back",), item="A2 no sync"),
+    Mutation(
+        id="device-inflow-sums-every-panel",
+        path="dytiscidae/envs/devroll/model_wp.py",
+        find="            if is_wing[p] != 0:\n                s = s + F[p]",
+        replace="            if True:\n                s = s + F[p]",
+        defect="the induced flow is driven by the whole machine's force, bluff hull drag "
+               "included, not the lifting system's, so a swimming hull makes downwash",
+        suites=("test_devroll::test_the_device_step_replays_step_batch",), item="A2 inflow"),
+    Mutation(
+        id="device-strip-skips-the-lagged-pass",
+        path="dytiscidae/envs/devroll/model_wp.py",
+        find="                bf[\"alpha_e\"], bf[\"lev_u\"]])\n            strip(1)",
+        replace="                bf[\"alpha_e\"], bf[\"lev_u\"]])\n            pass",
+        defect="the device step keeps the quasi-static strip pass, so the Wagner lag and the "
+               "LEV travel are computed and never reach the lift",
+        suites=("test_devroll::test_the_device_step_replays_step_batch",), item="A2 step"),
+    Mutation(
+        id="device-kinematics-at-the-frame-origin",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="        v_elem[i] = lin_com[b] + _wp.cross(w, p - xipos[b])",
+        replace="        v_elem[i] = lin_com[b] + _wp.cross(w, p - xpos[b])",
+        defect="the strip's lever arm is measured from the body frame origin while the velocity "
+               "is the centre of mass's, the 2026-09-23 bug that ran flapping strips 1.8-3.6x "
+               "too fast in U^2 S",
+        suites=("test_devroll::test_the_device_step_replays_step_batch",), item="A1a kinematics"),
+    Mutation(
+        id="device-entrainment-reacts-the-reset",
+        path="dytiscidae/envs/devroll/model_wp.py",
+        find="_NO_PREVIOUS_MASS = 1.0e30",
+        replace="_NO_PREVIOUS_MASS = 0.0",
+        defect="the first step after a reset reacts the whole added mass as if it were "
+               "entrained in one step: a machine placed in water is kicked to a stop",
+        suites=("test_devroll::test_the_device_step_replays_step_batch",), item="A2 entrainment"),
     # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
     Mutation(
         id="grpo-advantage-across-the-whole-batch",

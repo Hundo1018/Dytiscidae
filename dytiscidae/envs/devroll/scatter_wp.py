@@ -8,8 +8,11 @@ mass into ``body_mass``/``body_inertia`` (batchroll.py:538-540), as Warp kernels
 over flat arrays.  A row is one rotor, bell, strip, body, dof, actuator or one
 world's machine; the caller lays worlds out back to back and passes each row's
 index into its world's arrays.  The kernels return loads and model fields;
-writing them into the MJWarp ``Model`` and ``Data`` (``xfrc_applied``,
-``dof_damping``, ``qfrc_applied``, ``body_mass``, ``body_inertia``) is A2's job.
+``model_wp.DeviceBody`` writes them into the MJWarp ``Model`` and ``Data``
+(``xfrc_applied``, ``dof_damping``, ``qfrc_applied``, ``body_mass``,
+``body_inertia``).  Each class has a ``launch`` on device arrays, which reads
+nothing back to the host, and a numpy-in, numpy-out wrapper around it that the
+parity tests call.
 
 What stays on the host: the rotor tables (``rotor_table`` builds them once per
 rotor and medium, they are constants on the device), and whether the CPG left a
@@ -245,7 +248,7 @@ def make_kernels(T):
 
     @_wp.kernel
     def jets_wp(
-        theta: _wp.array(dtype=T), omega: _wp.array(dtype=T), lo: _wp.array(dtype=T),
+        omega: _wp.array(dtype=T), lo: _wp.array(dtype=T),
         hi: _wp.array(dtype=T), volume: _wp.array(dtype=T), stroke: _wp.array(dtype=T),
         orifice: _wp.array(dtype=T), refill: _wp.array(dtype=T), xmat: _wp.array(dtype=M),
         axis: _wp.array(dtype=V), rho: _wp.array(dtype=T), subf: _wp.array(dtype=T),
@@ -342,7 +345,18 @@ def make_kernels(T):
     # --- ImplicitAeroDamping -------------------------------------------
     # Worlds back to back: strips [poff[w], poff[w+1]), bodies [boff..), dofs
     # [voff..); a strip's body and root are global body indices; ``anc`` is each
-    # world's (nbody, nv) mask flattened from aoff[w].
+    # world's (nbody, nv) mask flattened from aoff[w].  The moments and the
+    # projection run in float64 at every precision: the moment form expands
+    # sum b |lin + rot x r|^2, which cancels when a strip sits near a dof's axis
+    # far from its root's centre of mass, and in float32 it lost 1% of B on a
+    # medusa bell joint (tests/test_devroll.py, the step replay).
+    D3 = _wp.vec3d
+    DM = _wp.mat33d
+    F64 = _wp.float64
+
+    @_wp.func
+    def d3(x: V) -> _wp.vec3d:
+        return _wp.vec3d(_wp.float64(x[0]), _wp.float64(x[1]), _wp.float64(x[2]))
 
     @_wp.kernel
     def damp_due(count: _wp.array(dtype=int), stale: _wp.array(dtype=int),
@@ -375,22 +389,25 @@ def make_kernels(T):
                      due: _wp.array(dtype=int), strip_body: _wp.array(dtype=int),
                      strip_root: _wp.array(dtype=int), pos: _wp.array(dtype=V),
                      com: _wp.array(dtype=V), b: _wp.array(dtype=T),
-                     B0: _wp.array(dtype=T), B1: _wp.array(dtype=V), B2: _wp.array(dtype=M)):
+                     B0: _wp.array(dtype=F64), B1: _wp.array(dtype=D3),
+                     B2: _wp.array(dtype=DM)):
         # projected's per-body moments: sum b, sum b r, sum b (|r|^2 I - r r^T).
         g = _wp.tid()
         w = body_world[g]
         if due[w] == 0:
             return
-        s0 = T(0.0)
-        s1 = V(T(0.0), T(0.0), T(0.0))
-        s2 = M(T(0.0), T(0.0), T(0.0), T(0.0), T(0.0), T(0.0), T(0.0), T(0.0), T(0.0))
+        s0 = F64(0.0)
+        s1 = D3(F64(0.0), F64(0.0), F64(0.0))
+        s2 = DM(F64(0.0), F64(0.0), F64(0.0), F64(0.0), F64(0.0), F64(0.0), F64(0.0),
+                F64(0.0), F64(0.0))
         for i in range(poff[w], poff[w + 1]):
             if strip_body[i] == g:
-                r = pos[i] - com[strip_root[i]]
-                s0 = s0 + b[i]
-                s1 = s1 + b[i] * r
-                s2 = s2 + b[i] * (_wp.dot(r, r) * _wp.identity(n=3, dtype=T)
-                                  - _wp.outer(r, r))
+                r = d3(pos[i]) - d3(com[strip_root[i]])
+                bi = F64(b[i])
+                s0 = s0 + bi
+                s1 = s1 + bi * r
+                s2 = s2 + bi * (_wp.dot(r, r) * _wp.identity(n=3, dtype=F64)
+                                - _wp.outer(r, r))
         B0[g] = s0
         B1[g] = s1
         B2[g] = s2
@@ -400,8 +417,8 @@ def make_kernels(T):
                     aoff: _wp.array(dtype=int), dof_world: _wp.array(dtype=int),
                     due: _wp.array(dtype=int), anc: _wp.array(dtype=int),
                     rot: _wp.array(dtype=V), lin: _wp.array(dtype=V),
-                    B0: _wp.array(dtype=T), B1: _wp.array(dtype=V), B2: _wp.array(dtype=M),
-                    last_b: _wp.array(dtype=T)):
+                    B0: _wp.array(dtype=F64), B1: _wp.array(dtype=D3), B2: _wp.array(dtype=DM),
+                    last_b: _wp.array(dtype=F64)):
         # B_k = sum over bodies dof k moves of B0|lin|^2 + 2 B1.(lin x rot) + rot.B2 rot.
         k = _wp.tid()
         w = dof_world[k]
@@ -410,14 +427,14 @@ def make_kernels(T):
         nv = voff[w + 1] - voff[w]
         kl = k - voff[w]
         nb = boff[w + 1] - boff[w]
-        rt = rot[k]
-        ln = lin[k]
+        rt = d3(rot[k])
+        ln = d3(lin[k])
         lxw = _wp.cross(ln, rt)
-        val = T(0.0)
+        val = F64(0.0)
         for j in range(nb):
             if anc[aoff[w] + j * nv + kl] != 0:
                 g = boff[w] + j
-                val = val + (B0[g] * _wp.dot(ln, ln) + T(2.0) * _wp.dot(B1[g], lxw)
+                val = val + (B0[g] * _wp.dot(ln, ln) + F64(2.0) * _wp.dot(B1[g], lxw)
                              + _wp.dot(rt, B2[g] * rt))
         last_b[k] = val
 
@@ -458,7 +475,7 @@ def make_kernels(T):
 
     @_wp.kernel
     def damp_out(dof_world: _wp.array(dtype=int), enabled: _wp.array(dtype=int),
-                 base: _wp.array(dtype=T), last_b: _wp.array(dtype=T),
+                 base: _wp.array(dtype=T), last_b: _wp.array(dtype=_wp.float64),
                  qvel: _wp.array(dtype=T), dof_damping: _wp.array(dtype=T),
                  qfrc: _wp.array(dtype=T)):
         # dof_damping = base + B, and the compensation qfrc_applied = B qvel that
@@ -466,7 +483,7 @@ def make_kernels(T):
         k = _wp.tid()
         lb = T(0.0)
         if enabled[dof_world[k]] != 0:
-            lb = last_b[k]
+            lb = T(last_b[k])
         dof_damping[k] = base[k] + lb
         qfrc[k] = lb * qvel[k]
 
@@ -527,6 +544,8 @@ class DeviceRotors:
 
         self._sc = sc
         self._axis = _np.array([x for s in self.sets for x in s.axis_local], float).reshape(-1, 3)
+        self._axis_dev = _wp.array(_np.ascontiguousarray(self._axis, dtype=npdt),
+                                   dtype=make_kernels(dtype)["V"])
         self._inertia = sc([x for s in self.sets for x in s.inertia])
         self._handed = sc([float(sp.handed) for sp in specs])
         self._R = sc([float(sp.radius) for sp in specs])
@@ -568,19 +587,39 @@ class DeviceRotors:
             pos, sc(_np.full(n, 0.01)), V(*[dtype(x) for x in wind]),
             V(*[dtype(x) for x in current]), dtype(self.air.rho), dtype(self.water.rho),
             dtype(self.air.mu), dtype(self.water.mu), rho, mu, subf, flow])
-        out = {k: _wp.zeros(n, dtype=V) for k in ("f_lin", "f_ang")}
-        out.update({k: _wp.zeros(n, dtype=dtype) for k in ("dq", "damp", "thrust", "torque")})
+        out = self.outputs()
+        self.launch(_wp.array(_np.ascontiguousarray(xmat, dtype=npdt).reshape(n, 3, 3), dtype=M),
+                    sc(omega), vec(cvel[:, 0:3]), vec(cvel[:, 3:6]), pos, vec(com), subf, flow,
+                    sc(dt), out)
+        res = {k: v.numpy() for k, v in out.items()}
+        res["subf"] = subf.numpy()
+        return res
+
+    def outputs(self) -> dict:
+        """Device arrays for :meth:`launch` to write, one row per rotor."""
+        V = make_kernels(self._dtype)["V"]
+        out = {k: _wp.zeros(max(self.n, 1), dtype=V) for k in ("f_lin", "f_ang")}
+        out.update({k: _wp.zeros(max(self.n, 1), dtype=self._dtype)
+                    for k in ("dq", "damp", "thrust", "torque")})
+        return out
+
+    def launch(self, xmat, omega, ang, lin, xipos, com, subf, flow, dt, out) -> None:
+        """One step on device arrays, no host transfer.  Per rotor row: ``xmat``
+        (3x3), ``omega``, ``ang`` and ``lin`` (the body's ``cvel`` halves),
+        ``xipos``, ``com`` (its root's ``subtree_com``), ``subf`` and ``flow``
+        (the medium at ``xipos``, half-height 0.01), ``dt``.  Writes ``out``
+        (:meth:`outputs`)."""
+        K = make_kernels(self._dtype)
+        dtype, n = self._dtype, self.n
+        if n == 0:
+            return
         args = [
-            _wp.array(_np.ascontiguousarray(xmat, dtype=npdt).reshape(n, 3, 3), dtype=M),
-            vec(self._axis), sc(omega), vec(cvel[:, 0:3]), vec(cvel[:, 3:6]), pos, vec(com),
-            subf, flow, self._inertia, self._handed, self._R, self._R4, sc(dt), self._rows,
+            xmat, self._axis_dev, omega, ang, lin, xipos, com,
+            subf, flow, self._inertia, self._handed, self._R, self._R4, dt, self._rows,
             self._tab_air, self._tab_w, dtype(self.air.rho), dtype(self.water.rho),
             self._grid_j, self._grid_mu, self._grid_tip,
             out["f_lin"], out["f_ang"], out["dq"], out["damp"], out["thrust"], out["torque"]]
         _wp.launch(K["rotor"], dim=n, inputs=args)
-        res = {k: v.numpy() for k, v in out.items()}
-        res["subf"] = subf.numpy()
-        return res
 
 
 class DevicePower:
@@ -633,13 +672,19 @@ class DevicePower:
     def step(self, force, velocity) -> None:
         """``force``, ``velocity``: every machine's first ``n`` actuator forces and
         velocities, concatenated in world order (``BatchedPower``'s layout)."""
+        self.launch(self._sc(force), self._sc(velocity))
+
+    def launch(self, force, velocity) -> None:
+        """:meth:`step` on device arrays, no host transfer."""
         K = make_kernels(self._dtype)
-        na = max(self._na, 1)
-        terms = _wp.zeros(na, dtype=self._dtype)
-        over = _wp.zeros(na, dtype=self._dtype)
+        if not hasattr(self, "_terms"):
+            na = max(self._na, 1)
+            self._terms = _wp.zeros(na, dtype=self._dtype)
+            self._over = _wp.zeros(na, dtype=self._dtype)
+        terms, over = self._terms, self._over
         if self._na:
             _wp.launch(K["power_terms"], dim=self._na, inputs=[
-                self._sc(force), self._sc(velocity), *self._const, terms, over])
+                force, velocity, *self._const, terms, over])
         s = self._state
         _wp.launch(K["power_charge"], dim=len(self.n), inputs=[
             self._off, terms, over, self._avionics, self._p_max, self._dt, self.active,
@@ -680,9 +725,6 @@ class DeviceJets:
         self._sc = sc
         cat = lambda f: _np.concatenate([_np.asarray(f(s), float) for s in self.sets]) \
             if self.n else _np.zeros(0)
-        self.qposadr = _np.concatenate(
-            [[int(m.jnt_qposadr[j]) if j >= 0 else -1 for j in s.joint_id] for s, m in sets]
-        ).astype(int) if self.n else _np.zeros(0, int)
         self.dofadr = _np.concatenate(
             [[int(m.jnt_dofadr[j]) if j >= 0 else -1 for j in s.joint_id] for s, m in sets]
         ).astype(int) if self.n else _np.zeros(0, int)
@@ -700,22 +742,25 @@ class DeviceJets:
         self._half = sc(_np.cbrt(_np.maximum(vol, 1e-9)) * 0.5)
         self._driven = _wp.array((self.dofadr >= 0).astype(_np.int32), dtype=int)
         self._off = _wp.array(self.off_np, dtype=int)
+        self._axis_dev = _wp.array(_np.ascontiguousarray(self._axis.reshape(-1, 3), dtype=npdt),
+                                   dtype=make_kernels(dtype)["V"]) if self.n else None
 
     def host_inputs(self, datas) -> dict:
-        """``theta``, ``omega``, ``xmat``, ``xpos`` per bell row, read from each
-        world's ``MjData`` as ``JetSet.apply`` reads them (0 for an undriven bell)."""
-        th, om, xm, xp = [], [], [], []
+        """``omega``, ``xmat``, ``xpos`` per bell row, read from each world's
+        ``MjData`` as ``JetSet.apply`` reads them (0 for an undriven bell).  The
+        joint angle is not an input: ``JetSet.apply`` reads it into a volume
+        that nothing downstream uses, and dV/dt comes from the rate alone."""
+        om, xm, xp = [], [], []
         for w, d in enumerate(datas):
             a, b = self.off_np[w], self.off_np[w + 1]
-            qa, va, bid = self.qposadr[a:b], self.dofadr[a:b], self.body_id[a:b]
-            th.append(_np.where(qa >= 0, d.qpos[_np.maximum(qa, 0)], 0.0))
+            va, bid = self.dofadr[a:b], self.body_id[a:b]
             om.append(_np.where(va >= 0, d.qvel[_np.maximum(va, 0)], 0.0))
             xm.append(d.xmat.reshape(-1, 9)[bid])
             xp.append(d.xpos[bid])
-        return {"theta": _np.concatenate(th), "omega": _np.concatenate(om),
+        return {"omega": _np.concatenate(om),
                 "xmat": _np.concatenate(xm), "xpos": _np.concatenate(xp)}
 
-    def loads(self, theta, omega, xmat, xpos, wind, current) -> dict:
+    def loads(self, omega, xmat, xpos, wind, current) -> dict:
         """One step of every bell; numpy in, numpy out (see the class docstring)."""
         dtype = self._dtype
         K = make_kernels(dtype)
@@ -723,10 +768,7 @@ class DeviceJets:
         V, M = K["V"], K["M"]
         npdt = _np_dtype(dtype)
         n, sc = self.n, self._sc
-        nw = len(self.sets)
-        out = {"f": _wp.zeros(max(n, 1), dtype=V), "thrust": _wp.zeros(max(n, 1), dtype=dtype),
-               "c_pump": _wp.zeros(max(n, 1), dtype=dtype),
-               "total": _wp.zeros(nw, dtype=dtype), "pump": _wp.zeros(nw, dtype=dtype)}
+        out = self.outputs()
         if n:
             def vec(a):
                 return _wp.array(_np.ascontiguousarray(a, dtype=npdt).reshape(-1, 3), dtype=V)
@@ -740,18 +782,36 @@ class DeviceJets:
                 pos, self._half, V(*[dtype(x) for x in wind]), V(*[dtype(x) for x in current]),
                 dtype(self.air.rho), dtype(self.water.rho), dtype(self.air.mu),
                 dtype(self.water.mu), rho, mu, subf, flow])
-            om = sc(omega)
-            _wp.launch(K["jets"], dim=n, inputs=[
-                sc(theta), om, self._lo, self._hi, self._volume, self._stroke, self._orifice,
-                self._refill,
-                _wp.array(_np.ascontiguousarray(xmat, dtype=npdt).reshape(n, 3, 3), dtype=M),
-                vec(self._axis), rho, subf, out["f"], out["thrust"], out["c_pump"]])
-            _wp.launch(K["jet_sums"], dim=nw, inputs=[
-                self._off, out["thrust"], out["c_pump"], om, self._driven,
-                out["total"], out["pump"]])
+            self.launch(sc(omega),
+                        _wp.array(_np.ascontiguousarray(xmat, dtype=npdt).reshape(n, 3, 3),
+                                  dtype=M), rho, subf, out)
         res = {k: v.numpy()[:n] if k in ("f", "thrust", "c_pump") else v.numpy()
                for k, v in out.items()}
         return res
+
+    def outputs(self) -> dict:
+        """Device arrays for :meth:`launch` to write: per bell ``f``, ``thrust``,
+        ``c_pump``; per world ``total`` and ``pump``."""
+        V = make_kernels(self._dtype)["V"]
+        n, nw, dtype = self.n, len(self.sets), self._dtype
+        return {"f": _wp.zeros(max(n, 1), dtype=V), "thrust": _wp.zeros(max(n, 1), dtype=dtype),
+                "c_pump": _wp.zeros(max(n, 1), dtype=dtype),
+                "total": _wp.zeros(nw, dtype=dtype), "pump": _wp.zeros(nw, dtype=dtype)}
+
+    def launch(self, omega, xmat, rho, subf, out) -> None:
+        """One step on device arrays, no host transfer: per bell row ``omega``,
+        ``xmat`` (3x3), and ``rho``, ``subf`` (the medium at the bell body's
+        ``xpos``, half-height ``self._half``).  Writes ``out`` (:meth:`outputs`)."""
+        K = make_kernels(self._dtype)
+        n = self.n
+        if n:
+            _wp.launch(K["jets"], dim=n, inputs=[
+                omega, self._lo, self._hi, self._volume, self._stroke, self._orifice,
+                self._refill, xmat, self._axis_dev, rho, subf,
+                out["f"], out["thrust"], out["c_pump"]])
+            _wp.launch(K["jet_sums"], dim=len(self.sets), inputs=[
+                self._off, out["thrust"], out["c_pump"], omega, self._driven,
+                out["total"], out["pump"]])
 
 
 class DeviceInflow:
@@ -793,7 +853,8 @@ class DeviceInflow:
         m = _np.ones(self.nw, bool) if mask is None else _np.asarray(mask, bool)
         w = self._w.numpy()
         w[m] = 0.0
-        self._w = _wp.array(w, dtype=_wp.vec3d)
+        # In place: a captured graph holds this array's address.
+        self._w.assign(w)
         self._count[m] = 0
 
     def update(self, F, Vf, rho, dt, due=None):
@@ -806,10 +867,16 @@ class DeviceInflow:
             return _wp.array(_np.ascontiguousarray(a, dtype=npdt).reshape(-1, 3), dtype=V)
 
         due = self.due() if due is None else _np.asarray(due, bool)
-        _wp.launch(K["inflow"], dim=self.nw, inputs=[
-            vec(F), vec(Vf), self._sc(rho), self._sc(_np.broadcast_to(dt, (self.nw,))),
-            self._span, self._area, _wp.array(due.astype(_np.int32), dtype=int), self._w])
+        self.launch(vec(F), vec(Vf), self._sc(rho), self._sc(_np.broadcast_to(dt, (self.nw,))),
+                    _wp.array(due.astype(_np.int32), dtype=int))
         return self.w
+
+    def launch(self, F, Vf, rho, dt, due) -> None:
+        """:meth:`update` on device arrays (``due`` an int array per world), no
+        host transfer and no host cadence: the caller keeps the cadence."""
+        K = make_kernels(self._dtype)
+        _wp.launch(K["inflow"], dim=self.nw, inputs=[
+            F, Vf, rho, dt, self._span, self._area, due, self._w])
 
     @property
     def w(self):
@@ -834,8 +901,8 @@ class DeviceDamping:
     Jets and rotors add to both after it, as on the host.
 
     The sea is the flat calm one of ``fluid_wp``: ``depth = -z``, so the wet
-    test does not read the time.  ``last_b`` is recomputed, not accumulated,
-    and is kept in the kernel's precision.
+    test does not read the time.  ``last_b`` is recomputed, not accumulated;
+    it and the moments it is projected from are float64 at every precision.
     """
 
     def __init__(self, dampers, body_ids, *, dtype=_wp.float64) -> None:
@@ -876,14 +943,20 @@ class DeviceDamping:
         K = make_kernels(dtype)
         V, M = K["V"], K["M"]
         self._V = V
-        self._B0 = _wp.zeros(max(self.nb, 1), dtype=dtype)
-        self._B1 = _wp.zeros(max(self.nb, 1), dtype=V)
-        self._B2 = _wp.zeros(max(self.nb, 1), dtype=M)
+        self._B0 = _wp.zeros(max(self.nb, 1), dtype=_wp.float64)
+        self._B1 = _wp.zeros(max(self.nb, 1), dtype=_wp.vec3d)
+        self._B2 = _wp.zeros(max(self.nb, 1), dtype=_wp.mat33d)
         self._b = _wp.zeros(max(self.n, 1), dtype=dtype)
         self.reset()
 
     def reset(self) -> None:
-        """``ImplicitAeroDamping.reset`` for every world."""
+        """``ImplicitAeroDamping.reset`` for every world, in place (a captured
+        graph holds these arrays' addresses)."""
+        if hasattr(self, "_count"):
+            for a in (self._count, self._stale, self._have_ref, self._have_prev, self._due,
+                      self._wet_ref, self._prev_pos, self._last_b):
+                a.zero_()
+            return
         nw = self.nw
         self._count = _wp.zeros(nw, dtype=int)
         self._stale = _wp.zeros(nw, dtype=int)
@@ -892,7 +965,7 @@ class DeviceDamping:
         self._due = _wp.zeros(nw, dtype=int)
         self._wet_ref = _wp.zeros(max(self.n, 1), dtype=int)
         self._prev_pos = _wp.zeros(max(self.n, 1), dtype=self._V)
-        self._last_b = _wp.zeros(max(self.nv, 1), dtype=self._dtype)
+        self._last_b = _wp.zeros(max(self.nv, 1), dtype=_wp.float64)
 
     def step(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale,
              subtree_com, cdof, qvel, enabled=None) -> dict:
@@ -916,37 +989,48 @@ class DeviceDamping:
         def vec(a):
             return _wp.array(_np.ascontiguousarray(a, dtype=npdt).reshape(-1, 3), dtype=V)
 
-        nw, n, nb, nv = self.nw, self.n, self.nb, self.nv
+        nw, nv = self.nw, self.nv
         en = _np.ones(nw, _np.int32) if enabled is None else _np.asarray(enabled, _np.int32)
         cdof = _np.asarray(cdof, float).reshape(-1, 6)
-        p = vec(pos)
+        dd = _wp.zeros(max(nv, 1), dtype=dtype)
+        qf = _wp.zeros(max(nv, 1), dtype=dtype)
+        self.launch(vec(pos), sc(q), sc(area), sc(lift), sc(drag), sc(rho), sc(ar),
+                    _ints(_np.asarray(is_wing) != 0), sc(_np.broadcast_to(lift_scale, (nw,))),
+                    vec(subtree_com), vec(cdof[:, :3]), vec(cdof[:, 3:]), sc(qvel), _ints(en),
+                    dd, qf)
+        # ``due`` is read back here, after the step, for the parity test's due
+        # sequence: wet_stale reads it and nothing rewrites it until the next
+        # step's damp_due.  :meth:`launch` itself reads nothing back.
+        return {"dof_damping": dd.numpy()[:nv], "qfrc_applied": qf.numpy()[:nv],
+                "due": self._due.numpy().astype(bool), "last_b": self._last_b.numpy()[:nv]}
+
+    def launch(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com,
+               cdof_rot, cdof_lin, qvel, enabled, dof_damping, qfrc_applied) -> None:
+        """:meth:`step` on device arrays, no host transfer: ``is_wing`` and
+        ``enabled`` int arrays, ``lift_scale`` one per world, ``cdof_rot`` and
+        ``cdof_lin`` the two halves of ``cdof``.  Writes ``dof_damping`` and
+        ``qfrc_applied`` (one row per dof, worlds back to back)."""
+        K = make_kernels(self._dtype)
+        nw, n, nb, nv = self.nw, self.n, self.nb, self.nv
         _wp.launch(K["damp_due"], dim=nw, inputs=[self._count, self._stale, self._due])
         if n:
             _wp.launch(K["strip_b"], dim=n, inputs=[
-                sc(q), sc(area), sc(lift), sc(drag), sc(rho), sc(ar),
-                _ints(_np.asarray(is_wing) != 0), sc(_np.broadcast_to(lift_scale, (nw,))),
-                self._world, self._b])
+                q, area, lift, drag, rho, ar, is_wing, lift_scale, self._world, self._b])
         if nb:
             _wp.launch(K["body_moments"], dim=nb, inputs=[
-                self._poff, self._body_world, self._due, self._sbody, self._sroot, p,
-                vec(subtree_com), self._b, self._B0, self._B1, self._B2])
-        dd = _wp.zeros(max(nv, 1), dtype=dtype)
-        qf = _wp.zeros(max(nv, 1), dtype=dtype)
+                self._poff, self._body_world, self._due, self._sbody, self._sroot, pos,
+                subtree_com, self._b, self._B0, self._B1, self._B2])
         if nv:
             _wp.launch(K["dof_project"], dim=nv, inputs=[
                 self._boff, self._voff, self._aoff, self._dof_world, self._due, self._anc,
-                vec(cdof[:, :3]), vec(cdof[:, 3:]), self._B0, self._B1, self._B2,
-                self._last_b])
-        # A read back for the parity test's due sequence; A2's step graph drops it.
-        due = self._due.numpy().astype(bool)
+                cdof_rot, cdof_lin, self._B0, self._B1, self._B2, self._last_b])
         _wp.launch(K["wet_stale"], dim=nw, inputs=[
-            self._poff, self._due, p, self._half, self._wet_ref, self._prev_pos,
+            self._poff, self._due, pos, self._half, self._wet_ref, self._prev_pos,
             self._have_ref, self._have_prev, self._stale, self._count])
         if nv:
             _wp.launch(K["damp_out"], dim=nv, inputs=[
-                self._dof_world, _ints(en), self._base, self._last_b, sc(qvel), dd, qf])
-        return {"dof_damping": dd.numpy()[:nv], "qfrc_applied": qf.numpy()[:nv],
-                "due": due, "last_b": self._last_b.numpy()[:nv]}
+                self._dof_world, enabled, self._base, self._last_b, qvel,
+                dof_damping, qfrc_applied])
 
 
 def added_mass_into_model(dry_mass, dry_inertia, m_body, lever2, boff, *, dtype=_wp.float64):
@@ -954,8 +1038,8 @@ def added_mass_into_model(dry_mass, dry_inertia, m_body, lever2, boff, *, dtype=
 
     Per body, worlds back to back from ``boff``: ``dry_mass``, ``dry_inertia
     (nb, 3)``, ``m_body`` (the step's added mass) and ``lever2``.  Returns
-    ``body_mass`` and ``body_inertia``, each world's own: A2 writes them into
-    the per-world (batched) ``Model`` fields.
+    ``body_mass`` and ``body_inertia``, each world's own: ``model_wp.DeviceBody``
+    writes them into the per-world (batched) ``Model`` fields.
     """
     K = make_kernels(dtype)
     V = K["V"]

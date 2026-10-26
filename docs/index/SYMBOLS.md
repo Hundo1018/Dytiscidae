@@ -761,18 +761,39 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 ## `envs.devroll.fluid_wp` — `dytiscidae/envs/devroll/fluid_wp.py`
 
-> Strip-theory loads on the device (IMPL_1010 A1a, first slice).
+> Strip-theory loads on the device (IMPL_1010 A1a).
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `assemble_bodies` | function | 477 | `(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *, dtype=_wp.float64)` | Buoyancy, panel-to-body assembly and ``finish_bodies``, on the device; numpy out. |
-| `entrain_bodies` | function | 514 | `(fb, m_new, m_old, lever2, vel, h, *, dtype=_wp.float64)` | ``entrainment_reaction`` on the device; returns the new ``fb (nb, 6)``. |
-| `make_kernels` | function | 38 | `(T)` | Return the kernels for precision ``T`` as a dict (``strip``, ``unsteady``, |
-| `medium_and_added_mass` | function | 436 | `(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, ext, chord, dr, volume, is_wing, scale, *, dtype=_wp.float64)` | Flat-calm medium and the strip added mass, on the device; numpy out. |
-| `strip_loads` | function | 349 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
-| `WagnerLag` | class | 386 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
-| `WagnerLag.__init__` | method | 394 | `(self, n: int, dtype=_wp.float64) -> None` | — |
-| `WagnerLag.update` | method | 409 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
+| `assemble_bodies` | function | 551 | `(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *, dtype=_wp.float64)` | Buoyancy, panel-to-body assembly and ``finish_bodies``, on the device; numpy out. |
+| `entrain_bodies` | function | 589 | `(fb, m_new, m_old, lever2, vel, h, *, dtype=_wp.float64)` | ``entrainment_reaction`` on the device; returns the new ``fb (nb, 6)``. |
+| `make_kernels` | function | 40 | `(T)` | Return the kernels for precision ``T`` as a dict (``strip``, ``unsteady``, |
+| `medium_and_added_mass` | function | 510 | `(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, ext, chord, dr, volume, is_wing, scale, *, dtype=_wp.float64)` | Flat-calm medium and the strip added mass, on the device; numpy out. |
+| `strip_loads` | function | 420 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
+| `WagnerLag` | class | 460 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
+| `WagnerLag.__init__` | method | 468 | `(self, n: int, dtype=_wp.float64) -> None` | — |
+| `WagnerLag.update` | method | 483 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
+
+## `envs.devroll.model_wp` — `dytiscidae/envs/devroll/model_wp.py`
+
+> One body on the device: its MJWarp ``Model`` and ``Data`` over W worlds, and the
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `device_model` | function | 307 | `(mjm, nworld: int)` | ``mjw.put_model`` of a copy of ``mjm`` with the margin zeroed and the three |
+| `DeviceBody` | class | 318 | — | W worlds of one body on the device; see the module docstring. |
+| `make_kernels` | function | 67 | `(T)` | The A2 gather, reduction, diagnostic and write kernels for precision ``T``. |
+| `DeviceBody.__init__` | method | 327 | `(self, envs, *, dtype=_wp.float64, njmax: int=NJMAX, nconmax: int=NCONMAX) -> None` | — |
+| `DeviceBody.diagnostics` | method | 796 | `(self) -> dict` | — |
+| `DeviceBody.fluid_and_scatter` | method | 606 | `(self) -> None` | Everything before ``mjw.step``: servo, fluid, damping, jets, rotors, |
+| `DeviceBody.gather` | method | 548 | `(self) -> None` | The step's kinematic inputs from MJWarp's state (float32) into ``state``. |
+| `DeviceBody.host_state` | method | 560 | `(self, datas) -> None` | ``state`` from host ``MjData`` in this precision, for the parity tests: |
+| `DeviceBody.load_state` | method | 539 | `(self, datas) -> None` | Each world's ``qpos``, ``qvel`` and ``time`` from its ``MjData``, then |
+| `DeviceBody.reset` | method | 525 | `(self) -> None` | ``FluidSolver.reset`` for every world (the MuJoCo state is not touched). |
+| `DeviceBody.resident` | method | 788 | `(self) -> dict` | The same five fields read from the MJWarp ``Model`` and ``Data``. |
+| `DeviceBody.set_targets` | method | 761 | `(self, angles_list, rates=None) -> None` | Host targets (one array per world) into ``targets``: a test and |
+| `DeviceBody.staged` | method | 776 | `(self) -> dict` | What the last step wrote, at the step's precision, per world: |
+| `DeviceBody.step` | method | 591 | `(self, *, gather: bool=True) -> None` | One ``step_batch`` step for every world (see the module docstring). |
 
 ## `envs.devroll.scatter_wp` — `dytiscidae/envs/devroll/scatter_wp.py`
 
@@ -780,31 +801,38 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `added_mass_into_model` | function | 952 | `(dry_mass, dry_inertia, m_body, lever2, boff, *, dtype=_wp.float64)` | batchroll.finish's added-mass write for many worlds; numpy in, numpy out. |
-| `DeviceDamping` | class | 823 | — | ``ImplicitAeroDamping`` for several machines, its state on the device. |
-| `DeviceInflow` | class | 757 | — | ``InducedFlow`` for one machine per world, its state ``w`` on the device. |
-| `DeviceJets` | class | 655 | — | ``JetSet.apply`` for several machines' bells on the device. |
-| `DevicePower` | class | 586 | — | ``BatchedPower`` with its state on the device: one row per world's machine. |
-| `DeviceRotors` | class | 499 | — | The rotor tables of several ``RotorSet``s on the device, and their kernel. |
-| `make_kernels` | function | 41 | `(T)` | Return the kernels for precision ``T`` (``rotor``, ``power_terms``, |
-| `servo_command` | function | 979 | `(target, rate, lead, world, has_rate, *, dtype=_wp.float64)` | ``TriphibianEnv.servo_command`` for many worlds; numpy in, numpy out. |
-| `DeviceDamping.__init__` | method | 841 | `(self, dampers, body_ids, *, dtype=_wp.float64) -> None` | — |
-| `DeviceDamping.reset` | method | 885 | `(self) -> None` | ``ImplicitAeroDamping.reset`` for every world. |
-| `DeviceDamping.step` | method | 897 | `(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com, cdof, qvel, enabled=None) -> dict` | One step; numpy in, numpy out. |
-| `DeviceInflow.__init__` | method | 771 | `(self, spans, *, dtype=_wp.float64) -> None` | — |
-| `DeviceInflow.due` | method | 786 | `(self)` | — |
-| `DeviceInflow.reset` | method | 792 | `(self, mask=None) -> None` | — |
-| `DeviceInflow.tick` | method | 789 | `(self, mask=None) -> None` | — |
-| `DeviceInflow.update` | method | 799 | `(self, F, Vf, rho, dt, due=None)` | Update the worlds in ``due`` (default: ``self.due()``); returns ``w``. |
-| `DeviceInflow.w` | property | 815 | `(self)` | — |
-| `DeviceJets.__init__` | method | 669 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
-| `DeviceJets.host_inputs` | method | 704 | `(self, datas) -> dict` | ``theta``, ``omega``, ``xmat``, ``xpos`` per bell row, read from each |
-| `DeviceJets.loads` | method | 718 | `(self, theta, omega, xmat, xpos, wind, current) -> dict` | One step of every bell; numpy in, numpy out (see the class docstring). |
-| `DevicePower.__init__` | method | 599 | `(self, envs, *, dtype=_wp.float64) -> None` | — |
-| `DevicePower.state` | method | 649 | `(self) -> dict` | — |
-| `DevicePower.step` | method | 633 | `(self, force, velocity) -> None` | ``force``, ``velocity``: every machine's first ``n`` actuator forces and |
-| `DeviceRotors.__init__` | method | 507 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
-| `DeviceRotors.loads` | method | 539 | `(self, xmat, omega, cvel, xipos, com, dt, wind, current)` | One step of every rotor; numpy in, numpy out. |
+| `added_mass_into_model` | function | 1036 | `(dry_mass, dry_inertia, m_body, lever2, boff, *, dtype=_wp.float64)` | batchroll.finish's added-mass write for many worlds; numpy in, numpy out. |
+| `DeviceDamping` | class | 890 | — | ``ImplicitAeroDamping`` for several machines, its state on the device. |
+| `DeviceInflow` | class | 817 | — | ``InducedFlow`` for one machine per world, its state ``w`` on the device. |
+| `DeviceJets` | class | 700 | — | ``JetSet.apply`` for several machines' bells on the device. |
+| `DevicePower` | class | 625 | — | ``BatchedPower`` with its state on the device: one row per world's machine. |
+| `DeviceRotors` | class | 516 | — | The rotor tables of several ``RotorSet``s on the device, and their kernel. |
+| `make_kernels` | function | 44 | `(T)` | Return the kernels for precision ``T`` (``rotor``, ``power_terms``, |
+| `servo_command` | function | 1063 | `(target, rate, lead, world, has_rate, *, dtype=_wp.float64)` | ``TriphibianEnv.servo_command`` for many worlds; numpy in, numpy out. |
+| `DeviceDamping.__init__` | method | 908 | `(self, dampers, body_ids, *, dtype=_wp.float64) -> None` | — |
+| `DeviceDamping.launch` | method | 1007 | `(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com, cdof_rot, cdof_lin, qvel, enabled, dof_damping, qfrc_applied) -> None` | :meth:`step` on device arrays, no host transfer: ``is_wing`` and |
+| `DeviceDamping.reset` | method | 952 | `(self) -> None` | ``ImplicitAeroDamping.reset`` for every world, in place (a captured |
+| `DeviceDamping.step` | method | 970 | `(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com, cdof, qvel, enabled=None) -> dict` | One step; numpy in, numpy out. |
+| `DeviceInflow.__init__` | method | 831 | `(self, spans, *, dtype=_wp.float64) -> None` | — |
+| `DeviceInflow.due` | method | 846 | `(self)` | — |
+| `DeviceInflow.launch` | method | 874 | `(self, F, Vf, rho, dt, due) -> None` | :meth:`update` on device arrays (``due`` an int array per world), no |
+| `DeviceInflow.reset` | method | 852 | `(self, mask=None) -> None` | — |
+| `DeviceInflow.tick` | method | 849 | `(self, mask=None) -> None` | — |
+| `DeviceInflow.update` | method | 860 | `(self, F, Vf, rho, dt, due=None)` | Update the worlds in ``due`` (default: ``self.due()``); returns ``w``. |
+| `DeviceInflow.w` | property | 882 | `(self)` | — |
+| `DeviceJets.__init__` | method | 714 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
+| `DeviceJets.host_inputs` | method | 748 | `(self, datas) -> dict` | ``omega``, ``xmat``, ``xpos`` per bell row, read from each world's |
+| `DeviceJets.launch` | method | 801 | `(self, omega, xmat, rho, subf, out) -> None` | One step on device arrays, no host transfer: per bell row ``omega``, |
+| `DeviceJets.loads` | method | 763 | `(self, omega, xmat, xpos, wind, current) -> dict` | One step of every bell; numpy in, numpy out (see the class docstring). |
+| `DeviceJets.outputs` | method | 792 | `(self) -> dict` | Device arrays for :meth:`launch` to write: per bell ``f``, ``thrust``, |
+| `DevicePower.__init__` | method | 638 | `(self, envs, *, dtype=_wp.float64) -> None` | — |
+| `DevicePower.launch` | method | 677 | `(self, force, velocity) -> None` | :meth:`step` on device arrays, no host transfer. |
+| `DevicePower.state` | method | 694 | `(self) -> dict` | — |
+| `DevicePower.step` | method | 672 | `(self, force, velocity) -> None` | ``force``, ``velocity``: every machine's first ``n`` actuator forces and |
+| `DeviceRotors.__init__` | method | 524 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
+| `DeviceRotors.launch` | method | 606 | `(self, xmat, omega, ang, lin, xipos, com, subf, flow, dt, out) -> None` | One step on device arrays, no host transfer.  Per rotor row: ``xmat`` |
+| `DeviceRotors.loads` | method | 558 | `(self, xmat, omega, cvel, xipos, com, dt, wind, current)` | One step of every rotor; numpy in, numpy out. |
+| `DeviceRotors.outputs` | method | 598 | `(self) -> dict` | Device arrays for :meth:`launch` to write, one row per rotor. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 

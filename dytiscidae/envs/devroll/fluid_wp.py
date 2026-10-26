@@ -1,10 +1,12 @@
-"""Strip-theory loads on the device (IMPL_1010 A1a, first slice).
+"""Strip-theory loads on the device (IMPL_1010 A1a).
 
-Per element: the incidence and relative speed, the lift and drag of a lifting
-strip, the bluff-body drag of a volume and the Kramer rotational lift.  This is
-``FluidSolver.apply`` (physics/fluid.py) from the kinematics to the strip
-forces, in quasi-static form: the Wagner lag, the inflow model, the medium
-and the added-mass tensor are later slices of A1a and A1b.
+Per element: the kinematics (world position, frame and material velocity), the
+incidence and relative speed, the lift and drag of a lifting strip (quasi-static,
+or on the Wagner-lagged incidence and the LEV of ``unsteady_update``), the
+bluff-body drag of a volume, the Kramer rotational lift, the flat calm medium,
+the added mass, buoyancy and the assembly onto bodies.  This is
+``FluidSolver.apply`` (physics/fluid.py); ``model_wp.DeviceBody`` runs the
+kernels in its order on W worlds of one body.
 
 The kernels are built per precision by :func:`make_kernels`, because a Warp
 kernel cannot take a float32 literal in a float64 expression.  Constants come
@@ -37,7 +39,8 @@ _WAGNER_B = tuple(float(x) for x in WAGNER_B)
 
 def make_kernels(T):
     """Return the kernels for precision ``T`` as a dict (``strip``, ``unsteady``,
-    ``medium``, ``added_mass``, ``assemble``, ``finish``) and the 3-vector type ``V``.
+    ``medium``, ``added_mass``, ``assemble``, ``finish``, ``entrain``, ``kinematics``,
+    ``rel``) and the 3-vector and 3x3 types ``V`` and ``M``.
 
     ``V`` is the matching 3-vector type.  Built once per precision and cached.
     """
@@ -63,10 +66,11 @@ def make_kernels(T):
         return t * t * (T(3.0) - T(2.0) * t)
 
     @_wp.func
-    def lift_coefficient(alpha: T, re: T, ar: T, lev: T) -> T:
+    def lift_coefficient(alpha: T, ae: T, re: T, ar: T, lev: T) -> T:
+        # ``ae``: the incidence the attached branch sees (alpha_e, or alpha unlagged).
         lv = _wp.clamp(lev, T(0.0), T(1.0))
         cl_alpha = T(2.0) * T(3.141592653589793) / (T(1.0) + T(2.0) / _wp.max(ar, T(0.5)))
-        cl_att = cl_alpha * alpha
+        cl_att = cl_alpha * ae
         cn = T(_CN_PLATE) + (T(_CN_LEV) - T(_CN_PLATE)) * lv
         cl_sep = cn * _wp.sin(alpha) * _wp.cos(alpha)
         w = stall_weight(alpha, re)
@@ -99,10 +103,17 @@ def make_kernels(T):
         chord: _wp.array(dtype=T), area: _wp.array(dtype=T), dr: _wp.array(dtype=T),
         cd_bluff: _wp.array(dtype=T), camber: _wp.array(dtype=T), ar: _wp.array(dtype=T),
         is_wing: _wp.array(dtype=_wp.int32), rho: _wp.array(dtype=T), mu: _wp.array(dtype=T),
-        lift_scale: T, cd_scale: T, c_rot: T,
+        lift_scale: T, cd_scale: T, c_rot: _wp.array(dtype=T),
+        lagged: _wp.int32, alpha_e_in: _wp.array(dtype=T), lev_in: _wp.array(dtype=T),
         F: _wp.array(dtype=V), D: _wp.array(dtype=T), cl_out: _wp.array(dtype=T),
         alpha_out: _wp.array(dtype=T), U_out: _wp.array(dtype=T), lev_out: _wp.array(dtype=T),
+        rev_out: _wp.array(dtype=_wp.int32), q_out: _wp.array(dtype=T),
+        L_out: _wp.array(dtype=T),
     ):
+        # ``lagged`` 0: quasi-static (alpha, Rossby LEV), the incidence pass.
+        # ``lagged`` 1: the attached branch on ``alpha_e_in`` and the LEV
+        # ``lev_in`` that ``unsteady_update`` formed from this pass's outputs,
+        # as FluidSolver.apply calls lift_coefficient(alpha, ..., lev, alpha_e).
         i = _wp.tid()
         s = s_hat[i]
         c = c_hat[i]
@@ -140,6 +151,10 @@ def make_kernels(T):
 
         omega_s = _wp.dot(omg, s)
         lev = rossby_lev(U, ch, omg, s)
+        ae = alpha
+        if lagged != 0:
+            lev = lev_in[i]
+            ae = alpha_e_in[i]
 
         lift_axis = _wp.cross(s, d_hat)
         lift_axis = lift_axis / _wp.max(_wp.length(lift_axis), T(1e-12))
@@ -148,15 +163,16 @@ def make_kernels(T):
         F_i = V(T(0.0), T(0.0), T(0.0))
         D_i = T(0.0)
         cl = T(0.0)
+        L = T(0.0)
         if is_w:
-            cl = lift_coefficient(alpha, re, ar_i, lev)
+            cl = lift_coefficient(alpha, ae, re, ar_i, lev)
             cd = drag_coefficient(alpha, re, ar_i, cl, lev)
             L = q * area[i] * cl * lift_scale
             D_i = q * area[i] * cd * cd_scale
             F_i = F_i + L * lift_axis + D_i * d_hat
 
             # Kramer rotational lift on the lifting strips.
-            f_rot = -c_rot * r * U * omega_s * ch * ch * dr[i]
+            f_rot = -c_rot[i] * r * U * omega_s * ch * ch * dr[i]
             F_i = F_i + f_rot * lift_axis
         else:
             # Bluff body: axial pressure plus friction, cross-flow drag.
@@ -188,13 +204,18 @@ def make_kernels(T):
         alpha_out[i] = alpha
         U_out[i] = U
         lev_out[i] = lev
+        rev_out[i] = 0
+        if rev:
+            rev_out[i] = 1
+        q_out[i] = q
+        L_out[i] = L
 
 
     @_wp.kernel
     def unsteady_update(
         alpha: _wp.array(dtype=T), rev: _wp.array(dtype=_wp.int32), U: _wp.array(dtype=T),
         chord: _wp.array(dtype=T), omega: _wp.array(dtype=V), s_hat: _wp.array(dtype=V),
-        x0: _wp.array(dtype=T), x1: _wp.array(dtype=T), s_trav: _wp.array(dtype=T),
+        x0: _wp.array(dtype=T), x1: _wp.array(dtype=T), s_trav: _wp.array(dtype=_wp.float64),
         rev_prev: _wp.array(dtype=_wp.int32), primed: _wp.int32, dt: T,
         a1: T, a2: T, b1: T, b2: T, travel_lo: T, travel_hi: T,
         alpha_e: _wp.array(dtype=T), lev: _wp.array(dtype=T),
@@ -206,12 +227,14 @@ def make_kernels(T):
             if r != rev_prev[i]:
                 x0[i] = T(0.0)
                 x1[i] = T(0.0)
-                s_trav[i] = T(0.0)
+                s_trav[i] = _wp.float64(0.0)
         rev_prev[i] = r
         c = _wp.max(chord[i], T(1e-6))
         ds = U[i] * dt / c
-        st = s_trav[i] + ds
-        s_trav[i] = st
+        # The chords travelled accumulate over a half-stroke: float64 at every precision.
+        st64 = s_trav[i] + _wp.float64(ds)
+        s_trav[i] = st64
+        st = T(st64)
         # Exact for a step held over dt: semichords = 2 * chords.
         x0[i] = x0[i] + (a - x0[i]) * (T(1.0) - _wp.exp(-b1 * T(2.0) * ds))
         x1[i] = x1[i] + (a - x1[i]) * (T(1.0) - _wp.exp(-b2 * T(2.0) * ds))
@@ -296,13 +319,15 @@ def make_kernels(T):
     def assemble_panels(
         pos: _wp.array(dtype=V), F_in: _wp.array(dtype=V), body_id: _wp.array(dtype=_wp.int32),
         xipos: _wp.array(dtype=V), subf: _wp.array(dtype=T), vb: _wp.array(dtype=T), buoy: T,
+        machine: _wp.array(dtype=_wp.int32),
         F_out: _wp.array(dtype=V), fb_f: _wp.array(dtype=V), fb_t: _wp.array(dtype=V),
-        total: _wp.array(dtype=T),
+        fsum_b: _wp.array(dtype=T), total: _wp.array(dtype=T),
     ):
         # Buoyancy into the panel force, then the panel's load onto its body: force, and
-        # torque about the body's centre of mass.  ``total`` is sum |F| over the machine's
-        # panels, which the limiter reads.  Atomic adds reorder against numpy's add.at,
-        # so the parity test is at rounding, not bitwise.
+        # torque about the body's centre of mass.  ``total[m]`` is sum |F| over machine
+        # (world) m's panels, which its limiter reads; ``fsum_b`` the same per body.
+        # ``body_id`` is global (worlds back to back).  Atomic adds reorder against
+        # numpy's add.at, so the parity test is at rounding, not bitwise.
         i = _wp.tid()
         b = body_id[i]
         f = F_in[i] + V(T(0.0), T(0.0), buoy * vb[i] * subf[i])
@@ -310,19 +335,22 @@ def make_kernels(T):
         arm = pos[i] - xipos[b]
         _wp.atomic_add(fb_f, b, f)
         _wp.atomic_add(fb_t, b, _wp.cross(arm, f))
-        _wp.atomic_add(total, 0, _wp.length(f))
+        fm = _wp.length(f)
+        _wp.atomic_add(fsum_b, b, fm)
+        _wp.atomic_add(total, machine[i], fm)
 
     @_wp.kernel
     def finish_bodies_wp(
         fb_f: _wp.array(dtype=V), fb_t: _wp.array(dtype=V), m_body: _wp.array(dtype=T),
-        total: _wp.array(dtype=T), limit: T, gravity: T,
+        total: _wp.array(dtype=T), body_world: _wp.array(dtype=_wp.int32), limit: T, gravity: T,
     ):
         # finish_bodies: scale all six components by limit/total if the machine's total
         # exceeds the limit, then cancel the weight of the entrained fluid at the CoM.
         b = _wp.tid()
+        tot = total[body_world[b]]
         s = T(1.0)
-        if total[0] > limit:
-            s = limit / total[0]
+        if tot > limit:
+            s = limit / tot
         fb_f[b] = fb_f[b] * s + V(T(0.0), T(0.0), m_body[b] * gravity)
         fb_t[b] = fb_t[b] * s
 
@@ -339,10 +367,53 @@ def make_kernels(T):
         fb_f[b] = fb_f[b] - dm * v[b]
         fb_t[b] = fb_t[b] - (dm * lever2[b]) * w[b]
 
+
+    M = _wp.mat33d if T == _wp.float64 else _wp.mat33
+
+    @_wp.kernel
+    def panel_kinematics(
+        body_id: _wp.array(dtype=_wp.int32), xpos: _wp.array(dtype=V),
+        xmat: _wp.array(dtype=M), xipos: _wp.array(dtype=V), ang: _wp.array(dtype=V),
+        lin_com: _wp.array(dtype=V), pos_local: _wp.array(dtype=V),
+        span_local: _wp.array(dtype=V), chord_local: _wp.array(dtype=V),
+        normal_local: _wp.array(dtype=V),
+        pos: _wp.array(dtype=V), s_hat: _wp.array(dtype=V), c_hat: _wp.array(dtype=V),
+        n_hat: _wp.array(dtype=V), omega: _wp.array(dtype=V), v_elem: _wp.array(dtype=V),
+    ):
+        # FluidSolver.apply's kinematics for one panel: its world position and frame,
+        # and the velocity of the material point, from the body's velocity at its
+        # centre of mass (mj_objectVelocity, mjOBJ_BODY).  ``body_id`` is global.
+        i = _wp.tid()
+        b = body_id[i]
+        R = xmat[b]
+        p = xpos[b] + R * pos_local[i]
+        pos[i] = p
+        s_hat[i] = R * span_local[i]
+        c_hat[i] = R * chord_local[i]
+        n_hat[i] = R * normal_local[i]
+        w = ang[b]
+        omega[i] = w
+        v_elem[i] = lin_com[b] + _wp.cross(w, p - xipos[b])
+
+    @_wp.kernel
+    def panel_rel(
+        flow: _wp.array(dtype=V), v_elem: _wp.array(dtype=V), is_wing: _wp.array(dtype=_wp.int32),
+        machine: _wp.array(dtype=_wp.int32), live_inflow: _wp.int32,
+        w_ind: _wp.array(dtype=_wp.vec3d), rel: _wp.array(dtype=V),
+    ):
+        # v_rel = medium flow + the machine's induced flow on lifting strips - v_elem.
+        i = _wp.tid()
+        u = flow[i]
+        if live_inflow != 0 and is_wing[i] != 0:
+            wd = w_ind[machine[i]]
+            u = u + V(T(wd[0]), T(wd[1]), T(wd[2]))
+        rel[i] = u - v_elem[i]
+
     _KERNELS[T] = {"strip": strip_loads, "unsteady": unsteady_update,
                    "medium": medium_flat, "added_mass": added_mass,
                    "assemble": assemble_panels, "finish": finish_bodies_wp,
-                   "entrain": entrain_wp, "V": V}
+                   "entrain": entrain_wp, "kinematics": panel_kinematics, "rel": panel_rel,
+                   "V": V, "M": M}
     return _KERNELS[T]
 
 
@@ -371,13 +442,16 @@ def strip_loads(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff,
     al = _wp.zeros(n, dtype=dtype)
     U = _wp.zeros(n, dtype=dtype)
     lev = _wp.zeros(n, dtype=dtype)
+    unused = _wp.zeros(n, dtype=dtype)
     _wp.launch(kern, dim=n, inputs=[
         vec(rel), vec(s_hat), vec(c_hat), vec(n_hat), vec(omega), vec(ext),
         sc(chord), sc(area), sc(dr), sc(cd_bluff), sc(camber), sc(ar),
         _wp.array(_np.asarray(is_wing, dtype=_np.int32), dtype=_wp.int32),
         sc(rho), sc(mu),
-        dtype(lift_scale), dtype(cd_scale), dtype(c_rot),
-        F, D, cl, al, U, lev,
+        dtype(lift_scale), dtype(cd_scale), sc(_np.broadcast_to(c_rot, (n,))),
+        0, unused, unused,
+        F, D, cl, al, U, lev, _wp.zeros(n, dtype=_wp.int32), _wp.zeros(n, dtype=dtype),
+        _wp.zeros(n, dtype=dtype),
     ])
     return {"F": F.numpy(), "D": D.numpy(), "cl": cl.numpy(), "alpha": al.numpy(),
             "U": U.numpy(), "lev": lev.numpy()}
@@ -401,7 +475,7 @@ class WagnerLag:
         self._n = n
         self._x0 = _wp.zeros(n, dtype=dtype)
         self._x1 = _wp.zeros(n, dtype=dtype)
-        self._s = _wp.zeros(n, dtype=dtype)
+        self._s = _wp.zeros(n, dtype=_wp.float64)
         self._rev_prev = _wp.zeros(n, dtype=_wp.int32)
         self._primed = 0
         self._travel = tuple(float(x) for x in LEV_TRAVEL)
@@ -503,10 +577,11 @@ def assemble_bodies(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *,
     total = _wp.zeros(1, dtype=dtype)
     _wp.launch(K["assemble"], dim=n, inputs=[
         vec(pos), vec(F), _wp.array(_np.asarray(body_id, dtype=_np.int32), dtype=_wp.int32),
-        vec(xipos), sc(subf), sc(vb), dtype(rho_w * GRAVITY),
-        F_out, fb_f, fb_t, total])
+        vec(xipos), sc(subf), sc(vb), dtype(rho_w * GRAVITY), _wp.zeros(n, dtype=_wp.int32),
+        F_out, fb_f, fb_t, _wp.zeros(nb, dtype=dtype), total])
     _wp.launch(K["finish"], dim=nb, inputs=[
-        fb_f, fb_t, sc(m_body), total, dtype(limit), dtype(GRAVITY)])
+        fb_f, fb_t, sc(m_body), total, _wp.zeros(nb, dtype=_wp.int32), dtype(limit),
+        dtype(GRAVITY)])
     fb = _np.concatenate([fb_f.numpy(), fb_t.numpy()], axis=1)
     return {"F": F_out.numpy(), "fb": fb, "clamped": float(total.numpy()[0]) > limit}
 
