@@ -2247,6 +2247,133 @@ MUTATIONS: tuple = (
         defect="the first step after a reset reacts the whole added mass as if it were "
                "entrained in one step: a machine placed in water is kicked to a stop",
         suites=("test_devroll::test_the_device_step_replays_step_batch",), item="A2 entrainment"),
+    # --- device controller (IMPL_1010 A3, 2026-10-26) -----------------------
+    Mutation(
+        id="device-control-obs-drops-task-channels",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="        if k_ph >= 0:\n            q = w * 4 + k_ph",
+        replace="        if k_ph >= 99:\n            q = w * 4 + k_ph",
+        defect="the six task channels read zero, so the controller is never told whether to "
+               "cruise or hold, which heading, or how much height it has lost",
+        suites=("test_devroll::test_the_device_controller_is_the_host_controller",),
+        item="A3 observation"),
+    Mutation(
+        id="device-control-obs-gravity-world-frame",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="            obs[o + 6 + k] = -Rw[2, k]",
+        replace="            obs[o + 6 + k] = T(0.0) - T(k // 2)",
+        defect="the gravity channels are the world-frame (0, 0, -1), so the controller cannot "
+               "sense its own attitude",
+        suites=("test_devroll::test_the_device_controller_is_the_host_controller",),
+        item="A3 observation"),
+    Mutation(
+        id="device-control-twist-in-the-body-frame",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="        Rt = _wp.transpose(Ri[w])",
+        replace="        Rt = _wp.transpose(R[w])",
+        defect="the body twist is rotated by xmat, not the inertial frame ximat "
+               "mj_objectVelocity uses for a body, so rates and velocities are mixed between "
+               "axes on any body whose principal axes are not its frame's",
+        suites=("test_devroll::test_the_device_controller_is_the_host_controller",),
+        item="A3 observation"),
+    Mutation(
+        id="device-control-mean-worlds-sample",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="        if sampled[w] != 0:\n            st = _wp.rand_init(",
+        replace="        if True:\n            st = _wp.rand_init(",
+        defect="the K_m worlds that score at the mean take exploration noise too, so the "
+               "archive's scores are those of a noisy controller",
+        suites=("test_devroll::test_the_device_controller_is_the_host_controller",),
+        item="A3 actor"),
+    Mutation(
+        id="device-control-skips-normalisation",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="            x = clip((T(f32(obs[w * 33 + k])) - mean[k]) / _wp.sqrt(var[k] + T(1e-8)),",
+        replace="            x = clip(T(f32(obs[w * 33 + k])),",
+        defect="the actor reads the raw observation, not SharedPolicy.normalise's, so the "
+               "device runs a different function from the one PPO trained",
+        suites=("test_devroll::test_the_device_actor_is_the_shared_policy",),
+        item="A3 actor"),
+    Mutation(
+        id="device-control-gain-not-applied",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="            if q < n and g != T(1.0):",
+        replace="            if q < 0 and g != T(1.0):",
+        defect="the gait gain is computed and never scales the amplitude, so the controller "
+               "cannot stop or hover (the arch42 wall)",
+        suites=("test_devroll::test_the_device_controller_is_the_host_controller",),
+        item="A3 decision"),
+    Mutation(
+        id="device-control-phase-not-continued",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="            psi[w] = psi[w] + _TWO_PI * (f_last[w] - f) * tw",
+        replace="            psi[w] = psi[w]",
+        defect="a frequency change jumps the stroke phase by 2 pi df t, as the closed form did "
+               "before the continuity term (2.5 rad at t = 4 s for 0.1 Hz)",
+        suites=("test_devroll::test_the_device_controller_is_the_host_controller",),
+        item="A3 CPG"),
+    Mutation(
+        id="device-control-amplitude-not-clipped",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="            amp = _wp.min(_wp.max(F64(cur[w * P + j]), F64(0.0)),\n"
+             "                          _wp.max(span - _wp.abs(off - mid), F64(1e-3)))",
+        replace="            amp = F64(cur[w * P + j])",
+        defect="CPGParams.clipped's amplitude bound is skipped, so a commanded stroke drives "
+               "the joint into its end stop",
+        suites=("test_devroll::test_the_device_controller_is_the_host_controller",),
+        item="A3 CPG"),
+    Mutation(
+        id="device-control-clock-in-float32",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="        t[w] = t[w] + dt",
+        replace="        t[w] = F64(f32(t[w] + dt))",
+        defect="the controller's clock is float32, so 2 pi f t and the task phase carry the "
+               "clock's rounding into every angle",
+        suites=("test_devroll::test_the_device_controller_is_the_host_controller",),
+        item="A3 CPG"),
+    Mutation(
+        id="device-control-diverged-world-keeps-deciding",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="            diverged[w] = 1\n            active[w] = 0\n            due[w] = 0",
+        replace="            diverged[w] = 1",
+        defect="a world whose observation is not finite is flagged and goes on deciding on it: "
+               "the NaN reaches the actor, as it killed arch43's actor pool",
+        suites=("test_devroll::test_the_device_controller_fails_a_non_finite_observation",),
+        item="A3 divergence"),
+    Mutation(
+        id="device-control-contact-in-world-zero",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="            touching[cworld[i]] = 1",
+        replace="            touching[0] = 1",
+        defect="every world's ground contact is credited to world 0, so a machine on the beach "
+               "senses no contact unless it is world 0",
+        suites=("test_devroll::test_the_device_controller_senses_mjwarp",), item="A3 sensing"),
+    Mutation(
+        id="device-control-clearance-ignores-the-beach",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="                ground = _wp.max(ground, (x - shore_x) * slope + shore_z)",
+        replace="                ground = ground",
+        defect="clearance is measured to the waterline, so a machine resting on the beach "
+               "reads as aloft (the 0.75 flight score of a lobbed wingless design)",
+        suites=("test_devroll::test_the_device_controller_senses_mjwarp",), item="A3 sensing"),
+    Mutation(
+        id="device-control-records-the-next-slot",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find="                rec_obs[(w * cap + nd) * 33 + k] = obs[ob + k]",
+        replace="                rec_obs[(w * cap + _wp.min(nd + 1, cap - 1)) * 33 + k] = obs[ob + k]",
+        defect="each decision's observation is recorded one slot late, so the host's log_prob "
+               "pairs every action with the next decision's observation",
+        suites=("test_devroll::test_the_device_controller_is_the_host_controller",),
+        item="A3 record"),
+    Mutation(
+        id="device-control-reads-due-back",
+        path="dytiscidae/envs/devroll/control_wp.py",
+        find='        _wp.launch(K["observe"], dim=W, inputs=[',
+        replace='        self.due.numpy()\n        _wp.launch(K["observe"], dim=W, inputs=[',
+        defect="the controller reads its decision mask back to the host every step: a sync "
+               "per step, and a rollout step that cannot be captured into a graph",
+        suites=("test_devroll::test_the_device_controller_reads_nothing_back",),
+        item="A3 no sync"),
     # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
     Mutation(
         id="grpo-advantage-across-the-whole-batch",

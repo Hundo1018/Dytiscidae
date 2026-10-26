@@ -1,6 +1,7 @@
 """Device evaluation path (IMPL_1010 A): the guard (A0), the fluid and scatter
-kernels each against its numpy code (A1a, A1b), and the per-body MJWarp model and
-the device step replayed against ``step_batch`` (A2).
+kernels each against its numpy code (A1a, A1b), the per-body MJWarp model and
+the device step replayed against ``step_batch`` (A2), and the controller
+replayed inside ``rollout_batch`` (A3).
 
 The device path is optional.  The guard checks run wherever the project runs.
 The kernel checks need MuJoCo Warp, warp and a CUDA device, and skip with a
@@ -1231,6 +1232,435 @@ def test_the_device_step_reads_nothing_back() -> None:
               err <= 2e-4, f"worst {k} {err:.2e}")
 
 
+# --- A3: the controller -------------------------------------------------------
+
+
+def _control_fixtures():
+    """(name, domain, envs) with a task drawn per world: an eel and a medusa in the
+    water, a teal launched in the air (heading and height lost matter), the rotor
+    fixture in the air, and a beetle on the beach."""
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.tasks import schedule_for
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    def plan(name, domain, seed, k=2):
+        envs = []
+        for s in range(k):
+            e = TriphibianEnv(build(BODY_PLANS[name]()), seed=s)
+            e.reset(domain, randomise=True)
+            # The evaluator's scatter: a stroke phase offset, a part-spent battery.
+            e.scatter(np.random.default_rng(seed + 50 + s))
+            e.task = schedule_for(domain, np.random.default_rng(seed + s),
+                                  trim_speed=e.launch_speed if domain is Domain.AIR else 0.0)
+            envs.append(e)
+        return envs
+
+    def rotor(seed):
+        rng = np.random.default_rng(seed)
+        envs = []
+        for k in range(2):
+            e = _rotor_machine(k)
+            e.reset(Domain.AIR, randomise=False)
+            e.scatter(rng)
+            e.task = schedule_for(Domain.AIR, np.random.default_rng(seed + k))
+            envs.append(e)
+        return envs
+
+    return [("eel", Domain.WATER, lambda: plan("eel", Domain.WATER, 101)),
+            ("teal", Domain.AIR, lambda: plan("teal", Domain.AIR, 103)),
+            ("rotor fixture", Domain.AIR, lambda: rotor(107)),
+            ("medusa", Domain.WATER, lambda: plan("medusa", Domain.WATER, 109)),
+            ("beetle", Domain.LAND, lambda: plan("beetle", Domain.LAND, 113))]
+
+
+def _controllers(envs, seed, *, gain=True):
+    """Per world a random ``MobilityBasis`` (orthonormal modes, unit effects) and a
+    per-design ``Policy`` (world 0 linear, world 1 one hidden layer), and a
+    ``SharedPolicy`` whose normalisation and output layer are not the identity
+    and the near-zero start, so every term reaches the command."""
+    import torch
+
+    from dytiscidae.control.cpg import MobilityBasis, Policy
+    from dytiscidae.learning.ppo import SharedPolicy
+
+    rng = np.random.default_rng(seed)
+    bases, pols = [], []
+    for w, e in enumerate(envs):
+        P = e.cpg.n_params
+        r = min(4, P)
+        q, _ = np.linalg.qr(rng.normal(size=(P, r)))
+        eff = rng.normal(size=(r, 6))
+        eff /= np.linalg.norm(eff, axis=1, keepdims=True)
+        bases.append(MobilityBasis(modes=0.2 * q.T, effects=eff,
+                                   authority=rng.uniform(0.3, 3.0, r), medium="water"))
+        p = Policy(n_obs=e.OBS_DIM, n_modes=r, hidden=(0 if w % 2 == 0 else 8), gain=gain)
+        p.weights = rng.normal(0.0, 0.3, p.n_weights)
+        pols.append(p)
+    torch.manual_seed(seed)
+    shared = SharedPolicy(envs[0].OBS_DIM, 6 + int(gain), hidden=16)
+    with torch.no_grad():
+        shared.actor[4].weight.mul_(80.0)
+        shared.obs_mean.copy_(torch.as_tensor(rng.normal(0.0, 0.2, envs[0].OBS_DIM)))
+        shared.obs_var.copy_(torch.as_tensor(rng.uniform(0.3, 2.0, envs[0].OBS_DIM)))
+    return bases, pols, shared
+
+
+class _SharedFloat64:
+    """``SharedPolicy.act_many`` at the mean in float64, for the float64 replay:
+    ``act_many`` runs the float32 network, which caps any comparison at 1e-7.  It
+    takes what ``rollout_batch`` hands ``act_many`` (the observation already in
+    float32) and calls the policy's own ``latent`` (normalisation, actor) on a
+    double copy."""
+
+    def __init__(self, shared):
+        import copy
+
+        self.pol = copy.deepcopy(shared).double()
+
+    def act_many(self, obs_np, *, deterministic=False, rngs=None):
+        import torch
+
+        assert deterministic, "the float64 replay runs at the mean"
+        with torch.no_grad():
+            a = torch.tanh(self.pol.latent(torch.as_tensor(np.asarray(obs_np, float))).mean)
+        a = a.numpy()
+        return a, np.zeros(len(a)), np.zeros(len(a))
+
+
+def test_the_device_controller_is_the_host_controller() -> None:
+    """``rollout_batch`` itself, with ``step_batch`` wrapped: before each step the
+    device controller senses the host machines (``sense_host``) and decides and
+    commands on the device; its observation is held to ``e.observation`` at each
+    decision and its targets and rates to the angles ``rollout_batch`` passes and
+    the rate the CPG left, on every step.  The per-design policy, the shared actor
+    at the mean, the bases, the gain and the CPG all run.  A phase boundary falls
+    inside every segment."""
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device controller replays rollout_batch's decisions and CPG", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs import batchroll as br
+    from dytiscidae.envs.devroll.control_wp import DeviceControl
+    from dytiscidae.envs.devroll.model_wp import DeviceBody
+
+    duration = 0.6
+    for name, domain, make in _control_fixtures():
+        for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+            pname = "float64" if dtype == wp.float64 else "float32"
+            envs = make()
+            bases, pols, shared = _controllers(envs, 131)
+            host_shared = _SharedFloat64(shared) if dtype == wp.float64 else shared
+            body = DeviceBody(envs, dtype=dtype)
+            ctl = DeviceControl(body, shared=shared, policies=pols, bases=bases)
+            params = [e.cpg.base for e in envs]
+            ctl.arm(domain, duration, params)
+            real = br.step_batch
+            st = {"i": 0, "obs": 0.0, "ang": 0.0, "rate": 0.0, "dec": 0, "obs_abs": 0.0,
+                  "ang_abs": 0.0, "host_obs": [[] for _ in envs], "phases": set(),
+                  "air_h": 0.0}
+
+            def wrapped(envs_, angles, bf_, live=None):
+                ctl.sense_host(envs_)
+                ctl.control()
+                if st["i"] % ctl.every == 0:
+                    ho = np.stack([e.observation(domain) for e in envs_])
+                    do = ctl.observation()
+                    err = float(np.abs(do - ho).max())
+                    st["obs"] = max(st["obs"], err / max(float(np.abs(ho).max()), 1e-30))
+                    st["obs_abs"] = max(st["obs_abs"], err)
+                    st["dec"] += 1
+                    st["phases"].update(
+                        e._active_task.index_at((e.data.time - e._seg_t0) / e._seg_T)
+                        for e in envs_)
+                    st["air_h"] = max(st["air_h"], float(np.abs(ho[:, 24]).max()))
+                    for w in range(len(envs_)):
+                        st["host_obs"][w].append(ho[w])
+                tg, rt = ctl.targets()
+                for w, e in enumerate(envs_):
+                    if angles[w] is None:
+                        continue
+                    a = np.asarray(angles[w], float)
+                    err = float(np.abs(tg[w] - a).max())
+                    st["ang"] = max(st["ang"], err / max(float(np.abs(a).max()), 1e-30))
+                    # 1e-5 rad on angle channels; a rotor's channel is a speed.
+                    ang = e.cpg.margin > 0
+                    if ang.any():
+                        st["ang_abs"] = max(st["ang_abs"],
+                                            float(np.abs(tg[w] - a)[ang].max()))
+                    r = e.cpg._rate
+                    st["rate"] = max(st["rate"], float(np.abs(rt[w] - r).max())
+                                     / max(float(np.abs(r).max()), 1e-30))
+                out = real(envs_, angles, bf_, live)
+                ctl.tick()
+                st["i"] += 1
+                return out
+
+            br.step_batch = wrapped
+            try:
+                res = br.rollout_batch(envs, br.HostFluid(envs), duration, params, domain,
+                                       policies=pols, bases=bases, shared=host_shared)
+            finally:
+                br.step_batch = real
+            n_steps = int(duration / envs[0].timestep)
+            check(f"{name} {pname}: the replay ran every step and decision, with both phases "
+                  "and a non-zero command",
+                  st["i"] == n_steps and st["dec"] == -(-n_steps // ctl.every)
+                  and len(st["phases"]) >= 2 and all(r_.survived for r_ in res),
+                  f"{st['i']} steps, {st['dec']} decisions, phases {sorted(st['phases'])}")
+            check(f"{name} {pname}: observation within {tol:g} of its maximum at every decision",
+                  st["obs"] <= tol, f"{st['obs']:.2e} (absolute {st['obs_abs']:.1e})")
+            check(f"{name} {pname}: commanded angles within {tol:g} of their maximum on every "
+                  "step, and within 1e-5 rad on angle channels",
+                  st["ang"] <= tol and st["ang_abs"] <= 1e-5,
+                  f"{st['ang']:.2e} (absolute {st['ang_abs']:.1e} rad)")
+            check(f"{name} {pname}: the servo rate the CPG leaves within {tol:g}",
+                  st["rate"] <= tol, f"{st['rate']:.2e}")
+            rec = ctl.records()
+            rec_err = max(float(np.abs(rec["obs"][w] - np.stack(st["host_obs"][w])).max())
+                          for w in range(len(envs)))
+            check(f"{name} {pname}: the recorded observations are the decisions' own",
+                  all(int(k) == st["dec"] for k in rec["n"])
+                  and rec_err <= tol * max(1.0, max(float(np.abs(np.stack(h)).max())
+                                                    for h in st["host_obs"])),
+                  f"{rec['n'].tolist()} records, {rec_err:.1e}")
+            if domain.value == "air":
+                check(f"{name} {pname}: the air segment's height-lost channel moved",
+                      st["air_h"] > 1e-4, f"max |height lost| {st['air_h']:.2e}")
+
+
+def test_the_device_controller_fails_a_non_finite_observation() -> None:
+    """``observation_finite`` on the device: a world whose observation holds a NaN
+    at a decision is failed as diverged, stops deciding and commanding, and the
+    other world is untouched."""
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device controller fails a non-finite observation as diverged", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.devroll.control_wp import DeviceControl
+    from dytiscidae.envs.devroll.model_wp import DeviceBody
+
+    name, domain, make = _control_fixtures()[0]
+    envs = make()
+    bases, pols, shared = _controllers(envs, 137)
+    body = DeviceBody(envs, dtype=wp.float32)
+    ctl = DeviceControl(body, shared=shared, policies=pols, bases=bases)
+    ctl.arm(domain, 0.4, [e.cpg.base for e in envs])
+    ctl.sense_host(envs)
+    ctl.control()
+    before, _ = ctl.targets()
+    ctl.tick()
+    for _ in range(ctl.every - 1):
+        ctl.sense_host(envs)
+        ctl.control()
+        ctl.tick()
+    ctl.sense_host(envs)
+    m = ctl.sense_buf["msub"].numpy()
+    m[1] = np.nan
+    ctl.sense_buf["msub"].assign(m)
+    held, _ = ctl.targets()
+    ctl.control()
+    after, _ = ctl.targets()
+    dg = ctl.decision()["diverged"]
+    check("a NaN in world 1's observation fails world 1 only",
+          dg.tolist() == [False, True], f"diverged {dg.tolist()}")
+    check("the failed world commands nothing more; the other world goes on",
+          float(np.abs(after[1] - held[1]).max()) == 0.0
+          and float(np.abs(after[0] - held[0]).max()) > 0.0)
+    del before
+
+
+def test_the_device_controller_senses_mjwarp() -> None:
+    """End to end on MJWarp's own state: from the same float32 state, the device's
+    sensing (root twist in the inertial frame, gravity, encoders, MJWarp's contact
+    pool, the clearance over the machine's geoms, the body's wetness and battery)
+    gives the host's observation within 2e-4, on the water, in the air and on the
+    beach (the beetle rests on it, so ground contact reads 1)."""
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device controller's sensing of MJWarp matches the host observation", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.devroll.control_wp import DeviceControl
+    from dytiscidae.envs.devroll.model_wp import DeviceBody
+
+    for name, domain, make in _control_fixtures():
+        envs = make()
+        if domain.value == "land":
+            for e in envs:            # settle onto the beach, at the device's zero margin
+                e.model.geom_margin[:] = 0.0
+                still = e.held_still_params()
+                for _ in range(300):
+                    e.step(e.cpg.command(still, e.data.time))
+        _round_to_float32(envs)
+        bases, pols, shared = _controllers(envs, 139)
+        body = DeviceBody(envs, dtype=wp.float32)
+        body.load_state([e.data for e in envs])
+        ctl = DeviceControl(body, shared=shared, policies=pols, bases=bases)
+        ctl.arm(domain, 0.6, [e.cpg.base for e in envs])
+        ctl.sense()
+        ctl.control()
+        ho = np.stack([e.observation(domain) for e in envs])
+        do = ctl.observation()
+        err = float(np.abs(do - ho).max())
+        rel = err / max(float(np.abs(ho).max()), 1e-30)
+        k = int(np.argmax(np.abs(do - ho).max(axis=0)))
+        dec = ctl.decision()
+        hc = np.array([e.clearance() for e in envs])
+        touch = [bool(e._touching_ground()) for e in envs]
+        c_err = float(np.abs(dec["clearance"] - hc).max()) / max(float(np.abs(hc).max()), 1e-3)
+        check(f"{name}: the observation from MJWarp's state within 2e-4 of its maximum",
+              rel <= 2e-4, f"{rel:.2e} (absolute {err:.1e}, worst channel {k})")
+        check(f"{name}: ground contact as the host reads it, clearance within 2e-4",
+              dec["touching"].tolist() == touch and c_err <= 2e-4,
+              f"touching {dec['touching'].tolist()} vs {touch}, clearance {c_err:.1e}")
+        if domain.value == "land":
+            check(f"{name}: the fixture is resting on the beach (contact reads 1)", all(touch))
+
+
+def test_the_device_controller_reads_nothing_back() -> None:
+    """A whole rollout step -- sense, decide, command, the body's step, the clock --
+    captures into one CUDA graph (a host read-back anywhere fails the capture),
+    and two launches of it on a decision step and the step after give the targets
+    and observation a direct run gives."""
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device controller's step captures into a CUDA graph", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.devroll.control_wp import DeviceControl
+    from dytiscidae.envs.devroll.model_wp import DeviceBody
+
+    name, domain, make = _control_fixtures()[1]
+    envs = make()
+    _round_to_float32(envs)
+    bases, pols, shared = _controllers(envs, 157)
+    body = DeviceBody(envs, dtype=wp.float32)
+    ctl = DeviceControl(body, shared=shared, policies=pols, bases=bases)
+    # The battery spends on every step and DevicePower has no reset: restore its
+    # ledger in place (the graph holds the arrays' addresses).
+    ledger = {k: v.numpy().copy() for k, v in body.power._state.items()}
+
+    def fresh():
+        body.reset()
+        for k, v in ledger.items():
+            body.power._state[k].assign(v)
+        body.power.active.fill_(1)
+        body.load_state([e.data for e in envs])
+        ctl.arm(domain, 0.6, [e.cpg.base for e in envs], sampled=[1, 0], seeds=[3, 4])
+    fresh()
+    ctl.step()                                # compile and load every module first
+    fresh()
+    try:
+        with wp.ScopedCapture() as cap:
+            ctl.step()
+        captured, why = True, ""
+    except Exception as exc:  # noqa: BLE001 - any capture failure is the finding
+        captured, why = False, f"{type(exc).__name__}: {str(exc)[:160]}"
+    check(f"{name}: sense, control, the body's step and the clock capture into a graph",
+          captured, why)
+    if not captured:
+        return
+    fresh()
+    wp.capture_launch(cap.graph)
+    wp.capture_launch(cap.graph)
+    a_t, a_o, a_n = ctl.targets()[0], ctl.observation(), ctl.ndec.numpy()[:2].copy()
+    fresh()
+    ctl.step()
+    ctl.step()
+    b_t, b_o = ctl.targets()[0], ctl.observation()
+    err = max(float(np.abs(a_t - b_t).max()), float(np.abs(a_o - b_o).max()))
+    check(f"{name}: the captured step decides and commands what the direct step does",
+          err <= 1e-6 and a_n.tolist() == [1, 1], f"{err:.1e}, decisions {a_n.tolist()}")
+
+
+def test_the_device_actor_is_the_shared_policy() -> None:
+    """The shared actor alone: at the mean, within 1e-9 of ``SharedPolicy.latent``
+    in float64 (a double copy) and 2e-4 of ``act_many`` in float32; sampled, over
+    4,096 rows of one observation, the latent's sample mean within 3 standard
+    errors of the policy's mean and its spread within 5% of ``exp(log_std)``, the
+    action mean within 3 combined standard errors of ``act_many``'s own sample,
+    and ``log_prob`` of the device's (obs, action) equal to the density at the
+    device's own latent within 1e-4."""
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device actor agrees with SharedPolicy", reason)
+        return
+    import copy
+
+    import torch
+    import warp as wp
+
+    from dytiscidae.envs.devroll.control_wp import sample_actions
+
+    envs = _control_fixtures()[0][2]()
+    _, _, shared = _controllers(envs, 149)
+    rng = np.random.default_rng(151)
+    obs = np.stack([e.observation() for e in envs]
+                   + [rng.normal(0.0, 1.0, envs[0].OBS_DIM) for _ in range(30)])
+    p64 = copy.deepcopy(shared).double()
+    with torch.no_grad():
+        # rollout_batch hands act_many the observation in float32; so does the device.
+        mean64 = torch.tanh(p64.latent(torch.as_tensor(
+            obs.astype(np.float32).astype(float))).mean).numpy()
+    a64, _ = sample_actions(shared, obs, np.arange(len(obs)), sampled=False, dtype=wp.float64)
+    err = float(np.abs(a64 - mean64).max()) / float(np.abs(mean64).max())
+    check("float64: the action at the mean within 1e-9 of SharedPolicy.latent's",
+          err <= 1e-9, f"{err:.2e}")
+    a32, _ = sample_actions(shared, obs, np.arange(len(obs)), sampled=False, dtype=wp.float32)
+    ref32 = shared.act_many(obs, deterministic=True)[0]
+    err = float(np.abs(a32 - ref32).max()) / float(np.abs(ref32).max())
+    check("float32: the action at the mean within 2e-4 of act_many's", err <= 2e-4, f"{err:.2e}")
+    check("the fixture's actions are not saturated or zero",
+          0.05 < float(np.abs(ref32).mean()) < 0.95, f"mean |a| {float(np.abs(ref32).mean()):.2f}")
+
+    N = 4096
+    one = np.repeat(obs[:1], N, axis=0)
+    act, u = sample_actions(shared, one, np.arange(N) + 7, decision=3, dtype=wp.float32)
+    with torch.no_grad():
+        base = shared.latent(torch.as_tensor(one[:1], dtype=torch.float32))
+        mu = base.mean.numpy()[0].astype(float)
+        sd = base.stddev.numpy()[0].astype(float)
+    se = sd / np.sqrt(N)
+    z_mu = float(np.abs(u.mean(axis=0) - mu).max() / se.min())
+    spread = float(np.abs(u.std(axis=0) / sd - 1.0).max())
+    check("sampled: the latent's mean within 3 standard errors, its spread within 5%",
+          z_mu <= 3.0 and spread <= 0.05, f"{z_mu:.2f} SE, spread off by {spread:.1%}")
+    host = shared.act_many(one, deterministic=False,
+                           rngs=[np.random.default_rng(1000 + i) for i in range(N)])[0]
+    se2 = np.sqrt(act.var(axis=0) / N + host.var(axis=0) / N)
+    z_a = float((np.abs(act.mean(axis=0) - host.mean(axis=0)) / se2).max())
+    check("sampled: the action mean within 3 combined standard errors of act_many's sample",
+          z_a <= 3.0, f"{z_a:.2f} SE")
+    with torch.no_grad():
+        lp = shared.log_prob(torch.as_tensor(one, dtype=torch.float32),
+                             torch.as_tensor(act, dtype=torch.float32)).numpy().astype(float)
+        uu = torch.as_tensor(u, dtype=torch.float32)
+        lp_u = (base.log_prob(uu).sum(-1)
+                - torch.log1p(-torch.tanh(uu).pow(2) + 1e-6).sum(-1)).numpy().astype(float)
+    lp_err = float(np.abs(lp - lp_u).max()) / max(float(np.abs(lp_u).max()), 1e-30)
+    check("sampled: log_prob of the device's (obs, action) is the density at its own latent, "
+          "within 1e-4", lp_err <= 1e-4, f"{lp_err:.2e}")
+    distinct = len(np.unique(np.round(act[:, 0], 6)))
+    check("sampled: every row draws its own noise", distinct > N * 0.99, f"{distinct}/{N}")
+
+
 def test_the_reason_is_set_when_the_packages_do_not_import() -> None:
     # The guard runs at import, so a GPU machine never reaches its except branch.
     # Force the import to fail in a child process and read the reason it leaves.
@@ -1262,7 +1692,12 @@ def main() -> int:
                  test_the_device_added_mass_is_each_worlds_own,
                  test_the_device_model_is_the_cpu_model,
                  test_the_device_step_replays_step_batch,
-                 test_the_device_step_reads_nothing_back]
+                 test_the_device_step_reads_nothing_back,
+                 test_the_device_controller_is_the_host_controller,
+                 test_the_device_controller_fails_a_non_finite_observation,
+                 test_the_device_controller_senses_mjwarp,
+                 test_the_device_controller_reads_nothing_back,
+                 test_the_device_actor_is_the_shared_policy]
     for fn in functions:
         print(f"{fn.__name__}")
         fn()

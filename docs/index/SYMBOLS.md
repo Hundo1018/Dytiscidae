@@ -759,6 +759,28 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 |---|---|---:|---|---|
 | `usable` | function | 49 | `(timeout: float=180.0) -> tuple` | Return ``(ok, reason)``: can the device path run in this environment? |
 
+## `envs.devroll.control_wp` — `dytiscidae/envs/devroll/control_wp.py`
+
+> The controller at a decision step and the CPG every step, on the device (IMPL_1010 A3).
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `DeviceControl` | class | 520 | — | The controller of the W worlds of one ``DeviceBody`` (see the module docstring). |
+| `make_kernels` | function | 60 | `(T)` | The A3 kernels for precision ``T``, cached. |
+| `sample_actions` | function | 911 | `(shared, obs, seeds, decision: int=0, *, sampled=True, dtype=_wp.float32) -> tuple` | The device actor on ``obs (N, 33)``, one row per world; numpy in, numpy out. |
+| `DeviceControl.__init__` | method | 534 | `(self, body, *, shared=None, policies=None, bases=None, control_hz: float=25.0, record: int=256) -> None` | — |
+| `DeviceControl.arm` | method | 701 | `(self, domain, duration: float, params_list, *, sampled=None, seeds=None) -> None` | Start a segment on every world: ``TriphibianEnv._arm_task`` on the host |
+| `DeviceControl.control` | method | 820 | `(self) -> None` | The decision (on decision steps) and the CPG command, no host transfer. |
+| `DeviceControl.decision` | method | 896 | `(self) -> dict` | The last decision per world: ``cur`` (the commanded CPG parameters, |
+| `DeviceControl.observation` | method | 874 | `(self)` | The last decision's observation per world, ``(W, 33)``. |
+| `DeviceControl.records` | method | 883 | `(self) -> dict` | Per world, the decisions made so far (up to ``record``): ``obs``, |
+| `DeviceControl.sense` | method | 793 | `(self) -> None` | The sensing from MJWarp's state (float32) and the body's own wetness |
+| `DeviceControl.sense_host` | method | 767 | `(self, envs) -> None` | The sensing from host machines at this precision, for the parity tests: |
+| `DeviceControl.set_shared` | method | 685 | `(self, shared) -> None` | The shared policy's current weights and normalisation into the device |
+| `DeviceControl.step` | method | 864 | `(self) -> None` | One rollout step on the device: sense, decide, command, the body's |
+| `DeviceControl.targets` | method | 878 | `(self)` | — |
+| `DeviceControl.tick` | method | 858 | `(self) -> None` | After the body's step: the clock and the step count. |
+
 ## `envs.devroll.fluid_wp` — `dytiscidae/envs/devroll/fluid_wp.py`
 
 > Strip-theory loads on the device (IMPL_1010 A1a).
@@ -801,38 +823,38 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `added_mass_into_model` | function | 1036 | `(dry_mass, dry_inertia, m_body, lever2, boff, *, dtype=_wp.float64)` | batchroll.finish's added-mass write for many worlds; numpy in, numpy out. |
-| `DeviceDamping` | class | 890 | — | ``ImplicitAeroDamping`` for several machines, its state on the device. |
-| `DeviceInflow` | class | 817 | — | ``InducedFlow`` for one machine per world, its state ``w`` on the device. |
-| `DeviceJets` | class | 700 | — | ``JetSet.apply`` for several machines' bells on the device. |
-| `DevicePower` | class | 625 | — | ``BatchedPower`` with its state on the device: one row per world's machine. |
-| `DeviceRotors` | class | 516 | — | The rotor tables of several ``RotorSet``s on the device, and their kernel. |
-| `make_kernels` | function | 44 | `(T)` | Return the kernels for precision ``T`` (``rotor``, ``power_terms``, |
-| `servo_command` | function | 1063 | `(target, rate, lead, world, has_rate, *, dtype=_wp.float64)` | ``TriphibianEnv.servo_command`` for many worlds; numpy in, numpy out. |
-| `DeviceDamping.__init__` | method | 908 | `(self, dampers, body_ids, *, dtype=_wp.float64) -> None` | — |
-| `DeviceDamping.launch` | method | 1007 | `(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com, cdof_rot, cdof_lin, qvel, enabled, dof_damping, qfrc_applied) -> None` | :meth:`step` on device arrays, no host transfer: ``is_wing`` and |
-| `DeviceDamping.reset` | method | 952 | `(self) -> None` | ``ImplicitAeroDamping.reset`` for every world, in place (a captured |
-| `DeviceDamping.step` | method | 970 | `(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com, cdof, qvel, enabled=None) -> dict` | One step; numpy in, numpy out. |
-| `DeviceInflow.__init__` | method | 831 | `(self, spans, *, dtype=_wp.float64) -> None` | — |
-| `DeviceInflow.due` | method | 846 | `(self)` | — |
-| `DeviceInflow.launch` | method | 874 | `(self, F, Vf, rho, dt, due) -> None` | :meth:`update` on device arrays (``due`` an int array per world), no |
-| `DeviceInflow.reset` | method | 852 | `(self, mask=None) -> None` | — |
-| `DeviceInflow.tick` | method | 849 | `(self, mask=None) -> None` | — |
-| `DeviceInflow.update` | method | 860 | `(self, F, Vf, rho, dt, due=None)` | Update the worlds in ``due`` (default: ``self.due()``); returns ``w``. |
-| `DeviceInflow.w` | property | 882 | `(self)` | — |
-| `DeviceJets.__init__` | method | 714 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
-| `DeviceJets.host_inputs` | method | 748 | `(self, datas) -> dict` | ``omega``, ``xmat``, ``xpos`` per bell row, read from each world's |
-| `DeviceJets.launch` | method | 801 | `(self, omega, xmat, rho, subf, out) -> None` | One step on device arrays, no host transfer: per bell row ``omega``, |
-| `DeviceJets.loads` | method | 763 | `(self, omega, xmat, xpos, wind, current) -> dict` | One step of every bell; numpy in, numpy out (see the class docstring). |
-| `DeviceJets.outputs` | method | 792 | `(self) -> dict` | Device arrays for :meth:`launch` to write: per bell ``f``, ``thrust``, |
-| `DevicePower.__init__` | method | 638 | `(self, envs, *, dtype=_wp.float64) -> None` | — |
-| `DevicePower.launch` | method | 677 | `(self, force, velocity) -> None` | :meth:`step` on device arrays, no host transfer. |
-| `DevicePower.state` | method | 694 | `(self) -> dict` | — |
-| `DevicePower.step` | method | 672 | `(self, force, velocity) -> None` | ``force``, ``velocity``: every machine's first ``n`` actuator forces and |
-| `DeviceRotors.__init__` | method | 524 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
-| `DeviceRotors.launch` | method | 606 | `(self, xmat, omega, ang, lin, xipos, com, subf, flow, dt, out) -> None` | One step on device arrays, no host transfer.  Per rotor row: ``xmat`` |
-| `DeviceRotors.loads` | method | 558 | `(self, xmat, omega, cvel, xipos, com, dt, wind, current)` | One step of every rotor; numpy in, numpy out. |
-| `DeviceRotors.outputs` | method | 598 | `(self) -> dict` | Device arrays for :meth:`launch` to write, one row per rotor. |
+| `added_mass_into_model` | function | 1039 | `(dry_mass, dry_inertia, m_body, lever2, boff, *, dtype=_wp.float64)` | batchroll.finish's added-mass write for many worlds; numpy in, numpy out. |
+| `DeviceDamping` | class | 893 | — | ``ImplicitAeroDamping`` for several machines, its state on the device. |
+| `DeviceInflow` | class | 820 | — | ``InducedFlow`` for one machine per world, its state ``w`` on the device. |
+| `DeviceJets` | class | 703 | — | ``JetSet.apply`` for several machines' bells on the device. |
+| `DevicePower` | class | 628 | — | ``BatchedPower`` with its state on the device: one row per world's machine. |
+| `DeviceRotors` | class | 519 | — | The rotor tables of several ``RotorSet``s on the device, and their kernel. |
+| `make_kernels` | function | 47 | `(T)` | Return the kernels for precision ``T`` (``rotor``, ``power_terms``, |
+| `servo_command` | function | 1066 | `(target, rate, lead, world, has_rate, *, dtype=_wp.float64)` | ``TriphibianEnv.servo_command`` for many worlds; numpy in, numpy out. |
+| `DeviceDamping.__init__` | method | 911 | `(self, dampers, body_ids, *, dtype=_wp.float64) -> None` | — |
+| `DeviceDamping.launch` | method | 1010 | `(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com, cdof_rot, cdof_lin, qvel, enabled, dof_damping, qfrc_applied) -> None` | :meth:`step` on device arrays, no host transfer: ``is_wing`` and |
+| `DeviceDamping.reset` | method | 955 | `(self) -> None` | ``ImplicitAeroDamping.reset`` for every world, in place (a captured |
+| `DeviceDamping.step` | method | 973 | `(self, pos, q, area, lift, drag, rho, ar, is_wing, lift_scale, subtree_com, cdof, qvel, enabled=None) -> dict` | One step; numpy in, numpy out. |
+| `DeviceInflow.__init__` | method | 834 | `(self, spans, *, dtype=_wp.float64) -> None` | — |
+| `DeviceInflow.due` | method | 849 | `(self)` | — |
+| `DeviceInflow.launch` | method | 877 | `(self, F, Vf, rho, dt, due) -> None` | :meth:`update` on device arrays (``due`` an int array per world), no |
+| `DeviceInflow.reset` | method | 855 | `(self, mask=None) -> None` | — |
+| `DeviceInflow.tick` | method | 852 | `(self, mask=None) -> None` | — |
+| `DeviceInflow.update` | method | 863 | `(self, F, Vf, rho, dt, due=None)` | Update the worlds in ``due`` (default: ``self.due()``); returns ``w``. |
+| `DeviceInflow.w` | property | 885 | `(self)` | — |
+| `DeviceJets.__init__` | method | 717 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
+| `DeviceJets.host_inputs` | method | 751 | `(self, datas) -> dict` | ``omega``, ``xmat``, ``xpos`` per bell row, read from each world's |
+| `DeviceJets.launch` | method | 804 | `(self, omega, xmat, rho, subf, out) -> None` | One step on device arrays, no host transfer: per bell row ``omega``, |
+| `DeviceJets.loads` | method | 766 | `(self, omega, xmat, xpos, wind, current) -> dict` | One step of every bell; numpy in, numpy out (see the class docstring). |
+| `DeviceJets.outputs` | method | 795 | `(self) -> dict` | Device arrays for :meth:`launch` to write: per bell ``f``, ``thrust``, |
+| `DevicePower.__init__` | method | 641 | `(self, envs, *, dtype=_wp.float64) -> None` | — |
+| `DevicePower.launch` | method | 680 | `(self, force, velocity) -> None` | :meth:`step` on device arrays, no host transfer. |
+| `DevicePower.state` | method | 697 | `(self) -> dict` | — |
+| `DevicePower.step` | method | 675 | `(self, force, velocity) -> None` | ``force``, ``velocity``: every machine's first ``n`` actuator forces and |
+| `DeviceRotors.__init__` | method | 527 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
+| `DeviceRotors.launch` | method | 609 | `(self, xmat, omega, ang, lin, xipos, com, subf, flow, dt, out) -> None` | One step on device arrays, no host transfer.  Per rotor row: ``xmat`` |
+| `DeviceRotors.loads` | method | 561 | `(self, xmat, omega, cvel, xipos, com, dt, wind, current)` | One step of every rotor; numpy in, numpy out. |
+| `DeviceRotors.outputs` | method | 601 | `(self) -> dict` | Device arrays for :meth:`launch` to write, one row per rotor. |
 
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 

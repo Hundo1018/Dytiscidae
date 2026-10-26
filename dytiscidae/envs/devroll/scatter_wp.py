@@ -16,7 +16,8 @@ parity tests call.
 
 What stays on the host: the rotor tables (``rotor_table`` builds them once per
 rotor and medium, they are constants on the device), and whether the CPG left a
-rate for the servo (``CPG.pop_rate`` is host state until A3).  The medium is the
+rate for the servo (``CPG.pop_rate``: a per-world flag the host sets, at
+``control_wp.DeviceControl.arm`` since A3).  The medium is the
 flat calm sea of ``fluid_wp``; waves are not ported.
 
 Kernels are built per precision by :func:`make_kernels`, as in ``fluid_wp``.
@@ -39,6 +40,8 @@ _NM = len(TABLE_MU)
 _TIP_LO = float(TABLE_TIP_SPEEDS[0])
 _TIP_HI = float(TABLE_TIP_SPEEDS[-1])
 _REFRESH = _wp.constant(int(_ImplicitAeroDamping.REFRESH_EVERY))
+#: pi in float64: ``wp.pi`` is a float32 constant, the same 2.7e-8 relative error control_wp.py documents.
+_PI = _wp.constant(3.141592653589793)
 
 
 def make_kernels(T):
@@ -377,7 +380,7 @@ def make_kernels(T):
         U = _wp.sqrt(T(2.0) * _wp.max(q[i], T(0.0)) / _wp.max(rho[i], T(1e-9)))
         slope = T(0.0)
         if is_wing[i] != 0:
-            slope = T(2.0) * T(_wp.pi) / (T(1.0) + T(2.0) / _wp.max(ar[i], T(0.1)))
+            slope = T(2.0) * T(_PI) / (T(1.0) + T(2.0) / _wp.max(ar[i], T(0.1)))
         slope = slope * lift_scale[world[i]]
         fa = _wp.sqrt(lift[i] * lift[i] + drag[i] * drag[i])
         b[i] = T(0.0)
@@ -1065,7 +1068,7 @@ def servo_command(target, rate, lead, world, has_rate, *, dtype=_wp.float64):
 
     ``target``, ``rate`` and ``lead`` are per actuator row, ``world`` the row's
     world and ``has_rate`` per world: 1 where the CPG left a rate of the
-    target's length (``pop_rate`` is host state until A3), else 0.
+    target's length (``pop_rate``; host-set, by ``DeviceControl.arm`` since A3), else 0.
     """
     K = make_kernels(dtype)
     npdt = _np_dtype(dtype)

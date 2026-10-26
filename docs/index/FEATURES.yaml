@@ -39,6 +39,9 @@ DeviceEvaluation:
     - envs.devroll.model_wp
     - envs.devroll.model_wp.DeviceBody
     - envs.devroll.model_wp.device_model
+    - envs.devroll.control_wp
+    - envs.devroll.control_wp.DeviceControl
+    - envs.devroll.control_wp.sample_actions
   tests:
     - tests.test_devroll
     - tests.test_devroll::test_the_device_rotors_are_the_rotor_batch
@@ -51,7 +54,12 @@ DeviceEvaluation:
     - tests.test_devroll::test_the_device_model_is_the_cpu_model
     - tests.test_devroll::test_the_device_step_replays_step_batch
     - tests.test_devroll::test_the_device_step_reads_nothing_back
-  note: IMPL_1010 A. The guard (A0), the A1a fluid kernels (kinematics, strip loads on the Wagner-lagged incidence, medium, added mass, assembly) and A1b's entrainment, rotors, power budget, servo command, jets, induced flow, implicit damping split and per-world added-mass write, each held to its numpy code; A2's per-body MJWarp Model and Data (per-world body_mass, body_inertia, dof_damping; margin zeroed on the device copy) and DeviceBody.step, step_batch with HostFluid on W worlds with the four diagnostics, replayed against it step by step (float64 1e-9 on the staged writes; MJWarp itself is float32) and captured into a CUDA graph with no host read-back. Not built: the controller on the device (A3), the rollout and recording (A4), per-world resets and the active mask.
+    - tests.test_devroll::test_the_device_controller_is_the_host_controller
+    - tests.test_devroll::test_the_device_controller_fails_a_non_finite_observation
+    - tests.test_devroll::test_the_device_controller_senses_mjwarp
+    - tests.test_devroll::test_the_device_controller_reads_nothing_back
+    - tests.test_devroll::test_the_device_actor_is_the_shared_policy
+  note: IMPL_1010 A. The guard (A0), the A1a fluid kernels (kinematics, strip loads on the Wagner-lagged incidence, medium, added mass, assembly) and A1b's entrainment, rotors, power budget, servo command, jets, induced flow, implicit damping split and per-world added-mass write, each held to its numpy code; A2's per-body MJWarp Model and Data (per-world body_mass, body_inertia, dof_damping; margin zeroed on the device copy) and DeviceBody.step, step_batch with HostFluid on W worlds with the four diagnostics, replayed against it step by step (float64 1e-9 on the staged writes; MJWarp itself is float32) and captured into a CUDA graph with no host read-back. A3's DeviceControl: the observation (body twist in the inertial frame, task channels on a float64 clock, MJWarp contacts, clearance), observation_finite, the shared actor (float32 input, normalisation, sampled worlds from wp.rand_init) with each decision's obs and action recorded for the host's log_prob, the per-design Policy, coeffs_for_twist, gait gain, command_params, twist_of, and CPG.command with its float64 phase continuity into the body's targets and rate (A1b's servo kernel turns them into ctrl), replayed inside rollout_batch step by step. Not built: the rollout and recording (A4), per-world resets, the freeze of a failed world.
 
 # --------------------------------------------------------------- the learner
 
