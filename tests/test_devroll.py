@@ -1188,6 +1188,71 @@ def test_the_device_step_replays_step_batch() -> None:
             del W
 
 
+def test_the_device_subtree_mass_follows_the_added_mass() -> None:
+    """MJWarp's ``body_subtreemass`` is fixed from the dry mass at ``put_model``;
+    the step writes the added mass into ``body_mass`` (2026-10-26).  A ray,
+    draw seed 21, its air and water worlds as ``evaluate_tier1_device`` builds
+    them, float32: with the subtree mass left dry, subtree_com
+    lands far from the body and MJWarp's qM factorisation is NaN on the first
+    step.  ``DeviceBody.subtree_mass`` recomputes it after every mass write:
+    each world's ``body_subtreemass`` is the subtree sum of the ``body_mass`` it
+    steps on, and ``qacc`` is finite over the first steps.  The stale path is
+    run beside it (the launch replaced by a no-op) and must go non-finite, so the
+    fixture still exercises the failure; the mutation
+    ``device-subtreemass-stays-dry`` drops the launch itself."""
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device subtree mass follows the added mass", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.devroll import rollout_wp as R
+    from dytiscidae.evolution.loop import placement_draw_seed
+    R.repeatable()
+
+    p, seed, nsteps = build(BODY_PLANS["ray"]()), 21, 3
+    ctrl, _ = _a4_controller(p, 171)
+
+    def run(stale: bool):
+        envs, doms, params, pols, bases, index = R.body_worlds(p, ctrl, [seed])
+        seg = R.DeviceSegments(envs, seconds=8.0, dtype=wp.float32, policies=pols,
+                               bases=bases)
+        if stale:
+            seg.body.subtree_mass = lambda: None
+        noise = [placement_draw_seed(seed, 101 + j) for j in range(2 * len(R.MEDIA))]
+        seg.arm(doms, params, sampled=[0] * len(envs), seeds=noise)
+        first_bad, sums_err, added = None, 0.0, 0.0
+        par = seg.body.mjm.body_parentid
+        for i in range(nsteps):
+            seg.step()
+            qacc = seg.body.d.qacc.numpy()[:seg.W]
+            if first_bad is None and not np.isfinite(qacc).all():
+                first_bad = i + 1
+            bm = seg.body.m.body_mass.numpy().astype(float)
+            want = bm.copy()
+            for b in range(len(par) - 1, 0, -1):
+                want[:, par[b]] += want[:, b]
+            got = seg.body.m.body_subtreemass.numpy().astype(float)
+            sums_err = max(sums_err, float(np.max(np.abs(got - want) / np.maximum(want, 1e-9))))
+            added = max(added, float(np.max(bm.sum(axis=1) - envs[0].solver._dry_mass.sum())))
+        return first_bad, sums_err, added
+
+    bad, err, added = run(stale=False)
+    check("ray, seed 21 (air and water worlds), float32: qacc finite over the first "
+          f"{nsteps} steps with the subtree mass kept", bad is None, f"first non-finite step {bad}")
+    check("each world's body_subtreemass is the subtree sum of its body_mass (float32, 1e-6), "
+          "with water's added mass in it", err <= 1e-6 and added > 0.0,
+          f"worst rel {err:.2e}, added mass {added:.4g} kg")
+    bad_stale, _, _ = run(stale=True)
+    check("and with the subtree mass left dry the same step is non-finite (the defect is "
+          "still reachable from this fixture)", bad_stale is not None,
+          f"first non-finite step {bad_stale}")
+
+
 def test_the_device_step_reads_nothing_back() -> None:
     """The fluid-and-scatter step and ``mjw.step`` capture into one CUDA graph: a
     host read-back anywhere in them (a ``.numpy()``, a synchronize) makes the
@@ -2201,6 +2266,7 @@ def main() -> int:
                  test_the_device_added_mass_is_each_worlds_own,
                  test_the_device_model_is_the_cpu_model,
                  test_the_device_step_replays_step_batch,
+                 test_the_device_subtree_mass_follows_the_added_mass,
                  test_the_device_step_reads_nothing_back,
                  test_the_device_controller_is_the_host_controller,
                  test_the_device_controller_fails_a_non_finite_observation,

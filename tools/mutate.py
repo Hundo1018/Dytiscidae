@@ -2200,6 +2200,17 @@ MUTATIONS: tuple = (
                "loads and the fluid reads a state the host path has not reached",
         suites=("test_devroll::test_the_device_step_replays_step_batch",), item="A2 step"),
     Mutation(
+        id="device-subtreemass-stays-dry",
+        path="dytiscidae/envs/devroll/model_wp.py",
+        find='        _wp.launch(make_kernels(self.dtype)["subtree_mass"], dim=self.W, inputs=[\n'
+             '            self.nb, self.m.body_parentid, self.m.body_mass, self.m.body_subtreemass])',
+        replace="        return",
+        defect="body_subtreemass stays at put_model's dry value while body_mass carries the "
+               "added mass, so subtree_com lands far from the body and MJWarp's float32 qM "
+               "factorisation goes NaN (ray in water, seed 21, 2026-10-26)",
+        suites=("test_devroll::test_the_device_subtree_mass_follows_the_added_mass",),
+        item="A2 step"),
+    Mutation(
         id="device-replay-writes-world-zero-only",
         path="dytiscidae/envs/devroll/model_wp.py",
         find="        xfrc_applied[w, b] = _wp.spatial_vector(",

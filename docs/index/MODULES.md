@@ -2,7 +2,7 @@
 
 # Modules
 
-112 modules, 43,111 lines, 1,214 indexed symbols.
+112 modules, 43,147 lines, 1,215 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -104,7 +104,7 @@ is what makes a violation visible while reading.
 | `envs.devroll` | On-device evaluation path (IMPL_1010 A): MuJoCo Warp plus Warp fluid kernels. | 76 | — | — | — |
 | `envs.devroll.control_wp` | The controller at a decision step and the CPG every step, on the device (IMPL_1010 A3). | 964 | — | `numpy`, `torch` | `control.cpg`, `core.mjcf`, `envs.tasks`, `envs.triphibian` |
 | `envs.devroll.fluid_wp` | Strip-theory loads on the device (IMPL_1010 A1a). | 618 | — | `numpy` | `physics.fluid`, `physics.medium` |
-| `envs.devroll.model_wp` | One body on the device: its MJWarp ``Model`` and ``Data`` over W worlds, and the | 929 | — | `mujoco`, `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `envs.devroll.scatter_wp`, `physics.fluid` |
+| `envs.devroll.model_wp` | One body on the device: its MJWarp ``Model`` and ``Data`` over W worlds, and the | 965 | — | `mujoco`, `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `envs.devroll.scatter_wp`, `physics.fluid` |
 | `envs.devroll.rollout_wp` | Air and water segments on the device, scored on the host (IMPL_1010 A4a). | 665 | — | `numpy` | `envs.batchroll`, `envs.devroll`, `envs.devroll.control_wp`, `envs.devroll.model_wp`, `envs.evaluate`, `envs.tasks`, `envs.triphibian`, `evolution.loop` |
 | `envs.devroll.scatter_wp` | The scatter between two ``mj_step``s on the device (IMPL_1010 A1b). | 1119 | — | `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `physics.energy`, `physics.fluid`, `physics.rotor` |
 | `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 753 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |

@@ -803,21 +803,22 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `device_model` | function | 388 | `(mjm, nworld: int)` | ``mjw.put_model`` of a copy of ``mjm`` with MULTICCD and NATIVECCD disabled |
-| `DeviceBody` | class | 399 | — | W worlds of one body on the device; see the module docstring. |
-| `make_kernels` | function | 73 | `(T)` | The A2 gather, reduction, diagnostic and write kernels for precision ``T``. |
-| `DeviceBody.__init__` | method | 408 | `(self, envs, *, dtype=_wp.float64, njmax: int=NJMAX, nconmax: int=NCONMAX) -> None` | — |
-| `DeviceBody.diagnostics` | method | 926 | `(self) -> dict` | — |
-| `DeviceBody.fluid_and_scatter` | method | 732 | `(self) -> None` | Everything before ``mjw.step``: servo, fluid, damping, jets, rotors, |
-| `DeviceBody.gather` | method | 658 | `(self) -> None` | The step's kinematic inputs from MJWarp's state (float32) into ``state``. |
-| `DeviceBody.hold` | method | 718 | `(self, alive) -> None` | The dead worlds' loads, mass, damping and control at their dry, |
-| `DeviceBody.host_state` | method | 670 | `(self, datas) -> None` | ``state`` from host ``MjData`` in this precision, for the parity tests: |
-| `DeviceBody.load_state` | method | 639 | `(self, datas) -> None` | Each world's ``qpos``, ``qvel``, ``time`` and the solver's warm start |
-| `DeviceBody.reset` | method | 611 | `(self, mask=None) -> None` | ``FluidSolver.reset`` for every world, or for the worlds in ``mask`` |
-| `DeviceBody.resident` | method | 918 | `(self) -> dict` | The same five fields read from the MJWarp ``Model`` and ``Data``. |
-| `DeviceBody.set_targets` | method | 891 | `(self, angles_list, rates=None) -> None` | Host targets (one array per world) into ``targets``: a test and |
-| `DeviceBody.staged` | method | 906 | `(self) -> dict` | What the last step wrote, at the step's precision, per world: |
-| `DeviceBody.step` | method | 701 | `(self, *, gather: bool=True, alive=None) -> None` | One ``step_batch`` step for every world (see the module docstring). |
+| `device_model` | function | 413 | `(mjm, nworld: int)` | ``mjw.put_model`` of a copy of ``mjm`` with MULTICCD and NATIVECCD disabled |
+| `DeviceBody` | class | 426 | — | W worlds of one body on the device; see the module docstring. |
+| `make_kernels` | function | 78 | `(T)` | The A2 gather, reduction, diagnostic and write kernels for precision ``T``. |
+| `DeviceBody.__init__` | method | 435 | `(self, envs, *, dtype=_wp.float64, njmax: int=NJMAX, nconmax: int=NCONMAX) -> None` | — |
+| `DeviceBody.diagnostics` | method | 962 | `(self) -> dict` | — |
+| `DeviceBody.fluid_and_scatter` | method | 767 | `(self) -> None` | Everything before ``mjw.step``: servo, fluid, damping, jets, rotors, |
+| `DeviceBody.gather` | method | 685 | `(self) -> None` | The step's kinematic inputs from MJWarp's state (float32) into ``state``. |
+| `DeviceBody.hold` | method | 745 | `(self, alive) -> None` | The dead worlds' loads, mass, damping and control at their dry, |
+| `DeviceBody.host_state` | method | 697 | `(self, datas) -> None` | ``state`` from host ``MjData`` in this precision, for the parity tests: |
+| `DeviceBody.load_state` | method | 666 | `(self, datas) -> None` | Each world's ``qpos``, ``qvel``, ``time`` and the solver's warm start |
+| `DeviceBody.reset` | method | 638 | `(self, mask=None) -> None` | ``FluidSolver.reset`` for every world, or for the worlds in ``mask`` |
+| `DeviceBody.resident` | method | 954 | `(self) -> dict` | The same five fields read from the MJWarp ``Model`` and ``Data``. |
+| `DeviceBody.set_targets` | method | 927 | `(self, angles_list, rates=None) -> None` | Host targets (one array per world) into ``targets``: a test and |
+| `DeviceBody.staged` | method | 942 | `(self) -> dict` | What the last step wrote, at the step's precision, per world: |
+| `DeviceBody.step` | method | 728 | `(self, *, gather: bool=True, alive=None) -> None` | One ``step_batch`` step for every world (see the module docstring). |
+| `DeviceBody.subtree_mass` | method | 760 | `(self) -> None` | ``body_subtreemass`` from the ``body_mass`` just written, every world |
 
 ## `envs.devroll.rollout_wp` — `dytiscidae/envs/devroll/rollout_wp.py`
 

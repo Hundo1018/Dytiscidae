@@ -38,6 +38,7 @@ DeviceEvaluation:
     - envs.devroll.scatter_wp.added_mass_into_model
     - envs.devroll.model_wp
     - envs.devroll.model_wp.DeviceBody
+    - envs.devroll.model_wp.DeviceBody.subtree_mass
     - envs.devroll.model_wp.device_model
     - envs.devroll.control_wp
     - envs.devroll.control_wp.DeviceControl
@@ -55,6 +56,7 @@ DeviceEvaluation:
   tests:
     - tests.test_devroll
     - tests.test_devroll::test_the_device_rotors_are_the_rotor_batch
+    - tests.test_devroll::test_the_device_subtree_mass_follows_the_added_mass
     - tests.test_devroll::test_the_device_power_budget_is_the_power_budget
     - tests.test_devroll::test_the_device_servo_command_is_servo_command
     - tests.test_devroll::test_the_device_jets_are_the_jet_set

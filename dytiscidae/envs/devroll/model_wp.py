@@ -7,7 +7,12 @@ world, and builds:
 * ``m``: ``mjw.put_model`` of a copy of ``envs[0].model`` at its dry mass, inertia
   and damping, with ``body_mass``, ``body_inertia`` and ``dof_damping`` batched
   per world (``batch_sizes``), so each world carries its own added mass and its
-  own damping split.  MJWarp reads the per-world ``body_mass`` for a welded body
+  own damping split.  ``body_subtreemass`` is batched too and recomputed from
+  ``body_mass`` after every write of it (``subtree_mass``): put_model fixes it
+  from the dry mass, and a stale subtree mass put subtree_com far from the body
+  and made MJWarp's float32 qM factorisation NaN in water (2026-10-26).  The host
+  keeps its stale one, harmless in float64; ``subtree_com`` differs between the
+  two paths by that, a change of reference point, not of the dynamics.  MJWarp reads the per-world ``body_mass`` for a welded body
   too (``experiments/mjwarp_probe/probe_jointless_mass.py``), so nothing stands
   in for ``mj_setConst``.  The geom margin is kept.  MJWarp 3.15 refuses a
   non-zero margin while MULTICCD or NATIVECCD is on (N9), so the device copy turns
@@ -26,7 +31,7 @@ W machines, in its order: the servo command into ``ctrl``; ``FluidSolver.apply``
 the inflow update and its per-world reduction, added mass, buoyancy and
 assembly, the damping split, the limiter and weight cancellation, the
 entrainment reaction); jets; rotors; the added mass into ``body_mass`` and
-``body_inertia``; the four diagnostics batchroll keeps (``clamped``,
+``body_inertia``, and ``body_subtreemass`` from it; the four diagnostics batchroll keeps (``clamped``,
 ``mean_submerged``, ``added_mass``, ``slam``); then ``mjw.step``; then the power
 budget.  No kernel launch in it reads anything back to the host, and nothing in
 it is host state baked into a launch: each world's step count since its reset
@@ -342,6 +347,25 @@ def make_kernels(T):
         body_inertia[w, b] = _wp.vec3(f32(i[0]), f32(i[1]), f32(i[2]))
 
     @_wp.kernel
+    def subtree_mass(nb: int, parent: _wp.array(dtype=int), body_mass: _wp.array2d(dtype=f32),
+                     body_subtreemass: _wp.array2d(dtype=f32)):
+        # Each world's subtree masses from the mass it carries now (dry plus
+        # added, or dry when held).  MJWarp's put_model fixes body_subtreemass
+        # from the dry mass, and subtree_com divides the mass-weighted sum of the
+        # bodies' positions by it: with water's added mass it landed far from the
+        # body, cinert reached ~2e6 and the float32 factorisation of qM went NaN on
+        # the first step (ray in water, seed 21, 2026-10-26).  Bodies are in
+        # topological order (parent < child), so one reverse pass adds every
+        # child into its parent.  One thread per world, no atomics.
+        w = _wp.tid()
+        for b in range(nb):
+            body_subtreemass[w, b] = body_mass[w, b]
+        for i in range(nb - 1):
+            b = nb - 1 - i
+            pb = parent[b]
+            body_subtreemass[w, pb] = body_subtreemass[w, pb] + body_subtreemass[w, b]
+
+    @_wp.kernel
     def hold_dofs(
         nv: int, alive: _wp.array(dtype=int), base: _wp.array(dtype=T),
         dof_damping: _wp.array2d(dtype=f32), qfrc_applied: _wp.array2d(dtype=f32),
@@ -363,6 +387,7 @@ def make_kernels(T):
         ctrl[w, i - w * nact] = f32(0.0)
 
     _KERNELS[T] = {"cadence": cadence, "count_tick": count_tick, "hold_bodies": hold_bodies,
+                   "subtree_mass": subtree_mass,
                    "hold_dofs": hold_dofs, "hold_ctrl": hold_ctrl,
                    "gather_bodies": gather_bodies, "gather_dofs": gather_dofs,
                    "gather_rows": gather_rows, "m_body": m_body_sum, "pick_root": pick_root,
@@ -387,12 +412,14 @@ def _masked_fill(arr, per: int, mask, value=0) -> None:
 
 def device_model(mjm, nworld: int):
     """``mjw.put_model`` of a copy of ``mjm`` with MULTICCD and NATIVECCD disabled
-    (the geom margin is kept) and the three per-world fields batched."""
+    (the geom margin is kept) and the four per-world fields batched: the three the
+    step writes and ``body_subtreemass``, which :meth:`DeviceBody.subtree_mass`
+    keeps equal to the subtree sums of ``body_mass``."""
     mjm = _copy.deepcopy(mjm)
     mjm.opt.disableflags |= (_mujoco.mjtDisableBit.mjDSBL_MULTICCD
                              | _mujoco.mjtDisableBit.mjDSBL_NATIVECCD)
     m = _mjw.put_model(mjm, batch_sizes={"body_mass": nworld, "body_inertia": nworld,
-                                         "dof_damping": nworld})
+                                         "dof_damping": nworld, "body_subtreemass": nworld})
     return m, mjm
 
 
@@ -728,6 +755,14 @@ class DeviceBody:
         if self.nact:
             _wp.launch(K["hold_ctrl"], dim=self.W * self.nact, inputs=[
                 self.nact, alive, self.d.ctrl])
+        self.subtree_mass()
+
+    def subtree_mass(self) -> None:
+        """``body_subtreemass`` from the ``body_mass`` just written, every world
+        (see ``make_kernels``' ``subtree_mass``).  Run after ``write_bodies`` and
+        after ``hold_bodies``, so ``load_state``'s forward and every step see it."""
+        _wp.launch(make_kernels(self.dtype)["subtree_mass"], dim=self.W, inputs=[
+            self.nb, self.m.body_parentid, self.m.body_mass, self.m.body_subtreemass])
 
     def fluid_and_scatter(self) -> None:
         """Everything before ``mjw.step``: servo, fluid, damping, jets, rotors,
@@ -868,6 +903,7 @@ class DeviceBody:
             _wp.launch(K["write_dofs"], dim=D_, inputs=[
                 nv, bf["dd"], bf["dd_x"], bf["qf"], bf["qf_x"], bf["s_dd"], bf["s_qf"],
                 self.m.dof_damping, self.d.qfrc_applied])
+        self.subtree_mass()
 
     def _gather_rows(self, r, x) -> None:
         K, st = make_kernels(self.dtype), self.state
