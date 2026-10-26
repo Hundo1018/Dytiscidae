@@ -2463,6 +2463,25 @@ MUTATIONS: tuple = (
         defect="MJWarp's overflow flags are not read, so a world whose constraints or "
                "contacts were dropped is scored on the truncated physics",
         suites=("test_devroll::test_the_device_path_fails_what_diverges_and_pays_nothing_still",), item="A4a overflow"),
+    # --- device path against both host paths (IMPL_1010 A5, 2026-10-26) -----
+    Mutation(
+        id="device-agreement-task-from-wrong-seed",
+        path="dytiscidae/envs/devroll/rollout_wp.py",
+        find="    task = schedule_for(dom, _np.random.default_rng(task_seed(ss)))",
+        replace="    task = schedule_for(dom, _np.random.default_rng(task_seed(int(seed))))",
+        defect="each device world's task is drawn from the eval seed instead of the medium's "
+               "scatter seed, so the device faces a different command from the host's",
+        suites=("test_devroll_agreement::test_the_device_path_agrees_with_both_evaluation_paths",),
+        item="A5 (iv)"),
+    Mutation(
+        id="device-agreement-scores-the-first-half",
+        path="dytiscidae/envs/devroll/rollout_wp.py",
+        find="                row[m] = b if a.survived else a",
+        replace="                row[m] = a",
+        defect="a draw's medium score is the first half alone, not the pair (the antipode in "
+               "water, the mirror in air), so motion the command did not choose is paid",
+        suites=("test_devroll_agreement::test_the_device_path_agrees_with_both_evaluation_paths",),
+        item="A5 score"),
     # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
     Mutation(
         id="grpo-advantage-across-the-whole-batch",
@@ -2658,7 +2677,9 @@ raise SystemExit(0)
 #: Per-suite wall-clock limits.  `test_search` takes ~25 min with the GPU
 #: kernel present, so a flat 900 s ended every run of it early -- see
 #: ``evaluate`` for why that used to be reported as a catch.
-SUITE_TIMEOUT = {"test_search": 3600}
+SUITE_TIMEOUT = {"test_search": 3600,
+                 # A5: three 8 s arms of 64 draws each (predicted 40 min, IMPL_1010)
+                 "test_devroll_agreement::test_the_device_path_agrees_with_both_evaluation_paths": 7200}
 
 
 def run_suite(tree: Path, suite: str, timeout: int | None = None) -> tuple:

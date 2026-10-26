@@ -1,5 +1,7 @@
 # Roadmap
 
+**2026-10-26: A5 (device score agreement) is red, and its suite is now `tests/test_devroll_agreement.py`.** Device failed 54 of 128 segments against the batched path's 8. Water agreement fails: Spearman with the batched path 0.76 against a null of 0.99, 53 of 64 draws within 0.005 against the null's 59. Air rank is not measurable on this flightless population (air means 0.002 on all arms), so (ii) air is recorded as unmeasured, not passed. Three defects to fix before any rerun: medusa air reports unstable on every draw (batched arm's failures not yet read by body); a contact-free segment shows contacts in three bodies (suspected per-launch overflow flags applied per world); ray and bat water go non-finite in MJWarp (the ray also reports bad qacc in air on the device). No bar changed. A6 and A4b wait on this.
+
 **2026-10-26: the user keeps the mujoco 3.15 upgrade, against D-M0.** `.venv` is mujoco
 3.15.0. D-M0 (`2b60ec6`) measured water and land drops of 14 and 16 reproductions
 against the spec's reference, past the 10-elite line, so water and land are not

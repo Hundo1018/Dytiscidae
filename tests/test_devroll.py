@@ -1,8 +1,9 @@
 """Device evaluation path (IMPL_1010 A): the guard (A0), the fluid and scatter
 kernels each against its numpy code (A1a, A1b), the per-body MJWarp model and
 the device step replayed against ``step_batch`` (A2), the controller
-replayed inside ``rollout_batch`` (A3), and the air and water segments with
-their record, checks, freezing and pairs (A4a).
+replayed inside ``rollout_batch`` (A3), the air and water segments with
+their record, checks, freezing and pairs (A4a), and the device path's scores
+over draws against both host evaluation paths (A5).
 
 The device path is optional.  The guard checks run wherever the project runs.
 The kernel checks need MuJoCo Warp, warp and a CUDA device, and skip with a
