@@ -72,7 +72,7 @@ stopping are withdrawn.
 `tools/suite_probe.py --all` re-measures this. `.github/workflows/checks.yml`
 runs the first three rows; `test_search.py` is not in CI.
 
-A headless machine needs `MUJOCO_GL=disable`: MuJoCo 3.13 imports a renderer at
+A headless machine needs `MUJOCO_GL=disable`: MuJoCo 3.15 imports a renderer at
 `import mujoco`.
 
 ### Whether a test is worth anything
@@ -253,6 +253,13 @@ then films (`dytiscidae/viz/film.py`) into `runs/<run>/media/`, embedded in
   comparable across it for that case only (1 of arch51's 1,112 fresh draws).
   The ROADMAP lists each boundary. Write
   "not comparable"; do not quote a shrunken difference.
+- **MuJoCo 3.11 to 3.15 (2026-10-26, the user's decision).** The `.venv` reference
+  engine is mujoco 3.15.0. D-M0 (`experiments/no_model_gate/D_M0_read.md`, commit
+  2b60ec6) read arch49's 229 elites: under 3.15 water 201 and land 179 against the
+  3.11 reference of 215/195 (the stored run) and 229/229 (the same-session 3.11 leg):
+  a drop of more than 10 on water and land. Air holds (222). Water and land are not
+  comparable across the upgrade; air is. The 3.11 baseline itself moved between
+  2026-10-08 and 2026-10-25, which is not explained yet.
 - `sink_rate` is the difference of two endpoints of the late airborne window, so
   it reads zero for a machine that drops and comes back. `station_keeping` sees
   the path between; where they disagree, trust `station_keeping` (arch37: 10x

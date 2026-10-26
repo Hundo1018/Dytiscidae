@@ -374,6 +374,241 @@ def test_the_device_entrainment_is_the_numpy_entrainment_reaction() -> None:
               err <= tol, f"{err:.2e}")
 
 
+def test_the_device_rotors_are_the_rotor_batch() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device rotors agree with RotorBatch.apply", reason)
+        return
+    import math
+
+    import mujoco
+    import warp as wp
+
+    from dytiscidae.core.bodyplans import REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.devroll.scatter_wp import DeviceRotors
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+    from dytiscidae.physics.rotor import RotorBatch, RotorSet, RotorSpec
+
+    rng = np.random.default_rng(13)
+
+    def machine(k0):
+        # test_physics' rotor fixture: four different rotors per machine, so a
+        # lookup that reads one rotor's table for another's cannot agree.
+        env = TriphibianEnv(build(REFERENCE_PLANS["quad"]()), seed=0)
+        env.reset(Domain.WATER, randomise=False)
+        names = [mujoco.mj_id2name(env.model, mujoco.mjtObj.mjOBJ_BODY, b)
+                 for b in env.rotors.body]
+        specs = {nm: RotorSpec(radius=0.08 + 0.03 * ((j + k0) % 4),
+                               pitch=0.06 + 0.025 * ((j + 2 * k0) % 3),
+                               blades=2 + (j % 2), handed=(1 if j % 2 else -1))
+                 for j, nm in enumerate(names)}
+        env.rotors = RotorSet(env.model, specs)
+        return env
+
+    def place(env, depth_of_first):
+        d, m = env.data, env.model
+        d.qpos[3:7] = [math.cos(0.2), math.sin(0.2), 0.0, 0.0]
+        mujoco.mj_forward(m, d)
+        z = d.xipos[env.rotors.body, 2]
+        d.qpos[2] += -depth_of_first - z[0]
+        d.qvel[:] = rng.normal(0.0, 2.0, m.nv)
+        for j, k in enumerate(env.rotors.dof):
+            # idle, reversed, forward, forward
+            d.qvel[k] = (0.0, -450.0, 700.0, 300.0)[j % 4] * (1.0 + 0.1 * rng.random())
+        mujoco.mj_forward(m, d)
+
+    # Two machines laid out as two worlds of one batch.
+    envs = [machine(0), machine(1)]
+    check("the calm sea is flat (SeaState amplitude 0), which the device medium assumes",
+          all(e.medium.sea_state.amplitude == 0.0 for e in envs))
+    med = envs[0].medium
+    keys = ("f_lin", "f_ang", "dq", "damp", "thrust", "torque")
+    refs, inputs, fracs = [], [], []
+    for depth in (0.004, -0.5, 0.3, 0.0):
+        for e in envs:
+            place(e, depth)
+        x = {"xmat": [], "omega": [], "cvel": [], "xipos": [], "com": [], "dt": []}
+        for e in envs:
+            s, d = e.rotors, e.data
+            x["xmat"].append(d.xmat[s.body_arr])
+            x["omega"].append(d.qvel[s.dof_arr])
+            x["cvel"].append(d.cvel[s.body_arr])
+            x["xipos"].append(d.xipos[s.body_arr])
+            x["com"].append(d.subtree_com[s.root_arr])
+            x["dt"].append(np.full(s.n, float(e.model.opt.timestep)))
+        inputs.append({k: np.concatenate(v) for k, v in x.items()})
+        # The reference: RotorBatch.apply into zeroed targets, read back per rotor.
+        saved = []
+        for e in envs:
+            s = e.rotors
+            saved.append(e.model.dof_damping[s.dof_arr].copy())
+            e.data.xfrc_applied[:] = 0.0
+            e.data.qfrc_applied[:] = 0.0
+            e.model.dof_damping[s.dof_arr] = 0.0
+        RotorBatch([e.rotors for e in envs]).apply(
+            [(i, e.model, e.data, e.medium) for i, e in enumerate(envs)], envs[0].data.time)
+        r = {k: [] for k in keys}
+        for e, dmp in zip(envs, saved):
+            s = e.rotors
+            r["f_lin"].append(e.data.xfrc_applied[s.body_arr, :3].copy())
+            r["f_ang"].append(e.data.xfrc_applied[s.body_arr, 3:].copy())
+            r["dq"].append(e.model.dof_damping[s.dof_arr].copy())
+            r["damp"].append(e.data.qfrc_applied[s.dof_arr].copy())
+            r["thrust"].append(s.last_thrust.copy())
+            r["torque"].append(s.last_torque.copy())
+            e.model.dof_damping[s.dof_arr] = dmp
+        refs.append({k: np.concatenate(v) for k, v in r.items()})
+        fracs += [float(f) for e in envs for f in e.medium.properties(
+            e.data.xipos[e.rotors.body], np.full(e.rotors.n, 0.01), e.data.time)[2]]
+    fracs = np.array(fracs)
+    omegas = np.concatenate([x["omega"] for x in inputs])
+    check("the fixture has rotors in air, in water and across the surface",
+          bool((fracs == 0).any() and (fracs == 1).any() and ((fracs > 0) & (fracs < 1)).any()),
+          f"submerged fractions {np.round(np.unique(fracs), 3).tolist()}")
+    check("the fixture has idle, reversed and forward rotors",
+          bool((np.abs(omegas) < 1e-6).any() and (omegas < -1e-6).any() and (omegas > 1e-6).any()))
+    check("and the rotors make force: the comparison is not of zeros",
+          max(float(np.abs(r["thrust"]).max()) for r in refs) > 0.1)
+    for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+        name = "float64" if dtype == wp.float64 else "float32"
+        dev = DeviceRotors([e.rotors for e in envs], med.air, med.water, dtype=dtype)
+        worst_name, worst = "", 0.0
+        for x, ref in zip(inputs, refs):
+            out = dev.loads(x["xmat"], x["omega"], x["cvel"], x["xipos"], x["com"], x["dt"],
+                            med.wind, med.current)
+            for k in keys:
+                scale_k = max(float(np.abs(ref[k]).max()), 1e-30)
+                err = float(np.abs(out[k] - ref[k]).max()) / scale_k
+                if err > worst:
+                    worst_name, worst = k, err
+        check(f"{name}: rotor force, torque, damping split, thrust and torque within {tol:g} "
+              "of their maxima", worst <= tol, f"worst {worst_name} at {worst:.2e}")
+
+
+def test_the_device_power_budget_is_the_power_budget() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device power budget agrees with PowerBudget.step", reason)
+        return
+    import copy
+
+    import warp as wp
+
+    from dytiscidae.envs.devroll.scatter_wp import DevicePower
+    from dytiscidae.envs.triphibian import TriphibianEnv
+
+    envs = [TriphibianEnv(build_plan) for build_plan in _power_plans()]
+    envs[1].budget.battery.energy_j = 20.0          # goes flat mid-fixture
+    e0 = [e.budget.battery.energy_j for e in envs]
+    steps = 50
+    rng = np.random.default_rng(7)
+    draws = []
+    for _ in range(steps):
+        f, v = [], []
+        for e in envs:
+            ff = rng.normal(0.0, 3.0, e.model.nu)
+            vv = rng.normal(0.0, 20.0, e.model.nu)
+            vv[rng.uniform(size=e.model.nu) < 0.2] = 0.0      # shafts at rest
+            if e is envs[2]:
+                ff *= 12.0                                    # past the pack's rating
+            f.append(ff)
+            v.append(vv)
+        draws.append((f, v))
+    ref = [copy.deepcopy(e.budget) for e in envs]
+    alive = [True] * len(envs)
+    for f, v in draws:
+        for i, r in enumerate(ref):
+            if alive[i]:
+                alive[i] = r.step(np.abs(f[i]), np.abs(v[i]), envs[i].timestep)
+    check("the fixture draws real power, overdraws one pack, and has shafts at rest",
+          all(r.actuator_j > 1.0 for r in ref) and any(r.battery.overdraw_time > 0 for r in ref)
+          and any((vv == 0).any() for _, v in draws for vv in v),
+          f"actuator_j {[round(r.actuator_j, 2) for r in ref]}, overdraw "
+          f"{[r.battery.overdraw_time for r in ref]}")
+    check("one pack goes flat and the others do not", alive == [True, False, True], str(alive))
+    want = {"energy_j": [r.battery.energy_j for r in ref], "total_j": [r.total_j for r in ref],
+            "actuator_j": [r.actuator_j for r in ref], "avionics_j": [r.avionics_j for r in ref],
+            "t": [r.t for r in ref], "max_overload": [r.max_overload for r in ref],
+            "peak_draw": [r.battery.peak_draw for r in ref],
+            "overdraw_time": [r.battery.overdraw_time for r in ref]}
+    want = {k: np.array(v) for k, v in want.items()}
+    for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+        name = "float64" if dtype == wp.float64 else "float32"
+        dev = DevicePower(envs, dtype=dtype)
+        for f, v in draws:
+            dev.step(np.concatenate([ff[:k] for ff, k in zip(f, dev.n)]),
+                     np.concatenate([vv[:k] for vv, k in zip(v, dev.n)]))
+        got = dev.state()
+        worst_name, worst = "", 0.0
+        for k, w in want.items():
+            err = float(np.abs(got[k] - w).max()) / max(float(np.abs(w).max()), 1e-30)
+            if err > worst:
+                worst_name, worst = k, err
+        check(f"{name}: battery energy, ledger and max_overload within {tol:g} of their maxima",
+              worst <= tol, f"worst {worst_name} at {worst:.2e}")
+        check(f"{name}: the flat pack leaves the batch as it left the loop",
+              [bool(a) for a in got["active"]] == alive, str(list(got["active"])))
+        if dtype == wp.float64:
+            used_ref = np.array(e0) - want["energy_j"]
+            used = np.array(e0) - got["energy_j"]
+            err = float(np.abs(used - used_ref).max()) / float(np.abs(used_ref).max())
+            check(f"{name}: the energy drawn (not only the energy left) within {tol:g}",
+                  err <= tol, f"{err:.2e}")
+
+
+def _power_plans():
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+
+    return [build(BODY_PLANS[k]()) for k in ("beetle", "teal", "ray")]
+
+
+def test_the_device_servo_command_is_servo_command() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device servo command agrees with TriphibianEnv.servo_command", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.triphibian import TriphibianEnv
+
+    rng = np.random.default_rng(29)
+    envs = [TriphibianEnv(p) for p in _power_plans()]
+    tgt, rate, lead, world, has, ref = [], [], [], [], [], []
+    for w, e in enumerate(envs):
+        n = len(e.act_names)
+        t = rng.uniform(-1.0, 1.0, n)
+        # World 0 has a rate, world 1 none, world 2 one of the wrong length.
+        r = (rng.normal(0.0, 5.0, n), None, rng.normal(0.0, 5.0, n + 1))[w]
+        e.cpg._rate = r
+        ref.append(e.servo_command(t))
+        h = r is not None and len(r) == n
+        tgt.append(t)
+        rate.append(r[:n] if h else np.zeros(n))
+        lead.append(e.servo_lead[:n])
+        world.append(np.full(n, w))
+        has.append(int(h))
+    ref = np.concatenate(ref)
+    lead_all = np.concatenate(lead)
+    check("the fixture has a servo lead and a rate to feed forward",
+          bool(np.abs(lead[0]).max() > 0) and has == [1, 0, 0], f"has_rate {has}")
+    for dtype, tol in ((wp.float64, 1e-9), (wp.float32, 2e-4)):
+        from dytiscidae.envs.devroll.scatter_wp import servo_command
+
+        name = "float64" if dtype == wp.float64 else "float32"
+        out = servo_command(np.concatenate(tgt), np.concatenate(rate), lead_all,
+                            np.concatenate(world), has, dtype=dtype)
+        err = float(np.abs(out - ref).max()) / max(float(np.abs(ref).max()), 1e-30)
+        check(f"{name}: ctrl within {tol:g} of its maximum", err <= tol, f"{err:.2e}")
+
+
 def test_the_device_replay_is_not_built_yet() -> None:
     skip("the device fluid replays FluidSolver.apply for 2000 steps (A1a replay)",
          "the Wagner lag, inflow, medium and added mass are A1a and A1b slices, not built")
@@ -386,6 +621,9 @@ def main() -> int:
                  test_the_device_medium_and_added_mass_are_the_numpy_ones,
                  test_the_device_assembly_is_the_numpy_finish_bodies,
                  test_the_device_entrainment_is_the_numpy_entrainment_reaction,
+                 test_the_device_rotors_are_the_rotor_batch,
+                 test_the_device_power_budget_is_the_power_budget,
+                 test_the_device_servo_command_is_servo_command,
                  test_the_device_replay_is_not_built_yet]
     for fn in functions:
         print(f"{fn.__name__}")

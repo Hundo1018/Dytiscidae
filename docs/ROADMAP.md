@@ -1,5 +1,12 @@
 # Roadmap
 
+**2026-10-26: the user keeps the mujoco 3.15 upgrade, against D-M0.** `.venv` is mujoco
+3.15.0. D-M0 (`2b60ec6`) measured water and land drops of 14 and 16 reproductions
+against the spec's reference, past the 10-elite line, so water and land are not
+comparable across the upgrade and air is (`CLAUDE.md`, comparability boundaries).
+The 3.11 baseline also moved between 2026-10-08 and 10-25 (215/195 then, 229/229 on
+the same session's 3.11 leg); that is open and is not attributed to mujoco.
+
 **2026-10-26: arch59's battery and rotor shares, and the arch58/59 verdicts in one place.**
 The E2 air L1 read on arch58 and arch59 is recorded in
 `experiments/air_turn_bar/README.md` "E2 air L1 on arch58 and arch59" (commit `d59f23d`):

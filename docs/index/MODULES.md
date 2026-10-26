@@ -2,7 +2,7 @@
 
 # Modules
 
-108 modules, 39,335 lines, 1,130 indexed symbols.
+109 modules, 39,757 lines, 1,139 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -103,6 +103,7 @@ is what makes a violation visible while reading.
 | `envs.device` | Which device a search scores on, and the one condition that allows the CPU. | 98 | — | — | — |
 | `envs.devroll` | On-device evaluation path (IMPL_1010 A): MuJoCo Warp plus Warp fluid kernels. | 76 | — | — | — |
 | `envs.devroll.fluid_wp` | Strip-theory loads on the device (IMPL_1010 A1a, first slice). | 538 | — | `numpy` | `physics.fluid`, `physics.medium` |
+| `envs.devroll.scatter_wp` | Rotors, the power budget and the servo command on the device (IMPL_1010 A1b). | 422 | — | `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `physics.energy`, `physics.rotor` |
 | `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 753 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 72 | — | — | — |
 | `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 336 | — | `numpy` | `envs.triphibian` |

@@ -28,9 +28,16 @@ DeviceEvaluation:
   implementation:
     - envs.devroll
     - envs.devroll.fluid_wp
+    - envs.devroll.scatter_wp
+    - envs.devroll.scatter_wp.DeviceRotors
+    - envs.devroll.scatter_wp.DevicePower
+    - envs.devroll.scatter_wp.servo_command
   tests:
     - tests.test_devroll
-  note: IMPL_1010 A. The guard (A0) and the quasi-static strip kernel (A1a, first slice; the replay of FluidSolver.apply is not built). A1b onward add the scatter and the rest.
+    - tests.test_devroll::test_the_device_rotors_are_the_rotor_batch
+    - tests.test_devroll::test_the_device_power_budget_is_the_power_budget
+    - tests.test_devroll::test_the_device_servo_command_is_servo_command
+  note: IMPL_1010 A. The guard (A0), the A1a fluid kernels (strip loads, Wagner lag, medium, added mass, assembly) and A1b's entrainment, rotors, power budget and servo command, each held to its numpy code; the replay of FluidSolver.apply and the rest of A1b's scatter are not built.
 
 # --------------------------------------------------------------- the learner
 

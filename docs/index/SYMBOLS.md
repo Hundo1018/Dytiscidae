@@ -774,6 +774,22 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `WagnerLag.__init__` | method | 394 | `(self, n: int, dtype=_wp.float64) -> None` | — |
 | `WagnerLag.update` | method | 409 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
 
+## `envs.devroll.scatter_wp` — `dytiscidae/envs/devroll/scatter_wp.py`
+
+> Rotors, the power budget and the servo command on the device (IMPL_1010 A1b).
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `DevicePower` | class | 335 | — | ``BatchedPower`` with its state on the device: one row per world's machine. |
+| `DeviceRotors` | class | 248 | — | The rotor tables of several ``RotorSet``s on the device, and their kernel. |
+| `make_kernels` | function | 34 | `(T)` | Return the kernels for precision ``T`` (``rotor``, ``power_terms``, |
+| `servo_command` | function | 404 | `(target, rate, lead, world, has_rate, *, dtype=_wp.float64)` | ``TriphibianEnv.servo_command`` for many worlds; numpy in, numpy out. |
+| `DevicePower.__init__` | method | 348 | `(self, envs, *, dtype=_wp.float64) -> None` | — |
+| `DevicePower.state` | method | 398 | `(self) -> dict` | — |
+| `DevicePower.step` | method | 382 | `(self, force, velocity) -> None` | ``force``, ``velocity``: every machine's first ``n`` actuator forces and |
+| `DeviceRotors.__init__` | method | 256 | `(self, sets, air, water, *, dtype=_wp.float64) -> None` | — |
+| `DeviceRotors.loads` | method | 288 | `(self, xmat, omega, cvel, xipos, com, dt, wind, current)` | One step of every rotor; numpy in, numpy out. |
+
 ## `envs.evaluate` — `dytiscidae/envs/evaluate.py`
 
 > Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness.

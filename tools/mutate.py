@@ -2130,6 +2130,14 @@ MUTATIONS: tuple = (
         defect="the entrained momentum is reacted at the angular velocity, so a translating body "
                "gets no linear reaction",
         suites=("test_devroll",), item="A1b entrainment"),
+    Mutation(
+        id="device-rotor-skipped",
+        path="dytiscidae/envs/devroll/scatter_wp.py",
+        find='        _wp.launch(K["rotor"], dim=n, inputs=args)',
+        replace="        pass",
+        defect="the rotor kernel never runs, so a rotorcraft on the device has no thrust, no "
+               "drag torque and no damping split, and a quad cannot leave the ground",
+        suites=("test_devroll",), item="A1b rotors"),
     # --- GRPO for the shared policy (ROADMAP N, 2026-10-03) ---------------
     Mutation(
         id="grpo-advantage-across-the-whole-batch",
