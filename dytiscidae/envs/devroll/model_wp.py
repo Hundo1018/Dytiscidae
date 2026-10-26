@@ -9,9 +9,10 @@ world, and builds:
   per world (``batch_sizes``), so each world carries its own added mass and its
   own damping split.  MJWarp reads the per-world ``body_mass`` for a welded body
   too (``experiments/mjwarp_probe/probe_jointless_mass.py``), so nothing stands
-  in for ``mj_setConst``.  The geom margin is zeroed on the device model only
-  (MJWarp 3.15 rejects the 1 mm margin, N9) and ``margin_zeroed`` says whether
-  that changed anything.
+  in for ``mj_setConst``.  The geom margin is kept.  MJWarp 3.15 refuses a
+  non-zero margin while MULTICCD or NATIVECCD is on (N9), so the device copy turns
+  those two off instead.  That is a contact-model boundary against the host,
+  which keeps both on; it is recorded, not hidden by zeroing the margin.
 * ``d``: ``mjw.put_data`` with ``nworld = W``, ``njmax`` 512 and ``nconmax`` set.
 
 World layout: every per-body, per-dof and per-panel array of the step is flat
@@ -305,14 +306,14 @@ def make_kernels(T):
 
 
 def device_model(mjm, nworld: int):
-    """``mjw.put_model`` of a copy of ``mjm`` with the margin zeroed and the three
-    per-world fields batched.  Returns ``(model, margin_zeroed)``."""
+    """``mjw.put_model`` of a copy of ``mjm`` with MULTICCD and NATIVECCD disabled
+    (the geom margin is kept) and the three per-world fields batched."""
     mjm = _copy.deepcopy(mjm)
-    margin_zeroed = bool((mjm.geom_margin != 0.0).any())
-    mjm.geom_margin[:] = 0.0
+    mjm.opt.disableflags |= (_mujoco.mjtDisableBit.mjDSBL_MULTICCD
+                             | _mujoco.mjtDisableBit.mjDSBL_NATIVECCD)
     m = _mjw.put_model(mjm, batch_sizes={"body_mass": nworld, "body_inertia": nworld,
                                          "dof_damping": nworld})
-    return m, margin_zeroed, mjm
+    return m, mjm
 
 
 class DeviceBody:
@@ -356,7 +357,7 @@ class DeviceBody:
         mjm.body_mass[:] = sol0._dry_mass
         mjm.body_inertia[:] = sol0._dry_inertia
         mjm.dof_damping[:] = sol0._damping.base
-        self.m, self.margin_zeroed, self.mjm = device_model(mjm, W)
+        self.m, self.mjm = device_model(mjm, W)
         self.njmax, self.nconmax = njmax, nconmax
         self.d = _mjw.put_data(self.mjm, _mujoco.MjData(self.mjm), nworld=W, nconmax=nconmax,
                                njmax=njmax)

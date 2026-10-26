@@ -615,7 +615,7 @@ Done: replay parity on 9 bodies; three mutations `caught`; D-A1 (the cost of thi
 
 Goal: a `Model` and `Data` for one body with W worlds, and the step graphs.
 - Model: `xml, names = build_model_xml(p, scene=scene_xml(timestep=0.004))` (as `experiments/mjwarp_probe/export_mjcf.py`), then `mujoco.MjModel.from_xml_string`, then `mjw.put_model(mjm, batch_sizes={"body_mass": W, "body_inertia": W, "dof_damping": W})`. `put_model` accepts `batch_sizes` for fields whose spec starts with `*` (`_src/io.py:288-306`); `body_mass`, `body_inertia` and `dof_damping` are `*` fields (`_src/types.py:1686, 1688, 1721`).
-- Margin: N9 found `put_model` rejects the 1 mm `geom margin` (`mjcf.py:193`) under MULTICCD and NATIVECCD (ROADMAP:3416-3419). Q2 zeroed it (`experiments/mjwarp_fused_step/run.py:249`). A2 zeroes it on the device model only, and records `margin_zeroed` on every device result. Air and water are expected to have no contacts (T9); A4a checks it.
+- Margin: N9 found `put_model` rejects the 1 mm `geom margin` (`mjcf.py:193`) under MULTICCD and NATIVECCD (ROADMAP:3416-3419). Q2 zeroed it (`experiments/mjwarp_fused_step/run.py:249`). **Revised 2026-10-26:** the device copy keeps the margin and turns off MULTICCD and NATIVECCD (`model_wp.device_model`). Zeroing the margin removed resting ground contact (an A3 finding), which breaks land comparability. The host keeps both flags on, so the contact model differs from the host for mesh and box pairs; that difference is a device boundary, not yet measured on a beach-settled body. Air and water are expected to have no contacts (T9); A4a checks it.
 - `njmax = 512` (N9: 64 overflowed on landing, ROADMAP:3421). Set `nconmax` explicitly, and read the overflow flags each segment (A4).
 - The integrator stays the model's own (`implicitfast`). MJWarp supports it (`_src/types.py:495`).
 - Step order inside one graph (F3), per step:
@@ -629,7 +629,7 @@ Goal: a `Model` and `Data` for one body with W worlds, and the step graphs.
 - Policy weights change every PPO update. Copy them into the captured device arrays in place (`wp.copy`) before the generation's first launch, and never re-capture for a weight change.
 
 Test `test_the_device_model_is_the_cpu_model` (GPU and warp):
-- (a) For the 9 bodies with the margin zeroed on both sides, gravity on, no fluid and zero `ctrl`, the device qpos stays within 1e-4 of CPU MuJoCo 3.15 for the first 300 steps (N9 measured 1.1e-5, ROADMAP:3415).
+- (a) For the seed plans with the same device copy on both sides (margin kept, MULTICCD and NATIVECCD off), gravity on, no fluid and zero `ctrl`, the device qpos stays within 1e-4 of CPU MuJoCo 3.15 for the first 300 steps (N9 measured 1.1e-5, ROADMAP:3415).
 - (b) Writing a different `body_mass` per world gives different `qacc` per world, and world 0 is unchanged by the others' writes.
 - (c) Every per-world field has leading dimension W after `put_model`.
 
@@ -785,7 +785,7 @@ Run before merging (the P6 read is the first arm, not this lane):
 
 Scope:
 - Land halves and the four transitions (`run_transition_batch`, batchroll.py:1196-1347, including `CrossingTracker`'s commanded hold-then-go and directional crossing, ARCH46_SPEC §8).
-- Contacts with the beach and the ramp, the margin zeroed (A2).
+- Contacts with the beach and the ramp, the margin kept and MULTICCD and NATIVECCD off on the device copy (A2 revision, 2026-10-26); the host-device contact difference is measured here before land results are compared.
 - The contact constants are varied per draw if the user chooses Q4's suggestion ("the K-draw score ... should vary the contact seed too", ROADMAP:3812-3815).
 
 Gates:

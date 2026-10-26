@@ -932,12 +932,13 @@ def test_the_device_model_is_the_cpu_model() -> None:
     from dytiscidae.envs.devroll.model_wp import NJMAX, device_model
     from dytiscidae.envs.triphibian import TriphibianEnv
 
-    # (a) every seed plan, margin zeroed on both sides, gravity on, no fluid, zero
+    # (a) every seed plan, the same device copy on both sides (margin kept, MULTICCD and
+    # NATIVECCD off), gravity on, no fluid, zero
     # ctrl: the device qpos stays within 1e-4 of CPU MuJoCo for 300 steps.
     worst, names = 0.0, []
     for plan in sorted(BODY_PLANS):
         e = TriphibianEnv(build(BODY_PLANS[plan]()), seed=0)
-        m, _, mjm = device_model(e.model, 1)
+        m, mjm = device_model(e.model, 1)
         d = mjw.put_data(mjm, mujoco.MjData(mjm), nworld=1, njmax=NJMAX)
         ref = mujoco.MjData(mjm)
         for _ in range(300):
@@ -952,9 +953,11 @@ def test_the_device_model_is_the_cpu_model() -> None:
     # world 0 is unchanged by the others' writes.
     e = TriphibianEnv(build(BODY_PLANS["eel"]()), seed=0)
     W = 3
-    m, zeroed, mjm = device_model(e.model, W)
-    check("the eel's 1 mm margin is zeroed on the device copy, not on the host model",
-          zeroed and float(np.abs(e.model.geom_margin).max()) > 0.0)
+    m, mjm = device_model(e.model, W)
+    check("the eel's margin is kept on the device copy, and MULTICCD and NATIVECCD are off there",
+          float(np.abs(mjm.geom_margin).max()) > 0.0
+          and bool(mjm.opt.disableflags & mujoco.mjtDisableBit.mjDSBL_MULTICCD)
+          and bool(mjm.opt.disableflags & mujoco.mjtDisableBit.mjDSBL_NATIVECCD))
     for k in ("body_mass", "body_inertia", "dof_damping"):
         check(f"(c) {k} has leading dimension W = {W} after put_model",
               getattr(m, k).shape[0] == W, str(getattr(m, k).shape))

@@ -802,20 +802,20 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `device_model` | function | 307 | `(mjm, nworld: int)` | ``mjw.put_model`` of a copy of ``mjm`` with the margin zeroed and the three |
-| `DeviceBody` | class | 318 | — | W worlds of one body on the device; see the module docstring. |
-| `make_kernels` | function | 67 | `(T)` | The A2 gather, reduction, diagnostic and write kernels for precision ``T``. |
-| `DeviceBody.__init__` | method | 327 | `(self, envs, *, dtype=_wp.float64, njmax: int=NJMAX, nconmax: int=NCONMAX) -> None` | — |
-| `DeviceBody.diagnostics` | method | 796 | `(self) -> dict` | — |
-| `DeviceBody.fluid_and_scatter` | method | 606 | `(self) -> None` | Everything before ``mjw.step``: servo, fluid, damping, jets, rotors, |
-| `DeviceBody.gather` | method | 548 | `(self) -> None` | The step's kinematic inputs from MJWarp's state (float32) into ``state``. |
-| `DeviceBody.host_state` | method | 560 | `(self, datas) -> None` | ``state`` from host ``MjData`` in this precision, for the parity tests: |
-| `DeviceBody.load_state` | method | 539 | `(self, datas) -> None` | Each world's ``qpos``, ``qvel`` and ``time`` from its ``MjData``, then |
-| `DeviceBody.reset` | method | 525 | `(self) -> None` | ``FluidSolver.reset`` for every world (the MuJoCo state is not touched). |
-| `DeviceBody.resident` | method | 788 | `(self) -> dict` | The same five fields read from the MJWarp ``Model`` and ``Data``. |
-| `DeviceBody.set_targets` | method | 761 | `(self, angles_list, rates=None) -> None` | Host targets (one array per world) into ``targets``: a test and |
-| `DeviceBody.staged` | method | 776 | `(self) -> dict` | What the last step wrote, at the step's precision, per world: |
-| `DeviceBody.step` | method | 591 | `(self, *, gather: bool=True) -> None` | One ``step_batch`` step for every world (see the module docstring). |
+| `device_model` | function | 308 | `(mjm, nworld: int)` | ``mjw.put_model`` of a copy of ``mjm`` with MULTICCD and NATIVECCD disabled |
+| `DeviceBody` | class | 319 | — | W worlds of one body on the device; see the module docstring. |
+| `make_kernels` | function | 68 | `(T)` | The A2 gather, reduction, diagnostic and write kernels for precision ``T``. |
+| `DeviceBody.__init__` | method | 328 | `(self, envs, *, dtype=_wp.float64, njmax: int=NJMAX, nconmax: int=NCONMAX) -> None` | — |
+| `DeviceBody.diagnostics` | method | 797 | `(self) -> dict` | — |
+| `DeviceBody.fluid_and_scatter` | method | 607 | `(self) -> None` | Everything before ``mjw.step``: servo, fluid, damping, jets, rotors, |
+| `DeviceBody.gather` | method | 549 | `(self) -> None` | The step's kinematic inputs from MJWarp's state (float32) into ``state``. |
+| `DeviceBody.host_state` | method | 561 | `(self, datas) -> None` | ``state`` from host ``MjData`` in this precision, for the parity tests: |
+| `DeviceBody.load_state` | method | 540 | `(self, datas) -> None` | Each world's ``qpos``, ``qvel`` and ``time`` from its ``MjData``, then |
+| `DeviceBody.reset` | method | 526 | `(self) -> None` | ``FluidSolver.reset`` for every world (the MuJoCo state is not touched). |
+| `DeviceBody.resident` | method | 789 | `(self) -> dict` | The same five fields read from the MJWarp ``Model`` and ``Data``. |
+| `DeviceBody.set_targets` | method | 762 | `(self, angles_list, rates=None) -> None` | Host targets (one array per world) into ``targets``: a test and |
+| `DeviceBody.staged` | method | 777 | `(self) -> dict` | What the last step wrote, at the step's precision, per world: |
+| `DeviceBody.step` | method | 592 | `(self, *, gather: bool=True) -> None` | One ``step_batch`` step for every world (see the module docstring). |
 
 ## `envs.devroll.scatter_wp` — `dytiscidae/envs/devroll/scatter_wp.py`
 
