@@ -905,8 +905,23 @@ def test_the_device_replay_is_not_built_yet() -> None:
          "in sequence inside an MJWarp step needs A2's model and step graph")
 
 
+def test_the_reason_is_set_when_the_packages_do_not_import() -> None:
+    # The guard runs at import, so a GPU machine never reaches its except branch.
+    # Force the import to fail in a child process and read the reason it leaves.
+    import subprocess
+    code = ("import sys; sys.modules['mujoco_warp'] = None; "
+            "from dytiscidae.envs import devroll; "
+            "print(repr(devroll.UNAVAILABLE_REASON), devroll.AVAILABLE)")
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                         cwd=str(Path(__file__).resolve().parents[1]), env={**__import__("os").environ, "PYTHONPATH": str(Path(__file__).resolve().parents[1])})
+    check("a failed import leaves the reason 'MJWarp not importable'",
+          out.stdout.strip() == "'MJWarp not importable' False",
+          out.stdout.strip() or out.stderr.strip()[-200:])
+
+
 def main() -> int:
     functions = [test_the_device_path_reports_why_it_cannot_run,
+                 test_the_reason_is_set_when_the_packages_do_not_import,
                  test_the_strip_kernel_is_the_numpy_strip_loads,
                  test_the_wagner_lag_is_the_numpy_unsteady_state,
                  test_the_device_medium_and_added_mass_are_the_numpy_ones,
