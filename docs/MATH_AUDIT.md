@@ -990,3 +990,8 @@ against an independent computation and agree.
 * Every experiment writes `results/result.json` with the commit, the seed, the
   numpy version and the elapsed time, so a number in this document can be traced
   to the run that produced it.
+
+
+## Host subtree mass is stale (2026-10-26)
+
+`FluidSolver._publish_inertia` leaves MuJoCo's `body_subtreemass` at the dry mass while `body_mass` carries the added mass, so the host's `subtree_com` sits at the dry reference point. The qM matrix is frame-independent, so the effect is conditioning only; float64 absorbs it (ray in water, condition number ~3.7e4, finite). The device path recomputes the subtree mass each step (`dytiscidae/envs/devroll/model_wp.py`, `subtree_mass`), because MJWarp's float32 factorisation fails with the stale value. The host is unchanged; revisit only if a host-device residual traces to it. Same family as the `body_simple` setConst case above.
