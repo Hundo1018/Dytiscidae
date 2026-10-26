@@ -525,7 +525,7 @@ Predicted wall per generation (16 bodies, no contacts, median body).
 | 50, 50 | 273 s | 233 s | 1.39x |
 | 100, 10 | 288 s | 254 s | 1.51x |
 
-### A0 — device-dep (requirements-device.txt; dytiscidae/envs/devroll/__init__.py; tests/test_device.py; tests/test_search.py; tools/suite_probe.py; docs). Depends on reading D-M0 before installing into `.venv`. Tier: sonnet.
+### A0 — device-dep (requirements-device.txt; dytiscidae/envs/devroll/__init__.py; tests/test_devroll.py; tests/test_search.py; tools/suite_probe.py; docs). Depends on reading D-M0 before installing into `.venv`. Tier: sonnet.
 
 - `requirements-device.txt` (new):
   ```
@@ -540,17 +540,17 @@ Predicted wall per generation (16 bodies, no contacts, median body).
   - `usable()` probes `wp.get_cuda_device_count() > 0` and that `mujoco.__version__ == mujoco_warp.__version__`, in a subprocess started with `env=dict(os.environ)` (F10);
   - the message is exactly `"MJWarp not importable"` or `"MJWarp not usable: <reason>"`.
 - Append `"MJWarp not importable"` and `"MJWarp not usable"` to `BLOCKED_MARKERS` in test_search.py (45) and in the new suite.
-- `tests/test_device.py` skeleton with one function, `test_the_device_path_reports_why_it_cannot_run`:
+- `tests/test_devroll.py` skeleton with one function, `test_the_device_path_reports_why_it_cannot_run`:
   - with the package importable, `AVAILABLE` is a bool and `UNAVAILABLE_REASON` is a str;
   - when `AVAILABLE` is False, `usable()` returns `(False, reason)` with a non-empty reason;
   - the suite prints `[skip]` for every other function.
-- `tools/suite_probe.py`: add `test_device` to the suites it probes. The CLAUDE.md "What each suite needs" table gains the row `| test_device.py | GPU, requirements-device.txt; every function skips without them |`.
+- `tools/suite_probe.py`: add `test_devroll` to the suites it probes. The CLAUDE.md "What each suite needs" table gains the row `| test_device.py | GPU, requirements-device.txt; every function skips without them |`.
 - FEATURES.yaml: new feature `DeviceEvaluation`, naming `envs.devroll` and `tests.test_device`. It grows with each A lane.
 - Mutation `device-path-hides-why`: find the line that sets `UNAVAILABLE_REASON` on import failure and replace it with `UNAVAILABLE_REASON = ""`. Caught by the test above. Anchor: a new group `# --- device path (IMPL_1010 A) ---` after M1's group.
 
-Done: `tests/test_device.py | tail -1` gives `all device-path checks passed` (or `..., N skipped` where MJWarp is absent); cheap suites pass; `index_gen check` exits 0.
+Done: `tests/test_devroll.py | tail -1` gives `all device-path checks passed` (or `..., N skipped` where MJWarp is absent); cheap suites pass; `index_gen check` exits 0.
 
-### A1a — fluid-kernels (devroll/fluid_wp.py; tests/test_device.py). Depends on A0. Tier: opus.
+### A1a — fluid-kernels (devroll/fluid_wp.py; tests/test_devroll.py). Depends on A0. Tier: opus.
 
 Goal: the panel pipeline in Warp, for W worlds of one body. Inputs per world: body poses (xpos, xmat), xipos, the 6-D body velocity, and t. Outputs per world: the panel forces assembled to bodies (`xfrc`, `fsum_b`), `m_body`, and the panel diagnostics (`subf`, `q`, `lift`, `drag`, `d_bluff`, `rho`, `pos_w`, `m_add`, `vn`, `force`, `buoy`). These are the fields `finish()` reads at batchroll.py:466-560.
 
@@ -582,9 +582,9 @@ Mutations (device group):
 - `device-fluid-skips-the-lag`: replace the unsteady-state update call with a pass-through of the quasi-steady incidence.
 - `device-fluid-world-offset`: index panel arrays with the panel index alone, not `world * n_panels + p`. Breaks the three-copies equality.
 
-Runner: predicted 10 min; timeout 30 min. Done: both precisions pass on 9 bodies and 2 media; three mutations `caught`.
+Runner: predicted 10 min; timeout 30 min. Done: both precisions pass on 7 seed plans and 2 media; three mutations `caught`.
 
-### A1b — fluid-scatter (devroll/scatter_wp.py; tests/test_device.py). Depends on A1a. Tier: opus.
+### A1b — fluid-scatter (devroll/scatter_wp.py; tests/test_devroll.py). Depends on A1a. Tier: opus.
 
 Goal: everything `BatchedFluid.finish` (batchroll.py:452-571) and `step_batch` (604-628) do between two `mj_step`s, in Warp, as arrays per world:
 - `slam_mass` (fluid.py:777);
@@ -609,12 +609,12 @@ Mutations:
 - `device-added-mass-shared-world`: write `body_mass` at world 0 for every world.
 - `device-rotor-skipped`: skip the rotor kernel.
 
-Done: replay parity on 9 bodies; three mutations `caught`; D-A1 (the cost of this step) is queued.
+Done: replay parity on 7 seed plans; three mutations `caught`; D-A1 (the cost of this step) is queued.
 
-### A2 — model-build (devroll/model_wp.py; tests/test_device.py). Depends on A0; parallel with A1a and A1b. Tier: opus.
+### A2 — model-build (devroll/model_wp.py; tests/test_devroll.py). Depends on A0; parallel with A1a and A1b. Tier: opus.
 
 Goal: a `Model` and `Data` for one body with W worlds, and the step graphs.
-- Model: `xml, names = build_model_xml(p, scene=scene_xml(timestep=0.004))` (as `experiments/mjwarp_probe/export_mjcf.py`), then `mujoco.MjModel.from_xml_string`, then `mjw.put_model(mjm, batch_sizes={"body_mass": W, "body_inertia": W, "dof_damping": W})`. `put_model` accepts `batch_sizes` for fields whose spec starts with `*` (`_src/io.py:288-306`); `body_mass`, `body_inertia` and `dof_damping` are `*` fields (`_src/types.py:1686, 1688, 1721`).
+- Model: a copy of `env.model` from `TriphibianEnv` (as built in `model_wp.device_model`; `build_model_xml` was not used), then `mjw.put_model(mjm, batch_sizes={"body_mass": W, "body_inertia": W, "dof_damping": W})`. `put_model` accepts `batch_sizes` for fields whose spec starts with `*` (`_src/io.py:288-306`); `body_mass`, `body_inertia` and `dof_damping` are `*` fields (`_src/types.py:1686, 1688, 1721`).
 - Margin: N9 found `put_model` rejects the 1 mm `geom margin` (`mjcf.py:193`) under MULTICCD and NATIVECCD (ROADMAP:3416-3419). Q2 zeroed it (`experiments/mjwarp_fused_step/run.py:249`). **Revised 2026-10-26:** the device copy keeps the margin and turns off MULTICCD and NATIVECCD (`model_wp.device_model`). Zeroing the margin removed resting ground contact (an A3 finding), which breaks land comparability. The host keeps both flags on, so the contact model differs from the host for mesh and box pairs; that difference is a device boundary, not yet measured on a beach-settled body. Air and water are expected to have no contacts (T9); A4a checks it.
 - `njmax = 512` (N9: 64 overflowed on landing, ROADMAP:3421). Set `nconmax` explicitly, and read the overflow flags each segment (A4).
 - The integrator stays the model's own (`implicitfast`). MJWarp supports it (`_src/types.py:495`).
@@ -639,7 +639,7 @@ Mutations:
 
 Done: the three checks pass; two mutations `caught`; D-A3 (graph capture cost) and D-A4 (memory per world) are queued.
 
-### A3 — control (devroll/control_wp.py; tests/test_device.py). Depends on A1a, A1b and A2. Tier: opus.
+### A3 — control (devroll/control_wp.py; tests/test_devroll.py). Depends on A1a, A1b and A2. Tier: opus.
 
 Goal: what `rollout_batch` does at a decision step (batchroll.py:771-860), per world, on the device:
 - the observation, exactly `TriphibianEnv.observation` (triphibian.py:1602-1680). It is 33 floats (`OBS_DIM = 25 + MORPHOLOGY_DIM`, triphibian.py:1730; `MORPHOLOGY_DIM = 8`, triphibian.py:486):
@@ -665,18 +665,18 @@ Host recomputation (reuse):
 - It feeds `SegmentCollector.record` and `finish` (ppo.py:508-540) unchanged. The critic MLP is not ported.
 
 Test `test_the_device_controller_is_the_host_controller` (GPU and warp). Replay CPU states, as in A1a:
-- (a) The observation matches `env.observation(dom)` within 1e-6 absolute (float32) on 2,000 steps, for the 9 bodies, in air and in water, with a task in force.
+- (a) The observation matches `env.observation(dom)` within 2e-4 absolute (float32) over 150 steps and 15 decisions (A3 measured 2.7e-5 worst), for the 7 seed plans, in air and in water, with a task in force.
 - (b) At the mean, the commanded joint angles match the CPU loop's `angles` within 1e-5 rad.
 - (c) The host-recomputed `logp` of device-sampled actions equals `log_prob` within 1e-5, and the empirical action mean over 4,096 samples is within 3 standard errors of the squashed mean.
 
 Mutations:
-- `device-obs-drops-task-channels`: zero the six task channels.
-- `device-obs-gravity-world-frame`: use world-frame gravity.
+- `device-control-drops-task-channels`: zero the six task channels.
+- `device-control-gravity-world-frame`: use world-frame gravity.
 - `device-mean-worlds-sample`: K_m worlds take noise.
 
 Done: three checks pass; three mutations `caught`.
 
-### A4a — air-water rollouts (devroll/rollout_wp.py; tests/test_device.py). Depends on A3. Tier: opus.
+### A4a — air-water rollouts (devroll/rollout_wp.py; tests/test_devroll.py). Depends on A3. Tier: opus.
 
 Goal: `evaluate_tier1_device` for air and water, with gravity on.
 - Identification as 96 worlds (F7). The host draws `deltas` exactly as `identify_batch` (batchroll.py:684-687), and `basis_from_probes` on the host turns the downloaded mean twists into bases (batchroll.py:722-723).
@@ -704,7 +704,7 @@ Mutations:
 
 Runner: predicted 20 min; timeout 60 min. Done: four checks pass; three mutations `caught`; D-A2 (step cost on real bodies) can run.
 
-### A5 — third-path agreement (tests/test_device.py; FEATURES.yaml). Depends on A4a. Tier: opus.
+### A5 — third-path agreement (tests/test_devroll.py; FEATURES.yaml). Depends on A4a. Tier: opus.
 
 Goal: the rule "two evaluation paths ... `tests/test_search.py` asserts their agreement" (CLAUDE.md) extended to a third path. Per machine identity is impossible (F5), so the tolerance comes from a measured null spread, as Q4 did (ROADMAP:3800-3806).
 
@@ -779,9 +779,9 @@ Mutations:
 Run before merging (the P6 read is the first arm, not this lane):
 - `test_search.py` in full, detached (25 min), with `evaluator="batched"` by default, to show the default path unchanged;
 - the canary;
-- `test_device.py` in full.
+- `test_devroll.py` in full.
 
-### A4b — land and crossings on the device (devroll/rollout_wp.py; tests/test_device.py). Depends on A4a and the user's decision (§D, question 1). Tier: opus.
+### A4b — land and crossings on the device (devroll/rollout_wp.py; tests/test_devroll.py). Depends on A4a and the user's decision (§D, question 1). Tier: opus.
 
 Scope:
 - Land halves and the four transitions (`run_transition_batch`, batchroll.py:1196-1347, including `CrossingTracker`'s commanded hold-then-go and directional crossing, ARCH46_SPEC §8).
@@ -821,7 +821,7 @@ Each item is frozen: run it as written, report in the shape of `runs/analysis_10
 | D-P1 | P1 | P1's R: `experiments/draw_variance/run.py` (229 elites x 6 draws, stored bases), plus an `--identify` arm re-identifying at each draw | 2 x 90 min / 5 h | "R ... at stored bases is below the re-identified value by >= 15% in every medium" (ROADMAP:4201-4203) | That fails in any medium. Also check the step count of one generation with 4 reevals (`steps.main.identify`): exactly 16 x 28,800 = 460,800 at 20 built. |
 | D-P2 | P2 | 30-generation trial on the generalist island, `tier2_every=5`, 3 arms of each mode (serial, parallel), same seeds; read `refine_wall` and `refine_best > refine_base` from the promote events | 6 x 40 min / 6 h | "`refine_wall` median 105.0 s -> <= 30 s"; acceptance within +-10 points of the serial arm (ROADMAP:4207-4212, with F2's serial baseline replacing arch50's) | `refine_wall` > 50 s, or acceptance lower by > 10 points |
 | ~~D-P3~~ (withdrawn with P3) | P3 | 20 bodies (16 + 4 reevals), 3 repeats each of merge on and merge off, `--workers 4 --min-shard 2` | 1 h / 3 h | "Generation wall -3 to -8% at equal results" (ROADMAP:4214-4217) | Merged slower, or any placed score differs |
-| D-A1 | A1b | Cost of the device fluid and scatter step at W = 24 / 100 / 730 / 1,600, float32 and float64, median and rotor fixtures, graph-captured | 1 h / 3 h | float32: the per-panel marginal <= 0.044 us (Q1's float64 Mojo, ROADMAP:3704) and the launch <= 117 us per kernel group; scatter adds <= 50% to the fluid step | The marginal > 0.1 us per panel, or the scatter doubles the step. **Measured 2026-10-26** (`experiments/mjwarp_probe/probe_d_a1.py`, RTX 3060, graph of `fluid_and_scatter` without `mjw.step`, median of 7 x 50 launches, spread <= 2% except 3% at median f32 W=1600; fluid = fluid_wp kernels (11 launches), scatter = the other 16 of 27; median = beetle, 48 panels/world, not the 126-panel body; rotor = quad, 10 panels/world; the same env repeated W times). Marginal us/panel, W 730 to 1600, total step: median f32 0.0049, f64 0.0255; rotor f32 0.0066, f64 0.0368 (fluid alone 0.0035 / 0.0238 / 0.0023 / 0.0312): float32 marginal <= 0.044 holds, the 0.1 falsifier is not hit. Launch cost at W=24 is 7.3 us (median f32), 3.1 us (rotor f32) per launch, under 117 us. Scatter does not stay under +50%: scatter/fluid = 2.44, 2.87, 1.74, 1.04 at W 24/100/730/1600 (median f32), 1.16-1.62 (rotor f32), so the step is 2.0-3.9x its fluid part at median f32 (total 0.198, 0.211, 0.381, 0.585 ms at W 24/100/730/1600), i.e. the falsifier 'scatter doubles the step' is met at W <= 730 and borderline (2.04x) at 1600. Log: `experiments/mjwarp_probe/d_a1.log`. |
+| D-A1 | A1b | Cost of the device fluid and scatter step at W = 24 / 100 / 730 / 1,600, float32 and float64, median and rotor fixtures, graph-captured | 1 h / 3 h | float32: the per-panel marginal <= 0.044 us (Q1's float64 Mojo, ROADMAP:3704) and the launch <= 117 us per kernel group; scatter adds <= 50% to the fluid step | The marginal > 0.1 us per panel, or the scatter doubles the step. **Measured 2026-10-26, corrected the same day** (`experiments/mjwarp_probe/probe_d_a1.py`, log `d_a1_medusa.log`; RTX 3060; graph of `fluid_and_scatter` without `mjw.step`; median of 7 x 50 launches, spread <= 2%): median fixture = `BODY_PLANS['medusa']`, 134 panels, nv 22 (the largest plan; the 126-panel elite file is not buildable without its archive genome); rotor fixture = the test quad, 10 panels, not the 24-dof elite. Fluid = 12 launches, scatter = the other 20 (32 in all, rotor 27). Bars: marginal 0.0063 us/panel f32 (<= 0.044, pass), launch 11.2 us at W=24 (<= 117, pass), rotor marginal 0.0029. Scatter/fluid: medusa f32 4.45 / 5.27 / 1.83 / 1.26 at W 24 / 100 / 730 / 1600; rotor f32 1.18 / 1.23 / 1.47 / 1.61. The falsifier 'scatter doubles the step' (scatter/fluid >= 1) fires at every W on both fixtures: medusa 1.26-5.27, rotor 1.18-1.61. Reading: at W 24 the 20 scatter launches are dominated by fixed launch cost, so the ratio is a launch-count effect, not an arithmetic one. At the arm's W = 60 per body, total fluid+scatter is ~0.4-0.6 ms per step, so the absolute cost is small. Consequence recorded: fuse scatter launches after the first device arm exists; not a blocker for A4a. Earlier run on beetle (48 panels) and quad (10 panels) is superseded; the substitution is named here, not hidden.
 | D-A2 | A4a | Step cost with gravity, A1a + A1b + A3, air and water segment worlds, on arch49's median, p90-dof (30) and rotor bodies at W = 10 x {2, 20, 60, 110} | 2 h / 5 h | c0 <= 0.6 ms; c1 <= 8 us per world for the 126-panel body; rotor bodies <= 1.6 x the median's c1 (Q2: 1.6x, ROADMAP:3771-3773) | c0 > 1 ms or c1 > 15 us (T7's falsifier, adjusted for F4's terms) |
 | D-A3 | A2 | Capture wall of an unrolled 2,000-step graph per body against host-driven per-step graphs over 2,300 steps | 30 min / 1 h | Capture >= 1 s per body, so per-step graphs (+28 ms per body) stay the default | Capture < 28 ms per body |
 

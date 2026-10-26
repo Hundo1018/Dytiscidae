@@ -1,5 +1,5 @@
 # D-A1 (IMPL_1010_SPEC §4): cost of DeviceBody.fluid_and_scatter (no mjw.step) as one CUDA graph, W = 24/100/730/1600,
-# float32 and float64, median (beetle) and rotor fixtures. "fluid" = launches of fluid_wp kernels; "scatter" = the rest
+# float32 and float64, median (medusa, 134 panels: the largest plan) and rotor fixtures. "fluid" = launches of fluid_wp kernels; "scatter" = the rest
 # (servo, damping, jets, rotors, added mass into model, diagnostics, writes). Fluid-only graph = same step with every
 # non-fluid_wp launch skipped; scatter = full - fluid. Run: MUJOCO_GL=disable PYTHONPATH=. python probe_d_a1.py
 import gc, statistics as st, sys, time
@@ -15,7 +15,7 @@ WS, REPS, INNER, WARM = (24, 100, 730, 1600), 7, 50, 30
 
 def median_env():
     rng = np.random.default_rng(1)
-    e = TriphibianEnv(build(BODY_PLANS["beetle"]()), seed=0)
+    e = TriphibianEnv(build(BODY_PLANS["medusa"]()), seed=0)
     e.reset(Domain.WATER, randomise=False)
     e.data.qvel[:] = rng.normal(0.0, 1.5, e.model.nv)
     mujoco.mj_forward(e.model, e.data); e.data.qpos[2] += -0.3 - e.data.xpos[1, 2]
