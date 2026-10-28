@@ -671,9 +671,9 @@ Test `test_the_device_controller_is_the_host_controller` (GPU and warp). Replay 
 - (c) The host-recomputed `logp` of device-sampled actions equals `log_prob` within 1e-5, and the empirical action mean over 4,096 samples is within 3 standard errors of the squashed mean.
 
 Mutations:
-- `device-control-drops-task-channels`: zero the six task channels.
-- `device-control-gravity-world-frame`: use world-frame gravity.
-- `device-mean-worlds-sample`: K_m worlds take noise.
+- `device-control-obs-drops-task-channels`: zero the six task channels (named as in `tools/mutate.py`).
+- `device-control-obs-gravity-world-frame`: use world-frame gravity.
+- `device-control-mean-worlds-sample`: K_m worlds take noise.
 
 Done: three checks pass; three mutations `caught`.
 

@@ -265,12 +265,18 @@ then films (`dytiscidae/viz/film.py`) into `runs/<run>/media/`, embedded in
   it reads zero for a machine that drops and comes back. `station_keeping` sees
   the path between; where they disagree, trust `station_keeping` (arch37: 10x
   gap).
-- **Two evaluation paths.** `batchroll.evaluate_tier1_batch` scores the search;
-  `evaluate.evaluate_tier1` serves Tier-2 verification, offline probes and the
-  showcase. They differed 60x on land locomotion until the scatter seed was
-  shared, and still differ in water with identification on.
-  `tests/test_search.py` asserts their agreement; read it before trusting an
-  offline re-measurement.
+- **Three evaluation paths.** `batchroll.evaluate_tier1_batch` scores the search
+  by default; `evaluate.evaluate_tier1` serves Tier-2 verification, offline probes
+  and the showcase; `devroll.rollout_wp.evaluate_tier1_device` (`--evaluator
+  device`, IMPL_1010) runs the K-draw mean on the GPU in float32. The batched and
+  single paths differed 60x on land locomotion until the scatter seed was shared,
+  and still differ in water with identification on. The device path has three
+  boundaries: float32; the geom margin is kept, with MULTICCD and NATIVECCD off on
+  the device copy only (`envs/devroll/model_wp.py`); and the subtree mass is
+  recomputed per world after each write. Its eel water gap is open and printed as
+  `[info]` by `tests/test_devroll.py`. `tests/test_search.py` asserts the
+  batched and single paths' agreement; read it before trusting an offline
+  re-measurement.
 - **A film is evidence only if it reproduces the score printed on it.** Judge a
   design from `media/evaluated_vs_mission.mp4` and `film_manifest.json`, never
   from a continuous-mission film alone. Each pair shows the Tier-1 evaluation
