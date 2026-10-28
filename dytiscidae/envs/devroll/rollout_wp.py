@@ -587,10 +587,6 @@ def evaluate_tier1_device(phenos, *, controllers=None, seeds=0, k_mean: int = 1,
     not fed here).  Bodies are launched round-robin on ``streams`` CUDA
     streams, one captured graph per body.
     """
-    from dytiscidae.envs.evaluate import Controller
-    from dytiscidae.envs.triphibian import pair_partner_of
-    from dytiscidae.evolution.loop import placement_draw_seed
-
     if identify_axes:
         raise NotImplementedError("identification on the device is not built (A4a); "
                                   "identify on the host and pass the bases")
@@ -599,8 +595,29 @@ def evaluate_tier1_device(phenos, *, controllers=None, seeds=0, k_mean: int = 1,
     seeds_l = ([int(seeds)] * len(phenos) if not isinstance(seeds, (list, tuple, _np.ndarray))
                else [int(s) for s in seeds])
     K = int(k_mean) + int(k_sampled)
+    # Bodies in chunks of ``streams``: each chunk is built, run on its streams,
+    # downloaded and scored, then released.  Holding every body's host envs at once
+    # (240 per body, ~0.7 GB each on the probe) put arch60's gen-0 parent at 8 GB.
+    out = []
+    for c0 in range(0, len(phenos), max(1, int(streams))):
+        out.extend(_device_chunk(range(c0, min(len(phenos), c0 + max(1, int(streams)))),
+                                 phenos, controllers, seeds_l, K, k_mean, k_sampled, spec,
+                                 segment_seconds, shared, dtype, still, streams, graph,
+                                 sea_state, perturb, keep_records))
+    return out
+
+
+def _device_chunk(idx, phenos, controllers, seeds_l, K, k_mean, k_sampled, spec,
+                  segment_seconds, shared, dtype, still, streams, graph, sea_state,
+                  perturb, keep_records) -> list:
+    """``evaluate_tier1_device`` for the bodies ``idx``, all resident at once."""
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import pair_partner_of
+    from dytiscidae.evolution.loop import placement_draw_seed
+
     runs, plans = [], []
-    for i, p in enumerate(phenos):
+    for i in idx:
+        p = phenos[i]
         ctrl = controllers[i] if controllers and controllers[i] is not None else None
         if ctrl is not None and ctrl.params is None:
             ctrl = Controller(params=None, policy=ctrl.policy, bases=ctrl.bases)
