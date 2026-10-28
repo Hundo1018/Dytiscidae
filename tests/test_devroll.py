@@ -36,6 +36,11 @@ def skip(name: str, reason: str) -> None:
     SKIPPED.append(name)
 
 
+def info(name: str, detail: str = "") -> None:
+    """Reported on every run, never gated: a known open gap stays visible."""
+    print(f"  [info] {name}{('  -- ' + detail) if detail else ''}")
+
+
 def test_the_device_path_reports_why_it_cannot_run() -> None:
     from dytiscidae.envs import devroll
 
@@ -2269,9 +2274,11 @@ def test_device_draws_pool_only_the_mean_draws() -> None:
 #: batched path's pooled mean over the same draws; air reported, not gated (A5
 #: recorded air as unmeasured on this population: 3 of 64 draws nonzero).
 A6_K, A6_KS = 4, 2
-# eel is out of the gate: device vs batched water 0.019 vs 0.039 on 4 draws (bar 0.005),
-# beyond the 1e-6 null's own spread. Open device-physics item, recorded in docs/ROADMAP.md.
 A6_BODIES = ("teal", "quad")
+# eel is not gated: device vs batched water 0.019 vs 0.039 on 4 draws (bar 0.005),
+# beyond the 1e-6 null's own spread. Open device-physics item, recorded in docs/ROADMAP.md.
+# Its numbers are printed as [info] on every run so the gap stays visible.
+A6_INFO_BODIES = ("eel",)
 
 
 def test_the_device_pooled_mean_is_the_host_pooled_mean() -> None:
@@ -2304,7 +2311,7 @@ def test_the_device_pooled_mean_is_the_host_pooled_mean() -> None:
     from tests.test_devroll_agreement import A5_MEAN_FLOOR, A5_SECONDS, _a4_controller, _a5_batched
 
     bodies, ctrls, shared = [], [], None
-    for n in A6_BODIES:
+    for n in A6_BODIES + A6_INFO_BODIES:
         p = build((BODY_PLANS.get(n) or REFERENCE_PLANS[n])())
         c, sh = _a4_controller(p, 171)
         shared = sh if shared is None else shared
@@ -2320,7 +2327,7 @@ def test_the_device_pooled_mean_is_the_host_pooled_mean() -> None:
     frames = [rres[keys.index((i, 0))] for i in range(len(bodies))]
     dev = loop._device_score(bodies, ctrls, frames, cfg, spec=None,
                              seeds=[d[0] for d in draws], shared=shared)
-    for i, name in enumerate(A6_BODIES):
+    for i, name in enumerate(A6_BODIES + A6_INFO_BODIES):
         st = dev[i].draw_stats
         line = []
         for m in ("air", "water"):
@@ -2331,8 +2338,12 @@ def test_the_device_pooled_mean_is_the_host_pooled_mean() -> None:
         dw, hw = line[1][1], line[1][2]
         detail = "; ".join(f"{m} device {d:.4f} batched {h:.4f} (|diff| {abs(d - h):.4f})"
                            for m, d, h in line)
-        check(f"{name}: the pooled water mean over {A6_K} draws within {A5_MEAN_FLOOR} of the "
-              f"batched path's (air reported)", abs(dw - hw) <= A5_MEAN_FLOOR, detail)
+        if name in A6_INFO_BODIES:
+            info(f"{name}: pooled water mean over {A6_K} draws, not gated (open device-physics "
+                 f"item); bar would be {A5_MEAN_FLOOR}", detail)
+        else:
+            check(f"{name}: the pooled water mean over {A6_K} draws within {A5_MEAN_FLOOR} of the "
+                  f"batched path's (air reported)", abs(dw - hw) <= A5_MEAN_FLOOR, detail)
         check(f"{name}: draw_stats n {A6_K} in air and water, 1 on land; scored_by names the "
               f"path; the median draw is one of the draws",
               st["air"]["n"] == A6_K and st["water"]["n"] == A6_K and st["land"]["n"] == 1
