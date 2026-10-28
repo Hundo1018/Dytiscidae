@@ -577,7 +577,7 @@ def evaluate_tier1_device(phenos, *, controllers=None, seeds=0, k_mean: int = 1,
                           k_sampled: int = 0, spec=None, segment_seconds: float = 8.0,
                           shared=None, buffer=None, identify_axes=False, dtype=_wp.float32,
                           still: bool = False, streams: int = 1, graph: bool = True,
-                          sea_state=None, perturb=None) -> list:
+                          sea_state=None, perturb=None, keep_records: bool = True) -> list:
     """Air and water for each body on the device, one ``DeviceDraws`` per body.
 
     Draw 0 is the body's ``eval_seed``; draw ``d >= 1`` is
@@ -627,15 +627,17 @@ def evaluate_tier1_device(phenos, *, controllers=None, seeds=0, k_mean: int = 1,
         second = seg.results(partners=partners, data=data)
         dd = DeviceDraws(eval_seed=draw_seeds[0], k_mean=int(k_mean))
         for key, w in index.items():
-            dd.recorded[key] = dict(seg.recorded(w, data), steps=int(data["nrec"][w]),
-                                    decisions=int(data["ndec"][w]),
-                                    contacts=int(data["contacts"][w]))
+            if keep_records:
+                dd.recorded[key] = dict(seg.recorded(w, data), steps=int(data["nrec"][w]),
+                                        decisions=int(data["ndec"][w]),
+                                        contacts=int(data["contacts"][w]))
         for k, s in enumerate(draw_seeds):
             row = {"seed": s}
             for m in MEDIA:
                 a, b = allres[index[(k, m, 0)]], second[index[(k, m, 1)]]
                 row[m] = b if a.survived else a
-                row[m + "_halves"] = (a, b)
+                if keep_records:
+                    row[m + "_halves"] = (a, b)
             dd.draws.append(row)
         if int(data["contacts"].sum()) > 0:
             dd.notes.append(f"{CONTACT_NOTE}: {int(data['contacts'].sum())} contacts in "

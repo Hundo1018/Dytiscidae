@@ -1072,7 +1072,7 @@ def _device_eval(phenos, ctrls, cfg, *, spec, seeds, shared):
     return evaluate_tier1_device(
         phenos, controllers=ctrls, seeds=[int(s) for s in seeds], k_mean=int(cfg.k_mean),
         k_sampled=int(cfg.k_sampled), spec=spec, segment_seconds=cfg.segment_seconds,
-        shared=shared, streams=int(getattr(cfg, "device_streams", 1)))
+        shared=shared, streams=int(getattr(cfg, "device_streams", 1)), keep_records=False)
 
 
 def _device_score(phenos, ctrls, results, cfg, *, spec, seeds, shared):
