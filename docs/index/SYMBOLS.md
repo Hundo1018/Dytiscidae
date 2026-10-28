@@ -830,10 +830,10 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `decisions_per_segment` | function | 107 | `(seconds: float, control_hz: float=25.0, timestep: float=0.004) -> int` | Decisions one world makes in a segment: ``ceil(n_steps / control_every)``, |
 | `DeviceDraws` | class | 517 | — | One body's device evaluation: per draw the air and water results (the |
 | `DeviceSegments` | class | 282 | — | One segment on each of W worlds of one body (see the module docstring). |
-| `evaluate_tier1_device` | function | 576 | `(phenos, *, controllers=None, seeds=0, k_mean: int=1, k_sampled: int=0, spec=None, segment_seconds: float=8.0, shared=None, buffer=None, identify_axes=False, dtype=_wp.float32, still: bool=False, streams: int=1, graph: bool=True, sea_state=None, perturb=None) -> list` | Air and water for each body on the device, one ``DeviceDraws`` per body. |
+| `evaluate_tier1_device` | function | 576 | `(phenos, *, controllers=None, seeds=0, k_mean: int=1, k_sampled: int=0, spec=None, segment_seconds: float=8.0, shared=None, buffer=None, identify_axes=False, dtype=_wp.float32, still: bool=False, streams: int=1, graph: bool=True, sea_state=None, perturb=None, keep_records: bool=True) -> list` | Air and water for each body on the device, one ``DeviceDraws`` per body. |
 | `make_kernels` | function | 117 | `(T)` | The A4a record, check and freeze kernels for precision ``T``, cached. |
 | `repeatable` | function | 92 | `(on: bool=True) -> None` | Warp's ``RUN_TO_RUN`` determinism for the device path's own modules (their |
-| `run_bodies` | function | 647 | `(runs, *, streams: int=1, graph: bool=True) -> None` | Every armed ``DeviceSegments`` to its segment's end, the bodies launched |
+| `run_bodies` | function | 666 | `(runs, *, streams: int=1, graph: bool=True) -> None` | Every armed ``DeviceSegments`` to its segment's end, the bodies launched |
 | `start_world` | function | 480 | `(p, seed: int, dom, half: int, params=None, *, spec=None, sea_state=None, perturb=None)` | A machine at the start of one half of ``dom``'s segment for eval seed |
 | `DeviceDraws.mean` | method | 529 | `(self, medium: str) -> float` | The medium's competence, mean over the ``k_mean`` draws at the mean. |
 | `DeviceDraws.stats` | method | 534 | `(self, medium: str) -> dict` | The medium's ``loop.draw_stats`` over the ``k_mean`` draws at the mean |
