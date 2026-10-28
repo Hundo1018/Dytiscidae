@@ -172,6 +172,7 @@ systemd-run --user --unit archNN --same-dir bash -c \
   processes import from the tree they were spawned in, so edits to the main
   tree cannot reach the run.
 - `--memory-ceiling-mb` stops cleanly with a checkpoint when parent plus workers
+  The ceiling is checked at generation boundaries only (2026-10-29: arch60's gen-0 spike to 8 GB passed it unseen in four dry runs), so pair it with `systemd-run -p MemoryMax=<G>` on the unit; the cgroup cap is what stops a within-generation runaway.
   pass it (0 = off). arch35 lost 405 generations to an OOM kill it could have
   resumed from.
 - **Pool shape: a queue by default since 2026-10-03, `--min-shard 2
@@ -206,6 +207,9 @@ then films (`dytiscidae/viz/film.py`) into `runs/<run>/media/`, embedded in
 - **Never disturb a live run.** Killing, reconfiguring or writing into a running
   `runs/archNN` destroys that arm. Keep spawned process counts low; the pool is
   contention-sensitive.
+- **systemd's memory peak under-reports a search by 10x.** On 2026-10-29 the unit's
+  `MemoryPeak` read 0.3-1.2 GB for processes the kernel killed at 8-11 GB anon-rss. Trust
+  the kernel's `Killed process ... anon-rss:` line (`journalctl -k`), not systemd's figure.
 - **Killing the parent orphans the workers.** Workers run as
   `python -c from multiprocessing.spawn …`; `pkill -f "ops.run search"` misses
   them, and they once survived two hours holding 1 GB. Kill by PID: the parent,
