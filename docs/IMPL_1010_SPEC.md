@@ -851,7 +851,7 @@ R1 (§2) and D1 (§2) are reads of the same kind and use the same reporting shap
 
 1. **Land and the crossings on the device (A4b), or kept on the batched path at small K?** Evidence: Q5 gives K for reliability 0.9 as air 66, water 36, land 18 (ROADMAP:3830). Q4's null control moved 34.5% of land elites by more than 50% (ROADMAP:3800-3803). Air and water carry most of A's payoff (F12). Default in this plan: built after A6, only on a yes.
 2. **K_m and K_s.** Defaults are 50 and 10 (§3 table: 147 s against 168 s). K_s = K_m (today's main + rescore symmetry) costs 233 s at K_m = 50.
-3. **The lower-bound rule.** ROADMAP:3867-3869 says "a candidate enters a cell when its lower bound beats the incumbent's". This plan reads that as both lower bounds, with z = 1 typed until D-A6. The alternative is the candidate's lower bound against the incumbent's mean.
+3. **The lower-bound rule.** ROADMAP:3867-3869 says "a candidate enters a cell when its lower bound beats the incumbent's". This plan reads that as both lower bounds, with z = 1 typed until D-A6. The alternative is the candidate's lower bound against the incumbent's mean. **Answered (2026-10-26, §D answer 3, commits 61377bd and 483febe): the pooled mean of K draws, with re-evaluated incumbents and no lower bound; z is not used.**
 4. **The reference engine upgrade to mujoco 3.15** (F6), after D-M0.
 5. **P3 at all**, given that A retires the two-trip structure.
 6. **The `Py_NewRef` fix**, after D1: set `MOJO_PYTHON_LIBRARY` before the first import, or scrub the children's environment.
