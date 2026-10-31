@@ -73,8 +73,12 @@ stopping are withdrawn.
 `tools/suite_probe.py --all` re-measures this. `.github/workflows/checks.yml`
 runs the first three rows; `test_search.py` is not in CI.
 
-A headless machine needs `MUJOCO_GL=disable`: MuJoCo 3.15 imports a renderer at
-`import mujoco`.
+`MUJOCO_GL` by purpose (probed 2026-10-31 on this machine): tests and tools set
+`MUJOCO_GL=disable` (MuJoCo 3.15 imports a renderer at `import mujoco`). The
+search launch block below sets nothing, so the run and its postrun films get
+`osmesa` from `dytiscidae/__init__.py` (headless default) — keep it that way;
+`training.py` notes a bad backend kills a worker. `egl` raises `EGLError` here;
+do not use it.
 
 ### Whether a test is worth anything
 
@@ -148,6 +152,25 @@ systemd-run --user --unit archNN --same-dir bash -c \
      --memory-ceiling-mb <MB> --seed 20260901 --run runs/archNN \
      > runs/archNN.log 2>&1 < /dev/null'
 ```
+
+**Launch checklist (scope verbs per `~/.claude/playbooks/10-model-dispatch.md` §7.8):**
+"give me the command" prints the block above and stops; only "launch"/"run it"
+starts it (the guards hook asks otherwise). When launching:
+
+1. Before: `git status` clean in the directory the unit starts in (`--same-dir`,
+   or the pinned worktree); the kernel
+   preflight passes (`.venv/bin/python -c "from dytiscidae.envs import batchroll;
+   print(batchroll.usable())"`); `free -m` leaves headroom above
+   `--memory-ceiling-mb` after the live runs already on the box.
+2. Within 60 s after: `systemctl --user is-active archNN` says `active`, and
+   `runs/archNN.log` is non-empty past the import lines (arch49's first launch had
+   an empty log and nobody noticed).
+3. Report once — unit state, first ~20 log lines, the notes file path — then
+   stop. No polling: a systemd unit sends no completion notice (unlike
+   `run_in_background`), and the user asks when they want status.
+4. ETA: fit the last ~20 generation times from `generations.jsonl` and extrapolate
+   the slope (cost rises ~110 s → ~225 s across a run as rotors accumulate);
+   never multiply the current rate by remaining generations.
 
 - **CPU fallback only without a GPU** (2026-10-12, `envs/device.py`). At t=0
   `run_search` scores on the Mojo kernel if `batchroll.usable()` passes. If it
