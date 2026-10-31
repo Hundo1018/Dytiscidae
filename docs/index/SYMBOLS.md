@@ -1293,7 +1293,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `evaluate_candidate` | function | 507 | `(genome: Genome, cfg: SearchConfig, *, inherited_policy=None, identify: bool=True, spec: MissionSpec \| None=None, seed: int=0, bases=None)` | Tier-0 gate then Tier-1.  Returns ``(phenotype, result, controller)``. |
 | `evaluate_candidates` | function | 632 | `(genomes, cfg: SearchConfig, *, inherited=None, identify=True, spec: MissionSpec \| None=None, seeds=None, shared=None, buffer=None, pool=None, log: dict \| None=None, select=None, cost: GenerationCost \| None=None, bases=None)` | Tier-0 gate then a shared Tier-1 for the whole group. |
 | `GenerationCost` | class | 539 | — | Where one generation's wall time and physics steps went. |
-| `load_state` | function | 2699 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
+| `load_state` | function | 2701 | `(state: SearchState) -> int` | Restore a previous run into ``state``.  Returns the generation to start at. |
 | `median_draw` | function | 980 | `(results: list)` | The result of the median draw by ``draw_key`` (the lower one of two). |
 | `placement_draw_seed` | function | 970 | `(seed: int, j: int) -> int` | Extra draw ``j`` (1, 2, ...) for a candidate scored at ``seed``. |
 | `pooled_mean` | function | 1023 | `(s: dict) -> float` | A medium's pooled mean from its statistics; 0 with no draws. |
@@ -1301,10 +1301,10 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `pooled_se` | function | 1028 | `(s: dict) -> float` | Standard error of the pooled mean, ``sd / sqrt(n)`` (sd with n - 1). |
 | `result_draw_stats` | function | 1037 | `(result) -> dict` | The draws ``result`` carries: its ``draw_stats`` when the device scored it, |
 | `run_search` | function | 1893 | `(cfg: SearchConfig, spec: MissionSpec \| None=None, on_generation=None, should_stop=None) -> SearchState` | Run the whole loop.  Returns the final state, checkpointed as it goes. |
-| `save_state` | function | 2574 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
+| `save_state` | function | 2576 | `(state: SearchState, gen: int) -> None` | Write the learned state beside the archives. |
 | `SearchConfig` | class | 74 | — | Everything adjustable about a run. |
 | `SearchState` | class | 416 | — | — |
-| `seed_archipelago` | function | 2963 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
+| `seed_archipelago` | function | 2965 | `(state: SearchState, spec: MissionSpec) -> None` | Seed every island from the same archetypes. |
 | `shared_policy_for` | function | 1874 | `(cfg: SearchConfig)` | The shared policy a run starts from: a body twist (plus the gait gain |
 | `GenerationCost.__init__` | method | 556 | `(self)` | — |
 | `GenerationCost.count` | method | 576 | `(self, call: str, results) -> None` | — |
