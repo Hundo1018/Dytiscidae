@@ -2608,6 +2608,13 @@ MUTATIONS: tuple = (
                "elite, so its fitness stays its first k_mean draws'",
         suites=("test_search::test_device_scores_are_pooled_draw_means",), item="A6 re-evaluation"),
     Mutation(
+        id="device-feed-drops-the-tanh-jacobian",
+        path="dytiscidae/learning/ppo.py",
+        find="        logp = base.log_prob(u_t).sum(-1) - torch.log1p(-a.pow(2) + 1e-6).sum(-1)\n",
+        replace="        logp = base.log_prob(u_t).sum(-1)\n",
+        defect="the device feed's logp omits the tanh Jacobian, so the ratio PPO clips is wrong for every banked decision",
+        suites=("test_ppo::test_a_device_segment_becomes_the_trajectory_the_collector_banks",), item="A6 PPO feed"),
+    Mutation(
         id="device-kdraw-enters-on-draw-zero",
         path="dytiscidae/evolution/loop.py",
         find="        pooled = pooled_result(results[j], stats)\n",

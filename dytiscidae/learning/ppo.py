@@ -576,6 +576,39 @@ class SegmentCollector:
         self.live = [Trajectory() for _ in range(self.k)]
 
 
+def trajectory_from_latents(shared, obs, act, u, domain: str, terminal_reward: float,
+                            tag: str = "") -> Trajectory:
+    """A sampled segment the device ran, as the trajectory `SegmentCollector` banks.
+
+    The device records, per decision, the observation, the squashed action and the
+    pre-squash latent ``u`` it drew (``DeviceControl.records``).  ``logp`` and
+    ``val`` are recomputed here on the host, exactly as :meth:`SharedPolicy.act`
+    computes them for the action it samples (log-density of ``u`` under the latent
+    Normal minus the tanh Jacobian, and the critic at ``obs``), and ``phi`` is
+    ``potential_of`` the observation: it is a function of the observation alone, so
+    the device needs to supply nothing more.  ``act`` is stored as the device
+    applied it.
+    """
+    n = len(obs)
+    t = Trajectory(terminal_reward=float(terminal_reward), tag=tag)
+    if n == 0:
+        return t
+    obs_t = torch.as_tensor(np.asarray(obs, np.float32))
+    u_t = torch.as_tensor(np.asarray(u, np.float32))
+    with torch.no_grad():
+        base = shared.latent(obs_t)
+        a = torch.tanh(u_t)
+        logp = base.log_prob(u_t).sum(-1) - torch.log1p(-a.pow(2) + 1e-6).sum(-1)
+        val = shared.value(obs_t)
+    for i in range(n):
+        t.obs.append(np.asarray(obs[i], float))
+        t.act.append(np.asarray(act[i], float))
+        t.logp.append(float(logp[i]))
+        t.val.append(float(val[i]))
+        t.phi.append(float(potential_of(obs[i], domain)))
+    return t
+
+
 def ppo_update(policy, buffer, *, lr: float = 1e-3, epochs: int = 10,
                minibatch: int = 2048, clip: float = 0.2,
                vf_coef: float = 0.5, ent_coef: float = 0.01,

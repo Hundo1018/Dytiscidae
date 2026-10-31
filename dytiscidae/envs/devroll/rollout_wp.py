@@ -55,8 +55,8 @@ root spin by 6e-5 rad/s after 5 steps and 2e-3 m/s in ``vz`` after 200
 (2026-10-26).
 
 Not here: identification on the device (the host's ``identify_batch`` stays the
-reference; ``evaluate_tier1_device`` refuses ``identify_axes``), feeding the
-PPO buffer from the sampled worlds (A6), land and the crossings (A4b).
+reference; ``evaluate_tier1_device`` refuses ``identify_axes``), land and the
+crossings (A4b).  The sampled worlds feed a PPO buffer when one is passed (``_feed_buffer``).
 """
 
 # No ``from __future__ import annotations``: Warp reads the kernel annotations.
@@ -583,15 +583,15 @@ def evaluate_tier1_device(phenos, *, controllers=None, seeds=0, k_mean: int = 1,
     Draw 0 is the body's ``eval_seed``; draw ``d >= 1`` is
     ``placement_draw_seed(eval_seed, d)``.  The first ``k_mean`` draws act at
     the policy mean and give the score; the next ``k_sampled`` sample (their
-    observation and action records are what A6's learner reads; the buffer is
-    not fed here).  Bodies are launched round-robin on ``streams`` CUDA
+    observation and action records are banked in ``buffer`` as PPO trajectories when
+    one is given).  Bodies are launched round-robin on ``streams`` CUDA
     streams, one captured graph per body.
     """
     if identify_axes:
         raise NotImplementedError("identification on the device is not built (A4a); "
                                   "identify on the host and pass the bases")
-    if buffer is not None:
-        raise NotImplementedError("the sampled worlds do not feed the PPO buffer yet (A6)")
+    if buffer is not None and (shared is None or still):
+        raise ValueError("a PPO buffer needs the shared policy and a machine that is not held still")
     seeds_l = ([int(seeds)] * len(phenos) if not isinstance(seeds, (list, tuple, _np.ndarray))
                else [int(s) for s in seeds])
     K = int(k_mean) + int(k_sampled)
@@ -603,13 +603,13 @@ def evaluate_tier1_device(phenos, *, controllers=None, seeds=0, k_mean: int = 1,
         out.extend(_device_chunk(range(c0, min(len(phenos), c0 + max(1, int(streams)))),
                                  phenos, controllers, seeds_l, K, k_mean, k_sampled, spec,
                                  segment_seconds, shared, dtype, still, streams, graph,
-                                 sea_state, perturb, keep_records))
+                                 sea_state, perturb, keep_records, buffer))
     return out
 
 
 def _device_chunk(idx, phenos, controllers, seeds_l, K, k_mean, k_sampled, spec,
                   segment_seconds, shared, dtype, still, streams, graph, sea_state,
-                  perturb, keep_records) -> list:
+                  perturb, keep_records, buffer=None) -> list:
     """``evaluate_tier1_device`` for the bodies ``idx``, all resident at once."""
     from dytiscidae.envs.evaluate import Controller
     from dytiscidae.envs.triphibian import pair_partner_of
@@ -642,6 +642,8 @@ def _device_chunk(idx, phenos, controllers, seeds_l, K, k_mean, k_sampled, spec,
             if h == 1:
                 partners[w] = pair_partner_of(allres[index[(k, m, 0)]])
         second = seg.results(partners=partners, data=data)
+        if buffer is not None:
+            _feed_buffer(buffer, shared, seg, index, allres, second, k_mean)
         dd = DeviceDraws(eval_seed=draw_seeds[0], k_mean=int(k_mean))
         for key, w in index.items():
             if keep_records:
@@ -661,6 +663,29 @@ def _device_chunk(idx, phenos, controllers, seeds_l, K, k_mean, k_sampled, spec,
                             f"{int((data['contacts'] > 0).sum())} of {seg.W} worlds")
         out.append(dd)
     return out
+
+
+def _feed_buffer(buffer, shared, seg, index, first, second, k_mean) -> None:
+    """Bank the sampled worlds of one body as PPO trajectories.
+
+    Only draws ``k >= k_mean`` sample (the mean draws act deterministically and, as in
+    ``batchroll``, bank nothing).  Each half is one trajectory, rewarded as the batched
+    path rewards it: the first half from its own result, the second from the result
+    scored against its partner (``learner_reward``).  ``logp``, ``val`` and ``phi`` are
+    recomputed on the host from the device's recorded obs and latent
+    (``ppo.trajectory_from_latents``).
+    """
+    from dytiscidae.learning.ppo import learner_reward, trajectory_from_latents
+
+    rec = seg.ctl.records()
+    air_turn = getattr(buffer, "air_turn_reward", 0.0)
+    for (k, medium, half), w in index.items():
+        if k < k_mean:
+            continue
+        res = (first if half == 0 else second)[w]
+        buffer.add(trajectory_from_latents(
+            shared, rec["obs"][w], rec["act"][w], rec["u"][w], medium,
+            learner_reward(res, medium, air_turn), tag=medium))
 
 
 def run_bodies(runs, *, streams: int = 1, graph: bool = True) -> None:

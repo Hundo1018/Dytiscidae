@@ -833,7 +833,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `evaluate_tier1_device` | function | 576 | `(phenos, *, controllers=None, seeds=0, k_mean: int=1, k_sampled: int=0, spec=None, segment_seconds: float=8.0, shared=None, buffer=None, identify_axes=False, dtype=_wp.float32, still: bool=False, streams: int=1, graph: bool=True, sea_state=None, perturb=None, keep_records: bool=True) -> list` | Air and water for each body on the device, one ``DeviceDraws`` per body. |
 | `make_kernels` | function | 117 | `(T)` | The A4a record, check and freeze kernels for precision ``T``, cached. |
 | `repeatable` | function | 92 | `(on: bool=True) -> None` | Warp's ``RUN_TO_RUN`` determinism for the device path's own modules (their |
-| `run_bodies` | function | 666 | `(runs, *, streams: int=1, graph: bool=True) -> None` | Every armed ``DeviceSegments`` to its segment's end, the bodies launched |
+| `run_bodies` | function | 691 | `(runs, *, streams: int=1, graph: bool=True) -> None` | Every armed ``DeviceSegments`` to its segment's end, the bodies launched |
 | `start_world` | function | 480 | `(p, seed: int, dom, half: int, params=None, *, spec=None, sea_state=None, perturb=None)` | A machine at the start of one half of ``dom``'s segment for eval seed |
 | `DeviceDraws.mean` | method | 529 | `(self, medium: str) -> float` | The medium's competence, mean over the ``k_mean`` draws at the mean. |
 | `DeviceDraws.stats` | method | 534 | `(self, medium: str) -> dict` | The medium's ``loop.draw_stats`` over the ``k_mean`` draws at the mean |
@@ -1380,11 +1380,12 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 |---|---|---:|---|---|
 | `learner_reward` | function | 349 | `(seg, tag: str, air_turn_reward: float=0.0) -> float` | The terminal reward the learner sees for one segment. |
 | `potential_of` | function | 403 | `(obs, domain: str) -> float` | A state's potential, for potential-based reward shaping. |
-| `ppo_update` | function | 579 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None, group_buffer=None) -> dict` | One PPO update over everything the generation collected. |
+| `ppo_update` | function | 612 | `(policy, buffer, *, lr: float=0.001, epochs: int=10, minibatch: int=2048, clip: float=0.2, vf_coef: float=0.5, ent_coef: float=0.01, max_grad_norm: float=0.5, target_kl: float=0.015, lr_fraction: float=1.0, optimiser=None, rng=None, group_buffer=None) -> dict` | One PPO update over everything the generation collected. |
 | `RolloutBuffer` | class | 443 | — | Trajectories from a whole generation, flattened into a PPO batch. |
 | `SegmentCollector` | class | 540 | — | Records one segment's decisions, per machine, into trajectories. |
 | `SharedPolicy` | class | 122 | `(nn.Module if AVAILABLE else object)` | A Gaussian policy and a value head, shared by every morphology. |
 | `Trajectory` | class | 375 | — | One segment's worth of decisions from one machine. |
+| `trajectory_from_latents` | function | 579 | `(shared, obs, act, u, domain: str, terminal_reward: float, tag: str='') -> Trajectory` | A sampled segment the device ran, as the trajectory `SegmentCollector` banks. |
 | `RolloutBuffer.__init__` | method | 457 | `(self, gamma: float=0.99, lam: float=0.95, shaping: float=0.2, air_turn_reward: float=0.0)` | — |
 | `RolloutBuffer.add` | method | 471 | `(self, traj: Trajectory) -> None` | — |
 | `RolloutBuffer.build` | method | 486 | `(self)` | Flatten to (obs, act, logp, advantage, return, value) arrays. |

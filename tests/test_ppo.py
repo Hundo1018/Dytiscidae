@@ -149,6 +149,39 @@ def test_one_decision_has_the_right_shape() -> None:
           f"max |a| = {np.abs(many).max():.4f}")
 
 
+def test_a_device_segment_becomes_the_trajectory_the_collector_banks() -> None:
+    """``trajectory_from_latents`` (the device feed) against ``SharedPolicy.act``:
+    for the latent an ``act`` call drew, the recomputed logp and value are the
+    ones ``act`` returned, and phi is ``potential_of`` the observation."""
+    print("\ndevice feed: trajectory from latents")
+    import torch
+    from dytiscidae.learning.ppo import potential_of, trajectory_from_latents
+    torch.manual_seed(0)
+    rng = np.random.default_rng(3)
+    p = SharedPolicy(N_OBS, N_MODES, hidden=32)
+    obs = [rng.normal(size=N_OBS) for _ in range(6)]
+    acts, lps, vals, us = [], [], [], []
+    for o in obs:
+        with torch.no_grad():
+            base = p.latent(torch.as_tensor(o, dtype=torch.float32).unsqueeze(0))
+            u = base.sample()
+        a, lp, v = p.act(o, rng=np.random.default_rng(1))
+        # the latent act() drew for this rng, reproduced
+        mean, std = base.mean, base.stddev
+        eps = np.random.default_rng(1).standard_normal(mean.shape[-1]).astype(np.float32)
+        u = mean + std * torch.as_tensor(eps)
+        us.append(u[0].numpy())
+        acts.append(a), lps.append(lp), vals.append(v)
+    t = trajectory_from_latents(p, obs, acts, us, "air", 0.25, tag="air")
+    check("logp matches act()", bool(np.allclose(t.logp, lps, atol=1e-4)),
+          f"max {np.abs(np.array(t.logp) - lps).max():.2e}")
+    check("value matches act()", bool(np.allclose(t.val, vals, atol=1e-5)))
+    check("phi is potential_of(obs)",
+          bool(np.allclose(t.phi, [potential_of(o, "air") for o in obs])))
+    check("reward, tag and length carried",
+          t.terminal_reward == 0.25 and t.tag == "air" and len(t) == 6)
+
+
 def test_batched_and_single_decisions_agree_when_deterministic() -> None:
     """``act_many`` is the batched form of ``act`` and must not be a second policy.
 
@@ -1552,6 +1585,7 @@ def main() -> int:
     test_group_rows_are_not_renormalised_with_the_batch()
     test_the_ppo_path_is_bit_identical_without_a_group_buffer()
     test_the_learner_is_wired_to_the_evaluator()
+    test_a_device_segment_becomes_the_trajectory_the_collector_banks()
 
     print("\n" + "=" * 68)
     if SKIPPED:
