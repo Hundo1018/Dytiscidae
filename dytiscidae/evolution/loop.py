@@ -2451,6 +2451,8 @@ def run_search(cfg: SearchConfig, spec: MissionSpec | None = None,
         # The checkpoint is written after this line, so the previous one's
         # seconds ride on the next generation's.
         report["cost"] = cost.report()
+        # Parent plus workers, MB: arch60 grew 45-65 MB a generation and nothing recorded it.
+        report["resident_mb"] = round(_resident_mb())
         if checkpoint_s is not None:
             report["cost"]["checkpoint_prev"] = round(checkpoint_s, 2)
         archive.history.append(archive.snapshot())
