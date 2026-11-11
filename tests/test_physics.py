@@ -4845,6 +4845,266 @@ def test_the_mission_verdict_reads_the_end_of_every_leg() -> None:
           f"held {water.held}, shares {water.shares}")
 
 
+def _assigned_after_construction(cls) -> list:
+    """Every ``self.x = ...`` (plain, augmented, annotated, or through setattr)
+    in a method of ``cls`` other than ``__init__``."""
+    import ast
+    import inspect
+    import textwrap
+
+    found = []
+    for fn in ast.parse(textwrap.dedent(inspect.getsource(cls))).body[0].body:
+        if not isinstance(fn, ast.FunctionDef) or fn.name == "__init__":
+            continue
+        for sub in ast.walk(fn):
+            targets = []
+            if isinstance(sub, ast.Assign):
+                targets = sub.targets
+            elif isinstance(sub, (ast.AugAssign, ast.AnnAssign)):
+                targets = [sub.target]
+            elif isinstance(sub, ast.Call) and getattr(sub.func, "id", "") == "setattr":
+                found.append(f"{fn.name}: setattr")
+            for tg in targets:
+                for leaf in ast.walk(tg):
+                    if (isinstance(leaf, ast.Attribute) and isinstance(leaf.value, ast.Name)
+                            and leaf.value.id == "self"):
+                        found.append(f"{fn.name}: self.{leaf.attr}")
+    return found
+
+
+def test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert() -> None:
+    """P0.5/P0.6 (2026-11-11, `experiments/triphibian_diagnosis`, E0s): the
+    hand law split into an outer law that reads an observation and an inner
+    loop that keeps the body the right way up.  What the split promises is
+    checked here on the anchor body: the zero action does nothing, the inner
+    loop cannot tell where on the map it is, the observation tells the outer
+    law only how far it is from the waterline, and the memory and the command
+    clock are the environment's to keep.
+    """
+    print("\nsplit controller: a zero action is inert and the inner loop reads no position")
+    from dytiscidae.control import innerloop as IL
+    from dytiscidae.control import outer as O
+    from dytiscidae.core.bodyplans import ANCHOR_PLANS, BODY_PLANS, REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import mission as M
+    from dytiscidae.envs.evaluate import evaluate_tier0
+    from dytiscidae.envs.triphibian import Domain, MissionSpec, TriphibianEnv
+    from dytiscidae.evolution.loop import SearchConfig
+
+    p = build(ANCHOR_PLANS["legged_quad"]())
+    t0 = evaluate_tier0(p, MissionSpec())
+    check("the anchor body passes Tier-0 as the search applies it, and is in neither plan table",
+          p.report.gate_margin >= SearchConfig().tier0_gate and t0.mission_fraction > 0.0
+          and "legged_quad" not in BODY_PLANS and "legged_quad" not in REFERENCE_PLANS
+          and p.genome.body_plan == "legged_quad",
+          f"gate margin {p.report.gate_margin:.3f} against {SearchConfig().tier0_gate}, "
+          f"Tier-0 mission fraction {t0.mission_fraction:.3f}")
+
+    env = TriphibianEnv(p, seed=0)
+    model = IL.body_model(env)
+    inner = IL.InnerLoop(env, model)
+    rot, stroke, feather = model.irot, model.istroke, model.ifeather
+    check("the model finds four rotors and four limbs, each with a stroke and a feather",
+          len(rot) == 4 and len(stroke) == 4 and len(feather) == 4
+          and sorted(rot + stroke + feather) == list(range(model.n_act)),
+          f"{len(rot)} rotors, {len(stroke)} strokes, {len(feather)} feathers of {model.n_act}")
+
+    # -- the zero action
+    env.reset(Domain.AIR, randomise=False)
+    z = inner.act(np.zeros(IL.N_ACT))
+    check("u = 0: every rotor command is 0 and the limbs are at rest",
+          np.all(z[rot] == 0.0) and np.all(z[stroke] == IL.GAIT["rest"])
+          and np.all(z[feather] == 0.0),
+          f"rotors {z[rot]}, strokes {z[stroke]}")
+    push = np.zeros(IL.N_ACT)
+    push[IL.U_ACC:IL.U_ACC + 3], push[IL.U_TILT] = (2.0, -1.0, 3.0), 30.0
+    off = inner.act(push)
+    push[IL.U_ON] = 1.0
+    on = inner.act(push)
+    check("an acceleration is asked of the rotors only while they are switched on",
+          np.all(off[rot] == 0.0) and np.all(on[rot] > 0.0),
+          f"off {off[rot]}, on {np.round(on[rot], 1)}")
+
+    # -- no position: the same body state somewhere else
+    def place(dx, dy):
+        env.reset(Domain.AIR, randomise=False)
+        d = env.data
+        d.qpos[0] += dx
+        d.qpos[1] += dy
+        d.qpos[3:7] = np.array([0.97, 0.12, -0.15, 0.14]) / np.linalg.norm([0.97, 0.12, -0.15, 0.14])
+        # Climbing fast enough that the advance-ratio correction is active
+        # (J > 0.07): the torque solve alone does not change when every lever
+        # arm is shifted by one vector, the flow through each rotor does.
+        d.qvel[:6] = (1.5, -0.7, 12.0, 0.3, -0.2, 0.5)
+        env._mj.mj_forward(env.model, d)
+
+    push[IL.U_DRIVE], push[IL.U_TURN] = 0.8, -0.3
+    place(0.0, 0.0)
+    here, o_here = inner.act(push), O.observe(env, Domain.AIR, np.zeros(O.K), 0.0)
+    place(3.0, -2.0)
+    there = inner.act(push)
+    check("the inner loop gives the same actuator targets 3 m and -2 m away",
+          np.all(here[rot] > 0.0) and float(np.max(np.abs(there - here))) < 1e-6,
+          f"largest difference {float(np.max(np.abs(there - here))):.2e} on targets up to "
+          f"{float(np.max(np.abs(here))):.0f}")
+    place(0.0, -2.0)
+    o_along = O.observe(env, Domain.AIR, np.zeros(O.K), 0.0)
+    place(3.0, 0.0)
+    o_across = O.observe(env, Domain.AIR, np.zeros(O.K), 0.0)
+    moved = np.flatnonzero(np.abs(o_across - o_here) > 1e-9)
+    check("the observation is unchanged along the shore, and across it only the "
+          "waterline distance moves",
+          float(np.max(np.abs(o_along - o_here))) < 1e-9 and list(moved) == [O.I_DW]
+          and abs(o_across[O.I_DW] - o_here[O.I_DW] - 3.0) < 1e-9
+          and len(o_here) == O.N_OBS == len(O.OBS_CHANNELS),
+          f"along: {float(np.max(np.abs(o_along - o_here))):.1e}; across: channels "
+          f"{[int(i) for i in moved]} "
+          f"by {o_across[O.I_DW] - o_here[O.I_DW]:.3f}")
+
+    # -- the limbs carry the body
+    def settled(pose):
+        """Mean ground support over the second half of 2 s in a held pose, and
+        the share of the final support that comes up through the hull."""
+        env.reset(Domain.LAND, randomise=False)
+        u = np.zeros(IL.N_ACT)
+        u[IL.U_POSE] = pose
+        n, sup = int(round(2.0 / env.timestep)), []
+        for i in range(n):
+            env.step(inner.act(u))
+            if i >= n // 2:
+                sup.append(env.ground_support())
+        m, d, f6, hull, total = env.model, env.data, np.zeros(6), 0.0, 0.0
+        for i in range(d.ncon):
+            c = d.contact[i]
+            b1, b2 = m.geom_bodyid[c.geom1], m.geom_bodyid[c.geom2]
+            if (b1 == 0) == (b2 == 0):
+                continue
+            env._mj.mj_contactForce(m, d, i, f6)
+            fz = float(np.asarray(c.frame, float).reshape(3, 3).T[2] @ f6[:3])
+            fz = fz if b1 == 0 else -fz
+            total += fz
+            hull += fz if env.root_body in (b1, b2) else 0.0
+        return float(np.mean(sup)), hull / total
+
+    stand, hull_stand = settled(1.0)
+    rest, hull_rest = settled(0.0)
+    check("standing, the ground carries the anchor body's weight through its limbs; "
+          "at rest it lies on its hull",
+          0.95 <= stand <= 1.05 and 0.95 <= rest <= 1.05 and hull_stand < 0.25
+          and hull_rest > 0.95,
+          f"support {stand:.3f} standing with {hull_stand:.2f} of it through the hull, "
+          f"{rest:.3f} at rest with {hull_rest:.2f}")
+
+    # -- no attribute after construction
+    left = {c.__name__: _assigned_after_construction(c) for c in (O.Teacher, IL.InnerLoop)}
+    check("neither the teacher nor the inner loop assigns an attribute after construction",
+          not any(left.values()), f"{left}")
+
+    # -- what the environment's side keeps
+    zero = O.SplitController(lambda o: np.zeros(IL.N_ACT), inner.act)
+    zero.log = []
+    own = env.cpg.command
+    with zero.installed(env):
+        still = env.held_still_params()
+        check("installed, any other parameter set still reaches the body's own generator",
+              np.array_equal(env.cpg.command(still, 0.3), own(still, 0.3)))
+        try:
+            O.SplitController(lambda o: np.zeros(IL.N_ACT), inner.act).install(env)
+            twice = False
+        except RuntimeError:
+            twice = True
+        check("a second controller on the same environment is an error, not a stack", twice)
+        short = (1.5, 2.5)
+        read = M.evaluate_mission(env, zero.controller, Domain.WATER, 0, leg_range=short)
+    check("uninstalled, the environment's command is the one that was replaced",
+          "command" not in vars(env.cpg) and zero.env is None)
+    check("a mission from the water under u = 0 makes no transition",
+          read.transitions_completed == 0 and not read.completed and read.held[1:] == [False, False],
+          f"held {read.held}, {read.transitions_completed} of {read.transitions_commanded}")
+    cmd = [int(np.argmax(o[11:14])) for _, o, _ in zero.log]
+    since = [float(o[O.I_SINCE]) for _, o, _ in zero.log]
+    change = [i for i in range(1, len(cmd)) if cmd[i] != cmd[i - 1]]
+    check("the command clock runs between commands and restarts at each new one",
+          len(change) == 2 and since[0] == 0.0 and all(since[i] == 0.0 for i in change)
+          and all(since[i - 1] > 1.0 for i in change)
+          and all(since[i] > since[i - 1] for i in range(1, change[0])),
+          f"{len(zero.log)} decisions, command changed at {change}, clock before each "
+          f"{[round(since[i - 1], 2) for i in change]}")
+
+    def remember(o):
+        u = np.zeros(IL.N_ACT)
+        u[IL.U_MEM] = 1.0
+        return u
+
+    seen = {}
+    for fed in (True, False):
+        ctl = O.SplitController(remember, inner.act, feed_memory=fed)
+        ctl.log = []
+        with ctl.installed(env):
+            M.evaluate_mission(env, ctl.controller, Domain.WATER, 0, n_legs=1, leg_range=(1.0, 1.0))
+        seen[fed] = [float(o[O.I_MEM]) for _, o, _ in ctl.log]
+    check("the law is handed its own memory output at the next decision, 0 at the first",
+          len(seen[True]) > 10 and seen[True][0] == 0.0 and all(m == 1.0 for m in seen[True][1:])
+          and all(m == 0.0 for m in seen[False]),
+          f"fed back: {seen[True][:3]}..., not fed back: {set(seen[False])}")
+
+
+def test_the_teacher_completes_the_mission_through_the_split() -> None:
+    """The stateless teacher over the inner loop completes the mission from
+    every start (E0s: 32, 32, 31 of 32 seeds), and it is the command that it
+    follows: shown its first command for the whole mission it completes none
+    (0 of 96).  A fresh teacher at every decision and a fresh inner loop at
+    every step are the same rollout, which is what "stateless" means.
+    """
+    print("\nsplit controller: the teacher completes the mission, and only by reading the command")
+    from dytiscidae.control import innerloop as IL
+    from dytiscidae.control import outer as O
+    from dytiscidae.core.bodyplans import ANCHOR_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import mission as M
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(ANCHOR_PLANS["legged_quad"]()), seed=0)
+    done, frozen = {}, {}
+    for start in (Domain.AIR, Domain.WATER, Domain.LAND):
+        with O.teacher_controller(env).installed(env) as ctl:
+            done[start.value] = M.evaluate_mission(env, ctl.controller, start, 0)
+        with O.teacher_controller(env, freeze_command=True).installed(env) as ctl:
+            frozen[start.value] = M.evaluate_mission(env, ctl.controller, start, 0)
+    check("the teacher completes the mission from the air, the water and the land (seed 0)",
+          all(r.completed and not r.failure for r in done.values()),
+          "; ".join(f"{k}: held {r.held}" for k, r in done.items()))
+    check("on land its weight is on the ground",
+          all(s is None or s > 0.8 for r in done.values() for s in r.supports)
+          and all(any(s is not None for s in r.supports) for r in done.values()),
+          "; ".join(f"{k}: {[None if s is None else round(s, 2) for s in r.supports]}"
+                    for k, r in done.items()))
+    check("shown only its first command, it completes none and makes no transition",
+          not any(r.completed for r in frozen.values())
+          and all(r.transitions_completed == 0 for r in frozen.values()),
+          "; ".join(f"{k}: held {r.held}" for k, r in frozen.items()))
+
+    model = IL.body_model(env)
+    shore = O.ShoreMap()
+    reused = (O.Teacher(model, shore).teach, IL.InnerLoop(env, model).act)
+    arms = {
+        "reused": reused,
+        "a fresh teacher at every decision": (lambda o: O.Teacher(model, shore).teach(o), reused[1]),
+        "a fresh inner loop at every step": (reused[0], lambda u: IL.InnerLoop(env, model).act(u)),
+    }
+    got = {}
+    for name, (law, act) in arms.items():
+        with O.SplitController(law, act).installed(env) as ctl:
+            r = M.evaluate_mission(env, ctl.controller, Domain.LAND, 0, leg_range=(1.5, 2.5))
+            got[name] = (r.held, r.shares, r.supports, r.failure, float(r.result.energy_wh),
+                         [float(x) for x in env.data.qpos[:7]], ctl.decisions)
+    check("a fresh teacher at every decision and a fresh inner loop at every step are the "
+          "same rollout, to the last bit",
+          got["reused"][6] > 50 and got["reused"][4] > 0.0
+          and all(v == got["reused"] for v in got.values()),
+          f"{got['reused'][6]} decisions, energy {got['reused'][4]!r} Wh, held {got['reused'][0]}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -4930,6 +5190,8 @@ def main() -> int:
         test_an_evaluation_counts_the_steps_it_took,
         test_an_open_loop_body_with_thrust_crosses_nothing,
         test_the_mission_verdict_reads_the_end_of_every_leg,
+        test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert,
+        test_the_teacher_completes_the_mission_through_the_split,
     ])
     return report("all physics checks passed")
 

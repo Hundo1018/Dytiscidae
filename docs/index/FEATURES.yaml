@@ -429,6 +429,22 @@ ContinuousMission:
     - tests.test_physics::test_the_mission_verdict_reads_the_end_of_every_leg
   note: `continuous_score` pays presence (a still quad 0.15-0.58, 2026-11-11); `evaluate_mission` is the verdict -- in the commanded medium at the end of every leg, on land with the weight on the ground, entry state and leg durations drawn from the seed
 
+SplitController:
+  implementation:
+    - control.innerloop.InnerLoop
+    - control.innerloop.body_model
+    - control.innerloop.BodyModel
+    - control.outer.observe
+    - control.outer.Teacher
+    - control.outer.ShoreMap
+    - control.outer.SplitController
+    - control.outer.teacher_controller
+    - core.bodyplans.legged_quad
+  tests:
+    - tests.test_physics::test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert
+    - tests.test_physics::test_the_teacher_completes_the_mission_through_the_split
+  note: P0.5/P0.6 (2026-11-11). A stateless outer law `u = teach(o)` at 25 Hz over an inner loop at every step (attitude PD, torque-first mixer, limb gait) on the anchor body `ANCHOR_PLANS["legged_quad"]`; `o` is TriphibianEnv.observation plus 13 channels (OBS_CHANNELS), one memory channel fed back. A hand law, nothing fitted: the teacher and the nulls a learner is measured against. Nothing in the search imports it. Held to the prototype's 688 stored rows field for field by experiments/triphibian_diagnosis/scripts/port_check.py
+
 ActuatorSkills:
   implementation:
     - envs.skills.DepthHold

@@ -2,7 +2,7 @@
 
 # Modules
 
-112 modules, 43,780 lines, 1,236 indexed symbols.
+114 modules, 44,673 lines, 1,259 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -65,13 +65,15 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `control.cpg` | Central pattern generator, and the *discovered* control basis. | 706 | — | `numpy` | — |
+| `control.innerloop` | The stabilising inner loop of a rotor-and-limb body, and the action it takes. | 341 | — | `numpy` | `physics.medium`, `physics.rotor` |
+| `control.outer` | The outer law of the split controller: an observation in, an action out. | 480 | — | `numpy` | `control.innerloop`, `core.mjcf`, `envs.evaluate`, `envs.tasks`, `envs.triphibian` |
 | `control.train` | Learning a controller for one morphology. | 257 | — | `numpy` | `control.cpg`, `envs.evaluate`, `envs.mission`, `envs.triphibian`, `evolution.cmaes`, `physics.wake`, `viz.showcase` |
 
 ## `core`
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
-| `core.bodyplans` | Body-plan archetypes: the seeds the search starts from. | 731 | — | `numpy` | `core.cppn`, `core.genome`, `core.sdf` |
+| `core.bodyplans` | Body-plan archetypes: the seeds the search starts from. | 803 | — | `numpy` | `core.cppn`, `core.genome`, `core.mjcf`, `core.phenotype`, `core.sdf`, `physics.medium`, `physics.rotor` |
 | `core.cppn` | Compositional Pattern Producing Networks -- the implicit shape representation. | 435 | — | `numpy` | — |
 | `core.genome` | The morphology genome: a recursive module graph plus implicit surface fields. | 1300 | — | `numpy` | `core.cppn`, `core.sdf` |
 | `core.mjcf` | Phenotype -> MJCF.  Builds the MuJoCo model and the triphibian scene. | 853 | — | `mujoco`, `numpy` | `core.genome`, `core.phenotype`, `physics.medium` |

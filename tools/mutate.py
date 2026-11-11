@@ -2000,6 +2000,76 @@ MUTATIONS: tuple = (
         defect="the weight-on-the-ground reading does not read the ground",
         suites=("test_physics::test_the_mission_verdict_reads_the_end_of_every_leg",),
         item="P0.4"),
+    # --- the split controller (2026-11-11) ------------------------------------
+    Mutation(
+        id="split-zero-action-is-not-inert",
+        path="dytiscidae/control/innerloop.py",
+        find='            out[md.istroke] = GAIT["rest"] + float(u[U_POSE]) * (GAIT["stand"] - GAIT["rest"])',
+        replace='            out[md.istroke] = GAIT["stand"]',
+        defect="the zero action stands the body up, so the u = 0 null is not a still machine",
+        suites=("test_physics::test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert",),
+        item="P0.5"),
+    Mutation(
+        id="split-rotors-on-flag-ignored",
+        path="dytiscidae/control/innerloop.py",
+        find="        if u[U_ON] <= 0.5:\n            return out",
+        replace="        if False:\n            return out",
+        defect="the inner loop hovers on its own: a law that asks for nothing is carried by the rotors",
+        suites=("test_physics::test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert",),
+        item="P0.5"),
+    Mutation(
+        id="split-inner-loop-reads-absolute-position",
+        path="dytiscidae/control/innerloop.py",
+        find="        hubs = d.xipos[md.rot] - p\n",
+        replace="        hubs = d.xipos[md.rot]\n",
+        defect="the mixer's lever arms are taken from world positions, so the inner loop "
+               "is a different controller at every place on the map",
+        suites=("test_physics::test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert",),
+        item="P0.5"),
+    Mutation(
+        id="split-inner-loop-inertia-about-the-world-origin",
+        path="dytiscidae/control/innerloop.py",
+        find="        com = (mb[:, None] * d.xipos[1:]).sum(0) / float(mb.sum()) - p\n",
+        replace="        com = (mb[:, None] * d.xipos[1:]).sum(0) / float(mb.sum())\n",
+        defect="the attitude loop's inertia is shifted by the machine's distance from the "
+               "world origin, so its gains grow with the square of where it is",
+        suites=("test_physics::test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert",),
+        item="P0.5"),
+    Mutation(
+        id="split-memory-not-fed-back",
+        path="dytiscidae/control/outer.py",
+        find="        self.u, self.mem = u, u[U_MEM:].copy()",
+        replace="        self.u, self.mem = u, np.zeros(K)",
+        defect="the law never sees its own memory output: the staged water exit cannot "
+               "remember it has gone (E0s: 16 water-to-land legs lost in 96 missions)",
+        suites=("test_physics::test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert",),
+        item="P0.6"),
+    Mutation(
+        id="split-command-clock-not-restarted",
+        path="dytiscidae/control/outer.py",
+        find="            self.cmd, self.t_change = cmd, t\n",
+        replace="            self.cmd = cmd\n",
+        defect="the clock channel counts from the start of the rollout, not from the command",
+        suites=("test_physics::test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert",),
+        item="P0.6"),
+    Mutation(
+        id="split-observation-carries-the-along-shore-position",
+        path="dytiscidae/control/outer.py",
+        find="    o[I_CLR] = clr\n",
+        replace="    o[I_CLR] = clr + 1e-3 * float(d.xpos[env.root_body][1])\n",
+        defect="a channel leaks where the machine is along the shore, which no sensor in "
+               "the list supplies",
+        suites=("test_physics::test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert",),
+        item="P0.6"),
+    Mutation(
+        id="split-frozen-command-arm-follows-the-command",
+        path="dytiscidae/control/outer.py",
+        find="        cmd = self.cmd_first if self.freeze_command else self.cmd\n",
+        replace="        cmd = self.cmd\n",
+        defect="the command-frozen null is the teacher itself, so it completes missions "
+               "and no longer shows that the command is what the law follows",
+        suites=("test_physics::test_the_teacher_completes_the_mission_through_the_split",),
+        item="P0.6"),
     Mutation(
         id="still-machine-leaves-rotors-spinning",
         path="dytiscidae/envs/triphibian.py",

@@ -371,6 +371,42 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `Policy.n_out` | property | 681 | `(self) -> int` | — |
 | `Policy.n_weights` | property | 686 | `(self) -> int` | — |
 
+## `control.innerloop` — `dytiscidae/control/innerloop.py`
+
+> The stabilising inner loop of a rotor-and-limb body, and the action it takes.
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `body_model` | function | 144 | `(env) -> BodyModel` | Read the model constants off an environment. |
+| `BodyModel` | class | 79 | — | What either half of the split knows about the body that is not in the |
+| `InnerLoop` | class | 188 | — | ``act(u) -> actuator targets``, every simulation step. |
+| `BodyModel.n` | property | 118 | `(self) -> int` | — |
+| `InnerLoop.__init__` | method | 191 | `(self, env, model: BodyModel)` | — |
+| `InnerLoop.act` | method | 196 | `(self, u) -> np.ndarray` | — |
+
+## `control.outer` — `dytiscidae/control/outer.py`
+
+> The outer law of the split controller: an observation in, an action out.
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `_TokenBasis` | class | 350 | — | A mobility basis that hands back one fixed parameter set: the evaluators |
+| `observe` | function | 102 | `(env, commanded, prev_memory, since: float) -> np.ndarray` | The whole of what the outer law is given. |
+| `ShoreMap` | class | 132 | — | Where the mission's places are, as distances from the waterline along |
+| `SplitController` | class | 365 | — | The environment's side of the split: an outer law ``law(o) -> u`` asked |
+| `Teacher` | class | 179 | — | ``teach(o) -> u``.  No attribute is assigned after construction. |
+| `teacher_controller` | function | 476 | `(env, **arms) -> SplitController` | The teacher over the inner loop for the body in ``env``, not yet |
+| `_TokenBasis.__init__` | method | 355 | `(self, token)` | — |
+| `_TokenBasis.command_policy` | method | 358 | `(self, params, action, n, policy)` | — |
+| `_TokenBasis.twist_of` | method | 361 | `(self, coeffs)` | — |
+| `SplitController.__init__` | method | 386 | `(self, law, act, *, every_step: bool=False, feed_memory: bool=True, freeze_command: bool=False)` | — |
+| `SplitController.act` | method | 450 | `(self, obs)` | The evaluators' policy call.  Reads the commanded medium out of the |
+| `SplitController.install` | method | 405 | `(self, env) -> 'SplitController'` | — |
+| `SplitController.installed` | method | 431 | `(self, env)` | — |
+| `SplitController.uninstall` | method | 421 | `(self, env) -> None` | — |
+| `Teacher.__init__` | method | 182 | `(self, model: BodyModel, shore: ShoreMap)` | — |
+| `Teacher.teach` | method | 218 | `(self, o) -> np.ndarray` | — |
+
 ## `control.train` — `dytiscidae/control/train.py`
 
 > Learning a controller for one morphology.
@@ -392,11 +428,12 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `beetle` | function | 235 | `() -> Genome` | Bilateral flapper with swimming paddles.  The diving beetle. |
 | `eel` | function | 375 | `() -> Genome` | A serial chain driven as a travelling wave.  No wings anywhere. |
 | `gannet` | function | 457 | `() -> Genome` | Fixed high-aspect wing with a lifting tail, folding at the shoulder. |
+| `legged_quad` | function | 699 | `() -> Genome` | The reference quad with a pack that closes, a hull that nearly floats and |
 | `medusa` | function | 284 | `() -> Genome` | Radial bell with pulsed jet propulsion, plus a ring of trailing fins. |
 | `quad` | function | 660 | `() -> Genome` | A quadrotor: the control for "can anything fly in this simulator". |
 | `ray` | function | 411 | `() -> Genome` | Wide pectoral membranes driven as a spanwise travelling wave. |
-| `sample_body_plan` | function | 699 | `(rng: np.random.Generator, *, perturb: int=0) -> Genome` | Draw one archetype and optionally mutate it. |
-| `seed_population` | function | 711 | `(rng: np.random.Generator, n: int) -> list[Genome]` | A seed set that covers every archetype before it repeats any. |
+| `sample_body_plan` | function | 771 | `(rng: np.random.Generator, *, perturb: int=0) -> Genome` | Draw one archetype and optionally mutate it. |
+| `seed_population` | function | 783 | `(rng: np.random.Generator, n: int) -> list[Genome]` | A seed set that covers every archetype before it repeats any. |
 | `teal` | function | 542 | `() -> Genome` | Gannet airframe on a two-segment leaping leg: gets off the ground. |
 
 ## `core.cppn` — `dytiscidae/core/cppn.py`
