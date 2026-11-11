@@ -1,0 +1,425 @@
+event type counts: {"run_start": 1, "?": 900}
+===== run_start
+kind: str = "run_start"
+config: dict[68]
+  generations: int = 900
+  batch: int = 16
+  seed: int = 20261018
+  workers: int = 4
+  min_shard: int = 2
+  pool_per_worker: float = 2.0
+  controller_refine_funnel: NoneType = null
+  distance_curriculum: int = 0
+  distance_step: float = 0.5
+  distance_advance_share: float = 0.5
+  distance_window: int = 200
+  pool_balance: int = 0
+  action_rate_penalty: float = 0.0
+  segment_seconds: float = 8.0
+  identify_axes_every: int = 1
+  tier0_gate: float = -0.85
+  tier2_every: int = 5
+  tier1_5_seconds: float = 60.0
+  tier2_label_all_media: int = 1
+  placement_draws: int = 1
+  draw_per_candidate: int = 1
+  reeval_per_generation: int = 4
+  reeval_depth: int = 8
+  controller_refine_steps: int = 0
+  mission_weight: float = 0.0
+  reward_shaping: float = 0.2
+  descriptor_bins: int = 5
+  controller_refine_sigma: float = 0.1
+  promotion_refine_steps: int = 6
+  promotion_refine_parallel: int = 1
+  policy_hidden: int = 0
+  n_modes: int = 6
+  use_shared_policy: int = 1
+  shared_hidden: int = 64
+  shared_lr: float = 0.001
+  shared_epochs: int = 10
+  shared_minibatch: int = 2048
+  shared_target_kl: float = 0.015
+  shared_ent_coef: float = 0.01
+  shared_learner: str = "ppo"
+  grpo_group: int = 4
+  grpo_bodies: int = 4
+  shared_lr_anneal: int = 1
+  n_reference_seeds: int = 12
+  n_random_seeds: int = 8
+  run_dir: str = "/home/hundo/Projects/Dytiscidae/dytiscidae/runs/arch51"
+  checkpoint_every: int = 20
+  snapshot_every: int = 50
+  learned_axes: int = 1
+  descriptor_refit_every: int = 400
+  descriptor_keep_if_overlap: float = 0.95
+  gait_gain: int = 1
+  wing_compliance: int = 0
+  event_sample: int = 1
+  islands: list[8] of str e.g. ["air", "water", "land", "amphibian"]
+  migrate_every: int = 60
+  n_migrants: int = 2
+  judge_quantile: float = 0.9
+  judge_update_every: int = 50
+  use_critic: int = 1
+  ... 8 more keys
+spec: dict[6]
+  cycles: int = 3
+  seconds_per_domain: float = 300.0
+  target_depth: float = 10.0
+  reference_mass: float = 15.0
+  transition_back: dict[0]
+  air_launch_height: NoneType = null
+islands: dict[8]
+  air: str = "fly as well as the physics allows; owe nothing to the water"
+  water: str = "dive as deep and hold as long as the hull allows"
+  land: str = "walk, climb the beach, carry itself, and get off it"
+  amphibian: str = "the rung real animals occupy: two media and the crossing"
+  aerial_diver: str = "the gannet problem: enter fast, come back out"
+  land_air: str = "the takeoff problem: carry yourself, then leave the ground"
+  triphibian: str = "all three media at once, paid on the weakest"
+  generalist: str = "the whole mission, scored as it is everywhere else"
+t: float = 0.792
+===== ?
+generation: int = 0
+regime: str = "bootstrapping"
+regime_note: str = "too few elites to refine; widen the net"
+structural_bias: float = 1.6
+n_mutations: int = 2
+feasibility_bias: float = 0.7
+coverage: float = 0.0128
+qd_score: float = 0.0
+filled: int = 8
+front_designs: int = 8
+evaluations: int = 36
+promotions: int = 0
+exploits: int = 0
+prunes: int = 0
+domain_best: dict[3]
+  air: float = 0.0
+  water: float = 0.001
+  land: float = 0.012
+starved: list[0] of ?
+famine_events: int = 0
+top_operators: list[5] of dict
+  operator: str = "radial_symmetry"
+  tries: int = 2
+  recent: float = 0.0375
+  lifetime: float = 0.0375
+island: str = "air"
+evaluated: int = 36
+tier0_rejected: int = 40
+diverged_rollouts: int = 0
+rollouts: int = 112
+mission_best: float = 0.0
+weakest_best: float = 0.0
+three_media: int = 0
+elapsed: float = 301.4
+curriculum: dict[9]
+  stages: dict[1]
+    single: int = 8
+  promotions: int = 0
+  demotions: int = 0
+  reached: int = 0
+  typical: int = 0
+  handover_floor: float = 0.25
+  handover_typical: float = 0.25
+  handover_mean: float = 0.25
+  rank_windows: dict[1]
+    single: int = 27
+judge: dict[3]
+  generation: int = 0
+  frozen: int = 0
+  bars: dict[4]
+    air: dict[4]
+      metric: str = "sink_rate"
+      bar: float = 6.0
+      tightenings: int = 0
+      samples: int = 98
+    water: dict[4]
+      metric: str = "depth_gain"
+      bar: float = 2.5682
+      tightenings: int = 1
+      samples: int = 132
+    land: dict[4]
+      metric: str = "land_speed"
+      bar: float = 0.0855
+      tightenings: int = 1
+      samples: int = 132
+    transition: dict[4]
+      metric: str = "exit_state"
+      bar: float = 0.0
+      tightenings: int = 0
+      samples: int = 132
+auditor: dict[6]
+  audited: int = 2
+  invalidated: int = 0
+  vetoed_tightenings: int = 0
+  mean_retained: NoneType = null
+  mean_held_out: dict[0]
+  recent_findings: list[2] of str e.g. ["not measurable: no credited medium and mission 0 (rule 4: could-not-measure is
+critic: dict[7]
+  fitted: int = 0
+  labels: int = 0
+  fits: int = 0
+  calibration: float = 0.0
+  calibration_by_target: dict[0]
+  dropped_legacy: int = 0
+  distrusts: list[0] of ?
+scout: dict[11]
+  fitted: int = 0
+  labels: int = 0
+  tracked: int = 132
+  depth_mean: float = 0.09
+  depth_max: int = 1
+  fits: int = 0
+  calibration: float = 0.0
+  score_only: float = 0.0
+  skill: float = 0.0
+  protected: int = 1
+  drivers: list[1] of dict
+    feature: str = "novelty"
+    effect: float = 1.0
+    note: str = "unfitted: novelty prior"
+archipelago: dict[3]
+  islands: dict[8]
+    air: dict[2]
+      cells: int = 8
+      best: float = 0.0
+    water: dict[2]
+      cells: int = 6
+      best: float = 0.0
+    land: dict[2]
+      cells: int = 6
+      best: float = 0.5
+    amphibian: dict[2]
+      cells: int = 6
+      best: float = 0.5
+    aerial_diver: dict[2]
+      cells: int = 6
+      best: float = 0.0
+    land_air: dict[2]
+      cells: int = 6
+      best: float = 0.375
+    triphibian: dict[2]
+      cells: int = 6
+      best: float = 0.5
+    generalist: dict[2]
+      cells: int = 6
+      best: float = 0.375
+  migrations: int = 0
+  hybrids: int = 0
+best: dict[44]
+  mass: float = 5.129
+  span: float = 1.816
+  wing_area: float = 0.261
+  aspect_ratio: float = 12.64
+  wing_loading: float = 192.7
+  density_ratio: float = 1.957
+  battery_wh: float = 260.0
+  flap_hz: float = 2.2
+  dof: int = 6
+  n_rotors: int = 0
+  body_plan: str = "beetle"
+  feasible: int = 1
+  air_gates: list[0] of ?
+  margin: float = 0.21
+  worst_check: str = "positive_buoyancy_available"
+  mission_fraction: float = 0.0
+  energy_margin: float = 0.031
+  tier: int = 1
+  air: float = 0.0
+  water: float = 0.0
+  land: float = 0.0
+  max_depth: float = 4.99
+  mobility_rank: dict[0]
+  mobility_cond: dict[0]
+  mobility_underdetermined: dict[0]
+  mobility_basis: dict[2]
+    air: dict[4]
+      modes: list[6] of list
+      effects: list[6] of list
+      authority: list[6] of float e.g. [3.3226277153856345, 2.717235617735791, 2.218595040859126, 0.24126890350578514]
+      medium: str = "air"
+    water: dict[4]
+      modes: list[6] of list
+      effects: list[6] of list
+      authority: list[6] of float e.g. [0.24002598114160115, 0.220754092138782, 0.06967403871697832, 0.0605369369143601
+      medium: str = "water"
+  eval_seed: int = 657265861
+  gen: int = 0
+  scored_with_shared_policy: int = 1
+  objectives: dict[3]
+    mission: float = 0.0
+    structure: float = 0.2104
+    energy: float = 0.0308
+  island: str = "air"
+  stage: int = 0
+  stage_name: str = "single"
+  rungs: dict[4]
+    air: int = 4
+    water: int = 1
+    land: int = 5
+    transition: int = 0
+  judged: dict[4]
+    air: float = 0.267
+    water: float = 0.325
+    land: float = 0.992
+    transition: float = 0.119
+  ladder_measurements: dict[4]
+    air: dict[11]
+      gain_cruise: float = 1.0001050372625468
+      command_rate: float = 0.00021789090185917874
+      command_reversal: float = 0.3939393939393939
+      spin_rate: float = 2.9334440574412426
+      measured_sink_rate: float = 9.9
+      air_gates: float = 0.0
+      airborne_seconds: float = 2.7720000000000002
+      lift_margin: float = 3.1831815536265724
+      flap_travel: float = 0.7245323348941808
+      thrust_margin: float = 0.14749951190613508
+      level_margin: float = 0.9386312725806648
+    water: dict[29]
+      gain_cruise: float = 0.9945026781666093
+      gain_hold: float = 0.9939498168928549
+      command_rate: float = 6.206396105579536e-06
+      command_reversal: float = 0.13636363636363635
+      max_depth: float = 4.990992527394003
+      depth_gain: float = 0.8293432531057352
+      depth_error: float = 5.293746756788929
+      water_speed: float = 0.05846255975323338
+      depth_station_keeping: float = 0.864
+      depth_excursion_ratio: float = 1.1529947378626328
+      pair_second: float = 0.0
+      pair_along: float = -0.2862695247265749
+      pair_across: float = 0.08302575478788553
+      pair_tracking: float = 0.0
+      pair_served: float = 1.0
+      pair_along_mean: float = -0.0011040091605638847
+      cruise_tracking: float = 0.0
+      cruise_progress: float = 0.0
+      cruise_depth_hold: float = 0.07558905675474259
+      cruise_score: float = 0.0
+      hold_error: float = 1.448546155990779
+      hold_depth_error: float = 1.2907199159075604
+      hold_drift: float = 0.15782624008321866
+      hold_sink_rate: float = 0.12949358479162118
+      hold_score: float = 0.0
+      cmd_depth: float = 6.136731390913807
+      cmd_heading: float = -2.749960497535243
+      task_hold_first: float = 0.0
+      task_score: float = 0.0
+    land: dict[27]
+      gain_cruise: float = 1.0025695020559942
+      gain_stop: float = 1.0013556433672783
+      command_rate: float = 0.00015530615341499544
+      command_reversal: float = 0.494949494949495
+      upright: float = 0.9239594824206894
+      contact_fraction: float = 0.6285
+      measured_contact_fraction: float = 0.6285
+      land_speed: float = 0.045135940393900606
+      measured_land_speed: float = 0.05239143921000987
+      land_peak_speed: float = 0.15462286512783188
+      slope_climbed: float = 0.050295781641609416
+      measured_slope_climbed: float = 0.050295781641609416
+      takeoff_height: float = 0.0013042011577539675
+      measured_takeoff_height: float = 0.001278383117250037
+      pair_second: float = 0.0
+      pair_along: float = -1.0
+      pair_across: float = 0.13041244056281553
+      pair_tracking: float = 0.0
+      pair_served: float = 1.0
+      pair_along_mean: float = 0.0
+      walk_tracking: float = 0.0
+      walk_progress: float = 0.0
+      stop_score: float = 0.0
+      stop_drift: float = 0.06186582524770441
+      cmd_heading: float = 0.06505796392686536
+      task_walk_first: float = 1.0
+      task_score: float = 0.0
+    transition: dict[7]
+      crossed: float = 0.0
+      shock: float = 0.0
+      control: float = 0.0
+      settle: float = 0.0
+      economy: float = 0.0
+      exit_state: float = 0.0
+      crossed_fraction: float = 0.0
+  critic_discount: float = 1.0
+  score_parts: dict[7]
+    island_q: float = 0.0
+    curriculum_q: float = 0.0
+    mission_q: float = 0.0
+    handover: float = 0.25
+    mission_weight: float = 0.0
+    blend: float = 0.0
+    at_floor: int = 1
+  novelty: float = 1.0
+  fitness: float = 0.0
+  n_parts: int = 4
+  cppn_complexity: int = 12
+  distance_to_next_rung: float = 0.25
+  draws: list[2] of dict
+    base: float = 0.0
+    fit: float = 0.0
+    obj: list[3] of float e.g. [0.0, 0.21035174939076806, 0.03083005632270619]
+    at_floor: int = 1
+    meta: dict[26]
+      air: float = 0.0
+      water: float = 0.0
+      land: float = 0.0
+      mission_fraction: float = 0.0
+      energy_margin: float = 0.031
+      tier: int = 1
+      max_depth: float = 4.99
+      air_gates: list[0] of ?
+      eval_seed: int = 657265861
+      gen: int = 0
+      scored_with_shared_policy: int = 1
+      mobility_rank: dict[0]
+      mobility_cond: dict[0]
+      mobility_underdetermined: dict[0]
+      mobility_axes: dict[0]
+      mobility_basis: dict[2]
+      policy: list[238] of float e.g. [0.0, 0.0, 0.0, 0.0]
+      objectives: dict[3]
+      score_parts: dict[7]
+      stage: int = 0
+      stage_name: str = "single"
+      rungs: dict[4]
+      judged: dict[4]
+      ladder_measurements: dict[4]
+      critic_discount: float = 1.0
+      critic_features: list[16] of float e.g. [0.0, 0.0, 0.0, 0.0]
+best_fitness: float = 0.0
+cost: dict[3]
+  seconds: dict[14]
+    audit: float = 63.74
+    build: float = 0.01
+    evaluate: float = 123.59
+    evaluate.main: float = 82.67
+    evaluate.rescore: float = 40.71
+    evaluate.tier0: float = 0.21
+    judge_scout_critic: float = 0.0
+    migrate: float = 0.0
+    place: float = 0.01
+    ppo: float = 1.06
+    refit: float = 0.0
+    report: float = 0.0
+    tier2: float = 0.0
+    untimed: float = 0.0
+  steps: dict[7]
+    main.identify: int = 345600
+    main.rig: int = 4784
+    main.segments: int = 192000
+    main.transitions: int = 96000
+    rescore.rig: int = 4784
+    rescore.segments: int = 192000
+    rescore.transitions: int = 96000
+  designs: dict[5]
+    n: int = 16
+    bodies_mean: float = 9.12
+    bodies_max: int = 22
+    dof_mean: float = 8.75
+    dof_max: int = 24
+t: float = 301.411

@@ -1,0 +1,659 @@
+{
+ "arch43": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 39,
+    "lines": 40,
+    "t_max": 10206.563,
+    "config_generations": 600,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 39,
+    "lines": 857,
+    "t_first": 176.059,
+    "t_max": 10206.561
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch44": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 599,
+    "lines": 600,
+    "t_max": 218275.973,
+    "config_generations": 600,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 599,
+    "lines": 10680,
+    "t_first": 94.532,
+    "t_max": 218275.969
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch45": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 899,
+    "lines": 900,
+    "t_max": 168897.093,
+    "config_generations": 900,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 899,
+    "lines": 16838,
+    "t_first": 46.801,
+    "t_max": 168897.084
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch46": {
+  "gen_segments": [
+   {
+    "gen_min": null,
+    "gen_max": null,
+    "lines": 0,
+    "t_max": 0.0,
+    "config_generations": 900,
+    "resume": 0
+   },
+   {
+    "gen_min": 0,
+    "gen_max": 499,
+    "lines": 500,
+    "t_max": 91810.525,
+    "config_generations": 500,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   0,
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 499,
+    "lines": 9403,
+    "t_first": 65.559,
+    "t_max": 91810.522
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch47": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 599,
+    "lines": 600,
+    "t_max": 76557.301,
+    "config_generations": 600,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 599,
+    "lines": 11374,
+    "t_first": 75.629,
+    "t_max": 76557.293
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch48": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 299,
+    "lines": 300,
+    "t_max": 42758.791,
+    "config_generations": 300,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 299,
+    "lines": 5953,
+    "t_first": 92.011,
+    "t_max": 42758.785
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch49": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 299,
+    "lines": 300,
+    "t_max": 49986.252,
+    "config_generations": 300,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 299,
+    "lines": 5951,
+    "t_first": 89.568,
+    "t_max": 49986.245
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch50": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 121,
+    "lines": 122,
+    "t_max": 24671.195,
+    "config_generations": 900,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 121,
+    "lines": 2515,
+    "t_first": 66.975,
+    "t_max": 24671.192
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch51": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 899,
+    "lines": 900,
+    "t_max": 131585.962,
+    "config_generations": 900,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 899,
+    "lines": 17316,
+    "t_first": 112.861,
+    "t_max": 131585.953
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch52": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 99,
+    "lines": 100,
+    "t_max": 10909.765,
+    "config_generations": 300,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 99,
+    "lines": 1868,
+    "t_first": 114.652,
+    "t_max": 10909.757
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch53": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 170,
+    "lines": 171,
+    "t_max": 22751.3,
+    "config_generations": 300,
+    "resume": 0
+   },
+   {
+    "gen_min": 161,
+    "gen_max": 299,
+    "lines": 139,
+    "t_max": 17648.612,
+    "config_generations": 300,
+    "resume": 1
+   }
+  ],
+  "gen_keep_below": [
+   161,
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 170,
+    "lines": 3211,
+    "t_first": 114.749,
+    "t_max": 22751.297
+   },
+   {
+    "gen_min": 161,
+    "gen_max": 299,
+    "lines": 2582,
+    "t_first": 104.322,
+    "t_max": 17648.609
+   }
+  ],
+  "event_keep_below": [
+   161,
+   1000000000
+  ]
+ },
+ "arch54": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 299,
+    "lines": 300,
+    "t_max": 34332.473,
+    "config_generations": 300,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 299,
+    "lines": 5604,
+    "t_first": 111.368,
+    "t_max": 34332.47
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch55": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 299,
+    "lines": 300,
+    "t_max": 39259.072,
+    "config_generations": 300,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 299,
+    "lines": 5583,
+    "t_first": 111.896,
+    "t_max": 39259.067
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch56": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 299,
+    "lines": 300,
+    "t_max": 35164.274,
+    "config_generations": 300,
+    "resume": 0
+   }
+  ],
+  "gen_keep_below": [
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 299,
+    "lines": 5628,
+    "t_first": 110.847,
+    "t_max": 35164.268
+   }
+  ],
+  "event_keep_below": [
+   1000000000
+  ]
+ },
+ "arch57": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 13,
+    "lines": 14,
+    "t_max": 2488.596,
+    "config_generations": 300,
+    "resume": 0
+   },
+   {
+    "gen_min": 1,
+    "gen_max": 299,
+    "lines": 299,
+    "t_max": 46738.903,
+    "config_generations": 300,
+    "resume": 1
+   }
+  ],
+  "gen_keep_below": [
+   1,
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 13,
+    "lines": 277,
+    "t_first": 113.07,
+    "t_max": 2488.592
+   },
+   {
+    "gen_min": 1,
+    "gen_max": 299,
+    "lines": 5545,
+    "t_first": 109.363,
+    "t_max": 46738.9
+   }
+  ],
+  "event_keep_below": [
+   1,
+   1000000000
+  ]
+ },
+ "arch58": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 224,
+    "lines": 225,
+    "t_max": 37553.877,
+    "config_generations": 300,
+    "resume": 0
+   },
+   {
+    "gen_min": 221,
+    "gen_max": 299,
+    "lines": 79,
+    "t_max": 12620.553,
+    "config_generations": 300,
+    "resume": 1
+   }
+  ],
+  "gen_keep_below": [
+   221,
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 224,
+    "lines": 4207,
+    "t_first": 101.153,
+    "t_max": 37553.862
+   },
+   {
+    "gen_min": 221,
+    "gen_max": 299,
+    "lines": 1462,
+    "t_first": 277.866,
+    "t_max": 12620.549
+   }
+  ],
+  "event_keep_below": [
+   221,
+   1000000000
+  ]
+ },
+ "arch59": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 139,
+    "lines": 140,
+    "t_max": 36586.525,
+    "config_generations": 300,
+    "resume": 0
+   },
+   {
+    "gen_min": 121,
+    "gen_max": 299,
+    "lines": 179,
+    "t_max": 35460.92,
+    "config_generations": 300,
+    "resume": 1
+   }
+  ],
+  "gen_keep_below": [
+   121,
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 139,
+    "lines": 2609,
+    "t_first": 298.794,
+    "t_max": 36586.518
+   },
+   {
+    "gen_min": 121,
+    "gen_max": 299,
+    "lines": 3321,
+    "t_first": 441.112,
+    "t_max": 35460.915
+   }
+  ],
+  "event_keep_below": [
+   121,
+   1000000000
+  ]
+ },
+ "arch60": {
+  "gen_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 20,
+    "lines": 21,
+    "t_max": 4465.753,
+    "config_generations": 150,
+    "resume": 0
+   },
+   {
+    "gen_min": 21,
+    "gen_max": 40,
+    "lines": 20,
+    "t_max": 4081.266,
+    "config_generations": 150,
+    "resume": 1
+   },
+   {
+    "gen_min": 41,
+    "gen_max": 55,
+    "lines": 15,
+    "t_max": 3861.776,
+    "config_generations": 150,
+    "resume": 1
+   },
+   {
+    "gen_min": null,
+    "gen_max": null,
+    "lines": 0,
+    "t_max": 0.0,
+    "config_generations": 150,
+    "resume": 1
+   },
+   {
+    "gen_min": 41,
+    "gen_max": 80,
+    "lines": 40,
+    "t_max": 10249.424,
+    "config_generations": 150,
+    "resume": 1
+   },
+   {
+    "gen_min": 81,
+    "gen_max": 112,
+    "lines": 32,
+    "t_max": 8971.729,
+    "config_generations": 150,
+    "resume": 1
+   },
+   {
+    "gen_min": 101,
+    "gen_max": 112,
+    "lines": 12,
+    "t_max": 3270.334,
+    "config_generations": 150,
+    "resume": 1
+   }
+  ],
+  "gen_keep_below": [
+   21,
+   41,
+   41,
+   41,
+   81,
+   101,
+   1000000000
+  ],
+  "event_segments": [
+   {
+    "gen_min": 0,
+    "gen_max": 20,
+    "lines": 409,
+    "t_first": 200.184,
+    "t_max": 4465.869
+   },
+   {
+    "gen_min": 21,
+    "gen_max": 40,
+    "lines": 369,
+    "t_first": 227.612,
+    "t_max": 4081.477
+   },
+   {
+    "gen_min": 41,
+    "gen_max": 55,
+    "lines": 282,
+    "t_first": 208.495,
+    "t_max": 3861.772
+   },
+   {
+    "gen_min": 41,
+    "gen_max": 80,
+    "lines": 750,
+    "t_first": 201.507,
+    "t_max": 10249.973
+   },
+   {
+    "gen_min": 81,
+    "gen_max": 112,
+    "lines": 592,
+    "t_first": 251.482,
+    "t_max": 8971.708
+   },
+   {
+    "gen_min": 101,
+    "gen_max": 112,
+    "lines": 221,
+    "t_first": 233.635,
+    "t_max": 3270.318
+   }
+  ],
+  "event_keep_below": [
+   21,
+   41,
+   41,
+   81,
+   101,
+   1000000000
+  ]
+ }
+}

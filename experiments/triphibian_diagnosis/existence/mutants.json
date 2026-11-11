@@ -1,0 +1,1303 @@
+{
+ "seed": 20261111,
+ "n_mutations": 2,
+ "structural_bias": 1.6,
+ "call_site": "dytiscidae/evolution/loop.py:2128-2129",
+ "draws": 38,
+ "skipped_identical": [
+  {
+   "draw": 5,
+   "plan": [
+    "edge_topology",
+    "cppn_weights"
+   ],
+   "applied": [
+    "edge_topology"
+   ]
+  },
+  {
+   "draw": 13,
+   "plan": [
+    "edge_topology",
+    "jet"
+   ],
+   "applied": [
+    "edge_topology"
+   ]
+  },
+  {
+   "draw": 26,
+   "plan": [
+    "jet",
+    "radial_symmetry"
+   ],
+   "applied": [
+    "radial_symmetry"
+   ]
+  },
+  {
+   "draw": 29,
+   "plan": [
+    "cppn_weights",
+    "actuator"
+   ],
+   "applied": []
+  },
+  {
+   "draw": 30,
+   "plan": [
+    "stroke",
+    "cppn_structure"
+   ],
+   "applied": []
+  },
+  {
+   "draw": 37,
+   "plan": [
+    "stroke",
+    "jet"
+   ],
+   "applied": []
+  }
+ ],
+ "B1": {
+  "genome_sha": "07ad2c36abed0e165c939de2912cb4dc841e1df682def2bd08f34a43003126a7",
+  "n_parts": 4,
+  "n_edges": 5,
+  "battery": [
+   200.0,
+   "lis"
+  ],
+  "scale": 1.0,
+  "buildable": true,
+  "mass": 2.044853758511946,
+  "n_segments": 10,
+  "n_rotors": 4,
+  "n_actuated": 4,
+  "density_ratio": 1.081483709359461,
+  "buoyant_L": 1.8446688187088855,
+  "wing_area": 0.0,
+  "report": "PASS worst=can_submerge margin=+0.12",
+  "tier0_pass": true,
+  "tier0": {
+   "gate_margin": 0.11738536632124164,
+   "mission_fraction": 1.0,
+   "failing": {}
+  },
+  "body_sha": "ced911657360c47945a130299e19e97b6b4d73686f4513c05e10aee0cfff61fb",
+  "body_differs": null
+ },
+ "mutants": [
+  {
+   "index": 0,
+   "name": "M00",
+   "draw": 1,
+   "plan": [
+    "radial_symmetry",
+    "add_part"
+   ],
+   "applied": [
+    "radial_symmetry",
+    "add_part"
+   ],
+   "genome_sha": "b5ec8d7b407014858121ce7ecdf5a03977e5ff53b833db54943700ca57a359af",
+   "n_parts": 5,
+   "n_edges": 6,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 3.0774590551340193,
+   "n_segments": 12,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.1636413797692016,
+   "buoyant_L": 2.580175585346605,
+   "wing_area": 0.07005793906018623,
+   "report": "PASS worst=can_submerge margin=+0.20",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.20230728515844798,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "aeee2677ac419be8117ab18d6fc609ae8c620b6554afd2d8367f3bd889efdd38",
+   "body_differs": true
+  },
+  {
+   "index": 1,
+   "name": "M01",
+   "draw": 2,
+   "plan": [
+    "part_kind",
+    "duplicate_part"
+   ],
+   "applied": [
+    "part_kind",
+    "duplicate_part"
+   ],
+   "genome_sha": "8b11fcb8b3373bf6664c21bf80cd2aa3025be5c52d39b1349503dbab8a3c4b79",
+   "n_parts": 5,
+   "n_edges": 6,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.125300037908444,
+   "n_segments": 11,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.095491051182385,
+   "buoyant_L": 1.8927251385395294,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.13",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.12628751624059453,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "ea87938aa174aa8c1d4427d3abca73604f06a734afbdb500adb3382ce8b8c961",
+   "body_differs": true
+  },
+  {
+   "index": 2,
+   "name": "M02",
+   "draw": 3,
+   "plan": [
+    "edge_topology",
+    "cppn_structure"
+   ],
+   "applied": [
+    "edge_topology"
+   ],
+   "genome_sha": "1b5b769e94f00f3e054970b5690cec4e32396bf96172ce7066b3da9b6cf4733f",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.036311417233768,
+   "n_segments": 9,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.0799533307398124,
+   "buoyant_L": 1.8395658669298065,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.12",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.11644833260478515,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "705a99b64c11b46efd051f999323accb34ab68cd177f40509258c666dc2fa2c5",
+   "body_differs": true
+  },
+  {
+   "index": 3,
+   "name": "M03",
+   "draw": 4,
+   "plan": [
+    "part_kind",
+    "joint"
+   ],
+   "applied": [
+    "part_kind"
+   ],
+   "genome_sha": "deb747d44c0903557b64a405785bd87a926fcc0605ff5754ada6218960bbd42e",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.0452707969614004,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.0815582059430018,
+   "buoyant_L": 1.8449179456201483,
+   "wing_area": 0.0,
+   "report": "FAIL worst=has_propulsor margin=-1.00",
+   "tier0_pass": false,
+   "tier0": {
+    "gate_margin": -1.0,
+    "mission_fraction": 1.0,
+    "failing": {
+     "has_propulsor": -1.0
+    }
+   },
+   "body_sha": "95c21d1bd3493281a0ed86773e460accfe212d03918eb492438e1681359d61f6",
+   "body_differs": true
+  },
+  {
+   "index": 4,
+   "name": "M04",
+   "draw": 6,
+   "plan": [
+    "material",
+    "scale"
+   ],
+   "applied": [
+    "material",
+    "scale"
+   ],
+   "genome_sha": "bb2ac23e1286f493ed376c9a4ea0a239583c34acd4e0d34ecb1df3b4eb149728",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0538654870817739,
+   "buildable": true,
+   "mass": 2.195183148072416,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 0.9919296237160377,
+   "buoyant_L": 2.159066575365733,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.08",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.08352861961344415,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "d4ad0aa853bf09644e560aa7004b053639b9e5bd510b2984af667a23f49e44fc",
+   "body_differs": true
+  },
+  {
+   "index": 5,
+   "name": "M05",
+   "draw": 7,
+   "plan": [
+    "cppn_weights",
+    "add_part"
+   ],
+   "applied": [
+    "add_part"
+   ],
+   "genome_sha": "e86d2a3078e22375d6be893469e2999f76178f8a481f234fd96618a1aa19000f",
+   "n_parts": 5,
+   "n_edges": 6,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 4.50747116126593,
+   "n_segments": 18,
+   "n_rotors": 4,
+   "n_actuated": 12,
+   "density_ratio": 1.1593189693126655,
+   "buoyant_L": 3.7932035588675337,
+   "wing_area": 0.0,
+   "report": "PASS worst=hull_buckling margin=+0.30",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.3000000000000005,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "1ae07dd4253e3d81062e7435f815e21488d0c227d7c09d52c1c1416aab391bc1",
+   "body_differs": true
+  },
+  {
+   "index": 6,
+   "name": "M06",
+   "draw": 8,
+   "plan": [
+    "part_kind",
+    "scale"
+   ],
+   "applied": [
+    "part_kind",
+    "scale"
+   ],
+   "genome_sha": "ed5ce5e83f1b8c1d18c6753edcdb8f0ef577e7917b69a8e3a0e51f1bf6f354d9",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 0.9767079725127509,
+   "buildable": true,
+   "mass": 1.9846510572981353,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.1265331988948426,
+   "buoyant_L": 1.7187642014002829,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.13",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.1317854037354549,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "c5eb3eb487322ddae82e8d12874315edeac0af23ba1f2c2f599eb7875085b297",
+   "body_differs": true
+  },
+  {
+   "index": 7,
+   "name": "M07",
+   "draw": 9,
+   "plan": [
+    "rotor",
+    "drivetrain"
+   ],
+   "applied": [
+    "rotor"
+   ],
+   "genome_sha": "9698c035ce1b4c056be4d6dd903cd9cf50ede24ccf73f8d3d64d429e01b016e5",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 1.757333758511946,
+   "n_segments": 10,
+   "n_rotors": 0,
+   "n_actuated": 0,
+   "density_ratio": 0.9294199273796135,
+   "buoyant_L": 1.8446688187088855,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.04",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.0414967871736025,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "bd26812b6354be227a322a1973ff3e65e1176d4e26ff7f46396f846843325c78",
+   "body_differs": true
+  },
+  {
+   "index": 8,
+   "name": "M08",
+   "draw": 10,
+   "plan": [
+    "stroke",
+    "edge_placement"
+   ],
+   "applied": [
+    "edge_placement"
+   ],
+   "genome_sha": "3fbc44f2d3eb8b19c6fc9a33556cbfc70ea40e4d98c78cc0726b500e86b49298",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.06028488899703,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.0830395812258937,
+   "buoyant_L": 1.855919278380134,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.12",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.11849067000809987,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "d13fe2515f16726371fe064360cde2f664e0b0674e4556b30797c0ca87e4e9e6",
+   "body_differs": true
+  },
+  {
+   "index": 9,
+   "name": "M09",
+   "draw": 11,
+   "plan": [
+    "global_energy",
+    "radial_symmetry"
+   ],
+   "applied": [
+    "global_energy",
+    "radial_symmetry"
+   ],
+   "genome_sha": "c8274974ccd0fddb669a1168f92eb6e7188d604e0528fe5b630c81839a02d13a",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lipo"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 3.349178876017338,
+   "n_segments": 14,
+   "n_rotors": 8,
+   "n_actuated": 8,
+   "density_ratio": 1.737143643879769,
+   "buoyant_L": 1.8809564758045578,
+   "wing_area": 0.0,
+   "report": "PASS worst=hull_buckling margin=+0.30",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.3000000000000005,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "f081fb80d8de770ba6ce0b5ae61e6a83a0c45aa194c6bd675223a5f7eefcb1ec",
+   "body_differs": true
+  },
+  {
+   "index": 10,
+   "name": "M10",
+   "draw": 12,
+   "plan": [
+    "material",
+    "joint"
+   ],
+   "applied": [
+    "material"
+   ],
+   "genome_sha": "215828f5901173ab951d0f81e332356e981ae7308644a49a80f428639339d79c",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.0460294786018456,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.0821055250363525,
+   "buoyant_L": 1.8446688187088855,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.12",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.11771839893546931,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "8e419e6d2149c114891d0e9570ddedc18efe6432bd1d2f6c06e3a758a04655bc",
+   "body_differs": true
+  },
+  {
+   "index": 11,
+   "name": "M11",
+   "draw": 14,
+   "plan": [
+    "scale",
+    "remove_part"
+   ],
+   "applied": [
+    "scale",
+    "remove_part"
+   ],
+   "genome_sha": "c3c8d5cb8dae9960f7cbd52a3a18e65d93a0678cfc8286cc72856b9482f816b3",
+   "n_parts": 3,
+   "n_edges": 3,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0202995852114871,
+   "buildable": true,
+   "mass": 2.0633671070564024,
+   "n_segments": 6,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.0389307488295032,
+   "buoyant_L": 1.9376085290795286,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.10",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.1008419205119544,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "65585f1f3354cf80df5e2c162dd743cc1b4983fe31012f7f8e874a8e479d5cce",
+   "body_differs": true
+  },
+  {
+   "index": 12,
+   "name": "M12",
+   "draw": 15,
+   "plan": [
+    "scale",
+    "cppn_structure"
+   ],
+   "applied": [
+    "scale"
+   ],
+   "genome_sha": "72ccf96d0590d18c538b8dae1ee642b1545a8b791ac51a836fdf1f58814ad615",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.1270572005357906,
+   "buildable": true,
+   "mass": 2.425525955259691,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 0.8960727004277464,
+   "buoyant_L": 2.64082008579171,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.04",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.03680339520123699,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "8d86eee11bcd186cd649a3ecafd72c9020fbfea4825b8c2212daedbe2fd3e505",
+   "body_differs": true
+  },
+  {
+   "index": 13,
+   "name": "M13",
+   "draw": 16,
+   "plan": [
+    "global_buoyancy",
+    "edge_placement"
+   ],
+   "applied": [
+    "global_buoyancy",
+    "edge_placement"
+   ],
+   "genome_sha": "8988a22837fded7ebf6b07e67f4dba0a055684ced4c9149418316ee425f93254",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.0372769117571417,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.0800718969554732,
+   "buoyant_L": 1.8402360403832607,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.12",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.12203055497812176,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "d6caf0b8a4409c188f74c6d255f53ddb36a6cf62ba58e602116328cd2fd43203",
+   "body_differs": true
+  },
+  {
+   "index": 14,
+   "name": "M14",
+   "draw": 17,
+   "plan": [
+    "radial_symmetry",
+    "part_dimensions"
+   ],
+   "applied": [
+    "radial_symmetry",
+    "part_dimensions"
+   ],
+   "genome_sha": "4760527eb272f90fd231a40dd826a2aba5e88b47acc7298b97045de172a38593",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.063915105282833,
+   "n_segments": 14,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.0844417033869567,
+   "buoyant_L": 1.8567855756397085,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.12",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.1192692859320319,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "60f4fd82c747e53a067c425d367869f4b5e508f5470e0666046eb27bac175231",
+   "body_differs": true
+  },
+  {
+   "index": 15,
+   "name": "M15",
+   "draw": 18,
+   "plan": [
+    "actuator",
+    "global_buoyancy"
+   ],
+   "applied": [
+    "global_buoyancy"
+   ],
+   "genome_sha": "772730f6f9dc609edd0263acf1d115d49631b0be1ce030624d9edc67074a9c64",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.044853758511946,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.081483709359461,
+   "buoyant_L": 1.8446688187088855,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.12",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.11738536632124164,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "ced911657360c47945a130299e19e97b6b4d73686f4513c05e10aee0cfff61fb",
+   "body_differs": false
+  },
+  {
+   "index": 16,
+   "name": "M16",
+   "draw": 19,
+   "plan": [
+    "global_buoyancy",
+    "cppn_structure"
+   ],
+   "applied": [
+    "global_buoyancy"
+   ],
+   "genome_sha": "8e0a922a188b53709bf42a5e949481917ebdef5998fe24d9220222b372679bc4",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.044853758511946,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.081483709359461,
+   "buoyant_L": 1.8446688187088855,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.11",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.10985039904978455,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "ced911657360c47945a130299e19e97b6b4d73686f4513c05e10aee0cfff61fb",
+   "body_differs": false
+  },
+  {
+   "index": 17,
+   "name": "M17",
+   "draw": 20,
+   "plan": [
+    "actuator",
+    "duplicate_part"
+   ],
+   "applied": [
+    "duplicate_part"
+   ],
+   "genome_sha": "19f3eec9208bf911e74fcd3c46107644edd6019166c4a202d678507530cc532b",
+   "n_parts": 5,
+   "n_edges": 6,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.046487079523789,
+   "n_segments": 11,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.0817753585706928,
+   "buoyant_L": 1.8456445182380625,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.12",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.11756470910167938,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "505cf8f93a876f348904cb0cc436e2af91591f85b9953aae2d962a837e0453a9",
+   "body_differs": true
+  },
+  {
+   "index": 18,
+   "name": "M18",
+   "draw": 21,
+   "plan": [
+    "edge_topology",
+    "material"
+   ],
+   "applied": [
+    "edge_topology",
+    "material"
+   ],
+   "genome_sha": "808e05673b293410b0baa8ca1b4cdfd56b912242a8b8c541cac39c7c5df017e4",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 1.9605307208938398,
+   "n_segments": 9,
+   "n_rotors": 3,
+   "n_actuated": 3,
+   "density_ratio": 1.042011399023243,
+   "buoyant_L": 1.8355969044349674,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.10",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.09653682154617793,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "a389c5800ff2f8d82522bcfb73def5927e31e0ec8dc45f31f41a5cf11d3c5bec",
+   "body_differs": true
+  },
+  {
+   "index": 19,
+   "name": "M19",
+   "draw": 22,
+   "plan": [
+    "global_buoyancy",
+    "actuator"
+   ],
+   "applied": [
+    "global_buoyancy"
+   ],
+   "genome_sha": "644b9820a33a262a70c64d23133c1c793fa7fb8065b1919ac907432a076ace3b",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.044717361759375,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.0814115717480053,
+   "buoyant_L": 1.8446688187088855,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.12",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.12215551214778597,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "e2a3170bf170a891556bb164ed9bca6e1cc38c97ff5b270f98030727ca8aadd3",
+   "body_differs": true
+  },
+  {
+   "index": 20,
+   "name": "M20",
+   "draw": 23,
+   "plan": [
+    "global_buoyancy",
+    "body_field"
+   ],
+   "applied": [
+    "global_buoyancy",
+    "body_field"
+   ],
+   "genome_sha": "827a88d7f37692931bcc8c076294c593f1eb8ef7e4fd816c1d605071af741670",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.5778243095240567,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 0.6321153018006012,
+   "buoyant_L": 3.9786262707344835,
+   "wing_area": 0.0,
+   "report": "FAIL worst=can_submerge margin=-0.12",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": -0.12351547989839406,
+    "mission_fraction": 1.0,
+    "failing": {
+     "can_submerge": -0.1235
+    }
+   },
+   "body_sha": "7cbc6c75bbf770e90d6bddda5ee36b2857736135b4eaeb9979b203845c2227f1",
+   "body_differs": true
+  },
+  {
+   "index": 21,
+   "name": "M21",
+   "draw": 24,
+   "plan": [
+    "part_dimensions",
+    "add_part"
+   ],
+   "applied": [
+    "part_dimensions",
+    "add_part"
+   ],
+   "genome_sha": "f4382085641f08b7ac1910ff71055b6c5450b4eaf6cd32ca9d109f6d0c951bc3",
+   "n_parts": 5,
+   "n_edges": 6,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.764852551637206,
+   "n_segments": 18,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 0.7665056249620145,
+   "buoyant_L": 3.519109365547277,
+   "wing_area": 0.0,
+   "report": "FAIL worst=can_submerge margin=-0.05",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": -0.04826702124435178,
+    "mission_fraction": 1.0,
+    "failing": {
+     "can_submerge": -0.0483
+    }
+   },
+   "body_sha": "a89a4cd59f24be0fbfe6ffc71d583add8f03bc9de8813b43fd945f8707540983",
+   "body_differs": true
+  },
+  {
+   "index": 22,
+   "name": "M22",
+   "draw": 25,
+   "plan": [
+    "radial_symmetry",
+    "global_buoyancy"
+   ],
+   "applied": [
+    "radial_symmetry",
+    "global_buoyancy"
+   ],
+   "genome_sha": "45791d6969bd52db50b57e74011af141c925abf1166f33ec82ad3dfea54131bc",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.044853758511946,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.081483709359461,
+   "buoyant_L": 1.8446688187088855,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.13",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.12514818778902215,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "a39791fbe2db93598df26da323da5fdfcd980440a610201e1133091a42671056",
+   "body_differs": true
+  },
+  {
+   "index": 23,
+   "name": "M23",
+   "draw": 27,
+   "plan": [
+    "edge_placement",
+    "phase_gradient"
+   ],
+   "applied": [
+    "edge_placement",
+    "phase_gradient"
+   ],
+   "genome_sha": "f2766b1c351833d32596cc084f0e9f2e754e8bf85566b96c0920d05c05901200",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.0391390653813204,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.080460849150819,
+   "buoyant_L": 1.8412550235292997,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.12",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.11675833131692315,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "7f4d846c1bcaff634a6e1bac4151dd099d8edbcfeb72b270a4f1ba2ec0394480",
+   "body_differs": true
+  },
+  {
+   "index": 24,
+   "name": "M24",
+   "draw": 28,
+   "plan": [
+    "global_energy",
+    "cppn_weights"
+   ],
+   "applied": [
+    "global_energy"
+   ],
+   "genome_sha": "2e36705abc48b8236672529cde366609585e5f244bfd5b2a8d97f370736806a2",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    142.7113182507135,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 1.8811718106568418,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 0.9949154844266725,
+   "buoyant_L": 1.8446688187088855,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.07",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.07288098577691082,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "966c552feddf8c33ff89a0c19b9575672d2e2d269040045917bd769bb5dcca70",
+   "body_differs": true
+  },
+  {
+   "index": 25,
+   "name": "M25",
+   "draw": 31,
+   "plan": [
+    "remove_part",
+    "radial_symmetry"
+   ],
+   "applied": [
+    "remove_part",
+    "radial_symmetry"
+   ],
+   "genome_sha": "5b19c3f6b39eb8a4b8f45521d601dfa018b350fe22c21538cf35e679eaa3ddd0",
+   "n_parts": 3,
+   "n_edges": 3,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.0950074310173394,
+   "n_segments": 7,
+   "n_rotors": 5,
+   "n_actuated": 5,
+   "density_ratio": 1.1148625104637948,
+   "buoyant_L": 1.8333289258664873,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.14",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.1351572602884581,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "37e027a2e5321e38b6906ce83fd563966510a7f7ec6217818b3221ab14a186c2",
+   "body_differs": true
+  },
+  {
+   "index": 26,
+   "name": "M26",
+   "draw": 32,
+   "plan": [
+    "material",
+    "scale"
+   ],
+   "applied": [
+    "material",
+    "scale"
+   ],
+   "genome_sha": "2dfd0ad5e69ccf5da368625af0583e2c37ce2d930ddf7b733250e3e87b103d58",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.1304573567074898,
+   "buildable": true,
+   "mass": 2.429025109933509,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 0.8892933779548099,
+   "buoyant_L": 2.6647905559660026,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.03",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.032753652097607944,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "7cff97d2b24b39517ddf010d08a646a11f09231ae2231c65535e0903fe28f540",
+   "body_differs": true
+  },
+  {
+   "index": 27,
+   "name": "M27",
+   "draw": 33,
+   "plan": [
+    "scale",
+    "edge_topology"
+   ],
+   "applied": [
+    "scale",
+    "edge_topology"
+   ],
+   "genome_sha": "c39bedc4c11de2347e5b4deb79dc466c5c23a7f74287ce26678315a22ebf4ed3",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.002551566864508,
+   "buildable": true,
+   "mass": 2.0516219627661845,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.0768006313640504,
+   "buoyant_L": 1.8588235782915428,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.12",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.1157977982450078,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "7ff8c606c33249008eff58138124c9acdc49ab065fa840577e46adef93498a63",
+   "body_differs": true
+  },
+  {
+   "index": 28,
+   "name": "M28",
+   "draw": 34,
+   "plan": [
+    "radial_symmetry",
+    "part_dimensions"
+   ],
+   "applied": [
+    "radial_symmetry",
+    "part_dimensions"
+   ],
+   "genome_sha": "1efee26ce1f7e571c1446b465affa37df7407eb705f093a98a16ce3c4658e72b",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.05752531159189,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.0706924571217609,
+   "buoyant_L": 1.8748070503857523,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.11",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.11360060716848008,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "19b1d275fa166b04eac74ee5307a40e057d0ea6f3c0dbf45dd910129ba54fb8d",
+   "body_differs": true
+  },
+  {
+   "index": 29,
+   "name": "M29",
+   "draw": 35,
+   "plan": [
+    "remove_part",
+    "scale"
+   ],
+   "applied": [
+    "remove_part",
+    "scale"
+   ],
+   "genome_sha": "8222baa1f3cd4ea9f39560d7ac72dbb75995f85415032322c8bd654f7aa5d82d",
+   "n_parts": 3,
+   "n_edges": 3,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0842318995663935,
+   "buildable": true,
+   "mass": 2.243455059760981,
+   "n_segments": 6,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 0.9413543065811666,
+   "buoyant_L": 2.3250933557826454,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.06",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.05996563238824382,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "77ea04a5d0f7fe8108c7d1dbfe2a2fff75ac0157bb2ff01b9506728c77b88494",
+   "body_differs": true
+  },
+  {
+   "index": 30,
+   "name": "M30",
+   "draw": 36,
+   "plan": [
+    "remove_part",
+    "scale"
+   ],
+   "applied": [
+    "remove_part",
+    "scale"
+   ],
+   "genome_sha": "78aa7b4b5acf0e0537b536196b9beb1cc381aa54500c7341ab5dcd2c2d0206b2",
+   "n_parts": 3,
+   "n_edges": 3,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 0.7977181930634554,
+   "buildable": true,
+   "mass": 1.593278944581064,
+   "n_segments": 6,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.6783410426180265,
+   "buoyant_L": 0.9261636598562769,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.23",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.23173451575531856,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "9909592bd4e9031993a3c1b316bde326aba26e9d56b1a4304f7cd99b8d875bc5",
+   "body_differs": true
+  },
+  {
+   "index": 31,
+   "name": "M31",
+   "draw": 38,
+   "plan": [
+    "part_kind",
+    "phase_gradient"
+   ],
+   "applied": [
+    "part_kind",
+    "phase_gradient"
+   ],
+   "genome_sha": "98e0f61fce36deed414e191b195f0fa324fc40b264c0b0635b231d90da993580",
+   "n_parts": 4,
+   "n_edges": 5,
+   "battery": [
+    200.0,
+    "lis"
+   ],
+   "scale": 1.0,
+   "buildable": true,
+   "mass": 2.0519754241584574,
+   "n_segments": 10,
+   "n_rotors": 4,
+   "n_actuated": 4,
+   "density_ratio": 1.0827531138964661,
+   "buoyant_L": 1.8489230992623569,
+   "wing_area": 0.0,
+   "report": "PASS worst=can_submerge margin=+0.12",
+   "tier0_pass": true,
+   "tier0": {
+    "gate_margin": 0.11816776519901806,
+    "mission_fraction": 1.0,
+    "failing": {}
+   },
+   "body_sha": "99a410d5ff55ebcfc578dcae965458c3459b71adc2f45b286c3f1ba5a615d209",
+   "body_differs": true
+  }
+ ],
+ "triquad_sha256": "1cc5f4bd199505f412146f468e3a14f71b20ec55f7409491d50103ba99ecee67"
+}

@@ -1,0 +1,55 @@
+156 trial rollouts in 27 steps
+ 1. B0: first run of the cascade through the paired air path, fly.py gains
+      air[0] 0.000; air[1] 0.000
+ 2. B0: attitude PD per axis on the COM inertia, wn 13 zeta 1.3 (yaw 9/1.0): fly.py's effective pitch loop; was wn 7 on COM inertia, which settled 57 deg nose-down
+      air[0] 0.000; air[1] 0.110
+ 3. B1: same gains, first B1 air
+      air[0] 0.000; air[1] 0.000
+ 4. B0: COM from xipos (subtree_com is stale against xipos in the rollout loop: lever arms 0.058 m off)
+      air[0] 0.776; air[1] 0.865
+ 5. B1: COM from xipos, B1
+      air[0] 0.617; air[1] 0.762
+ 6. B1: first water and land segments, initial gains
+      water[0] 0.353; land[0] 0.782; water[1] 0.323; land[1] 0.510
+ 7. B0: first water and land segments, initial gains
+      water[0] 0.478; land[0] 0.656; water[1] 0.484; land[1] 0.699
+ 8. B1: first crossings and missions, initial navigation law
+      air_to_water crossed hold 0.59; water_to_air crossed hold 1.00; water_to_land no hold 1.00 (never crossed the boundary); land_to_air crossed hold 1.00; mission_air 1/2 score 0.47; mission_water 1/2 score 0.52; mission_land 2/2 score 0.80
+ 9. B1: water: thrust direction free (dive allowed when >0.6 m above target), sqrt depth law kz 4 kvz 8, rotor inflow term
+      water[0] 0.234; water[1] 0.311; water[2] 0.225; water[3] 0.270
+10. B1: exit by breach burst (all rotors full for 0.30 s from first dry rotor); rotor inflow term
+      air_to_water crossed hold 0.59; water_to_air crossed hold 1.00; water_to_land no hold 0.00 (diverged); land_to_air crossed hold 1.00; mission_air 1/2 score 0.47; mission_water 0/1 score 0.19 (unstable) BAD_QACC; mission_land 2/2 score 0.80
+11. B1: no yaw demand (mixer rank 3: props handed by side), water hold upright (tilt 30) with dive hysteresis 0.6/0.08
+      air[0] 0.852; water[0] 0.244; air[1] 0.846; water[1] 0.717
+12. B1: staged level exit (wait at 0.12 m under until level and still), plain cascade through the surface
+      air_to_water crossed hold 0.59; water_to_air crossed hold 1.00; water_to_land no hold 1.00 (never crossed the boundary); land_to_air crossed hold 1.00; mission_air 1/2 score 0.48; mission_water 1/2 score 0.56; mission_land 2/2 score 0.80
+13. B1: air vertical PD 10/5 (was 3/2.5); nav kv 2.5, sqrt approach, land when over the beach
+      air[0] 0.912; water[0] 0.244; land[0] 0.540; air[1] 0.905; water[1] 0.717; land[1] 0.719; air[2] 0.917; water[2] 0.422; land[2] 0.783; air[3] 0.891; water[3] 0.489; land[3] 0.001
+14. B1: same patch, crossings and missions
+      air_to_water crossed hold 0.87; water_to_air crossed hold 1.00; water_to_land crossed hold 1.00; land_to_air crossed hold 1.00; mission_air 2/2 score 0.69; mission_water 2/2 score 0.76; mission_land 2/2 score 0.80
+15. B1: land ground mode variant gains={"c_ref": -0.05, "tilt_g": 25.0}
+      land[0] 0.002; land[1] 0.002; land[2] 0.003; land[3] 0.118
+16. B1: land ground mode variant gains={"c_ref": 0.03}
+      land[0] 0.718; land[1] 0.733; land[2] 0.747; land[3] 0.618
+17. B1: land skid: more ground load, stiffer position loop gains={"c_ref": -0.02, "kd_g": 6.0, "kp_g": 20.0, "tilt_g": 20.0}
+      land[0] 0.806; land[1] 0.760; land[2] 0.721; land[3] 0.000
+18. B1: land skid: more ground load, stiffer position loop gains={"c_ref": -0.03, "kd_g": 8.0, "kp_g": 30.0, "tilt_g": 25.0}
+      land[0] 0.562; land[1] 0.524; land[2] 0.834; land[3] 0.007
+19. B1: land taxi: clearance set-point above the ground, stiffer position loop gains={"c_ref": 0.03, "kd_g": 6.0, "kp_g": 16.0}
+      land[0] 0.681; land[1] 0.700; land[2] 0.723; land[3] 0.347
+20. B1: land taxi: clearance set-point above the ground, stiffer position loop gains={"c_ref": 0.015, "kd_g": 6.0, "kp_g": 16.0}
+      land[0] 0.725; land[1] 0.629; land[2] 0.706; land[3] 0.000
+21. B1: land: settle on the ground first, then taxi 3 cm clear; water dive_in 0.2
+      water[0] 0.219; land[0] 0.713; water[1] 0.681; land[1] 0.741; water[2] 0.519; land[2] 0.747; water[3] 0.456; land[3] 0.761
+22. B0: first full pass on B0 with the controller as tuned on B1
+      air[0] 0.916; water[0] 0.401; land[0] 0.723; air_to_water crossed hold 0.96; water_to_air crossed hold 1.00; water_to_land crossed hold 1.00; land_to_air crossed hold 1.00; mission_air 2/2 score 0.68; mission_water 2/2 score 0.74; mission_land 2/2 score 0.80
+23. B1: faster staging (5 deg, 0.5 rad/s, rise 1.5 m/s), nav depth 0.8 m, transit 9 m/s brake 4
+      air_to_water crossed hold 0.87; water_to_air crossed hold 1.00; water_to_land crossed hold 1.00; land_to_air crossed hold 1.00; mission_air 2/2 score 0.70; mission_water 2/2 score 0.78; mission_land 2/2 score 0.79
+24. B0: faster staging (5 deg, 0.5 rad/s, rise 1.5 m/s), nav depth 0.8 m, transit 9 m/s brake 4
+      air_to_water crossed hold 0.96; water_to_air crossed hold 1.00; water_to_land crossed hold 1.00; land_to_air crossed hold 1.00; mission_air 1/2 score 0.26 (unstable) BAD_QACC; mission_water 2/2 score 0.77; mission_land 2/2 score 0.79
+25. B0: staging back to 3 deg / 0.3 rad/s (5/0.5 gave B0 a bad_qacc at the surface in mission_air)
+      water_to_air crossed hold 1.00; water_to_land crossed hold 1.00; mission_air 2/2 score 0.70; mission_water 2/2 score 0.76; mission_land 2/2 score 0.79
+26. B1: staging back to 3 deg / 0.3 rad/s (5/0.5 gave B0 a bad_qacc at the surface in mission_air)
+      water_to_air crossed hold 1.00; water_to_land crossed hold 1.00; mission_air 2/2 score 0.70; mission_water 2/2 score 0.77; mission_land 2/2 score 0.79
+27. B1: X2: the pre-registered land mode (skid on the feet, clearance set-point -0.012 m) on the final controller, all 8 seeds, same item order as the table gains={"c_ref": -0.012}
+      air[0] 0.912; water[0] 0.223; land[0] 0.391; air[1] 0.905; water[1] 0.717; land[1] 0.662; air[2] 0.917; water[2] 0.422; land[2] 0.648; air[3] 0.891; water[3] 0.516; land[3] 0.689; air[4] 0.927; water[4] 0.425; land[4] 0.564; air[5] 0.924; water[5] 0.211; land[5] 0.521; air[6] 0.895; water[6] 0.293; land[6] 0.871; air[7] 0.910; water[7] 0.218; land[7] 0.628
