@@ -1,0 +1,24 @@
+{
+ "sample": 0,
+ "sample_seed": 20261111,
+ "sizes": {
+  "arch49": {
+   "island_entries": 645,
+   "unique": 645,
+   "with_credit": 5,
+   "replayed": 645
+  },
+  "arch51": {
+   "island_entries": 359,
+   "unique": 359,
+   "with_credit": 4,
+   "replayed": 359
+  },
+  "arch56": {
+   "island_entries": 111,
+   "unique": 111,
+   "with_credit": 2,
+   "replayed": 111
+  }
+ }
+}
