@@ -391,3 +391,9 @@ rollouts, no training, `triquad.py` sha256 unchanged (1cc5f4bd...ee67).
 - Clock arms (timed, otherdraw) complete 8-17 of 32: my estimate before measuring was under 0.3. D3 amended in DIAGNOSIS §7a.
 - B1 from air: 25 completed, 4 failed (diverged 2, unstable 2), 3 missed the land leg. L1 has none of these.
 - Launcher mistake: `( cmd & )` inside a run_in_background shell detaches, so the task "completed" at once; use plain `cmd &` then `wait`.
+
+## 2026-11-11 — E0s (P0.5/P0.6 prototype)
+
+- Agent commit 88359d7. Lead verification: `existence/logs/leadverify4_{m,s,c}.jsonl`, 25 rows (18 missions incl. zero and frozen arms, 3 segments, 4 gated crossings), 0 differ from `results_stateless.jsonl`; `stateless.py tests` re-run, all PASS.
+- Read at source: `Teacher.teach` takes only `o`; `Inner.act` reads attitude, rates, world velocity, hub wetness, submerged fraction, mass matrix; positions only as differences on the body. The harness (`Split`) holds the previous memory, the held `u` and the command clock.
+- Open: air_to_water holds at entries 3 and 4 (0.406, 0.371); observation velocity frame; 3x cruise over-ask.
