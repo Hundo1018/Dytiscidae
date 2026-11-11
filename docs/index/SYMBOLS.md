@@ -930,16 +930,25 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `build_schedule` | function | 167 | `(spec: MissionSpec, rng: np.random.Generator, leg_seconds: float \| None=None) -> list[tuple[Domain, float]]` | Random starting domain, then cycle, as specified. |
-| `continuous_score` | function | 309 | `(result: ContinuousResult, spec: MissionSpec) -> float` | A single number for the continuous mission, in [0, 1]. |
+| `continuous_score` | function | 315 | `(result: ContinuousResult, spec: MissionSpec) -> float` | A single number for the continuous mission, in [0, 1]. |
 | `ContinuousResult` | class | 59 | — | What one unbroken mission produced. |
 | `current_domain` | function | 156 | `(env: TriphibianEnv) -> Domain` | Which domain the machine is physically in right now. |
+| `evaluate_mission` | function | 475 | `(env: TriphibianEnv, controller, start: Domain, seed: int, *, n_legs: int=3, leg_range: tuple[float, float]=LEG_SECONDS_RANGE, on_step=None) -> MissionRead` | Fly one mission from ``start`` and judge it (see the note above). |
 | `LegRecord` | class | 39 | — | One commanded stretch of the mission. |
-| `run_continuous` | function | 178 | `(env: TriphibianEnv, controller, schedule: list[tuple[Domain, float]], *, on_step=None, control_hz: float=25.0, energy_scale: float=1.0, stress_probe=None) -> ContinuousResult` | Fly the whole schedule without ever resetting. |
+| `mission_schedule` | function | 379 | `(start: Domain, seed: int, n_legs: int=3, leg_range: tuple[float, float]=LEG_SECONDS_RANGE) -> list[tuple[Domain, float]]` | ``start`` then the cycle, each leg's duration drawn from ``seed``. |
+| `MissionJudge` | class | 437 | — | ``run_continuous``'s ``on_step``: reads the end of every leg. |
+| `MissionRead` | class | 404 | — | One mission, judged.  ``completed`` is the definition of done for one |
+| `run_continuous` | function | 178 | `(env: TriphibianEnv, controller, schedule: list[tuple[Domain, float]], *, on_step=None, control_hz: float=25.0, energy_scale: float=1.0, stress_probe=None, entry=None) -> ContinuousResult` | Fly the whole schedule without ever resetting. |
+| `settled_in` | function | 390 | `(env: TriphibianEnv, medium: Domain) -> bool` | In ``medium`` right now, as a crossing into it is judged, and upright. |
 | `ContinuousResult.mean_power_w` | property | 101 | `(self) -> float` | Mean draw, on the time base the energy was billed against. |
 | `ContinuousResult.on_task` | property | 86 | `(self) -> float` | Fraction of the whole mission spent in the domain being asked for. |
 | `ContinuousResult.summary` | method | 106 | `(self) -> str` | — |
 | `ContinuousResult.transition_rate` | property | 95 | `(self) -> float` | — |
 | `LegRecord.duration` | property | 54 | `(self) -> float` | — |
+| `MissionJudge.__init__` | method | 440 | `(self, env: TriphibianEnv, schedule: list[tuple[Domain, float]])` | — |
+| `MissionRead.completed` | property | 432 | `(self) -> bool` | — |
+| `MissionRead.transitions_commanded` | property | 421 | `(self) -> int` | — |
+| `MissionRead.transitions_completed` | property | 425 | `(self) -> int` | Leg i's transition: held leg i-1 to its end, and leg i to its end. |
 
 ## `envs.skills` — `dytiscidae/envs/skills.py`
 
@@ -1029,7 +1038,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `air_task` | function | 3042 | `(turn: float, height: float) -> float` | Air's task score: the turn response, qualified by holding height. |
+| `air_task` | function | 3069 | `(turn: float, height: float) -> float` | Air's task score: the turn response, qualified by holding height. |
 | `airworthiness` | function | 342 | `(p: Phenotype) -> list[str]` | Which flight gates a design fails, as reasons.  Empty means none. |
 | `command_statistics` | function | 114 | `(commands) -> tuple[float, float] \| None` | How much, and how erratically, a controller's commands move. |
 | `Domain` | class | 66 | `(str, Enum)` | — |
@@ -1037,8 +1046,8 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `MissionResult` | class | 183 | — | Aggregate of a whole evaluation, at whatever fidelity produced it. |
 | `MissionSpec` | class | 79 | — | The mission the user specified, with every number left adjustable. |
 | `morphology_channels` | function | 489 | `(*, mass: float, density_ratio: float, wing_area: float, span: float, aspect_ratio: float, wing_loading: float, n_actuated: int, battery_wh: float) -> np.ndarray` | The eight body-identity channels, from scalars rather than a phenotype. |
-| `pair_partner_of` | function | 3075 | `(seg: SegmentResult) -> dict` | What the second half of an antipodal pair needs from the first. |
-| `paired_turn` | function | 3053 | `(signed: float, factor: float, partner: dict \| None) -> tuple` | ``(signed, factor, mean)`` for the air turn as one half of a mirrored pair. |
+| `pair_partner_of` | function | 3102 | `(seg: SegmentResult) -> dict` | What the second half of an antipodal pair needs from the first. |
+| `paired_turn` | function | 3080 | `(signed: float, factor: float, partner: dict \| None) -> tuple` | ``(signed, factor, mean)`` for the air turn as one half of a mirrored pair. |
 | `rotor_lift_ratio` | function | 330 | `(p: Phenotype) -> float` | Static thrust of every propeller at top speed, in air, over the weight. |
 | `SegmentResult` | class | 139 | — | What one stretch of operating in one domain produced. |
 | `TriphibianEnv` | class | 519 | — | A compiled machine in the triphibian world, steppable by a controller. |
@@ -1048,30 +1057,31 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `SegmentResult.cost_of_transport` | property | 175 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
 | `TriphibianEnv.__init__` | method | 606 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
 | `TriphibianEnv.body_twist` | method | 1352 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
-| `TriphibianEnv.clearance` | method | 1460 | `(self) -> float` | `_clearance_now`, remembered for the state it was computed on. |
-| `TriphibianEnv.clearance_many` | method | 1479 | `(envs, active=None) -> None` | Fill the `clearance` memo of every (active) machine in one array |
-| `TriphibianEnv.depth` | method | 1399 | `(self) -> float` | — |
+| `TriphibianEnv.clearance` | method | 1487 | `(self) -> float` | `_clearance_now`, remembered for the state it was computed on. |
+| `TriphibianEnv.clearance_many` | method | 1506 | `(envs, active=None) -> None` | Fill the `clearance` memo of every (active) machine in one array |
+| `TriphibianEnv.depth` | method | 1426 | `(self) -> float` | — |
 | `TriphibianEnv.flap_travel` | method | 950 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
 | `TriphibianEnv.flies_level` | method | 1099 | `(self) -> bool` | Whether ``level_margin`` clears ``LEVEL_GATE`` (ROADMAP AD). |
-| `TriphibianEnv.ground_height` | method | 1423 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
-| `TriphibianEnv.ground_heights` | method | 1432 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
-| `TriphibianEnv.held_still_params` | method | 1377 | `(self) -> CPGParams` | The base gait with every actuator held still: the still machine of |
-| `TriphibianEnv.identify` | method | 3002 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.ground_height` | method | 1450 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
+| `TriphibianEnv.ground_heights` | method | 1459 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
+| `TriphibianEnv.ground_support` | method | 1377 | `(self) -> float` | Share of the machine's dry weight the terrain is carrying right now. |
+| `TriphibianEnv.held_still_params` | method | 1404 | `(self) -> CPGParams` | The base gait with every actuator held still: the still machine of |
+| `TriphibianEnv.identify` | method | 3029 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
 | `TriphibianEnv.launch_pitch` | property | 920 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
 | `TriphibianEnv.launch_speed` | property | 888 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
 | `TriphibianEnv.level_margin` | method | 1107 | `(self)` | Can this machine hold height *and* speed, with its own actuators? |
 | `TriphibianEnv.lift_margin` | property | 936 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
-| `TriphibianEnv.morphology_context` | property | 1563 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
-| `TriphibianEnv.observation` | method | 1602 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
+| `TriphibianEnv.morphology_context` | property | 1590 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
+| `TriphibianEnv.observation` | method | 1629 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
 | `TriphibianEnv.reset` | method | 757 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
 | `TriphibianEnv.restore` | method | 1343 | `(self, snap: tuple) -> None` | — |
-| `TriphibianEnv.rollout` | method | 1766 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
-| `TriphibianEnv.root_pos` | method | 1396 | `(self) -> np.ndarray` | — |
+| `TriphibianEnv.rollout` | method | 1793 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
+| `TriphibianEnv.root_pos` | method | 1423 | `(self) -> np.ndarray` | — |
 | `TriphibianEnv.scatter` | method | 791 | `(self, rng, *, strength: float=1.0, pose=None) -> None` | Widen the initial condition, from a caller-supplied generator. |
-| `TriphibianEnv.servo_command` | method | 1739 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
+| `TriphibianEnv.servo_command` | method | 1766 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
 | `TriphibianEnv.snapshot` | method | 1340 | `(self) -> tuple` | — |
-| `TriphibianEnv.step` | method | 1748 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
-| `TriphibianEnv.task_channels` | method | 1687 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
+| `TriphibianEnv.step` | method | 1775 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
+| `TriphibianEnv.task_channels` | method | 1714 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
 | `TriphibianEnv.thrust_margin` | method | 978 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
 
 ## `evolution.archive` — `dytiscidae/evolution/archive.py`

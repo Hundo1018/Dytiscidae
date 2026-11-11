@@ -1374,6 +1374,33 @@ class TriphibianEnv:
                 return True
         return False
 
+    def ground_support(self) -> float:
+        """Share of the machine's dry weight the terrain is carrying right now.
+
+        The vertical component of every terrain contact force on the machine,
+        over ``m g``.  1 for a body at rest on the beach, 0 for one in the air,
+        afloat, or carried by its rotors a few centimetres up: measured
+        2026-11-11 (`experiments/triphibian_diagnosis`, E0b), the hand-flown
+        quad's land score of 0.71-0.76 was earned at 0.000, a skid on 94%
+        thrust reads 0.08, and a walker 1.00.  An instantaneous reading: a gait
+        with an aerial phase reads 0 and then more than 1, so judge it over a
+        window.  The weight is the fluid solver's dry mass, because
+        ``model.body_mass`` carries added mass after any time in the water.
+        """
+        f6 = np.zeros(6)
+        total = 0.0
+        for i in range(self.data.ncon):
+            c = self.data.contact[i]
+            b1 = self.model.geom_bodyid[c.geom1]
+            b2 = self.model.geom_bodyid[c.geom2]
+            if (b1 == 0) == (b2 == 0):  # body 0 is the world
+                continue
+            self._mj.mj_contactForce(self.model, self.data, i, f6)
+            # The contact frame's rows are its axes; the force is on geom2.
+            fz = float(np.asarray(c.frame, float).reshape(3, 3).T[2] @ f6[:3])
+            total += fz if b1 == 0 else -fz
+        return total / (float(self.solver._dry_mass.sum()) * GRAVITY)
+
     def held_still_params(self) -> CPGParams:
         """The base gait with every actuator held still: the still machine of
         CLAUDE.md's lesson.

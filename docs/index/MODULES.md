@@ -2,7 +2,7 @@
 
 # Modules
 
-112 modules, 43,583 lines, 1,226 indexed symbols.
+112 modules, 43,780 lines, 1,236 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -109,11 +109,11 @@ is what makes a violation visible while reading.
 | `envs.devroll.scatter_wp` | The scatter between two ``mj_step``s on the device (IMPL_1010 A1b). | 1119 | — | `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `physics.energy`, `physics.fluid`, `physics.rotor` |
 | `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 753 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 72 | — | — | — |
-| `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 336 | — | `numpy` | `envs.triphibian` |
+| `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 506 | — | `numpy` | `envs.transitions`, `envs.triphibian` |
 | `envs.skills` | The actuator skill bench: learning to operate components, not vehicles. | 655 | — | `numpy` | `evolution.cmaes`, `physics.energy`, `physics.materials`, `physics.medium`, `physics.structure` |
 | `envs.tasks` | What a segment asks the machine to do, phase by phase. | 301 | — | — | — |
 | `envs.transitions` | Crossing between media, scored rather than merely survived. | 905 | — | `numpy` | `core.mjcf`, `envs.triphibian` |
-| `envs.triphibian` | The triphibian mission environment. | 3088 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
+| `envs.triphibian` | The triphibian mission environment. | 3115 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
 
 ## `evolution`
 

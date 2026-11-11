@@ -4776,6 +4776,75 @@ def test_an_open_loop_body_with_thrust_crosses_nothing() -> None:
           f"hold {upright.hold:.2f}, {upright.failure}")
 
 
+def test_the_mission_verdict_reads_the_end_of_every_leg() -> None:
+    """P0.3 (2026-11-11, `experiments/triphibian_diagnosis`): the mission as a
+    verdict.  ``continuous_score`` paid a quad with its rotors stopped
+    0.15-0.58; ``evaluate_mission`` asks whether the machine is in the
+    commanded medium at the end of every leg, and on land with its weight on
+    the ground.  The still machine is the check: it holds the leg it was put
+    in and no other.
+    """
+    print("\nmission: the verdict reads the end of every leg")
+    from dytiscidae.core.bodyplans import REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import mission as M
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    a = M.mission_schedule(Domain.WATER, 3)
+    lo, hi = M.LEG_SECONDS_RANGE
+    check("a schedule is the cycle from its start, each leg's duration drawn from the seed",
+          [d for d, _ in a] == [Domain.WATER, Domain.LAND, Domain.AIR]
+          and all(lo <= s <= hi for _, s in a) and a == M.mission_schedule(Domain.WATER, 3)
+          and a != M.mission_schedule(Domain.WATER, 4)
+          and [s for _, s in a] != [s for _, s in M.mission_schedule(Domain.LAND, 3)],
+          ", ".join(f"{d.value} {s:.2f}s" for d, s in a))
+
+    read = M.MissionRead(Domain.AIR, 0, M.mission_schedule(Domain.AIR, 0),
+                         held=[False, True, True])
+    check("a transition counts only if the leg before it was held to its end",
+          read.transitions_completed == 1 and not read.completed,
+          f"{read.transitions_completed} of {read.transitions_commanded}")
+    read = M.MissionRead(Domain.AIR, 0, M.mission_schedule(Domain.AIR, 0),
+                         held=[True, True], failure="unstable")
+    check("a mission that failed measured nothing",
+          read.transitions_completed == 0 and not read.completed)
+
+    env = TriphibianEnv(build(REFERENCE_PLANS["quad"]()), seed=0)
+    still = Controller(params=env.held_still_params(), policy=None, bases=None)
+    short = (1.5, 2.5)
+
+    env.reset(Domain.AIR, randomise=False)
+    check("a machine in the air is carried by no ground",
+          env.ground_support() == 0.0, f"{env.ground_support():.3f}")
+
+    land = M.evaluate_mission(env, still, Domain.LAND, 0, leg_range=short)
+    check("the still quad holds the land leg it was put on, with its weight on the ground",
+          land.held == [True, False, False] and land.transitions_completed == 0
+          and not land.completed and not land.failure
+          and land.supports[0] is not None and 0.95 <= land.supports[0] <= 1.05,
+          f"held {land.held}, support {land.supports[0]}")
+    again = M.evaluate_mission(env, still, Domain.LAND, 0, leg_range=short)
+    check("the same seed is the same mission",
+          again.shares == land.shares and again.supports == land.supports
+          and again.result.energy_wh == land.result.energy_wh)
+
+    floated = type(env).ground_support
+    try:
+        type(env).ground_support = lambda self: 0.0
+        taxi = M.evaluate_mission(env, still, Domain.LAND, 0, leg_range=short)
+    finally:
+        type(env).ground_support = floated
+    check("ashore without the weight on the ground is not on land",
+          taxi.held[0] is False and taxi.shares[0] >= M.ARRIVAL_SHARE,
+          f"held {taxi.held}, share {taxi.shares[0]:.2f}, support {taxi.supports[0]}")
+
+    water = M.evaluate_mission(env, still, Domain.WATER, 0, leg_range=short)
+    check("and from the water it holds the water leg and makes no transition",
+          water.held == [True, False, False] and water.transitions_completed == 0,
+          f"held {water.held}, shares {water.shares}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -4860,6 +4929,7 @@ def main() -> int:
         test_depth_is_a_gain_not_a_spawn,
         test_an_evaluation_counts_the_steps_it_took,
         test_an_open_loop_body_with_thrust_crosses_nothing,
+        test_the_mission_verdict_reads_the_end_of_every_leg,
     ])
     return report("all physics checks passed")
 

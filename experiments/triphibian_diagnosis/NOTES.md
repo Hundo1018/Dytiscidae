@@ -384,3 +384,10 @@ rollouts, no training, `triquad.py` sha256 unchanged (1cc5f4bd...ee67).
 - `scripts/crossing_telemetry.py` -> `results/crossing_telemetry.jsonl` (gates off) and `_gates_on.jsonl`. Row-for-row: hand arms identical; base B1 water_to_land entry 2 and B0 water_to_air entry 1 lose the crossing; base holds go to 0 on 25 more rows that had not crossed.
 - Dwell gate dropped on evidence (see ROADMAP). L1 walk loses water_to_land from 3 of 8 entry states with or without gates: a P0.9 item.
 - `tools/mutate.py --only` takes one id per invocation (the last wins).
+
+## 2026-11-11 — P0.3 mission verdict
+
+- `scripts/mission_eval.py` -> `results/mission_eval.jsonl` (1,152 rows, legs 7-13 s) and `mission_eval_wide.jsonl` (288 rows, L1, legs 7-19 s).
+- Clock arms (timed, otherdraw) complete 8-17 of 32: my estimate before measuring was under 0.3. D3 amended in DIAGNOSIS §7a.
+- B1 from air: 25 completed, 4 failed (diverged 2, unstable 2), 3 missed the land leg. L1 has none of these.
+- Launcher mistake: `( cmd & )` inside a run_in_background shell detaches, so the task "completed" at once; use plain `cmd &` then `wait`.
