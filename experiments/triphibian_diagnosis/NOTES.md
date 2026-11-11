@@ -397,3 +397,8 @@ rollouts, no training, `triquad.py` sha256 unchanged (1cc5f4bd...ee67).
 - Agent commit 88359d7. Lead verification: `existence/logs/leadverify4_{m,s,c}.jsonl`, 25 rows (18 missions incl. zero and frozen arms, 3 segments, 4 gated crossings), 0 differ from `results_stateless.jsonl`; `stateless.py tests` re-run, all PASS.
 - Read at source: `Teacher.teach` takes only `o`; `Inner.act` reads attitude, rates, world velocity, hub wetness, submerged fraction, mass matrix; positions only as differences on the body. The harness (`Split`) holds the previous memory, the held `u` and the command clock.
 - Open: air_to_water holds at entries 3 and 4 (0.406, 0.371); observation velocity frame; 3x cruise over-ask.
+
+## 2026-11-11 — port of E0s (5045265)
+
+- Lead check, own script, 27 missions through `teacher_controller(env).installed(env)`: first attempt forgot to install (controller None runs the base gait, silently); second: 10 of 27 differ from the prototype rows (energy at 1e-12; nomem verdicts 2); third, with the prototype's preamble (`launch_speed`, `level_margin()`, `flies_level()`, `thrust_margin()` before installing): 8 of 8 re-run rows identical. So the port is exact and the environment carries history across `reset`.
+- To trace: what `reset` leaves (candidates: fluid solver's published mass/inertia, rotor state, cached facts).
