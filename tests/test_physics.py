@@ -4909,6 +4909,18 @@ def test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert() -> None:
           and sorted(rot + stroke + feather) == list(range(model.n_act)),
           f"{len(rot)} rotors, {len(stroke)} strokes, {len(feather)} feathers of {model.n_act}")
 
+    # -- the constants are the body's, not the history's
+    used = TriphibianEnv(p, seed=0)
+    used.reset(Domain.AIR, randomise=False)
+    used.rollout(0.3, params=used.cpg.base, policy=None, basis=None, domain=Domain.AIR)
+    after = IL.body_model(used)
+    check("the model read off an environment that has flown is the model read off a fresh one",
+          np.array_equal(after.hubs_body, model.hubs_body) and after.side == model.side
+          and after.yaw_ok == model.yaw_ok and np.array_equal(after.ipos, model.ipos)
+          and float(np.abs(used.data.qpos[7:]).max()) > 1.0,
+          f"hub lever arms differ by {float(np.abs(after.hubs_body - model.hubs_body).max()):.1e} "
+          f"with the joints up to {float(np.abs(used.data.qpos[7:]).max()):.1f} rad from reference")
+
     # -- the zero action
     env.reset(Domain.AIR, randomise=False)
     z = inner.act(np.zeros(IL.N_ACT))

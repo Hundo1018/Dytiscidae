@@ -377,12 +377,12 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `body_model` | function | 144 | `(env) -> BodyModel` | Read the model constants off an environment. |
+| `body_model` | function | 157 | `(env) -> BodyModel` | Read the model constants off an environment. |
 | `BodyModel` | class | 79 | — | What either half of the split knows about the body that is not in the |
-| `InnerLoop` | class | 188 | — | ``act(u) -> actuator targets``, every simulation step. |
+| `InnerLoop` | class | 201 | — | ``act(u) -> actuator targets``, every simulation step. |
 | `BodyModel.n` | property | 118 | `(self) -> int` | — |
-| `InnerLoop.__init__` | method | 191 | `(self, env, model: BodyModel)` | — |
-| `InnerLoop.act` | method | 196 | `(self, u) -> np.ndarray` | — |
+| `InnerLoop.__init__` | method | 204 | `(self, env, model: BodyModel)` | — |
+| `InnerLoop.act` | method | 209 | `(self, u) -> np.ndarray` | — |
 
 ## `control.outer` — `dytiscidae/control/outer.py`
 

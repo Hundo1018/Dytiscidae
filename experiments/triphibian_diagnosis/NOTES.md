@@ -402,3 +402,10 @@ rollouts, no training, `triquad.py` sha256 unchanged (1cc5f4bd...ee67).
 
 - Lead check, own script, 27 missions through `teacher_controller(env).installed(env)`: first attempt forgot to install (controller None runs the base gait, silently); second: 10 of 27 differ from the prototype rows (energy at 1e-12; nomem verdicts 2); third, with the prototype's preamble (`launch_speed`, `level_margin()`, `flies_level()`, `thrust_margin()` before installing): 8 of 8 re-run rows identical. So the port is exact and the environment carries history across `reset`.
 - To trace: what `reset` leaves (candidates: fluid solver's published mass/inertia, rotor state, cached facts).
+
+## 2026-11-12 — the history dependence
+
+- Not `reset`. Side-by-side stepping after reset (scratchpad probe): 0 differences in 400 steps, five history/medium pairs, still and base gait.
+- Cause: `body_model` read hub lever arms off the live `env.data`. Fix: scratch `MjData` at the reference pose. Eight histories, one energy (0.7786780709202821 Wh on the 2-3 s probe mission).
+- `scripts/split_eval.py` is the package-based runner (fresh environment per mission); `results/split_eval.jsonl`.
+- `scripts/port_check.py` now reports differences against the prototype rows by construction; its gate was met at 5045265.

@@ -2,7 +2,7 @@
 
 # Modules
 
-114 modules, 44,673 lines, 1,259 indexed symbols.
+114 modules, 44,686 lines, 1,259 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -65,7 +65,7 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `control.cpg` | Central pattern generator, and the *discovered* control basis. | 706 | — | `numpy` | — |
-| `control.innerloop` | The stabilising inner loop of a rotor-and-limb body, and the action it takes. | 341 | — | `numpy` | `physics.medium`, `physics.rotor` |
+| `control.innerloop` | The stabilising inner loop of a rotor-and-limb body, and the action it takes. | 354 | — | `numpy` | `physics.medium`, `physics.rotor` |
 | `control.outer` | The outer law of the split controller: an observation in, an action out. | 480 | — | `numpy` | `control.innerloop`, `core.mjcf`, `envs.evaluate`, `envs.tasks`, `envs.triphibian` |
 | `control.train` | Learning a controller for one morphology. | 257 | — | `numpy` | `control.cpg`, `envs.evaluate`, `envs.mission`, `envs.triphibian`, `evolution.cmaes`, `physics.wake`, `viz.showcase` |
 

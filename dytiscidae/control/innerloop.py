@@ -119,7 +119,20 @@ class BodyModel:
         return len(self.rot)
 
 
-def _yaw_authority(env, rot) -> bool:
+def _reference_pose(env):
+    """A scratch ``MjData`` at the model's reference pose, never the one being
+    simulated.  The constants below were first read off ``env.data`` at
+    whatever pose the last rollout left, so a hub's lever arm carried the
+    rounding of that pose, and the same seed's mission came out different in
+    the 12th digit after a different history: the teacher's verdict on none of
+    nine missions, the zero-memory arm's on one (2026-11-11).  The same
+    mistake, and the same cure, as `TriphibianEnv._measure_trim_speed`."""
+    d = env._mj.MjData(env.model)
+    env._mj.mj_forward(env.model, d)
+    return d
+
+
+def _yaw_authority(env, rot, d) -> bool:
     """Whether rotor reaction torque can yaw the body independently of roll
     and pitch.  On the reference quad it cannot: its propellers are handed
     by side (left +, right -), so the yaw row of the mixer is -(kappa/0.2)
@@ -127,10 +140,10 @@ def _yaw_authority(env, rot) -> bool:
     mixer then leaks every yaw demand into roll (8.6%).  Without authority
     the yaw demand is dropped and the heading is left free; the cascade is
     omnidirectional and no score reads the heading."""
-    m, d = env.model, env.data
-    env._mj.mj_forward(m, d)
+    m = env.model
     R = d.xmat[env.root_body].reshape(3, 3)
-    mb = m.body_mass[1:]
+    # Dry: `model.body_mass` carries the water a body last entrained.
+    mb = env.solver._dry_mass[1:]
     com = (mb[:, None] * d.xipos[1:]).sum(0) / float(mb.sum())
     A = np.zeros((4, len(rot)))
     for i, b in enumerate(rot):
@@ -145,11 +158,12 @@ def body_model(env) -> BodyModel:
     """Read the model constants off an environment.
 
     Rotor actuators are the ones named ``*_r``, limb strokes ``*_a`` and limb
-    feathers ``*_f`` (`core.mjcf`).  Geometry is read from the pose the
-    environment is in (after an ``mj_forward``), so it is exact to rounding
-    only: build the model where the controller is built.
+    feathers ``*_f`` (`core.mjcf`).  Geometry is read at the model's reference
+    pose on a scratch ``MjData`` (`_reference_pose`), so the constants are the
+    body's and not the history's.
     """
-    mj, m, d = env._mj, env.model, env.data
+    mj, m = env._mj, env.model
+    d = _reference_pose(env)
     names = env.act_names
     irot = [k for k, a in enumerate(names) if a.endswith("_r")]
     rot = [mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY, names[k][:-2] + "_rot") for k in irot]
@@ -158,8 +172,7 @@ def body_model(env) -> BodyModel:
     Ta, Qa = bemt(spec, 600.0, 0.0, 0.0, air.rho, air.mu)
     Tw, Qw = bemt(spec, 30.0, 0.0, 0.0, water.rho, water.mu)
     aid = mj.mj_name2id(m, mj.mjtObj.mjOBJ_ACTUATOR, names[irot[0]])
-    yaw_ok = _yaw_authority(env, rot)
-    mj.mj_forward(m, d)
+    yaw_ok = _yaw_authority(env, rot, d)
     Rr = d.xmat[env.root_body].reshape(3, 3)
     p0 = d.xpos[env.root_body]
     istroke = [k for k, a in enumerate(names) if a.endswith("_a")]

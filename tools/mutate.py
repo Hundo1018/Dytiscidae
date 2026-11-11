@@ -2002,6 +2002,15 @@ MUTATIONS: tuple = (
         item="P0.4"),
     # --- the split controller (2026-11-11) ------------------------------------
     Mutation(
+        id="split-body-model-read-off-the-live-pose",
+        path="dytiscidae/control/innerloop.py",
+        find="    mj, m = env._mj, env.model\n    d = _reference_pose(env)\n",
+        replace="    mj, m = env._mj, env.model\n    d = env.data\n    mj.mj_forward(m, d)\n",
+        defect="the controller's lever arms carry the rounding of whatever pose the last rollout "
+               "left, so the same seed's mission depends on the environment's history",
+        suites=("test_physics::test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert",),
+        item="P0.5"),
+    Mutation(
         id="split-zero-action-is-not-inert",
         path="dytiscidae/control/innerloop.py",
         find='            out[md.istroke] = GAIT["rest"] + float(u[U_POSE]) * (GAIT["stand"] - GAIT["rest"])',
