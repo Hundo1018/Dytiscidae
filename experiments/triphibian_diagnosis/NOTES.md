@@ -377,3 +377,10 @@ rollouts, no training, `triquad.py` sha256 unchanged (1cc5f4bd...ee67).
 - Lead verification: `existence/logs/leadverify3_{walk5,frozen2,mis}.jsonl`, 8 rows, every numeric field equal to `results_land.jsonl` except `wall_s`. First attempt failed: `landgait.py --out` resolves against the script's directory; pass an absolute path.
 - Found: the land command speed is 0.04 m/s (`dytiscidae/envs/tasks.py:63`), so a land score of 0.94 is a crawl (measured_land_speed 0.0087 on seed 5). Goes to P0.11.
 - Not run: L1 entry-state rows, L1 crossing nulls (P0.9).
+
+## 2026-11-11 (later still) — P0.2 first part
+
+- Committed the record as b652788 on branch `triphibian-diagnosis` (trajectories left out, regenerable).
+- `scripts/crossing_telemetry.py` -> `results/crossing_telemetry.jsonl` (gates off) and `_gates_on.jsonl`. Row-for-row: hand arms identical; base B1 water_to_land entry 2 and B0 water_to_air entry 1 lose the crossing; base holds go to 0 on 25 more rows that had not crossed.
+- Dwell gate dropped on evidence (see ROADMAP). L1 walk loses water_to_land from 3 of 8 entry states with or without gates: a P0.9 item.
+- `tools/mutate.py --only` takes one id per invocation (the last wins).

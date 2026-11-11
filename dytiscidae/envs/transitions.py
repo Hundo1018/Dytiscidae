@@ -51,6 +51,9 @@ without the raw record of what happened changing underneath it.
 
 from __future__ import annotations
 
+import math
+import os
+from collections import deque
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -172,6 +175,15 @@ class TransitionResult:
     #: no contact at all, which a body floating in water satisfies every step:
     #: it paid a still machine 0.300 on ``water_to_air`` until 2026-10-03.
     aloft_fraction: float = 0.0
+    #: Furthest the root got, horizontally, from where the hold began, metres,
+    #: over the hold phase.  Raw: a body that moves the same whatever it is
+    #: told drifts through the hold as it does through the go (2026-11-11, E0n:
+    #: an open-loop gait was credited two crossings in 35).
+    hold_drift: float = 0.0
+    #: Share of the last DWELL_SECONDS spent arrived: clear by more than 0.5 m
+    #: for an air target, in the water for a water target, ashore for a land
+    #: target.  Raw.  ``None`` when the probe did not run that long.
+    end_dwell: float | None = None
     #: Highest clearance reached in the go phase.  ``peak_clearance`` covers the
     #: whole episode including where the probe *put* the machine, and the 5 cm
     #: placement gap alone paid a sitting gannet 0.031 of a takeoff.
@@ -261,6 +273,29 @@ HOLD_PASS = 0.5
 HOLD_ALT_FULL = 0.5  # m
 HOLD_ALT_ZERO = 1.5  # m
 
+
+#: Holding in water or on land is holding station: full marks for a root that
+#: stays within STATION_FULL of where the hold began, nothing at STATION_ZERO.
+#: Measured 2026-11-11 over four crossings from eight entry states
+#: (``experiments/triphibian_diagnosis/results/crossing_telemetry.jsonl``): the
+#: hand law holds within 0.22 m in water and 0.07 m on land on three bodies,
+#: and the two crossings credited to an open-loop gait drifted 0.88 and 0.98 m
+#: through their holds.  Read only with ``crossing_gates()`` on.
+STATION_FULL = 0.25  # m
+STATION_ZERO = 0.75  # m
+
+
+def crossing_gates() -> bool:
+    """Whether the 2026-11-11 gates apply: station in a water or land hold, and
+    arriving the right way up (``CrossingTracker``).  Off by default, so every
+    stored crossing keeps its meaning; on, crossings are not comparable with
+    earlier ones.  An environment variable because the batched path's workers
+    are spawned processes and inherit it."""
+    return os.environ.get("DYTISCIDAE_CROSSING_GATES", "0") not in ("", "0")
+
+
+#: The window at the end of a probe over which ``end_dwell`` is read.
+DWELL_SECONDS = 0.5
 
 #: How close to the ground counts as on it when classifying the start and the
 #: land hold: every placement leaves a few centimetres so the machine does not
@@ -360,15 +395,33 @@ class CrossingTracker:
     - the graded shore progress counts only what was made after the command.
     - a probe that aborted (battery flat, diverged, unstable) holds nothing,
       so it earns no graded approach.
+
+    And with ``crossing_gates()`` on (2026-11-11, the tenth instance: the still
+    machine is not the only machine that does not read the command).  A body
+    with thrust on an open-loop gait was credited two crossings in 35
+    (``water_to_air`` and ``water_to_land``, both tumbling out of the water
+    upside down), because the water and land holds read only which medium the
+    root was in:
+
+    - holding in water or on land is holding *station*: the hold is scaled by
+      how far the root strayed from where it began (STATION_FULL, STATION_ZERO).
+      A body that moves the same whatever it is told moves through the hold;
+    - a crossing has to arrive the right way up.  A body past 90 degrees at the
+      end was thrown, not flown, and the next leg cannot start from it.
     """
 
     def __init__(self, env: TriphibianEnv, kind: str):
         self.start, self.target = TRANSITION_ENDPOINTS[kind]
+        self.gates = crossing_gates()
         self.hold_steps = max(int(round(HOLD_SECONDS / env.timestep)), 1)
         self.started_in = medium_of(env, GROUND_TOL)
         self.z0 = float(env.root_pos()[2])
         self.x0 = float(env.root_pos()[0])
         self.x_go = self.x0
+        self.y0 = float(env.root_pos()[1])
+        self.hold_drift = 0.0
+        self._dwell: deque = deque(
+            maxlen=max(int(round(DWELL_SECONDS / env.timestep)), 1))
         self.z_min = self.z0
         self.in_start = 0
         self.held_steps = 0
@@ -405,6 +458,8 @@ class CrossingTracker:
             self.held_steps += 1
             # Where the go command finds it: shore progress counts from here.
             self.x_go = float(env.root_pos()[0])
+            self.hold_drift = max(self.hold_drift, math.hypot(
+                self.x_go - self.x0, float(env.root_pos()[1]) - self.y0))
             if self.start is Domain.AIR:
                 if m is Domain.AIR:
                     self.in_start += 1
@@ -439,10 +494,19 @@ class CrossingTracker:
         self.go_peak = max(self.go_peak, cl)
         if cl > AIRBORNE_GAP:
             self.aloft_steps += 1
-        if (self.cross_step < 0 and self.target is not Domain.AIR and m is self.target
-                and (self.target is not Domain.LAND or ashore(env))):
+        if self.target is Domain.AIR:
+            arrived = cl > 0.5
+        else:
+            arrived = m is self.target and (self.target is not Domain.LAND or ashore(env))
+        self._dwell.append(arrived)
+        if self.cross_step < 0 and self.target is not Domain.AIR and arrived:
             self.cross_step = i
             self.entry_speed = abs(float(env.body_twist()[2]))
+
+    @staticmethod
+    def upright_at_end(env: TriphibianEnv) -> float:
+        """The root's up axis against the world's: 1 level, 0 on its side."""
+        return float(env.data.xmat[env.root_body].reshape(3, 3)[2, 2])
 
     def hold_score(self) -> float:
         if self.started_in is not self.start or self.left_early or not self.held_steps:
@@ -456,6 +520,9 @@ class CrossingTracker:
             height = float(np.clip((HOLD_ALT_ZERO - loss) / (HOLD_ALT_ZERO - HOLD_ALT_FULL),
                                    0.0, 1.0))
             return float(stayed * height)
+        if self.gates:
+            stayed *= float(np.clip((STATION_ZERO - self.hold_drift)
+                                    / (STATION_ZERO - STATION_FULL), 0.0, 1.0))
         return float(stayed)
 
     def finish(self, env: TriphibianEnv, r: TransitionResult, n_steps: int) -> int:
@@ -471,6 +538,9 @@ class CrossingTracker:
         r.started_in = self.started_in.value
         r.aloft_fraction = self.aloft_steps / max(self.go_steps, 1)
         r.go_peak_clearance = self.go_peak
+        r.hold_drift = self.hold_drift
+        r.end_dwell = (sum(self._dwell) / len(self._dwell)
+                       if len(self._dwell) == self._dwell.maxlen else None)
         if self.target is Domain.LAND and SHORE_X > self.x0:
             # Progress made after the command, over the whole start-to-shore
             # distance.  From the start it paid a still amphibian 0.136 of a
@@ -488,6 +558,9 @@ class CrossingTracker:
                              or (self.target is Domain.LAND and not ashore(env))):
             # Held: it has to be there at the end, not have passed through.
             cross = -1
+        overturned = False
+        if self.gates and cross >= 0 and self.upright_at_end(env) <= 0.0:
+            cross, overturned = -1, True
         if cross >= 0:
             r.peak_entry_speed = max(r.peak_entry_speed, self.entry_speed)
         r.crossed = cross >= 0 and not r.failure and r.hold >= HOLD_PASS
@@ -496,6 +569,8 @@ class CrossingTracker:
                 r.failure = f"did not start in {self.start.value}"
             elif cross >= 0 and r.hold < HOLD_PASS:
                 r.failure = "did not hold before the command to cross"
+            elif overturned:
+                r.failure = "arrived overturned"
         return cross if r.crossed else -1
 
 
@@ -617,6 +692,7 @@ def run_transition(
     control_every = max(1, int(1.0 / (25.0 * env.timestep)))
     cur = controller.params
 
+    bad0 = int(env.data.warning[env._mj.mjtWarning.mjWARN_BADQACC].number)
     energy0 = float(env.budget.total_j)
     track = CrossingTracker(env, kind)
     uprights: list[float] = []
@@ -671,6 +747,12 @@ def run_transition(
         # Vertical speed at the moment of crossing is what the hull sees.
         track.observe(env, i)
 
+    # A MuJoCo auto-reset, as the batched path reads it: positions cannot see
+    # one.  Until 2026-11-11 only ``evaluate_transition_batch`` read this, so a
+    # probe that reset mid-crossing could be credited here and not there.
+    r.bad_qacc = int(env.data.warning[env._mj.mjtWarning.mjWARN_BADQACC].number) - bad0
+    if r.bad_qacc > 0 and not r.failure:
+        r.failure = "unstable"
     cross_step = track.finish(env, r, len(uprights))
     r.airborne_fraction = airborne_steps / max(len(uprights), 1)
     r.energy_j = float(env.budget.total_j - energy0)

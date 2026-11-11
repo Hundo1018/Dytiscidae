@@ -1941,6 +1941,32 @@ MUTATIONS: tuple = (
                "pays the jump: 0.54 to arch46 elite 82 held still",
         suites=("test_search::test_a_crossing_is_commanded_and_a_still_machine_makes_none",),
         item="ARCH46 8"),
+    # --- crossings: a body that does not read the command (2026-11-11) -------
+    Mutation(
+        id="crossing-station-gate-off",
+        path="dytiscidae/envs/transitions.py",
+        find="        if self.gates:\n            stayed *= float(np.clip((STATION_ZERO - self.hold_drift)",
+        replace="        if False:\n            stayed *= float(np.clip((STATION_ZERO - self.hold_drift)",
+        defect="a water or land hold reads only the medium, so an open-loop gait that drifts "
+               "0.98 m through the hold keeps it",
+        suites=("test_physics::test_an_open_loop_body_with_thrust_crosses_nothing",),
+        item="P0.2"),
+    Mutation(
+        id="crossing-arrives-overturned-and-counts",
+        path="dytiscidae/envs/transitions.py",
+        find="        if self.gates and cross >= 0 and self.upright_at_end(env) <= 0.0:",
+        replace="        if False:",
+        defect="a body thrown out of the water upside down is credited water_to_air",
+        suites=("test_physics::test_an_open_loop_body_with_thrust_crosses_nothing",),
+        item="P0.2"),
+    Mutation(
+        id="crossing-single-path-ignores-auto-reset",
+        path="dytiscidae/envs/transitions.py",
+        find="    if r.bad_qacc > 0 and not r.failure:\n        r.failure = \"unstable\"\n    cross_step",
+        replace="    cross_step",
+        defect="run_transition credits a probe MuJoCo reset mid-crossing; the batched path does not",
+        suites=("test_physics::test_an_open_loop_body_with_thrust_crosses_nothing",),
+        item="P0.2"),
     Mutation(
         id="still-machine-leaves-rotors-spinning",
         path="dytiscidae/envs/triphibian.py",

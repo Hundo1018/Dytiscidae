@@ -4703,6 +4703,79 @@ def test_an_evaluation_counts_the_steps_it_took() -> None:
           rep["steps"].get("main.identify") == 2 * want["identify"])
 
 
+def test_an_open_loop_body_with_thrust_crosses_nothing() -> None:
+    """The tenth instance (2026-11-11, `experiments/triphibian_diagnosis`, E0n).
+
+    The reference quad on its open-loop base gait -- rest throttle, no policy,
+    nothing that reads the command -- was credited a ``water_to_air`` crossing
+    from one entry state in eight: it tumbles out of the water during the hold
+    and is upside down, clear by more than 0.5 m, at the last step.  The water
+    hold read only which medium the root was in.
+
+    With ``crossing_gates()`` on, the hold is a station and the arrival has to
+    be the right way up.  Each gate is checked with the other taken out, and
+    the leak is checked to be there with both out, so this cannot go quiet.
+    """
+    print("\ntransitions: an open-loop body with thrust crosses nothing")
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.core.bodyplans import REFERENCE_PLANS
+    from dytiscidae.envs import transitions as T
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import TriphibianEnv
+
+    env = TriphibianEnv(build(REFERENCE_PLANS["quad"]()), seed=0)
+    ctrl = Controller(params=env.cpg.base, policy=None, bases=None)
+    draw = T.transition_scatter_seed
+
+    def run(gates: str, **patch):
+        saved = {k: getattr(T, k) if hasattr(T, k) else T.CrossingTracker.__dict__[k]
+                 for k in patch}
+        old = os.environ.get("DYTISCIDAE_CROSSING_GATES")
+        try:
+            os.environ["DYTISCIDAE_CROSSING_GATES"] = gates
+            # The entry state that leaked: the repo's draw for this kind, moved.
+            T.transition_scatter_seed = lambda kind: (draw(kind) + 7919) & 0x7FFFFFFF
+            for k, v in patch.items():
+                setattr(T if hasattr(T, k) else T.CrossingTracker, k, v)
+            return T.run_transition(env, "water_to_air", ctrl)
+        finally:
+            T.transition_scatter_seed = draw
+            for k, v in saved.items():
+                setattr(T if hasattr(T, k) else T.CrossingTracker, k, v)
+            if old is None:
+                os.environ.pop("DYTISCIDAE_CROSSING_GATES", None)
+            else:
+                os.environ["DYTISCIDAE_CROSSING_GATES"] = old
+
+    # A MuJoCo auto-reset mid-crossing: the batched path has always read the
+    # counter, the single path did not until 2026-11-11.
+    reset = T.run_transition(env, "air_to_water", ctrl)
+    check("a crossing probe that MuJoCo reset is unstable on the single path too",
+          reset.bad_qacc > 0 and reset.failure == "unstable" and not reset.crossed
+          and reset.hold == 0.0,
+          f"bad_qacc {reset.bad_qacc}, {reset.failure}")
+
+    off = run("0")
+    check("with the gates off the open-loop quad is credited water_to_air (the leak is there)",
+          off.crossed and off.bad_qacc == 0 and off.hold_drift > T.STATION_ZERO
+          and off.exit_upright < 0.0,
+          f"crossed {off.crossed}, drift {off.hold_drift:.2f} m, exit upright "
+          f"{off.exit_upright:+.2f}, {off.failure}")
+    on = run("1")
+    check("with the gates on it is not",
+          not on.crossed and on.hold == 0.0 and on.components["crossed"] == 0.0,
+          f"crossed {on.crossed}, hold {on.hold:.2f}, approach {on.components['crossed']:.3f}")
+    station = run("1", upright_at_end=staticmethod(lambda env: 1.0))
+    check("the station gate alone refuses it: it strayed through the hold",
+          not station.crossed and station.hold < T.HOLD_PASS,
+          f"hold {station.hold:.2f} at drift {station.hold_drift:.2f} m")
+    upright = run("1", STATION_FULL=1e9, STATION_ZERO=2e9)
+    check("the arrival gate alone refuses it: it is upside down at the end",
+          not upright.crossed and upright.hold >= T.HOLD_PASS
+          and upright.failure == "arrived overturned",
+          f"hold {upright.hold:.2f}, {upright.failure}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -4786,6 +4859,7 @@ def main() -> int:
         test_takeoff_is_measured_where_the_machine_starts_on_the_ground,
         test_depth_is_a_gain_not_a_spawn,
         test_an_evaluation_counts_the_steps_it_took,
+        test_an_open_loop_body_with_thrust_crosses_nothing,
     ])
     return report("all physics checks passed")
 

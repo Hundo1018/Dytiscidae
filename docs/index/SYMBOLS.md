@@ -1003,23 +1003,25 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `ashore` | function | 287 | `(env: TriphibianEnv) -> bool` | On land *out of the water*: ``medium_of`` says LAND and the ground under |
-| `CrossingTracker` | class | 325 | — | What a crossing is, shared by ``run_transition`` and the batched path. |
-| `medium_of` | function | 273 | `(env: TriphibianEnv, ground_tol: float=0.0) -> Domain` | Which medium the machine is in: root under water, else on the ground |
-| `reseat_after_scatter` | function | 565 | `(env: TriphibianEnv, kind: str) -> None` | Put a land start back on the ground at the pose ``scatter`` left. |
-| `run_transition` | function | 592 | `(env: TriphibianEnv, kind: str, controller, *, duration: float=6.0, back: float=0.0) -> TransitionResult` | Simulate one crossing and measure it.  ``back``: see ``_place_for``. |
-| `transition_scatter_seed` | function | 223 | `(kind: str) -> int` | The entry-state draw every machine's ``kind`` crossing starts from. |
-| `TransitionResult` | class | 127 | — | One crossing, measured.  Every field is a raw physical quantity or a |
-| `TransitionSet` | class | 799 | — | All crossings attempted in one evaluation. |
-| `CrossingTracker.__init__` | method | 365 | `(self, env: TriphibianEnv, kind: str)` | — |
-| `CrossingTracker.commanded` | method | 398 | `(self, i: int) -> Domain` | The medium the controller is told about at step ``i``. |
-| `CrossingTracker.energy_height_loss` | method | 387 | `(self) -> float \| None` | Energy height lost over the hold, metres, from the fitted slope; |
-| `CrossingTracker.finish` | method | 461 | `(self, env: TriphibianEnv, r: TransitionResult, n_steps: int) -> int` | Set ``r.hold``, ``r.started_in``, ``r.crossed``; return the cross step. |
-| `CrossingTracker.hold_score` | method | 447 | `(self) -> float` | — |
-| `CrossingTracker.observe` | method | 402 | `(self, env: TriphibianEnv, i: int) -> None` | — |
-| `TransitionResult.components` | property | 209 | `(self) -> dict[str, float]` | The scored parts, for the judge to weight. |
-| `TransitionSet.component_means` | method | 810 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
-| `TransitionSet.crossed_fraction` | property | 805 | `(self) -> float` | — |
+| `ashore` | function | 322 | `(env: TriphibianEnv) -> bool` | On land *out of the water*: ``medium_of`` says LAND and the ground under |
+| `crossing_gates` | function | 288 | `() -> bool` | Whether the 2026-11-11 gates apply: station in a water or land hold, and |
+| `CrossingTracker` | class | 360 | — | What a crossing is, shared by ``run_transition`` and the batched path. |
+| `medium_of` | function | 308 | `(env: TriphibianEnv, ground_tol: float=0.0) -> Domain` | Which medium the machine is in: root under water, else on the ground |
+| `reseat_after_scatter` | function | 640 | `(env: TriphibianEnv, kind: str) -> None` | Put a land start back on the ground at the pose ``scatter`` left. |
+| `run_transition` | function | 667 | `(env: TriphibianEnv, kind: str, controller, *, duration: float=6.0, back: float=0.0) -> TransitionResult` | Simulate one crossing and measure it.  ``back``: see ``_place_for``. |
+| `transition_scatter_seed` | function | 235 | `(kind: str) -> int` | The entry-state draw every machine's ``kind`` crossing starts from. |
+| `TransitionResult` | class | 130 | — | One crossing, measured.  Every field is a raw physical quantity or a |
+| `TransitionSet` | class | 881 | — | All crossings attempted in one evaluation. |
+| `CrossingTracker.__init__` | method | 413 | `(self, env: TriphibianEnv, kind: str)` | — |
+| `CrossingTracker.commanded` | method | 451 | `(self, i: int) -> Domain` | The medium the controller is told about at step ``i``. |
+| `CrossingTracker.energy_height_loss` | method | 440 | `(self) -> float \| None` | Energy height lost over the hold, metres, from the fitted slope; |
+| `CrossingTracker.finish` | method | 528 | `(self, env: TriphibianEnv, r: TransitionResult, n_steps: int) -> int` | Set ``r.hold``, ``r.started_in``, ``r.crossed``; return the cross step. |
+| `CrossingTracker.hold_score` | method | 511 | `(self) -> float` | — |
+| `CrossingTracker.observe` | method | 455 | `(self, env: TriphibianEnv, i: int) -> None` | — |
+| `CrossingTracker.upright_at_end` | method | 507 | `(env: TriphibianEnv) -> float` | The root's up axis against the world's: 1 level, 0 on its side. |
+| `TransitionResult.components` | property | 221 | `(self) -> dict[str, float]` | The scored parts, for the judge to weight. |
+| `TransitionSet.component_means` | method | 892 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
+| `TransitionSet.crossed_fraction` | property | 887 | `(self) -> float` | — |
 
 ## `envs.triphibian` — `dytiscidae/envs/triphibian.py`
 
