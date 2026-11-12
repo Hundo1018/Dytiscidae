@@ -551,6 +551,14 @@ Asked which of three the three runs are for, the user answered: "a想驗證框�
 
 This changes §6 and §7a where they read as if the hand-built anchor's mission were the end. D1-D5 remain the definition of "a machine does triphibian locomotion" and are what (a) is read by; done for the project is D1-D5 met by a body the search produced, and the flapping share is what the search then maximises. The anchor is a seed and a test fixture.
 
+## 7c The goal, redirected by the user later on 2026-11-12
+
+After the evidence that the search as run did not optimise and that co-design with learning in the loop costs 1e3-1e4 times this project's budget (ROADMAP, same day), the user changed the target, in their words:
+
+> 我認為應該先調整目標 / 我仍然想保持三棲撲翼的目標 / 而機構生成/強化學習 的部分則要進行取捨 / 我認為你可以「直接」多方參考並設計一個足夠優雅的撲翼，我不限制你的撲翼形狀、振動、膜、羽翼或是軟韌度與運動方式，但求的是能夠以該優雅撲翼進行划水游泳與拍翅飛行，而陸行移動則以該翼支撐身體行走 / 能源效率則忽略不計 / 其餘若你有不確定或建議則可問我
+
+That is: the target is a flapping triphibian. One wing, designed directly and from references, has to row or fly the body through water, flap it through air, and carry it on land by supporting the body. Its shape, vibration, membrane or feathers, compliance and motion are free. Energy efficiency is not counted. Body generation and reinforcement learning are to be traded off, not assumed. This supersedes §7b's ordering (search as the goal) and §7a's rotor-borne anchor as the route; the instruments (crossing gates, `evaluate_mission`, `ground_support`) and the method stand. The legged quad is a control, not the design.
+
 ## 8 Not verified, or found on the way
 
 - The reviewer did not re-open the literature of §4 and did not check E0's
