@@ -23,6 +23,8 @@ DEFAULTS = dict(
     stroke_range=1.4,        # rad either way
     motor_mass=0.004, gear_ratio=6.0, motor_class="coreless",
     battery_wh=0.6, battery_chem="lipo",
+    hand_fraction=0.0,       # share of the wing's length that is the outer panel (0: one panel)
+    wrist_motor_mass=0.002,
 )
 
 
@@ -47,6 +49,24 @@ def flapper(**over) -> Genome:
     g.parts = [hull, wing]
     g.edges = [Edge(parent=0, child=1, pos_u=float(e["shoulder_u"]), elevation=0.0, roll=0.0,
                     scale=1.0, reflect=True)]
+    if float(e["hand_fraction"]) > 0.0:
+        # Two panels: the inner "arm" keeps the shoulder, the outer "hand" turns
+        # about the span on a wrist at the arm's tip.  The wing's length and
+        # chord are unchanged, so the area is the one-panel wing's.
+        h = float(e["hand_fraction"]) * float(e["wing_length"])
+        wing.length = wing.span = float(e["wing_length"]) - h
+        hand = Part(kind=WING, length=h, span=h, root_chord=float(e["wing_chord"]),
+                    radius=float(e["wing_radius"]), material=str(e["wing_material"]),
+                    joint="hinge", joint_axis=np.array([1.0, 0.0, 0.0]),
+                    joint_range=(-1.0, 1.0), actuated=True, motor_class=str(e["motor_class"]),
+                    motor_mass=float(e["wrist_motor_mass"]), gear_ratio=float(e["gear_ratio"]),
+                    sealed=False, stroke_amplitude=0.0, neutral=0.5)
+        g.parts.append(hand)
+        # Elevation pi/2 continues along the arm's own axis and roll pi keeps the
+        # chord on the arm's side of the spar (checked on the built model: the
+        # hand's centre is at the arm's chordwise station, its hinge along the span).
+        g.edges.append(Edge(parent=1, child=2, pos_u=1.0, elevation=math.pi / 2, roll=math.pi,
+                            scale=1.0, reflect=False))
     g.battery_wh, g.battery_chem = float(e["battery_wh"]), str(e["battery_chem"])
     g.flap_frequency = 1.0
     g.lineage = ["flapper"]
