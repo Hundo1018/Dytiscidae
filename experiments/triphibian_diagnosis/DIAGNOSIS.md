@@ -559,6 +559,15 @@ After the evidence that the search as run did not optimise and that co-design wi
 
 That is: the target is a flapping triphibian. One wing, designed directly and from references, has to row or fly the body through water, flap it through air, and carry it on land by supporting the body. Its shape, vibration, membrane or feathers, compliance and motion are free. Energy efficiency is not counted. Body generation and reinforcement learning are to be traded off, not assumed. This supersedes §7b's ordering (search as the goal) and §7a's rotor-borne anchor as the route; the instruments (crossing gates, `evaluate_mission`, `ground_support`) and the method stand. The legged quad is a control, not the design.
 
+Four questions were put to the user the same day and answered:
+
+| question | answer |
+|---|---|
+| Scale | Set by the physics (expected tens to hundreds of grams); the 15 kg, 10 m, 45 min reference is set aside. |
+| Actuators, given that energy is not counted | Two stages: first the wing's motion prescribed with no torque limit, to find a motion that flies, swims and walks; then a real drive (motor and crank, or elastic resonance), and the gap reported. Endurance and consumption are not counted in either. |
+| What counts as done | First the three ways of moving, each in its medium, by the same wings, with the do-nothing arms at zero; then the transitions (take-off under its own power, entering and leaving the water, coming ashore). |
+| What the body may have besides the wings | An active tail or an active body is allowed. No rotors, legs or wheels: propulsion and support on land are the wings'. |
+
 ## 8 Not verified, or found on the way
 
 - The reviewer did not re-open the literature of §4 and did not check E0's
