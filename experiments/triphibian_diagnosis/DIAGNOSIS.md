@@ -541,6 +541,16 @@ Not part of done, and named so that nobody reads them in: `water_to_air`
 crawling on the flapping wings. The last is the user's stated direction for
 land and is the first thing after done, or sooner if E0b's arm W shows it.
 
+## 7b The goal, restated by the user on 2026-11-12
+
+Asked which of three the three runs are for, the user answered: "a想驗證框架是否正確 / c是最佳化條件 b是目標". That is:
+
+- **(b) is the goal**: the body that does triphibian locomotion comes out of the search.
+- **(a) is a check**: one machine doing it shows the framework (instruments, verdict, controller architecture, learner) is correct. It is not the destination.
+- **(c) is the optimisation criterion**: among bodies that do it, toward flapping.
+
+This changes §6 and §7a where they read as if the hand-built anchor's mission were the end. D1-D5 remain the definition of "a machine does triphibian locomotion" and are what (a) is read by; done for the project is D1-D5 met by a body the search produced, and the flapping share is what the search then maximises. The anchor is a seed and a test fixture.
+
 ## 8 Not verified, or found on the way
 
 - The reviewer did not re-open the literature of §4 and did not check E0's
