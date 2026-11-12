@@ -93,6 +93,11 @@ def make_env(layout: str, seed: int, **over):
     # draw must not end a rollout as a flat pack.  The mass is the 0.6 Wh pack's.
     env.budget.battery.capacity_j = 1e15
     env.budget.battery.reset()
+    # A fore-to-hind wake fed back at this gain (`wakefb.py`), for sensitivity
+    # reads; unset or 0 it is not attached and nothing changes.
+    if float(os.environ.get("FLAPPER_WAKE_GAIN", "0") or 0.0) != 0.0:
+        import wakefb
+        wakefb.attach(env, float(os.environ["FLAPPER_WAKE_GAIN"]))
     return env
 
 
