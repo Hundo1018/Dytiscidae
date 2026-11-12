@@ -83,8 +83,9 @@ def fly(args):
     return row, (np.array(obs), np.array(lab))
 
 
-def fit(X, Y, hold):
-    """Fit on rows ``~hold``; report error on rows ``hold``."""
+def fit(X, Y, hold, weight=None):
+    """Fit on rows ``~hold``; report error on rows ``hold``.  ``weight`` (L1, arm
+    W) is a per-row loss weight; ``None`` is L0's unweighted fit, unchanged."""
     import torch
 
     torch.manual_seed(FIT_SEED)
@@ -107,6 +108,7 @@ def fit(X, Y, hold):
                               torch.nn.Linear(HIDDEN, len(CONT) + len(FLAG))).double()
     opt = torch.optim.Adam(net.parameters(), lr=LR)
     bce = torch.nn.BCEWithLogitsLoss()
+    wt = None if weight is None else torch.as_tensor(np.asarray(weight, float)[~hold])
     g = torch.Generator().manual_seed(FIT_SEED)
     n = len(x)
     for _ in range(EPOCHS):
@@ -114,7 +116,14 @@ def fit(X, Y, hold):
         for i in range(0, n, BATCH):
             idx = perm[i:i + BATCH]
             out = net(x[idx])
-            loss = ((out[:, :len(CONT)] - yc[idx]) ** 2).mean() + bce(out[:, len(CONT):], yf[idx])
+            if wt is None:
+                loss = (((out[:, :len(CONT)] - yc[idx]) ** 2).mean()
+                        + bce(out[:, len(CONT):], yf[idx]))
+            else:
+                wi = wt[idx] / wt[idx].mean()
+                loss = ((wi[:, None] * (out[:, :len(CONT)] - yc[idx]) ** 2).mean()
+                        + (wi[:, None] * torch.nn.functional.binary_cross_entropy_with_logits(
+                            out[:, len(CONT):], yf[idx], reduction="none")).mean())
             opt.zero_grad()
             loss.backward()
             opt.step()
