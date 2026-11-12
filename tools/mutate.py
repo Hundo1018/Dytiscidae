@@ -246,8 +246,8 @@ MUTATIONS: tuple = (
     Mutation(
         id="antipode-keeps-the-heading",
         path="dytiscidae/envs/tasks.py",
-        find="        Phase(ph.kind, ph.start, _wrap(ph.heading + math.pi), ph.speed, ph.depth)\n",
-        replace="        Phase(ph.kind, ph.start, ph.heading, ph.speed, ph.depth)\n",
+        find="              _wrap(ph.heading + math.pi) if ph.kind == CRUISE else ph.heading, ph.speed,\n",
+        replace="              ph.heading, ph.speed,\n",
         defect="the second half repeats the first heading, so nothing cancels",
         suites=("test_search::test_the_heading_pair_cancels_what_the_command_did_not_choose",), item="heading pair"),
     Mutation(
@@ -1966,6 +1966,31 @@ MUTATIONS: tuple = (
         replace="    cross_step",
         defect="run_transition credits a probe MuJoCo reset mid-crossing; the batched path does not",
         suites=("test_physics::test_an_open_loop_body_with_thrust_crosses_nothing",),
+        item="P0.2"),
+    # --- the water hold, paired (2026-11-12) ----------------------------------
+    Mutation(
+        id="depth-pair-response-not-read",
+        path="dytiscidae/envs/triphibian.py",
+        find="                second *= float(np.clip(resp, 0.0, 1.0))\n",
+        replace="                pass\n",
+        defect="a body that sinks the same way in both halves of a water pair keeps its hold credit",
+        suites=("test_physics::test_a_depth_command_is_answerable_both_ways",),
+        item="P0.2"),
+    Mutation(
+        id="depth-pair-antipode-keeps-the-depth",
+        path="dytiscidae/envs/tasks.py",
+        find='    flip = schedule.domain == "water" and depth_pair()\n',
+        replace="    flip = False\n",
+        defect="both halves of a water pair are told the same depth, so sinking answers both",
+        suites=("test_physics::test_a_depth_command_is_answerable_both_ways",),
+        item="P0.2"),
+    Mutation(
+        id="depth-pair-unmeasured-hold-is-paid",
+        path="dytiscidae/envs/triphibian.py",
+        find="            else:\n                second = 0.0\n",
+        replace="            else:\n                pass\n",
+        defect="a hold measured in one half only is paid half its score with no response read",
+        suites=("test_physics::test_a_depth_command_is_answerable_both_ways",),
         item="P0.2"),
     # --- the mission verdict (2026-11-11) -------------------------------------
     Mutation(

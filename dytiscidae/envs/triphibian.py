@@ -2099,6 +2099,7 @@ class TriphibianEnv:
                     sink = float(abs(dep[top - 1] - dep[mid]) / max(span, 1e-6))
                     level = float(np.clip(1.0 - sink / HOLD_SINK_SPEED, 0.0, 1.0))
                     rec.update(error=e_d + e_m, depth_error=e_d, drift=e_m, sink=sink,
+                               depth=float(np.mean(dep[mid:top])),
                                score=at * still * level * served)
                 else:
                     drift = float(np.mean(np.linalg.norm(xy[mid:top] - xy[mid], axis=1)))
@@ -2163,9 +2164,18 @@ class TriphibianEnv:
             cr = next(r for r in phases if r["kind"] == CRUISE)
             ho = next(r for r in phases if r["kind"] == HOLD)
             self._publish_half(m, cr, ho["score"])
-            prog, served, track, second = self._paired(cr, ho["score"])
+            # What the depth pair reads (`tasks.depth_pair`): where the hold was
+            # told to be, always, and where it was, when it was measured.
+            hph = next(ph for ph in t.phases if ph.kind == HOLD)
+            ho["cmd"] = float(hph.depth)
+            m["pair_hold_cmd"] = ho["cmd"]
+            if "depth" in ho:
+                m["pair_hold_depth"] = ho["depth"]
+            prog, served, track, second = self._paired(cr, ho["score"], hold=ho)
             if "pair_along_mean" in cr:
                 m["pair_along_mean"] = cr["pair_along_mean"]
+            if "pair_depth_response" in ho:
+                m["pair_depth_response"] = ho["pair_depth_response"]
             task = 0.5 * prog * served + 0.5 * second
             if cr["measured"]:
                 m["cruise_tracking"] = track
@@ -2251,7 +2261,7 @@ class TriphibianEnv:
             m["pair_tracking"] = cruise["tracking"]
             m["pair_served"] = cruise["served"]
 
-    def _paired(self, cruise: dict, second: float) -> tuple:
+    def _paired(self, cruise: dict, second: float, hold: dict | None = None) -> tuple:
         """``(progress, served, tracking, second)`` for the cruise phase.
 
         On its own: this half's numbers.  As the second half of an antipodal
@@ -2261,12 +2271,27 @@ class TriphibianEnv:
         half's, because following one command is not following both; the hold
         or stop score is the mean.  A half that was not measured makes the
         pair's progress unmeasured too -- zero, as an unserved phase is.
+
+        ``hold`` is the water hold's record.  When the two halves were told
+        different depths (`tasks.depth_pair`), the mean hold score is scaled by
+        the *response*: how much of the commanded difference in depth the
+        measured difference is, clipped to [0, 1].  A body that sinks the same
+        way in both halves answers nothing and is paid nothing, however long it
+        spent at either depth; a hold not measured in either half is no answer.
         """
         p = self.pair_partner
         if p is None:
             return (cruise.get("progress", 0.0), cruise.get("served", 0.0),
                     cruise.get("tracking", 0.0), float(second))
         second = 0.5 * (float(second) + float(p.get("second", 0.0)))
+        if hold is not None and "hold_cmd" in p and abs(hold["cmd"] - p["hold_cmd"]) > 1e-9:
+            if "depth" in hold and "hold_depth" in p:
+                resp = (hold["depth"] - p["hold_depth"]) / (hold["cmd"] - p["hold_cmd"])
+                # Unclipped, so a reader can see the cancellation is exact.
+                hold["pair_depth_response"] = float(resp)
+                second *= float(np.clip(resp, 0.0, 1.0))
+            else:
+                second = 0.0
         if not cruise["measured"] or "along" not in p:
             return 0.0, 0.0, 0.0, second
         along = 0.5 * (cruise["along"] + p["along"])
@@ -3112,4 +3137,8 @@ def pair_partner_of(seg: SegmentResult) -> dict:
     if "pair_along" in m:
         out.update(along=float(m["pair_along"]), across=float(m["pair_across"]),
                    tracking=float(m["pair_tracking"]), served=float(m["pair_served"]))
+    if "pair_hold_cmd" in m:
+        out["hold_cmd"] = float(m["pair_hold_cmd"])
+    if "pair_hold_depth" in m:
+        out["hold_depth"] = float(m["pair_hold_depth"])
     return out

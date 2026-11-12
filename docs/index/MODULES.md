@@ -2,7 +2,7 @@
 
 # Modules
 
-114 modules, 44,686 lines, 1,259 indexed symbols.
+114 modules, 44,747 lines, 1,261 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -113,9 +113,9 @@ is what makes a violation visible while reading.
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 72 | — | — | — |
 | `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 506 | — | `numpy` | `envs.transitions`, `envs.triphibian` |
 | `envs.skills` | The actuator skill bench: learning to operate components, not vehicles. | 655 | — | `numpy` | `evolution.cmaes`, `physics.energy`, `physics.materials`, `physics.medium`, `physics.structure` |
-| `envs.tasks` | What a segment asks the machine to do, phase by phase. | 301 | — | — | — |
+| `envs.tasks` | What a segment asks the machine to do, phase by phase. | 333 | — | — | — |
 | `envs.transitions` | Crossing between media, scored rather than merely survived. | 905 | — | `numpy` | `core.mjcf`, `envs.triphibian` |
-| `envs.triphibian` | The triphibian mission environment. | 3115 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
+| `envs.triphibian` | The triphibian mission environment. | 3144 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
 
 ## `evolution`
 

@@ -5117,6 +5117,89 @@ def test_the_teacher_completes_the_mission_through_the_split() -> None:
           f"{got['reused'][6]} decisions, energy {got['reused'][4]!r} Wh, held {got['reused'][0]}")
 
 
+def test_a_depth_command_is_answerable_both_ways() -> None:
+    """The water hold, paired (2026-11-12, `tasks.depth_pair`).
+
+    Every commanded depth is below the release depth, so a body that only
+    sinks is at the commanded depth for a while: the gannet held still is paid
+    0.013 of a hold on the default draw, and the two-pair flapper held still
+    0.072 (`experiments/flapper/RESULT_F3c.md`).  With the switch on the second
+    half of the pair is told the depth on the other side of the release depth
+    and the hold is scaled by the response between the halves.
+    """
+    print("\nwater: a depth command is answerable both ways")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import tasks as TK
+    from dytiscidae.envs.evaluate import Controller, _scatter_seed, run_segment
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    def with_switch(value, fn):
+        old = os.environ.get("DYTISCIDAE_DEPTH_PAIR")
+        os.environ["DYTISCIDAE_DEPTH_PAIR"] = value
+        try:
+            return fn()
+        finally:
+            if old is None:
+                os.environ.pop("DYTISCIDAE_DEPTH_PAIR", None)
+            else:
+                os.environ["DYTISCIDAE_DEPTH_PAIR"] = old
+
+    check("the release depth the mirror turns about is the water spawn's",
+          TK.WATER_START_DEPTH == -TriphibianEnv.SPAWN[Domain.WATER][2],
+          f"{TK.WATER_START_DEPTH} against {-TriphibianEnv.SPAWN[Domain.WATER][2]}")
+    w = TK.schedule_for("water", np.random.default_rng(3))
+    off = with_switch("0", lambda: TK.antipode(w))
+    on = with_switch("1", lambda: TK.antipode(w))
+    d0 = w.phases[0].depth
+    turned = all(abs(math.cos(a.heading) + math.cos(b.heading)) < 1e-12
+                 for a, b in zip(w.phases, on.phases) if a.kind == TK.CRUISE)
+    check("off, the antipode keeps the depth; on, it is the other side of the release depth",
+          all(ph.depth == d0 for ph in off.phases)
+          and all(abs(ph.depth - (2 * TK.WATER_START_DEPTH - d0)) < 1e-12 for ph in on.phases)
+          and turned and on.phases[0].depth < TK.WATER_START_DEPTH < d0,
+          f"drawn {d0:.2f} m, pair {on.phases[0].depth:.2f} m")
+    land = TK.schedule_for("land", np.random.default_rng(3))
+    check("a land pair is not touched, and a mirrored depth stays under the surface",
+          with_switch("1", lambda: TK.antipode(land)) == TK.antipode(land)
+          and TK.mirror_depth(9.0) == 0.5)
+
+    env = TriphibianEnv(build(BODY_PLANS["gannet"]()), seed=0)
+    still = Controller(params=env.held_still_params(), policy=None, bases=None)
+
+    def seg():
+        ss = _scatter_seed(0, Domain.WATER)
+        t = TK.schedule_for(Domain.WATER, np.random.default_rng(TK.task_seed(ss)))
+        return run_segment(env, Domain.WATER, 8.0, still, scatter_seed=ss, task=t)
+
+    leak = with_switch("0", seg)
+    shut = with_switch("1", seg)
+    check("off, the gannet held still is paid for a hold by sinking (the leak is there)",
+          leak.measurements["pair_second"] > 0.005 and "pair_depth_response" not in leak.measurements,
+          f"pair hold {leak.measurements['pair_second']:.4f}, competence {leak.competence:.4f}")
+    check("on, it answers nothing and is paid nothing",
+          abs(shut.measurements["pair_depth_response"]) < 1e-9
+          and shut.measurements["pair_second"] == 0.0 and shut.competence < 1e-12,
+          f"response {shut.measurements['pair_depth_response']:+.1e}, competence {shut.competence}")
+
+    cruise = {"measured": False}
+    env.pair_partner = {"second": 0.6, "hold_cmd": 2.0, "hold_depth": 2.0}
+    try:
+        half = env._paired(dict(cruise), 0.8, hold={"cmd": 6.0, "depth": 4.0})[3]
+        full = env._paired(dict(cruise), 0.8, hold={"cmd": 6.0, "depth": 6.5})[3]
+        wrong = env._paired(dict(cruise), 0.8, hold={"cmd": 6.0, "depth": 1.0})[3]
+        unread = env._paired(dict(cruise), 0.8, hold={"cmd": 6.0})[3]
+        env.pair_partner = {"second": 0.6, "hold_cmd": 6.0, "hold_depth": 2.0}
+        same = env._paired(dict(cruise), 0.8, hold={"cmd": 6.0, "depth": 6.0})[3]
+    finally:
+        env.pair_partner = None
+    check("the pair's hold is the mean scaled by the share of the commanded difference made",
+          abs(half - 0.35) < 1e-12 and abs(full - 0.7) < 1e-12 and wrong == 0.0,
+          f"half the way {half:.3f}, all of it and more {full:.3f}, the wrong way {wrong:.3f}")
+    check("a hold not measured is no answer, and one depth for both halves is not gated",
+          unread == 0.0 and abs(same - 0.7) < 1e-12, f"unmeasured {unread}, same command {same:.3f}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -5202,6 +5285,7 @@ def main() -> int:
         test_an_evaluation_counts_the_steps_it_took,
         test_an_open_loop_body_with_thrust_crosses_nothing,
         test_the_mission_verdict_reads_the_end_of_every_leg,
+        test_a_depth_command_is_answerable_both_ways,
         test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert,
         test_the_teacher_completes_the_mission_through_the_split,
     ])

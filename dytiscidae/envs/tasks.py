@@ -49,6 +49,7 @@ scoring that reads it is ``TriphibianEnv._task_scores``.
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass
 
 #: Commanded cruise speed per medium, in m/s.  Air is absent on purpose: a
@@ -278,10 +279,41 @@ def antipode(schedule: TaskSchedule) -> TaskSchedule:
     eight-heading sweep every elite earned its credit on 1-3 headings, and the
     still machine cleared water 0.15 in 35 of 200 against the elites' 45.
     """
+    flip = schedule.domain == "water" and depth_pair()
     return TaskSchedule(schedule.domain, tuple(
-        Phase(ph.kind, ph.start, _wrap(ph.heading + math.pi), ph.speed, ph.depth)
-        if ph.kind == CRUISE else ph
+        Phase(ph.kind, ph.start,
+              _wrap(ph.heading + math.pi) if ph.kind == CRUISE else ph.heading, ph.speed,
+              mirror_depth(ph.depth) if flip and ph.depth is not None else ph.depth)
         for ph in schedule.phases))
+
+
+#: The depth the water segment releases a machine at, metres
+#: (``TriphibianEnv.SPAWN``; `tests/test_physics.py` holds the two together).
+WATER_START_DEPTH = 4.0
+
+
+def depth_pair() -> bool:
+    """Whether the second half of a water pair is commanded to the *other* side
+    of the release depth (2026-11-12).  Off by default, so every stored water
+    score keeps its meaning; on, water is not comparable with earlier water.
+    An environment variable because the batched path's workers are spawned
+    processes and inherit it (as ``transitions.crossing_gates``).
+
+    The heading has been answerable both ways since 2026-10-06 and the depth
+    was not: every commanded depth (``HOLD_DEPTH_RANGE``) is below the release
+    depth, in both halves, so a body that sinks and does nothing else is at
+    the commanded depth for a while in both.  Measured 2026-11-12 on the
+    two-pair flapper held still (16% heavy): hold credit on 4 of 16 unseen
+    seeds, 0.072 at most, with its progress at exactly 0.  With this on the
+    two halves ask for depths either side of the release depth and the hold is
+    paid on the response between them (``TriphibianEnv._paired``), so a body
+    that does the same thing whatever it is told is paid nothing."""
+    return os.environ.get("DYTISCIDAE_DEPTH_PAIR", "0") not in ("", "0")
+
+
+def mirror_depth(depth: float) -> float:
+    """``depth`` reflected about the release depth, kept under the surface."""
+    return max(2.0 * WATER_START_DEPTH - float(depth), 0.5)
 
 
 def _at(ph: Phase, start: float) -> Phase:

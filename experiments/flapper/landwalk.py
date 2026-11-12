@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import math
 import sys
 import time
@@ -82,6 +83,10 @@ SERVO = dict(stroke=(30.0, 0.10), feather=(20.0, 0.03), tail=(5.0, 0.01))
 
 def make_env(layout: str, seed: int, **over):
     body = dict(LAYOUTS[layout])
+    # Body options from the environment (JSON), for a re-read on a changed body
+    # without touching the layouts the stored rows were made with: unset, this
+    # is the layout as F2 and F3b ran it.  Inherited by spawned workers.
+    body.update(json.loads(os.environ.get(f"FLAPPER_BODY_{layout}", "{}")))
     body.update(over)
     env = TriphibianEnv(build(flapper(**body)), seed=seed, timestep=DT)
     # Energy is not counted in stage 1 (the user, 2026-11-12): an ideal servo's

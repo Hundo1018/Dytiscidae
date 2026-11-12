@@ -1031,17 +1031,19 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `antipode` | function | 265 | `(schedule: TaskSchedule) -> TaskSchedule` | The same script with every cruise heading turned by pi. |
-| `mirror` | function | 234 | `(schedule: TaskSchedule) -> TaskSchedule` | The same air script with the drawn turn the other way. |
-| `pair_of` | function | 253 | `(schedule: TaskSchedule) -> TaskSchedule` | The second half of a paired segment: the antipode in water and on land, |
-| `Phase` | class | 136 | — | One purpose, over one stretch of a segment. |
-| `schedule_for` | function | 189 | `(domain, rng=None, *, trim_speed: float=0.0) -> TaskSchedule` | The two-phase script for one segment in ``domain``. |
-| `task_seed` | function | 295 | `(scatter_seed: int) -> int` | The task draw for one segment, derived from its scatter draw. |
-| `TaskSchedule` | class | 156 | — | The phases one segment is made of, in order. |
-| `Phase.moving` | property | 151 | `(self) -> bool` | — |
-| `TaskSchedule.at` | method | 170 | `(self, frac: float) -> Phase` | — |
-| `TaskSchedule.bounds` | method | 173 | `(self, n: int) -> list` | Sample index ranges ``[(lo, hi), ...]`` for a segment of ``n`` samples. |
-| `TaskSchedule.index_at` | method | 162 | `(self, frac: float) -> int` | The phase in force at ``frac`` of the way through the segment. |
+| `antipode` | function | 266 | `(schedule: TaskSchedule) -> TaskSchedule` | The same script with every cruise heading turned by pi. |
+| `depth_pair` | function | 295 | `() -> bool` | Whether the second half of a water pair is commanded to the *other* side |
+| `mirror` | function | 235 | `(schedule: TaskSchedule) -> TaskSchedule` | The same air script with the drawn turn the other way. |
+| `mirror_depth` | function | 314 | `(depth: float) -> float` | ``depth`` reflected about the release depth, kept under the surface. |
+| `pair_of` | function | 254 | `(schedule: TaskSchedule) -> TaskSchedule` | The second half of a paired segment: the antipode in water and on land, |
+| `Phase` | class | 137 | — | One purpose, over one stretch of a segment. |
+| `schedule_for` | function | 190 | `(domain, rng=None, *, trim_speed: float=0.0) -> TaskSchedule` | The two-phase script for one segment in ``domain``. |
+| `task_seed` | function | 327 | `(scatter_seed: int) -> int` | The task draw for one segment, derived from its scatter draw. |
+| `TaskSchedule` | class | 157 | — | The phases one segment is made of, in order. |
+| `Phase.moving` | property | 152 | `(self) -> bool` | — |
+| `TaskSchedule.at` | method | 171 | `(self, frac: float) -> Phase` | — |
+| `TaskSchedule.bounds` | method | 174 | `(self, n: int) -> list` | Sample index ranges ``[(lo, hi), ...]`` for a segment of ``n`` samples. |
+| `TaskSchedule.index_at` | method | 163 | `(self, frac: float) -> int` | The phase in force at ``frac`` of the way through the segment. |
 
 ## `envs.transitions` — `dytiscidae/envs/transitions.py`
 
@@ -1075,7 +1077,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `air_task` | function | 3069 | `(turn: float, height: float) -> float` | Air's task score: the turn response, qualified by holding height. |
+| `air_task` | function | 3094 | `(turn: float, height: float) -> float` | Air's task score: the turn response, qualified by holding height. |
 | `airworthiness` | function | 342 | `(p: Phenotype) -> list[str]` | Which flight gates a design fails, as reasons.  Empty means none. |
 | `command_statistics` | function | 114 | `(commands) -> tuple[float, float] \| None` | How much, and how erratically, a controller's commands move. |
 | `Domain` | class | 66 | `(str, Enum)` | — |
@@ -1083,8 +1085,8 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `MissionResult` | class | 183 | — | Aggregate of a whole evaluation, at whatever fidelity produced it. |
 | `MissionSpec` | class | 79 | — | The mission the user specified, with every number left adjustable. |
 | `morphology_channels` | function | 489 | `(*, mass: float, density_ratio: float, wing_area: float, span: float, aspect_ratio: float, wing_loading: float, n_actuated: int, battery_wh: float) -> np.ndarray` | The eight body-identity channels, from scalars rather than a phenotype. |
-| `pair_partner_of` | function | 3102 | `(seg: SegmentResult) -> dict` | What the second half of an antipodal pair needs from the first. |
-| `paired_turn` | function | 3080 | `(signed: float, factor: float, partner: dict \| None) -> tuple` | ``(signed, factor, mean)`` for the air turn as one half of a mirrored pair. |
+| `pair_partner_of` | function | 3127 | `(seg: SegmentResult) -> dict` | What the second half of an antipodal pair needs from the first. |
+| `paired_turn` | function | 3105 | `(signed: float, factor: float, partner: dict \| None) -> tuple` | ``(signed, factor, mean)`` for the air turn as one half of a mirrored pair. |
 | `rotor_lift_ratio` | function | 330 | `(p: Phenotype) -> float` | Static thrust of every propeller at top speed, in air, over the weight. |
 | `SegmentResult` | class | 139 | — | What one stretch of operating in one domain produced. |
 | `TriphibianEnv` | class | 519 | — | A compiled machine in the triphibian world, steppable by a controller. |
@@ -1103,7 +1105,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `TriphibianEnv.ground_heights` | method | 1459 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
 | `TriphibianEnv.ground_support` | method | 1377 | `(self) -> float` | Share of the machine's dry weight the terrain is carrying right now. |
 | `TriphibianEnv.held_still_params` | method | 1404 | `(self) -> CPGParams` | The base gait with every actuator held still: the still machine of |
-| `TriphibianEnv.identify` | method | 3029 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.identify` | method | 3054 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
 | `TriphibianEnv.launch_pitch` | property | 920 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
 | `TriphibianEnv.launch_speed` | property | 888 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
 | `TriphibianEnv.level_margin` | method | 1107 | `(self)` | Can this machine hold height *and* speed, with its own actuators? |
