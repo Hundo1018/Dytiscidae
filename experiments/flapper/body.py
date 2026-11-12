@@ -11,7 +11,7 @@ import math
 import numpy as np
 
 from dytiscidae.core.bodyplans import _fusiform
-from dytiscidae.core.genome import HULL, WING, Edge, Genome, Part
+from dytiscidae.core.genome import HULL, PADDLE, STRUT, WING, Edge, Genome, Part
 
 DEFAULTS = dict(
     hull_length=0.16, hull_radius=0.018, hull_dry=0.9,
@@ -26,6 +26,13 @@ DEFAULTS = dict(
     hand_fraction=0.0,       # share of the wing's length that is the outer panel (0: one panel)
     wrist_motor_mass=0.002,
     hand_compliance=0.0,     # > 0: the wrist is a passive spring hinge of this compliance
+    # -- F2 (land): all off by default
+    thumb_length=0.0,        # m; > 0: a fixed strut under each wing, pointing down
+    thumb_radius=0.002, thumb_u=0.25,      # station along the wing, 0 shoulder, 1 tip
+    tail_length=0.0,         # m; > 0: a paddle on an actuated hinge at the rear of the hull
+    tail_chord=0.06, tail_radius=0.002, tail_motor_mass=0.003, tail_range=1.0,
+    tail_el=-math.pi / 2, tail_roll=0.0,
+    hind_u=None,             # a hull station: a second wing pair there (the same wing part)
 )
 
 
@@ -75,6 +82,33 @@ def flapper(**over) -> Genome:
         # hand's centre is at the arm's chordwise station, its hinge along the span).
         g.edges.append(Edge(parent=1, child=2, pos_u=1.0, elevation=math.pi / 2, roll=math.pi,
                             scale=1.0, reflect=False))
+    if e["hind_u"] is not None:
+        g.edges.append(Edge(parent=0, child=1, pos_u=float(e["hind_u"]), elevation=0.0, roll=0.0,
+                            scale=1.0, reflect=True))
+    if float(e["thumb_length"]) > 0.0:
+        # One fixed strut through each wing, half below and half above.  The
+        # mirrored wing is the first turned half a turn about the body's long
+        # axis, so a single edge pointing down on one side points up on the
+        # other (checked on the built model); two edges, azimuth +-pi/2, give
+        # every wing a thumb below it and an idle one above.
+        thumb = Part(kind=STRUT, length=float(e["thumb_length"]), radius=float(e["thumb_radius"]),
+                     material="cfrp", joint="none", actuated=False)
+        g.parts.append(thumb)
+        for az in (math.pi / 2, -math.pi / 2):
+            g.edges.append(Edge(parent=1, child=len(g.parts) - 1, pos_u=float(e["thumb_u"]),
+                                azimuth=az, elevation=0.0, roll=0.0, scale=1.0, reflect=False))
+    if float(e["tail_length"]) > 0.0:
+        tail = Part(kind=PADDLE, length=float(e["tail_length"]), span=float(e["tail_length"]),
+                    root_chord=float(e["tail_chord"]), radius=float(e["tail_radius"]),
+                    material="cfrp", joint="hinge", joint_axis=np.array([0.0, 1.0, 0.0]),
+                    joint_range=(-float(e["tail_range"]), float(e["tail_range"])), actuated=True,
+                    motor_class=str(e["motor_class"]), motor_mass=float(e["tail_motor_mass"]),
+                    gear_ratio=float(e["gear_ratio"]), sealed=False, stroke_amplitude=0.0,
+                    neutral=0.5)
+        g.parts.append(tail)
+        g.edges.append(Edge(parent=0, child=len(g.parts) - 1, pos_u=0.0,
+                            azimuth=0.0, elevation=float(e["tail_el"]),
+                            roll=float(e["tail_roll"]), scale=1.0, reflect=False))
     g.battery_wh, g.battery_chem = float(e["battery_wh"]), str(e["battery_chem"])
     g.flap_frequency = 1.0
     g.lineage = ["flapper"]

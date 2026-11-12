@@ -48,7 +48,11 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
         if a.endswith("_f"):
             role.append("feather")
         else:
-            role.append("stroke" if int(m.body_parentid[m.jnt_bodyid[j]]) == hull else "twist")
+            bj = int(m.jnt_bodyid[j])
+            if "wing" not in mj.mj_id2name(m, mj.mjtObj.mjOBJ_BODY, bj):
+                role.append("held")          # F2: a tail hinge is held at 0, not flapped
+            else:
+                role.append("stroke" if int(m.body_parentid[bj]) == hull else "twist")
     role = np.array(role)
     w = 2 * math.pi * f
     n_beat = int(round(1.0 / (f * dt))) if flap else int(round(0.2 / dt))
