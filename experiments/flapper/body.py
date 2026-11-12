@@ -25,6 +25,7 @@ DEFAULTS = dict(
     battery_wh=0.6, battery_chem="lipo",
     hand_fraction=0.0,       # share of the wing's length that is the outer panel (0: one panel)
     wrist_motor_mass=0.002,
+    hand_compliance=0.0,     # > 0: the wrist is a passive spring hinge of this compliance
 )
 
 
@@ -61,6 +62,13 @@ def flapper(**over) -> Genome:
                     joint_range=(-1.0, 1.0), actuated=True, motor_class=str(e["motor_class"]),
                     motor_mass=float(e["wrist_motor_mass"]), gear_ratio=float(e["gear_ratio"]),
                     sealed=False, stroke_amplitude=0.0, neutral=0.5)
+        if float(e["hand_compliance"]) > 0.0:
+            # A passive wrist: no motor, the hand pitches about its leading edge
+            # against a spring (`Part.pitch_compliance`, the package's own
+            # pseudo-rigid-body hinge).
+            hand.joint, hand.actuated = "none", False
+            hand.pitch_compliance = float(e["hand_compliance"])
+            hand.motor_mass = 0.0
         g.parts.append(hand)
         # Elevation pi/2 continues along the arm's own axis and roll pi keeps the
         # chord on the arm's side of the spar (checked on the built model: the
