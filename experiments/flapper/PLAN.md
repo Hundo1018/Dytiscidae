@@ -238,8 +238,22 @@ those results and is reopened (decision 4).
      are open. L0 carries it as an option for air only, with electric for
      water, if the survey says a hobby engine of that size exists.
    - L0 therefore gets two more columns per row: sustained source and burst
-     source, with mass and count of uses; report A14 (to be written before
-     L0) supplies the numbers.
+     source, with mass and count of uses; report A14 supplies the numbers.
+   - **Corrected by A14** (`reports/A14_power.md`, 2026-11-13; much of it
+     from search summaries and arithmetic, each number labelled there). Two
+     statements above were wrong: pouch packs are worse on energy than the
+     welded cylindrical baseline (106-142 against 182 Wh/kg), buying power
+     and shape only; and fuel gives about 4-7.5 times the shaft energy per
+     kilogram, not an order of magnitude, which at 50-150 W for 15 minutes
+     is an engine system of 135-287 g against 182-393 g electric, with a
+     second, electric drive still needed under water. A crossing needs
+     5-32 J, which the flight pack already holds, so a separate burst
+     *energy* store buys nothing; the question is whether the drive and
+     wings can pass about 500 W per kilogram for seconds (RoboFalcon 2.0,
+     0.8 kg, 400 W peak, wings-only lift-off from a 45 degree stand,
+     tethered: the one unassisted precedent at this mass). Water-exit
+     precedents stop at 0.16 kg and are one shot per charge. A take-off run
+     has no machine above 13 g.
 
 ## What changed from draft 1, by the review's points
 
