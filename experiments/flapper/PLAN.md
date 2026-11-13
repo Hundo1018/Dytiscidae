@@ -192,14 +192,22 @@ those results and is reopened (decision 4).
    mass closure of "What the numbers already say" stands. A direct
    water<->land crossing is not on the list and is not a gate (the lead's
    reading; to be confirmed).
-2. **Launch is assisted: by hand, or by a mother craft that throws, launches
-   or otherwise helps the child off.** Static thrust above weight is no
-   longer required. L0's "take off" and "leave the water" rows become
-   "survives and flies away from an assisted launch at speed v" and "can be
-   relaunched from the water state" (picked up and thrown, or from a
-   carrier). The mother craft is a second machine: it is not designed until
-   the child flies from the hand, and L0 says whether the water->air leg
-   needs it. Landing and water entry remain the child's own.
+2. **Only the first take-off may be assisted** (by hand, or by a mother
+   craft that throws or launches the child). **Every crossing between media
+   is under the machine's own power** (the user's correction, same day: the
+   mother craft is not a long-term arrangement and is for take-off only),
+   unless mother and child are together nearly all the time and can part and
+   join at will. The lead's reading, the strict one: after the first launch,
+   land->air and water->air inside a scenario are crossings and are the
+   machine's own. So the conflict of "What the numbers already say" is back
+   for those two legs, and L0 must answer it. Three candidates for L0, none
+   checked: (a) a take-off run instead of a standing take-off, on the ground
+   or planing on the water, which needs thrust above drag up to flight
+   speed, not thrust above weight (Robo Raven II has 0.5-0.7 of its weight
+   in thrust); (b) a lighter child, with the 15 minutes paid in cell count
+   and wing loading; (c) a companion carrier that travels with the child and
+   docks at will, which is a second machine and is taken up only if (a) and
+   (b) fail on paper. Landing and water entry are the child's own.
 3. **Motion is optimised together with the wing** (closed-loop stroke
    parameters and gains in the same optimiser). No separate learning runs;
    the monthly budget goes to parts.
