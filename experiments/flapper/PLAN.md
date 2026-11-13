@@ -1,6 +1,7 @@
 # Plan for a flapping triphibian that will be built — draft 2 (2026-11-13)
 
-Status: draft 2, not approved, nothing implemented. Draft 1 (2026-11-12, in
+Status: draft 3 (draft 2 plus the user's five decisions of 2026-11-13, in
+their own section), not approved, nothing implemented. Draft 1 (2026-11-12, in
 git history) was a line of phases; the user's answer was "a design that has
 not been iterated will not be a good design". It was then attacked by a
 fresh-context reviewer (`PLAN_review_1.md`). This draft is rebuilt around
@@ -182,16 +183,29 @@ earned at 108 g with ideal servos on four independently feathered plates and
 are void at the new scale and drive. The choice of two wing pairs was made on
 those results and is reopened (decision 4).
 
-## Decisions that are the user's, before draft 3
+## The user's decisions (2026-11-13) and what follows from each
 
-1. One charge for all 45 minutes, or 15 minutes per charge?
-2. If taking off under its own power and 15 minutes cannot both be had on
-   one machine: which gives (hand launch; a shorter flight; or two machines)?
-3. Is the motion to be learned per wing (the budget allows that on a few
-   finalists per pass), or is a fitted closed-loop stroke acceptable?
-4. Are two wing pairs still the choice once the drive is a crank? Every
-   machine with a precedent at this mass is one pair and a tail.
-5. Fresh water or sea?
+1. **Fifteen minutes per charge, per scenario.** Six scenarios, each on its
+   own charge: water; land; air; land<->air; water<->air; land<->air<->water.
+   A mixed scenario is 15 minutes in total. So the cells are sized by the
+   worst single scenario (15 minutes of flight), not by 45 minutes, and the
+   mass closure of "What the numbers already say" stands. A direct
+   water<->land crossing is not on the list and is not a gate (the lead's
+   reading; to be confirmed).
+2. **Launch is assisted: by hand, or by a mother craft that throws, launches
+   or otherwise helps the child off.** Static thrust above weight is no
+   longer required. L0's "take off" and "leave the water" rows become
+   "survives and flies away from an assisted launch at speed v" and "can be
+   relaunched from the water state" (picked up and thrown, or from a
+   carrier). The mother craft is a second machine: it is not designed until
+   the child flies from the hand, and L0 says whether the water->air leg
+   needs it. Landing and water entry remain the child's own.
+3. **Motion is optimised together with the wing** (closed-loop stroke
+   parameters and gains in the same optimiser). No separate learning runs;
+   the monthly budget goes to parts.
+4. **Wing count by merit**: one pair with a tail against two pairs, compared
+   in L0 and L1 at the same mass and drive, by the worst gate margin.
+5. **Fresh water.**
 
 ## What changed from draft 1, by the review's points
 
