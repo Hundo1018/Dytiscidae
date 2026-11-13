@@ -214,6 +214,32 @@ those results and is reopened (decision 4).
 4. **Wing count by merit**: one pair with a tail against two pairs, compared
    in L0 and L1 at the same mass and drive, by the worst gate margin.
 5. **Fresh water.**
+6. **Power source and drive are open** (the user, 2026-11-13, later: cells
+   are not limited to 18650/21700, and neither source nor drive need be
+   electric; the hope is a lower thrust-to-weight bar). This replaces the
+   "powered by 18650 or 21700 cells" of the Purpose. What it can and cannot
+   do, from the lead's general knowledge and **not yet surveyed**:
+   - It does not change the force needed: a standing take-off still needs
+     force above weight, a run needs thrust above drag. It changes who
+     supplies the force and for how long.
+   - Sustained flight is an energy problem, a crossing is a few seconds of
+     power. So the two may have different sources: a sustained source sized
+     for 15 minutes, and a burst source for leaving ground or water (stored
+     gas, a spring or elastic launcher on board, a jump, a water jet).
+     Burst-assisted water exits exist in the literature at small scale; the
+     survey must give masses, repeats per charge and hobby availability.
+   - Pouch lithium-polymer cells have about the same energy per kilogram as
+     the cylindrical cells but several times the power and a free shape:
+     they lift the power ceiling and ease packaging, they do not shrink the
+     15-minute energy mass much.
+   - Fuel has an order of magnitude more energy per kilogram than cells, so
+     a combustion drive would cut the flight mass most; it does not breathe
+     under water, and its vibration, heat, sealing and restart after a dive
+     are open. L0 carries it as an option for air only, with electric for
+     water, if the survey says a hobby engine of that size exists.
+   - L0 therefore gets two more columns per row: sustained source and burst
+     source, with mass and count of uses; report A14 (to be written before
+     L0) supplies the numbers.
 
 ## What changed from draft 1, by the review's points
 
