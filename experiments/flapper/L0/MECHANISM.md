@@ -189,3 +189,51 @@ and a mechanical lock, and away from a many-facet creased sheet as the
 flight surface. A many-facet sheet is unprecedented here, not excluded; the
 user's rule is that no precedent is not a reason not to try, so it stays as
 a bench comparison once the hinged fold exists.
+
+## Three more proposals from the user (2026-11-15) and two checks
+
+1. **Other origami families.** The lean toward "few rigid hinged panels"
+   above was drawn from Miura-specific findings (the cosine floor, the stack
+   height, softness in bending and twist) and does not carry over to origami
+   in general. A15 found no precedent for any fold at this mass operated wet,
+   hinged, creased or inflated, so precedent does not discriminate here.
+   Folds are compared by the properties a wing fold needs: rigid-foldable
+   with thick panels; one or few degrees of freedom; contracts in span and
+   chord (pass 1d: 2.2-2.6 times the force when the chord narrows too); a
+   deployed state that is locked and stiff in bending and twist at about
+   5.5 N m a wing; a folded stack that fits the hull. A16 surveys them so.
+2. **Inflation and deflation.** Checked by arithmetic (`inflate.py`, lead's
+   numbers, not measured):
+   - An inflated wing of 2 mm mean thickness displaces 0.68 L, 1.1 times the
+     machine's weight in buoyancy; at 10 mm, 5.7 times. So in water an
+     inflated wing must be deflated. Inflation is not a way to shrink the
+     wing for water; it is a way to stiffen it for air and, separately, a
+     swim bladder for L0 row 9 (float for the take-off run, sink to dive).
+   - A pressurised tube that carries the 5.5 N m root moment without
+     wrinkling (M = pi p r^3 / 2) needs a radius of 26 mm at 2 bar or 33 mm
+     at 1 bar: a spar 20-25% of the chord thick, displacing 2.8-4.4 L for two
+     wings. So an all-inflated flapping wing is not a candidate at this load;
+     inflation can stiffen a membrane between rigid spars, or a thick root.
+   - Time: CO2 is one shot (A14); a hobby pump moves litres per minute. A
+     water-to-air crossing gives seconds, so inflating during the exit needs
+     a stored-gas reservoir or pre-inflation at the surface. A16 sizes it.
+3. **Recovery in a low-drag shape** (the user: a swimmer does not keep the
+   arm straight; after the stroke the wing should return in its least-drag
+   form, and the same may hold in flight). The model so far holds the wing's
+   shape through the stroke and changes only its feather. In-stroke shape
+   change is what birds do on the upstroke and what this project's namesake
+   does: a diving beetle's hind legs carry fringes of hairs that spread on
+   the power stroke and fold on the return, passively, by the flow. That is a
+   different requirement from the fold of passes 1c-1d: the area changes
+   every beat (0.5-2.5 Hz in water, 3-4.5 Hz in air if flight uses it), not a
+   few times a flight. Consequences:
+   - A hinge that is locked in flight sees load cycles each beat but flexes
+     only on folding; a hinge or flap that opens and shuts every beat is the
+     fatigue case: about 3,600 flexes a flight in air, and a million flexes
+     is about 280 flights. The earlier "crease life at 3,600 beats" mixed the
+     two.
+   - A per-beat change can be passive (one-way flaps, or flexible fringes
+     that collapse under reversed flow) and need no actuator; an actuated
+     one needs an actuator fast enough for the beat.
+   - Pass 1e (`PREREG_L1e_recovery.md`) tests it in the model: chord reduced
+     on one half of the stroke only.
