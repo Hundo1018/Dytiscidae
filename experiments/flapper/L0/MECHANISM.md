@@ -96,3 +96,13 @@ out added mass and the wing's own turning in water. The claim "it buys a
 place for the motor to work" is withdrawn until re-derived with added mass.
 What stands: the per-side throw for steering and parking, the crutch
 arithmetic, and the tilted stroke plane.
+
+## Water, re-derived from measurement (L1 pass 1b, `../RESULT_L1b_water.md`)
+
+`mechanism.py` now reads the held-rig water map instead of a scaling rule.
+Under the 15.8 N m shoulder cap every stroke holds 0.3 m/s with 0.3-0.5 N to
+spare and none gives 0.94 N. A 15 deg stroke does it at 0.25 Hz for 2.0 N m
+at the crank; the full stroke at 0.05 Hz for 9.8 N m. So the variable throw
+moves the motor to a workable point in water without raising the force, as
+first claimed, but the frozen gates of 1b failed and this is a reading after
+the fact. The wing itself is the limit: it must shed area in water.
