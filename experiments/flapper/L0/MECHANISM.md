@@ -237,3 +237,28 @@ a bench comparison once the hinged fold exists.
      one needs an actuator fast enough for the beat.
    - Pass 1e (`PREREG_L1e_recovery.md`) tests it in the model: chord reduced
      on one half of the stroke only.
+
+## What A16 found (`reports/A16_morphing_wing.md`, 2026-11-15; labels there, not re-read by the lead)
+
+- Fold patterns: the waterbomb tube is the only pattern found that is
+  rigid-foldable, one degree of freedom, and shrinks in both directions; no
+  contraction formula, deployed lock or wing was found for it. Kresling locks
+  (bistable) but shortens along one axis only and couples a twist. The
+  closest machine to ours, a 460 g, 1.8 m gull ornithopter folding at an
+  elbow, lost its elbow joint and never flapped continuously folded.
+- Inflation: the wrinkling and collapse formulas behind `inflate.py` are
+  confirmed (tests differ by up to 45%). Hobby pumps stop at 1-2.5 bar and
+  cheap valves at under 0.5 bar: 1 L at 1 bar takes at least 11 s, so no
+  pump inflates during a crossing; one 16 g CO2 cartridge fills 2.5 L to
+  2 bar once. Two metres of fresh water shrink a gas volume to 0.84. Every
+  robot swim bladder found moves water, not gas. Inflation stays a stiffener
+  for air and a candidate for buoyancy, not the fold.
+- Per-beat shape change: the diving beetle beats at 3.7 Hz with its hairs
+  folding passively on the recovery (recovery drag about 1/40 of thrust, as
+  cited). Birds and bats fold to 0.3-0.4 of their span on the upstroke. A
+  duck-foot robot with a passive per-beat fold doubled its net thrust. No
+  measured gain was found for a per-beat area cut on a lift-based flapping
+  wing, which is what pass 1e's unproven result claims.
+
+Consequence: the next model pass builds the one-way flap as a part (`RESULT_L1e_recovery.md`, Next), since it is the per-beat device with the
+most precedent and it tests pass 1e's artefact at the same time.
