@@ -133,3 +133,14 @@ fold that L1 pass 1b made a requirement. From the lead's general knowledge,
 
 Before it is designed: a survey of origami and tendon-deployed wings that
 have flown or swum (masses, deployed stiffness, cycles), as A12-A14 were done.
+
+The user, same day: it need not all be creases; part of it can be pin
+hinges. Taken as the default reading of the proposal: rigid or semi-rigid
+panels (printed frames with film, or thin sheet) joined by pin or printed
+hinges along the lines that carry load or fold most often, and film creases
+only where the load is small. Hinged panels have thickness, so the pattern
+is a thick-panel one, and a hinge line can carry a stop or an over-centre
+lock, which is the answer a bare crease lacks for the flat state. Costs to
+measure: hinge mass and play (each line adds slop to the deployed surface),
+and friction and grit in water. Lead's reasoning, not surveyed; A15 covers
+thick-panel origami and hinge life.
