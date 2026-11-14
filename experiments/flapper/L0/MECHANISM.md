@@ -106,3 +106,30 @@ at the crank; the full stroke at 0.05 Hz for 9.8 N m. So the variable throw
 moves the motor to a workable point in water without raising the force, as
 first claimed, but the frozen gates of 1b failed and this is a reading after
 the fact. The wing itself is the limit: it must shed area in water.
+
+## The fold itself: origami and a tendon (the user's proposal, 2026-11-15)
+
+The user: consider origami (a Miura fold or the like) with pulleys and line
+for furling and deploying the wing. Recorded as the first candidate for the
+fold that L1 pass 1b made a requirement. From the lead's general knowledge,
+**not surveyed and not measured**:
+
+- A Miura sheet has one degree of freedom and contracts along span and chord
+  together, so one line furls the whole wing. That matters here: pass 1b's
+  torque came from a 0.257 m chord turning in water as much as from length,
+  and pass 1c shortens the span only. A fold that also narrows the chord is
+  a different, probably better, case and gets its own measurement (span and
+  chord both scaled).
+- Line and pulleys are light, cheap, printable, and do not mind water; the
+  winch sits in the hull. One line against an elastic return, or two opposed.
+- Open questions, each a bench question: a Miura sheet has no stiffness when
+  fully flat, so the deployed wing is either held just short of flat (a
+  corrugated surface: its cost in lift at this size is unknown here) or
+  locked by line tension or spars; crease life at about 3,600 beats a flight
+  under air load; how the line's tension path survives the flapping stroke;
+  mass (typed guess 10-20 g a side).
+- It also makes wing area a control in the air (full for take-off, reduced
+  for fast cruise), which the search can use.
+
+Before it is designed: a survey of origami and tendon-deployed wings that
+have flown or swum (masses, deployed stiffness, cycles), as A12-A14 were done.
