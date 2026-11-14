@@ -144,3 +144,17 @@ lock, which is the answer a bare crease lacks for the flat state. Costs to
 measure: hinge mass and play (each line adds slop to the deployed surface),
 and friction and grit in water. Lead's reasoning, not surveyed; A15 covers
 thick-panel origami and hinge life.
+
+The user, same day: several pairs of thin lines over pulleys, working as
+antagonists. Taken as the actuation of the fold: each hinge line (or group)
+has a deploy line and a furl line pulling against each other, so both
+directions are driven and the pair's pretension holds the deployed state
+stiff without a spring that the motor must fight. One winch drum can wind a
+pair in opposite senses, so a pair costs one actuator if the two path
+lengths change equally; where they do not, the difference needs a
+compensating spring or cam. Several pairs give more than one fold state
+(span and chord separately, or left and right). To measure: pretension
+against line creep when wet, the load the pretension puts on the hinges and
+the spar, and the path length through the flapping shoulder. Lead's
+reasoning, not surveyed; A15 covers lines, pulleys and routing through a
+joint.
