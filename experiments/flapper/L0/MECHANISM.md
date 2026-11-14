@@ -158,3 +158,34 @@ against line creep when wet, the load the pretension puts on the hinges and
 the spar, and the path length through the flapping shoulder. Lead's
 reasoning, not surveyed; A15 covers lines, pulleys and routing through a
 joint.
+
+## What the survey found about the fold (A15, `reports/A15_folding_wing.md`, 2026-11-15)
+
+Not re-read at the sources by the lead; labels are in the report.
+- No Miura sheet has flown or swum as a wing on any machine found, and no
+  origami or tendon-folded wing has been operated wet or above a 35 g wing
+  module. The largest origami wing with numbers (a 35 g, 0.66 m glider
+  module) is **furled by a line and motor and deployed and locked by springs
+  in the facets**, the reverse of driving both ways by line.
+- A Miura sheet cannot contract both ways freely: one direction cannot go
+  below the cosine of the pattern angle (span and chord both to 0.4 needs an
+  angle of 66 deg or more), and a sheet folded to 0.28 of its area stands
+  0.83 of a panel length high. Its soft modes are bending and twist, which
+  are a wing's loads.
+- One team tried a tendon fold on a flapping wing and gave it up ("unreliable
+  folding, string tensioning, string friction"). A Bowden cable does work
+  through a flapping joint at 3 Hz, for twist.
+- The only folds demonstrated wet are rigid: a 90 deg sweep in under 0.5 s by
+  one 6.5 g servo, on a 201 g propeller machine.
+- Auks beat at 2-4 Hz in water against 7-11 Hz in air with partly flexed
+  wings; murre wings held extended gave 1.5-6 times more force than flexed.
+- Hinges: a moulded polypropylene hinge lasts about a million flexes; nothing
+  found for printed or film hinges, or wet. The line itself does not mind
+  water; it creeps 1.7-5% under high load, so pretension needs a take-up.
+
+Read against the proposals: the evidence leans toward few, rigid, hinged
+panels (a sweep or a two- or three-panel fold) with line or servo actuation
+and a mechanical lock, and away from a many-facet creased sheet as the
+flight surface. A many-facet sheet is unprecedented here, not excluded; the
+user's rule is that no precedent is not a reason not to try, so it stays as
+a bench comparison once the hinged fold exists.
