@@ -19,7 +19,14 @@ G = 9.80665
 
 def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_deg: float,
         psi0_deg: float, T_deg: float = 0.0, tau0_deg: float = 0.0, *, beats: int = 5,
-        skip: int = 2, steps_per_beat: int = 50, medium: str = "air") -> dict:
+        skip: int = 2, steps_per_beat: int = 50, medium: str = "air",
+        chord_law: tuple | None = None) -> dict:
+    """chord_law = (k, sign): every wing strip's chord and area are scaled by k
+    while the stroke rate has that sign (+1 or -1), blended across the
+    reversal, and by k throughout if sign is 0.  Pass 1e's in-stroke shape
+    change.  It changes the fluid strips only, not the wing's mass or
+    geometry, so a constant k is not the same as a narrower built wing.
+    None leaves the wing fixed."""
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
     from body import flapper
@@ -58,6 +65,10 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     n_beat = int(round(1.0 / (f * dt))) if flap else int(round(0.2 / dt))
     weight = float(env.solver._dry_mass.sum() * G)
     F, P, Tq = [], [], []
+    pan = env.solver.panels
+    from dytiscidae.physics.fluid import WING as KIND_WING
+    is_w = pan.kind == KIND_WING
+    chord0, area0 = pan.chord.copy(), pan.area.copy()
     t = 0.0
     for k in range(beats * n_beat):
         tgt, rate = np.zeros(len(names)), np.zeros(len(names))
@@ -65,6 +76,15 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
         tgt[role == "stroke"], rate[role == "stroke"] = 0.5 * Phi * s, 0.5 * Phi * w * c
         tgt[role == "feather"], rate[role == "feather"] = psi0 - Psi * c, Psi * w * s
         tgt[role == "twist"], rate[role == "twist"] = tau0 - T * c, T * w * s
+        if chord_law is not None:
+            kc, sign = chord_law[:2]
+            # Blended over the stroke reversal (width 0.3 in cos wt, about a
+            # fifth of the beat): a step change makes the solver's added-mass
+            # backward difference kick the torque by 3x.
+            on = 1.0 if sign == 0 else 0.5 * (1.0 + math.tanh(sign * c / 0.3))
+            scale = 1.0 - (1.0 - kc) * on
+            pan.chord[is_w] = chord0[is_w] * scale
+            pan.area[is_w] = area0[is_w] * scale
         d.qpos[:7] = q0
         d.qpos[0] = q0[0] + V * t
         d.qvel[:6] = 0.0
