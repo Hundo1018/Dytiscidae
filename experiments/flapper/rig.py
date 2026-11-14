@@ -57,7 +57,7 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     w = 2 * math.pi * f
     n_beat = int(round(1.0 / (f * dt))) if flap else int(round(0.2 / dt))
     weight = float(env.solver._dry_mass.sum() * G)
-    F, P = [], []
+    F, P, Tq = [], [], []
     t = 0.0
     for k in range(beats * n_beat):
         tgt, rate = np.zeros(len(names)), np.zeros(len(names))
@@ -79,7 +79,7 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
             F.append(Fk)
             # Aerodynamic power: every wing body's fluid wrench about each
             # prescribed axis that carries it, times that axis's rate.
-            pw = 0.0
+            pw, tq = 0.0, 0.0      # tq: fluid torque about the stroke axes, all shoulders
             for a, j in enumerate(jid):
                 if rate[a] == 0.0:
                     continue
@@ -93,12 +93,16 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
                         tau += float(d.xaxis[j] @ (d.xfrc_applied[b, 3:] + np.cross(
                             d.xipos[b] - d.xanchor[j], d.xfrc_applied[b, :3])))
                 pw -= tau * rate[a]
+                if role[a] == "stroke":
+                    tq += abs(tau)
             P.append(pw)
+            Tq.append(tq)
     F = np.array(F).mean(0)
     return {"V": V, "theta_deg": theta_deg, "f": f, "Phi_deg": Phi_deg, "Psi_deg": Psi_deg,
             "psi0_deg": psi0_deg, "T_deg": T_deg, "tau0_deg": tau0_deg, "medium": medium,
             "Fz": float(F[2]), "Fx": float(F[0]), "Fy": float(F[1]), "weight": weight,
             "lift_over_weight": float(F[2] / weight), "aero_power_W": float(np.mean(P)),
+            "stroke_torque_mean": float(np.mean(Tq)), "stroke_torque_peak": float(np.max(Tq)),
             "mass_kg": float(p.mass), "roles": sorted(set(role.tolist())),
             "finite": bool(np.isfinite(F).all())}
 
