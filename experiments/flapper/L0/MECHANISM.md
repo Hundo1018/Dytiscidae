@@ -86,3 +86,13 @@ stroke plane tilted, throw 15-85 deg per side, crank limited to its take-off
 torque with a torque-speed line. Fixture 2 is K2 at its typed mass. K0 is the
 control: K1 with the throw locked at 85 deg. A scheme stays only if it beats
 K0 on a gate K0 fails.
+
+## Correction, same day (L1 pass 1a, `../RESULT_L1a.md`)
+
+The water table above is wrong. On the held rig the three points of
+`mechanism.py` ask 25-230 N m at the shoulder against the 15.8 N m cap, and
+the small fast strokes are the worst, not the best: the rule used here left
+out added mass and the wing's own turning in water. The claim "it buys a
+place for the motor to work" is withdrawn until re-derived with added mass.
+What stands: the per-side throw for steering and parking, the crutch
+arithmetic, and the tilted stroke plane.
