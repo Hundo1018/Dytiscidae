@@ -77,7 +77,21 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     if passive_feather is not None:
         k_s, zeta = passive_feather[:2]
         com = passive_feather[2] if len(passive_feather) > 2 else None
+        axis = passive_feather[3] if len(passive_feather) > 3 else 0.0
         free = role == "feather"
+        if axis:
+            # Move each feather hinge's axis axis x chord behind the leading
+            # edge, parallel to it; the wing's built shape and pose are unchanged.
+            for a, j in enumerate(jid):
+                if not free[a]:
+                    continue
+                b = int(m.jnt_bodyid[j])
+                sel = (pan.body_id == b) & (pan.kind == KIND_WING)
+                cdir = pan.chord_local[sel][0] / np.linalg.norm(pan.chord_local[sel][0])
+                if float(pan.pos_local[sel].mean(0) @ cdir) < 0.0:
+                    cdir = -cdir                       # aft, towards the strips' load points
+                m.jnt_pos[j] = m.jnt_pos[j] + axis * float(pan.chord[sel].mean()) * cdir
+            mj.mj_forward(m, d)
         if com is not None:
             # Move each wing's centre of mass along its chord to com x chord
             # behind the leading-edge hinge (built: 0.25, the strips' load
@@ -106,6 +120,10 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
             m.jnt_stiffness[j] = k_s
             m.qpos_spring[int(m.jnt_qposadr[j])] = psi0
             m.dof_damping[dof] = 2.0 * zeta * math.sqrt(k_s * inertia)
+            # The solver's implicit damping rewrites dof_damping as its own
+            # copy (taken at build) plus the fluid bound every step, which wiped
+            # this hinge damping in pass 1f (zeta was 0 there, not 0.3).
+            env.solver._damping.base[dof] = m.dof_damping[dof]
         feather_q = [int(m.jnt_qposadr[j]) for a, j in enumerate(jid) if free[a]]
         d.qpos[feather_q] = psi0
         # The rig moves the body and the stroke by overwriting their state each
