@@ -21,7 +21,8 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
         psi0_deg: float, T_deg: float = 0.0, tau0_deg: float = 0.0, *, beats: int = 5,
         skip: int = 2, steps_per_beat: int = 50, medium: str = "air",
         chord_law: tuple | None = None, passive_feather: tuple | None = None,
-        cop_law: str | None = None, feather_axis: float = 0.0) -> dict:
+        cop_law: str | None = None, feather_axis: float = 0.0,
+        one_way_flap: dict | None = None, coupling: str = "static") -> dict:
     """chord_law = (k, sign): every wing strip's chord and area are scaled by k
     while the stroke rate has that sign (+1 or -1), blended across the
     reversal, and by k throughout if sign is 0.  Pass 1e's in-stroke shape
@@ -39,7 +40,15 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     (feather_axis does the same for a prescribed feather).
 
     cop_law: the solver's `FluidSolver.cop_law` (centre of pressure that moves
-    with separation, and pitch damping); None keeps the quarter chord."""
+    with separation, and pitch damping); None keeps the quarter chord.
+
+    one_way_flap: `flapwing.compile_with_flap`'s keywords (x_h, open_deg, sign,
+    k_f, damp_f): each wing's rear part is a hinged flap of its own.
+
+    coupling: how a free joint feels the prescribed motion it rides on.
+    "static" (passes 1f-1i) adds M[f, s] a_s with M taken once at the start
+    pose; "step" adds (M a)_f from the current pose every step, for every
+    prescribed axis.  A flap always uses "step"."""
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
     from body import flapper
@@ -51,7 +60,17 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     flap = f > 0.0
     dt = min(1e-3, 1.0 / (steps_per_beat * f)) if flap else 1e-3
     p = build(flapper(**body))
-    env = TriphibianEnv(p, seed=0, timestep=dt)
+    if one_way_flap is not None:
+        import dytiscidae.envs.triphibian as TR
+        from flapwing import compile_with_flap
+        orig = TR.compile_phenotype
+        TR.compile_phenotype = lambda p_, **kw: compile_with_flap(p_, **one_way_flap, **kw)
+        try:
+            env = TriphibianEnv(p, seed=0, timestep=dt)
+        finally:
+            TR.compile_phenotype = orig
+    else:
+        env = TriphibianEnv(p, seed=0, timestep=dt)
     dom = Domain.AIR if medium == "air" else Domain.WATER
     env.reset(dom, randomise=False)
     d, m, mj = env.data, env.model, env._mj
@@ -156,6 +175,17 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
                 if free[a2] and int(m.jnt_bodyid[j2]) == int(m.jnt_bodyid[j]):
                     couple.append((a, int(m.jnt_dofadr[j2]), float(col[int(m.jnt_dofadr[j2])])))
         m.dof_armature[held_dofs] = 1e4
+    flap_dofs = [int(m.jnt_dofadr[j]) for j in range(m.njnt)
+                 if (mj.mj_id2name(m, mj.mjtObj.mjOBJ_JOINT, j) or "").endswith("_jflap")]
+    step_free = flap_dofs + ([int(m.jnt_dofadr[j]) for a, j in enumerate(jid) if free[a]]
+                             if coupling == "step" else [])
+    if flap_dofs:
+        m.dof_armature[list(range(6)) + [int(m.jnt_dofadr[j]) for a, j in enumerate(jid)
+                                         if not free[a]]] = 1e4
+    dof_of = np.array([int(m.jnt_dofadr[j]) for j in jid])
+    flap_q = [int(m.jnt_qposadr[j]) for j in range(m.njnt)
+              if (mj.mj_id2name(m, mj.mjtObj.mjOBJ_JOINT, j) or "").endswith("_jflap")]
+    fl = []
     fq = []
     # Each wing's inertia about its feather axis (structure only), for a
     # drive that also turns the feather.
@@ -195,7 +225,19 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
         d.qvel[0] = V
         held = ~free
         d.qpos[np.asarray(qadr)[held]], d.qvel[np.asarray(vadr)[held]] = tgt[held], rate[held]
-        if free.any():
+        if step_free:
+            # (M a)_free from the pose of the last step: every prescribed axis's
+            # acceleration, so a free joint feels what it rides on.
+            acc = np.zeros(m.nv)
+            acc[dof_of[role == "stroke"]] = -0.5 * Phi * w * w * s
+            if not free.any():
+                acc[dof_of[role == "feather"]] = Psi * w * w * c
+            acc[dof_of[role == "twist"]] = T * w * w * c
+            ma = np.zeros(m.nv)
+            mj.mj_mulM(m, d, ma, acc)
+            d.qfrc_applied[:] = 0.0
+            d.qfrc_applied[step_free] -= ma[step_free]
+        elif free.any():
             d.qfrc_applied[:] = 0.0
             for a, fdof, mfs in couple:
                 d.qfrc_applied[fdof] -= mfs * (-0.5 * Phi * w * w * s)
@@ -234,12 +276,17 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
             ts.append(t - dt)
             if free.any():
                 fq.append(float(d.qpos[np.asarray(qadr)[free][0]]))
+            if flap_q:
+                fl.append(np.abs(d.qpos[flap_q]).copy())
     F = np.array(F).mean(0)
     return {"V": V, "theta_deg": theta_deg, "f": f, "Phi_deg": Phi_deg, "Psi_deg": Psi_deg,
             "psi0_deg": psi0_deg, "T_deg": T_deg, "tau0_deg": tau0_deg, "medium": medium,
             "Fz": float(F[2]), "Fx": float(F[0]), "Fy": float(F[1]), "weight": weight,
             "lift_over_weight": float(F[2] / weight), "aero_power_W": float(np.mean(P)),
             "stroke_torque_mean": float(np.mean(Tq)), "stroke_torque_peak": float(np.max(Tq)),
+            # per flap: the widest it opened, and its mean opening over the beat
+            "flap_open_max_deg": (np.degrees(np.max(fl, axis=0)).tolist() if fl else None),
+            "flap_open_mean_deg": (np.degrees(np.mean(fl, axis=0)).tolist() if fl else None),
             "feather_torque_peak": float(np.max(Tf)), "feather_inertia": i_feather,
             "power_series": [float(x) for x in P],
             "stroke_power_series": [float(x) for x in Ps], "time_series": [float(x) for x in ts],
