@@ -653,6 +653,14 @@ FluidSolver:
     - tests.test_stall_blend
     - tests.test_reduced_frequency
 
+PitchingMoment:
+  # Opt-in (`FluidSolver.cop_law`, default None): centre of pressure that moves
+  # aft with separation, and damping of a strip's pitch.  Numpy path only.
+  implementation:
+    - physics.fluid.chordwise_cop
+  tests:
+    - tests.test_physics::test_centre_of_pressure_moves_aft_when_the_flow_separates
+
 AddedMass:
   implementation:
     - physics.fluid.FluidSolver.apply

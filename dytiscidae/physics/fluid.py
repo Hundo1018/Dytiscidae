@@ -290,6 +290,33 @@ def _stall(alpha, re):
     return alpha_stall, t * t * (3.0 - 2.0 * t)
 
 
+def chordwise_cop(alpha: np.ndarray, re: np.ndarray, law: str) -> np.ndarray:
+    """Centre of pressure of a strip's lift and drag, as a fraction of chord
+    from the edge the flow meets.
+
+    Attached flow keeps it at the quarter chord, where thin-airfoil theory and
+    the solver's strip placement put it; it moves to the separated law by the
+    stall weight ``w`` that `lift_coefficient` uses.  Separated laws:
+
+    * "plate": the Kirchhoff-Rayleigh free-streamline plate,
+      1/2 - 3 cos(a) / (4 (4 + pi sin(a))): 0.415 at 45 deg, 0.5 at 90.  The
+      sweeping plate of Percin & van Oudheusden (2015, Re 1e4, water) put it
+      near 0.41 at 45 deg (torque over force, read from Wang et al. 2016
+      fig. 11).
+    * "insect": the fit to a dynamically scaled hawkmoth wing (Han et al.
+      2015, in Wang et al. 2016 fig. 6), 0.06 + 0.00501 a[deg]: 0.29 at 45.
+    """
+    a = np.minimum(np.abs(alpha), np.pi / 2)
+    _, w = _stall(alpha, re)
+    if law == "plate":
+        sep = 0.5 - 0.75 * np.cos(a) / (4.0 + np.pi * np.sin(a))
+    elif law == "insect":
+        sep = np.minimum(0.06 + 5.01e-3 * np.degrees(a), 0.5)
+    else:
+        raise ValueError(f"unknown centre-of-pressure law {law!r}")
+    return (1.0 - w) * 0.25 + w * sep
+
+
 def lift_coefficient(
     alpha: np.ndarray, re: np.ndarray, ar: np.ndarray,
     lev: np.ndarray, alpha_e: np.ndarray | None = None,
@@ -949,6 +976,15 @@ class FluidSolver:
         self.wing_added_mass_tensor = True
         #: Lift and drag damping integrated implicitly (`ImplicitAeroDamping`).
         self.implicit_damping = True
+        #: A wing strip's pitching moment (`chordwise_cop`): its lift and drag
+        #: act at a centre of pressure that moves aft as the flow separates,
+        #: and its rotation about the quarter chord is damped (Wang, Goosen &
+        #: van Keulen, JFM 2016, eqs 15-18).  ``None`` (the default, and every
+        #: stored score) puts the whole load at the quarter chord; "plate" or
+        #: "insect" names the separated law.  Numpy path only: the Mojo kernel
+        #: has no counterpart.  It matters only where a pitch hinge is free
+        #: (experiments/flapper, PREREG_L1h_cop.md).
+        self.cop_law: str | None = None
         #: React the entrainment of added mass, ``-dm/dt v`` (`entrainment_reaction`,
         #: ROADMAP AK).  Off, the mass matrix creates ``dm v`` of momentum every
         #: step the added mass grows.
@@ -1158,6 +1194,7 @@ class FluidSolver:
         L = q * p.area * cl * self.lift_scale
         D = q * p.area * cd * self.cd_scale
         F += L[:, None] * lift_axis + D[:, None] * d_hat
+        F_circ = F.copy() if self.cop_law is not None else None
 
         # --- bluff-body drag ------------------------------------------------
         # Strip theory is wrong for a volume, and it was wrong here in a way
@@ -1405,6 +1442,18 @@ class FluidSolver:
         f_buoy = self.medium.water.rho * GRAVITY * p.volume_buoyant * subf
         F[:, 2] += f_buoy
 
+        if self.cop_law is not None:
+            # Rotation about the quarter chord (where v_elem is taken) drags
+            # each chordwise element along s x (towards the leading edge);
+            # integrated over z in [-0.75c, 0.25c]: z|z| -> -26/192 c^3,
+            # |z|^3 -> 82/1024 c^4.  Coefficient: the plate's drag at 90 deg
+            # (Wang et al. 2016 eq 18).
+            ar = ar_eff
+            c_rd = 2.0 * np.pi * ar / (2.0 + np.sqrt(ar * ar + 4.0))
+            k_rd = np.where(is_wing, -0.5 * rho * c_rd * omega_s * np.abs(omega_s) * p.dr, 0.0)
+            F += (k_rd * (-26.0 / 192.0) * p.chord**3)[:, None] * _cross3(s_hat, -c_hat)
+            tau_rd = (k_rd * (82.0 / 1024.0) * p.chord**4)[:, None] * s_hat
+
         # --- accumulate to bodies -----------------------------------------
         # xfrc_applied takes a world-frame force at the body CoM plus a torque.
         # Summed per body first, unscaled, in panel order -- the batched path's
@@ -1422,6 +1471,13 @@ class FluidSolver:
         arm = pos - xipos[p.body_id]
         np.add.at(fb[:, :3], p.body_id, F)
         np.add.at(fb[:, 3:], p.body_id, _cross3(arm, F))
+        if self.cop_law is not None:
+            # Lift and drag moved from the quarter chord to their centre of
+            # pressure, measured from the edge the flow meets; c_hat is aft.
+            x_cp = chordwise_cop(alpha, re, self.cop_law)
+            x_geo = np.where(rev, 1.0 - x_cp, x_cp)
+            shift = np.where(is_wing, (x_geo - 0.25) * p.chord, 0.0)[:, None] * c_hat
+            np.add.at(fb[:, 3:], p.body_id, _cross3(shift, F_circ) + tau_rd)
         fsum_b = np.zeros(nb)
         np.add.at(fsum_b, p.body_id, fmag)
         weight = float(self._dry_mass.sum()) * GRAVITY + 1.0

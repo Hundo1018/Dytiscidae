@@ -2792,6 +2792,23 @@ MUTATIONS: tuple = (
         defect="the k_sampled draws (policy noise on) enter the pooled mean",
         suites=("test_devroll::test_device_draws_pool_only_the_mean_draws",),
         item="A6 pooled mean"),
+    Mutation(
+        id="cop-ignores-reversed-flow",
+        path="dytiscidae/physics/fluid.py",
+        find="            x_geo = np.where(rev, 1.0 - x_cp, x_cp)\n",
+        replace="            x_geo = x_cp\n",
+        defect="flow over the trailing edge puts the centre of pressure where the "
+               "leading edge's would be, so a reversing stroke pitches the wrong way",
+        suites=("test_physics::test_centre_of_pressure_moves_aft_when_the_flow_separates",),
+        item="pitching moment"),
+    Mutation(
+        id="pitch-damping-pushes",
+        path="dytiscidae/physics/fluid.py",
+        find="            k_rd = np.where(is_wing, -0.5 * rho",
+        replace="            k_rd = np.where(is_wing, 0.5 * rho",
+        defect="the strip's pitch is driven, not damped, by its own rotation",
+        suites=("test_physics::test_centre_of_pressure_moves_aft_when_the_flow_separates",),
+        item="pitching moment"),
 )
 
 

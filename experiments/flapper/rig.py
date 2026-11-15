@@ -20,7 +20,8 @@ G = 9.80665
 def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_deg: float,
         psi0_deg: float, T_deg: float = 0.0, tau0_deg: float = 0.0, *, beats: int = 5,
         skip: int = 2, steps_per_beat: int = 50, medium: str = "air",
-        chord_law: tuple | None = None, passive_feather: tuple | None = None) -> dict:
+        chord_law: tuple | None = None, passive_feather: tuple | None = None,
+        cop_law: str | None = None) -> dict:
     """chord_law = (k, sign): every wing strip's chord and area are scaled by k
     while the stroke rate has that sign (+1 or -1), blended across the
     reversal, and by k throughout if sign is 0.  Pass 1e's in-stroke shape
@@ -33,7 +34,11 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     zeta of critical for k and the wing's inertia about the hinge; the stroke
     alone is prescribed, as a one-degree-of-freedom drive would give it.  Psi
     is then ignored, and the feather the wing takes is reported.  com, if
-    given, moves the wing's centre of mass to com x chord behind the hinge."""
+    given, moves the wing's centre of mass to com x chord behind the hinge;
+    h, if given, moves the hinge axis to h x chord behind the leading edge.
+
+    cop_law: the solver's `FluidSolver.cop_law` (centre of pressure that moves
+    with separation, and pitch damping); None keeps the quarter chord."""
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
     from body import flapper
@@ -49,6 +54,7 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     dom = Domain.AIR if medium == "air" else Domain.WATER
     env.reset(dom, randomise=False)
     d, m, mj = env.data, env.model, env._mj
+    env.solver.cop_law = cop_law
     q0 = d.qpos[:7].copy()
     q0[:3] = (0.0, 0.0, 30.0 if medium == "air" else -3.0)
     q0[3:7] = (math.cos(-th / 2), 0.0, math.sin(-th / 2), 0.0)

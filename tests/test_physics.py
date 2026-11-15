@@ -36,6 +36,7 @@ from dytiscidae.physics.fluid import (  # noqa: E402
     WING,
     FluidSolver,
     PanelSet,
+    chordwise_cop,
     lift_coefficient,
 )
 from dytiscidae.physics.materials import CFRP_TUBE, PETG  # noqa: E402
@@ -421,6 +422,60 @@ def test_lift_sign_and_magnitude() -> None:
         3.0 < lift < 14.0,
         f"L={lift:.2f} N (expected ~7.7 N)",
     )
+
+
+def test_centre_of_pressure_moves_aft_when_the_flow_separates() -> None:
+    """`FluidSolver.cop_law`: the pitching moment a free pitch hinge reads.
+
+    One strip, its quarter chord on the body's centre of mass, in a +X wind:
+    the torque about the span over the chordwise lever of the force gives the
+    centre of pressure.  Off, the torque is zero and nothing else moves."""
+    print("\nfluid: centre of pressure moves aft when the flow separates")
+    m, d = _single_panel_model()
+    c = 0.2
+
+    def load(alpha, law, wind=10.0, spin=0.0):
+        panels = _wing_panels(m, alpha)
+        solver = FluidSolver(m, panels, MediumField(wind=np.array([wind, 0.0, 0.0])))
+        solver.cop_law = law
+        d.qvel[:] = 0.0
+        d.qvel[4] = spin                                     # about +Y, the span
+        d.xfrc_applied[:] = 0.0
+        mujoco.mj_forward(m, d)
+        solver.apply(d, 0.0)
+        b = panels.body_id[0]
+        a = math.radians(alpha)
+        c_hat = np.array([math.cos(a), 0.0, -math.sin(a)])
+        f, tau = d.xfrc_applied[b, :3].copy(), d.xfrc_applied[b, 3:].copy()
+        lever = float(np.cross(c_hat, f)[1])
+        return f, tau, (0.25 + tau[1] / (lever * c) if abs(lever) > 1e-9 else float("nan"))
+
+    f0, t0, _ = load(45.0, None)
+    for law in ("plate", "insect"):
+        f1, t1, x = load(45.0, law)
+        check(f"{law}: the force is unchanged, only its point", np.allclose(f0, f1),
+              f"{f0} vs {f1}")
+        re = np.array([1.225 * 10.0 * c / 1.81e-5])
+        want = float(chordwise_cop(np.array([math.radians(45.0)]), re, law)[0])
+        check(f"{law}: centre of pressure at 45 deg is the law's", abs(x - want) < 0.01,
+              f"{x:.3f} vs {want:.3f}")
+    check("off: no moment about the quarter chord", np.abs(t0).max() < 1e-9, f"{t0}")
+    _, _, x5 = load(5.0, "plate")
+    check("attached flow keeps the quarter chord", abs(x5 - 0.25) < 0.01, f"{x5:.3f}")
+    _, _, x80 = load(80.0, "plate")
+    check("near broadside it sits near mid-chord", 0.45 < x80 < 0.5, f"{x80:.3f}")
+    # Flow over the trailing edge: the same law measured from the other edge.
+    _, _, xr = load(45.0, "plate", wind=-10.0)
+    check("reversed flow measures it from the trailing edge", abs(xr - (1.0 - 0.415)) < 0.02,
+          f"{xr:.3f}")
+    # Pitching in still air: damped, about the span, by 1/2 rho C w|w| 82/1024 c^4.
+    _, ts_off, _ = load(0.0, None, wind=0.0, spin=20.0)
+    _, ts_on, _ = load(0.0, "plate", wind=0.0, spin=20.0)
+    ar = 5.0
+    want = -0.5 * 1.225 * 2 * math.pi * ar / (2 + math.sqrt(ar * ar + 4)) * 400.0 * 82 / 1024 * c**4
+    got = ts_on[1] - ts_off[1]
+    check("rotation is damped by the plate's broadside drag", abs(got - want) < 0.02 * abs(want),
+          f"{got:.3e} vs {want:.3e} N m")
 
 
 def test_buoyancy() -> None:
@@ -5244,6 +5299,7 @@ def main() -> int:
         test_the_gait_gain_can_stop_a_machine,
         test_a_film_is_the_evaluation,
         test_lift_sign_and_magnitude,
+        test_centre_of_pressure_moves_aft_when_the_flow_separates,
         test_buoyancy,
         test_bluff_drag_is_orientation_dependent,
         test_generated_bodies_reach_the_fluid,
