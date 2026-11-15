@@ -5,6 +5,15 @@ disclosed there). Data: `results/L1f_passive.jsonl`, 250 rows, all finite,
 one pass. Stroke prescribed, feather a spring hinge at the leading edge,
 damping 0.3 of critical, mass at the quarter chord, body held.
 
+**Erratum (found during pass 1g, 2026-11-15): the damping was not 0.3 of
+critical.** The fluid solver's implicit damping rewrites `dof_damping` every
+step from its own copy taken at build, which wiped the rig's hinge damping.
+Every point here ran at the feather joint's built 0.0365 N m s/rad: an
+effective zeta of about 1.3 at k = 0.3 falling to about 0.2 at k = 10. The
+probe line "damping changed nothing" is void. The numbers below are those of
+that damping. Pass 1g's h = 0 rows re-measure this pass with the damping as
+stated (`PREREG_L1g_axis.md`).
+
 ## (a) Lift from rest
 
 | frequency | best vertical force / weight | aero power | peak drive torque | feather taken |
