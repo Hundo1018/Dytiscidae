@@ -30,7 +30,9 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
              mass: float | None = 0.60, medium: str = "air", cop_law: str | None = None,
              feather_axis: float = 0.0, one_way_flap: dict | None = None,
              dt: float = 2.5e-4, wn: float = 600.0, keep_series: bool = False,
-             joint_damping: float | None = 0.0, solver_flags: dict | None = None) -> dict:
+             joint_damping: float | None = 0.0, solver_flags: dict | None = None,
+             hull_inertia: float | None = None, cg_shift: float = 0.0,
+             tail: dict | None = None) -> dict:
     """free: root axes released after hold_beats, any of "x", "z", "p" (pitch).
     The measurement runs over the ``beats`` after that, body held or not.
     mass: the machine's all-up mass, made up with ballast at the hull's centre
@@ -38,7 +40,18 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     joint_damping: N m s/rad on every driven joint.  The built model carries
     0.0365 (a generic bearing figure, TYPED), which costs 46 W at the take-off
     point of pass 1i; 0.0, the default, charges the drive what `rig.run`'s
-    aerodynamic power did.  None keeps the built value."""
+    aerodynamic power did.  None keeps the built value.
+    hull_inertia: kg m2, the hull's two transverse moments of inertia (how far
+    the mass is spread along it); None keeps the built hull's, which has the
+    ballast as a point at its centre.
+    cg_shift: m, the hull's centre of mass moved forward along its axis.
+    tail: for a body built with ``stab_length`` (an all-moving tail).  Keys:
+    i0_deg (incidence, leading edge up, relative to the hull), kp (rad of tail
+    per rad of pitch error), kd (s), limit_deg (25), rate (rad/s, 8), and
+    lag_beats (1: the pitch error and rate are low-passed over this many
+    beats before the tail sees them, so it does not chase the flapping),
+    ref_deg (the pitch it holds; theta_deg unless given).
+    The tail's servo is rate-limited; its feedback starts at release."""
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
     from body import flapper
@@ -84,8 +97,21 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         m.actuator_ctrllimited[aid] = 0
         j = int(m.actuator_trnid[aid, 0])
         jid.append(j)
-        role.append("feather" if a.endswith("_f") else "stroke")
+        if int(m.body_parentid[int(m.jnt_bodyid[j])]) != hull:
+            role.append("tail")
+        else:
+            role.append("feather" if a.endswith("_f") else "stroke")
     role = np.array(role)
+    if hull_inertia is not None:
+        long_axis = int(np.argmin(m.body_inertia[hull]))
+        for ax in range(3):
+            if ax != long_axis:
+                m.body_inertia[hull, ax] = hull_inertia
+                env.solver._dry_inertia[hull, ax] = hull_inertia
+    if cg_shift:
+        m.body_ipos[hull, int(np.argmax(np.abs(m.body_ipos[hull])))] += cg_shift
+    if hull_inertia is not None or cg_shift:
+        mj.mj_setConst(m, d)
     dof = np.array([int(m.jnt_dofadr[j]) for j in jid])
     if joint_damping is not None:
         m.dof_damping[dof] = joint_damping
@@ -112,10 +138,18 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     released = np.zeros(6, bool)
     m.dof_armature[:6] = ARM
 
+    tl = dict(i0_deg=0.0, kp=0.0, kd=0.0, limit_deg=25.0, rate=8.0, lag_beats=1.0,
+              ref_deg=theta_deg)
+    tl.update(tail or {})
+    th_ref = math.radians(tl["ref_deg"])
+    tail_q = -math.radians(tl["i0_deg"])            # joint angle: leading edge down is positive
+    e_f, r_f = 0.0, 0.0
+
     def ref(t):
         s, c = math.sin(w * t), math.cos(w * t)
         q, qd, qdd = np.zeros(len(jid)), np.zeros(len(jid)), np.zeros(len(jid))
         st, fe = role == "stroke", role == "feather"
+        q[role == "tail"] = tail_q
         q[st], qd[st], qdd[st] = 0.5 * Phi * s, 0.5 * Phi * w * c, -0.5 * Phi * w * w * s
         q[fe], qd[fe], qdd[fe] = psi0 - Psi * c, Psi * w * s, Psi * w * w * c
         return q, qd, qdd
@@ -141,15 +175,28 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         m.actuator_gainprm[aid, 0] = kp[n_]
         m.actuator_biasprm[aid, 1], m.actuator_biasprm[aid, 2] = -kp[n_], -kv[n_]
 
+    # the machine's centre of mass from the hull frame's origin, world axes, at the start
+    # (not `subtree_com`: the solver inflates body_mass without body_subtreemass)
+    dry = env.solver._dry_mass
+    com0 = ((dry[:, None] * d.xipos).sum(0) / dry.sum() - d.xpos[hull]).tolist()
     n_beat = int(round(1.0 / (f * dt)))
     n_hold, n_all = hold_beats * n_beat, (hold_beats + beats) * n_beat
-    rec = dict(t=[], P=[], Ps=[], tq=[], err=[], hold=[], pos=[], vel=[], pitch=[])
+    rec = dict(t=[], P=[], Ps=[], tq=[], err=[], hold=[], pos=[], vel=[], pitch=[], tail=[], Pt=[])
     t = 0.0
     for k in range(n_all):
         if k == n_hold:
             for ch in free:
                 released[rel[ch]] = True
                 m.dof_armature[rel[ch]] = 0.0
+        if k >= n_hold and released[4] and (tl["kp"] or tl["kd"]):
+            # pitch, nose up positive, from the hull's attitude; its rate from the gyro
+            a_f = dt * f / max(tl["lag_beats"], 1e-6) * 2.0 * math.pi
+            e_f += a_f * ((-2.0 * math.atan2(d.qpos[5], d.qpos[3]) - th_ref) - e_f)
+            r_f += a_f * (-d.qvel[4] - r_f)
+            want = -(math.radians(tl["i0_deg"]) + tl["kp"] * e_f + tl["kd"] * r_f)
+            lim = math.radians(tl["limit_deg"])
+            want = min(max(want, -lim), lim)
+            tail_q += min(max(want - tail_q, -tl["rate"] * dt), tl["rate"] * dt)
         q, qd, qdd = ref(t)
         d.ctrl[:] = 0.0
         d.ctrl[aids] = q + (kv / kp) * qd          # the reference rate, fed forward
@@ -182,6 +229,8 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
             rec["vel"].append(d.qvel[:3].copy())
             qw, qy = d.qpos[3], d.qpos[5]
             rec["pitch"].append(-2.0 * math.atan2(qy, qw))
+            rec["tail"].append(-tail_q)
+            rec["Pt"].append(float(tau[role == "tail"] @ d.qvel[dof][role == "tail"]))
     T = beats / f
     hold = np.array(rec["hold"])
     vel, pos = np.array(rec["vel"]), np.array(rec["pos"])
@@ -203,16 +252,43 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
             else float(hold[:, i].mean())
     out["Fx"], out["Fz"] = float(net[0]), float(net[2] + total * G)
     out["lift_over_weight"] = out["Fz"] / (total * G)
+    # The pitching moment about the built centre of mass, from the holder's
+    # wrench about the hull frame's origin (gravity acts at the centre of mass).
+    F_ng = hold[:, :3] + np.array([0.0, 0.0, total * G])
+    c0 = np.array(com0)
+    M_cg = hold[:, 4] - (c0[2] * F_ng[:, 0] - c0[0] * F_ng[:, 2]) \
+        - np.cross(c0, np.array([0.0, 0.0, -total * G]))[1]
+    if role.tolist().count("tail"):
+        out["tail_power_W"] = float(np.mean(np.abs(rec["Pt"])))
+        tq_t = np.array(rec["tail"])
+        out["tail_min_deg"], out["tail_max_deg"] = (float(math.degrees(tq_t.min())),
+                                                     float(math.degrees(tq_t.max())))
     if released[4]:
-        out["pitch_end_deg"] = float(math.degrees(rec["pitch"][-1]) - theta_deg)
+        pd_ = np.degrees(np.array(rec["pitch"])) - theta_deg
+        out["pitch_end_deg"] = float(pd_[-1])
+        out["pitch_dev_max_deg"] = float(np.abs(pd_).max())
+        nb_ = len(pd_) // n_beat
+        bm = pd_[: nb_ * n_beat].reshape(nb_, n_beat)
+        out["pitch_beat_mean_deg"] = [float(x) for x in bm.mean(1)]
+        out["pitch_swing_deg"] = float((bm.max(1) - bm.min(1)).max() / 2.0)
+        out["pitch_swing_late_deg"] = float((bm.max(1) - bm.min(1))[-max(nb_ // 4, 1):].max() / 2.0)
     else:
         out["pitch_moment_mean"] = float(hold[:, 4].mean())
         out["pitch_moment_peak"] = float(np.abs(hold[:, 4]).max())
+        out["pitch_moment_cg_mean"] = float(M_cg.mean())
+        out["pitch_moment_cg_swing"] = float(np.abs(M_cg - M_cg.mean()).max())
     if free:
         out["dx"], out["dz"] = float(pos[-1, 0] - pos[0, 0] - V * T), float(pos[-1, 2] - pos[0, 2])
         out["vx_end"], out["vz_end"] = float(vel[-1, 0]), float(vel[-1, 2])
         zz = pos[:n_beat, 2] - np.linspace(pos[0, 2], pos[n_beat - 1, 2], n_beat)
         out["bob_mm"] = float(1e3 * (zz.max() - zz.min()))
+        zr = pos[:, 2] - pos[0, 2]
+        out["dz_min"], out["dz_max"] = float(zr.min()), float(zr.max())
+        out["vx_min"], out["vx_max"] = float(vel[:, 0].min()), float(vel[:, 0].max())
+        late = max(len(zr) - 10 * n_beat, 0)
+        out["vz_late"] = float((pos[-1, 2] - pos[late, 2]) / max(rec["t"][-1] - rec["t"][late], 1e-9))
+        out["power_late_W"] = float(P[late:].mean())
     if keep_series:
-        out["series"] = {k: np.asarray(v).tolist() for k, v in rec.items() if k != "hold"}
+        out["series"] = {k: np.asarray(v).tolist() for k, v in rec.items()}
+        out["com0"] = com0
     return out

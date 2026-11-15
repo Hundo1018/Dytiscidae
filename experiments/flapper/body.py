@@ -33,6 +33,10 @@ DEFAULTS = dict(
     tail_chord=0.06, tail_radius=0.002, tail_motor_mass=0.003, tail_range=1.0,
     tail_el=-math.pi / 2, tail_roll=0.0,
     hind_u=None,             # a hull station: a second wing pair there (the same wing part)
+    # -- pass 1m (pitch): off by default
+    stab_length=0.0,         # m; > 0: an all-moving horizontal tail, this long each side,
+    stab_chord=0.12,         # on a boom behind the hull, turning about its own span
+    stab_boom=0.3, boom_radius=0.004, stab_motor_mass=0.009, stab_range=0.6,
 )
 
 
@@ -109,6 +113,23 @@ def flapper(**over) -> Genome:
         g.edges.append(Edge(parent=0, child=len(g.parts) - 1, pos_u=0.0,
                             azimuth=0.0, elevation=float(e["tail_el"]),
                             roll=float(e["tail_roll"]), scale=1.0, reflect=False))
+    if float(e["stab_length"]) > 0.0:
+        boom = Part(kind=STRUT, length=float(e["stab_boom"]), radius=float(e["boom_radius"]),
+                    material="cfrp", joint="none", actuated=False)
+        stab = Part(kind=WING, length=float(e["stab_length"]), span=float(e["stab_length"]),
+                    root_chord=float(e["stab_chord"]), radius=float(e["wing_radius"]),
+                    material=str(e["wing_material"]), joint="hinge",
+                    joint_axis=np.array([1.0, 0.0, 0.0]),
+                    joint_range=(-float(e["stab_range"]), float(e["stab_range"])), actuated=True,
+                    motor_class=str(e["motor_class"]), motor_mass=float(e["stab_motor_mass"]) / 2,
+                    gear_ratio=float(e["gear_ratio"]), sealed=False, stroke_amplitude=0.0,
+                    neutral=0.5)
+        g.parts += [boom, stab]
+        nb = len(g.parts) - 2
+        g.edges.append(Edge(parent=0, child=nb, pos_u=0.0, azimuth=0.0, elevation=-math.pi / 2,
+                            roll=0.0, scale=1.0, reflect=False))
+        g.edges.append(Edge(parent=nb, child=nb + 1, pos_u=1.0, elevation=0.0, roll=math.pi,
+                            scale=1.0, reflect=True))
     g.battery_wh, g.battery_chem = float(e["battery_wh"]), str(e["battery_chem"])
     g.flap_frequency = 1.0
     g.lineage = ["flapper"]
