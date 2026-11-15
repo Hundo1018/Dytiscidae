@@ -23,7 +23,8 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
         chord_law: tuple | None = None, passive_feather: tuple | None = None,
         cop_law: str | None = None, feather_axis: float = 0.0,
         one_way_flap: dict | None = None, coupling: str = "static",
-        legacy_coupling: bool = False) -> dict:
+        legacy_coupling: bool = False, solver_flags: dict | None = None,
+        added_mass_ref: bool = False, legacy_added_weight: bool = False) -> dict:
     """chord_law = (k, sign): every wing strip's chord and area are scaled by k
     while the stroke rate has that sign (+1 or -1), blended across the
     reversal, and by k throughout if sign is 0.  Pass 1e's in-stroke shape
@@ -82,6 +83,15 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     env.reset(dom, randomise=False)
     d, m, mj = env.data, env.model, env._mj
     env.solver.cop_law = cop_law
+    for k_, v_ in (solver_flags or {}).items():
+        setattr(env.solver, k_, v_)
+    amref = None
+    if added_mass_ref:
+        # The plate's potential-flow added-mass load from the prescribed
+        # motion (`amref.py`), in place of the solver's entrainment reaction.
+        from amref import AddedMassRef
+        env.solver.entrainment = False
+        amref = AddedMassRef(env.solver, mj)
     q0 = d.qpos[:7].copy()
     q0[:3] = (0.0, 0.0, 30.0 if medium == "air" else -3.0)
     q0[3:7] = (math.cos(-th / 2), 0.0, math.sin(-th / 2), 0.0)
@@ -260,9 +270,19 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
             env.step(tgt)
         d.qpos[np.asarray(qadr)[held]] = tgt[held]
         t += dt
+        if not legacy_added_weight:
+            # The solver cancels the weight MuJoCo gives the entrained fluid
+            # with an upward force at each body's centre of mass.  It is not a
+            # fluid load, and until pass S1 only the net force took it out:
+            # the torque and power series carried m_added g times the wing's
+            # arm and rate (in water, most of the stroke torque).
+            d.xfrc_applied[:, 2] -= (m.body_mass - env.solver._dry_mass) * G
+        if amref is not None:
+            amref.add(d, t - dt)
         if k >= skip * n_beat:
             Fk = d.xfrc_applied[:, :3].sum(0).copy()
-            Fk[2] -= (m.body_mass.sum() - env.solver._dry_mass.sum()) * G
+            if legacy_added_weight:
+                Fk[2] -= (m.body_mass.sum() - env.solver._dry_mass.sum()) * G
             F.append(Fk)
             # Aerodynamic power: every wing body's fluid wrench about each
             # prescribed axis that carries it, times that axis's rate.
@@ -305,6 +325,7 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
             "flap_open_mean_deg": (np.degrees(np.mean(fl, axis=0)).tolist() if fl else None),
             "feather_torque_peak": float(np.max(Tf)), "feather_inertia": i_feather,
             "power_series": [float(x) for x in P],
+            "stroke_torque_series": [float(x) for x in Tq],
             "stroke_power_series": [float(x) for x in Ps], "time_series": [float(x) for x in ts],
             "feather_taken_deg": ([math.degrees(min(fq)), math.degrees(max(fq))] if fq else None),
             "mass_kg": float(p.mass), "roles": sorted(set(role.tolist())),

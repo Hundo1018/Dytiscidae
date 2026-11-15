@@ -987,9 +987,16 @@ class FluidSolver:
         self.cop_law: str | None = None
         #: React the entrainment of added mass, ``-dm/dt v`` (`entrainment_reaction`,
         #: ROADMAP AK).  Off, the mass matrix creates ``dm v`` of momentum every
-        #: step the added mass grows.
-        self.entrainment = True
+        #: step the added mass grows.  ``"wetting"`` (opt-in, numpy path only)
+        #: reacts only the growth that comes from a strip's density rising --
+        #: water arriving -- and not the growth of a wing's tensor projection
+        #: as the flow turns.  The projection is a function of the velocity, so
+        #: its ``dm/dt`` is an acceleration fed back explicitly: under a stiffly
+        #: driven wing in water it diverges (experiments/flapper,
+        #: PREREG_S1_entrainment.md).
+        self.entrainment: bool | str = True
         self._prev_mbody: np.ndarray | None = None
+        self._prev_rho: np.ndarray | None = None
         self._damping = ImplicitAeroDamping(model, medium, panels.half_height)
         #: Wagner lag and the LEV's travel/Rossby history (F-02, F-13).
         self.unsteady = True
@@ -1070,6 +1077,7 @@ class FluidSolver:
         # A body placed in water is placed with its water: a reset is not an
         # entrainment event, so the first step after it reacts nothing.
         self._prev_mbody = None
+        self._prev_rho = None
         self.diag = FluidDiagnostics()
 
     # ------------------------------------------------------------------ step
@@ -1489,7 +1497,15 @@ class FluidSolver:
             # quasi-steady model estimated but the momentum bookkeeping of the
             # mass matrix it just wrote, and by construction it cannot exceed
             # the body's own momentum.
-            if self._prev_mbody is not None:
+            if self.entrainment == "wetting":
+                if self._prev_rho is not None:
+                    wetted = np.zeros(nb)
+                    np.add.at(wetted, p.body_id,
+                              np.maximum(1.0 - self._prev_rho / rho, 0.0) * m_add)
+                    entrainment_reaction(fb, wetted, np.zeros(nb), self._lever2,
+                                         vel, self.model.opt.timestep)
+                self._prev_rho = rho.copy()
+            elif self._prev_mbody is not None:
                 entrainment_reaction(fb, m_body, self._prev_mbody, self._lever2,
                                      vel, self.model.opt.timestep)
             self._prev_mbody = m_body.copy()

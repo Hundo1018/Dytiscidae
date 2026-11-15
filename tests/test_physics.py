@@ -478,6 +478,58 @@ def test_centre_of_pressure_moves_aft_when_the_flow_separates() -> None:
           f"{got:.3e} vs {want:.3e} N m")
 
 
+def test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning() -> None:
+    """`FluidSolver.entrainment = "wetting"`: the reaction ``-dm/dt v`` for the
+    growth a strip's density brings, and none for the growth of a submerged
+    wing's tensor projection when the flow turns from edge-on to broadside.
+
+    One strip, two calls a step apart; the second call's force is read."""
+    print("\nfluid: the wetting entrainment mode")
+    m, d = _single_panel_model()
+    h = m.opt.timestep
+    bid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "wing")
+
+    def second(mode, first, then):
+        solver = FluidSolver(m, _wing_panels(m, 0.0), MediumField())
+        solver.entrainment = mode
+        for k, (z, v) in enumerate((first, then)):
+            mujoco.mj_resetData(m, d)
+            d.qpos[2] = z
+            d.qvel[:3] = v
+            mujoco.mj_forward(m, d)
+            d.xfrc_applied[:] = 0.0
+            solver.apply(d, k * h)
+        f = d.xfrc_applied[bid, :3].copy()
+        grown = float(m.body_mass[bid] - solver._dry_mass[bid])
+        solver.reset()
+        return f, grown
+
+    edge, broad = (-5.0, [2.0, 0.0, 0.0]), (-5.0, [0.0, 0.0, 2.0])
+    off, _ = second(False, edge, broad)
+    wet, _ = second("wetting", edge, broad)
+    on, grown = second(True, edge, broad)
+    check("submerged, the flow turning broadside: the default reacts the projection's growth",
+          on[2] - off[2] < -0.5 * grown * 2.0 / h, f"{on[2] - off[2]:.0f} N, {grown:.1f} kg grown")
+    check("submerged, the flow turning broadside: wetting reacts nothing",
+          np.allclose(wet, off, rtol=0, atol=1e-9), f"{np.abs(wet - off).max():.2e} N")
+
+    above, below = (1.0, [0.0, 0.0, -2.0]), (-1.0, [0.0, 0.0, -2.0])
+    off, _ = second(False, above, below)
+    wet, grown = second("wetting", above, below)
+    on, _ = second(True, above, below)
+    rho_w, rho_a = MediumField().water.rho, MediumField().air.rho
+    want = grown * (1.0 - rho_a / rho_w) * 2.0 / h
+    check("entering water: wetting reacts the water that arrived",
+          abs((wet[2] - off[2]) - want) < 0.01 * want,
+          f"{wet[2] - off[2]:.0f} N against {want:.0f} N")
+    check("entering water: wetting and the default react the same",
+          abs(wet[2] - on[2]) < 1e-6 * want, f"{wet[2] - on[2]:.2e} N")
+    off, _ = second(False, below, (1.0, [0.0, 0.0, 2.0]))
+    wet, _ = second("wetting", below, (1.0, [0.0, 0.0, 2.0]))
+    check("leaving water: wetting reacts nothing (shed water takes its momentum)",
+          np.allclose(wet, off, rtol=0, atol=1e-9), f"{np.abs(wet - off).max():.2e} N")
+
+
 def test_buoyancy() -> None:
     """A submerged volume lighter than water must be pushed up, and the net
     force must match Archimedes to within a percent."""
@@ -5300,6 +5352,7 @@ def main() -> int:
         test_a_film_is_the_evaluation,
         test_lift_sign_and_magnitude,
         test_centre_of_pressure_moves_aft_when_the_flow_separates,
+        test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning,
         test_buoyancy,
         test_bluff_drag_is_orientation_dependent,
         test_generated_bodies_reach_the_fluid,
