@@ -7,6 +7,15 @@ the crank metric: the instantaneous power of stroke and feather, fluid and
 inertia, over the crank rate, expressed as the shoulder torque of a K1
 rocker at 85 deg. The shoulder metric of 1a-1h is listed beside it.
 
+**Correction (2026-11-15, found in pass 1l): the two gates are met with
+different feather amplitudes.** All 16 take-off gate points have Psi 50 or
+60 deg; all 26 cruise gate points have Psi 20 or 30 deg. At 40 deg take-off
+tops out at 1.47 weights under the caps and no cruise point sustains; at
+30 deg take-off tops out at 0.92. So "one motor with a cam meets both gates"
+holds only if the cam's feather amplitude can be changed between take-off
+and cruise. That adjustment is not designed, and its mass and mechanism are
+unaccounted.
+
 ## (a) Take-off: met under both laws (P1 confirmed)
 
 16 points meet the gate: 7 under "plate", 9 under "insect". Every hinge axis

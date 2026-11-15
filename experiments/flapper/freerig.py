@@ -30,7 +30,7 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
              mass: float | None = 0.60, medium: str = "air", cop_law: str | None = None,
              feather_axis: float = 0.0, one_way_flap: dict | None = None,
              dt: float = 2.5e-4, wn: float = 600.0, keep_series: bool = False,
-             joint_damping: float | None = 0.0) -> dict:
+             joint_damping: float | None = 0.0, solver_flags: dict | None = None) -> dict:
     """free: root axes released after hold_beats, any of "x", "z", "p" (pitch).
     The measurement runs over the ``beats`` after that, body held or not.
     mass: the machine's all-up mass, made up with ballast at the hull's centre
@@ -63,6 +63,8 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     env.reset(Domain.AIR if medium == "air" else Domain.WATER, randomise=False)
     d, m, mj = env.data, env.model, env._mj
     env.solver.cop_law = cop_law
+    for k_, v_ in (solver_flags or {}).items():      # diagnosis only
+        setattr(env.solver, k_, v_)
     pan = env.solver.panels
     hull = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY, "seg0_hull")
     if mass is not None:
@@ -72,11 +74,14 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         mj.mj_setConst(m, d)
     total = float(env.solver._dry_mass.sum())
 
-    jid, role = [], []
+    jid, role, aids = [], [], []
     for a in env.act_names:
         aid = mj.mj_name2id(m, mj.mjtObj.mjOBJ_ACTUATOR, a)
+        aids.append(aid)
         m.actuator_gainprm[aid, :] = 0.0
         m.actuator_biasprm[aid, :] = 0.0
+        m.actuator_forcelimited[aid] = 0
+        m.actuator_ctrllimited[aid] = 0
         j = int(m.actuator_trnid[aid, 0])
         jid.append(j)
         role.append("feather" if a.endswith("_f") else "stroke")
@@ -128,6 +133,13 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         mj.mj_mulM(m, d, col, e)
         J[n_] = col[i]
     kp, kv = J * wn * wn, 2.0 * J * wn
+    # The servo is the model's own position actuator, so the integrator
+    # treats its damping implicitly.  An explicit PD (the first version) was
+    # stable in air and not in water, where a wing's added mass, and so the
+    # inertia the gains were sized on, changes several-fold through a beat.
+    for n_, aid in enumerate(aids):
+        m.actuator_gainprm[aid, 0] = kp[n_]
+        m.actuator_biasprm[aid, 1], m.actuator_biasprm[aid, 2] = -kp[n_], -kv[n_]
 
     n_beat = int(round(1.0 / (f * dt)))
     n_hold, n_all = hold_beats * n_beat, (hold_beats + beats) * n_beat
@@ -139,15 +151,16 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
                 released[rel[ch]] = True
                 m.dof_armature[rel[ch]] = 0.0
         q, qd, qdd = ref(t)
-        tau = J * qdd + kp * (q - d.qpos[qad]) + kv * (qd - d.qvel[dof])
         d.ctrl[:] = 0.0
+        d.ctrl[aids] = q + (kv / kp) * qd          # the reference rate, fed forward
         d.xfrc_applied[:] = 0.0
         env.solver.apply(d, d.time)
         # The solver has just rewritten all of qfrc_applied (its implicit
         # damping's explicit half); the drive is added to that, never set.
-        d.qfrc_applied[dof] += tau
+        d.qfrc_applied[dof] += J * qdd
         vb = d.qvel[:6].copy()
         mj.mj_step(m, d)
+        tau = J * qdd + d.actuator_force[aids]
         hold = ARM * (d.qvel[:6] - vb) / dt           # wrench the holder did NOT have to: -hold
         t += dt
         # put the held root axes back; a released axis keeps what it has

@@ -6,6 +6,12 @@ rows, all finite; worst tracking error 0.71 deg. Reader: `l1k_read.py`.
 Points: pass 1i's 16 take-off and 26 cruise gate points. No tail, no
 controller. Joint damping is zero unless stated.
 
+**Note (2026-11-15, pass 1l):** the rig's servo was later changed from an
+explicit PD to the model's own actuator. Air forces and power did not move;
+the crank metric moved by up to 10% (the probe point: 10.1 to 9.0 N m held).
+The crank figures below carry that uncertainty; gate counts that turn on
+12 N m are within it.
+
 ## The new rig against pass 1i, body held (P1)
 
 | | lift | power | crank metric |
