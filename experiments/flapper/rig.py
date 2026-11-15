@@ -21,7 +21,7 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
         psi0_deg: float, T_deg: float = 0.0, tau0_deg: float = 0.0, *, beats: int = 5,
         skip: int = 2, steps_per_beat: int = 50, medium: str = "air",
         chord_law: tuple | None = None, passive_feather: tuple | None = None,
-        cop_law: str | None = None) -> dict:
+        cop_law: str | None = None, feather_axis: float = 0.0) -> dict:
     """chord_law = (k, sign): every wing strip's chord and area are scaled by k
     while the stroke rate has that sign (+1 or -1), blended across the
     reversal, and by k throughout if sign is 0.  Pass 1e's in-stroke shape
@@ -35,7 +35,8 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     alone is prescribed, as a one-degree-of-freedom drive would give it.  Psi
     is then ignored, and the feather the wing takes is reported.  com, if
     given, moves the wing's centre of mass to com x chord behind the hinge;
-    h, if given, moves the hinge axis to h x chord behind the leading edge.
+    h, if given, moves the hinge axis to h x chord behind the leading edge
+    (feather_axis does the same for a prescribed feather).
 
     cop_law: the solver's `FluidSolver.cop_law` (centre of pressure that moves
     with separation, and pitch damping); None keeps the quarter chord."""
@@ -80,24 +81,25 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     chord0, area0 = pan.chord.copy(), pan.area.copy()
     w = 2 * math.pi * f
     free = np.zeros(len(names), bool)
+    axis = passive_feather[3] if passive_feather is not None and len(passive_feather) > 3 \
+        else feather_axis
+    if axis:
+        # Move each feather hinge's axis axis x chord behind the leading
+        # edge, parallel to it; the wing's built shape and pose are unchanged.
+        for a, j in enumerate(jid):
+            if role[a] != "feather":
+                continue
+            b = int(m.jnt_bodyid[j])
+            sel = (pan.body_id == b) & (pan.kind == KIND_WING)
+            cdir = pan.chord_local[sel][0] / np.linalg.norm(pan.chord_local[sel][0])
+            if float(pan.pos_local[sel].mean(0) @ cdir) < 0.0:
+                cdir = -cdir                       # aft, towards the strips' load points
+            m.jnt_pos[j] = m.jnt_pos[j] + axis * float(pan.chord[sel].mean()) * cdir
+        mj.mj_forward(m, d)
     if passive_feather is not None:
         k_s, zeta = passive_feather[:2]
         com = passive_feather[2] if len(passive_feather) > 2 else None
-        axis = passive_feather[3] if len(passive_feather) > 3 else 0.0
         free = role == "feather"
-        if axis:
-            # Move each feather hinge's axis axis x chord behind the leading
-            # edge, parallel to it; the wing's built shape and pose are unchanged.
-            for a, j in enumerate(jid):
-                if not free[a]:
-                    continue
-                b = int(m.jnt_bodyid[j])
-                sel = (pan.body_id == b) & (pan.kind == KIND_WING)
-                cdir = pan.chord_local[sel][0] / np.linalg.norm(pan.chord_local[sel][0])
-                if float(pan.pos_local[sel].mean(0) @ cdir) < 0.0:
-                    cdir = -cdir                       # aft, towards the strips' load points
-                m.jnt_pos[j] = m.jnt_pos[j] + axis * float(pan.chord[sel].mean()) * cdir
-            mj.mj_forward(m, d)
         if com is not None:
             # Move each wing's centre of mass along its chord to com x chord
             # behind the leading-edge hinge (built: 0.25, the strips' load
@@ -155,9 +157,22 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
                     couple.append((a, int(m.jnt_dofadr[j2]), float(col[int(m.jnt_dofadr[j2])])))
         m.dof_armature[held_dofs] = 1e4
     fq = []
+    # Each wing's inertia about its feather axis (structure only), for a
+    # drive that also turns the feather.
+    mj.mj_forward(m, d)
+    i_feather = []
+    for a, j in enumerate(jid):
+        if role[a] != "feather":
+            continue
+        b = int(m.jnt_bodyid[j])
+        r = d.xipos[b] - d.xanchor[j]
+        r = r - (r @ d.xaxis[j]) * d.xaxis[j]
+        R = d.ximat[b].reshape(3, 3)
+        i_feather.append(float(m.body_mass[b] * (r @ r))
+                         + float(d.xaxis[j] @ (R @ np.diag(m.body_inertia[b]) @ R.T) @ d.xaxis[j]))
     n_beat = int(round(1.0 / (f * dt))) if flap else int(round(0.2 / dt))
     weight = float(env.solver._dry_mass.sum() * G)
-    F, P, Tq = [], [], []
+    F, P, Ps, Tq, Tf, ts = [], [], [], [], [], []
     t = 0.0
     for k in range(beats * n_beat):
         tgt, rate = np.zeros(len(names)), np.zeros(len(names))
@@ -193,7 +208,7 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
             F.append(Fk)
             # Aerodynamic power: every wing body's fluid wrench about each
             # prescribed axis that carries it, times that axis's rate.
-            pw, tq = 0.0, 0.0      # tq: fluid torque about the stroke axes, all shoulders
+            pw, ps, tq, tf = 0.0, 0.0, 0.0, 0.0   # power, its stroke part; fluid torques
             for a, j in enumerate(jid):
                 if rate[a] == 0.0:
                     continue
@@ -209,8 +224,14 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
                 pw -= tau * rate[a]
                 if role[a] == "stroke":
                     tq += abs(tau)
+                    ps -= tau * rate[a]
+                elif role[a] == "feather":
+                    tf = max(tf, abs(tau))
             P.append(pw)
+            Ps.append(ps)
             Tq.append(tq)
+            Tf.append(tf)
+            ts.append(t - dt)
             if free.any():
                 fq.append(float(d.qpos[np.asarray(qadr)[free][0]]))
     F = np.array(F).mean(0)
@@ -219,6 +240,9 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
             "Fz": float(F[2]), "Fx": float(F[0]), "Fy": float(F[1]), "weight": weight,
             "lift_over_weight": float(F[2] / weight), "aero_power_W": float(np.mean(P)),
             "stroke_torque_mean": float(np.mean(Tq)), "stroke_torque_peak": float(np.max(Tq)),
+            "feather_torque_peak": float(np.max(Tf)), "feather_inertia": i_feather,
+            "power_series": [float(x) for x in P],
+            "stroke_power_series": [float(x) for x in Ps], "time_series": [float(x) for x in ts],
             "feather_taken_deg": ([math.degrees(min(fq)), math.degrees(max(fq))] if fq else None),
             "mass_kg": float(p.mass), "roles": sorted(set(role.tolist())),
             "finite": bool(np.isfinite(F).all())}
