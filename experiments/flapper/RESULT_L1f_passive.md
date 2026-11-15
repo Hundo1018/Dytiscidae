@@ -14,6 +14,12 @@ probe line "damping changed nothing" is void. The numbers below are those of
 that damping. Pass 1g's h = 0 rows re-measure this pass with the damping as
 stated (`PREREG_L1g_axis.md`).
 
+**Erratum 2 (found 2026-11-15 while building `freerig.py`): the stroke's
+inertial push on the free joint never acted in this pass.** The rig wrote it
+to `qfrc_applied` before `env.step`; the fluid solver rewrites all of
+`qfrc_applied` inside the step and wiped it. `probe_push.py`: on pass 1h's cheapest passive take-off point the push changes lift from 1.631 to 1.576 weights and the fluid stroke torque from 13.13 to 13.84 N m.
+The rig is fixed (`legacy_coupling=True` reproduces this pass as run). Not re-measured: pass 1h supersedes it, and 1h is re-run as `L1h_cop_r`.
+
 ## (a) Lift from rest
 
 | frequency | best vertical force / weight | aero power | peak drive torque | feather taken |

@@ -22,7 +22,8 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
         skip: int = 2, steps_per_beat: int = 50, medium: str = "air",
         chord_law: tuple | None = None, passive_feather: tuple | None = None,
         cop_law: str | None = None, feather_axis: float = 0.0,
-        one_way_flap: dict | None = None, coupling: str = "static") -> dict:
+        one_way_flap: dict | None = None, coupling: str = "static",
+        legacy_coupling: bool = False) -> dict:
     """chord_law = (k, sign): every wing strip's chord and area are scaled by k
     while the stroke rate has that sign (+1 or -1), blended across the
     reversal, and by k throughout if sign is 0.  Pass 1e's in-stroke shape
@@ -48,7 +49,13 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     coupling: how a free joint feels the prescribed motion it rides on.
     "static" (passes 1f-1i) adds M[f, s] a_s with M taken once at the start
     pose; "step" adds (M a)_f from the current pose every step, for every
-    prescribed axis.  A flap always uses "step"."""
+    prescribed axis.  A flap always uses "step".
+
+    legacy_coupling=True reproduces passes 1f-1h and 1j as they ran: the push
+    above was written before `env.step` and the fluid solver, which rewrites
+    all of qfrc_applied, wiped it, so the free joint felt no inertial push
+    from the stroke at all.  For a free hinge prefer `freerig.run_free`,
+    where the stroke is driven by torque and the coupling is the model's own."""
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
     from body import flapper
@@ -225,6 +232,7 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
         d.qvel[0] = V
         held = ~free
         d.qpos[np.asarray(qadr)[held]], d.qvel[np.asarray(vadr)[held]] = tgt[held], rate[held]
+        push = np.zeros(m.nv)
         if step_free:
             # (M a)_free from the pose of the last step: every prescribed axis's
             # acceleration, so a free joint feels what it rides on.
@@ -235,13 +243,21 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
             acc[dof_of[role == "twist"]] = T * w * w * c
             ma = np.zeros(m.nv)
             mj.mj_mulM(m, d, ma, acc)
-            d.qfrc_applied[:] = 0.0
-            d.qfrc_applied[step_free] -= ma[step_free]
+            push[step_free] -= ma[step_free]
         elif free.any():
-            d.qfrc_applied[:] = 0.0
             for a, fdof, mfs in couple:
-                d.qfrc_applied[fdof] -= mfs * (-0.5 * Phi * w * w * s)
-        env.step(tgt)
+                push[fdof] -= mfs * (-0.5 * Phi * w * w * s)
+        if push.any() and not legacy_coupling:
+            # `env.step` unrolled, because the solver rewrites all of
+            # qfrc_applied inside it: a push written before the step was wiped
+            # (passes 1f-1h and 1j ran with no push at all; see their errata).
+            d.ctrl[: len(tgt)] = env.servo_command(tgt)
+            d.xfrc_applied[:] = 0.0
+            env.solver.apply(d, d.time)
+            d.qfrc_applied[:] += push
+            mj.mj_step(m, d)
+        else:
+            env.step(tgt)
         d.qpos[np.asarray(qadr)[held]] = tgt[held]
         t += dt
         if k >= skip * n_beat:

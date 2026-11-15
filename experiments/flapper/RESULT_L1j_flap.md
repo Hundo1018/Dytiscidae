@@ -6,6 +6,12 @@ finite, one pass. Reader: `l1j_read.py`. Held body, water. The rear 60% of
 each wing is a hinged body with a stop; "welded" is the same split wing with
 no hinge.
 
+**Erratum 2 (found 2026-11-15 while building `freerig.py`): the stroke's
+inertial push on the free joint never acted in this pass.** The rig wrote it
+to `qfrc_applied` before `env.step`; the fluid solver rewrites all of
+`qfrc_applied` inside the step and wiped it. `probe_push.py`: on the still-water rowing point the flap-up arm changes from +1.37 N at 17.9 N m to +2.33 N at 6.1 N m, and on pass 1e's up-down point from -1.79 N to +0.24 N. In water the push includes the flap's added mass, so every flap number below is void until re-run.
+The rig is fixed (`legacy_coupling=True` reproduces this pass as run). Re-run with the push acting as `results/L1j_flap_r.jsonl` (`PREREG_L1r_reruns.md`).
+
 ## Block A: pass 1e's up-down stroke, 0.3 m/s
 
 Best net forward force under both torque caps:

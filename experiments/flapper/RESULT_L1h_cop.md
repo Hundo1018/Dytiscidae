@@ -5,6 +5,12 @@ Pre-registration: `PREREG_L1h_cop.md` (commit ab66da3). Data:
 51 cruise points could not be trimmed to the weight. Reader: `l1h_read.py`.
 One pass.
 
+**Erratum 2 (found 2026-11-15 while building `freerig.py`): the stroke's
+inertial push on the free joint never acted in this pass.** The rig wrote it
+to `qfrc_applied` before `env.step`; the fluid solver rewrites all of
+`qfrc_applied` inside the step and wiped it. `probe_push.py`: on pass 1h's cheapest passive take-off point the push changes lift from 1.631 to 1.576 weights and the fluid stroke torque from 13.13 to 13.84 N m.
+The rig is fixed (`legacy_coupling=True` reproduces this pass as run). Re-run with the push acting as `results/L1h_cop_r.jsonl` (`PREREG_L1r_reruns.md`).
+
 ## (a) Take-off: 0 of 800 meet the gate (P1 confirmed)
 
 | axis h | law | lowest drive torque anywhere | cheapest point at >= 1.6 weights | most lift within 12 N m |

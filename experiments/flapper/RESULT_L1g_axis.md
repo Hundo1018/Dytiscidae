@@ -5,6 +5,12 @@ the probes are disclosed there). Data: `results/L1g_axis.jsonl`, 1,216 rows:
 640 take-off and 576 cruise. All rows are finite and all cruise points are
 trimmed. One pass. Reader: `l1g_read.py`.
 
+**Erratum 2 (found 2026-11-15 while building `freerig.py`): the stroke's
+inertial push on the free joint never acted in this pass.** The rig wrote it
+to `qfrc_applied` before `env.step`; the fluid solver rewrites all of
+`qfrc_applied` inside the step and wiped it. `probe_push.py`: on pass 1h's cheapest passive take-off point the push changes lift from 1.631 to 1.576 weights and the fluid stroke torque from 13.13 to 13.84 N m.
+The rig is fixed (`legacy_coupling=True` reproduces this pass as run). Not re-measured: pass 1h supersedes it, and 1h is re-run as `L1h_cop_r`.
+
 ## (a) Take-off: 0 of 640 meet the gate (P1 confirmed)
 
 | axis h | zeta | most lift | cheapest point at >= 1.6 weights |
