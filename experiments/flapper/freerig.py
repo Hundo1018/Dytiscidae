@@ -54,14 +54,14 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     The tail's servo is rate-limited; its feedback starts at release."""
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
-    from body import flapper
+    from body import built
     from dytiscidae.core.phenotype import build
     from dytiscidae.envs.triphibian import Domain, TriphibianEnv
     from dytiscidae.physics.fluid import WING as KIND_WING
 
     Phi, Psi, psi0, th = (math.radians(x) for x in (Phi_deg, Psi_deg, psi0_deg, theta_deg))
     w = 2 * math.pi * f
-    p = build(flapper(**body))
+    p = built(body)
     if one_way_flap is not None:
         import dytiscidae.envs.triphibian as TR
         from flapwing import compile_with_flap

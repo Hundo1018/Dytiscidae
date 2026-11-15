@@ -27,12 +27,12 @@ def draw(body: dict, out, title: str, notes: list, *, stroke_deg: float = 0.0,
     import matplotlib.pyplot as plt
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
-    from body import flapper
+    from body import built
     from dytiscidae.core.phenotype import build
     from dytiscidae.envs.triphibian import Domain, TriphibianEnv
     from dytiscidae.physics.fluid import WING
 
-    env = TriphibianEnv(build(flapper(**body)), seed=0, timestep=1e-3)
+    env = TriphibianEnv(built(body), seed=0, timestep=1e-3)
     env.reset(Domain.AIR, randomise=False)
     d, m, mj = env.data, env.model, env._mj
     hull = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY, "seg0_hull")
@@ -176,6 +176,24 @@ def main() -> int:
                  stroke_deg=60.0, feather_deg=20.0,
                  spec=dict(base, tail_span=2 * tail["stab_length"], tail_chord=tail["stab_chord"],
                            tail_area=2 * tail["stab_length"] * tail["stab_chord"]))
+    elif which == "L1n":
+        from l1a import BODY_S
+        tail = dict(stab_length=0.25, stab_chord=0.12, stab_boom=0.3)
+        draw(dict(BODY_S, **tail), figs / "L1n_fixture.png",
+             "Pass 1n: the fixture with its shoulders on the hull's sides, and the 0.06 m2 tail",
+             ["air: take-off at rest and cruise at 6-11 m/s, cam-driven feather; released runs carry the tail",
+              "water: the wing folded to 0.4 and 0.6 of its length (drawn separately), no tail",
+              "not modelled: the tail in the wings' wake; roll and yaw; the fold's and the cam's own structure"],
+             stroke_deg=85.0, feather_deg=30.0,
+             spec=dict(base, tail_span=0.5, tail_chord=0.12, tail_area=0.06))
+        for ks in (0.4, 0.6):
+            draw(dict(BODY_S, wing_length=ks * LENGTH), figs / f"L1n_water{ks}.png",
+                 f"Pass 1n: the water wing folded to {ks} of its length, shoulders on the hull's sides",
+                 ["body held at 0.3 m/s in water; stroke 40 or 85 deg at 0.25-1 Hz; feather 20-60 deg, cam-driven",
+                  "the fold is modelled as a shorter wing of the same chord; its mechanism is not modelled"],
+                 stroke_deg=85.0, feather_deg=30.0,
+                 spec=dict(span=2 * (ks * LENGTH + BODY["hull_radius"]), wing_area=ks * AREA,
+                           chord=base["chord"], mass=MASS))
     else:
         raise SystemExit("unknown figure set")
     return 0

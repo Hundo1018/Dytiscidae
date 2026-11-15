@@ -37,6 +37,8 @@ DEFAULTS = dict(
     stab_length=0.0,         # m; > 0: an all-moving horizontal tail, this long each side,
     stab_chord=0.12,         # on a boom behind the hull, turning about its own span
     stab_boom=0.3, boom_radius=0.004, stab_motor_mass=0.009, stab_range=0.6,
+    wing_seat=0.0,           # m; `built` moves each main wing's root this far out from the
+                             # hull's axis (the hull's radius: shoulders on its sides)
 )
 
 
@@ -134,3 +136,20 @@ def flapper(**over) -> Genome:
     g.flap_frequency = 1.0
     g.lineage = ["flapper"]
     return g
+
+
+def built(body: dict):
+    """The phenotype of ``flapper(**body)``.  The genome can only attach a part
+    on its parent's axis, so the main wings' roots, and with them the stroke
+    and feather axes, sit on the hull's centre line: the span is short of the
+    design's by the hull's diameter (found on the drawing, pass S1).
+    ``wing_seat`` moves each root out sideways by that much before the model
+    is compiled."""
+    from dytiscidae.core.phenotype import build
+    p = build(flapper(**body))
+    seat = float(dict(DEFAULTS, **body)["wing_seat"])
+    if seat:
+        for s in p.segments:
+            if s.part is p.genome.parts[1] and s.parent == 0:
+                s.offset = s.offset + np.array([0.0, -seat if s.mirrored else seat, 0.0])
+    return p

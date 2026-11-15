@@ -59,7 +59,7 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     where the stroke is driven by torque and the coupling is the model's own."""
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
-    from body import flapper
+    from body import built
     from dytiscidae.core.phenotype import build
     from dytiscidae.envs.triphibian import Domain, TriphibianEnv
 
@@ -67,7 +67,7 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
                                    (Phi_deg, Psi_deg, psi0_deg, T_deg, tau0_deg, theta_deg))
     flap = f > 0.0
     dt = min(1e-3, 1.0 / (steps_per_beat * f)) if flap else 1e-3
-    p = build(flapper(**body))
+    p = built(body)
     if one_way_flap is not None:
         import dytiscidae.envs.triphibian as TR
         from flapwing import compile_with_flap

@@ -17,6 +17,7 @@ MASS, SPAN, AREA, HULL_R = 0.60, 1.4, 0.34, 0.04
 LENGTH = SPAN / 2 - HULL_R
 BODY = dict(wing_length=LENGTH, wing_chord=AREA / (2 * LENGTH), hull_length=0.5,
             hull_radius=HULL_R)
+BODY_S = dict(BODY, wing_seat=HULL_R)                 # shoulders on the hull's sides (pass 1n on)
 W = MASS * G
 J_WING = 0.187 * (AREA / 2) * LENGTH ** 2 / 3        # kg m2, one wing (A13: 187 g/m2)
 
