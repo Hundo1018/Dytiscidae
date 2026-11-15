@@ -1,5 +1,15 @@
 # Re-runs of passes 1h and 1j with the inertial push acting: result (2026-11-15)
 
+**Erratum (2026-11-15, pass S1): the stroke torque, crank metric and power
+series in this file's water re-run (pass 1j's flap) carried the entrained weight's cancellation**, a force
+the solver adds to cancel the weight MuJoCo gives the added mass; only the
+net force had it removed. On pass 1l's grid the corrected crank metric is
+0.36-0.96 of the one read (median 0.66). The pass also ran with the solver's
+default entrainment reaction, a one-sided drag on a flapping wing (median 23%
+of thrust on that grid). Torque caps here were applied to an overstated
+torque and forces are understated. Mean force and mean power are otherwise
+unaffected. See `RESULT_S1_entrainment.md`; not re-run unless said there.
+
 Pre-registration: `PREREG_L1r_reruns.md` (commit 7f40010). Data:
 `results/L1h_cop_r.jsonl` (1,520 rows) and `results/L1j_flap_r.jsonl` (306
 rows), all finite. Same scripts, grids, gates and readers as the original

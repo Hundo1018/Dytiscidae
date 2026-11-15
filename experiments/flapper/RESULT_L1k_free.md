@@ -1,5 +1,12 @@
 # L1 pass 1k result: the cam drive with the body let go (2026-11-15)
 
+**Correction (2026-11-15, pass 1m): the holder's pitching moment below was
+taken about the hull frame's origin, the hull's tail end, 0.25 m behind the
+centre of mass.** About the centre of mass it swings by 1.4-1.5 N m in cruise
+and 5.1 at take-off (six points probed), not 2.1-4.2 and 5.3-8.2. The reading
+"this is the cam's reaction" is not established. The released runs are
+unaffected. See `PREREG_L1m_tail.md`.
+
 Pre-registration: `PREREG_L1k_free.md` (commit 7f40010; one take-off and one
 cruise probe point disclosed there). Data: `results/L1k_free.jsonl`, 168
 rows, all finite; worst tracking error 0.71 deg. Reader: `l1k_read.py`.

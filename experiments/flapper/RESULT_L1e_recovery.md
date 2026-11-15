@@ -1,5 +1,15 @@
 # L1 pass 1e result: a recovery half-stroke in a low-drag shape (2026-11-15)
 
+**Erratum (2026-11-15, pass S1): the stroke torque, crank metric and power
+series in this pass carried the entrained weight's cancellation**, a force
+the solver adds to cancel the weight MuJoCo gives the added mass; only the
+net force had it removed. On pass 1l's grid the corrected crank metric is
+0.36-0.96 of the one read (median 0.66). The pass also ran with the solver's
+default entrainment reaction, a one-sided drag on a flapping wing (median 23%
+of thrust on that grid). Torque caps here were applied to an overstated
+torque and forces are understated. Mean force and mean power are otherwise
+unaffected. See `RESULT_S1_entrainment.md`; not re-run unless said there.
+
 Pre-registration: `PREREG_L1e_recovery.md` (commit 6ac3f35; six probe points
 seen before freezing, disclosed there). Data: `results/L1e_recovery.jsonl`,
 258 points, all finite, one pass. Held body, water, 0.3 m/s; chord and area

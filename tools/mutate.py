@@ -1740,9 +1740,9 @@ MUTATIONS: tuple = (
     Mutation(
         id="entrainment-not-reacted",
         path="dytiscidae/physics/fluid.py",
-        find="            if self._prev_mbody is not None:\n"
+        find="            elif self._prev_mbody is not None:\n"
              "                entrainment_reaction(",
-        replace="            if False:\n"
+        replace="            elif False:\n"
                 "                entrainment_reaction(",
         defect="added mass grows in the mass matrix with no -dm/dt v reaction, so "
                "every step of entrainment creates dm v of momentum: the ray "
@@ -2802,12 +2802,12 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_centre_of_pressure_moves_aft_when_the_flow_separates",),
         item="pitching moment"),
     Mutation(
-        id="wetting-entrainment-reacts-shedding",
+        id="wetting-entrainment-reacts-standing-water",
         path="dytiscidae/physics/fluid.py",
         find="                              np.maximum(1.0 - self._prev_rho / rho, 0.0) * m_add)\n",
-        replace="                              (1.0 - self._prev_rho / rho) * m_add)\n",
-        defect="the wetting mode reacts water that is shed as well, which pushes a "
-               "surfacing strip out of the water",
+        replace="                              np.maximum(1.0 - self._prev_rho / rho, 1.0) * m_add)\n",
+        defect="the wetting mode reacts a submerged strip's whole added mass every step, "
+               "not only the water that arrived",
         suites=("test_physics::test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning",),
         item="entrainment"),
     Mutation(

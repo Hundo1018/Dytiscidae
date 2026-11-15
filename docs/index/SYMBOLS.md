@@ -1583,10 +1583,10 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `strip_damping` | function | 780 | `(q, area, lift, drag, rho, aspect_ratio, is_wing, lift_scale: float=1.0) -> np.ndarray` | Per-strip damping bound ``b_i`` for `ImplicitAeroDamping`, N s/m. |
 | `UnsteadyState` | class | 447 | — | Per-strip history: Wagner lag and chords travelled since reversal. |
 | `FluidSolver.__init__` | method | 889 | `(self, model, panels: PanelSet, medium: MediumField, *, c_rot: float \| None=None, added_mass_scale: float=1.0, cd_scale: float=1.0, lift_scale: float=1.0, disc_span: float \| None=None) -> None` | — |
-| `FluidSolver.apply` | method | 1077 | `(self, data, t: float) -> FluidDiagnostics` | Compute and accumulate fluid loads into ``data.xfrc_applied``. |
-| `FluidSolver.instantaneous_power` | method | 1560 | `(self, data) -> float` | Mechanical power the machine is currently putting into the fluid, W. |
-| `FluidSolver.reset` | method | 1059 | `(self) -> None` | — |
-| `FluidSolver.steady` | method | 1036 | `(self)` | Context for quasi-static probes (trim, lift and thrust margins). |
+| `FluidSolver.apply` | method | 1085 | `(self, data, t: float) -> FluidDiagnostics` | Compute and accumulate fluid loads into ``data.xfrc_applied``. |
+| `FluidSolver.instantaneous_power` | method | 1576 | `(self, data) -> float` | Mechanical power the machine is currently putting into the fluid, W. |
+| `FluidSolver.reset` | method | 1066 | `(self) -> None` | — |
+| `FluidSolver.steady` | method | 1043 | `(self)` | Context for quasi-static probes (trim, lift and thrust margins). |
 | `ImplicitAeroDamping.__init__` | method | 625 | `(self, model, medium=None, half_height=None) -> None` | — |
 | `ImplicitAeroDamping.apply` | method | 746 | `(self, data, pos: np.ndarray, body_id: np.ndarray, b) -> None` | ``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip -- |
 | `ImplicitAeroDamping.clear` | method | 694 | `(self, data) -> None` | The step's damping with the split off: the dry model's own.  Called |
