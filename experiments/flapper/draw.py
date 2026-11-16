@@ -158,6 +158,16 @@ def draw(body: dict, out, title: str, notes: list, *, stroke_deg: float = 0.0,
         ax.set_aspect("equal")
         ax.grid(alpha=0.3)
         ax.set_title(name, fontsize=10)
+    if full.get("wing_section"):
+        import sections
+        xy = sections.coordinates(full["wing_section"])
+        ins = axs[1].inset_axes([0.02, 0.80, 0.55, 0.18])
+        ins.plot(xy[:, 0], xy[:, 1], color="tab:blue", lw=1.2)
+        ins.set_aspect("equal")
+        ins.set_xticks([])
+        ins.set_yticks([])
+        ins.set_title("section %s: thickness %.1f%%, height %.1f%% of chord" % (
+            full["wing_section"], 100 * _thickness(xy), 100 * (xy[:, 1].max() - min(xy[0, 1], xy[-1, 1]))), fontsize=7)
     wing = [q for q, bid in rest if is_main(bid)]
     other = [q for q, bid in rest if not is_main(bid)]
 
@@ -192,6 +202,15 @@ def draw(body: dict, out, title: str, notes: list, *, stroke_deg: float = 0.0,
     for k, v, bv, ok in table:
         print("%-24s %-11s design %.4g built %.4g %s" % (Path(out).name, k, v, bv, "OK" if ok else "DIFFERS"))
     return table
+
+
+def _thickness(xy) -> float:
+    """Largest gap between the two surfaces of a profile given as one loop
+    from the trailing edge round the leading edge and back."""
+    i = int(np.argmin(xy[:, 0]))
+    up, lo = xy[: i + 1][::-1], xy[i:]
+    x = np.linspace(0.02, 0.98, 97)
+    return float(np.max(np.abs(np.interp(x, up[:, 0], up[:, 1]) - np.interp(x, lo[:, 0], lo[:, 1]))))
 
 
 def asked(body: dict, **more) -> dict:
@@ -254,6 +273,14 @@ def main() -> int:
             draw(body, figs / f"R0s_{name}.png", f"R0 again: {name} at its reported span",
                  ["body held, lift trimmed to the weight; rectangular flat wings, no tail (as R0)"],
                  stroke_deg=60.0, mass=k["mass"], spec=dict(span=k["span"], wing_area=k["area"], mass=k["mass"]))
+    elif which == "W4":
+        for lam in (1.0, 0.6, 0.4):
+            body = dict(BODY_S, wing_shape=dict(camber=0.04, taper=lam, twist_tip_deg=-8.0), wing_section="goe417a")
+            draw(body, figs / f"W4_taper{lam}.png",
+                 f"Pass W4: tip chord {lam} of the root's, 8 deg of washout, section Goe 417a",
+                 ["held, 6 and 8 m/s, stroke 30-60 deg at 2-3.5 Hz, feather 0-20 deg; take-off at rest; twist 0 and -8 deg both run",
+                  "the section is a measured polar applied strip by strip; the wing is rigid; the leading edge is straight"],
+                 stroke_deg=40.0, feather_deg=0.0, spec=dict(span=SPAN, wing_area=AREA, mass=MASS))
     elif which == "past":
         import landwalk as LW
         import reproduce as RP

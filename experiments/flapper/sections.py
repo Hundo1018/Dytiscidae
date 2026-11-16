@@ -49,3 +49,30 @@ def lift_runs(name: str):
         k = int(re.search(r"_Re(\d+)k", p).group(1))
         out.append((1e3 * k, np.radians(a[:, 0]), a[:, 1]))
     return out
+
+
+def coordinates(name: str):
+    """(x, y) over the chord of the section as built for the tunnel (the
+    archive's digitised `.dap` profile where it has one, else its nominal
+    `.dat`), read from the raw UIUC volumes."""
+    import zipfile
+    for z in sorted(glob.glob(str(HERE / "raw" / "volume0*.zip"))):
+        with zipfile.ZipFile(z) as zf:
+            for member in zf.namelist():
+                if "COORD" not in member.upper():
+                    continue
+                lines = zf.read(member).decode("latin-1").splitlines()
+                for ext in (".dap", ".dat"):
+                    for i, line in enumerate(lines):
+                        if line.strip().lower() == name.lower() + ext:
+                            pts = []
+                            for row in lines[i + 3:]:
+                                p = row.split()
+                                try:
+                                    pts.append((float(p[0]), float(p[1])))
+                                except (ValueError, IndexError):
+                                    if pts:
+                                        break
+                            if len(pts) > 10:
+                                return np.array(pts)
+    raise FileNotFoundError(f"no coordinates for section {name!r}")
