@@ -1,5 +1,11 @@
 # R0 result: two machines that flew, through the present pipeline (2026-11-15)
 
+**Erratum (2026-11-16, found on the drawings, `REVIEW_figures_past.md`): the
+wings were not built at the reported spans.** The roots sat on the hull's
+centre line, so the spans were 1.42 m (E-Flap, 1.50 reported) and 1.25 m
+(Robo Raven II, 1.33). Area and mass were as reported. Every figure below is
+for those shorter spans until the pass is re-run on the seated fixture.
+
 Pre-registration: `PREREG_R0_reproduce.md` (commit a6407c4, before any
 rollout). Data: `results/R0_reproduce.jsonl`, 240 points, 191 trimmed, one
 pass, nothing tuned after reading. Command:

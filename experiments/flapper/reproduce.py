@@ -5,6 +5,7 @@ held-body rig (PREREG_R0_reproduce.md).  Lift is trimmed to the real weight.
 """
 import argparse
 import json
+import os
 import multiprocessing as mp
 import sys
 from pathlib import Path
@@ -27,8 +28,11 @@ def body(name):
     k = MACHINES[name]
     hull_radius = 0.04
     length = k["span"] / 2 - hull_radius
+    # FLAPPER_SEAT=1: the roots on the hull's sides, so the span is the reported
+    # one (the first run had them on the centre line; RESULT_R0's erratum).
     return dict(wing_length=length, wing_chord=k["area"] / (2 * length),
-                hull_length=k["hull"], hull_radius=hull_radius)
+                hull_length=k["hull"], hull_radius=hull_radius,
+                wing_seat=hull_radius if os.environ.get("FLAPPER_SEAT") == "1" else 0.0)
 
 
 def point(args):
