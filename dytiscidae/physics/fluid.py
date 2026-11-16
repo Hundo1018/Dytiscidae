@@ -399,10 +399,35 @@ class SectionPolar:
     that off it).  The table is two-dimensional data: with the solver's
     inflow on it is used as it is, and otherwise the lift is scaled by the
     Helmholtz factor and the induced drag added, as for the default.
+
+    ``lift_tables`` (optional): one ``(reynolds, alpha_rad, cl)`` per Reynolds
+    number, the section's lift measured on past the end of the drag table
+    (UIUC ran lift to 18-24 deg on a balance, drag only to about 11 deg with a
+    wake rake).  Past the drag table the lift is then this measurement up to
+    its last angle, and the drag, which nobody measured there, is the force
+    normal to the chord that the measured lift implies, ``cl tan a`` and skin
+    friction, entered across `SEPARATION_COMPLETE`.  The plate takes over from
+    the last measured angle to `PLATE_BY`.  Without it the plate took over
+    within 6 deg of the drag table's end and read 0.12-0.41 below these same
+    lift runs there (experiments/flapper, RESULT_W3_section.md, RESULT_W5).
     """
 
-    def __init__(self, name: str, tables) -> None:
+    #: The angle by which a stalled section is on the plate law.  At 30 deg the
+    #: plate is within 0.06 of a 2D NACA 0012 and within 0.08 of a NACA 4409
+    #: wing of aspect ratio 6, in lift and in drag; at 25 deg it is 0.23 under
+    #: the wing (experiments/flapper/RESULT_W5_separated.md).
+    PLATE_BY = np.radians(30.0)
+
+    def __init__(self, name: str, tables, lift_tables=None) -> None:
         self.name = name
+        self.lift_tables = None
+        if lift_tables:
+            self.lift_tables = sorted(((float(r), np.asarray(a, float), np.asarray(l, float))
+                                       for r, a, l in lift_tables), key=lambda t: t[0])
+            for _, a, l in self.lift_tables:
+                if len(a) < 3 or np.any(np.diff(a) <= 0) or len(l) != len(a):
+                    raise ValueError(f"section {name!r}: a lift table needs three or more ascending angles")
+            self._lift_logre = np.log([t[0] for t in self.lift_tables])
         self.tables = sorted(((float(r), np.asarray(a, float), np.asarray(l, float), np.asarray(d, float))
                               for r, a, l, d in tables), key=lambda t: t[0])
         if not self.tables:
@@ -425,6 +450,18 @@ class SectionPolar:
         n = np.arange(alpha.shape[0])
         return (1.0 - t) * vals[i, :, n].T + t * vals[i + 1, :, n].T
 
+    def _lift_at(self, alpha, re):
+        """The lift run's value and its last measured angle at each strip's Re."""
+        vals = np.array([[np.interp(alpha, a, l), np.full_like(alpha, a[-1])]
+                         for _, a, l in self.lift_tables])                 # (n_re, 2, n)
+        if len(self.lift_tables) == 1:
+            return vals[0]
+        x = np.clip(np.log(np.maximum(re, 1.0)), self._lift_logre[0], self._lift_logre[-1])
+        i = np.clip(np.searchsorted(self._lift_logre, x) - 1, 0, len(self.lift_tables) - 2)
+        t = (x - self._lift_logre[i]) / (self._lift_logre[i + 1] - self._lift_logre[i])
+        n = np.arange(alpha.shape[0])
+        return (1.0 - t) * vals[i, :, n].T + t * vals[i + 1, :, n].T
+
     def coefficients(self, alpha, re, ar, lev, alpha_e=None):
         """``(cl, cd)`` for incidence ``alpha`` measured towards the section's
         upper side.  ``alpha_e`` is the Wagner-lagged incidence the attached
@@ -435,6 +472,16 @@ class SectionPolar:
         cl_t, cd_t, lo, hi = self._at(ae, re)
         t = np.clip(np.maximum(alpha - hi, lo - alpha) / SEPARATION_COMPLETE, 0.0, 1.0)
         w = t * t * (3.0 - 2.0 * t)
+        if self.lift_tables is not None:
+            cl_l, top = self._lift_at(ae, re)
+            # past the drag table: the measured lift, and the drag it implies
+            # on a section loaded normal to its chord
+            past = _smoothstep((alpha - hi) / SEPARATION_COMPLETE)
+            cl_t = (1.0 - past) * cl_t + past * cl_l
+            cd_t = (1.0 - past) * cd_t + past * (
+                skin_friction_cd(re) + np.maximum(cl_l, 0.0) * np.tan(np.clip(ae, 0.0, self.PLATE_BY)))
+            up = _smoothstep((alpha - top) / np.maximum(self.PLATE_BY - top, 1e-6))
+            w = np.where((alpha > hi) & (top > hi), up, w)
         w = w + (1.0 - w) * lev
         k = 1.0 / (1.0 + 2.0 / np.maximum(ar, 0.5))
         cn = CN_PLATE + (CN_LEV - CN_PLATE) * lev

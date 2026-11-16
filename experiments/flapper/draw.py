@@ -281,6 +281,19 @@ def main() -> int:
                  ["held, 6 and 8 m/s, stroke 30-60 deg at 2-3.5 Hz, feather 0-20 deg; take-off at rest; twist 0 and -8 deg both run",
                   "the section is a measured polar applied strip by strip; the wing is rigid; the leading edge is straight"],
                  stroke_deg=40.0, feather_deg=0.0, spec=dict(span=SPAN, wing_area=AREA, mass=MASS))
+    elif which == "W6":
+        # draw.py W6 <cruise twist, deg> <tip feather of a share-1 beat, deg>
+        twc, psi = float(sys.argv[2]), float(sys.argv[3])
+        for tag, tw, what in (
+                ("takeoff", 0.0, "the take-off setting: no twist"),
+                ("cruise", twc, f"the cruise setting: the tip held {twc:+.0f} deg against the root"),
+                ("beat_down", twc - psi, f"a tip-feathered beat at its nose-down end: tip {twc - psi:+.0f} deg, root unmoved"),
+                ("beat_up", twc + psi, f"a tip-feathered beat at its nose-up end: tip {twc + psi:+.0f} deg, root unmoved")):
+            body = dict(BODY_S, wing_shape=dict(camber=0.04, twist_tip_deg=tw), wing_section="goe417a+lift")
+            draw(body, figs / f"W6_{tag}.png", f"Pass W6: Goe 417a rectangle, {what}",
+                 ["the twist is linear along the span and turns the fluid strips only: no torsion structure, no twist actuator is modelled",
+                  "held rig; cruise 6 and 8 m/s, stroke 30-60 deg at 2-3.5 Hz; take-off at rest, stroke 85 deg at 3-5 Hz"],
+                 stroke_deg=40.0, feather_deg=0.0, spec=dict(span=SPAN, wing_area=AREA, mass=MASS))
     elif which == "past":
         import landwalk as LW
         import reproduce as RP

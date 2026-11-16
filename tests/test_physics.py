@@ -558,6 +558,36 @@ def test_a_measured_section_replaces_the_default_law_where_it_was_measured() -> 
     check("a full leading-edge vortex takes it to the vortex's normal force at any angle",
           abs(cl[0] - 3.4 * math.sin(math.radians(2)) * math.cos(math.radians(2))) < 1e-6, f"cl {cl[0]:.3f}")
 
+    # The lift run carried past the drag table (pass W5): measured lift to its
+    # last angle, the drag that lift implies normal to the chord, the plate by
+    # 30 deg.
+    la = np.radians(np.array([0.0, 10.0, 14.0, 20.0]))
+    ext = SectionPolar("t+", [(1e5, a, np.array([-0.1, 0.3, 0.7, 1.3]), np.array([0.05, 0.03, 0.02, 0.03]))],
+                       [(1e5, la, np.array([0.3, 1.3, 1.2, 1.1]))])
+    al = np.radians([18.0])
+    cl, cd = ext.coefficients(al, np.array([1e5]), big, zero)
+    cl0, _ = lo.coefficients(al, np.array([1e5]), big, zero)
+    cf = float(skin_friction_cd(np.array([1e5]))[0])
+    check("past the drag table, inside the lift run: the measured lift",
+          abs(cl[0] - (1.2 + (1.1 - 1.2) * 4 / 6)) < 1e-5 and cl0[0] < 0.7,
+          f"cl {cl[0]:.4f}; without the lift run {cl0[0]:.3f}")
+    check("its drag there is the lift's normal-force drag and skin friction",
+          abs(cd[0] - (cf + cl[0] * math.tan(al[0]))) < 1e-5, f"cd {cd[0]:.4f}")
+    cl, cd = ext.coefficients(np.radians([2.0]), np.array([1e5]), big, zero)
+    check("inside the drag table nothing changes", abs(cl[0] - 0.5) < 1e-5 and abs(cd[0] - 0.025) < 1e-5,
+          f"cl {cl[0]:.4f} cd {cd[0]:.4f}")
+    al = np.radians([25.0])
+    cl, _ = ext.coefficients(al, np.array([1e5]), big, zero)
+    plate = CN_PLATE * math.sin(al[0]) * math.cos(al[0])
+    check("between the lift run's end and 30 deg: between the measurement and the plate",
+          plate < cl[0] < 1.1 and abs(cl[0] - 0.5 * (plate + 1.1)) < 1e-5, f"cl {cl[0]:.4f}, plate {plate:.4f}")
+    al = np.radians([30.0, 40.0])
+    cl, _ = ext.coefficients(al, np.full(2, 1e5), np.full(2, 1e6), np.zeros(2))
+    check("from 30 deg: the plate", np.allclose(cl, CN_PLATE * np.sin(al) * np.cos(al), atol=1e-9), f"cl {cl}")
+    cl, _ = ext.coefficients(np.radians([-12.0]), np.array([1e5]), big, zero)
+    cln, _ = lo.coefficients(np.radians([-12.0]), np.array([1e5]), big, zero)
+    check("below the table (the lower side stalled) the lift run changes nothing", cl[0] == cln[0], f"{cl[0]:.4f}")
+
     m, d = _single_panel_model()
     bid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "wing")
 

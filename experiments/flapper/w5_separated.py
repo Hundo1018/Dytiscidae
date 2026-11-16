@@ -97,7 +97,7 @@ def revolve(alpha_deg, *, R=0.33, chord=0.10, re=54000.0, section=None, camber=0
 
 
 def translate(alpha_deg, *, ar=4.0, chord=0.10, re=100000.0, section=None, camber=0.0,
-              chords=60.0, flags=None):
+              chords=60.0, flags=None, strip_ar=None):
     """(CL, CD) of a rectangular wing of aspect ratio ``ar`` in steady flight,
     averaged over the last tenth of ``chords`` of travel."""
     xml = """<mujoco><option timestep="0.0005" gravity="0 0 0"/>
@@ -110,7 +110,7 @@ def translate(alpha_deg, *, ar=4.0, chord=0.10, re=100000.0, section=None, cambe
     b = ar * chord
     dr = b / NSTRIP
     x = -b / 2 + dr * (np.arange(NSTRIP) + 0.5)
-    bid, p = _wing(m, x, dr, chord, math.radians(alpha_deg), ar, camber)
+    bid, p = _wing(m, x, dr, chord, math.radians(alpha_deg), strip_ar or ar, camber)
     sol = _solver(m, p, b, section, flags)
     U = re * NU / chord
     dt = m.opt.timestep
@@ -146,7 +146,10 @@ def main() -> int:
         cl, cd = translate(a, ar=6.0, re=200000.0, section="goe417a", camber=0.06)
         put(rig="translate", section="goe417a", ar=6.0, alpha=a, cl=cl, cd=cd)
     for a in (30, 35, 40, 45, 50, 60, 70, 80, 90):
-        cl, cd = translate(a, ar=1e4, chord=0.01, re=100000.0, flags=dict(inflow=False))
+        # two-dimensional: no inflow, and the strips told their aspect ratio is
+        # unbounded (the first form, a 100 m span of 1 cm chord, read zero
+        # force; a harness defect, RESULT_W5)
+        cl, cd = translate(a, ar=8.0, re=100000.0, flags=dict(inflow=False), strip_ar=1e4)
         put(rig="translate", section=None, ar="2D", alpha=a, cl=cl, cd=cd)
     return 0
 

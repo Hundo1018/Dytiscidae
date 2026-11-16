@@ -35,8 +35,19 @@ def tables(name: str, min_points: int = 8):
 
 
 def load(name: str):
+    """``"goe417a"``: the drag runs only (pass W3).  ``"goe417a+lift"``: with
+    the lift runs carried past the drag runs' end (pass W5)."""
     from dytiscidae.physics.fluid import SectionPolar
-    return SectionPolar(name, tables(name))
+    base, _, ext = name.partition("+")
+    if ext not in ("", "lift"):
+        raise ValueError(f"unknown section option {ext!r}")
+    lift = None
+    if ext:
+        lift = []
+        for re_, a, cl in lift_runs(base):
+            keep = np.concatenate([[True], a[1:] > np.maximum.accumulate(a)[:-1]])
+            lift.append((re_, a[keep], cl[keep]))
+    return SectionPolar(name, tables(base), lift)
 
 
 def lift_runs(name: str):
@@ -56,6 +67,7 @@ def coordinates(name: str):
     archive's digitised `.dap` profile where it has one, else its nominal
     `.dat`), read from the raw UIUC volumes."""
     import zipfile
+    name = name.partition("+")[0]
     for z in sorted(glob.glob(str(HERE / "raw" / "volume0*.zip"))):
         with zipfile.ZipFile(z) as zf:
             for member in zf.namelist():
