@@ -39,6 +39,9 @@ DEFAULTS = dict(
     stab_boom=0.3, boom_radius=0.004, stab_motor_mass=0.009, stab_range=0.6,
     wing_seat=0.0,           # m; `built` moves each main wing's root this far out from the
                              # hull's axis (the hull's radius: shoulders on its sides)
+    wing_shape=None,         # `built`: dict(taper=tip/root chord, camber=fraction of chord,
+                             # twist_tip_deg=tip incidence against the root, nose up positive);
+                             # the area stays the rectangle's.  None: a flat rectangle.
 )
 
 
@@ -152,4 +155,18 @@ def built(body: dict):
         for s in p.segments:
             if s.part is p.genome.parts[1] and s.parent == 0:
                 s.offset = s.offset + np.array([0.0, -seat if s.mirrored else seat, 0.0])
+    shape = dict(DEFAULTS, **body)["wing_shape"]
+    if shape:
+        from dataclasses import replace
+        lam = float(shape.get("taper", 1.0))
+        for s in p.segments:
+            if s.part is not p.genome.parts[1] or s.parent != 0:
+                continue
+            sf = s.surface
+            x = sf.u / max(float(sf.u[-1]), 1e-9)
+            sign = -1.0 if s.mirrored else 1.0           # as `phenotype._surface_of`
+            s.surface = replace(
+                sf, chord=sf.chord * 2.0 / (1.0 + lam) * (1.0 - (1.0 - lam) * x),
+                camber=sign * np.full(len(x), float(shape.get("camber", 0.0))),
+                twist=sign * np.radians(float(shape.get("twist_tip_deg", 0.0))) * x)
     return p

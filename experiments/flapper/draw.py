@@ -247,6 +247,13 @@ def main() -> int:
                  stroke_deg=85.0, feather_deg=30.0,
                  spec=dict(span=2 * (ks * LENGTH + BODY["hull_radius"]), wing_area=ks * AREA,
                            chord=base["chord"], mass=MASS))
+    elif which == "R0s":
+        import reproduce as RP
+        for name, k in RP.MACHINES.items():
+            body = dict(RP.body(name), wing_seat=0.04)
+            draw(body, figs / f"R0s_{name}.png", f"R0 again: {name} at its reported span",
+                 ["body held, lift trimmed to the weight; rectangular flat wings, no tail (as R0)"],
+                 stroke_deg=60.0, mass=k["mass"], spec=dict(span=k["span"], wing_area=k["area"], mass=k["mass"]))
     elif which == "past":
         import landwalk as LW
         import reproduce as RP

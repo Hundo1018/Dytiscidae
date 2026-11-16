@@ -32,7 +32,7 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
              dt: float = 2.5e-4, wn: float = 600.0, keep_series: bool = False,
              joint_damping: float | None = 0.0, solver_flags: dict | None = None,
              hull_inertia: float | None = None, cg_shift: float = 0.0,
-             tail: dict | None = None) -> dict:
+             tail: dict | None = None, pilot: dict | None = None) -> dict:
     """free: root axes released after hold_beats, any of "x", "z", "p" (pitch).
     The measurement runs over the ``beats`` after that, body held or not.
     mass: the machine's all-up mass, made up with ballast at the hull's centre
@@ -47,10 +47,17 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     cg_shift: m, the hull's centre of mass moved forward along its axis.
     tail: for a body built with ``stab_length`` (an all-moving tail).  Keys:
     i0_deg (incidence, leading edge up, relative to the hull), kp (rad of tail
-    per rad of pitch error), kd (s), limit_deg (25), rate (rad/s, 8), and
+    per rad of pitch error), kd (s), ki (1/s, 0), limit_deg (25), rate (rad/s, 8), and
     lag_beats (1: the pitch error and rate are low-passed over this many
     beats before the tail sees them, so it does not chase the flapping),
     ref_deg (the pitch it holds; theta_deg unless given).
+    pilot: a height and speed loop over the tail's pitch loop, from release
+    on (needs the tail's feedback and pitch released).  Height is held with
+    the pitch the tail is asked for, speed with the flapping frequency:
+        pitch asked = ref_deg + clip(kh (z0 - z) - kvz vz, +-pitch_lim_deg)
+        f = f0 (1 + clip(kf (V - vx), +-f_lim))
+    kh deg/m, kvz deg/(m/s), kf 1/(m/s).  z, vz and vx are low-passed over
+    lag_beats like the pitch.  The cam offset stays where it was set.
     The tail's servo is rate-limited; its feedback starts at release."""
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
@@ -138,15 +145,20 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     released = np.zeros(6, bool)
     m.dof_armature[:6] = ARM
 
-    tl = dict(i0_deg=0.0, kp=0.0, kd=0.0, limit_deg=25.0, rate=8.0, lag_beats=1.0,
+    tl = dict(i0_deg=0.0, kp=0.0, kd=0.0, ki=0.0, limit_deg=25.0, rate=8.0, lag_beats=1.0,
               ref_deg=theta_deg)
     tl.update(tail or {})
     th_ref = math.radians(tl["ref_deg"])
+    ap = None
+    if pilot is not None:
+        ap = dict(kh=3.0, kvz=3.0, pitch_lim_deg=8.0, kf=0.08, f_lim=0.2)
+        ap.update(pilot)
+    zf, vzf, vxf, w_now, th_ask = 0.0, 0.0, V, w, 0.0
     tail_q = -math.radians(tl["i0_deg"])            # joint angle: leading edge down is positive
-    e_f, r_f = 0.0, 0.0
+    e_f, r_f, e_i = 0.0, 0.0, 0.0
 
-    def ref(t):
-        s, c = math.sin(w * t), math.cos(w * t)
+    def ref(t, ph=None, w=w):
+        s, c = (math.sin(w * t), math.cos(w * t)) if ph is None else (math.sin(ph), math.cos(ph))
         q, qd, qdd = np.zeros(len(jid)), np.zeros(len(jid)), np.zeros(len(jid))
         st, fe = role == "stroke", role == "feather"
         q[role == "tail"] = tail_q
@@ -181,7 +193,9 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     com0 = ((dry[:, None] * d.xipos).sum(0) / dry.sum() - d.xpos[hull]).tolist()
     n_beat = int(round(1.0 / (f * dt)))
     n_hold, n_all = hold_beats * n_beat, (hold_beats + beats) * n_beat
-    rec = dict(t=[], P=[], Ps=[], tq=[], err=[], hold=[], pos=[], vel=[], pitch=[], tail=[], Pt=[])
+    rec = dict(t=[], P=[], Ps=[], tq=[], err=[], hold=[], pos=[], vel=[], pitch=[], tail=[], Pt=[],
+               w=[], ask=[])
+    phase = None
     t = 0.0
     for k in range(n_all):
         if k == n_hold:
@@ -191,13 +205,24 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         if k >= n_hold and released[4] and (tl["kp"] or tl["kd"]):
             # pitch, nose up positive, from the hull's attitude; its rate from the gyro
             a_f = dt * f / max(tl["lag_beats"], 1e-6) * 2.0 * math.pi
-            e_f += a_f * ((-2.0 * math.atan2(d.qpos[5], d.qpos[3]) - th_ref) - e_f)
+            if ap is not None:
+                zf += a_f * ((d.qpos[2] - q0[2]) - zf)
+                vzf += a_f * (d.qvel[2] - vzf)
+                vxf += a_f * (d.qvel[0] - vxf)
+                lim_p = ap["pitch_lim_deg"]
+                th_ask = math.radians(min(max(-ap["kh"] * zf - ap["kvz"] * vzf, -lim_p), lim_p))
+                w_now = w * (1.0 + min(max(ap["kf"] * (V - vxf), -ap["f_lim"]), ap["f_lim"]))
+            e_f += a_f * ((-2.0 * math.atan2(d.qpos[5], d.qpos[3]) - th_ref - th_ask) - e_f)
             r_f += a_f * (-d.qvel[4] - r_f)
-            want = -(math.radians(tl["i0_deg"]) + tl["kp"] * e_f + tl["kd"] * r_f)
             lim = math.radians(tl["limit_deg"])
+            if tl["ki"]:                               # integral, held inside the tail's travel
+                e_i = min(max(e_i + tl["ki"] * e_f * dt, -lim), lim)
+            want = -(math.radians(tl["i0_deg"]) + tl["kp"] * e_f + tl["kd"] * r_f + e_i)
             want = min(max(want, -lim), lim)
             tail_q += min(max(want - tail_q, -tl["rate"] * dt), tl["rate"] * dt)
-        q, qd, qdd = ref(t)
+        if ap is not None and phase is None and k >= n_hold:
+            phase = w * t                              # the crank's own angle from release on
+        q, qd, qdd = ref(t, phase, w_now)
         d.ctrl[:] = 0.0
         d.ctrl[aids] = q + (kv / kp) * qd          # the reference rate, fed forward
         d.xfrc_applied[:] = 0.0
@@ -210,6 +235,8 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         tau = J * qdd + d.actuator_force[aids]
         hold = ARM * (d.qvel[:6] - vb) / dt           # wrench the holder did NOT have to: -hold
         t += dt
+        if phase is not None:
+            phase += w_now * dt
         # put the held root axes back; a released axis keeps what it has
         lin = ~released[:3]
         d.qpos[:3][lin] = (q0[:3] + v0[:3] * t)[lin]
@@ -230,6 +257,8 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
             qw, qy = d.qpos[3], d.qpos[5]
             rec["pitch"].append(-2.0 * math.atan2(qy, qw))
             rec["tail"].append(-tail_q)
+            rec["w"].append(w_now)
+            rec["ask"].append(th_ask)
             rec["Pt"].append(float(tau[role == "tail"] @ d.qvel[dof][role == "tail"]))
     T = beats / f
     hold = np.array(rec["hold"])
@@ -239,9 +268,9 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
            "psi0_deg": psi0_deg, "free": free, "medium": medium, "mass_kg": total,
            "finite": bool(np.isfinite(pos).all() and np.isfinite(P).all()),
            "power_W": float(P.mean()), "stroke_power_W": float(np.mean(rec["Ps"])),
-           "crank_eq_peak": float(np.abs(P).max() / w / K85),
-           "crank_eq_stroke_only_peak": float(np.abs(rec["Ps"]).max() / w / K85),
-           "crank_eq_min": float(P.min() / w / K85),
+           "crank_eq_peak": float((np.abs(P) / np.array(rec["w"])).max() / K85),
+           "crank_eq_stroke_only_peak": float((np.abs(rec["Ps"]) / np.array(rec["w"])).max() / K85),
+           "crank_eq_min": float((P / np.array(rec["w"])).min() / K85),
            "stroke_torque_peak": float(np.max(rec["tq"])),
            "track_err_deg": float(math.degrees(np.max(rec["err"])))}
     # Net force on the machine, gravity included: from the holder where held,
@@ -272,6 +301,7 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         out["pitch_beat_mean_deg"] = [float(x) for x in bm.mean(1)]
         out["pitch_swing_deg"] = float((bm.max(1) - bm.min(1)).max() / 2.0)
         out["pitch_swing_late_deg"] = float((bm.max(1) - bm.min(1))[-max(nb_ // 4, 1):].max() / 2.0)
+        out["pitch_late_deg"] = float(bm.mean(1)[-10:].mean() + theta_deg)
     else:
         out["pitch_moment_mean"] = float(hold[:, 4].mean())
         out["pitch_moment_peak"] = float(np.abs(hold[:, 4]).max())
@@ -288,6 +318,14 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         late = max(len(zr) - 10 * n_beat, 0)
         out["vz_late"] = float((pos[-1, 2] - pos[late, 2]) / max(rec["t"][-1] - rec["t"][late], 1e-9))
         out["power_late_W"] = float(P[late:].mean())
+        out["dz_late_min"], out["dz_late_max"] = float(zr[late:].min()), float(zr[late:].max())
+        out["vx_late_min"], out["vx_late_max"] = float(vel[late:, 0].min()), float(vel[late:, 0].max())
+        if ap is not None:
+            ff = np.array(rec["w"]) / (2.0 * math.pi)
+            out["f_min"], out["f_max"], out["f_late"] = float(ff.min()), float(ff.max()), float(ff[late:].mean())
+            aa = np.degrees(np.array(rec["ask"]))
+            out["pitch_ask_min_deg"], out["pitch_ask_max_deg"] = float(aa.min()), float(aa.max())
+            out["pitch_ask_late_deg"] = float(aa[late:].mean())
     if keep_series:
         out["series"] = {k: np.asarray(v).tolist() for k, v in rec.items()}
         out["com0"] = com0
