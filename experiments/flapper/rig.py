@@ -24,13 +24,24 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
         cop_law: str | None = None, feather_axis: float = 0.0,
         one_way_flap: dict | None = None, coupling: str = "static",
         legacy_coupling: bool = False, solver_flags: dict | None = None,
-        added_mass_ref: bool = False, legacy_added_weight: bool = False) -> dict:
+        added_mass_ref: bool = False, legacy_added_weight: bool = False,
+        strip_twist: dict | None = None) -> dict:
     """chord_law = (k, sign): every wing strip's chord and area are scaled by k
     while the stroke rate has that sign (+1 or -1), blended across the
     reversal, and by k throughout if sign is 0.  Pass 1e's in-stroke shape
     change.  It changes the fluid strips only, not the wing's mass or
     geometry, so a constant k is not the same as a narrower built wing.
     None leaves the wing fixed.
+
+    strip_twist = dict(tip_deg, share): a spanwise twist that is a control
+    (pass W6).  Each wing strip's chord is turned about its span by its
+    station's fraction of the tip's angle, as a built `wing_shape` twist is:
+    by ``tip_deg`` throughout (nose up positive), and by ``share`` of the
+    feather's oscillation, which the feather hinge then no longer makes
+    (share 1: the root keeps its incidence and the tip alone feathers by
+    ``Psi``).  Like chord_law it moves the fluid strips only: the strips'
+    own twisting rate, the wing's torsional inertia and the torque that
+    holds the twist are not in the loads.
 
     passive_feather = (k, zeta[, com]): the feather hinges (leading-edge span axis)
     are not driven.  Each is a spring of k N m/rad about psi0 with damping
@@ -121,6 +132,39 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     from dytiscidae.physics.fluid import WING as KIND_WING
     is_w = pan.kind == KIND_WING
     chord0, area0 = pan.chord.copy(), pan.area.copy()
+    tw = None
+    if strip_twist is not None:
+        # Each strip's turn (rad) per degree at the tip, read off the same body built
+        # with one degree of twist, so the stations and the mirrored wing's
+        # sign are the phenotype's own.
+        shape1 = dict(dict(_BD, **body)["wing_shape"] or {})
+        base_tw = float(shape1.get("twist_tip_deg", 0.0))
+        shape1["twist_tip_deg"] = base_tw + 1.0
+        ref = TriphibianEnv(built(dict(body, wing_shape=shape1)), seed=0, timestep=dt).solver.panels
+        c0, s0 = pan.chord_local.copy(), pan.span_local.copy()
+        unit = lambda v: v / np.maximum(np.linalg.norm(v, axis=1, keepdims=True), 1e-12)
+        per_deg = np.einsum("ni,ni->n", np.cross(unit(c0), unit(ref.chord_local)), unit(s0))  # sin(turn) about the span
+        per_deg = np.where(is_w, np.arcsin(np.clip(per_deg, -1.0, 1.0)), 0.0)
+        # The feather hinge's sense against the twist's: turn the hinge by one
+        # degree and read the tip strip's turn about its own span.
+        fsign = np.zeros(pan.n)
+        q_keep = d.qpos.copy()
+        mj.mj_forward(m, d)
+        R0 = d.xmat.reshape(-1, 3, 3).copy()
+        for a, j in enumerate(jid):
+            if role[a] == "feather":
+                d.qpos[int(m.jnt_qposadr[j])] += math.radians(1.0)
+        mj.mj_forward(m, d)
+        R1 = d.xmat.reshape(-1, 3, 3).copy()
+        d.qpos[:] = q_keep
+        mj.mj_forward(m, d)
+        cw0 = np.einsum("nij,nj->ni", R0[pan.body_id], c0)
+        cw1 = np.einsum("nij,nj->ni", R1[pan.body_id], c0)
+        sw0 = np.einsum("nij,nj->ni", R0[pan.body_id], s0)
+        turn = np.einsum("ni,ni->n", np.cross(cw0, cw1), sw0)
+        fsign[is_w] = np.sign(turn[is_w]) * np.sign(per_deg[is_w] + 1e-30)
+        tw = dict(c0=c0, s0=s0, per_deg=per_deg, fsign=fsign,
+                  tip=float(strip_twist.get("tip_deg", 0.0)), share=float(strip_twist.get("share", 0.0)))
     w = 2 * math.pi * f
     free = np.zeros(len(names), bool)
     axis = passive_feather[3] if passive_feather is not None and len(passive_feather) > 3 \
@@ -232,6 +276,15 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
         s, c = (math.sin(w * t), math.cos(w * t)) if flap else (0.0, 0.0)
         tgt[role == "stroke"], rate[role == "stroke"] = 0.5 * Phi * s, 0.5 * Phi * w * c
         tgt[role == "feather"], rate[role == "feather"] = psi0 - Psi * c, Psi * w * s
+        if tw is not None:
+            k_f = 1.0 - tw["share"]
+            tgt[role == "feather"], rate[role == "feather"] = psi0 - k_f * Psi * c, k_f * Psi * w * s
+            # degrees at the tip: the held twist, and the feather's share in
+            # the hinge's own sense
+            ang = tw["per_deg"] * (tw["tip"] + tw["fsign"] * tw["share"] * math.degrees(-Psi * c))
+            ca, sa = np.cos(ang)[:, None], np.sin(ang)[:, None]
+            pan.chord_local[:] = tw["c0"] * ca + np.cross(tw["s0"], tw["c0"]) * sa
+            pan.normal_local[:] = np.cross(pan.span_local, pan.chord_local)
         tgt[role == "twist"], rate[role == "twist"] = tau0 - T * c, T * w * s
         if chord_law is not None:
             kc, sign = chord_law[:2]
