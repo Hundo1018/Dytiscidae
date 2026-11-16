@@ -379,6 +379,72 @@ def drag_coefficient(
     return cd_f + cd_i + cd_p
 
 
+class SectionPolar:
+    """A wing section's measured lift and drag, for `FluidSolver.section`.
+
+    ``tables``: one ``(reynolds, alpha_rad, cl, cd)`` per Reynolds number, the
+    angles ascending, covering the range the section was measured over (for
+    the UIUC low-speed tests: about -5 deg to stall).  Inside that range the
+    coefficients are the table's, linear in the angle and in log Reynolds
+    number between tables, held at the nearest table outside them.  Past
+    either end the strip goes over to the solver's separated plate
+    (``CN sin a cos a``, ``CN sin^2 a``) across `SEPARATION_COMPLETE`, as the
+    default law does past its stall angle, and a leading-edge vortex takes it
+    there at any angle (``lev``), also as the default does.
+
+    What the default law has instead: a lift slope of 2 pi at every angle up
+    to 11 deg, a camber that only shifts the zero-lift angle, and a laminar
+    flat plate's skin friction for the whole profile drag (0.008 at Re 1e5;
+    measured sections there have 0.009-0.023 at their best and several times
+    that off it).  The table is two-dimensional data: with the solver's
+    inflow on it is used as it is, and otherwise the lift is scaled by the
+    Helmholtz factor and the induced drag added, as for the default.
+    """
+
+    def __init__(self, name: str, tables) -> None:
+        self.name = name
+        self.tables = sorted(((float(r), np.asarray(a, float), np.asarray(l, float), np.asarray(d, float))
+                              for r, a, l, d in tables), key=lambda t: t[0])
+        if not self.tables:
+            raise ValueError("a section needs at least one table")
+        for _, a, l, d in self.tables:
+            if len(a) < 3 or np.any(np.diff(a) <= 0) or len(l) != len(a) or len(d) != len(a):
+                raise ValueError(f"section {name!r}: a table needs three or more ascending angles")
+        self._logre = np.log([t[0] for t in self.tables])
+
+    def _at(self, alpha, re):
+        """Table values and the measured range's two ends at each strip's Re."""
+        vals = np.array([[np.interp(alpha, a, l), np.interp(alpha, a, d),
+                          np.full_like(alpha, a[0]), np.full_like(alpha, a[-1])]
+                         for _, a, l, d in self.tables])                   # (n_re, 4, n)
+        if len(self.tables) == 1:
+            return vals[0]
+        x = np.clip(np.log(np.maximum(re, 1.0)), self._logre[0], self._logre[-1])
+        i = np.clip(np.searchsorted(self._logre, x) - 1, 0, len(self.tables) - 2)
+        t = (x - self._logre[i]) / (self._logre[i + 1] - self._logre[i])
+        n = np.arange(alpha.shape[0])
+        return (1.0 - t) * vals[i, :, n].T + t * vals[i + 1, :, n].T
+
+    def coefficients(self, alpha, re, ar, lev, alpha_e=None):
+        """``(cl, cd)`` for incidence ``alpha`` measured towards the section's
+        upper side.  ``alpha_e`` is the Wagner-lagged incidence the attached
+        lift is read at."""
+        alpha, re = np.asarray(alpha, float), np.asarray(re, float)
+        lev = np.clip(lev, 0.0, 1.0)
+        ae = alpha if alpha_e is None else alpha_e
+        cl_t, cd_t, lo, hi = self._at(ae, re)
+        t = np.clip(np.maximum(alpha - hi, lo - alpha) / SEPARATION_COMPLETE, 0.0, 1.0)
+        w = t * t * (3.0 - 2.0 * t)
+        w = w + (1.0 - w) * lev
+        k = 1.0 / (1.0 + 2.0 / np.maximum(ar, 0.5))
+        cn = CN_PLATE + (CN_LEV - CN_PLATE) * lev
+        sa, ca = np.sin(alpha), np.cos(alpha)
+        cl = (1.0 - w) * k * cl_t + w * cn * sa * ca
+        cd = (1.0 - w) * cd_t + w * (skin_friction_cd(re) + cn * sa * sa) \
+            + cl * cl / (np.pi * 0.75 * np.maximum(ar, 0.5))
+        return cl, cd
+
+
 # --------------------------------------------------------------------------
 # Solver
 # --------------------------------------------------------------------------
@@ -985,6 +1051,14 @@ class FluidSolver:
         #: has no counterpart.  It matters only where a pitch hinge is free
         #: (experiments/flapper, PREREG_L1h_cop.md).
         self.cop_law: str | None = None
+        #: A measured section (`SectionPolar`) for every wing strip whose
+        #: ``camber`` is not zero; the camber's sign says which side is the
+        #: section's upper one, and its size is not used (the table has the
+        #: section's own zero-lift angle).  Flow over the trailing edge and
+        #: strips with no camber keep the default law.  ``None`` (the default,
+        #: and every stored score): the default law everywhere.  Numpy path
+        #: only (experiments/flapper, PREREG_W3_section.md).
+        self.section: SectionPolar | None = None
         #: React the entrainment of added mass, ``-dm/dt v`` (`entrainment_reaction`,
         #: ROADMAP AK).  Off, the mass matrix creates ``dm v`` of momentum every
         #: step the added mass grows.  ``"wetting"`` (opt-in, numpy path only)
@@ -1171,7 +1245,13 @@ class FluidSolver:
         # sees the arc from its other end: the arc is fore-aft symmetric, so
         # it still lifts toward its convex side, which is the opposite sign on
         # the flipped lift axis.
-        alpha = alpha + 2.0 * np.where(rev, -p.camber, p.camber)
+        shift = 2.0 * np.where(rev, -p.camber, p.camber)
+        on_sec = None
+        if self.section is not None:
+            # A measured section carries its own zero-lift angle.
+            on_sec = is_wing & (p.camber != 0.0) & ~rev
+            shift = np.where(on_sec, 0.0, shift)
+        alpha = alpha + shift
 
         # Angular rate about the span axis: the strip's *pitch* rate, which the
         # Kramer rotational force below wants.  It used to index the LEV as
@@ -1199,6 +1279,11 @@ class FluidSolver:
             lift_coefficient(alpha, re, ar_eff, lev, alpha_e),
             0.0)
         cd = np.where(is_wing, drag_coefficient(alpha, re, ar_eff, cl, lev), 0.0)
+        if on_sec is not None and on_sec.any():
+            up = np.sign(p.camber)
+            cl_s, cd_s = self.section.coefficients(up * alpha, re, ar_eff, lev, up * alpha_e)
+            cl = np.where(on_sec, up * cl_s, cl)
+            cd = np.where(on_sec, cd_s, cd)
         L = q * p.area * cl * self.lift_scale
         D = q * p.area * cd * self.cd_scale
         F += L[:, None] * lift_axis + D[:, None] * d_hat

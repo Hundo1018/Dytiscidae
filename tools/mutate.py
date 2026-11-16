@@ -2811,6 +2811,22 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning",),
         item="entrainment"),
     Mutation(
+        id="section-drag-is-skin-friction",
+        path="dytiscidae/physics/fluid.py",
+        find="        cd = (1.0 - w) * cd_t + w * (skin_friction_cd(re) + cn * sa * sa) \\\n",
+        replace="        cd = (1.0 - w) * skin_friction_cd(re) + w * (skin_friction_cd(re) + cn * sa * sa) \\\n",
+        defect="a measured section's profile drag is thrown away for a laminar flat plate's",
+        suites=("test_physics::test_a_measured_section_replaces_the_default_law_where_it_was_measured",),
+        item="section polar"),
+    Mutation(
+        id="section-ignores-the-upper-side",
+        path="dytiscidae/physics/fluid.py",
+        find="            up = np.sign(p.camber)\n",
+        replace="            up = np.ones(p.n)\n",
+        defect="the mirrored wing's section is flown upside down",
+        suites=("test_physics::test_a_measured_section_replaces_the_default_law_where_it_was_measured",),
+        item="section polar"),
+    Mutation(
         id="pitch-damping-pushes",
         path="dytiscidae/physics/fluid.py",
         find="            k_rd = np.where(is_wing, -0.5 * rho",

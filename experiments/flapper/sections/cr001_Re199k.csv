@@ -1,0 +1,24 @@
+# source: Selig, Lyon, Giguere, Ninham, Guglielmo, "Summary of Low-Speed Airfoil Data, Volume 2", SoarTech Publications, 1996 (data set re-reduced 1997/98)
+# program: UIUC Low-Speed Airfoil Tests (M. S. Selig et al.), UIUC subsonic wind tunnel, 2D model spanning the test section between splitter plates, nominal 12 in chord
+# url_fetched: https://m-selig.ae.illinois.edu/pd/pub/lsat/volume02.zip
+# date_fetched: 2026-11-16
+# raw_file: raw/volume02.zip member volume02/DRAG02.TXT section CR001.DRG
+# airfoil_as_labelled: CR-001 | builder: J. Robertson | comment: clean
+# run_note: Tabulated from data in file CL00662.DAT & reduced using program Q02.00D
+# reynolds_number: 199000 (run average, as given in the source)
+# measured_or_computed: MEASURED (wind tunnel)
+# method: cl from the lift balance at the drag-run angle; cd from wake-rake momentum deficit, the value given is the source's average of its spanwise wake stations (per-station values are in the raw file, dropped here)
+# corrections: as published by UIUC (their standard solid/wake blockage and streamline-curvature corrections; see the volume text); nothing applied here
+# columns: alpha_deg,cl,cd
+alpha_deg,cl,cd
+-5.27,-0.306,0.0763
+-3.75,-0.050,0.0345
+-2.17,0.174,0.0165
+-0.62,0.407,0.0120
+0.91,0.579,0.0100
+2.49,0.738,0.0102
+4.00,0.887,0.0111
+5.53,1.025,0.0129
+7.07,1.146,0.0169
+8.60,1.236,0.0234
+10.11,1.297,0.0322

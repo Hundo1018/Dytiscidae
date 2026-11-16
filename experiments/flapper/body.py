@@ -39,6 +39,8 @@ DEFAULTS = dict(
     stab_boom=0.3, boom_radius=0.004, stab_motor_mass=0.009, stab_range=0.6,
     wing_seat=0.0,           # m; `built` moves each main wing's root this far out from the
                              # hull's axis (the hull's radius: shoulders on its sides)
+    wing_section=None,       # a measured section (`sections.load`) for the rigs' fluid solver;
+                             # it acts on strips with a camber, so wing_shape needs one
     wing_shape=None,         # `built`: dict(taper=tip/root chord, camber=fraction of chord,
                              # twist_tip_deg=tip incidence against the root, nose up positive);
                              # the area stays the rectangle's.  None: a flat rectangle.

@@ -83,6 +83,12 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     env.reset(dom, randomise=False)
     d, m, mj = env.data, env.model, env._mj
     env.solver.cop_law = cop_law
+    from body import DEFAULTS as _BD
+    if dict(_BD, **body)["wing_section"]:
+        import sections
+        env.solver.section = sections.load(dict(_BD, **body)["wing_section"])
+        if not np.any(env.solver.panels.camber != 0.0):
+            raise ValueError("wing_section needs a wing_shape with a camber: it marks the upper side")
     for k_, v_ in (solver_flags or {}).items():
         setattr(env.solver, k_, v_)
     amref = None

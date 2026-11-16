@@ -1,0 +1,47 @@
+# source: Selig, Guglielmo, Broeren, Giguere, "Summary of Low-Speed Airfoil Data, Volume 1", SoarTech Publications, 1995 (data set re-reduced, version Q01.00D 12-05-97)
+# program: UIUC Low-Speed Airfoil Tests (M. S. Selig et al.), UIUC subsonic wind tunnel, 2D model spanning the test section between splitter plates, nominal 12 in chord
+# url_fetched: https://m-selig.ae.illinois.edu/pd/pub/lsat/volume01.zip
+# date_fetched: 2026-11-16
+# raw_file: raw/volume01.zip member volume01/LIFT01.TXT section E387A.LFT
+# airfoil_as_labelled: E387 (A) | builder: B. Champine | comment: clean
+# run_note: Tabulated from data in file AB00208.DAT & reduced using program Q01.00L
+# reynolds_number: 61300 (run average, as given in the source)
+# measured_or_computed: MEASURED (wind tunnel)
+# method: lift and pitching moment (about quarter chord) from the force balance; NO drag in this file
+# row order is the run order: where alpha goes up and then comes back down both branches are kept (hysteresis loop), not sorted, not merged
+# corrections: as published by UIUC; nothing applied here
+# columns: alpha_deg,cl,cm  (cd not measured in lift runs)
+alpha_deg,cl,cm
+-7.00,-0.383,-0.0850
+-5.32,-0.240,-0.0850
+-3.76,-0.125,-0.0850
+-2.08,0.053,-0.0850
+-0.64,0.251,-0.0850
+0.85,0.409,-0.0850
+2.55,0.578,-0.0850
+4.10,0.739,-0.0850
+5.47,0.870,-0.0850
+6.96,1.011,-0.0850
+8.79,1.171,-0.0850
+10.11,1.213,-0.0850
+11.69,1.241,-0.0850
+13.03,1.246,-0.0850
+14.51,1.179,-0.0850
+16.16,1.156,-0.0850
+17.59,1.117,-0.0850
+15.85,1.146,-0.0850
+14.43,1.237,-0.0850
+12.97,1.247,-0.0850
+11.26,1.230,-0.0850
+9.90,1.203,-0.0850
+8.35,1.136,-0.0850
+6.83,0.992,-0.0850
+5.27,0.840,-0.0850
+3.79,0.698,-0.0850
+2.27,0.543,-0.0850
+0.68,0.389,-0.0850
+-1.00,0.174,-0.0850
+-2.45,0.003,-0.0850
+-3.93,-0.144,-0.0850
+-5.50,-0.255,-0.0850
+-7.10,-0.394,-0.0850

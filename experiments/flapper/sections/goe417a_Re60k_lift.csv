@@ -1,0 +1,63 @@
+# source: Lyon, Broeren, Giguere, Gopalarathnam, Selig, "Summary of Low-Speed Airfoil Data, Volume 3", SoarTech Publications, 1997/98
+# program: UIUC Low-Speed Airfoil Tests (M. S. Selig et al.), UIUC subsonic wind tunnel, 2D model spanning the test section between splitter plates, nominal 12 in chord
+# url_fetched: https://m-selig.ae.illinois.edu/pd/pub/lsat/volume03.zip
+# date_fetched: 2026-11-16
+# raw_file: raw/volume03.zip member volume03/LIFT03.TXT section GOE417A.LFT
+# airfoil_as_labelled: Goe 417a | builder: M. Fox | comment: clean
+# run_note: Tabulated from data in file PG01724.DAT & reduced using program Q06.01L
+# reynolds_number: 60200 (run average, as given in the source)
+# measured_or_computed: MEASURED (wind tunnel)
+# method: lift and pitching moment (about quarter chord) from the force balance; NO drag in this file
+# row order is the run order: where alpha goes up and then comes back down both branches are kept (hysteresis loop), not sorted, not merged
+# corrections: as published by UIUC; nothing applied here
+# columns: alpha_deg,cl,cm  (cd not measured in lift runs)
+alpha_deg,cl,cm
+-5.14,-0.329,0.0177
+-3.59,-0.325,0.0043
+-3.08,-0.306,0.0004
+-1.60,-0.186,-0.0225
+-0.59,-0.068,-0.0359
+0.41,0.083,-0.0549
+1.45,0.264,-0.0730
+2.49,0.442,-0.0892
+3.55,0.601,-0.1022
+4.62,0.794,-0.1148
+5.63,0.939,-0.1129
+6.64,1.043,-0.1039
+7.64,1.125,-0.0943
+8.61,1.193,-0.0848
+9.57,1.265,-0.0805
+10.63,1.315,-0.0722
+11.57,1.344,-0.0631
+12.52,1.363,-0.0559
+13.60,1.396,-0.0620
+14.56,1.300,-0.1251
+15.54,1.236,-0.1355
+16.55,1.234,-0.1450
+17.57,1.235,-0.1660
+18.55,1.251,-0.1689
+19.52,1.268,-0.1767
+17.55,1.242,-0.1742
+16.62,1.199,-0.1656
+15.62,1.227,-0.1486
+14.70,1.308,-0.1226
+13.79,1.380,-0.1011
+12.88,1.382,-0.0688
+11.54,1.345,-0.0682
+10.70,1.324,-0.0738
+9.83,1.284,-0.0817
+8.48,1.203,-0.0940
+7.49,1.113,-0.1012
+6.59,1.030,-0.1071
+5.56,0.945,-0.1212
+4.62,0.805,-0.1238
+3.68,0.637,-0.1129
+2.34,0.436,-0.0979
+1.46,0.277,-0.0867
+0.53,0.117,-0.0715
+-0.81,-0.083,-0.0439
+-1.70,-0.179,-0.0322
+-2.58,-0.241,-0.0176
+-3.90,-0.303,0.0064
+-4.78,-0.312,0.0114
+-5.71,-0.312,0.0150

@@ -530,6 +530,62 @@ def test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning() -> Non
           np.allclose(wet, off, rtol=0, atol=1e-9), f"{np.abs(wet - off).max():.2e} N")
 
 
+def test_a_measured_section_replaces_the_default_law_where_it_was_measured() -> None:
+    """`SectionPolar` and `FluidSolver.section`: inside the measured range the
+    coefficients are the table's; past it the strip goes to the separated
+    plate; the camber's sign picks the upper side; no camber, no section."""
+    print("\nfluid: a measured section")
+    from dytiscidae.physics.fluid import CN_PLATE, SectionPolar, skin_friction_cd
+    a = np.radians(np.array([-4.0, 0.0, 4.0, 10.0]))
+    lo = SectionPolar("t", [(1e5, a, np.array([-0.1, 0.3, 0.7, 1.3]), np.array([0.05, 0.03, 0.02, 0.03]))])
+    two = SectionPolar("t2", [(1e5, a, np.array([-0.1, 0.3, 0.7, 1.3]), np.array([0.05, 0.03, 0.02, 0.03])),
+                              (4e5, a, np.array([-0.1, 0.3, 0.7, 1.3]), np.array([0.03, 0.01, 0.01, 0.01]))])
+    big, zero = np.array([1e6]), np.array([0.0])
+    cl, cd = lo.coefficients(np.radians([2.0]), np.array([1e5]), big, zero)
+    check("inside the range: the table's lift and drag, interpolated",
+          abs(cl[0] - 0.5) < 1e-5 and abs(cd[0] - 0.025) < 1e-5, f"cl {cl[0]:.4f} cd {cd[0]:.4f}")
+    cl, cd = two.coefficients(np.radians([0.0]), np.array([2e5]), big, zero)
+    check("between two Reynolds numbers: linear in log Re", abs(cd[0] - 0.02) < 1e-6, f"cd {cd[0]:.5f}")
+    cl, cd = two.coefficients(np.radians([0.0]), np.array([1e7]), big, zero)
+    check("outside them: the nearest table", abs(cd[0] - 0.01) < 1e-6, f"cd {cd[0]:.5f}")
+    al = np.radians([30.0])
+    cl, cd = lo.coefficients(al, np.array([1e5]), big, zero)
+    want = CN_PLATE * math.sin(al[0]) * math.cos(al[0])
+    wantd = float(skin_friction_cd(np.array([1e5]))[0]) + CN_PLATE * math.sin(al[0]) ** 2
+    check("far past the measured range: the separated plate",
+          abs(cl[0] - want) < 1e-6 and abs(cd[0] - wantd) < 1e-6, f"cl {cl[0]:.3f} cd {cd[0]:.3f}")
+    cl, cd = lo.coefficients(np.radians([2.0]), np.array([1e5]), big, np.array([1.0]))
+    check("a full leading-edge vortex takes it to the vortex's normal force at any angle",
+          abs(cl[0] - 3.4 * math.sin(math.radians(2)) * math.cos(math.radians(2))) < 1e-6, f"cl {cl[0]:.3f}")
+
+    m, d = _single_panel_model()
+    bid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "wing")
+
+    def lift(camber, section):
+        panels = _wing_panels(m, 0.0)
+        panels.camber[:] = camber
+        solver = FluidSolver(m, panels, MediumField(wind=np.array([10.0, 0.0, 0.0])))
+        solver.section = section
+        with solver.steady():
+            mujoco.mj_resetData(m, d)
+            mujoco.mj_forward(m, d)
+            d.xfrc_applied[:] = 0.0
+            solver.apply(d, 0.0)
+        out = float(d.xfrc_applied[bid, 2])
+        solver.reset()
+        return out
+
+    plain = lift(0.0, None)                     # the strip's buoyancy in air, nothing else
+    up, down, flat = lift(0.04, lo) - plain, lift(-0.04, lo) - plain, lift(0.0, lo) - plain
+    law = lift(0.04, None) - plain              # the default law's side for a positive camber
+    check("in the solver at zero incidence: the section lifts towards its upper side",
+          up * law > 0 and abs(up) > 0.5 and abs(up + down) < 1e-9 * abs(up),
+          f"{up:+.2f} and {down:+.2f} N; the default law's camber shift gives {law:+.2f} N")
+    check("a strip with no camber keeps the default law", flat == 0.0, f"{flat:+.3e} N")
+    check("the camber's size is not used: the table has the zero-lift angle",
+          abs(lift(0.08, lo) - plain - up) < 1e-12, f"{lift(0.08, lo) - plain:+.4f} against {up:+.4f} N")
+
+
 def test_buoyancy() -> None:
     """A submerged volume lighter than water must be pushed up, and the net
     force must match Archimedes to within a percent."""
@@ -5353,6 +5409,7 @@ def main() -> int:
         test_lift_sign_and_magnitude,
         test_centre_of_pressure_moves_aft_when_the_flow_separates,
         test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning,
+        test_a_measured_section_replaces_the_default_law_where_it_was_measured,
         test_buoyancy,
         test_bluff_drag_is_orientation_dependent,
         test_generated_bodies_reach_the_fluid,

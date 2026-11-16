@@ -1,0 +1,79 @@
+# source: Selig, Guglielmo, Broeren, Giguere, "Summary of Low-Speed Airfoil Data, Volume 1", SoarTech Publications, 1995 (data set re-reduced, version Q01.00D 12-05-97)
+# program: UIUC Low-Speed Airfoil Tests (M. S. Selig et al.), UIUC subsonic wind tunnel, 2D model spanning the test section between splitter plates, nominal 12 in chord
+# url_fetched: https://m-selig.ae.illinois.edu/pd/pub/lsat/volume01.zip
+# date_fetched: 2026-11-16
+# raw_file: raw/volume01.zip member volume01/LIFT01.TXT section S1223.LFT
+# airfoil_as_labelled: S1223 | builder: Y. Tinel | comment: clean
+# run_note: Tabulated from data in file MS00338.DAT & reduced using program Q01.00L
+# reynolds_number: 171400 (run average, as given in the source)
+# measured_or_computed: MEASURED (wind tunnel)
+# method: lift and pitching moment (about quarter chord) from the force balance; NO drag in this file
+# row order is the run order: where alpha goes up and then comes back down both branches are kept (hysteresis loop), not sorted, not merged
+# corrections: as published by UIUC; nothing applied here
+# columns: alpha_deg,cl,cm  (cd not measured in lift runs)
+alpha_deg,cl,cm
+-8.86,-0.187,-0.2900
+-7.85,-0.147,-0.2900
+-6.88,-0.082,-0.2900
+-5.82,0.021,-0.2900
+-4.69,0.198,-0.2900
+-3.65,0.336,-0.2900
+-2.67,0.768,-0.2900
+-1.40,0.923,-0.2900
+-0.35,1.044,-0.2900
+0.65,1.143,-0.2900
+1.61,1.232,-0.2900
+2.68,1.331,-0.2900
+3.74,1.410,-0.2900
+4.73,1.489,-0.2900
+5.59,1.554,-0.2900
+6.56,1.630,-0.2900
+7.67,1.706,-0.2900
+8.64,1.774,-0.2900
+9.71,1.840,-0.2900
+10.69,1.903,-0.2900
+11.73,1.961,-0.2900
+12.73,2.014,-0.2900
+13.70,2.067,-0.2900
+14.80,2.123,-0.2900
+15.68,2.161,-0.2900
+16.78,2.175,-0.2900
+17.72,2.140,-0.2900
+18.77,2.066,-0.2900
+19.72,2.009,-0.2900
+20.70,1.957,-0.2900
+21.67,1.931,-0.2900
+22.22,1.464,-0.2900
+23.59,1.539,-0.2900
+22.61,1.490,-0.2900
+21.56,1.455,-0.2900
+20.48,1.406,-0.2900
+19.50,1.363,-0.2900
+18.42,1.341,-0.2900
+17.36,1.328,-0.2900
+16.39,1.349,-0.2900
+15.38,1.259,-0.2900
+14.54,1.273,-0.2900
+13.49,1.248,-0.2900
+12.49,1.212,-0.2900
+11.46,1.171,-0.2900
+10.39,1.154,-0.2900
+9.47,1.135,-0.2900
+8.55,1.128,-0.2900
+7.44,1.143,-0.2900
+6.73,1.640,-0.2900
+5.85,1.573,-0.2900
+4.72,1.481,-0.2900
+3.59,1.389,-0.2900
+2.62,1.312,-0.2900
+1.51,1.212,-0.2900
+0.51,1.117,-0.2900
+-0.57,1.006,-0.2900
+-1.60,0.887,-0.2900
+-2.52,0.781,-0.2900
+-3.53,0.339,-0.2900
+-4.55,0.188,-0.2900
+-5.60,0.036,-0.2900
+-6.67,-0.068,-0.2900
+-7.70,-0.150,-0.2900
+-8.76,-0.179,-0.2900
