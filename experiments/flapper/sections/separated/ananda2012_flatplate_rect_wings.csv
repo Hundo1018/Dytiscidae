@@ -1,0 +1,35 @@
+# Source: Ananda, Sukumar, Selig, AIAA 2012-3026, Figs 13(b),16(b),19(b),20(b) (lift curves) and 13(a),16(a),19(a) (polars). https://m-selig.web.engr.illinois.edu/pubs/AnandaSukumarSelig-2012-AIAA-2012-3026.pdf
+# Rectangular (taper 1) flat-plate wings, 4.3% thick, 5:1 elliptic LE, 10:1 TE, full-span models, static, Re 40,000-100,000 (curves for all Re overlap within symbol size).
+# PROVENANCE: read BY EYE from the plotted figures (no tables exist in the paper); uncertainty about +-0.03 in CL, +-0.02 in CD. CD only where it could be read from the polar (plot axis ends at CD 0.40).
+aspect_ratio,alpha_deg,CL,CD
+2,5,0.28,
+2,10,0.53,
+2,12,0.64,
+2,15,0.74,0.20
+2,20,0.75,0.27
+2,25,0.72,0.33
+2,30,0.69,0.39
+3,5,0.35,
+3,8,0.55,
+3,10,0.63,
+3,12,0.70,
+3,15,0.70,
+3,20,0.67,
+3,25,0.68,
+3,30,0.69,0.40
+4,5,0.42,
+4,8,0.60,
+4,10,0.64,
+4,12,0.65,
+4,15,0.67,
+4,20,0.68,
+4,25,0.70,
+4,30,0.75,0.40
+5,5,0.45,
+5,8,0.62,
+5,10,0.66,
+5,12,0.67,
+5,15,0.68,
+5,20,0.70,
+5,25,0.75,
+5,28,0.81,
