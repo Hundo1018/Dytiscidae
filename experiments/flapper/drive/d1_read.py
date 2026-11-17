@@ -23,7 +23,7 @@ for p in d1_run.POINTS:
     b0 = base[p]
     print("\n%s: baseline (prescribed stroke, ideal torque): %.2f W, lift %.3f N (%.3f of weight), thrust %+.3f N"
           % (p, b0["power_W"], b0["Fz"], b0["lift_over_weight"], b0["Fx"]))
-    print("  %-4s %4s %5s %6s %7s %7s %7s %6s %6s %6s %6s %6s %6s %7s %6s" % (
+    print("  %-4s %4s %5s %6s %7s %7s %7s %6s %6s %6s %6s %6s %6s %7s %6s %5s %5s" % (
         "kind", "N", "k", "amp", "mean", "down", "kinerr", "mechW", "elecW", "Cu W", "lift%", "dFx", "limit",
         "loopN", "gapmm", "freq", "slack"))
     for kind in ("DD", "FB", "SY", "CT"):
