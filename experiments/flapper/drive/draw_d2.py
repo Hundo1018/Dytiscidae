@@ -21,13 +21,16 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 from drive import Drive  # noqa: E402
 
+# horn, shaft depth (m), arm scale, output name: D2's geometry unless given (D2b)
+C_H, DROP, SCALE = (float(v) for v in sys.argv[1:4]) if len(sys.argv) > 3 else (0.03, 0.08, 1.0)
+NAME = sys.argv[4] if len(sys.argv) > 4 else "D2_fx2"
 COLOURS = ("tab:blue", "tab:orange", "tab:green", "tab:red")
 
 
 def main():
     import l1a
     from body import built
-    D = Drive("FB", 85.0, 4.5, 24, a=0.06, feather_axis=0.1, feather=dict(mode="crank2", c_h=0.03))
+    D = Drive("FB", 85.0, 4.5, 24, a=0.06, feather_axis=0.1, feather=dict(mode="crank2", c_h=C_H, drop=DROP, arm_scale=SCALE))
     m, d, _, _ = D.compile(built(dict(l1a.BODY_S, wing_shape=dict(camber=0.04))))
     for nm, side in (("seg1_wing_jf", 1), ("seg2_wing_jf", -1)):     # freerig's feather_axis shift
         m.jnt_pos[m.joint(nm).id] += D.lever_local[side] - np.array([D.a, 0.0, 0.0])
@@ -93,7 +96,7 @@ def main():
         ax.set_aspect("equal")
         ax.grid(alpha=0.3)
     fig.tight_layout()
-    out = HERE.parent / "figures" / "D2_fx2.png"
+    out = HERE.parent / "figures" / f"{NAME}.png"
     fig.savefig(out, dpi=130)
     for s in snaps:
         print("crank %5.0f stroke %+6.1f feather %+6.1f gap %.3f mm  horn-hinge %.1f mm  shaft-horn(rest) %s" % (

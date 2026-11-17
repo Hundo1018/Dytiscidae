@@ -48,6 +48,19 @@ def job(a):
     return r
 
 
+def any_job(a):
+    """D2c mixes D2's rows (the feather motor) with D1's (DD, FB)."""
+    if a[0] == "d1":
+        import d1_run
+        return dict(d1_run.job(a[1]), cand="D1")
+    return job(a)
+
+
+D2B = [(30, 80, 1.0), (30, 80, .85), (30, 120, 1.0), (30, 120, .85), (30, 160, 1.0), (30, 160, .85),
+       (45, 80, .85), (45, 120, 1.0), (45, 120, .85), (45, 160, 1.0), (45, 160, .85),
+       (60, 80, .85), (60, 120, .85), (60, 160, 1.0), (60, 160, .85)]          # horn mm, drop mm, arm scale
+
+
 def main() -> int:
     grid = [("F0", 24, None, False), ("F0", 24, None, True)]
     grid += [("FM", 24, dict(mode="motor", N=n), v) for n in FM_GEARS for v in (False, True)]
@@ -58,9 +71,21 @@ def main() -> int:
     if sys.argv[1] == "fx2":     # FX2's rows again, after the horn anchor fix (RESULT_D2)
         grid = [g for g in grid if g[0] == "FX2"]
         grid += [("FX2 stop 85", 24, dict(mode="crank2", c_h=0.03, range_deg=85.0), v) for v in (False, True)]
+    if sys.argv[1] == "d2b":     # PREREG_D2bc: FX2's geometry
+        grid = [("FX2", 24, dict(mode="crank2", c_h=c * 1e-3, drop=dr * 1e-3, arm_scale=sc), v)
+                for c, dr, sc in D2B for v in (False, True)]
+    if sys.argv[1] == "d2c":     # PREREG_D2bc: the rotor's inertia
+        grid = []
+        for J in (5e-6, 1e-6):
+            mo = dict(J_r=J)
+            grid += [("FM", 24, dict(mode="motor", N=n, motor=mo), False) for n in (16, 24, 32)]
+            grid += [("d1", ("takeoff", "DD", n, 0.0, dict(motor=mo))) for n in (12, 16, 24, 32)]
+            grid += [("d1", ("cruise", "DD", n, 0.0, dict(motor=mo))) for n in (32, 48, 64, 90)]
+            grid += [("d1", ("takeoff", "FB", 24, 0.0, dict(motor=mo, a=LEVER))),
+                     ("d1", ("cruise", "FB", 48, 0.0, dict(motor=mo)))]
     out = Path(sys.argv[-1]).resolve()
-    with mp.get_context("spawn").Pool(6) as pool, open(out, "w") as fh:
-        for r in pool.imap_unordered(job, grid):
+    with mp.get_context("spawn").Pool(int(sys.argv[2]) if sys.argv[2].isdigit() else 6) as pool, open(out, "w") as fh:
+        for r in pool.imap_unordered(any_job, grid):
             r.pop("series", None)
             fh.write(json.dumps(r) + "\n")
             fh.flush()
