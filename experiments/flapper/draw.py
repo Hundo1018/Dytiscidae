@@ -323,6 +323,15 @@ def main() -> int:
                   "drawn with the twist at the stroke's ends for legibility; in the beat it peaks at mid-stroke. Body held, no tail"],
                  stroke_deg=40.0, feather_deg=0.0, feather_axis=0.1, twist_deg=tw,
                  spec=dict(span=SPAN, wing_area=AREA, chord=AREA / (2 * LENGTH), mass=MASS))
+    elif which == "PX":
+        # the two extreme bodies of experiments/physics_extremes (E6, E7)
+        for tag, L, c in (("stubby", 0.15, 0.40), ("slender", 0.90, 0.03)):
+            draw(dict(BODY_S, wing_length=L, wing_chord=c), figs / f"PX_{tag}.png",
+                 f"Physics at the extremes: the {tag} wing, each {L} m long with a chord of {c} m",
+                 ["held at rest in air and water; 0.3-30 Hz, stroke 5-160 deg, feather 0-85 deg; all-up mass 5 g to 50 kg (ballast)",
+                  "a test body for the solver's laws, not a design"],
+                 stroke_deg=80.0, feather_deg=30.0, mass=None, feather_axis=0.1,
+                 spec=dict(span=2 * (L + BODY_S["hull_radius"]), wing_area=2 * L * c, chord=c))
     elif which == "past":
         import landwalk as LW
         import reproduce as RP

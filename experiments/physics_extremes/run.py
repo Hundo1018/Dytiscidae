@@ -215,8 +215,13 @@ def e10_added_mass():
     for name, axis in (("normal", "0 0 1"), ("edge-on", "0 1 0")):
         dt = 1e-4
         m, d, sol, bid = bare(f'<joint type="slide" axis="{axis}" stiffness="{ks}"/>', span, chord, 0.0,
-                              fluid=FRESHWATER, dt=dt, mass=mb)
-        d.qpos[0] = 0.002 * chord
+                              fluid=FRESHWATER, dt=dt, mass=mb, gravity=G)
+        # Gravity on (harness fix after the first run, RESULT.md): the solver
+        # cancels the weight of the fluid it folds into the body's mass with
+        # Earth's g whatever the model's gravity is, so with gravity off the
+        # plate was pushed 0.097 m up its spring.  The period is read about
+        # the position it settles at.
+        d.qpos[0] = (-mb * G / ks if axis == "0 0 1" else 0.0) + 0.002 * chord
         qs, ts = [], []
         for k in range(int(3.0 / dt)):
             d.xfrc_applied[:] = 0.0
@@ -225,6 +230,7 @@ def e10_added_mass():
             qs.append(float(d.qpos[0]))
             ts.append((k + 1) * dt)
         qs, ts = np.array(qs), np.array(ts)
+        qs = qs - qs[len(qs) // 2:].mean()
         up = np.flatnonzero((qs[:-1] < 0) & (qs[1:] >= 0))
         tz = ts[up] + dt * (-qs[up]) / (qs[up + 1] - qs[up])
         if len(tz) < 3:
@@ -319,6 +325,7 @@ def free_job(a):
         r["hold_absmax"] = np.abs(hold).max(0).tolist()
     if keep == "motion":
         r["t"], r["vel"], r["pitch"] = s["t"], s["vel"], s["pitch"]
+        r["com_vel"], r["angmom"] = s["com_vel"], s["angmom"]
     r["tag"], r["body_kind"] = tag, kind
     return r
 
@@ -366,7 +373,7 @@ def machine_grid():
         free.append(("E13 take-off dt %g" % dt, "section", (0.0, 90.0, 4.5, 85.0, 50.0, 0.0),
                      dict(dt=dt, solver_flags=dict(camber_moment=True))))
     # E13 (rig) and E8 (new slow and fast points)
-    for spb in (50, 200):
+    for spb in (50, 200, 2000):
         held.append(("E13 rig cruise spb %d" % spb, "section", (8.0, 0.0, 2.5, 40.0, 15.0, -2.955),
                      dict(strip_twist=dict(tip_deg=0.0, share=1.0), steps_per_beat=spb)))
         held.append(("E13 rig take-off spb %d" % spb, "section", (0.0, 90.0, 4.5, 85.0, 50.0, 0.0),
@@ -395,32 +402,37 @@ def read_machine(free, held):
             record("E4", "%s: largest %s / vertical force" % (tag[3:], name), v, 0.0, 1e-4, v <= 1e-4)
 
     print("E5 momentum in a vacuum (control: air)")
-    res = {}
+    # Read on the machine's centre of mass (repair after the first read,
+    # RESULT.md: the frozen form read the hull, whose beat mean moves with the
+    # body's attitude even when momentum is conserved).  The frozen form is
+    # kept below it and labelled.
     for tag in ("E5 vacuum", "E5 air"):
         r = by[tag]
         t, vel, pitch = np.array(r["t"]), np.array(r["vel"]), np.array(r["pitch"])
+        cv, am = np.array(r["com_vel"]), np.array(r["angmom"])
         nb = int(round(1.0 / (r["f"] * (t[1] - t[0]))))
         beats = len(t) // nb
-        sig = {"forward speed": vel[:, 0], "vertical speed + g t": vel[:, 2] + G * (t - t[0]),
-               "pitch rate": np.gradient(pitch, t)}
-        swing_lin = None
-        for name, x in sig.items():
-            xb = x[: beats * nb].reshape(beats, nb)
-            drift = float(xb.mean(1).max() - xb.mean(1).min())
-            swing = float((xb.max(1) - xb.min(1)).mean())
-            if name == "vertical speed + g t":
-                swing_lin = swing
-            res[(tag, name)] = (drift, swing)
-        for name in sig:
-            drift, swing = res[(tag, name)]
-            scale = swing if name == "pitch rate" else res[(tag, "vertical speed + g t")][1]
-            ratio = drift / max(scale, 1e-300)
+        hull_swing = float((vel[: beats * nb, 2].reshape(beats, nb).max(1) - vel[: beats * nb, 2].reshape(beats, nb).min(1)).mean())
+        mass = r["mass_kg"]
+        lin = {"forward": cv[:, 0], "vertical + g t": cv[:, 2] + G * (t - t[0])}
+        for name, x in lin.items():
+            ratio = float(np.abs(x - x[0]).max()) / hull_swing
             if tag == "E5 vacuum":
-                record("E5", "vacuum: drift of beat-mean %s / in-beat swing" % name, ratio, 0.0, 1e-3, ratio <= 1e-3,
-                       "swing %.3g" % scale)
+                record("E5", "vacuum: change of the centre of mass's %s speed / hull's in-beat swing" % name, ratio, 0.0,
+                       1e-3, ratio <= 1e-3, "swing %.3g m/s" % hull_swing)
             else:
-                record("E5", "control in air: the same for %s" % name, ratio, "> 0.01", 0.01, ratio > 1e-2,
-                       "the check must be able to fail" if name != "forward speed" else "")
+                record("E5", "control in air: the same, %s" % name, ratio, "> 0.01", 0.01, ratio > 1e-2)
+        ratio = float(np.abs(am[:, 1] - am[0, 1]).max()) / (mass * hull_swing * b / 4)
+        if tag == "E5 vacuum":
+            record("E5", "vacuum: change of angular momentum (pitch) / (mass x swing x span/4)", ratio, 0.0, 1e-3,
+                   ratio <= 1e-3)
+        else:
+            record("E5", "control in air: the same, angular momentum", ratio, "> 0.01", 0.01, ratio > 1e-2)
+        if tag == "E5 vacuum":
+            for name, x in (("forward speed", vel[:, 0]), ("vertical speed + g t", vel[:, 2] + G * (t - t[0]))):
+                xb = x[: beats * nb].reshape(beats, nb)
+                record("E5", "vacuum, as frozen (the hull, not the centre of mass): %s" % name,
+                       float(xb.mean(1).max() - xb.mean(1).min()) / hull_swing, 0.0, 1e-3, True, "superseded; reported")
 
     print("E6 still fluid gives no energy; E7 hover bound")
     e6 = [r for r in free if r["tag"].startswith("E6")]
@@ -488,7 +500,9 @@ def read_machine(free, held):
             ("freerig cruise (S6)", "E13 cruise dt 0.00025", "E13 cruise dt 0.000125", ("power_W", "lift_over_weight"), 0.02),
             ("freerig take-off", "E13 take-off dt 0.00025", "E13 take-off dt 0.000125", ("power_W", "lift_over_weight"), 0.02),
             ("rig cruise", "E13 rig cruise spb 50", "E13 rig cruise spb 200", ("aero_power_W", "Fz"), 0.03),
-            ("rig take-off", "E13 rig take-off spb 50", "E13 rig take-off spb 200", ("aero_power_W", "Fz"), 0.05)):
+            ("rig take-off", "E13 rig take-off spb 50", "E13 rig take-off spb 200", ("aero_power_W", "Fz"), 0.05),
+            ("rig cruise, 1 ms against 0.2 ms (repair)", "E13 rig cruise spb 50", "E13 rig cruise spb 2000", ("aero_power_W", "Fz"), 0.03),
+            ("rig take-off, 1 ms against 0.11 ms (repair)", "E13 rig take-off spb 50", "E13 rig take-off spb 2000", ("aero_power_W", "Fz"), 0.05)):
         for k in keys:
             x, y = by[a_][k], by[b_][k]
             record("E13", "%s: %s, coarse against fine" % (name, k), x, y, "%g%%" % (100 * tol),
