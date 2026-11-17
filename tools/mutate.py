@@ -2827,6 +2827,22 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_a_measured_section_replaces_the_default_law_where_it_was_measured",),
         item="section polar"),
     Mutation(
+        id="camber-moment-ignores-reversal",
+        path="dytiscidae/physics/fluid.py",
+        find="            arc = np.where(rev, -p.camber, p.camber)\n",
+        replace="            arc = p.camber\n",
+        defect="a cambered strip's pitching moment keeps its sign when the flow comes over the trailing edge",
+        suites=("test_physics::test_a_cambered_strip_carries_its_own_pitching_moment",),
+        item="camber moment"),
+    Mutation(
+        id="camber-moment-survives-stall",
+        path="dytiscidae/physics/fluid.py",
+        find="            tau_cm = np.where(is_wing, (1.0 - w_st) * (1.0 - lev) * np.pi * arc * q * p.chord * p.area,\n",
+        replace="            tau_cm = np.where(is_wing, np.pi * arc * q * p.chord * p.area,\n",
+        defect="the attached-flow pitching moment of a cambered strip is applied in separated flow too",
+        suites=("test_physics::test_a_cambered_strip_carries_its_own_pitching_moment",),
+        item="camber moment"),
+    Mutation(
         id="section-lift-run-ignored",
         path="dytiscidae/physics/fluid.py",
         find="            cl_t = (1.0 - past) * cl_t + past * cl_l\n",

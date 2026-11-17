@@ -17,7 +17,8 @@ sys.path.insert(0, str(HERE))
 
 def draw(body: dict, out, title: str, notes: list, *, stroke_deg: float = 0.0,
          feather_deg: float = 0.0, mass: float | None = 0.60, spec: dict | None = None,
-         tol: float = 0.02, feather_axis: float = 0.0, flap: dict | None = None) -> list:
+         tol: float = 0.02, feather_axis: float = 0.0, flap: dict | None = None,
+         twist_deg: float = 0.0) -> list:
     """spec: the design's figures (m, m2, kg) for any of span, wing_area,
     chord, mass, other_span, other_area, other_chord ("other": every lifting
     surface that is not a main wing).  Each is compared with what the built
@@ -25,7 +26,10 @@ def draw(body: dict, out, title: str, notes: list, *, stroke_deg: float = 0.0,
     (name, design, built, ok).  A drawing is also looked at: the table cannot
     see a part that is in the wrong place.
     mass: the rig's ballasted all-up mass; None draws the model as built.
-    feather_axis, flap: as `rig.run`'s feather_axis and one_way_flap."""
+    feather_axis, flap: as `rig.run`'s feather_axis and one_way_flap.
+    twist_deg: for a wing built as a chain of panels (`wing_panels`), the tip's
+    twist against the root, shared between the span hinges: +twist in the
+    upper pose and -twist in the lower."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -70,7 +74,7 @@ def draw(body: dict, out, title: str, notes: list, *, stroke_deg: float = 0.0,
     if feather_axis:
         for j in hinge:
             b = int(m.jnt_bodyid[j])
-            if not jn[j].endswith("_jf") or b not in main:
+            if not ((jn[j].endswith("_jf") and b in main) or (is_main(b) and b not in main)):
                 continue
             sel = (p.body_id == b) & (p.kind == WING)
             cdir = p.chord_local[sel][0] / np.linalg.norm(p.chord_local[sel][0])
@@ -78,13 +82,17 @@ def draw(body: dict, out, title: str, notes: list, *, stroke_deg: float = 0.0,
                 cdir = -cdir
             m.jnt_pos[j] = m.jnt_pos[j] + feather_axis * float(p.chord[sel].mean()) * cdir
 
-    def pose(stroke, feather):
+    n_tw = max(sum(1 for j in hinge if is_main(int(m.jnt_bodyid[j])) and int(m.jnt_bodyid[j]) not in main) // 2, 1)
+
+    def pose(stroke, feather, twist=0.0):
         d.qpos[:] = m.qpos0
         d.qpos[:3] = 0.0
         d.qpos[3:7] = (1.0, 0.0, 0.0, 0.0)
         for j in hinge:
             if int(m.jnt_bodyid[j]) in main:
                 d.qpos[m.jnt_qposadr[j]] = math.radians(feather if jn[j].endswith("_jf") else stroke)
+            elif is_main(int(m.jnt_bodyid[j])):
+                d.qpos[m.jnt_qposadr[j]] = math.radians(twist / n_tw)
         mj.mj_forward(m, d)
         quads = []
         for bid in np.unique(p.body_id):
@@ -126,7 +134,7 @@ def draw(body: dict, out, title: str, notes: list, *, stroke_deg: float = 0.0,
             R = d.geom_xmat[g].reshape(3, 3)
             geoms.append((float(m.geom_size[g][0]), d.geom_xpos[g] - m.geom_size[g][1] * R[:, 2],
                           d.geom_xpos[g] + m.geom_size[g][1] * R[:, 2]))
-    up, dn = pose(stroke_deg / 2, feather_deg), pose(-stroke_deg / 2, -feather_deg)
+    up, dn = pose(stroke_deg / 2, feather_deg, twist_deg), pose(-stroke_deg / 2, -feather_deg, -twist_deg)
 
     fig, axs = plt.subplots(1, 3, figsize=(17, 6.4), gridspec_kw=dict(width_ratios=[1.25, 1.0, 1.25]))
     views = ((0, 1, "top view (x forward, y to the left), m"), (0, 2, "side view, m"),
@@ -294,6 +302,27 @@ def main() -> int:
                  ["the twist is linear along the span and turns the fluid strips only: no torsion structure, no twist actuator is modelled",
                   "held rig; cruise 6 and 8 m/s, stroke 30-60 deg at 2-3.5 Hz; take-off at rest, stroke 85 deg at 3-5 Hz"],
                  stroke_deg=40.0, feather_deg=0.0, spec=dict(span=SPAN, wing_area=AREA, mass=MASS))
+    elif which == "C1":
+        tail = dict(stab_length=0.25, stab_chord=0.12, stab_boom=0.3)
+        for tag, tw in (("beat_down", -15.0), ("beat_up", 15.0)):
+            body = dict(BODY_S, wing_shape=dict(camber=0.04, twist_tip_deg=tw), wing_section="goe417a+lift", **tail)
+            draw(body, figs / f"C1_{tag}.png",
+                 f"Pass C1: the W6 wing with the 0.06 m2 tail, released in x, z and pitch; tip {tw:+.0f} deg, root unmoved",
+                 ["8 m/s; stroke 30-60 deg at 2-3.5 Hz; the tip alone feathers 5-20 deg (fluid strips turned, no twist structure or drive)",
+                  "tail: both halves turn together; pitch feedback, height by the pitch asked for, speed by the flapping frequency",
+                  "not modelled: the tail in the wings' wake; roll and yaw; wind; sensors (the loops read the true state)"],
+                 stroke_deg=40.0, feather_deg=0.0, feather_axis=0.1,
+                 spec=dict(base, other_span=0.5, other_chord=0.12, other_area=0.06))
+    elif which == "W7":
+        for tag, n, tw in (("chain6_twist15", 6, 15.0), ("chain6_locked", 6, 0.0), ("chain3_twist15", 3, 15.0)):
+            body = dict(BODY_S, wing_shape=dict(camber=0.04), wing_section="goe417a+lift", wing_panels=n)
+            draw(body, figs / f"W7_{tag}.png",
+                 f"Pass W7: the wing as {n} panels on span hinges; tip twisted {tw:+.0f} / {-tw:+.0f} deg against the root",
+                 ["each hinge is a joint of the model: the panels' inertia, twisting rate and the hinge torques are in the loads",
+                  "the hinges: each driven, or springs with one torque from root to tip, or springs alone; the twist axis is the feather's (0.1 chord)",
+                  "drawn with the twist at the stroke's ends for legibility; in the beat it peaks at mid-stroke. Body held, no tail"],
+                 stroke_deg=40.0, feather_deg=0.0, feather_axis=0.1, twist_deg=tw,
+                 spec=dict(span=SPAN, wing_area=AREA, chord=AREA / (2 * LENGTH), mass=MASS))
     elif which == "past":
         import landwalk as LW
         import reproduce as RP

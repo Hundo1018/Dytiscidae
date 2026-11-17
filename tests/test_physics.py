@@ -468,6 +468,44 @@ def test_centre_of_pressure_moves_aft_when_the_flow_separates() -> None:
     _, _, xr = load(45.0, "plate", wind=-10.0)
     check("reversed flow measures it from the trailing edge", abs(xr - (1.0 - 0.415)) < 0.02,
           f"{xr:.3f}")
+
+
+def test_a_cambered_strip_carries_its_own_pitching_moment() -> None:
+    """`FluidSolver.camber_moment`: thin-airfoil theory's ``Cm = -pi f`` about
+    the quarter chord of a parabolic arc, in attached flow only."""
+    print("\nfluid: a cambered strip's pitching moment about its quarter chord")
+    m, d = _single_panel_model()
+
+    def load(alpha, camber, on, wind=10.0):
+        panels = _wing_panels(m, alpha)
+        panels.camber[:] = camber
+        solver = FluidSolver(m, panels, MediumField(wind=np.array([wind, 0.0, 0.0])))
+        solver.camber_moment = on
+        solver.unsteady = False          # a strip that has just started carries a leading-edge vortex
+        d.qvel[:] = 0.0
+        d.xfrc_applied[:] = 0.0
+        mujoco.mj_forward(m, d)
+        solver.apply(d, 0.0)
+        b = panels.body_id[0]
+        return d.xfrc_applied[b, :3].copy(), d.xfrc_applied[b, 3:].copy(), panels
+
+    f, tau, panels = load(0.0, 0.04, True)
+    q = 0.5 * 1.225 * 10.0 ** 2
+    want = math.pi * 0.04 * q * float(panels.chord[0]) * float(panels.area.sum())
+    check("its size is pi f q c S", abs(abs(tau[1]) - want) < 1e-3 * want, f"{abs(tau[1]):.5f} vs {want:.5f}")
+    # the chord runs +X (aft), so +Y turns the trailing edge down: nose up
+    check("it is nose down for an arc that lifts upwards", f[2] * tau[1] < 0.0, f"lift {f[2]:+.3f}, moment {tau[1]:+.4f}")
+    f_, tau_, _ = load(0.0, -0.04, True)
+    check("the other camber mirrors it", abs(tau_[1] + tau[1]) < 1e-9 and f_[2] * tau_[1] < 0.0, f"{tau_[1]:+.5f}")
+    fr, taur, _ = load(0.0, 0.04, True, wind=-10.0)
+    check("flow over the trailing edge: nose down for the edge it meets", fr[2] * taur[1] > 0.0
+          and abs(abs(taur[1]) - want) < 1e-3 * want, f"lift {fr[2]:+.3f}, moment {taur[1]:+.4f}")
+    _, t0, _ = load(0.0, 0.0, True)
+    check("a flat strip has none", np.abs(t0).max() < 1e-12, f"{t0}")
+    _, t_off, _ = load(0.0, 0.04, False)
+    check("off: no moment about the quarter chord", np.abs(t_off).max() < 1e-12, f"{t_off}")
+    _, t45, _ = load(45.0, 0.04, True)
+    check("separated flow has none", np.abs(t45).max() < 1e-9, f"{t45}")
     # Pitching in still air: damped, about the span, by 1/2 rho C w|w| 82/1024 c^4.
     _, ts_off, _ = load(0.0, None, wind=0.0, spin=20.0)
     _, ts_on, _ = load(0.0, "plate", wind=0.0, spin=20.0)
@@ -5438,6 +5476,7 @@ def main() -> int:
         test_a_film_is_the_evaluation,
         test_lift_sign_and_magnitude,
         test_centre_of_pressure_moves_aft_when_the_flow_separates,
+        test_a_cambered_strip_carries_its_own_pitching_moment,
         test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning,
         test_a_measured_section_replaces_the_default_law_where_it_was_measured,
         test_buoyancy,

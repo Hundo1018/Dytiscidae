@@ -33,7 +33,7 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
              joint_damping: float | None = 0.0, solver_flags: dict | None = None,
              hull_inertia: float | None = None, cg_shift: float = 0.0,
              tail: dict | None = None, pilot: dict | None = None,
-             strip_twist: dict | None = None) -> dict:
+             strip_twist: dict | None = None, chain: dict | None = None) -> dict:
     """free: root axes released after hold_beats, any of "x", "z", "p" (pitch).
     The measurement runs over the ``beats`` after that, body held or not.
     mass: the machine's all-up mass, made up with ballast at the hull's centre
@@ -64,7 +64,20 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     in the height and in the speed asked for that many beats after release.
     strip_twist: `rig.run`'s (tip_deg, share): the fluid strips turned about
     their span, the feather hinge making the rest; the twist's own drive,
-    rate and inertia are not in the loads."""
+    rate and inertia are not in the loads.
+    chain: for a body built with ``wing_panels`` > 1 (pass W7): how the span
+    hinges between the panels are held.  The tip's twist against the root is
+    the sum of a wing's hinge angles; the reference is
+    ``held_deg - tip_deg cos(wt)`` at the tip (the feather's phase and sense),
+    shared equally between the hinges.  Keys: mode
+      "servo"   every hinge tracks its share (a drive at each rib);
+      "tube"    one torque between root and tip tracks the tip's twist, the
+                hinges are springs of k N m/rad (a torque tube in a
+                torsionally soft wing);
+      "passive" springs of k only, nothing driven;
+    zeta (0.05): the springs' damping, of critical for k and the panel's own
+    inertia about its hinge.  Reported: the twist drive's power and peak
+    torque, what the tip actually did, and each hinge's swing."""
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
     from body import built
@@ -116,7 +129,12 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         m.actuator_ctrllimited[aid] = 0
         j = int(m.actuator_trnid[aid, 0])
         jid.append(j)
-        if int(m.body_parentid[int(m.jnt_bodyid[j])]) != hull:
+        par = int(m.body_parentid[int(m.jnt_bodyid[j])])
+        if par != hull and "wing" in mj.mj_id2name(m, mj.mjtObj.mjOBJ_BODY, par) \
+                and "wing" in mj.mj_id2name(m, mj.mjtObj.mjOBJ_BODY, int(m.jnt_bodyid[j])) \
+                and body.get("wing_panels", 1) > 1:
+            role.append("twist")
+        elif par != hull:
             role.append("tail")
         else:
             role.append("feather" if a.endswith("_f") else "stroke")
@@ -138,7 +156,7 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     qad = np.array([int(m.jnt_qposadr[j]) for j in jid])
     if feather_axis:
         for a, j in enumerate(jid):
-            if role[a] != "feather":
+            if role[a] not in ("feather", "twist"):
                 continue
             b = int(m.jnt_bodyid[j])
             sel = (pan.body_id == b) & (pan.kind == KIND_WING)
@@ -177,6 +195,23 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         tw = twist_setup(env, body, [j for a, j in enumerate(jid) if role[a] == "feather"], strip_twist, dt)
         k_f = 1.0 - tw["share"]
 
+    is_tw = role == "twist"
+    ch = None
+    if is_tw.any():
+        ch = dict(mode="servo", tip_deg=0.0, held_deg=0.0, k=1.0, zeta=0.05)
+        ch.update(chain or {})
+        n_h = int(is_tw.sum()) // 2                 # hinges per wing
+        # which wing a hinge is on: walk up to the panel on the hull
+        side = []
+        for j in np.array(jid)[is_tw]:
+            b = int(m.jnt_bodyid[j])
+            while int(m.body_parentid[b]) != hull:
+                b = int(m.body_parentid[b])
+            side.append(b)
+        side = np.array(side)
+        sides = [np.flatnonzero(is_tw)[side == s_] for s_ in np.unique(side)]
+        A_t, H_t = math.radians(ch["tip_deg"]), math.radians(ch["held_deg"])
+
     def ref(t, ph=None, w=w):
         s, c = (math.sin(w * t), math.cos(w * t)) if ph is None else (math.sin(ph), math.cos(ph))
         q, qd, qdd = np.zeros(len(jid)), np.zeros(len(jid)), np.zeros(len(jid))
@@ -186,6 +221,9 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         q[fe], qd[fe], qdd[fe] = psi0 - k_f * Psi * c, k_f * Psi * w * s, k_f * Psi * w * w * c
         if tw is not None:
             twist_turn(pan, tw, math.degrees(-Psi * c))
+        if ch is not None and ch["mode"] == "servo":
+            q[is_tw], qd[is_tw], qdd[is_tw] = ((H_t - A_t * c) / n_h, A_t * w * s / n_h,
+                                               A_t * w * w * c / n_h)
         return q, qd, qdd
 
     d.qpos[:7], d.qvel[:6] = q0, v0
@@ -205,6 +243,11 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     # treats its damping implicitly.  An explicit PD (the first version) was
     # stable in air and not in water, where a wing's added mass, and so the
     # inertia the gains were sized on, changes several-fold through a beat.
+    if ch is not None and ch["mode"] != "servo":
+        # the hinges are the wing's own torsional springs, not drives
+        kp[is_tw] = ch["k"]
+        kv[is_tw] = 2.0 * ch["zeta"] * np.sqrt(ch["k"] * J[is_tw])
+        J_tube = [float(J[ix].sum()) for ix in sides]
     for n_, aid in enumerate(aids):
         m.actuator_gainprm[aid, 0] = kp[n_]
         m.actuator_biasprm[aid, 1], m.actuator_biasprm[aid, 2] = -kp[n_], -kv[n_]
@@ -216,7 +259,7 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     n_beat = int(round(1.0 / (f * dt)))
     n_hold, n_all = hold_beats * n_beat, (hold_beats + beats) * n_beat
     rec = dict(t=[], P=[], Ps=[], tq=[], err=[], hold=[], pos=[], vel=[], pitch=[], tail=[], Pt=[],
-               w=[], ask=[])
+               w=[], ask=[], Ptw=[], tqtw=[], tip=[], hinge=[], stroke=[])
     phase = None
     t = 0.0
     for k in range(n_all):
@@ -255,9 +298,35 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         # The solver has just rewritten all of qfrc_applied (its implicit
         # damping's explicit half); the drive is added to that, never set.
         d.qfrc_applied[dof] += J * qdd
+        tube = None
+        if ch is not None and ch["mode"] == "tube":
+            # One torque between the root panel and the tip's: by virtual work
+            # it is the same generalised force on every hinge of the wing.
+            s_, c_ = (math.sin(phase), math.cos(phase)) if phase is not None else (math.sin(w * t), math.cos(w * t))
+            tube = []
+            for ix, Jt in zip(sides, J_tube):
+                e_ = (H_t - A_t * c_) - float(d.qpos[qad[ix]].sum())
+                ed = A_t * w_now * s_ - float(d.qvel[dof[ix]].sum())
+                tq_ = Jt * (wn * wn * e_ + 2.0 * wn * ed) / len(ix)
+                d.qfrc_applied[dof[ix]] += tq_
+                tube.append(tq_)
         vb = d.qvel[:6].copy()
+        qv_before = d.qvel[dof].copy()
         mj.mj_step(m, d)
         tau = J * qdd + d.actuator_force[aids]
+        p_tw, tq_tw = 0.0, 0.0
+        if ch is not None:
+            if ch["mode"] == "servo":
+                p_tw = float(tau[is_tw] @ qd[is_tw])
+                tq_tw = float(np.abs(tau[is_tw]).max())
+            elif tube is not None:
+                p_tw = float(sum(tq_ * qv_before[ix].sum() for tq_, ix in zip(tube, sides)))
+                tq_tw = float(max(abs(x) for x in tube))
+            if ch["mode"] != "servo":
+                tau = np.where(is_tw, 0.0, tau)        # a spring is not a drive
+                tau_plus = p_tw
+            else:
+                tau_plus = 0.0
         hold = ARM * (d.qvel[:6] - vb) / dt           # wrench the holder did NOT have to: -hold
         t += dt
         if phase is not None:
@@ -272,10 +341,17 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
             d.qvel[3], d.qvel[5] = 0.0, 0.0
         if k >= n_hold:
             rec["t"].append(t - dt)
-            rec["P"].append(float(tau @ qd))
+            rec["P"].append(float(tau @ qd) + (tau_plus if ch is not None else 0.0))
+            if ch is not None:
+                rec["Ptw"].append(p_tw)
+                rec["tqtw"].append(tq_tw)
+                rec["tip"].append(float(d.qpos[qad[sides[0]]].sum()))
+                rec["hinge"].append(d.qpos[qad[sides[0]]].copy())
+                rec["stroke"].append(float(q[role == "stroke"][0]))
             rec["Ps"].append(float(tau[role == "stroke"] @ qd[role == "stroke"]))
             rec["tq"].append(float(np.abs(tau[role == "stroke"]).sum()))
-            rec["err"].append(float(np.abs(q - d.qpos[qad]).max()))
+            trk = ~is_tw if (ch is not None and ch["mode"] != "servo") else np.ones(len(q), bool)
+            rec["err"].append(float(np.abs(q - d.qpos[qad])[trk].max()))
             rec["hold"].append(hold)
             rec["pos"].append(d.qpos[:3].copy())
             rec["vel"].append(d.qvel[:3].copy())
@@ -312,6 +388,20 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     c0 = np.array(com0)
     M_cg = hold[:, 4] - (c0[2] * F_ng[:, 0] - c0[0] * F_ng[:, 2]) \
         - np.cross(c0, np.array([0.0, 0.0, -total * G]))[1]
+    if ch is not None:
+        ptw, tip_s, hg = np.array(rec["Ptw"]), np.degrees(rec["tip"]), np.degrees(rec["hinge"])
+        tt = np.array(rec["t"]) - rec["t"][0]
+        # the tip's twist as offset - amp cos(wt - lag): the feather's phase is lag 0
+        cs, sn = np.cos(w * (tt + rec["t"][0])), np.sin(w * (tt + rec["t"][0]))
+        a_c, a_s = -2.0 * float(np.mean((tip_s - tip_s.mean()) * cs)), -2.0 * float(np.mean((tip_s - tip_s.mean()) * sn))
+        out.update(twist_mode=ch["mode"], twist_power_W=float(ptw.mean()),
+                   twist_power_pos_W=float(np.maximum(ptw, 0.0).mean()),
+                   twist_torque_peak=float(np.max(rec["tqtw"])),
+                   tip_twist_mean_deg=float(tip_s.mean()), tip_twist_min_deg=float(tip_s.min()),
+                   tip_twist_max_deg=float(tip_s.max()), tip_twist_amp_deg=float(math.hypot(a_c, a_s)),
+                   tip_twist_lag_deg=float(math.degrees(math.atan2(a_s, a_c))),
+                   hinge_swing_deg=[float(x) for x in (hg.max(0) - hg.min(0)) / 2.0],
+                   hinge_mean_deg=[float(x) for x in hg.mean(0)])
     if role.tolist().count("tail"):
         out["tail_power_W"] = float(np.mean(np.abs(rec["Pt"])))
         tq_t = np.array(rec["tail"])

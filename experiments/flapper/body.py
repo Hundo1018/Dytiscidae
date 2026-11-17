@@ -100,6 +100,7 @@ def flapper(**over) -> Genome:
     if int(e["wing_panels"]) > 1:
         assert float(e["hand_fraction"]) == 0.0, "wing_panels and hand_fraction are two ways to split one wing"
         n_pan = int(e["wing_panels"])
+        assert n_pan <= 6, "phenotype.expand stops at depth 6: a longer chain is silently cut short"
         seg = float(e["wing_length"]) / n_pan
         wing.length = wing.span = seg
         for k in range(1, n_pan):

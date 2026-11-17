@@ -1098,6 +1098,16 @@ class FluidSolver:
         #: has no counterpart.  It matters only where a pitch hinge is free
         #: (experiments/flapper, PREREG_L1h_cop.md).
         self.cop_law: str | None = None
+        #: A cambered strip's own pitching moment about its quarter chord, which
+        #: the strip model otherwise leaves out: thin-airfoil theory's
+        #: ``Cm = -pi f`` for a parabolic arc of camber ``f`` (nose down, i.e.
+        #: the leading edge the flow meets turns towards the concave side),
+        #: while the flow is attached; it goes with the stall weight and the
+        #: leading-edge vortex as the quarter-chord centre of pressure does.
+        #: Off by default (every stored score).  Numpy path only.  It matters
+        #: where a wing's twist or feather is free or its drive is being sized
+        #: (experiments/flapper, PREREG_W7_twistmech.md).
+        self.camber_moment: bool = False
         #: A measured section (`SectionPolar`) for every wing strip whose
         #: ``camber`` is not zero; the camber's sign says which side is the
         #: section's upper one, and its size is not used (the table has the
@@ -1335,6 +1345,15 @@ class FluidSolver:
         D = q * p.area * cd * self.cd_scale
         F += L[:, None] * lift_axis + D[:, None] * d_hat
         F_circ = F.copy() if self.cop_law is not None else None
+        tau_cm = None
+        if self.camber_moment:
+            # n = s x c, so c x n = s: about +s the edge the flow meets turns
+            # away from +n, which is nose down for an arc convex towards +n
+            # (camber > 0, flow over the leading edge).
+            _, w_st = _stall(alpha, re)
+            arc = np.where(rev, -p.camber, p.camber)
+            tau_cm = np.where(is_wing, (1.0 - w_st) * (1.0 - lev) * np.pi * arc * q * p.chord * p.area,
+                              0.0)[:, None] * s_hat
 
         # --- bluff-body drag ------------------------------------------------
         # Strip theory is wrong for a volume, and it was wrong here in a way
@@ -1618,6 +1637,8 @@ class FluidSolver:
             x_geo = np.where(rev, 1.0 - x_cp, x_cp)
             shift = np.where(is_wing, (x_geo - 0.25) * p.chord, 0.0)[:, None] * c_hat
             np.add.at(fb[:, 3:], p.body_id, _cross3(shift, F_circ) + tau_rd)
+        if tau_cm is not None:
+            np.add.at(fb[:, 3:], p.body_id, tau_cm)
         fsum_b = np.zeros(nb)
         np.add.at(fsum_b, p.body_id, fmag)
         weight = float(self._dry_mass.sum()) * GRAVITY + 1.0
