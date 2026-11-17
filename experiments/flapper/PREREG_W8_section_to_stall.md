@@ -82,3 +82,34 @@ handover to `cl tan a` starts at the lift's peak. Mutations for each.
 
 The body is pass W6's (`figures/W6_takeoff.png`, the cruise wing with no
 held twist), checked there; the section's table changes, not the body.
+
+## Addendum W8b, frozen after section 3 was read and before this is run
+
+Read so far (RESULT_W8 has it against section 4): L1 and L2 hold; **L3 and
+L4 are falsified**. Under "extend" and "hold" nothing sustains at 6 m/s
+either; the band gives back 0.00-0.07 N of a 0.15-0.7 N shortfall. So X1's
+reading (that the shortfall was this band) was wrong.
+
+A second reading, to be tested: at 6 m/s the strip solver trims at a root
+incidence of 11-12 deg where the outside solver needs 5-8. The grid's tip
+feather stops at 20 deg; at 2.5 Hz and a 50 deg stroke the tip's plunging
+speed is 4.8 m/s against 6 m/s of flight, a swing of +-38 deg in the flow's
+direction there, so with 15-20 deg of feather the outer wing still swings
++-18 to 23 deg about its mean and spends part of every beat past the
+section's static stall (13 deg). A linear solver does not see that; the
+strip solver clips the lift and charges separated drag. If that is the
+cause, a larger tip feather removes it.
+
+Run: 6 m/s, the same rig and wing, tip feather 25, 30, 35, 40 deg, f 2-3.5
+Hz, stroke 30-60 deg, treatments "normal" and "extend": 128 trims.
+
+Prediction L5: with a tip feather of 25-40 deg at least three points
+sustain at 6 m/s under "normal", the cheapest 8-16 W, at a root incidence
+(cam offset) under 9 deg in magnitude. Falsified if none sustains; then the
+shortfall is neither the band nor the feather range, and stays unexplained.
+
+Caveat frozen with it: a strip swinging through its static stall at a
+reduced frequency of 0.25-0.4 is dynamic stall, which the solver does not
+model in either direction (RESULT_W5: no data obtained). L5 can show the
+grid's edge was the limit; it cannot show the stalled part of the beat is
+modelled right.
