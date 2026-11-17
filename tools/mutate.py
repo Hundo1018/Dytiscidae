@@ -2893,8 +2893,8 @@ MUTATIONS: tuple = (
     Mutation(
         id="section-stalled-drag-is-skin-friction",
         path="dytiscidae/physics/fluid.py",
-        find="                skin_friction_cd(re) + np.maximum(cl_l, 0.0) * np.tan(np.clip(ae, 0.0, self.PLATE_BY)))\n",
-        replace="                skin_friction_cd(re))\n",
+        find="            cd_n = skin_friction_cd(re) + np.maximum(cl_l, 0.0) * np.tan(np.clip(ae, 0.0, self.PLATE_BY))\n",
+        replace="            cd_n = skin_friction_cd(re) + 0.0 * cl_l\n",
         defect="a stalled section keeps its measured lift and pays no pressure drag for it",
         suites=("test_physics::test_a_measured_section_replaces_the_default_law_where_it_was_measured",),
         item="section polar"),
