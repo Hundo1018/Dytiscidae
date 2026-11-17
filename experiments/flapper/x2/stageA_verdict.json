@@ -1,0 +1,32 @@
+{
+ "A1": {
+  "kOmegaSST": false,
+  "kOmegaSSTLM": false
+ },
+ "per_closure": {
+  "kOmegaSSTLM": {
+   "A2_lift": true,
+   "A2_drag": false,
+   "worst_dCL": 0.04957539908823527,
+   "worst_dCD_rel": 1.0393787128916663,
+   "complete": true,
+   "clmax_grid": 1.3001806616692768,
+   "a_clmax_grid": 10,
+   "clmax_fit": 1.30362747694587,
+   "a_clmax_fit": 9.724145607559928,
+   "A3": "False"
+  },
+  "kOmegaSST": {
+   "A2_lift": true,
+   "A2_drag": false,
+   "worst_dCL": 0.09213662385987664,
+   "worst_dCD_rel": 0.6078220787540981,
+   "complete": true,
+   "clmax_grid": 1.6336359490044075,
+   "a_clmax_grid": 20,
+   "clmax_fit": 1.6336359490044075,
+   "a_clmax_fit": 20,
+   "A3": false
+  }
+ }
+}
