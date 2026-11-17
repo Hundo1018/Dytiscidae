@@ -303,7 +303,7 @@ CN_LEV = 3.4
 #: The lift and drag law of a lifting strip that has no `SectionPolar`:
 #: `FluidSolver.stall_law`'s default, and what the Mojo kernel and the device
 #: path are launched with.  "legacy", "plate" (numpy only) or "table".
-DEFAULT_STALL_LAW = "legacy"
+DEFAULT_STALL_LAW = "table"
 
 
 def _log_ramp(re, lo, hi):

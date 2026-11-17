@@ -288,6 +288,16 @@ then films (`dytiscidae/viz/film.py`) into `runs/<run>/media/`, embedded in
   a drop of more than 10 on water and land. Air holds (222). Water and land are not
   comparable across the upgrade; air is. The 3.11 baseline itself moved between
   2026-10-08 and 2026-10-25, which is not explained yet.
+- **The default lift law, 2026-11-17 (the user's decision; repair R3,
+  `experiments/physics_extremes/RESULT_R3_table.md`).** A lifting strip reads
+  two measured thin sections (UIUC flat plate, Goe 417a; `fluid.table_coefficients`,
+  `fluid.DEFAULT_STALL_LAW = "table"`) on all three paths, in place of the 11 deg
+  stall and the `2 f/c` camber shift (`"legacy"`, still selectable per solver).
+  Every air and water score that a lifting strip contributes to is not comparable
+  across it; land is, where no strip carries load. Known: 0.03-0.29 high in CL for
+  a flat wing at 25-30 deg; under a leading-edge vortex camber no longer acts.
+  After editing a csv in `experiments/flapper/sections/`:
+  `tools/bake_thin_plate.py write` (the suite checks it).
 - `sink_rate` is the difference of two endpoints of the late airborne window, so
   it reads zero for a machine that drops and comes back. `station_keeping` sees
   the path between; where they disagree, trust `station_keeping` (arch37: 10x

@@ -336,7 +336,7 @@ def test_the_device_body_takes_its_stall_law_from_the_solver() -> None:
     check("a body whose solver runs law plate is refused: numpy-only", raised)
     if len(envs) > 1:
         envs = make()
-        envs[0].solver.stall_law = "table"
+        envs[0].solver.stall_law = "legacy" if envs[1].solver.stall_law == "table" else "table"
         try:
             DeviceBody(envs, dtype=wp.float64)
             raised = False

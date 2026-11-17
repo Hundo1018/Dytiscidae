@@ -46,6 +46,8 @@ No tolerance and no prediction was changed.
 | T5 | a 4% plate's maximum 1.17-1.22 | 1.22 at 60k (13.5 deg), 1.19 at 100k | 60k is 0.005 over; the stated 0.1-0.2 above the second-hand tables stands |
 | T7 | no step over 0.02; cd >= cf; broadside 1.98 + cf; best cl/cd within 2% | 0.020; 0; 2e-16; 75.3 against 76.2 | holds |
 | T7 | flat plate odd to 1e-12 | 1.6e-12 on the check's grid | **fails as frozen** |
+| T6 | the battery under the new default: E1, E3-E8, E10, E11, E13, E14 keep their verdicts; E2 gains no failure; E9's slope fails at aspect ratio 4 as well; E12 not predicted | verdicts kept (E14's square plate still 0.746); **E2 gains one** (chord x0.02 at 20 deg, CD 0.299 against 0.205 before); **E9's slope fails at every aspect ratio** (4.67, 5.79, 6.59, 7.21 per radian at 4, 8, 16, 40); E12 fails at s = 4 (0.58) | the first holds, the next two are **wrong** |
+| T8 | the mirrors' suites hold with the table law on | `test_gpu_mirror` (kernel against numpy: cl 7.8e-16, one fused step 2.7e-13), `test_devroll` (float64 7.8e-16, float32 3.0e-7); `test_search` whole, 0 skipped: every agreement check holds, one check failed for another reason (below) | holds |
 | T9 | one W6 row reads 7.237 W | 7.236704 W under either default (Fx 0.045276; Fz differs in the seventh figure) | holds |
 
 What the failures are:
@@ -73,6 +75,13 @@ What the failures are:
   tan(alpha): the wings' own CD is their CL tan(alpha) within 0.01-0.02 at
   all six points, so the normal-force rule for the flat plate's drag holds
   on them.
+- **T6, the lift slope.** The flat plate's measured two-dimensional slope
+  is 7.2 per radian (0.60-0.65 at 5 deg), above thin-airfoil theory's
+  2 pi; with it every aspect ratio now reads above Helmbold's slope, not
+  only the stubby ones. The legacy law's 2 pi passed that check from
+  aspect ratio 4 up. Which is right for a 3% thick plate at Re 1e5 was
+  not settled here: it is the measurement. `r3_battery_results.json` holds
+  this run; `results.json` stays the legacy law's.
 - **T4.** Two builds of nearly one camber (5.65% and 5.78%, 5.0% and 3.4%
   thick) differ by up to 0.12 in lift past 8 deg and 0.16 near zero
   incidence at Re 60k. That is the scatter the interpolation cannot be
@@ -93,5 +102,32 @@ flat-plate section data found, it was taken between splitter plates with a
 12 in chord, and no drag was measured with it. Not repaired here: any cut
 of that run chosen now would be chosen with Ananda's points in view.
 
+A change of behaviour that follows from the design and was not listed as a
+prediction: under a leading-edge vortex (a flapping or revolving strip, and
+the first chords of an impulsive start) camber no longer acts, as for a
+`SectionPolar`; the legacy law shifted the separated plate's angle by
+`2 f/c` too. `test_a_mirrored_wing_is_a_mirror_image` read camber's lift at
+the first instant and read zero; it now reads steady flight.
+
 Also open, as frozen: nothing between 0 and 5.78% camber was measured;
 nothing below Re 60k (held); static tables, no dynamic stall.
+
+## The suites under the new default
+
+`test_physics`: all checks passed, 0 skipped (one test changed, above).
+`test_gpu_mirror`, `test_devroll`, `test_ppo`, the cheap suites, `mutate.py
+--check` (336, 0 problems), `--only table-law-` 7 of 7 caught,
+`bake_thin_plate.py check`: pass. `test_search`, whole, 0 skipped: one
+failure, "with the hold reading height alone, the still gliders cross
+again", 2 of 5 against a bar of 3. It shows a guard is load-bearing by
+removing it on five gliders bred in arch46; under the table law three of
+them no longer coast far enough to show the leak. That step now runs under
+the law those bodies were recorded with (4 of 5); the guarded check, that
+none of the 24 crosses held still, runs under the new default and holds.
+The function was re-run alone after the change; the whole suite was not
+re-run.
+
+`tests/test_gpu_mirror.py` had two failing checks from `4e634c6` (repair
+R1) until this pass: constants of the numpy-only plate law with no twin in
+the kernel. It was not in the suites run then. A one-way allowance
+(`PYTHON_ONLY`) now names them.

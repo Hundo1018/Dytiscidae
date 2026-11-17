@@ -653,6 +653,18 @@ FluidSolver:
     - tests.test_stall_blend
     - tests.test_reduced_frequency
 
+ThinPlateTableLaw:
+  # The default lift and drag of a lifting strip since 2026-11-17 (repair R3):
+  # two measured thin sections, linear in camber.  One law in three places.
+  implementation:
+    - physics.fluid.table_coefficients
+    - physics.fluid.SectionPolar
+    - envs.devroll.fluid_wp.table_arrays
+  tests:
+    - tests.test_physics::test_the_table_law_reads_two_measured_thin_sections
+    - tests.test_gpu_mirror::test_the_kernel_reproduces_table_coefficients
+    - tests.test_devroll::test_the_strip_kernel_under_law_table_is_table_coefficients
+
 PitchingMoment:
   # Opt-in (`FluidSolver.cop_law`, default None): centre of pressure that moves
   # aft with separation, and damping of a strip's pitch.  Numpy path only.

@@ -41,7 +41,7 @@ outright.
 
 | where | what | note |
 |---|---|---|
-| `fluid.py:285-288` (checked) | stall at 11 deg, times a Reynolds law `0.55 + 0.45 log10(Re)/5` | no source in the code. RESULT_W5 P4: 3-5 deg late and 0.3-0.5 high for a flat wing |
+| `fluid.py:285-288` (checked) | stall at 11 deg, times a Reynolds law `0.55 + 0.45 log10(Re)/5` | no source in the code. RESULT_W5 P4: 3-5 deg late and 0.3-0.5 high for a flat wing. **No longer the default (2026-11-17, repair R3):** `fluid.DEFAULT_STALL_LAW = "table"` reads two measured sections on all three backends; this law is `"legacy"` |
 | `SEPARATION_COMPLETE` 6 deg | width of the handover | stated as a modelling choice |
 | `fluid.py:372` (checked) `oswald = 0.75` | induced-drag efficiency | inert with the live inflow; active in `steady()` (launch-speed and thrust-margin probes) and whenever inflow is off |
 | `fluid.py:1624` (checked) `60 x weight` | cap on the total fluid load, all strips scaled together; sets `diag.clamped` | whether a score reads the flag was not checked |

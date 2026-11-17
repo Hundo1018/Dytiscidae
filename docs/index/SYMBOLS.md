@@ -755,29 +755,29 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batched_fluid` | function | 634 | `(envs)` | The fluid for a batch: the Mojo kernel when it imports, else `HostFluid`. |
-| `BatchedFluid` | class | 229 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 1007 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `finish_segment` | function | 975 | `(e, domain, res, r: dict, start, end, bad_qacc: int, duration: float, mean_power: float, max_overload: float)` | A segment's `SegmentResult` from what was recorded (``r``, the lists |
-| `HostFluid` | class | 584 | — | `BatchedFluid`'s interface over each machine's own numpy `FluidSolver`. |
-| `identify_batch` | function | 718 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `observation_finite` | function | 642 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
-| `rollout_batch` | function | 799 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 1284 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 663 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `batched_fluid` | function | 677 | `(envs)` | The fluid for a batch: the Mojo kernel when it imports, else `HostFluid`. |
+| `BatchedFluid` | class | 269 | — | One GPU pipeline serving N environments stepped in lockstep. |
+| `evaluate_tier1_batch` | function | 1050 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `finish_segment` | function | 1018 | `(e, domain, res, r: dict, start, end, bad_qacc: int, duration: float, mean_power: float, max_overload: float)` | A segment's `SegmentResult` from what was recorded (``r``, the lists |
+| `HostFluid` | class | 627 | — | `BatchedFluid`'s interface over each machine's own numpy `FluidSolver`. |
+| `identify_batch` | function | 761 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `observation_finite` | function | 685 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
+| `rollout_batch` | function | 842 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 1327 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 706 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 104 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
-| `BatchedFluid.__init__` | method | 240 | `(self, envs)` | — |
-| `BatchedFluid.apply` | method | 380 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
-| `BatchedFluid.finish` | method | 461 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
-| `BatchedFluid.launch` | method | 386 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
-| `BatchedFluid.ready` | method | 376 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
-| `BatchedFluid.reset_slam` | method | 351 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
-| `HostFluid.__init__` | method | 601 | `(self, envs)` | — |
-| `HostFluid.apply` | method | 615 | `(self, t: float, active=None) -> None` | — |
-| `HostFluid.finish` | method | 622 | `(self, t: float, active=None) -> None` | — |
-| `HostFluid.launch` | method | 619 | `(self, t: float, active=None) -> None` | — |
-| `HostFluid.ready` | method | 612 | `(self, t: float) -> bool` | — |
-| `HostFluid.reset_slam` | method | 608 | `(self)` | — |
+| `BatchedFluid.__init__` | method | 280 | `(self, envs)` | — |
+| `BatchedFluid.apply` | method | 422 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
+| `BatchedFluid.finish` | method | 504 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
+| `BatchedFluid.launch` | method | 428 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
+| `BatchedFluid.ready` | method | 418 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
+| `BatchedFluid.reset_slam` | method | 393 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
+| `HostFluid.__init__` | method | 644 | `(self, envs)` | — |
+| `HostFluid.apply` | method | 658 | `(self, t: float, active=None) -> None` | — |
+| `HostFluid.finish` | method | 665 | `(self, t: float, active=None) -> None` | — |
+| `HostFluid.launch` | method | 662 | `(self, t: float, active=None) -> None` | — |
+| `HostFluid.ready` | method | 655 | `(self, t: float) -> bool` | — |
+| `HostFluid.reset_slam` | method | 651 | `(self)` | — |
 
 ## `envs.device` — `dytiscidae/envs/device.py`
 
@@ -825,14 +825,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `assemble_bodies` | function | 556 | `(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *, dtype=_wp.float64)` | Buoyancy, panel-to-body assembly and ``finish_bodies``, on the device; numpy out. |
-| `entrain_bodies` | function | 594 | `(fb, m_new, m_old, lever2, vel, h, *, dtype=_wp.float64)` | ``entrainment_reaction`` on the device; returns the new ``fb (nb, 6)``. |
-| `make_kernels` | function | 40 | `(T)` | Return the kernels for precision ``T`` as a dict (``strip``, ``unsteady``, |
-| `medium_and_added_mass` | function | 515 | `(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, ext, chord, dr, volume, is_wing, scale, *, dtype=_wp.float64)` | Flat-calm medium and the strip added mass, on the device; numpy out. |
-| `strip_loads` | function | 424 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
-| `WagnerLag` | class | 464 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
-| `WagnerLag.__init__` | method | 472 | `(self, n: int, dtype=_wp.float64) -> None` | — |
-| `WagnerLag.update` | method | 488 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
+| `assemble_bodies` | function | 704 | `(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *, dtype=_wp.float64)` | Buoyancy, panel-to-body assembly and ``finish_bodies``, on the device; numpy out. |
+| `entrain_bodies` | function | 742 | `(fb, m_new, m_old, lever2, vel, h, *, dtype=_wp.float64)` | ``entrainment_reaction`` on the device; returns the new ``fb (nb, 6)``. |
+| `law_code` | function | 524 | `(law: str) -> int` | The strip kernel's integer switch for ``FluidSolver.stall_law``. |
+| `make_kernels` | function | 56 | `(T)` | Return the kernels for precision ``T`` as a dict (``strip``, ``unsteady``, |
+| `medium_and_added_mass` | function | 663 | `(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, ext, chord, dr, volume, is_wing, scale, *, dtype=_wp.float64)` | Flat-calm medium and the strip added mass, on the device; numpy out. |
+| `strip_loads` | function | 561 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64, law='legacy', alpha_e=None, lev=None)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
+| `table_arrays` | function | 541 | `(dtype=_wp.float64)` | The baked tables of law "table" as flat device arrays of ``dtype``: |
+| `WagnerLag` | class | 612 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
+| `WagnerLag.__init__` | method | 620 | `(self, n: int, dtype=_wp.float64) -> None` | — |
+| `WagnerLag.update` | method | 636 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
 
 ## `envs.devroll.model_wp` — `dytiscidae/envs/devroll/model_wp.py`
 
@@ -844,18 +846,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `DeviceBody` | class | 426 | — | W worlds of one body on the device; see the module docstring. |
 | `make_kernels` | function | 78 | `(T)` | The A2 gather, reduction, diagnostic and write kernels for precision ``T``. |
 | `DeviceBody.__init__` | method | 435 | `(self, envs, *, dtype=_wp.float64, njmax: int=NJMAX, nconmax: int=NCONMAX) -> None` | — |
-| `DeviceBody.diagnostics` | method | 962 | `(self) -> dict` | — |
-| `DeviceBody.fluid_and_scatter` | method | 767 | `(self) -> None` | Everything before ``mjw.step``: servo, fluid, damping, jets, rotors, |
-| `DeviceBody.gather` | method | 685 | `(self) -> None` | The step's kinematic inputs from MJWarp's state (float32) into ``state``. |
-| `DeviceBody.hold` | method | 745 | `(self, alive) -> None` | The dead worlds' loads, mass, damping and control at their dry, |
-| `DeviceBody.host_state` | method | 697 | `(self, datas) -> None` | ``state`` from host ``MjData`` in this precision, for the parity tests: |
-| `DeviceBody.load_state` | method | 666 | `(self, datas) -> None` | Each world's ``qpos``, ``qvel``, ``time`` and the solver's warm start |
-| `DeviceBody.reset` | method | 638 | `(self, mask=None) -> None` | ``FluidSolver.reset`` for every world, or for the worlds in ``mask`` |
-| `DeviceBody.resident` | method | 954 | `(self) -> dict` | The same five fields read from the MJWarp ``Model`` and ``Data``. |
-| `DeviceBody.set_targets` | method | 927 | `(self, angles_list, rates=None) -> None` | Host targets (one array per world) into ``targets``: a test and |
-| `DeviceBody.staged` | method | 942 | `(self) -> dict` | What the last step wrote, at the step's precision, per world: |
-| `DeviceBody.step` | method | 728 | `(self, *, gather: bool=True, alive=None) -> None` | One ``step_batch`` step for every world (see the module docstring). |
-| `DeviceBody.subtree_mass` | method | 760 | `(self) -> None` | ``body_subtreemass`` from the ``body_mass`` just written, every world |
+| `DeviceBody.diagnostics` | method | 968 | `(self) -> dict` | — |
+| `DeviceBody.fluid_and_scatter` | method | 773 | `(self) -> None` | Everything before ``mjw.step``: servo, fluid, damping, jets, rotors, |
+| `DeviceBody.gather` | method | 691 | `(self) -> None` | The step's kinematic inputs from MJWarp's state (float32) into ``state``. |
+| `DeviceBody.hold` | method | 751 | `(self, alive) -> None` | The dead worlds' loads, mass, damping and control at their dry, |
+| `DeviceBody.host_state` | method | 703 | `(self, datas) -> None` | ``state`` from host ``MjData`` in this precision, for the parity tests: |
+| `DeviceBody.load_state` | method | 672 | `(self, datas) -> None` | Each world's ``qpos``, ``qvel``, ``time`` and the solver's warm start |
+| `DeviceBody.reset` | method | 644 | `(self, mask=None) -> None` | ``FluidSolver.reset`` for every world, or for the worlds in ``mask`` |
+| `DeviceBody.resident` | method | 960 | `(self) -> dict` | The same five fields read from the MJWarp ``Model`` and ``Data``. |
+| `DeviceBody.set_targets` | method | 933 | `(self, angles_list, rates=None) -> None` | Host targets (one array per world) into ``targets``: a test and |
+| `DeviceBody.staged` | method | 948 | `(self) -> dict` | What the last step wrote, at the step's precision, per world: |
+| `DeviceBody.step` | method | 734 | `(self, *, gather: bool=True, alive=None) -> None` | One ``step_batch`` step for every world (see the module docstring). |
+| `DeviceBody.subtree_mass` | method | 766 | `(self) -> None` | ``body_subtreemass`` from the ``body_mass`` just written, every world |
 
 ## `envs.devroll.rollout_wp` — `dytiscidae/envs/devroll/rollout_wp.py`
 
@@ -1566,50 +1568,52 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `camber_lift_factor` | function | 310 | `(re)` | The share of thin-airfoil theory's camber lift a thin arc makes at |
-| `chordwise_cop` | function | 374 | `(alpha: np.ndarray, re: np.ndarray, law: str, camber=0.0, ar=None, stall_law: str='legacy') -> np.ndarray` | Centre of pressure of a strip's lift and drag, as a fraction of chord |
-| `drag_coefficient` | function | 437 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, cl: np.ndarray, lev: np.ndarray \| float=0.0, camber: np.ndarray \| float=0.0, law: str='legacy') -> np.ndarray` | Skin friction, plus induced drag, plus separated pressure drag. |
-| `entrainment_reaction` | function | 1070 | `(fb: np.ndarray, m_new: np.ndarray, m_old: np.ndarray, lever2: np.ndarray, vel: np.ndarray, h: float) -> None` | The ``-dm/dt v`` half of ``F = -d(m_a v)/dt``, added in place to ``fb`` |
-| `finish_bodies` | function | 1046 | `(fb: np.ndarray, fsum_b: np.ndarray, m_body: np.ndarray, limit: float) -> bool` | Per-machine limiter and weight cancellation, in place on ``fb`` (nb, 6). |
-| `FluidDiagnostics` | class | 616 | — | Per-step aggregates, recorded for observability and for scoring. |
-| `FluidSolver` | class | 1106 | — | Applies blade-element fluid loads to a MuJoCo model each step. |
-| `ImplicitAeroDamping` | class | 827 | — | Lift and drag made implicit by splitting their damping off. |
-| `InducedFlow` | class | 715 | — | Momentum-theory downwash of a machine's lifting system, one vector. |
-| `lift_coefficient` | function | 402 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, lev: np.ndarray, alpha_e: np.ndarray \| None=None, camber: np.ndarray \| float=0.0, law: str='legacy') -> np.ndarray` | Lift coefficient: attached below stall, separated normal force above. |
-| `machine_flow` | function | 818 | `(model, data, medium, t: float) -> np.ndarray` | The flow the machine's root body sees: medium velocity minus its own. |
+| `camber_lift_factor` | function | 315 | `(re)` | The share of thin-airfoil theory's camber lift a thin arc makes at |
+| `chordwise_cop` | function | 385 | `(alpha: np.ndarray, re: np.ndarray, law: str, camber=0.0, ar=None, stall_law: str='legacy') -> np.ndarray` | Centre of pressure of a strip's lift and drag, as a fraction of chord |
+| `drag_coefficient` | function | 448 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, cl: np.ndarray, lev: np.ndarray \| float=0.0, camber: np.ndarray \| float=0.0, law: str='legacy') -> np.ndarray` | Skin friction, plus induced drag, plus separated pressure drag. |
+| `entrainment_reaction` | function | 1155 | `(fb: np.ndarray, m_new: np.ndarray, m_old: np.ndarray, lever2: np.ndarray, vel: np.ndarray, h: float) -> None` | The ``-dm/dt v`` half of ``F = -d(m_a v)/dt``, added in place to ``fb`` |
+| `finish_bodies` | function | 1131 | `(fb: np.ndarray, fsum_b: np.ndarray, m_body: np.ndarray, limit: float) -> bool` | Per-machine limiter and weight cancellation, in place on ``fb`` (nb, 6). |
+| `FluidDiagnostics` | class | 701 | — | Per-step aggregates, recorded for observability and for scoring. |
+| `FluidSolver` | class | 1191 | — | Applies blade-element fluid loads to a MuJoCo model each step. |
+| `ImplicitAeroDamping` | class | 912 | — | Lift and drag made implicit by splitting their damping off. |
+| `InducedFlow` | class | 800 | — | Momentum-theory downwash of a machine's lifting system, one vector. |
+| `lift_coefficient` | function | 413 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, lev: np.ndarray, alpha_e: np.ndarray \| None=None, camber: np.ndarray \| float=0.0, law: str='legacy') -> np.ndarray` | Lift coefficient: attached below stall, separated normal force above. |
+| `machine_flow` | function | 903 | `(model, data, medium, t: float) -> np.ndarray` | The flow the machine's root body sees: medium velocity minus its own. |
 | `PanelSet` | class | 94 | — | The fluid-facing discretisation of a machine. |
-| `plate_lift_limit` | function | 316 | `(alpha, re, camber=0.0)` | ``(CLmax, plateau)`` of a thin plate of signed camber ``camber`` (as |
-| `rossby_lev` | function | 660 | `(U, chord, omega, s_hat)` | LEV strength from the strip's own Rossby number, ``U / (\|w_perp\| c)``. |
-| `SectionPolar` | class | 473 | — | A wing section's measured lift and drag, for `FluidSolver.section`. |
+| `plate_lift_limit` | function | 321 | `(alpha, re, camber=0.0)` | ``(CLmax, plateau)`` of a thin plate of signed camber ``camber`` (as |
+| `rossby_lev` | function | 745 | `(U, chord, omega, s_hat)` | LEV strength from the strip's own Rossby number, ``U / (\|w_perp\| c)``. |
+| `SectionPolar` | class | 484 | — | A wing section's measured lift and drag, for `FluidSolver.section`. |
 | `skin_friction_cd` | function | 242 | `(re: np.ndarray) -> np.ndarray` | Two-sided skin friction coefficient of a flat plate. |
-| `slam_mass` | function | 1032 | `(m_add, rho, chord, dr, is_wing, scale: float=1.0) -> np.ndarray` | The entrained mass the slam diagnostic differences: a wing's *normal* |
-| `strip_damping` | function | 1008 | `(q, area, lift, drag, rho, aspect_ratio, is_wing, lift_scale: float=1.0) -> np.ndarray` | Per-strip damping bound ``b_i`` for `ImplicitAeroDamping`, N s/m. |
-| `UnsteadyState` | class | 675 | — | Per-strip history: Wagner lag and chords travelled since reversal. |
-| `FluidSolver.__init__` | method | 1117 | `(self, model, panels: PanelSet, medium: MediumField, *, c_rot: float \| None=None, added_mass_scale: float=1.0, cd_scale: float=1.0, lift_scale: float=1.0, disc_span: float \| None=None) -> None` | — |
-| `FluidSolver.apply` | method | 1340 | `(self, data, t: float) -> FluidDiagnostics` | Compute and accumulate fluid loads into ``data.xfrc_applied``. |
-| `FluidSolver.instantaneous_power` | method | 1854 | `(self, data) -> float` | Mechanical power the machine is currently putting into the fluid, W. |
-| `FluidSolver.reset` | method | 1321 | `(self) -> None` | — |
-| `FluidSolver.steady` | method | 1298 | `(self)` | Context for quasi-static probes (trim, lift and thrust margins). |
-| `ImplicitAeroDamping.__init__` | method | 853 | `(self, model, medium=None, half_height=None) -> None` | — |
-| `ImplicitAeroDamping.apply` | method | 974 | `(self, data, pos: np.ndarray, body_id: np.ndarray, b) -> None` | ``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip -- |
-| `ImplicitAeroDamping.clear` | method | 922 | `(self, data) -> None` | The step's damping with the split off: the dry model's own.  Called |
-| `ImplicitAeroDamping.due` | method | 894 | `(self) -> bool` | Whether this step recomputes B (callers skip forming ``b`` if not). |
-| `ImplicitAeroDamping.projected` | method | 929 | `(self, data, pos, body_id, b) -> np.ndarray` | ``B_k = sum_i b_i \|lin_k + rot_k x r_i\|^2`` over strips on bodies dof |
-| `ImplicitAeroDamping.reset` | method | 914 | `(self) -> None` | — |
-| `InducedFlow.__init__` | method | 744 | `(self, span: float) -> None` | — |
-| `InducedFlow.due` | method | 750 | `(self) -> bool` | — |
-| `InducedFlow.reset` | method | 756 | `(self) -> None` | — |
-| `InducedFlow.tick` | method | 753 | `(self) -> None` | — |
-| `InducedFlow.update` | method | 760 | `(self, F: np.ndarray, V: np.ndarray, rho: float, dt: float) -> np.ndarray` | — |
+| `slam_mass` | function | 1117 | `(m_add, rho, chord, dr, is_wing, scale: float=1.0) -> np.ndarray` | The entrained mass the slam diagnostic differences: a wing's *normal* |
+| `strip_damping` | function | 1093 | `(q, area, lift, drag, rho, aspect_ratio, is_wing, lift_scale: float=1.0) -> np.ndarray` | Per-strip damping bound ``b_i`` for `ImplicitAeroDamping`, N s/m. |
+| `table_coefficients` | function | 653 | `(alpha, re, ar, lev, alpha_e=None, camber=0.0)` | ``(cl, cd, w)`` of a thin plate of signed camber ``camber`` from two |
+| `UnsteadyState` | class | 760 | — | Per-strip history: Wagner lag and chords travelled since reversal. |
+| `FluidSolver.__init__` | method | 1202 | `(self, model, panels: PanelSet, medium: MediumField, *, c_rot: float \| None=None, added_mass_scale: float=1.0, cd_scale: float=1.0, lift_scale: float=1.0, disc_span: float \| None=None) -> None` | — |
+| `FluidSolver.apply` | method | 1425 | `(self, data, t: float) -> FluidDiagnostics` | Compute and accumulate fluid loads into ``data.xfrc_applied``. |
+| `FluidSolver.instantaneous_power` | method | 1946 | `(self, data) -> float` | Mechanical power the machine is currently putting into the fluid, W. |
+| `FluidSolver.reset` | method | 1406 | `(self) -> None` | — |
+| `FluidSolver.steady` | method | 1383 | `(self)` | Context for quasi-static probes (trim, lift and thrust margins). |
+| `ImplicitAeroDamping.__init__` | method | 938 | `(self, model, medium=None, half_height=None) -> None` | — |
+| `ImplicitAeroDamping.apply` | method | 1059 | `(self, data, pos: np.ndarray, body_id: np.ndarray, b) -> None` | ``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip -- |
+| `ImplicitAeroDamping.clear` | method | 1007 | `(self, data) -> None` | The step's damping with the split off: the dry model's own.  Called |
+| `ImplicitAeroDamping.due` | method | 979 | `(self) -> bool` | Whether this step recomputes B (callers skip forming ``b`` if not). |
+| `ImplicitAeroDamping.projected` | method | 1014 | `(self, data, pos, body_id, b) -> np.ndarray` | ``B_k = sum_i b_i \|lin_k + rot_k x r_i\|^2`` over strips on bodies dof |
+| `ImplicitAeroDamping.reset` | method | 999 | `(self) -> None` | — |
+| `InducedFlow.__init__` | method | 829 | `(self, span: float) -> None` | — |
+| `InducedFlow.due` | method | 835 | `(self) -> bool` | — |
+| `InducedFlow.reset` | method | 841 | `(self) -> None` | — |
+| `InducedFlow.tick` | method | 838 | `(self) -> None` | — |
+| `InducedFlow.update` | method | 845 | `(self, F: np.ndarray, V: np.ndarray, rho: float, dt: float) -> np.ndarray` | — |
 | `PanelSet.concat` | method | 213 | `(sets: list['PanelSet']) -> 'PanelSet'` | — |
 | `PanelSet.empty` | method | 191 | `() -> 'PanelSet'` | — |
 | `PanelSet.total_area` | property | 183 | `(self) -> float` | — |
 | `PanelSet.total_volume` | property | 187 | `(self) -> float` | — |
-| `SectionPolar.__init__` | method | 521 | `(self, name: str, tables, lift_tables=None, drag_past: str='normal') -> None` | — |
-| `SectionPolar.coefficients` | method | 571 | `(self, alpha, re, ar, lev, alpha_e=None)` | ``(cl, cd)`` for incidence ``alpha`` measured towards the section's |
-| `UnsteadyState.__init__` | method | 683 | `(self, n: int) -> None` | — |
-| `UnsteadyState.reset` | method | 689 | `(self) -> None` | — |
-| `UnsteadyState.update` | method | 695 | `(self, alpha, rev, U, chord, omega, s_hat, dt)` | — |
+| `SectionPolar.__init__` | method | 532 | `(self, name: str, tables, lift_tables=None, drag_past: str='normal') -> None` | — |
+| `SectionPolar.coefficients` | method | 612 | `(self, alpha, re, ar, lev, alpha_e=None)` | ``(cl, cd)`` for incidence ``alpha`` measured towards the section's |
+| `SectionPolar.table_part` | method | 582 | `(self, alpha, re, alpha_e=None)` | ``(cl, cd, w)``: the measured part of `coefficients`, two- |
+| `UnsteadyState.__init__` | method | 768 | `(self, n: int) -> None` | — |
+| `UnsteadyState.reset` | method | 774 | `(self) -> None` | — |
+| `UnsteadyState.update` | method | 780 | `(self, alpha, rev, U, chord, omega, s_hat, dt)` | — |
 
 ## `physics.jet` — `dytiscidae/physics/jet.py`
 
