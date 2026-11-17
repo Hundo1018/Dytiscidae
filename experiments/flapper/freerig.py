@@ -247,7 +247,7 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         return q, qd, qdd
 
     # joints a servo moves: under a drive the stroke is the mechanism's
-    driven = (role != "stroke") if drive is not None else np.ones(len(jid), bool)
+    driven = ~np.isin(role, sorted(drive.undriven)) if drive is not None else np.ones(len(jid), bool)
     d.qpos[:7], d.qvel[:6] = q0, v0
     q, qd, _ = ref(0.0)
     d.qpos[qad], d.qvel[dof] = q, qd
@@ -394,7 +394,7 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
             rec["tqf"].append(float(tau[fe_].sum()) if fe_.any() else 0.0)
             trk = ~is_tw if (chn is not None and chn["mode"] != "servo") else np.ones(len(q), bool)
             trk = trk & driven
-            rec["err"].append(float(np.abs(q - d.qpos[qad])[trk].max()))
+            rec["err"].append(float(np.abs(q - d.qpos[qad])[trk].max(initial=0.0)))
             rec["hold"].append(hold)
             rec["pos"].append(d.qpos[:3].copy())
             rec["vel"].append(d.qvel[:3].copy())

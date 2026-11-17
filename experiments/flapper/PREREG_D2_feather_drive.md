@@ -77,3 +77,31 @@ a common shaft, for this question the same constraint), cables.
 
 Each row also reports peak loop and rod forces, and the feather's amplitude,
 mean and lead as made.
+
+## Addendum D2a (frozen 2026-11-17, before any grid row; disclosed probes)
+
+**FX as frozen cannot be assembled.** Built as §2 says (the arm on the
+stroke crank's shaft, which lies along the body, the pin turning in a
+plane across the span), no rod length in 0.5-1.5 times the rest distance
+closes the arm-rod-horn loop at every crank angle (`_feather_crank` raises).
+This is reported as FX's row; it is a finding about the geometry, not a
+failed run.
+
+**FX2, added: the feather crank on a shaft of its own, geared 1:1 to the
+stroke crank** (the "separate crank geared to the first" that §2 set aside
+as the same constraint; it is not the same geometry, because its shaft can
+lie along the span). The shaft is 80 mm under the horn, the pin turns in
+the horn's own plane; arm radius, arm angle and rod length by §2's frozen
+rule. The gear is a joint coupling (ideal, no backlash, no loss). Seen
+before freezing (scratchpad `smoke_d2.py`, `fx_dbg.py`): the design closes
+at every angle with a feather of 55.6 deg amplitude, 6.5 deg rms from the
+servo's reference; the first runs locked because the shaft turned the
+wrong way (fixed: axis sign); after the fix, in a vacuum, held body, the
+feather follows the design within 1-2 deg over two beats (one sample 11
+deg off, at the fast swing). No run in air with the fix has been seen.
+
+Predictions for FX2, the same as G3 for FX: amplitude 40-60 deg, lead
+70-110 deg, lift within 10% of F0's, its one motor's electrical power
+within 15% of FM's machine total, its motor on the limit under 10% of the
+beat at gear 24 (else gears 16 and 32 are run and reported). G1 (vacuum)
+and G5 (the drawing) apply to FX2 in place of FX.

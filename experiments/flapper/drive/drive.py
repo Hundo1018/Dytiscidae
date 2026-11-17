@@ -57,7 +57,7 @@ class Drive:
     (solref = 2 dt)."""
 
     def __init__(self, kind, Phi_deg, f, N, *, a=0.03, lam=0.015, k_spring=0.0, motor=None,
-                 dt=1e-4, wn=150.0, feather_axis=0.0):
+                 dt=1e-4, wn=150.0, feather_axis=0.0, feather=None):
         if kind not in ("DD", "FB", "SY", "CT"):
             raise ValueError(kind)
         self.kind, self.N, self.a, self.lam, self.k = kind, float(N), float(a), float(lam), float(k_spring)
@@ -68,6 +68,16 @@ class Drive:
         # `freerig.run_free`'s feather_axis: the feather hinge moved this
         # share of the chord towards the leading edge; the lever goes with it
         self.feather_axis = float(feather_axis)
+        # pass D2: what turns the root feather.  None: freerig's ideal servo.
+        # dict(mode="motor", N=...): a second witness motor on the hinge;
+        # dict(mode="crank", c_h=0.03): an arm on the stroke's crankshaft and a
+        # ball-ended rod to a horn c_h ahead of the hinge ("FB" only);
+        # dict(mode="passive", k=...): a torsion spring at rest at 0.
+        # Psi_deg: the feather amplitude the motor follows or the arm is sized for.
+        self.feather = dict(feather) if feather else None
+        if self.feather and self.feather["mode"] in ("crank", "crank2") and kind != "FB":
+            raise ValueError("the feather arm rides on the four-bar's crankshaft")
+        self.undriven = {"stroke"} | ({"feather"} if self.feather else set())
         self._design()
 
     # ------------------------------------------------------------ kinematics
@@ -256,7 +266,17 @@ class Drive:
                               anchor=" ".join(f"{v:.6g}" for v in e), solref=ref)
                 self.loops.append(f"link{side:+d}")
             self.input_joint = "crank_j"
+        fe = self.feather
+        if fe and fe["mode"] == "motor":
+            ET.SubElement(eq, "joint", joint1="seg2_wing_jf", joint2="seg1_wing_jf", polycoef="0 1 0 0 0",
+                          solref=ref)
+        if fe and fe["mode"] in ("crank", "crank2"):
+            self._feather_crank(root, eq, plain, pdat, Rh, ref, rod, mass)
         mt = self.motor
+        if fe and fe["mode"] == "motor":
+            ET.SubElement(act, "general", name="feather_motor", joint="seg1_wing_jf", gear=f"{fe['N']}",
+                          ctrllimited="true", ctrlrange="-1 1", gainprm=f"{mt['tau_s']}",
+                          biastype="affine", biasprm=f"0 0 {-mt['tau_s'] / mt['omega_0']}")
         ET.SubElement(act, "general", name="drive_motor", joint=self.input_joint, gear=f"{self.N}",
                       ctrllimited="true", ctrlrange="-1 1", gainprm=f"{mt['tau_s']}",
                       biastype="affine", biasprm=f"0 0 {-mt['tau_s'] / mt['omega_0']}")
@@ -268,8 +288,162 @@ class Drive:
                 j = model.joint(nm)
                 model.jnt_stiffness[j.id] = self.k
                 model.qpos_spring[j.qposadr[0]] = self.bm
+        if fe and fe["mode"] == "motor":
+            model.dof_armature[model.joint("seg1_wing_jf").dofadr[0]] += mt["J_r"] * fe["N"] ** 2
+        if fe and fe["mode"] == "passive":
+            for nm in ("seg1_wing_jf", "seg2_wing_jf"):
+                j = model.joint(nm)
+                model.jnt_stiffness[j.id] = fe["k"]
+                model.qpos_spring[j.qposadr[0]] = 0.0
+        if fe and fe.get("range_deg"):
+            for nm in ("seg1_wing_jf", "seg2_wing_jf"):      # the hinge's stop, if asked
+                model.jnt_range[model.joint(nm).id] = np.radians([-fe["range_deg"], fe["range_deg"]])
+        if fe and fe["mode"] in ("crank", "crank2"):
+            for side in (1, -1):            # the horn, not where the rod's end was at the built pose
+                i = model.eq(f"featherrod{side:+d}").id
+                model.eq_data[i, 3:6] = self.horn_local[side]
         data = mujoco.MjData(model)
         return model, data, names, build_panels(p, model)
+
+    def _feather_crank(self, root, eq, plain, pdat, Rh, ref, rod, mass):
+        """Pass D2's arm: a second arm on each crank's shaft, under a horn on the
+        wing's root chord ``c_h`` ahead of the feather hinge, and a rod with a
+        ball at each end from the arm's pin to the horn.  The arm's radius,
+        angle and the rod's length are fitted (on the model's own kinematics)
+        so the feather follows ``-Psi cos(phase)``, the servo's reference."""
+        import mujoco
+        fe = self.feather
+        c_h, Psi = float(fe.get("c_h", 0.03)), math.radians(fe.get("Psi_deg", 50.0))
+        hb = plain.body("seg0_hull").id
+        self.horn_local, self.arm = {}, {}
+        # the horn in each wing's frame: c_h along the chord towards the leading edge
+        for side, nm in ((1, "seg1_wing"), (-1, "seg2_wing")):
+            shift = self.lever_local[side] - np.array([self.a, 0.0, 0.0])
+            cdir = shift / max(np.linalg.norm(shift), 1e-12) if self.feather_axis else None
+            if cdir is None:
+                raise ValueError("the crank feather needs the hinge's chord direction (feather_axis > 0)")
+            self.horn_local[side] = shift + c_h * cdir
+        js, jf = plain.joint("seg1_wing_j"), plain.joint("seg1_wing_jf")
+        # the feather hinge where freerig will put it (its feather_axis)
+        plain.jnt_pos[jf.id] = plain.jnt_pos[jf.id] + (self.lever_local[1] - np.array([self.a, 0.0, 0.0]))
+        d = mujoco.MjData(plain)
+        bid = plain.body("seg1_wing").id
+
+        def horn(beta, psi):
+            d.qpos[:] = plain.qpos0
+            d.qpos[js.qposadr[0]], d.qpos[jf.qposadr[0]] = beta, psi
+            mujoco.mj_kinematics(plain, d)
+            w = d.xpos[bid] + d.xmat[bid].reshape(3, 3) @ self.horn_local[1]
+            return Rh.T @ (w - d.xpos[hb])                    # hull frame
+        two = fe["mode"] == "crank2"
+        O = self.wings[1][1] + np.array([0.0, self.O2[0], self.O2[1]])
+        H0 = horn(0.0, 0.0)
+        dx = H0[0] - O[0]
+        if two:
+            # crank2 (added after "crank" as frozen would not close, PREREG_D2
+            # addendum): a shaft of its own along the span, under the horn by
+            # `drop`, its pin turning in the horn's own plane, geared 1:1
+            # (bevel) to the stroke crank
+            drop = float(fe.get("drop", 0.08))
+            O = H0 - np.array([0.0, 0.0, drop])
+        th = np.linspace(0.0, 2.0 * math.pi, 48, endpoint=False)
+        betas = self.beta(self.th0 + th)
+        psis = np.linspace(-1.0, 1.0, 81)
+        Htab = np.array([[horn(b, ps) for ps in psis] for b in betas])     # (48, 81, 3)
+        self._Htab, self._psis, self._th_tab = Htab, psis, th
+
+        def pin(r2, ph2, t):
+            if two:
+                return O + np.array([r2 * math.cos(ph2 + t), 0.0, r2 * math.sin(ph2 + t)])
+            return O + np.array([dx, r2 * math.cos(ph2 + t), r2 * math.sin(ph2 + t)])
+
+        def feather_of(x):
+            r2, ph2, ell = x
+            out = []
+            for i, t in enumerate(th):
+                g = np.linalg.norm(Htab[i] - pin(r2, ph2, t), axis=1) - ell
+                k = np.flatnonzero(np.sign(g[:-1]) != np.sign(g[1:]))
+                if len(k) == 0:
+                    return None
+                k = k[np.argmin(np.abs(psis[k]))]            # the branch near level
+                out.append(psis[k] - g[k] * (psis[k + 1] - psis[k]) / (g[k + 1] - g[k]))
+            return np.array(out)
+
+        # The frozen rule (PREREG_D2 2): arm radius c_h sin(Psi); its angle so
+        # that, with the rod taken as vertical, the horn's height c_h sin(psi)
+        # follows the pin's and the feather is -Psi cos(phase); rod length for
+        # a level mean.  The feather the model then makes is measured.
+        up = float(np.sign(horn(0.0, 0.05)[2] - H0[2]))           # +psi raises the horn, or lowers it
+        r2 = c_h * math.sin(Psi)
+        # pin height r2 sin(ph2 + t) = up c_h sin(psi), psi = -Psi cos(t + th0 - phi)
+        ph2 = self.th0 - self.phi - up * math.pi / 2.0
+        ph2 = math.atan2(math.sin(ph2), math.cos(ph2))
+        # the rod length that puts the mean feather at 0 (the frozen rule's
+        # words), among the lengths at which the loop closes at every angle
+        d0 = float(np.linalg.norm(H0 - pin(r2, ph2, -ph2)))
+        mean_of = {}
+        for ell_ in np.linspace(0.5 * d0, 1.5 * d0, 201):
+            f_ = feather_of((r2, ph2, ell_))
+            if f_ is not None:
+                mean_of[float(ell_)] = float(f_.mean())
+        if not mean_of:
+            raise ValueError("the feather arm as frozen does not close at every crank angle at any rod length")
+        ks = sorted(mean_of)
+        ell = min(ks, key=lambda e_: abs(mean_of[e_]))
+        for lo_, hi_ in zip(ks[:-1], ks[1:]):
+            if mean_of[lo_] * mean_of[hi_] <= 0.0 and hi_ - lo_ < 0.011 * d0:
+                for _ in range(40):
+                    mid_ = 0.5 * (lo_ + hi_)
+                    f_ = feather_of((r2, ph2, mid_))
+                    if f_ is None:
+                        break
+                    if f_.mean() * mean_of[lo_] > 0.0:
+                        lo_ = mid_
+                    else:
+                        hi_ = mid_
+                ell = 0.5 * (lo_ + hi_)
+                break
+        best = type("fit", (), {})()
+        best.x = np.array([r2, ph2, ell])
+        f = feather_of(best.x)
+        self._design_f = f
+        if f is None:
+            raise ValueError("the feather arm as frozen does not close at every crank angle")
+        best.fun = float(np.mean((f - -Psi * np.cos(th + self.th0 - self.phi)) ** 2))
+        self.arm = dict(r2=float(r2), ph2=float(ph2), ell=float(ell), dx=float(dx), c_h=c_h,
+                        fit_rms_deg=float(math.degrees(math.sqrt(best.fun))),
+                        psi0=float(f[0]), design_amp_deg=float(math.degrees(f.max() - f.min()) / 2.0))
+        # build both sides; the rod points at the horn's built (psi 0) place and
+        # `init_state` turns it to where the loop closes
+        hull = next(b for b in root.iter("body") if b.get("name") == "seg0_hull")
+        for side in (1, -1):
+            if two:
+                Os = O * np.array([1.0, side, 1.0])
+                cr = ET.SubElement(hull, "body", name=f"fcrank{side:+d}", pos=" ".join(f"{v:.6g}" for v in Os))
+                ET.SubElement(cr, "joint", name=f"fcrank{side:+d}_j", type="hinge", axis="0 -1 0", limited="false",
+                              armature="1e-7", damping="0")
+                Pl = np.array([r2 * math.cos(ph2), 0.0, r2 * math.sin(ph2)])
+                rod(cr, (0, 0, 0), Pl, 0.003)
+                ET.SubElement(eq, "joint", joint1=f"fcrank{side:+d}_j", joint2="crank+1_j",
+                              polycoef="0 1 0 0 0", solref=ref)
+            else:
+                cr = next(b for b in root.iter("body") if b.get("name") == f"crank{side:+d}")
+                Pl = np.array([dx, side * r2 * math.cos(ph2), r2 * math.sin(ph2)])
+                rod(cr, (0, 0, 0), (dx, 0, 0), 0.003)
+                rod(cr, (dx, 0, 0), Pl, 0.003)
+                Os = self.wings[side][1] + np.array([0.0, side * self.O2[0], self.O2[1]])
+            Hs = H0 * np.array([1.0, side, 1.0])
+            e0 = Hs - (Os + Pl)
+            e0 = ell * e0 / np.linalg.norm(e0)
+            rb = ET.SubElement(cr, "body", name=f"featherrod{side:+d}", pos=" ".join(f"{v:.6g}" for v in Pl))
+            ET.SubElement(rb, "joint", name=f"featherrod{side:+d}_j", type="ball", limited="false",
+                          armature="1e-6", damping="0")
+            rod(rb, (0, 0, 0), e0, 0.002)
+            ET.SubElement(eq, "connect", name=f"featherrod{side:+d}", body1=f"featherrod{side:+d}",
+                          body2=f"seg{1 if side > 0 else 2}_wing",
+                          anchor=" ".join(f"{v:.6g}" for v in e0), solref=ref)
+            self.loops.append(f"featherrod{side:+d}")
+        self._rod_e0 = {side: e for side, e in ((1, None), (-1, None))}
 
     # ---------------------------------------------------------------- running
 
@@ -278,6 +452,8 @@ class Drive:
         jin = m.joint(self.input_joint)
         self.q_in, self.v_in = int(jin.qposadr[0]), int(jin.dofadr[0])
         self.q_st, self.v_st = int(m.joint("seg1_wing_j").qposadr[0]), int(m.joint("seg1_wing_j").dofadr[0])
+        self.q_fe, self.v_fe = int(m.joint("seg1_wing_jf").qposadr[0]), int(m.joint("seg1_wing_jf").dofadr[0])
+        self.fid = m.actuator("feather_motor").id if (self.feather and self.feather["mode"] == "motor") else None
 
     def setup(self, m, d):
         import mujoco
@@ -292,7 +468,16 @@ class Drive:
             mujoco.mj_mulM(m, d, col, e2)
             self.J_in += float(col[int(m.joint("seg2_wing_j").dofadr[0])])
         self.u_i = 0.0
-        self.rec = dict(Pm=[], Pe=[], u=[], tau=[], om=[], gap=[], floop=[], stroke=[], th=[], slack=[])
+        if self.fid is not None:
+            j2 = int(m.joint("seg2_wing_jf").dofadr[0])
+            self.J_fe = 0.0
+            for v in (self.v_fe, j2):
+                e3 = np.zeros(m.nv)
+                e3[v] = 1.0
+                mujoco.mj_mulM(m, d, col, e3)
+                self.J_fe += float(col[v])
+        self.rec = dict(Pm=[], Pe=[], u=[], tau=[], om=[], gap=[], floop=[], stroke=[], th=[], slack=[],
+                        feather=[], Pfm=[], Pfe=[], ufe=[])
 
     def init_state(self, m, d):
         self._ids(m)
@@ -303,6 +488,29 @@ class Drive:
             d.qvel[self.v_in] = self.w
             if self.kind in ("FB", "CT"):
                 d.qvel[int(m.joint("crank-1_j").dofadr[0])] = self.w
+        if self.feather and self.feather["mode"] in ("crank", "crank2"):
+            import mujoco
+            # the feather where the loop closes at the built crank angle, and each
+            # rod turned (ball joint) from its built direction to the horn
+            psi0 = self.arm["psi0"]
+            for nm in ("seg1_wing_jf", "seg2_wing_jf"):
+                d.qpos[m.joint(nm).qposadr[0]] = psi0
+            mujoco.mj_kinematics(m, d)
+            for side in (1, -1):
+                b = m.body(f"featherrod{side:+d}").id
+                i = m.eq(f"featherrod{side:+d}").id
+                wb = int(m.eq_obj2id[i])
+                Hw = d.xpos[wb] + d.xmat[wb].reshape(3, 3) @ m.eq_data[i, 3:6]
+                Pw = d.xpos[b]
+                e0 = m.eq_data[i, 0:3] / np.linalg.norm(m.eq_data[i, 0:3])
+                Rp = d.xmat[int(m.body_parentid[b])].reshape(3, 3)
+                e1 = Rp.T @ (Hw - Pw)
+                e1 /= np.linalg.norm(e1)
+                ax_ = np.cross(e0, e1)
+                s_, c_ = np.linalg.norm(ax_), float(e0 @ e1)
+                q = np.array([1.0, 0.0, 0.0, 0.0]) if s_ < 1e-12 else np.concatenate(
+                    [[math.cos(0.5 * math.atan2(s_, c_))], math.sin(0.5 * math.atan2(s_, c_)) * ax_ / s_])
+                d.qpos[m.joint(f"featherrod{side:+d}_j").qposadr[0]: m.joint(f"featherrod{side:+d}_j").qposadr[0] + 4] = q
 
     def phase(self, m, d, t):
         """The feather's phase: the stroke ~ sin(phase)."""
@@ -325,16 +533,31 @@ class Drive:
                 self.u_i += kp * 2 * math.pi * 2.0 * e * self.dt
             u = u0
         d.ctrl[self.aid] = min(max(u, -1.0), 1.0)
+        if self.fid is not None:
+            fe, ph = self.feather, self.phase(m, d, t)
+            A = math.radians(fe.get("Psi_deg", 50.0))
+            q_r, qd_r, qdd_r = -A * math.cos(ph), A * self.w * math.sin(ph), A * self.w ** 2 * math.cos(ph)
+            tq = self.J_fe * (qdd_r + self.wn ** 2 * (q_r - d.qpos[self.q_fe]) + 2 * self.wn * (qd_r - d.qvel[self.v_fe]))
+            u = qd_r * fe["N"] / mt["omega_0"] + tq / (fe["N"] * mt["tau_s"])
+            d.ctrl[self.fid] = min(max(u, -1.0), 1.0)
 
     def after_step(self, m, d, keep):
         import mujoco
         mt = self.motor
         tau, om = float(d.actuator_force[self.aid]), float(d.actuator_velocity[self.aid])
+        Pfm = Pfe = 0.0
+        if self.fid is not None:
+            tf, of = float(d.actuator_force[self.fid]), float(d.actuator_velocity[self.fid])
+            Pfm, Pfe = tf * of, tf * of + tf * tf * mt["omega_0"] / mt["tau_s"]
         if not keep:
-            return tau * om
+            return tau * om + Pfm
         Pm = tau * om
         Pe = Pm + tau * tau * mt["omega_0"] / mt["tau_s"]
         r = self.rec
+        r["feather"].append(float(d.qpos[self.q_fe]))
+        r["Pfm"].append(Pfm)
+        r["Pfe"].append(Pfe)
+        r["ufe"].append(float(d.ctrl[self.fid]) if self.fid is not None else 0.0)
         r["Pm"].append(Pm)
         r["Pe"].append(Pe)
         r["u"].append(float(d.ctrl[self.aid]))
@@ -358,7 +581,7 @@ class Drive:
             r["slack"].append(0.0 if taut.any() else 1.0)
         r["gap"].append(gap)
         r["floop"].append(fl)
-        return Pm
+        return Pm + Pfm
 
     def summary(self):
         r = {k: np.asarray(v) for k, v in self.rec.items()}
@@ -382,4 +605,22 @@ class Drive:
             out["kin_err_deg"] = float(np.degrees(np.abs(b - self.beta(r["th"])).max()))
         if self.kind == "CT":
             out["slack_share"] = float(r["slack"].mean())
+        # the feather as made, and its phase against the stroke's (fundamentals
+        # over the whole window, which is a whole number of planned beats)
+        fz = r["feather"]
+        n = len(b)
+        k = np.arange(n)
+        beats = max(int(round(n * self.dt * self.w / (2.0 * math.pi))), 1)
+        e = np.exp(-2j * math.pi * beats * k / n)
+        Zs, Zf = np.sum((b - b.mean()) * e), np.sum((fz - fz.mean()) * e)
+        out.update(feather_amp_deg=float(np.degrees(fz.max() - fz.min()) / 2.0),
+                   feather_mean_deg=float(np.degrees(fz.mean())),
+                   feather_lead_deg=float(np.degrees(np.angle(Zf / Zs))),
+                   feather_mode=(self.feather or {}).get("mode", "servo"))
+        if self.fid is not None:
+            out.update(feather_motor_shaft_W=float(r["Pfm"].mean()), feather_motor_elec_W=float(r["Pfe"].mean()),
+                       feather_motor_at_limit=float(np.mean(np.abs(r["ufe"]) >= 0.999)))
+        out["machine_elec_W"] = out["elec_W"] + float(r["Pfe"].mean())
+        if self.feather and self.feather["mode"] in ("crank", "crank2"):
+            out["arm"] = self.arm
         return out
