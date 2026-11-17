@@ -32,7 +32,8 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
              dt: float = 2.5e-4, wn: float = 600.0, keep_series: bool = False,
              joint_damping: float | None = 0.0, solver_flags: dict | None = None,
              hull_inertia: float | None = None, cg_shift: float = 0.0,
-             tail: dict | None = None, pilot: dict | None = None) -> dict:
+             tail: dict | None = None, pilot: dict | None = None,
+             strip_twist: dict | None = None) -> dict:
     """free: root axes released after hold_beats, any of "x", "z", "p" (pitch).
     The measurement runs over the ``beats`` after that, body held or not.
     mass: the machine's all-up mass, made up with ballast at the hull's centre
@@ -58,7 +59,12 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         f = f0 (1 + clip(kf (V - vx), +-f_lim))
     kh deg/m, kvz deg/(m/s), kf 1/(m/s).  z, vz and vx are low-passed over
     lag_beats like the pitch.  The cam offset stays where it was set.
-    The tail's servo is rate-limited; its feedback starts at release."""
+    The tail's servo is rate-limited; its feedback starts at release.
+    Optional pilot keys: z_step = (beat, m) and v_step = (beat, m/s), a step
+    in the height and in the speed asked for that many beats after release.
+    strip_twist: `rig.run`'s (tip_deg, share): the fluid strips turned about
+    their span, the feather hinge making the rest; the twist's own drive,
+    rate and inertia are not in the loads."""
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
     from body import built
@@ -160,8 +166,16 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         ap = dict(kh=3.0, kvz=3.0, pitch_lim_deg=8.0, kf=0.08, f_lim=0.2)
         ap.update(pilot)
     zf, vzf, vxf, w_now, th_ask = 0.0, 0.0, V, w, 0.0
+    z_ask, v_ask = 0.0, V
     tail_q = -math.radians(tl["i0_deg"])            # joint angle: leading edge down is positive
     e_f, r_f, e_i = 0.0, 0.0, 0.0
+
+    tw = None
+    k_f = 1.0
+    if strip_twist is not None:
+        from rig import twist_setup, twist_turn
+        tw = twist_setup(env, body, [j for a, j in enumerate(jid) if role[a] == "feather"], strip_twist, dt)
+        k_f = 1.0 - tw["share"]
 
     def ref(t, ph=None, w=w):
         s, c = (math.sin(w * t), math.cos(w * t)) if ph is None else (math.sin(ph), math.cos(ph))
@@ -169,7 +183,9 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         st, fe = role == "stroke", role == "feather"
         q[role == "tail"] = tail_q
         q[st], qd[st], qdd[st] = 0.5 * Phi * s, 0.5 * Phi * w * c, -0.5 * Phi * w * w * s
-        q[fe], qd[fe], qdd[fe] = psi0 - Psi * c, Psi * w * s, Psi * w * w * c
+        q[fe], qd[fe], qdd[fe] = psi0 - k_f * Psi * c, k_f * Psi * w * s, k_f * Psi * w * w * c
+        if tw is not None:
+            twist_turn(pan, tw, math.degrees(-Psi * c))
         return q, qd, qdd
 
     d.qpos[:7], d.qvel[:6] = q0, v0
@@ -216,8 +232,11 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
                 vzf += a_f * (d.qvel[2] - vzf)
                 vxf += a_f * (d.qvel[0] - vxf)
                 lim_p = ap["pitch_lim_deg"]
-                th_ask = math.radians(min(max(-ap["kh"] * zf - ap["kvz"] * vzf, -lim_p), lim_p))
-                w_now = w * (1.0 + min(max(ap["kf"] * (V - vxf), -ap["f_lim"]), ap["f_lim"]))
+                kb = (k - n_hold) / n_beat
+                z_ask = ap["z_step"][1] if ap.get("z_step") and kb >= ap["z_step"][0] else 0.0
+                v_ask = V + (ap["v_step"][1] if ap.get("v_step") and kb >= ap["v_step"][0] else 0.0)
+                th_ask = math.radians(min(max(ap["kh"] * (z_ask - zf) - ap["kvz"] * vzf, -lim_p), lim_p))
+                w_now = w * (1.0 + min(max(ap["kf"] * (v_ask - vxf), -ap["f_lim"]), ap["f_lim"]))
             e_f += a_f * ((-2.0 * math.atan2(d.qpos[5], d.qpos[3]) - th_ref - th_ask) - e_f)
             r_f += a_f * (-d.qvel[4] - r_f)
             lim = math.radians(tl["limit_deg"])

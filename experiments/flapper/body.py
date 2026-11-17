@@ -41,6 +41,10 @@ DEFAULTS = dict(
                              # hull's axis (the hull's radius: shoulders on its sides)
     wing_section=None,       # a measured section (`sections.load`) for the rigs' fluid solver;
                              # it acts on strips with a camber, so wing_shape needs one
+    wing_panels=1,           # > 1: the wing is this many equal panels in a chain, each outer
+                             # one on a span hinge at the tip of the one before (the twist
+                             # joints of pass W7); the length, chord and area are unchanged
+    panel_roll=math.pi,      # the chain's edge roll (checked on the built model, pass W7)
     wing_shape=None,         # `built`: dict(taper=tip/root chord, camber=fraction of chord,
                              # twist_tip_deg=tip incidence against the root, nose up positive);
                              # the area stays the rectangle's.  None: a flat rectangle.
@@ -93,6 +97,21 @@ def flapper(**over) -> Genome:
         # hand's centre is at the arm's chordwise station, its hinge along the span).
         g.edges.append(Edge(parent=1, child=2, pos_u=1.0, elevation=math.pi / 2, roll=math.pi,
                             scale=1.0, reflect=False))
+    if int(e["wing_panels"]) > 1:
+        assert float(e["hand_fraction"]) == 0.0, "wing_panels and hand_fraction are two ways to split one wing"
+        n_pan = int(e["wing_panels"])
+        seg = float(e["wing_length"]) / n_pan
+        wing.length = wing.span = seg
+        for k in range(1, n_pan):
+            g.parts.append(Part(kind=WING, length=seg, span=seg, root_chord=float(e["wing_chord"]),
+                                radius=float(e["wing_radius"]), material=str(e["wing_material"]),
+                                joint="hinge", joint_axis=np.array([1.0, 0.0, 0.0]),
+                                joint_range=(-1.0, 1.0), actuated=True,
+                                motor_class=str(e["motor_class"]), motor_mass=0.0,
+                                gear_ratio=float(e["gear_ratio"]), sealed=False,
+                                stroke_amplitude=0.0, neutral=0.5))
+            g.edges.append(Edge(parent=k, child=k + 1, pos_u=1.0, elevation=math.pi / 2,
+                                roll=float(e["panel_roll"]), scale=1.0, reflect=False))
     if e["hind_u"] is not None:
         g.edges.append(Edge(parent=0, child=1, pos_u=float(e["hind_u"]), elevation=0.0, roll=0.0,
                             scale=1.0, reflect=True))
@@ -161,11 +180,15 @@ def built(body: dict):
     if shape:
         from dataclasses import replace
         lam = float(shape.get("taper", 1.0))
+        n_pan = max(int(dict(DEFAULTS, **body)["wing_panels"]), 1)
+        chain = {id(q): k for k, q in enumerate(p.genome.parts[1:1 + n_pan])}   # panel -> place from the root
         for s in p.segments:
-            if s.part is not p.genome.parts[1] or s.parent != 0:
+            k = chain.get(id(s.part))
+            if k is None or (k == 0 and s.parent != 0):
                 continue
             sf = s.surface
-            x = sf.u / max(float(sf.u[-1]), 1e-9)
+            # the station along the whole wing, 0 at the shoulder and 1 at the tip
+            x = (k + sf.u / max(float(sf.u[-1]), 1e-9)) / n_pan
             sign = -1.0 if s.mirrored else 1.0           # as `phenotype._surface_of`
             s.surface = replace(
                 sf, chord=sf.chord * 2.0 / (1.0 + lam) * (1.0 - (1.0 - lam) * x),

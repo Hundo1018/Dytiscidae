@@ -17,6 +17,57 @@ import numpy as np
 G = 9.80665
 
 
+def twist_setup(env, body: dict, feather_joints, strip_twist: dict, dt: float) -> dict:
+    """What `twist_turn` needs to turn ``env``'s wing strips as a built
+    `wing_shape` twist would (`run`'s strip_twist; `freerig.run_free` uses the
+    same).  Each strip's turn (rad) per degree at the tip is read off the same
+    body built with one degree more twist, so the stations and the mirrored
+    wing's sign are the phenotype's own."""
+    from body import DEFAULTS as _BD
+    from body import built
+    from dytiscidae.envs.triphibian import TriphibianEnv
+    from dytiscidae.physics.fluid import WING as KIND_WING
+    d, m, mj, pan = env.data, env.model, env._mj, env.solver.panels
+    is_w = pan.kind == KIND_WING
+    shape1 = dict(dict(_BD, **body)["wing_shape"] or {})
+    base_tw = float(shape1.get("twist_tip_deg", 0.0))
+    shape1["twist_tip_deg"] = base_tw + 1.0
+    ref = TriphibianEnv(built(dict(body, wing_shape=shape1)), seed=0, timestep=dt).solver.panels
+    c0, s0 = pan.chord_local.copy(), pan.span_local.copy()
+    unit = lambda v: v / np.maximum(np.linalg.norm(v, axis=1, keepdims=True), 1e-12)
+    per_deg = np.einsum("ni,ni->n", np.cross(unit(c0), unit(ref.chord_local)), unit(s0))  # sin(turn) about the span
+    per_deg = np.where(is_w, np.arcsin(np.clip(per_deg, -1.0, 1.0)), 0.0)
+    # The feather hinge's sense against the twist's: turn the hinge by one
+    # degree and read the tip strip's turn about its own span.
+    fsign = np.zeros(pan.n)
+    q_keep = d.qpos.copy()
+    mj.mj_forward(m, d)
+    R0 = d.xmat.reshape(-1, 3, 3).copy()
+    for j in feather_joints:
+        d.qpos[int(m.jnt_qposadr[j])] += math.radians(1.0)
+    mj.mj_forward(m, d)
+    R1 = d.xmat.reshape(-1, 3, 3).copy()
+    d.qpos[:] = q_keep
+    mj.mj_forward(m, d)
+    cw0 = np.einsum("nij,nj->ni", R0[pan.body_id], c0)
+    cw1 = np.einsum("nij,nj->ni", R1[pan.body_id], c0)
+    sw0 = np.einsum("nij,nj->ni", R0[pan.body_id], s0)
+    turn = np.einsum("ni,ni->n", np.cross(cw0, cw1), sw0)
+    fsign[is_w] = np.sign(turn[is_w]) * np.sign(per_deg[is_w] + 1e-30)
+    return dict(c0=c0, s0=s0, per_deg=per_deg, fsign=fsign,
+                tip=float(strip_twist.get("tip_deg", 0.0)), share=float(strip_twist.get("share", 0.0)))
+
+
+def twist_turn(pan, tw: dict, feather_deg: float) -> None:
+    """Turn the strips: the held twist, and the feather's share in the
+    hinge's own sense (``feather_deg`` is the feather oscillation now, degrees
+    at the tip)."""
+    ang = tw["per_deg"] * (tw["tip"] + tw["fsign"] * tw["share"] * feather_deg)
+    ca, sa = np.cos(ang)[:, None], np.sin(ang)[:, None]
+    pan.chord_local[:] = tw["c0"] * ca + np.cross(tw["s0"], tw["c0"]) * sa
+    pan.normal_local[:] = np.cross(pan.span_local, pan.chord_local)
+
+
 def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_deg: float,
         psi0_deg: float, T_deg: float = 0.0, tau0_deg: float = 0.0, *, beats: int = 5,
         skip: int = 2, steps_per_beat: int = 50, medium: str = "air",
@@ -134,37 +185,8 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
     chord0, area0 = pan.chord.copy(), pan.area.copy()
     tw = None
     if strip_twist is not None:
-        # Each strip's turn (rad) per degree at the tip, read off the same body built
-        # with one degree of twist, so the stations and the mirrored wing's
-        # sign are the phenotype's own.
-        shape1 = dict(dict(_BD, **body)["wing_shape"] or {})
-        base_tw = float(shape1.get("twist_tip_deg", 0.0))
-        shape1["twist_tip_deg"] = base_tw + 1.0
-        ref = TriphibianEnv(built(dict(body, wing_shape=shape1)), seed=0, timestep=dt).solver.panels
-        c0, s0 = pan.chord_local.copy(), pan.span_local.copy()
-        unit = lambda v: v / np.maximum(np.linalg.norm(v, axis=1, keepdims=True), 1e-12)
-        per_deg = np.einsum("ni,ni->n", np.cross(unit(c0), unit(ref.chord_local)), unit(s0))  # sin(turn) about the span
-        per_deg = np.where(is_w, np.arcsin(np.clip(per_deg, -1.0, 1.0)), 0.0)
-        # The feather hinge's sense against the twist's: turn the hinge by one
-        # degree and read the tip strip's turn about its own span.
-        fsign = np.zeros(pan.n)
-        q_keep = d.qpos.copy()
-        mj.mj_forward(m, d)
-        R0 = d.xmat.reshape(-1, 3, 3).copy()
-        for a, j in enumerate(jid):
-            if role[a] == "feather":
-                d.qpos[int(m.jnt_qposadr[j])] += math.radians(1.0)
-        mj.mj_forward(m, d)
-        R1 = d.xmat.reshape(-1, 3, 3).copy()
-        d.qpos[:] = q_keep
-        mj.mj_forward(m, d)
-        cw0 = np.einsum("nij,nj->ni", R0[pan.body_id], c0)
-        cw1 = np.einsum("nij,nj->ni", R1[pan.body_id], c0)
-        sw0 = np.einsum("nij,nj->ni", R0[pan.body_id], s0)
-        turn = np.einsum("ni,ni->n", np.cross(cw0, cw1), sw0)
-        fsign[is_w] = np.sign(turn[is_w]) * np.sign(per_deg[is_w] + 1e-30)
-        tw = dict(c0=c0, s0=s0, per_deg=per_deg, fsign=fsign,
-                  tip=float(strip_twist.get("tip_deg", 0.0)), share=float(strip_twist.get("share", 0.0)))
+        tw = twist_setup(env, body, [j for a, j in enumerate(jid) if role[a] == "feather"],
+                         strip_twist, dt)
     w = 2 * math.pi * f
     free = np.zeros(len(names), bool)
     axis = passive_feather[3] if passive_feather is not None and len(passive_feather) > 3 \
@@ -279,12 +301,7 @@ def run(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, Psi_de
         if tw is not None:
             k_f = 1.0 - tw["share"]
             tgt[role == "feather"], rate[role == "feather"] = psi0 - k_f * Psi * c, k_f * Psi * w * s
-            # degrees at the tip: the held twist, and the feather's share in
-            # the hinge's own sense
-            ang = tw["per_deg"] * (tw["tip"] + tw["fsign"] * tw["share"] * math.degrees(-Psi * c))
-            ca, sa = np.cos(ang)[:, None], np.sin(ang)[:, None]
-            pan.chord_local[:] = tw["c0"] * ca + np.cross(tw["s0"], tw["c0"]) * sa
-            pan.normal_local[:] = np.cross(pan.span_local, pan.chord_local)
+            twist_turn(pan, tw, math.degrees(-Psi * c))
         tgt[role == "twist"], rate[role == "twist"] = tau0 - T * c, T * w * s
         if chord_law is not None:
             kc, sign = chord_law[:2]
