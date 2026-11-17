@@ -67,6 +67,10 @@ frequency). Under "extend" the same four sustain within 0.02 N and 0.01 W.
   8 m/s cruise is a point with 0.2-0.3 N in hand, 8.5-12 W on the held rig.
 - 6 m/s costs 16 W or more here. Slow flight is expensive for this wing as
   modelled; whether a real wing does better depends on dynamic stall.
+- Added 2026-11-17: every count and cheapest point above keeps only rows
+  whose ideal-crank equivalent torque is at most 12 (`crank_eq_peak`,
+  `w8_read.py`). No crank was simulated; the figure assumes one. Under
+  another drive the filter, and so the cheapest point, may differ.
 
 ## Tests
 

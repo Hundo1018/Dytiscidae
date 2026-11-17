@@ -77,9 +77,9 @@ giving the weight on the wings as 17.3 N/m^2. Both were run; the table uses
 - With a spar that stiff, the twist the cruise needs (15 deg at the tip,
   40 at 6 m/s) cannot come from the structure giving way: at 1.0 N m the
   8x6 tube twists 32 deg, and W7's cruise torque is 0.55-0.69 N m. It has
-  to be driven, by turning the plate about the spar or by turning the spar
-  at its root. W7 flew the second (a tube with one root-to-tip torque) at
-  7.2-7.7 W.
+  to be driven. By what mechanism is open: no linkage, pulley, tendon or
+  cam has been simulated in this project yet (the user, 2026-11-17: the
+  drive is not to be fixed before several simulated candidates exist).
 - How the plate is held at its root changes the stiffness by a third (1.71
   against 1.27). A plate free to turn on the spar and a plate bonded to a
   root rib are different wings.

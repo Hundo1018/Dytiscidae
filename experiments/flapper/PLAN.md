@@ -264,8 +264,28 @@ those results and is reopened (decision 4).
   beat (0.4-0.6) and the feather's timing (+-20 deg of phase), at the 8 m/s
   cruise, where the outside solver can cross-check. Pre-registered. Not at
   6 m/s or take-off: the model has no dynamic stall there. The waveform a
-  machine can have is set by its drive (a crank's linkage ratios, or a
-  servo's torque and rate), so it enters the search as mechanism genes.
+  machine can have is set by whichever drive it gets, so it is read with the
+  drive candidates below, not fixed before them.
+- **Drive mechanisms as simulated candidates** (the user: material,
+  construction and the real drive are not to be fixed before several
+  suitable simulated candidates exist). As of 2026-11-17 no linkage,
+  pulley, tendon or cam has been built in the model: `rig.py` prescribes
+  joint angles, `freerig.py` puts an ideal torque at each hinge, and
+  `crank_eq_*` is a torque figure computed from the prescribed sinusoid,
+  not a crank. Candidates are to be bodies and constraints in MuJoCo
+  (closed loops by equality constraints, cables and pulleys by tendons,
+  one motor with a torque-speed curve and a gearbox driving them), several
+  kinds side by side on the same wing and the same tasks: for the stroke,
+  for example a crank-rocker four-bar, a slider-crank, a cam, a cable and
+  pulley pair, direct drive; for the twist, the same set plus coupling to
+  the stroke. Each is judged on the waveform it can make, the peak torque
+  and power its motor sees, mass, and whether it can also serve water and
+  land. None is chosen by this list.
+- **Results that already carry a drive assumption**: W8's and W8b's
+  "sustaining" counts and cheapest points keep only rows with
+  `crank_eq_peak <= 12` (`w8_read.py`), a ceiling on an ideal crank's
+  torque; C1, W7 and every free flight ran on ideal torque at the hinge.
+  Under another drive those filters and points move.
 
 ## What changed from draft 1, by the review's points
 
