@@ -87,6 +87,17 @@ giving the weight on the wings as 17.3 N/m^2. Both were run; the table uses
   carbon plates are 0.22 kg of a 0.60 kg machine; with depron 0.14 kg. The
   mass budget of the flapper line has not carried either.
 
+## Not a choice of construction (the user, 2026-11-17)
+
+"太早選定構造了": material and construction are tuned after the mechanism's
+structure is settled, not now. Nothing above selects a tube, a plate or a
+foam. What the passes that follow take from this one is a range and two
+sensitivities: a twist stiffness from 0.3 to 2.6 N m^2 is reachable at 18
+to 110 g a side; the stiffness W7 asks is not reachable by a light plate
+alone; and the wing's structural mass (0.05-0.22 kg the pair in these
+cases) is not yet in the flapper's mass budget, so results are to be read
+across that range.
+
 ## What these numbers rest on
 
 Linear static; material values typical of hobby stock, assumed (the rows
