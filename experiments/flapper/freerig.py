@@ -34,7 +34,7 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
              hull_inertia: float | None = None, cg_shift: float = 0.0,
              tail: dict | None = None, pilot: dict | None = None,
              strip_twist: dict | None = None, chain: dict | None = None,
-             fluid=None) -> dict:
+             fluid=None, drive=None) -> dict:
     """free: root axes released after hold_beats, any of "x", "z", "p" (pitch).
     The measurement runs over the ``beats`` after that, body held or not.
     mass: the machine's all-up mass, made up with ballast at the hull's centre
@@ -81,6 +81,11 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     torque, what the tip actually did, and each hinge's swing.
     fluid: a `medium.Fluid` in place of the medium's own (air, or water when
     ``medium`` is "water"): another density and viscosity, a vacuum.
+    drive: a `drive.Drive` (pass D1): the stroke is made by that mechanism
+    and its motor instead of a servo on each stroke hinge; the feather and
+    the strip twist follow the mechanism's own phase.  The result gains
+    ``drive`` (the motor's and the loops' figures) and ``power_W`` counts
+    the motor's shaft power in place of the stroke servos'.
     The result's ``clamped`` says whether the solver's load limiter ever bound."""
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
@@ -92,7 +97,15 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     Phi, Psi, psi0, th = (math.radians(x) for x in (Phi_deg, Psi_deg, psi0_deg, theta_deg))
     w = 2 * math.pi * f
     p = built(body)
-    if one_way_flap is not None:
+    if drive is not None:
+        import dytiscidae.envs.triphibian as TR
+        orig = TR.compile_phenotype
+        TR.compile_phenotype = drive.compile
+        try:
+            env = TriphibianEnv(p, seed=0, timestep=dt)
+        finally:
+            TR.compile_phenotype = orig
+    elif one_way_flap is not None:
         import dytiscidae.envs.triphibian as TR
         from flapwing import compile_with_flap
         orig = TR.compile_phenotype
@@ -233,9 +246,15 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
                                                A_t * w * w * c / n_h)
         return q, qd, qdd
 
+    # joints a servo moves: under a drive the stroke is the mechanism's
+    driven = (role != "stroke") if drive is not None else np.ones(len(jid), bool)
     d.qpos[:7], d.qvel[:6] = q0, v0
     q, qd, _ = ref(0.0)
     d.qpos[qad], d.qvel[dof] = q, qd
+    if drive is not None:
+        # the loops are closed at the built stroke; the mechanism sets its own rates
+        d.qpos[qad[~driven]], d.qvel[dof[~driven]] = 0.0, 0.0
+        drive.init_state(m, d)
     mj.mj_forward(m, d)
     env.solver.apply(d, 0.0)                       # folds the added mass in
     mj.mj_forward(m, d)
@@ -258,6 +277,12 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     for n_, aid in enumerate(aids):
         m.actuator_gainprm[aid, 0] = kp[n_]
         m.actuator_biasprm[aid, 1], m.actuator_biasprm[aid, 2] = -kp[n_], -kv[n_]
+    if drive is not None:
+        for n_, aid in enumerate(aids):
+            if not driven[n_]:
+                m.actuator_gainprm[aid, 0] = 0.0
+                m.actuator_biasprm[aid, 1], m.actuator_biasprm[aid, 2] = 0.0, 0.0
+        drive.setup(m, d)
 
     # the machine's centre of mass from the hull frame's origin, world axes, at the start
     # (not `subtree_com`: the solver inflates body_mass without body_subtreemass)
@@ -297,6 +322,8 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
             tail_q += min(max(want - tail_q, -tl["rate"] * dt), tl["rate"] * dt)
         if ap is not None and phase is None and k >= n_hold:
             phase = w * t                              # the crank's own angle from release on
+        if drive is not None:
+            phase = drive.phase(m, d, t)
         q, qd, qdd = ref(t, phase, w_now)
         d.ctrl[:] = 0.0
         d.ctrl[aids] = q + (kv / kp) * qd          # the reference rate, fed forward
@@ -305,7 +332,9 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         # The solver has just rewritten all of qfrc_applied (its implicit
         # damping's explicit half); the drive is added to that, never set.
         clamped_any |= bool(env.solver.diag.clamped)
-        d.qfrc_applied[dof] += J * qdd
+        d.qfrc_applied[dof] += J * qdd * driven
+        if drive is not None:
+            drive.control(m, d, t)
         tube = None
         if chn is not None and chn["mode"] == "tube":
             # One torque between the root panel and the tip's: by virtual work
@@ -321,7 +350,8 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         vb = d.qvel[:6].copy()
         qv_before = d.qvel[dof].copy()
         mj.mj_step(m, d)
-        tau = J * qdd + d.actuator_force[aids]
+        tau = (J * qdd + d.actuator_force[aids]) * driven
+        P_drive = drive.after_step(m, d, k >= n_hold) if drive is not None else 0.0
         p_tw, tq_tw = 0.0, 0.0
         if chn is not None:
             if chn["mode"] == "servo":
@@ -337,7 +367,7 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
                 tau_plus = 0.0
         hold = ARM * (d.qvel[:6] - vb) / dt           # wrench the holder did NOT have to: -hold
         t += dt
-        if phase is not None:
+        if phase is not None and drive is None:
             phase += w_now * dt
         # put the held root axes back; a released axis keeps what it has
         lin = ~released[:3]
@@ -349,16 +379,17 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
             d.qvel[3], d.qvel[5] = 0.0, 0.0
         if k >= n_hold:
             rec["t"].append(t - dt)
-            rec["P"].append(float(tau @ qd) + (tau_plus if chn is not None else 0.0))
+            rec["P"].append(float(tau @ qd) + (tau_plus if chn is not None else 0.0) + P_drive)
             if chn is not None:
                 rec["Ptw"].append(p_tw)
                 rec["tqtw"].append(tq_tw)
                 rec["tip"].append(float(d.qpos[qad[sides[0]]].sum()))
                 rec["hinge"].append(d.qpos[qad[sides[0]]].copy())
                 rec["stroke"].append(float(q[role == "stroke"][0]))
-            rec["Ps"].append(float(tau[role == "stroke"] @ qd[role == "stroke"]))
+            rec["Ps"].append(float(tau[role == "stroke"] @ qd[role == "stroke"]) + P_drive)
             rec["tq"].append(float(np.abs(tau[role == "stroke"]).sum()))
             trk = ~is_tw if (chn is not None and chn["mode"] != "servo") else np.ones(len(q), bool)
+            trk = trk & driven
             rec["err"].append(float(np.abs(q - d.qpos[qad])[trk].max()))
             rec["hold"].append(hold)
             rec["pos"].append(d.qpos[:3].copy())
@@ -455,6 +486,8 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
             aa = np.degrees(np.array(rec["ask"]))
             out["pitch_ask_min_deg"], out["pitch_ask_max_deg"] = float(aa.min()), float(aa.max())
             out["pitch_ask_late_deg"] = float(aa[late:].mean())
+    if drive is not None:
+        out["drive"] = drive.summary()
     if keep_series:
         out["series"] = {k: np.asarray(v).tolist() for k, v in rec.items()}
         out["com0"] = com0
