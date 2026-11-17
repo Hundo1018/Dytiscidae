@@ -114,3 +114,29 @@ through freerig's compile seam), `drive/d1_run.py`, `drive/d1_read.py`,
 `results/D1_drive.jsonl`; a figure of each candidate from the built model
 at four crank angles, checked against the geometry above; the result file
 with a table of candidates and no pick.
+
+## Addendum D1b (frozen 2026-11-17, after D1's result, before any run of it)
+
+D1's result named the lever (30 and 40 mm, picked, not swept) as setting
+the take-off link forces. Every take-off verdict on the linkages leans on
+it. Take-off only, levers 40 (D1's), 60, 80 and 120 mm, crank and link
+scaled with it (crank a sin(stroke/2), link 2a); FB and SY at gears 16, 24,
+32; CT at springs 8 and 16 with gears 24 and 32. DD has no lever and is not
+re-run. Same dt, motor, points and reader; the beat made is read (the
+condition D1 added after its first sweep).
+
+- L1. FB's peak loop force times the lever is constant within 20% across
+  the four levers, at each gear (the hinge's torque does not depend on it).
+- L2. SY's error against its own kinematics falls as 1/a^2 (the loop's gap
+  goes with its force, the angle with gap over lever): from 9.5 deg at 40
+  mm to under 2.5 deg at 80 and under 1.2 at 120; SY holds the stroke
+  within 2 deg from 80 mm.
+- L3. CT does not do the task at any lever: its beat is under 0.98 of the
+  planned at its best by the frozen rule, or its amplitude is off by more
+  than 2 deg.
+- L4. FB's electrical power at the gear that holds the beat changes by
+  under 10% across the levers; the share of the beat its motor spends on
+  its limit at a given gear changes by under 0.05.
+- L5. Drawn, as for D1: the mechanism's lowest point is about 2a + r below
+  the shoulder (110, 150, 220 mm at 60, 80, 120 mm), further outside the
+  hull; reported, not judged.

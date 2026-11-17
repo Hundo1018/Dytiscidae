@@ -43,6 +43,7 @@ def job(a):
     from dytiscidae.physics.medium import Fluid
     point, kind, N, k, extra = a
     V, th, f, Phi, Psi, psi0, lev, kw = POINTS[point]
+    lev = extra.get("a", lev)
     body = dict(l1a.BODY_S, wing_shape=dict(camber=0.04), wing_section="goe417a+lift")
     kw = dict(kw, feather_axis=0.1, cop_law="plate", dt=DT)
     if extra.get("vacuum"):
@@ -75,6 +76,12 @@ def main() -> int:
             for kind in ("FB", "SY", "DD"):
                 grid += [(point, kind, N, 0.0, {}) for N in gears(kind, point)]
             grid += [(point, "CT", N, k, {}) for N in gears("CT", point) for k in SPRINGS]
+    elif stage == "lever":                       # addendum D1b
+        grid = []
+        for a in (0.06, 0.08, 0.12):
+            for kind in ("FB", "SY"):
+                grid += [("takeoff", kind, N, 0.0, dict(a=a)) for N in (16, 24, 32)]
+            grid += [("takeoff", "CT", N, k, dict(a=a)) for N in (24, 32) for k in (8.0, 16.0)]
     else:
         rows = [json.loads(x) for x in open(sys.argv[2])]
         grid = []
