@@ -501,6 +501,15 @@ class SectionPolar:
     the last measured angle to `PLATE_BY`.  Without it the plate took over
     within 6 deg of the drag table's end and read 0.12-0.41 below these same
     lift runs there (experiments/flapper, RESULT_W3_section.md, RESULT_W5).
+
+    ``drag_past`` (with ``lift_tables``): what the drag is between the drag
+    table's end and the angle the lift run peaks at, a band of 1-2 deg that
+    nobody measured and in which the lift is still rising.  "normal" (the
+    default, pass W5): ``cl tan a`` from the drag table's end, which stalls
+    the drag before the lift.  "extend": the drag table continued in a
+    straight line at its own end slope (least squares, last three points) up
+    to the lift's peak, and ``cl tan a`` from there.  "hold": its last value
+    held up to the peak.  Pass W8 (experiments/flapper, RESULT_W8).
     """
 
     #: The angle by which a stalled section is on the plate law.  At 30 deg the
@@ -509,8 +518,11 @@ class SectionPolar:
     #: the wing (experiments/flapper/RESULT_W5_separated.md).
     PLATE_BY = np.radians(30.0)
 
-    def __init__(self, name: str, tables, lift_tables=None) -> None:
+    def __init__(self, name: str, tables, lift_tables=None, drag_past: str = "normal") -> None:
         self.name = name
+        if drag_past not in ("normal", "extend", "hold"):
+            raise ValueError(f"unknown drag_past {drag_past!r}")
+        self.drag_past = drag_past
         self.lift_tables = None
         if lift_tables:
             self.lift_tables = sorted(((float(r), np.asarray(a, float), np.asarray(l, float))
@@ -531,8 +543,9 @@ class SectionPolar:
     def _at(self, alpha, re):
         """Table values and the measured range's two ends at each strip's Re."""
         vals = np.array([[np.interp(alpha, a, l), np.interp(alpha, a, d),
-                          np.full_like(alpha, a[0]), np.full_like(alpha, a[-1])]
-                         for _, a, l, d in self.tables])                   # (n_re, 4, n)
+                          np.full_like(alpha, a[0]), np.full_like(alpha, a[-1]),
+                          np.full_like(alpha, max(float(np.polyfit(a[-3:], d[-3:], 1)[0]), 0.0))]
+                         for _, a, l, d in self.tables])                   # (n_re, 5, n)
         if len(self.tables) == 1:
             return vals[0]
         x = np.clip(np.log(np.maximum(re, 1.0)), self._logre[0], self._logre[-1])
@@ -542,9 +555,11 @@ class SectionPolar:
         return (1.0 - t) * vals[i, :, n].T + t * vals[i + 1, :, n].T
 
     def _lift_at(self, alpha, re):
-        """The lift run's value and its last measured angle at each strip's Re."""
-        vals = np.array([[np.interp(alpha, a, l), np.full_like(alpha, a[-1])]
-                         for _, a, l in self.lift_tables])                 # (n_re, 2, n)
+        """The lift run's value, its last measured angle and the angle of its
+        peak at each strip's Re."""
+        vals = np.array([[np.interp(alpha, a, l), np.full_like(alpha, a[-1]),
+                          np.full_like(alpha, a[int(np.argmax(l))])]
+                         for _, a, l in self.lift_tables])                 # (n_re, 3, n)
         if len(self.lift_tables) == 1:
             return vals[0]
         x = np.clip(np.log(np.maximum(re, 1.0)), self._lift_logre[0], self._lift_logre[-1])
@@ -560,17 +575,26 @@ class SectionPolar:
         alpha, re = np.asarray(alpha, float), np.asarray(re, float)
         lev = np.clip(lev, 0.0, 1.0)
         ae = alpha if alpha_e is None else alpha_e
-        cl_t, cd_t, lo, hi = self._at(ae, re)
+        cl_t, cd_t, lo, hi, d_end = self._at(ae, re)
         t = np.clip(np.maximum(alpha - hi, lo - alpha) / SEPARATION_COMPLETE, 0.0, 1.0)
         w = t * t * (3.0 - 2.0 * t)
         if self.lift_tables is not None:
-            cl_l, top = self._lift_at(ae, re)
+            cl_l, top, peak = self._lift_at(ae, re)
             # past the drag table: the measured lift, and the drag it implies
             # on a section loaded normal to its chord
             past = _smoothstep((alpha - hi) / SEPARATION_COMPLETE)
             cl_t = (1.0 - past) * cl_t + past * cl_l
-            cd_t = (1.0 - past) * cd_t + past * (
-                skin_friction_cd(re) + np.maximum(cl_l, 0.0) * np.tan(np.clip(ae, 0.0, self.PLATE_BY)))
+            cd_n = skin_friction_cd(re) + np.maximum(cl_l, 0.0) * np.tan(np.clip(ae, 0.0, self.PLATE_BY))
+            if self.drag_past == "normal":
+                cd_t = (1.0 - past) * cd_t + past * cd_n
+            else:
+                # the lift is still rising up to its peak: the drag follows
+                # the table's own trend that far, and stalls with the lift
+                stall = np.maximum(peak, hi)
+                if self.drag_past == "extend":
+                    cd_t = cd_t + d_end * (np.clip(ae, hi, stall) - hi)
+                gone = _smoothstep((alpha - stall) / SEPARATION_COMPLETE)
+                cd_t = (1.0 - gone) * cd_t + gone * cd_n
             up = _smoothstep((alpha - top) / np.maximum(self.PLATE_BY - top, 1e-6))
             w = np.where((alpha > hi) & (top > hi), up, w)
         w = w + (1.0 - w) * lev

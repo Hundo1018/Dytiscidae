@@ -323,6 +323,14 @@ def main() -> int:
                   "drawn with the twist at the stroke's ends for legibility; in the beat it peaks at mid-stroke. Body held, no tail"],
                  stroke_deg=40.0, feather_deg=0.0, feather_axis=0.1, twist_deg=tw,
                  spec=dict(span=SPAN, wing_area=AREA, chord=AREA / (2 * LENGTH), mass=MASS))
+    elif which == "W8":
+        for tag, tw in (("tip40_down", -40.0), ("tip40_up", 40.0)):
+            body = dict(BODY_S, wing_shape=dict(camber=0.04, twist_tip_deg=tw), wing_section="goe417a+lift")
+            draw(body, figs / f"W8_{tag}.png",
+                 f"Pass W8: the 6 m/s beat, tip {tw:+.0f} deg against the root (linear along the span), root unmoved",
+                 ["held rig, 6 m/s, 3.5 Hz, stroke 60 deg; the twist turns the fluid strips only (W6's device; W7 made 15 deg by joints, 40 not yet)",
+                  "a 40 deg twist over 0.66 m is 61 deg per metre: whether a wing of GJ 1.1 N m2 can be driven to it is not looked at"],
+                 stroke_deg=60.0, feather_deg=0.0, feather_axis=0.1, spec=dict(span=SPAN, wing_area=AREA, mass=MASS))
     elif which == "PX":
         # the two extreme bodies of experiments/physics_extremes (E6, E7)
         for tag, L, c in (("stubby", 0.15, 0.40), ("slender", 0.90, 0.03)):

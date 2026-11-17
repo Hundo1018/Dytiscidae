@@ -76,3 +76,20 @@ within 2-4 deg.
 
 The subagent's power formula against an energy balance; unsteady loads
 against Theodorsen; the twist is piecewise linear over six segments.
+
+## Added later the same day
+
+- **The hull case** (a flat, fixed centre plate 0.5 m long filling the gap to
+  within 1 mm): inviscid thrust at 8 m/s 0.27-0.32 N (open 0.18, sealed
+  0.42); at 6 m/s 0.49 and 0.42 N (open 0.44 and 0.36, sealed 0.82 and
+  0.72). A plate in the plane z = 0 seals the roots only when they lie in
+  that plane; a degree or two of root incidence opens a slot. A real hull
+  has sides the root stays against, so it lies between this case and
+  "sealed". The junction is a near-singular lattice interaction and was not
+  checked against a reference. The bracket is narrowed a little, not closed.
+- **My reading of the 6 m/s gap was wrong.** Pass W8 gave the section's
+  drag two gentler treatments in the unmeasured band and nothing changed
+  (RESULT_W8_section_to_stall.md). What moves the 6 m/s result is the tip's
+  feather: beyond the 20 deg the grid stopped at, the strip solver sustains
+  at 6 m/s for 16 W and more. The strip solver still trims 3 deg or more
+  above the outside solver at 6 m/s; that is not explained.

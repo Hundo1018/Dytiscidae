@@ -517,6 +517,35 @@ def test_a_cambered_strip_carries_its_own_pitching_moment() -> None:
     check("separated flow has none", np.abs(t45).max() < 1e-9, f"{t45}")
 
 
+def test_a_sections_drag_can_follow_its_table_to_the_lifts_peak() -> None:
+    """`SectionPolar(drag_past=)` (pass W8): between the drag table's end and
+    the angle the lift run peaks at, "normal" charges ``cl tan a``, "extend"
+    continues the table's end slope and "hold" its last value; all three stall
+    the drag at the lift's peak or before, and agree elsewhere."""
+    from dytiscidae.physics.fluid import SEPARATION_COMPLETE, SectionPolar, skin_friction_cd
+    print("\nfluid: a section's drag between its drag run's end and its lift's peak")
+    a_d = np.radians(np.arange(0.0, 11.0, 1.0))                     # drag run: 0-10 deg
+    cl_d = 0.3 + 0.1 * np.degrees(a_d)
+    cd_d = 0.02 + 0.002 * np.maximum(np.degrees(a_d) - 6.0, 0.0)    # end slope 0.002 per deg
+    a_l = np.radians(np.arange(0.0, 21.0, 1.0))                     # lift run: peak at 13 deg
+    cl_l = np.where(np.degrees(a_l) <= 13.0, 0.3 + 0.1 * np.degrees(a_l), 1.6 - 0.05 * (np.degrees(a_l) - 13.0))
+    sec = {k: SectionPolar("t", [(1e5, a_d, cl_d, cd_d)], [(1e5, a_l, cl_l)], k) for k in ("normal", "extend", "hold")}
+    one = lambda x: np.array([float(x)])
+    cd = lambda k, deg: float(sec[k].coefficients(one(math.radians(deg)), one(1e5), one(1e9), one(0.0))[1][0])
+    check("inside the drag run the three agree", cd("normal", 5.0) == cd("extend", 5.0) == cd("hold", 5.0))
+    check("hold keeps the last measured drag up to the peak", abs(cd("hold", 12.0) - 0.028) < 1e-9, f"{cd('hold', 12.0):.5f}")
+    check("extend continues the table's end slope", abs(cd("extend", 12.0) - (0.028 + 0.002 * 2.0)) < 1e-9,
+          f"{cd('extend', 12.0):.5f}")
+    check("normal has gone over to cl tan a there", cd("normal", 12.0) > 3.0 * cd("extend", 12.0),
+          f"{cd('normal', 12.0):.4f} against {cd('extend', 12.0):.4f}")
+    past = 13.0 + math.degrees(SEPARATION_COMPLETE)
+    want = float(skin_friction_cd(one(1e5))[0]) + (1.6 - 0.05 * (past - 13.0)) * math.tan(math.radians(past))
+    check("a handover's width past the peak all three are cl tan a",
+          all(abs(cd(k, past) - want) < 1e-9 for k in sec), f"{[round(cd(k, past), 5) for k in sec]} vs {want:.5f}")
+    check("the drag does not fall as the incidence rises through the peak",
+          all(cd(k, 13.5) >= cd(k, 13.0) >= cd(k, 12.5) for k in ("extend", "hold")))
+
+
 def test_the_plate_stall_law_is_opt_in_and_reads_the_thin_plate_table() -> None:
     """`FluidSolver.stall_law = "plate"` (repair R1): a lift limit, a plateau
     and a camber lift that depends on Reynolds number, for strips with no
@@ -5532,6 +5561,7 @@ def main() -> int:
         test_lift_sign_and_magnitude,
         test_centre_of_pressure_moves_aft_when_the_flow_separates,
         test_a_cambered_strip_carries_its_own_pitching_moment,
+        test_a_sections_drag_can_follow_its_table_to_the_lifts_peak,
         test_the_plate_stall_law_is_opt_in_and_reads_the_thin_plate_table,
         test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning,
         test_a_measured_section_replaces_the_default_law_where_it_was_measured,

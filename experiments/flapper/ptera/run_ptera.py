@@ -34,6 +34,8 @@ WEIGHT = 5.884
 PIVOT = 0.1 * CHORD          # feathering / incidence axis behind the leading edge
 S_REF = 2.0 * (Y_TIP - Y_ROOT) * CHORD     # the two panels, hull gap excluded
 B_REF = 2.0 * Y_TIP
+HULL_CHORD = 0.50
+HULL_NOSE_AHEAD = 0.17     # wing leading edge is this far aft of the hull's nose
 AR_FULL = B_REF / CHORD      # 5.43, the brief's aspect ratio (gap counted as span)
 
 
@@ -44,7 +46,8 @@ def outline():
 
 
 def build(V, f, Phi, A, inc, share, sign=1.0, nc=8, nseg=6, ns_per_seg=2,
-          steps_per_cycle=None, cycles=3, flat=False, y_root=Y_ROOT):
+          steps_per_cycle=None, cycles=3, flat=False, y_root=Y_ROOT, root=None,
+          hull_half=0.039):
     """The UnsteadyProblem for one case and its bookkeeping.
 
     share: 1 = linear tip twist, 0 = rigid feathering of the whole wing.
@@ -80,8 +83,30 @@ def build(V, f, Phi, A, inc, share, sign=1.0, nc=8, nseg=6, ns_per_seg=2,
         symmetryPoint_G_Cg=(0.0, 0.0, 0.0),
         num_chordwise_panels=nc, chordwise_spacing="uniform",
     )
+    wings = [wing]
+    if root == "hull":
+        # The hull as a flat, uncambered centre panel: fixed, zero incidence,
+        # chord 0.50 m, nose 0.17 m ahead of the wings' leading edge. Its side
+        # edges stop 1 mm short of the wing roots (hull_half = 0.039) so that no
+        # bound leg of one surface lies exactly on a leg of the other.
+        flat_af = ps.geometry.airfoil.Airfoil(
+            name="flat", outline_A_lp=[[1, 0.001], [0.5, 0.001], [0, 0],
+                                      [0.5, -0.001], [1, -0.001]])
+        hull = ps.geometry.wing.Wing(
+            [ps.geometry.wing_cross_section.WingCrossSection(
+                airfoil=flat_af, num_spanwise_panels=2, chord=HULL_CHORD,
+                spanwise_spacing="uniform", control_surface_symmetry_type="symmetric"),
+             ps.geometry.wing_cross_section.WingCrossSection(
+                airfoil=flat_af, num_spanwise_panels=None, chord=HULL_CHORD,
+                Lp_Wcsp_Lpp=(0.0, hull_half, 0.0),
+                control_surface_symmetry_type="symmetric")],
+            name="hull", Ler_Gs_Cgs=(-HULL_NOSE_AHEAD, 0.0, 0.0),
+            symmetric=True, symmetryNormal_G=(0.0, 1.0, 0.0),
+            symmetryPoint_G_Cg=(0.0, 0.0, 0.0),
+            num_chordwise_panels=16, chordwise_spacing="uniform")
+        wings.append(hull)
     airplane = ps.geometry.airplane.Airplane(
-        [wing], name="flapper", weight=WEIGHT,
+        wings, name="flapper", weight=WEIGHT,
         s_ref=S_REF, c_ref=CHORD, b_ref=B_REF)
 
     static = (Phi == 0 and A == 0)
@@ -91,6 +116,12 @@ def build(V, f, Phi, A, inc, share, sign=1.0, nc=8, nseg=6, ns_per_seg=2,
     ph = 90.0 if sign > 0 else -90.0
     wing_movements = []
     for w in airplane.wings:
+        if w.name == "hull":
+            wing_movements.append(ps.movements.wing_movement.WingMovement(
+                base_wing=w, wing_cross_section_movements=[
+                    ps.movements.wing_cross_section_movement.WingCrossSectionMovement(
+                        base_wing_cross_section=cs) for cs in w.wing_cross_sections]))
+            continue
         wcsm = []
         n = len(w.wing_cross_sections)
         for i, cs in enumerate(w.wing_cross_sections):
@@ -163,7 +194,12 @@ def make_solver(problem):
             p += np.sum(u * self._calculate_current_movement_velocities_at_collocation_points())
             F = (r + fr + l + b + u).sum(axis=0)
             Fs = (r + fr + l + b).sum(axis=0)
-            w = self.current_airplanes[0].wings[0]      # the y > 0 wing
+            ws = self.current_airplanes[0].wings
+            Ft = r + fr + l + b + u
+            nh = ws[-1].num_panels if ws[-1].name == "hull" else 0
+            hull_Fz = float(Ft[len(Ft) - nh:, 2].sum()) if nh else 0.0
+            hull_Fx = float(Ft[len(Ft) - nh:, 0].sum()) if nh else 0.0
+            w = ws[0]      # the y > 0 wing
             P = w.panels
             le_t, te_t = P[0, -1].Frpp_GP1_CgP1, P[-1, -1].Brpp_GP1_CgP1
             le_r, te_r = P[0, 0].Flpp_GP1_CgP1, P[-1, 0].Blpp_GP1_CgP1
@@ -171,7 +207,7 @@ def make_solver(problem):
             self.rec.append(dict(
                 step=int(self._current_step), Fx=float(F[0]), Fy=float(F[1]),
                 Fz=float(F[2]), Fx_steady=float(Fs[0]), Fz_steady=float(Fs[2]),
-                power=float(p),
+                power=float(p), hull_Fz=hull_Fz, hull_Fx=hull_Fx,
                 tip_z=float(0.5 * (le_t[2] + te_t[2])), tip_y=float(le_t[1]),
                 tip_pitch=pitch(le_t, te_t), root_pitch=pitch(le_r, te_r),
                 tip_pivot_z=float(le_t[2] + 0.1 * (te_t[2] - le_t[2])),
@@ -187,11 +223,12 @@ def make_solver(problem):
 def run_case(case):
     """case: dict of build() arguments plus 'tag', 'group', 'free_wake'."""
     kw = {k: case[k] for k in ("V", "f", "Phi", "A", "inc", "share")}
-    for k in ("sign", "nc", "nseg", "ns_per_seg", "steps_per_cycle", "cycles", "flat", "y_root"):
+    for k in ("sign", "nc", "nseg", "ns_per_seg", "steps_per_cycle", "cycles", "flat", "y_root", "root", "hull_half"):
         if k in case:
             kw[k] = case[k]
     t0 = time.time()
     out = dict(case)
+    out["root"] = root_of(case)
     try:
         problem, meta = build(**kw)
         solver = make_solver(problem)
@@ -210,6 +247,8 @@ def run_case(case):
             panels=int(solver.num_panels),
             lift=lift, thrust=thrust, power=power,
             side=float(arr("Fy", last).mean()),
+            hull_lift=float(arr("hull_Fz", last).mean()),
+            hull_thrust=float(-arr("hull_Fx", last).mean()),
             CL=lift / (0.5 * RHO * case["V"] ** 2 * 2.0 * (Y_TIP - case.get("y_root", Y_ROOT)) * CHORD),
             lift_min=float(arr("Fz", last).min()), lift_max=float(arr("Fz", last).max()),
             finite=bool(np.all(np.isfinite(arr("Fz", slice(None))))),
@@ -278,13 +317,28 @@ def plan():
     sweep("4a-flat-sealed", 8, 2.5, 0, 0, 1, incs=[0, 4], flat=True, y_root=0.001)
     sweep("1-sealed", 8, 2.5, 40, 15, 1, y_root=0.001)
     sweep("3-sealed", 6, 2.5, 50, 15, 1, incs=[2, 4, 6, 8, 10], y_root=0.001)
+    # the hull as a fixed flat centre panel between the roots
+    sweep("4a-hull", 8, 2.5, 0, 0, 1, root="hull")
+    sweep("4a-hull-touching", 8, 2.5, 0, 0, 1, incs=[0, 4], root="hull", hull_half=0.04)
+    for hh in (0.035, 0.030, 0.020):       # clearance to the wing root 5, 10, 20 mm
+        sweep("4a-hull-clearance", 8, 2.5, 0, 0, 1, incs=[-8, -4, -2, 0, 2, 4, 8], root="hull", hull_half=hh)
+    sweep("1-hull", 8, 2.5, 40, 15, 1, incs=[-2, 0, 2, 4], root="hull")
+    sweep("3-hull", 6, 2.5, 50, 15, 1, incs=[2, 4, 6, 8, 10], root="hull")
+    sweep("3-hull", 6, 2.0, 60, 15, 1, incs=[2, 4, 6, 8, 10], root="hull")
+    sweep("3-sealed", 6, 2.0, 60, 15, 1, incs=[2, 4, 6, 8, 10], y_root=0.001)
     return cases
+
+
+def root_of(c):
+    """Root treatment of a case or row: open (8 cm gap), sealed (2 mm), hull."""
+    return c.get("root") or ("sealed" if c.get("y_root") else "open")
 
 
 def key(c):
     return json.dumps({k: c.get(k) for k in (
         "group", "V", "f", "Phi", "A", "share", "inc", "sign", "nc", "nseg",
-        "ns_per_seg", "steps_per_cycle", "cycles", "flat", "free_wake", "y_root")}, sort_keys=True)
+        "ns_per_seg", "steps_per_cycle", "cycles", "flat", "free_wake", "y_root", "hull_half")}
+                      | {"root": root_of(c)}, sort_keys=True)
 
 
 def load():
@@ -358,7 +412,7 @@ def read():
                   + (f"   twist@mid-down {r['tip_twist_at_mid_downstroke']:+.2f} @mid-up {r['tip_twist_at_mid_upstroke']:+.2f}"
                      if "tip_twist_at_mid_downstroke" in r else ""))
     # 4a
-    for name in ("4a", "4a-flat", "4a-sealed", "4a-flat-sealed"):
+    for name in ("4a", "4a-flat", "4a-sealed", "4a-flat-sealed", "4a-hull", "4a-hull-touching"):
         g = sorted([r for r in rows if r["group"] == name], key=lambda r: r["inc"])
         if len(g) < 2:
             continue
@@ -369,6 +423,11 @@ def read():
         q = 0.5 * RHO * 64
         helm = 2 * np.pi * AR_FULL / (2 + np.sqrt(AR_FULL ** 2 + 4))
         S = 2.0 * (Y_TIP - g[0].get("y_root", Y_ROOT)) * CHORD
+        if g[0].get("root") == "hull":
+            print(f"\n{name}: centre panel lift / total lift by inc:",
+                  [(r["inc"], round(r["hull_lift"], 3), round(r["lift"], 3)) for r in g],
+                  "; d(hull lift)/d(total lift) =",
+                  round(float(np.polyfit([r["lift"] for r in g], [r["hull_lift"] for r in g], 1)[0]), 4))
         print(f"\n{name}: dCL/dalpha = {slope:.3f} /rad on the panel area S = {S:.4f} m2 "
               f"({slope * S / (B_REF * CHORD):.3f} on b*c = {B_REF * CHORD:.4f}); "
               f"zero-lift angle = {np.degrees(-c0 / slope):+.2f} deg; "
@@ -394,6 +453,54 @@ def read():
                 print(f"   trim on {name}: inc {t['inc_trim']:+.2f} thrust {t['thrust_trim']:+.3f} power {t['power_trim']:.2f}")
 
 
+def read_roots():
+    """Open gap / hull panel / sealed, side by side."""
+    rows = [r for r in load() if r.get("ok")]
+    print("\n\n=== root treatment, three ways (open 8 cm gap | hull = fixed flat centre panel | sealed 2 mm) ===")
+    print("(a) static, V = 8, on the wing area 0.34 m2 for every column")
+    q = 0.5 * RHO * 64
+    for root, name in (("open", "4a"), ("hull", "4a-hull"), ("sealed", "4a-sealed")):
+        g = sorted([r for r in rows if r["group"] == name], key=lambda r: r["inc"])
+        a = np.radians([r["inc"] for r in g])
+        CL = np.array([r["lift"] for r in g]) / (q * 0.34)
+        slope, c0 = np.polyfit(a, CL, 1)
+        e = [-r["thrust"] * q * np.pi * B_REF ** 2 / r["lift"] ** 2 for r in (g[0], g[-1])]
+        hl = np.polyfit([r["lift"] for r in g], [r.get("hull_lift", 0.0) for r in g], 1)[0]
+        print(f"   {root:6s}: dCL/dalpha {slope:.3f} /rad ({slope / 4.383:.3f} of Helmbold), zero-lift {np.degrees(-c0 / slope):+.2f} deg, "
+              f"Di/(L^2/(q pi b^2)) at inc -8/+8: {e[0]:.2f}/{e[1]:.2f}, centre panel carries {100 * hl:.1f}% of each added newton"
+              + (f" ({g[-1]['hull_lift']:.3f} of {g[-1]['lift']:.3f} N at inc +8)" if root == "hull" else ""))
+    print("    static lift N by inc (hull: total [centre panel]); the hull column is NOT a straight line:")
+    tab = {}
+    for name, lab in (("4a", "open"), ("4a-hull", "hull 1 mm"), ("4a-sealed", "sealed")):
+        tab[lab] = {r["inc"]: r for r in rows if r["group"] == name}
+    for hh in (0.035, 0.030, 0.020):
+        tab[f"hull {round(1000 * (0.04 - hh))} mm"] = {r["inc"]: r for r in rows if r["group"] == "4a-hull-clearance" and r.get("hull_half") == hh}
+    for inc in INCS:
+        print(f"      {inc:+d}: " + "  ".join(
+            f"{lab} {t[inc]['lift']:.3f}" + (f" [{t[inc]['hull_lift']:+.3f}]" if lab.startswith("hull") else "")
+            for lab, t in tab.items() if inc in t))
+    for lab in ("open", "hull 1 mm"):
+        t = tab[lab]
+        print(f"      {lab}: slope on inc +2..+8 only = {(t[8]['lift'] - t[2]['lift']) / np.radians(6) / (q * 0.34):.3f} /rad; "
+              f"induced drag N at +2/+8: {-t[2]['thrust']:.4f}/{-t[8]['thrust']:.4f}")
+    print("    hull, flapping, V 8 (2.5, 40, 15): inc, lift, centre-panel lift, thrust, power:",
+          [(r["inc"], round(r["lift"], 3), round(r["hull_lift"], 3), round(r["thrust"], 4), round(r["power"], 3))
+           for r in sorted((r for r in rows if r["group"] == "1-hull"), key=lambda r: r["inc"])])
+    print("(b) trimmed to total lift 5.884 N: inc_trim deg, inviscid thrust N, power W [centre-panel lift N at the bracketing points]")
+    for V, f, Phi, A in ((8, 2.5, 40, 15), (6, 2.5, 50, 15), (6, 2.0, 60, 15)):
+        line = f"   V {V} f {f} Phi {Phi} A {A} tip:"
+        for root in ("open", "hull", "sealed"):
+            g = [r for r in rows if root_of(r) == root and (r["V"], r["f"], r["Phi"], r["A"], r["share"]) == (V, f, Phi, A, 1)
+                 and r["group"].split("-")[0] in ("1", "3") and r["group"] in ("1", "3", "1-hull", "3-hull", "1-sealed", "3-sealed")]
+            t = trim(g) if len(g) >= 2 else None
+            if t is None:
+                line += f"  {root}: none"
+            else:
+                hl = [round(r.get("hull_lift", 0.0), 3) for r in sorted(g, key=lambda r: r["inc"]) if r["inc"] in t["bracket"]]
+                line += f"  {root}: {t['inc_trim']:+.2f}, {t['thrust_trim']:+.3f}, {t['power_trim']:.2f}" + (f" [{hl}]" if root == "hull" else "")
+        print(line)
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "read"
     if cmd == "probe":
@@ -408,3 +515,4 @@ if __name__ == "__main__":
         run_all(int(sys.argv[2]) if len(sys.argv) > 2 else 10)
     else:
         read()
+        read_roots()

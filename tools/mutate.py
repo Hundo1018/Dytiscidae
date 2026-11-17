@@ -2827,6 +2827,22 @@ MUTATIONS: tuple = (
         suites=("test_physics::test_a_measured_section_replaces_the_default_law_where_it_was_measured",),
         item="section polar"),
     Mutation(
+        id="section-drag-extend-is-flat",
+        path="dytiscidae/physics/fluid.py",
+        find="                    cd_t = cd_t + d_end * (np.clip(ae, hi, stall) - hi)\n",
+        replace="                    cd_t = cd_t + 0.0 * d_end\n",
+        defect="a section's extended drag holds its last value instead of following the table's end slope",
+        suites=("test_physics::test_a_sections_drag_can_follow_its_table_to_the_lifts_peak",),
+        item="section polar"),
+    Mutation(
+        id="section-drag-stalls-before-the-lift",
+        path="dytiscidae/physics/fluid.py",
+        find="                stall = np.maximum(peak, hi)\n",
+        replace="                stall = hi + 0.0 * peak\n",
+        defect="extend and hold go over to cl tan a from the drag table's end, before the lift has peaked",
+        suites=("test_physics::test_a_sections_drag_can_follow_its_table_to_the_lifts_peak",),
+        item="section polar"),
+    Mutation(
         id="plate-stall-has-no-plateau",
         path="dytiscidae/physics/fluid.py",
         find="        plate = np.where(a < 0.25 * np.pi, np.maximum(plate, (1.0 - lev) * t * plateau), plate)\n",

@@ -227,3 +227,77 @@ Numerical uncertainty of a trimmed point: about 2% in lift and power, about
 - With the gap "sealed" the roots are 2 mm apart and the flap hinges are at
   y = +-0.001, so the sealed flapping runs are a different machine (longer
   panels, 0.699 m), a bracket and not the brief's geometry.
+
+## Follow-up: the hull as a flat centre panel (third root treatment, `root = "hull"`)
+
+Every row of `results.jsonl` now carries `root`: `open` (8 cm gap), `sealed`
+(roots 2 mm apart), `hull`. 51 rows were added (210 in all, all `ok`);
+`read.txt` ends with the three-way section (`read_roots()` in the script).
+
+**What was built.** The two flapping wings exactly as in `open`, plus a third
+`Wing` named "hull" in the same `Airplane`: flat section, chord 0.50 m, leading
+edge at x = -0.17 (wing leading edge 0.17 m aft of the nose; PteraSoftware's x
+points aft), symmetric about y = 0 ("type 4": one surface), 16 chordwise x 4
+spanwise panels (256 with the wings), its own static `WingMovement` (no flap, no
+twist, zero incidence always; it does not take `inc`). One airplane was enough:
+PteraSoftware moves each `Wing` by its own `WingMovement`. The panel sheds its
+own wake. Centre-panel lift is the sum of its panels' F_z (`hull_lift`).
+
+**Deviation: the panel stops 1 mm short of each root** (half-width 0.039, not
+0.040). With the edges touching, bound legs of the two surfaces lie on one
+another with unmatched chordwise panelling, and the static result is wrong
+(two points run, `4a-hull-touching`: fitted slope 2.93 /rad, below the open gap).
+Clearances of 5, 10 and 20 mm were also run on the static wing.
+
+### (a) Static, V = 8, all on the wing area 0.34 m2
+
+| | open | hull (1 mm) | sealed |
+|---|---|---|---|
+| dCL/dalpha, line through -8..+8 (/rad) | 3.438 | 3.672 **(not a line: residual 0.052 in CL)** | 4.439 (4.191 on its own 0.360 m2) |
+| dCL/dalpha on +2..+8 only | 3.379 | 3.286 | - |
+| zero-lift angle of that line | -4.97 | -5.16 | -4.79 |
+| induced drag / elliptic at inc -8 / +8 | 1.54 / 1.67 | 1.37 / 1.51 | 0.96 / 1.03 |
+| lift at inc 0 / +2 / +8 (N) | 4.009 / 5.610 / 10.326 | 5.094 / 6.297 / 10.883 | 4.993 / 7.057 / 13.139 |
+| centre-panel lift at inc 0 / +2 / +8 (N) | - | +0.602 / -0.068 / -0.348 | - |
+
+The flat panel seals the gap **only when the wing root lies in its plane**. At
+inc = 0 the total (5.09 N) is the sealed value (4.99 N) and the panel carries
+0.60 N. One or two degrees away the root edge leaves the panel's plane (it turns
+about 0.1 chord, so the trailing edge is 8 mm off the plane at 2 deg), a slot
+opens, and the lift falls back to 0.55-0.69 N above the open gap with the panel
+carrying slightly negative lift. Lift against inc therefore has a bump at 0 and
+is not a straight line; the fitted slope and zero-lift angle of the hull column
+describe that bump, not a wing. The bump shrinks with clearance (panel lift at
+inc 0: 0.60, 0.43, 0.27, 0.12 N at 1, 5, 10, 20 mm) and is not converged in it.
+
+### (b) Trimmed to total lift 5.884 N (centre panel included): inc_trim, inviscid thrust, power
+
+| case (tip feathering) | open | hull | sealed |
+|---|---|---|---|
+| V 8, 2.5 Hz, 40, 15 | +2.42, +0.177 N, 4.37 W | **+1.46, +0.265 N, 4.43 W (interpolated across the bump: see below)** | +0.92, +0.416 N, 5.80 W |
+| V 6, 2.5 Hz, 50, 15 | +8.05, +0.443 N, 7.78 W | +7.40, +0.494 N, 7.87 W | +5.02, +0.816 N, 9.99 W |
+| V 6, 2.0 Hz, 60, 15 | +8.41, +0.363 N, 7.04 W | +7.76, +0.417 N, 7.14 W | +5.28, +0.722 N, 9.12 W |
+
+Centre-panel lift at the trims: about -0.2 N at 6 m/s (so the wings carry 6.1 N);
+at 8 m/s it changes sign inside the bracket (+0.65 N at inc 0, -0.10 N at inc 2).
+The 8 m/s hull trim is bracketed by inc 0 (sealed-like, 5.06 N) and inc 2
+(slotted, 6.19 N); extrapolating each branch by itself gives inc_trim 0.7 or
+1.6 deg and thrust 0.32 or 0.27 N, so read it as +0.7..1.6 deg, +0.27..0.32 N,
+4.43 W. The 6 m/s trims sit on the smooth slotted branch (bracket 6-8 deg).
+Cycle-to-cycle change of the hull runs: <= 0.011 N lift, 0.0005 N thrust, 0.002 W.
+
+### What this case does and does not say
+
+- A zero-thickness plate in the z = 0 plane is not the hull. The real hull is a
+  body with side walls; a wing root abuts a wall at any incidence, and the slot
+  that opens here at 1-2 deg would not open the same way. PteraSoftware has no
+  bodies, so a wall-like seal cannot be represented; the closest things are the
+  `sealed` runs (perfect seal) and this plate (seal only when aligned). The hull
+  therefore lies between `hull` and `sealed`, and this case does not narrow the
+  bracket much: away from inc = 0 it sits near `open`.
+- The interaction at 1 mm clearance is a near-singular lattice interaction with
+  unmatched panels; its dependence on clearance (above) is the measure of how
+  far to trust it. Not checked against any reference.
+- The plate's own lift at zero incidence is induced entirely by the wings; its
+  sign change with inc was not explained beyond the slot opening.
+- A sealed run for V 6 (2.0, 60, 15) was added for the comparison.

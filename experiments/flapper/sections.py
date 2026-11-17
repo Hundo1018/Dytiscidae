@@ -36,18 +36,21 @@ def tables(name: str, min_points: int = 8):
 
 def load(name: str):
     """``"goe417a"``: the drag runs only (pass W3).  ``"goe417a+lift"``: with
-    the lift runs carried past the drag runs' end (pass W5)."""
+    the lift runs carried past the drag runs' end (pass W5).
+    ``"goe417a+lift+extend"`` / ``"+hold"``: `SectionPolar`'s ``drag_past``
+    (pass W8)."""
     from dytiscidae.physics.fluid import SectionPolar
     base, _, ext = name.partition("+")
-    if ext not in ("", "lift"):
-        raise ValueError(f"unknown section option {ext!r}")
+    ext, _, past = ext.partition("+")
+    if ext not in ("", "lift") or past not in ("", "extend", "hold"):
+        raise ValueError(f"unknown section option in {name!r}")
     lift = None
     if ext:
         lift = []
         for re_, a, cl in lift_runs(base):
             keep = np.concatenate([[True], a[1:] > np.maximum.accumulate(a)[:-1]])
             lift.append((re_, a[keep], cl[keep]))
-    return SectionPolar(name, tables(base), lift)
+    return SectionPolar(name, tables(base), lift, past or "normal")
 
 
 def lift_runs(name: str):
