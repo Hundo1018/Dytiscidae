@@ -33,7 +33,8 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
              joint_damping: float | None = 0.0, solver_flags: dict | None = None,
              hull_inertia: float | None = None, cg_shift: float = 0.0,
              tail: dict | None = None, pilot: dict | None = None,
-             strip_twist: dict | None = None, chain: dict | None = None) -> dict:
+             strip_twist: dict | None = None, chain: dict | None = None,
+             fluid=None) -> dict:
     """free: root axes released after hold_beats, any of "x", "z", "p" (pitch).
     The measurement runs over the ``beats`` after that, body held or not.
     mass: the machine's all-up mass, made up with ballast at the hull's centre
@@ -77,7 +78,10 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
       "passive" springs of k only, nothing driven;
     zeta (0.05): the springs' damping, of critical for k and the panel's own
     inertia about its hinge.  Reported: the twist drive's power and peak
-    torque, what the tip actually did, and each hinge's swing."""
+    torque, what the tip actually did, and each hinge's swing.
+    fluid: a `medium.Fluid` in place of the medium's own (air, or water when
+    ``medium`` is "water"): another density and viscosity, a vacuum.
+    The result's ``clamped`` says whether the solver's load limiter ever bound."""
     import dytiscidae.core.phenotype as PH
     PH.AVIONICS_MASS = 0.005
     from body import built
@@ -101,7 +105,10 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         env = TriphibianEnv(p, seed=0, timestep=dt)
     env.reset(Domain.AIR if medium == "air" else Domain.WATER, randomise=False)
     d, m, mj = env.data, env.model, env._mj
+    if fluid is not None:
+        setattr(env.medium, "air" if medium == "air" else "water", fluid)
     env.solver.cop_law = cop_law
+    clamped_any = False
     from body import DEFAULTS as _BD
     if dict(_BD, **body)["wing_section"]:
         import sections
@@ -297,6 +304,7 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
         env.solver.apply(d, d.time)
         # The solver has just rewritten all of qfrc_applied (its implicit
         # damping's explicit half); the drive is added to that, never set.
+        clamped_any |= bool(env.solver.diag.clamped)
         d.qfrc_applied[dof] += J * qdd
         tube = None
         if ch is not None and ch["mode"] == "tube":
@@ -373,7 +381,7 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
            "crank_eq_stroke_only_peak": float((np.abs(rec["Ps"]) / np.array(rec["w"])).max() / K85),
            "crank_eq_min": float((P / np.array(rec["w"])).min() / K85),
            "stroke_torque_peak": float(np.max(rec["tq"])),
-           "track_err_deg": float(math.degrees(np.max(rec["err"])))}
+           "track_err_deg": float(math.degrees(np.max(rec["err"]))), "clamped": clamped_any}
     # Net force on the machine, gravity included: from the holder where held,
     # from the motion where released.
     net = np.zeros(3)
