@@ -1,7 +1,7 @@
 # Physics at the extremes: result
 
 2026-11-17. Frozen text: `PREREG.md` (`3a19bbe`). Run: `run.py` ->
-`results.json` (107 rows), `machine_rows.jsonl`, `run.log`. Three runs were
+`results.json` (107 rows), `machine_rows.jsonl` (`run.log` is ignored by git). Three runs were
 needed; what changed between them is in "Repairs to the checks" below, and
 no solver code and no tolerance was touched.
 
