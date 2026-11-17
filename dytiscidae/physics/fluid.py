@@ -300,6 +300,11 @@ PLATE_DROP = (0.04, 3.5, 0.25)
 CN_PLATE = 1.98
 CN_LEV = 3.4
 
+#: The lift and drag law of a lifting strip that has no `SectionPolar`:
+#: `FluidSolver.stall_law`'s default, and what the Mojo kernel and the device
+#: path are launched with.  "legacy", "plate" (numpy only) or "table".
+DEFAULT_STALL_LAW = "legacy"
+
 
 def _log_ramp(re, lo, hi):
     """0 at ``re <= lo``, 1 at ``re >= hi``, linear in log10 between."""
@@ -338,11 +343,17 @@ def _stall(alpha, re, camber=0.0, ar=None, law="legacy"):
     (``ar``: the Helmholtz aspect ratio, None for two-dimensional).  ``alpha``
     is the lift angle, camber shift included.
 
-    law "legacy" (the default, every stored score, and the two GPU mirrors):
+    law "table": `table_coefficients`.
+
+    law "legacy" (every score stored before 2026-11-17):
     11 deg times a Reynolds factor over 6 deg, neither with a source, 3-5 deg
     late and 0.3-0.5 high for a flat wing (RESULT_W5 P4).  The rotor model
     was fitted with it and names it.
     """
+    if law == "table":
+        # the tables hold their own stall; ``w`` is the share of the separated
+        # plate past their measured angles
+        return None, table_coefficients(alpha, re, 1e12, 0.0, None, camber)[2]
     if law == "legacy":
         alpha_stall = np.radians(11.0) * np.clip(
             0.55 + 0.45 * np.log10(np.maximum(re, 10.0)) / 5.0, 0.5, 1.0)
@@ -568,12 +579,11 @@ class SectionPolar:
         n = np.arange(alpha.shape[0])
         return (1.0 - t) * vals[i, :, n].T + t * vals[i + 1, :, n].T
 
-    def coefficients(self, alpha, re, ar, lev, alpha_e=None):
-        """``(cl, cd)`` for incidence ``alpha`` measured towards the section's
-        upper side.  ``alpha_e`` is the Wagner-lagged incidence the attached
-        lift is read at."""
+    def table_part(self, alpha, re, alpha_e=None):
+        """``(cl, cd, w)``: the measured part of `coefficients`, two-
+        dimensional, and the share ``w`` of the separated plate that replaces
+        it outside the measured angles (before any leading-edge vortex)."""
         alpha, re = np.asarray(alpha, float), np.asarray(re, float)
-        lev = np.clip(lev, 0.0, 1.0)
         ae = alpha if alpha_e is None else alpha_e
         cl_t, cd_t, lo, hi, d_end = self._at(ae, re)
         t = np.clip(np.maximum(alpha - hi, lo - alpha) / SEPARATION_COMPLETE, 0.0, 1.0)
@@ -597,6 +607,15 @@ class SectionPolar:
                 cd_t = (1.0 - gone) * cd_t + gone * cd_n
             up = _smoothstep((alpha - top) / np.maximum(self.PLATE_BY - top, 1e-6))
             w = np.where((alpha > hi) & (top > hi), up, w)
+        return cl_t, cd_t, w
+
+    def coefficients(self, alpha, re, ar, lev, alpha_e=None):
+        """``(cl, cd)`` for incidence ``alpha`` measured towards the section's
+        upper side.  ``alpha_e`` is the Wagner-lagged incidence the attached
+        lift is read at."""
+        alpha, re = np.asarray(alpha, float), np.asarray(re, float)
+        lev = np.clip(lev, 0.0, 1.0)
+        cl_t, cd_t, w = self.table_part(alpha, re, alpha_e)
         w = w + (1.0 - w) * lev
         k = 1.0 / (1.0 + 2.0 / np.maximum(ar, 0.5))
         cn = CN_PLATE + (CN_LEV - CN_PLATE) * lev
@@ -605,6 +624,72 @@ class SectionPolar:
         cd = (1.0 - w) * cd_t + w * (skin_friction_cd(re) + cn * sa * sa) \
             + cl * cl / (np.pi * 0.75 * np.maximum(ar, 0.5))
         return cl, cd
+
+
+def _thin_plate(section, alpha, alpha_e, re):
+    """One anchor of `table_coefficients`: its baked row values at the lagged
+    angle and the weight ``w`` by which the strip has left the measured range
+    for the separated plate.  Angles towards the convex side."""
+    from . import thin_plate_tables as T
+    x = np.clip(np.log(np.maximum(re, 1.0)), np.log(T.RE_NODES[0]), np.log(T.RE_NODES[-1]))
+    logre = np.log(T.RE_NODES)
+    j = np.clip(np.searchsorted(logre, x) - 1, 0, len(logre) - 2)
+    t = (x - logre[j]) / (logre[j + 1] - logre[j])
+    u = np.clip((alpha_e - T.ALPHA0) / T.STEP, 0.0, T.CL.shape[2] - 1.0)
+    k = np.minimum(u.astype(int), T.CL.shape[2] - 2)
+    f = u - k
+
+    def read(tab):
+        row = lambda jj: (1.0 - f) * tab[section, jj, k] + f * tab[section, jj, k + 1]
+        return (1.0 - t) * row(j) + t * row(j + 1)
+
+    lo = (1.0 - t) * T.LO[section, j] + t * T.LO[section, j + 1]
+    top = (1.0 - t) * T.TOP[section, j] + t * T.TOP[section, j + 1]
+    w = np.maximum(_smoothstep((alpha - top) / (SectionPolar.PLATE_BY - top)),
+                   _smoothstep((lo - alpha) / SEPARATION_COMPLETE))
+    return read(T.CL), read(T.CD), w
+
+
+def table_coefficients(alpha, re, ar, lev, alpha_e=None, camber=0.0):
+    """``(cl, cd, w)`` of a thin plate of signed camber ``camber`` from two
+    measured sections: the UIUC flat plate and Goe 417a (5.78% camber), linear
+    in the camber between them at the same angle towards the convex side, the
+    arc's values held past it.  The default law since 2026-11-17 (repair R3,
+    experiments/physics_extremes/PREREG_R3_table.md); the tables are baked by
+    `tools/bake_thin_plate.py`.
+
+    Inside a section's measured angles the coefficients are its own, read at
+    the Wagner-lagged ``alpha_e``; outside them, and under a leading-edge
+    vortex, the separated plate, as for a `SectionPolar`.  ``w`` is the share
+    of the separated plate.  Outside the measured Reynolds numbers the tables
+    are held and the drag moves by the flat plate's friction.  No camber
+    shift: the tables carry their own zero-lift angle.
+    """
+    from . import thin_plate_tables as T
+    alpha, re = np.asarray(alpha, float), np.asarray(re, float)
+    ae = alpha if alpha_e is None else np.asarray(alpha_e, float)
+    camber = np.broadcast_to(np.asarray(camber, float), alpha.shape)
+    lev = np.clip(lev, 0.0, 1.0)
+    up = np.where(camber < 0.0, -1.0, 1.0)
+    share = np.minimum(np.abs(camber) / T.CAMBER, 1.0)
+    a, e = up * alpha, up * ae
+    # the flat plate is odd: read on its positive side
+    side = np.where(a < 0.0, -1.0, 1.0)
+    cl0, cd0, w0 = _thin_plate(0, side * a, side * e, re)
+    cl1, cd1, w1 = _thin_plate(1, a, e, re)
+    k = 1.0 / (1.0 + 2.0 / np.maximum(ar, 0.5))
+    cn = CN_PLATE + (CN_LEV - CN_PLATE) * lev
+    sa, ca = np.sin(a), np.cos(a)
+    cf = skin_friction_cd(re)
+    off = cf - skin_friction_cd(np.clip(re, T.RE_NODES[0], T.RE_NODES[-1]))
+    w0, w1 = w0 + (1.0 - w0) * lev, w1 + (1.0 - w1) * lev
+    cl_a = (1.0 - w0) * k * side * cl0 + w0 * cn * sa * ca
+    cl_b = (1.0 - w1) * k * cl1 + w1 * cn * sa * ca
+    cd_a = (1.0 - w0) * (cd0 + off) + w0 * (cf + cn * sa * sa)
+    cd_b = (1.0 - w1) * (cd1 + off) + w1 * (cf + cn * sa * sa)
+    cl = up * ((1.0 - share) * cl_a + share * cl_b)
+    cd = (1.0 - share) * cd_a + share * cd_b + cl * cl / (np.pi * 0.75 * np.maximum(ar, 0.5))
+    return cl, cd, (1.0 - share) * w0 + share * w1
 
 
 # --------------------------------------------------------------------------
@@ -1231,7 +1316,7 @@ class FluidSolver:
         #: camber lift of `plate_lift_limit` and `camber_lift_factor` (repair
         #: R1, experiments/physics_extremes/RESULT_R1_stall.md).  Numpy path
         #: only until the mirrors carry it.
-        self.stall_law: str = "legacy"
+        self.stall_law: str = DEFAULT_STALL_LAW
         #: A measured section (`SectionPolar`) for every wing strip whose
         #: ``camber`` is not zero; the camber's sign says which side is the
         #: section's upper one, and its size is not used (the table has the
@@ -1428,7 +1513,10 @@ class FluidSolver:
         # the flipped lift axis.
         arc = np.where(rev, -p.camber, p.camber)
         law = self.stall_law
-        shift = 2.0 * arc * (camber_lift_factor(re) if law == "plate" else 1.0)
+        if law == "table":
+            shift = np.zeros(p.n)        # the measured tables carry their own zero-lift angle
+        else:
+            shift = 2.0 * arc * (camber_lift_factor(re) if law == "plate" else 1.0)
         on_sec = None
         if self.section is not None:
             # A measured section carries its own zero-lift angle.
@@ -1457,11 +1545,15 @@ class FluidSolver:
         F = np.zeros((p.n, 3))
 
         # Circulatory lift and drag, on the lifting strips only.
-        cl = np.where(
-            is_wing,
-            lift_coefficient(alpha, re, ar_eff, lev, alpha_e, arc, law),
-            0.0)
-        cd = np.where(is_wing, drag_coefficient(alpha, re, ar_eff, cl, lev, arc, law), 0.0)
+        if law == "table":
+            cl, cd, _ = table_coefficients(alpha, re, ar_eff, lev, alpha_e, arc)
+            cl, cd = np.where(is_wing, cl, 0.0), np.where(is_wing, cd, 0.0)
+        else:
+            cl = np.where(
+                is_wing,
+                lift_coefficient(alpha, re, ar_eff, lev, alpha_e, arc, law),
+                0.0)
+            cd = np.where(is_wing, drag_coefficient(alpha, re, ar_eff, cl, lev, arc, law), 0.0)
         if on_sec is not None and on_sec.any():
             up = np.sign(p.camber)
             cl_s, cd_s = self.section.coefficients(up * alpha, re, ar_eff, lev, up * alpha_e)

@@ -600,6 +600,98 @@ def test_the_plate_stall_law_is_opt_in_and_reads_the_thin_plate_table() -> None:
           abs(ratio - float(camber_lift_factor(re))) < 0.01, f"ratio {ratio:.3f} at Re {re:.0f}")
 
 
+def test_the_table_law_reads_two_measured_thin_sections() -> None:
+    """`FluidSolver.stall_law = "table"` (repair R3): the UIUC flat plate and
+    Goe 417a, linear in camber between them, towards the convex side.  Every
+    expectation is read from the csv files or from the law's own symmetries
+    at run time."""
+    from dytiscidae.physics import thin_plate_tables as T
+    from dytiscidae.physics.fluid import CN_LEV, skin_friction_cd, table_coefficients
+    root = Path(__file__).resolve().parents[1]
+    for extra in (root / "tools", root / "experiments" / "flapper"):
+        if str(extra) not in sys.path:
+            sys.path.insert(0, str(extra))
+    import bake_thin_plate
+    import sections
+    print("\nfluid: the table law")
+
+    def law(a, re, camber, lev=0.0, ae=None, ar=1e12):
+        a = np.atleast_1d(np.asarray(a, float))
+        return table_coefficients(a, np.full(a.shape, float(re)), np.full(a.shape, ar), lev,
+                                  None if ae is None else np.full(a.shape, float(ae)), camber)
+
+    built = bake_thin_plate.build()
+    worst = max(float(np.max(np.abs(built[k] - getattr(T, k)))) for k in ("CL", "CD", "LO", "TOP"))
+    check("the baked grid is what the csv files give", worst < 1e-6 and abs(built["CAMBER"] - T.CAMBER) < 1e-6,
+          f"largest difference {worst:.1e}")
+    worst = 0.0
+    for re_, a, cl in bake_thin_plate.flat_runs(sections):
+        worst = max(worst, float(np.max(np.abs(law(a, re_, 0.0)[0] - cl))))
+    check("a flat strip reads the flat plate's lift runs", worst < 0.01, f"largest difference {worst:.4f}")
+    w_l = w_d = 0.0
+    for re_, a, cl, cd in sections.tables("goe417a"):
+        m_cl, m_cd, _ = law(a, re_, T.CAMBER)
+        w_l, w_d = max(w_l, float(np.max(np.abs(m_cl - cl)))), max(w_d, float(np.max(np.abs(m_cd - cd))))
+    check("a strip of Goe 417a's camber reads its drag runs", w_l < 0.01 and w_d < 0.002,
+          f"lift {w_l:.4f}, drag {w_d:.5f}")
+    a = np.radians(np.arange(-20.0, 28.1, 1.0))
+    flat, arc, half = law(a, 1e5, 0.0), law(a, 1e5, T.CAMBER), law(a, 1e5, 0.5 * T.CAMBER)
+    check("half that camber is half way between them, in lift and in drag",
+          np.allclose(half[0], 0.5 * (flat[0] + arc[0]), rtol=0, atol=1e-12)
+          and np.allclose(half[1], 0.5 * (flat[1] + arc[1]), rtol=0, atol=1e-9)
+          and float(np.max(np.abs(arc[0] - flat[0]))) > 0.3)
+    more = law(a, 1e5, 0.09)
+    check("past it the arc's values are held",
+          np.allclose(more[0], arc[0], rtol=0, atol=1e-12) and np.allclose(more[1], arc[1], rtol=0, atol=1e-12))
+    check("the flat plate is odd", np.allclose(law(-a, 1e5, 0.0)[0], -flat[0], rtol=0, atol=1e-12)
+          and np.allclose(law(-a, 1e5, 0.0)[1], flat[1], rtol=0, atol=1e-12))
+    other = law(-a, 1e5, -T.CAMBER)
+    check("an arc turned over lifts towards its convex side all the same",
+          np.allclose(other[0], -arc[0], rtol=0, atol=1e-12) and np.allclose(other[1], arc[1], rtol=0, atol=1e-12)
+          and float(law(0.0, 1e5, -T.CAMBER)[0][0]) < -0.1 < 0.1 < float(law(0.0, 1e5, T.CAMBER)[0][0]))
+    cf = lambda re: float(skin_friction_cd(np.array([float(re)]))[0])
+    five = math.radians(5.0)
+    f_cl, f_cd, _ = law(five, 1e5, 0.0)
+    check("the flat plate's drag is friction and its lift's share normal to the chord",
+          abs(float(f_cd[0]) - cf(1e5) - float(f_cl[0]) * math.tan(five)) < 2e-3,
+          f"{float(f_cd[0]):.4f} vs {cf(1e5) + float(f_cl[0]) * math.tan(five):.4f}")
+    lo, edge = law(five, 1e4, T.CAMBER), law(five, T.RE_NODES[0], T.CAMBER)
+    check("below the measured Reynolds numbers the lift is held and the drag moves by the friction",
+          abs(float(lo[0][0] - edge[0][0])) < 1e-12
+          and abs(float(lo[1][0] - edge[1][0]) - (cf(1e4) - cf(T.RE_NODES[0]))) < 1e-12,
+          f"drag +{float(lo[1][0] - edge[1][0]):.4f}")
+    mid = law(five, 9e4, T.CAMBER)[0][0]
+    a80, a100 = law(five, 8e4, T.CAMBER)[0][0], law(five, 1e5, T.CAMBER)[0][0]
+    t = (math.log(9e4) - math.log(8e4)) / (math.log(1e5) - math.log(8e4))
+    check("between two Reynolds numbers it is linear in log Re",
+          abs(float(mid) - ((1 - t) * float(a80) + t * float(a100))) < 1e-12 and abs(float(a80 - a100)) > 1e-3)
+    sc = CN_LEV * math.sin(five) * math.cos(five)
+    check("a leading-edge vortex takes the strip to the separated plate", abs(float(law(five, 1e5, 0.03, lev=1.0)[0][0]) - sc) < 1e-12)
+    check("the lift is read at the lagged angle",
+          abs(float(law(math.radians(8.0), 1e5, 0.03, ae=five)[0][0]) - float(law(five, 1e5, 0.03)[0][0])) < 1e-12)
+    ninety = law(math.radians(90.0), 1e5, 0.03)
+    check("broadside it is the plate", abs(float(ninety[0][0])) < 1e-9 and abs(float(ninety[1][0]) - 1.98 - cf(1e5)) < 1e-9)
+
+    # through the solver: one cambered strip at zero incidence in a wind
+    m, d = _single_panel_model()
+    panels = _wing_panels(m, 0.0)
+    panels.camber[:] = 0.03
+    wind = 12.0
+    solver = FluidSolver(m, panels, MediumField(wind=np.array([wind, 0.0, 0.0])))
+    solver.stall_law, solver.unsteady, solver.inflow = "table", False, False
+    d.qvel[:] = 0.0
+    d.xfrc_applied[:] = 0.0
+    mujoco.mj_forward(m, d)
+    solver.apply(d, 0.0)
+    q = 0.5 * 1.225 * wind ** 2 * float(panels.area.sum())
+    b = panels.body_id[0]
+    fz = float(d.xfrc_applied[b, 2]) - (m.body_mass[b] - solver._dry_mass[b]) * 9.80665
+    re = 1.225 * wind * float(panels.chord[0]) / 1.81e-5
+    want = float(table_coefficients(np.zeros(1), np.array([re]), panels.aspect_ratio[:1], 0.0, None, 0.03)[0][0])
+    check("the solver reads it, with no camber shift of its own", abs(abs(fz) / q - abs(want)) < 0.02 * abs(want) and abs(want) > 0.03,
+          f"{abs(fz) / q:.4f} vs {abs(want):.4f} at Re {re:.0f}")
+
+
 def test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning() -> None:
     """`FluidSolver.entrainment = "wetting"`: the reaction ``-dm/dt v`` for the
     growth a strip's density brings, and none for the growth of a submerged
@@ -5563,6 +5655,7 @@ def main() -> int:
         test_a_cambered_strip_carries_its_own_pitching_moment,
         test_a_sections_drag_can_follow_its_table_to_the_lifts_peak,
         test_the_plate_stall_law_is_opt_in_and_reads_the_thin_plate_table,
+        test_the_table_law_reads_two_measured_thin_sections,
         test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning,
         test_a_measured_section_replaces_the_default_law_where_it_was_measured,
         test_buoyancy,

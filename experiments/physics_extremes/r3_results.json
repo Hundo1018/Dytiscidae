@@ -1,0 +1,308 @@
+[
+ {
+  "check": "T1",
+  "case": "flat plate, lift runs (odd, zero-shifted)",
+  "measured": 0.008958544617686304,
+  "expected": "< 0.01",
+  "tol": 0.01,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T1",
+  "case": "Goe 417a, lift inside the drag runs",
+  "measured": 0.006852040000118562,
+  "expected": "< 0.01",
+  "tol": 0.01,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T1",
+  "case": "Goe 417a, drag runs",
+  "measured": 0.0004875650711117993,
+  "expected": "< 0.002",
+  "tol": 0.002,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T1",
+  "case": "Goe 417a, lift runs past the drag runs",
+  "measured": 0.07268030365732048,
+  "expected": "< 0.01",
+  "tol": 0.01,
+  "ok": false,
+  "note": ""
+ },
+ {
+  "check": "T2",
+  "case": "Re 60000: largest |dcl|",
+  "measured": 0.0028128057066990064,
+  "expected": "< 0.02",
+  "tol": 0.02,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T2",
+  "case": "Re 60000: largest |dcd|",
+  "measured": 0.000281060139341191,
+  "expected": "< 0.005",
+  "tol": 0.005,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T2",
+  "case": "Re 100000: largest |dcl|",
+  "measured": 9.494551609368074e-07,
+  "expected": "< 0.02",
+  "tol": 0.02,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T2",
+  "case": "Re 100000: largest |dcd|",
+  "measured": 7.694147921011307e-07,
+  "expected": "< 0.005",
+  "tol": 0.005,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T2",
+  "case": "Re 200000: largest |dcl|",
+  "measured": 6.151153060240944e-07,
+  "expected": "< 0.02",
+  "tol": 0.02,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T2",
+  "case": "Re 200000: largest |dcd|",
+  "measured": 5.594723975765881e-07,
+  "expected": "< 0.005",
+  "tol": 0.005,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T2",
+  "case": "Re 80000: largest |dcl|",
+  "measured": 0.024946942716272402,
+  "expected": "< 0.03",
+  "tol": 0.03,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T2",
+  "case": "Re 80000: largest |dcd|",
+  "measured": 0.002494881933286966,
+  "expected": "< 0.008",
+  "tol": 0.008,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T2",
+  "case": "Re 150000: largest |dcl|",
+  "measured": 0.0014580490033904436,
+  "expected": "< 0.03",
+  "tol": 0.03,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T2",
+  "case": "Re 150000: largest |dcd|",
+  "measured": 0.003763728023638946,
+  "expected": "< 0.008",
+  "tol": 0.008,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T7",
+  "case": "largest step of cl over 0.1 deg",
+  "measured": 0.019999999999958884,
+  "expected": "<= 0.02",
+  "tol": 0.02,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T7",
+  "case": "flat plate: |cl(a) + cl(-a)|",
+  "measured": 1.5666357100485584e-12,
+  "expected": "<= 1e-12",
+  "tol": 1e-12,
+  "ok": false,
+  "note": ""
+ },
+ {
+  "check": "T7",
+  "case": "largest cf - cd",
+  "measured": 0.0,
+  "expected": "<= 0",
+  "tol": 0.0,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T7",
+  "case": "|cd(90 deg) - 1.98 - cf|",
+  "measured": 2.0469737016526324e-16,
+  "expected": "<= 1e-9",
+  "tol": 1e-09,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T7",
+  "case": "Goe 417a camber, Re 198k: best cl/cd",
+  "measured": 75.34024242404008,
+  "expected": "76.21 within 2%",
+  "tol": 0.02,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T4",
+  "case": "lift, Re 100k, 0-5 deg",
+  "measured": 0.06749345567738146,
+  "expected": "<= 0.1",
+  "tol": 0.1,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T4",
+  "case": "lift, Re 100k, 8-19 deg",
+  "measured": 0.11317234257204789,
+  "expected": "<= 0.1",
+  "tol": 0.1,
+  "ok": false,
+  "note": ""
+ },
+ {
+  "check": "T4",
+  "case": "lift, Re 200k, 0-5 deg",
+  "measured": 0.05695641727887696,
+  "expected": "<= 0.1",
+  "tol": 0.1,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T4",
+  "case": "lift, Re 200k, 8-19 deg",
+  "measured": 0.06979720388989086,
+  "expected": "<= 0.1",
+  "tol": 0.1,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T4",
+  "case": "lift, Re 60k, 0-5 deg",
+  "measured": 0.1580717168859728,
+  "expected": "<= 0.2",
+  "tol": 0.2,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T4",
+  "case": "lift, Re 60k, 8-19 deg",
+  "measured": 0.11861314250948207,
+  "expected": "<= 0.1",
+  "tol": 0.1,
+  "ok": false,
+  "note": ""
+ },
+ {
+  "check": "T4",
+  "case": "drag, Re 199k, 0-10 deg",
+  "measured": 0.0064244156063971505,
+  "expected": "<= 0.008 (100k, 200k)",
+  "tol": 0.008,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T4",
+  "case": "drag, Re 59k, 0-10 deg",
+  "measured": 0.009922638403976718,
+  "expected": "<= 0.008 (100k, 200k)",
+  "tol": 0.008,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T4",
+  "case": "drag, Re 99k, 0-10 deg",
+  "measured": 0.0063063839167848655,
+  "expected": "<= 0.008 (100k, 200k)",
+  "tol": 0.008,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T5",
+  "case": "Re 60000: maximum CL",
+  "measured": 1.2246714495610393,
+  "expected": "1.17-1.22 (stated disagreement)",
+  "tol": "-",
+  "ok": false,
+  "note": "at 13.5 deg"
+ },
+ {
+  "check": "T5",
+  "case": "Re 100000: maximum CL",
+  "measured": 1.1934784244076746,
+  "expected": "1.17-1.22 (stated disagreement)",
+  "tol": "-",
+  "ok": true,
+  "note": "at 12.8 deg"
+ },
+ {
+  "check": "T3",
+  "case": "rms CL error, 31 points",
+  "measured": 0.12237124489421689,
+  "expected": "< 0.14",
+  "tol": 0.14,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "T3",
+  "case": "the gate: below the legacy law's",
+  "measured": 0.12237124489421689,
+  "expected": "< 0.165",
+  "tol": "-",
+  "ok": true,
+  "note": "legacy 0.165"
+ },
+ {
+  "check": "T3",
+  "case": "largest |CL error|",
+  "measured": 0.2879190394758453,
+  "expected": "<= 0.25, at AR 2",
+  "tol": 0.25,
+  "ok": false,
+  "note": "AR 3, 30 deg"
+ },
+ {
+  "check": "T3",
+  "case": "rms CD error where given",
+  "measured": 0.11372412262566631,
+  "expected": "< 0.05",
+  "tol": 0.05,
+  "ok": false,
+  "note": "legacy 0.056"
+ }
+]
