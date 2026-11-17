@@ -468,6 +468,14 @@ def test_centre_of_pressure_moves_aft_when_the_flow_separates() -> None:
     _, _, xr = load(45.0, "plate", wind=-10.0)
     check("reversed flow measures it from the trailing edge", abs(xr - (1.0 - 0.415)) < 0.02,
           f"{xr:.3f}")
+    # Pitching in still air: damped, about the span, by 1/2 rho C w|w| 82/1024 c^4.
+    _, ts_off, _ = load(0.0, None, wind=0.0, spin=20.0)
+    _, ts_on, _ = load(0.0, "plate", wind=0.0, spin=20.0)
+    ar = 5.0
+    want = -0.5 * 1.225 * 2 * math.pi * ar / (2 + math.sqrt(ar * ar + 4)) * 400.0 * 82 / 1024 * c**4
+    got = ts_on[1] - ts_off[1]
+    check("rotation is damped by the plate's broadside drag", abs(got - want) < 0.02 * abs(want),
+          f"{got:.3e} vs {want:.3e} N m")
 
 
 def test_a_cambered_strip_carries_its_own_pitching_moment() -> None:
@@ -506,14 +514,6 @@ def test_a_cambered_strip_carries_its_own_pitching_moment() -> None:
     check("off: no moment about the quarter chord", np.abs(t_off).max() < 1e-12, f"{t_off}")
     _, t45, _ = load(45.0, 0.04, True)
     check("separated flow has none", np.abs(t45).max() < 1e-9, f"{t45}")
-    # Pitching in still air: damped, about the span, by 1/2 rho C w|w| 82/1024 c^4.
-    _, ts_off, _ = load(0.0, None, wind=0.0, spin=20.0)
-    _, ts_on, _ = load(0.0, "plate", wind=0.0, spin=20.0)
-    ar = 5.0
-    want = -0.5 * 1.225 * 2 * math.pi * ar / (2 + math.sqrt(ar * ar + 4)) * 400.0 * 82 / 1024 * c**4
-    got = ts_on[1] - ts_off[1]
-    check("rotation is damped by the plate's broadside drag", abs(got - want) < 0.02 * abs(want),
-          f"{got:.3e} vs {want:.3e} N m")
 
 
 def test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning() -> None:
