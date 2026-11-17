@@ -316,7 +316,9 @@ class Drive:
         c_h, Psi = float(fe.get("c_h", 0.03)), math.radians(fe.get("Psi_deg", 50.0))
         hb = plain.body("seg0_hull").id
         self.horn_local, self.arm = {}, {}
-        # the horn in each wing's frame: c_h along the chord towards the leading edge
+        # the horn in each wing's frame: c_h further along the hinge's shift, i.e.
+        # aft of the hinge (the hinge is 0.1 chord, 26 mm, behind the leading
+        # edge, so 30 mm ahead of it would be off the wing; RESULT_D2)
         for side, nm in ((1, "seg1_wing"), (-1, "seg2_wing")):
             shift = self.lever_local[side] - np.array([self.a, 0.0, 0.0])
             cdir = shift / max(np.linalg.norm(shift), 1e-12) if self.feather_axis else None
@@ -493,6 +495,10 @@ class Drive:
             # the feather where the loop closes at the built crank angle, and each
             # rod turned (ball joint) from its built direction to the horn
             psi0 = self.arm["psi0"]
+            # mj_setConst (freerig calls it after setting the mass) puts a
+            # connect's body2 anchor back where the rod's end was built: the horn again
+            for side in (1, -1):
+                m.eq_data[m.eq(f"featherrod{side:+d}").id, 3:6] = self.horn_local[side]
             for nm in ("seg1_wing_jf", "seg2_wing_jf"):
                 d.qpos[m.joint(nm).qposadr[0]] = psi0
             mujoco.mj_kinematics(m, d)

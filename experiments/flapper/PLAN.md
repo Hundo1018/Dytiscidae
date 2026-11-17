@@ -280,7 +280,13 @@ those results and is reopened (decision 4).
   pulley pair, direct drive; for the twist, the same set plus coupling to
   the stroke. Each is judged on the waveform it can make, the peak torque
   and power its motor sees, mass, and whether it can also serve water and
-  land. None is chosen by this list.
+  land. None is chosen by this list. Built since: the stroke by DD, FB, SY,
+  CT (`RESULT_D1_stroke_drive.md`, with the D1b lever sweep) and the root
+  feather at take-off by servo, second motor, feather crank and spring
+  (`RESULT_D2_feather_drive.md`). Open from D2: a feather crank with its
+  toggle moved away (horn length, arm ratio), and a motor matched to the
+  feather's slow high-torque load; the cruise tip twist needs W7's hinged
+  wing (D3).
 - **Results that already carry a drive assumption**: W8's and W8b's
   "sustaining" counts and cheapest points keep only rows with
   `crank_eq_peak <= 12` (`w8_read.py`), a ceiling on an ideal crank's
