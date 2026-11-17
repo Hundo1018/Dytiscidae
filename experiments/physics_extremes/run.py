@@ -43,7 +43,7 @@ def record(check, case, measured, expected, tol, ok, note=""):
 
 def bare(joints, span, chord, alpha_deg, *, fluid=AIR, wind=None, ar=None, dt, gravity=0.0,
          mass=0.2, volume=0.0, half_height=None, flags=None, medium=None, z0=5.0, x_of=None,
-         disc_span=None):
+         disc_span=None, camber=0.0):
     """One rectangular plate of strips on a body with the given joints.  Span
     along X, the chord (leading edge to trailing) back along -Y and down for a
     positive incidence, upper side +Z; it flies along +Y."""
@@ -65,7 +65,7 @@ def bare(joints, span, chord, alpha_deg, *, fluid=AIR, wind=None, ar=None, dt, g
         chord=np.full(n, chord), dr=np.full(n, dr), volume=np.full(n, volume / n),
         half_height=np.full(n, half_height if half_height is not None else chord / 20),
         kind=np.full(n, WING), aspect_ratio=np.full(n, ar if ar is not None else span / chord),
-        cd_bluff=np.zeros(n), camber=np.zeros(n))
+        cd_bluff=np.zeros(n), camber=np.full(n, camber))
     med = medium if medium is not None else MediumField(air=fluid, wind=wind)
     sol = FluidSolver(m, p, med, disc_span=disc_span or span)
     for k, v in (flags or {}).items():
@@ -82,13 +82,13 @@ def fluid_force(m, d, sol, bid):
 
 
 def translate(alpha, *, chord=0.1, ar=4.0, re=1e5, fluid=AIR, frame="body", chords=40.0,
-              flags=None, strip_ar=None, series=False, U=None):
+              flags=None, strip_ar=None, series=False, U=None, camber=0.0):
     """Steady flight along +Y; mean force over the last tenth, or the history."""
     U = re * fluid.nu / chord if U is None else U
     dt = chord / U / 100.0
     wind = np.array([0.0, -U, 0.0]) if frame == "wind" else None
     m, d, sol, bid = bare('<joint type="slide" axis="0 1 0"/>', ar * chord, chord, alpha, fluid=fluid,
-                          wind=wind, ar=strip_ar or ar, dt=dt, flags=flags)
+                          wind=wind, ar=strip_ar or ar, dt=dt, flags=flags, camber=camber)
     n = int(round(chords * chord / U / dt))
     last = max(n // 10, 1)
     F, hist = np.zeros(3), []

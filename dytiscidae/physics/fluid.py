@@ -264,6 +264,33 @@ def skin_friction_cd(re: np.ndarray) -> np.ndarray:
 #: such in `docs/MATH_AUDIT.md`, not a measurement.
 SEPARATION_COMPLETE = np.radians(6.0)
 
+#: The same width under `law="plate"` (repair R1, 2026-11-17): 4 degrees, over
+#: which 4-6% cambered plates drop from their maximum to their plateau
+#: (McArthur 2008 figs 5.1-5.2).
+PLATE_SEPARATION = np.radians(4.0)
+
+#: Reynolds numbers between which a thin arc's camber lift grows from
+#: `CAMBER_LIFT[0]` to `CAMBER_LIFT[1]` of thin-airfoil theory's (linear in
+#: log Re): a 5% arc carries CL 0.2 at zero incidence at Re 1e4-2e4, not
+#: 4 pi f = 0.63, and theory's value only near Re 4e5.  A fit to three
+#: plates in three tunnels, +-0.1 (experiments/flapper/sections/
+#: TYPED_CONSTANTS_SOURCES.md, A.2).
+CAMBER_RE = (2.0e4, 3.0e5)
+CAMBER_LIFT = (0.3, 0.9)
+
+#: A thin plate's maximum lift, ``min(PLATE_CLMAX[0] + PLATE_CLMAX[1] f, cap)``:
+#: 0.70 flat, 1.02 at 4% camber, and a cap of `PLATE_CAP[0]` up to Re
+#: `PLATE_CAP_RE[0]` rising to `PLATE_CAP[1]` at `PLATE_CAP_RE[1]`.  Past it the
+#: lift settles `PLATE_DROP[0] + PLATE_DROP[1] f` lower (at most
+#: `PLATE_DROP[2]`) and holds until the separated plate's lift exceeds it.
+#: Same source and status as `CAMBER_RE`: a fit to the table there, scatter
+#: +-0.07, for sections up to about 4% thick; a round-nosed section of 6% and
+#: more is another regime and wants a `SectionPolar`.
+PLATE_CLMAX = (0.70, 8.0)
+PLATE_CAP = (1.10, 1.30)
+PLATE_CAP_RE = (2.0e5, 1.0e6)
+PLATE_DROP = (0.04, 3.5, 0.25)
+
 #: Normal-force coefficient of the separated branch, ``CL = CN sin a cos a``,
 #: ``CD = CN sin^2 a``.  1.98 is a flat plate broadside (the pressure-drag
 #: constant this module always used); 3.4 is a wing carrying a stable
@@ -274,23 +301,78 @@ CN_PLATE = 1.98
 CN_LEV = 3.4
 
 
-def _stall(alpha, re):
+def _log_ramp(re, lo, hi):
+    """0 at ``re <= lo``, 1 at ``re >= hi``, linear in log10 between."""
+    return np.clip((np.log10(np.maximum(re, 1.0)) - np.log10(lo)) / (np.log10(hi) - np.log10(lo)),
+                   0.0, 1.0)
+
+
+def camber_lift_factor(re):
+    """The share of thin-airfoil theory's camber lift a thin arc makes at
+    this Reynolds number (`CAMBER_RE`)."""
+    return CAMBER_LIFT[0] + (CAMBER_LIFT[1] - CAMBER_LIFT[0]) * _log_ramp(re, *CAMBER_RE)
+
+
+def plate_lift_limit(alpha, re, camber=0.0):
+    """``(CLmax, plateau)`` of a thin plate of signed camber ``camber`` (as
+    the flow meets it: positive when it lifts towards positive ``alpha``).
+    On the other side, where it would lift away from its convex face, the
+    flat plate's values are used: there is no data for that side."""
+    f = np.where(np.asarray(alpha) * camber >= 0.0, np.abs(camber), 0.0)
+    cap = PLATE_CAP[0] + (PLATE_CAP[1] - PLATE_CAP[0]) * _log_ramp(re, *PLATE_CAP_RE)
+    clmax = np.minimum(PLATE_CLMAX[0] + PLATE_CLMAX[1] * f, np.maximum(cap, PLATE_CLMAX[0]))
+    return clmax, clmax - np.minimum(PLATE_DROP[0] + PLATE_DROP[1] * f, PLATE_DROP[2])
+
+
+def _stall(alpha, re, camber=0.0, ar=None, law="legacy"):
     """Static stall angle and the attached-to-separated weight ``w``.
 
     ``w`` is 0 up to the stall angle and reaches 1 ``SEPARATION_COMPLETE``
     beyond it, a smoothstep, so ``w`` and ``w'`` are exactly zero at zero
-    incidence (F-05) and the attached lift peaks at stall and falls to the plate
-    curve after it (F-08).
+    incidence (F-05) and the attached lift peaks at stall and falls after it
+    (F-08).
+
+    law "plate" (2026-11-17, repair R1): the strip stalls where its attached
+    lift reaches a thin plate's measured maximum, `plate_lift_limit`, so the
+    angle is ``CLmax / slope`` with the slope the attached branch uses
+    (``ar``: the Helmholtz aspect ratio, None for two-dimensional).  ``alpha``
+    is the lift angle, camber shift included.
+
+    law "legacy" (the default, every stored score, and the two GPU mirrors):
+    11 deg times a Reynolds factor over 6 deg, neither with a source, 3-5 deg
+    late and 0.3-0.5 high for a flat wing (RESULT_W5 P4).  The rotor model
+    was fitted with it and names it.
     """
-    alpha_stall = np.radians(11.0)
-    # Very low Reynolds number wings stall early and softly.
-    alpha_stall = alpha_stall * np.clip(
-        0.55 + 0.45 * np.log10(np.maximum(re, 10.0)) / 5.0, 0.5, 1.0)
-    t = np.clip((np.abs(alpha) - alpha_stall) / SEPARATION_COMPLETE, 0.0, 1.0)
+    if law == "legacy":
+        alpha_stall = np.radians(11.0) * np.clip(
+            0.55 + 0.45 * np.log10(np.maximum(re, 10.0)) / 5.0, 0.5, 1.0)
+        t = np.clip((np.abs(alpha) - alpha_stall) / SEPARATION_COMPLETE, 0.0, 1.0)
+        return alpha_stall, t * t * (3.0 - 2.0 * t)
+    slope = 2.0 * np.pi if ar is None else 2.0 * np.pi / (1.0 + 2.0 / np.maximum(ar, 0.5))
+    clmax, _ = plate_lift_limit(alpha, re, camber)
+    alpha_stall = clmax / slope
+    t = np.clip((np.abs(alpha) - alpha_stall) / PLATE_SEPARATION, 0.0, 1.0)
     return alpha_stall, t * t * (3.0 - 2.0 * t)
 
 
-def chordwise_cop(alpha: np.ndarray, re: np.ndarray, law: str) -> np.ndarray:
+def _separated(alpha, re, ar, lev, camber, law):
+    """``(w, |cl_sep|)``: the handover weight with the vortex's pull in it,
+    and the size of the separated branch's lift.  Past stall a thin plate
+    holds a plateau until the flat plate's ``CN sin a cos a`` exceeds it
+    (repair R1); the vortex weights the plateau out as it does the attached
+    branch."""
+    cn = CN_PLATE + (CN_LEV - CN_PLATE) * lev
+    a = np.abs(alpha)
+    plate = cn * np.sin(a) * np.cos(a)
+    _, t = _stall(alpha, re, camber, ar, law)
+    if law != "legacy":
+        _, plateau = plate_lift_limit(alpha, re, camber)
+        plate = np.where(a < 0.25 * np.pi, np.maximum(plate, (1.0 - lev) * t * plateau), plate)
+    return t + (1.0 - t) * lev, plate
+
+
+def chordwise_cop(alpha: np.ndarray, re: np.ndarray, law: str, camber=0.0, ar=None,
+                  stall_law: str = "legacy") -> np.ndarray:
     """Centre of pressure of a strip's lift and drag, as a fraction of chord
     from the edge the flow meets.
 
@@ -307,7 +389,7 @@ def chordwise_cop(alpha: np.ndarray, re: np.ndarray, law: str) -> np.ndarray:
       2015, in Wang et al. 2016 fig. 6), 0.06 + 0.00501 a[deg]: 0.29 at 45.
     """
     a = np.minimum(np.abs(alpha), np.pi / 2)
-    _, w = _stall(alpha, re)
+    _, w = _stall(alpha, re, camber, ar, stall_law)
     if law == "plate":
         sep = 0.5 - 0.75 * np.cos(a) / (4.0 + np.pi * np.sin(a))
     elif law == "insect":
@@ -320,6 +402,7 @@ def chordwise_cop(alpha: np.ndarray, re: np.ndarray, law: str) -> np.ndarray:
 def lift_coefficient(
     alpha: np.ndarray, re: np.ndarray, ar: np.ndarray,
     lev: np.ndarray, alpha_e: np.ndarray | None = None,
+    camber: np.ndarray | float = 0.0, law: str = "legacy",
 ) -> np.ndarray:
     """Lift coefficient: attached below stall, separated normal force above.
 
@@ -340,20 +423,20 @@ def lift_coefficient(
     ae = alpha if alpha_e is None else alpha_e
     cl_alpha = 2.0 * np.pi / (1.0 + 2.0 / np.maximum(ar, 0.5))
     cl_att = cl_alpha * ae
-    cn = CN_PLATE + (CN_LEV - CN_PLATE) * lev
-    cl_sep = cn * np.sin(alpha) * np.cos(alpha)
-    _, w = _stall(alpha, re)
     # A strong LEV is separated flow from the leading edge on: the robofly's
     # CL is CN sin a cos a from a few degrees up (0.55 at 9 deg; CN 3.5 gives
     # 0.54).  So the LEV strength also moves the handover toward the separated
-    # branch, all the way at lev = 1.
-    w = w + (1.0 - w) * lev
-    return (1.0 - w) * cl_att + w * cl_sep
+    # branch, all the way at lev = 1 (inside `_separated`).
+    w, sep = _separated(alpha, re, ar, lev, camber, law)
+    if law == "legacy":
+        # the stored scores' own expression, to the bit
+        return (1.0 - w) * cl_att + w * (CN_PLATE + (CN_LEV - CN_PLATE) * lev) * np.sin(alpha) * np.cos(alpha)
+    return (1.0 - w) * cl_att + w * np.sign(alpha) * sep
 
 
 def drag_coefficient(
     alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, cl: np.ndarray,
-    lev: np.ndarray | float = 0.0,
+    lev: np.ndarray | float = 0.0, camber: np.ndarray | float = 0.0, law: str = "legacy",
 ) -> np.ndarray:
     """Skin friction, plus induced drag, plus separated pressure drag.
 
@@ -371,11 +454,19 @@ def drag_coefficient(
     # pipeline tends to generate.
     oswald = 0.75
     cd_i = cl * cl / (np.pi * oswald * np.maximum(ar, 0.5))
-    _, w = _stall(alpha, re)
-    w = w + (1.0 - w) * lev
+    # Separated flow loads the strip normal to its chord, so its pressure
+    # drag is its lift times tan(alpha): ``CN sin^2 a`` on the plate branch,
+    # and the plateau's own share where a thin plate holds one (repair R1).
+    w, sep = _separated(alpha, re, ar, lev, camber, law)
+    a = np.abs(alpha)
+    sa = np.sin(a)
     cn = CN_PLATE + (CN_LEV - CN_PLATE) * lev
-    sa = np.sin(alpha)
-    cd_p = w * cn * sa * sa
+    # the plateau lives below 45 deg; from there on it is the plate itself,
+    # written directly so that broadside (tan -> infinity) is exact
+    if law == "legacy":
+        cd_p = w * cn * sa * sa            # the stored scores' own expression, to the bit
+    else:
+        cd_p = w * np.where(a < 0.25 * np.pi, sep * np.tan(np.minimum(a, 0.25 * np.pi)), cn * sa * sa)
     return cd_f + cd_i + cd_p
 
 
@@ -1108,6 +1199,15 @@ class FluidSolver:
         #: where a wing's twist or feather is free or its drive is being sized
         #: (experiments/flapper, PREREG_W7_twistmech.md).
         self.camber_moment: bool = False
+        #: The default law's stall, for strips with no measured section.
+        #: "legacy" (the default, every stored score, and what the Mojo kernel
+        #: and the device path mirror): 11 deg times a Reynolds factor and thin-
+        #: airfoil theory's full camber lift, neither right for a thin plate at
+        #: Re 1e4-3e5.  "plate": the lift limit, plateau and Reynolds-dependent
+        #: camber lift of `plate_lift_limit` and `camber_lift_factor` (repair
+        #: R1, experiments/physics_extremes/RESULT_R1_stall.md).  Numpy path
+        #: only until the mirrors carry it.
+        self.stall_law: str = "legacy"
         #: A measured section (`SectionPolar`) for every wing strip whose
         #: ``camber`` is not zero; the camber's sign says which side is the
         #: section's upper one, and its size is not used (the table has the
@@ -1302,7 +1402,9 @@ class FluidSolver:
         # sees the arc from its other end: the arc is fore-aft symmetric, so
         # it still lifts toward its convex side, which is the opposite sign on
         # the flipped lift axis.
-        shift = 2.0 * np.where(rev, -p.camber, p.camber)
+        arc = np.where(rev, -p.camber, p.camber)
+        law = self.stall_law
+        shift = 2.0 * arc * (camber_lift_factor(re) if law == "plate" else 1.0)
         on_sec = None
         if self.section is not None:
             # A measured section carries its own zero-lift angle.
@@ -1333,9 +1435,9 @@ class FluidSolver:
         # Circulatory lift and drag, on the lifting strips only.
         cl = np.where(
             is_wing,
-            lift_coefficient(alpha, re, ar_eff, lev, alpha_e),
+            lift_coefficient(alpha, re, ar_eff, lev, alpha_e, arc, law),
             0.0)
-        cd = np.where(is_wing, drag_coefficient(alpha, re, ar_eff, cl, lev), 0.0)
+        cd = np.where(is_wing, drag_coefficient(alpha, re, ar_eff, cl, lev, arc, law), 0.0)
         if on_sec is not None and on_sec.any():
             up = np.sign(p.camber)
             cl_s, cd_s = self.section.coefficients(up * alpha, re, ar_eff, lev, up * alpha_e)
@@ -1350,8 +1452,7 @@ class FluidSolver:
             # n = s x c, so c x n = s: about +s the edge the flow meets turns
             # away from +n, which is nose down for an arc convex towards +n
             # (camber > 0, flow over the leading edge).
-            _, w_st = _stall(alpha, re)
-            arc = np.where(rev, -p.camber, p.camber)
+            _, w_st = _stall(alpha, re, arc, ar_eff, law)
             tau_cm = np.where(is_wing, (1.0 - w_st) * (1.0 - lev) * np.pi * arc * q * p.chord * p.area,
                               0.0)[:, None] * s_hat
 
@@ -1633,7 +1734,7 @@ class FluidSolver:
         if self.cop_law is not None:
             # Lift and drag moved from the quarter chord to their centre of
             # pressure, measured from the edge the flow meets; c_hat is aft.
-            x_cp = chordwise_cop(alpha, re, self.cop_law)
+            x_cp = chordwise_cop(alpha, re, self.cop_law, arc, ar_eff, law)
             x_geo = np.where(rev, 1.0 - x_cp, x_cp)
             shift = np.where(is_wing, (x_geo - 0.25) * p.chord, 0.0)[:, None] * c_hat
             np.add.at(fb[:, 3:], p.body_id, _cross3(shift, F_circ) + tau_rd)

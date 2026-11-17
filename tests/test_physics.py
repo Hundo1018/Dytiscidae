@@ -508,12 +508,67 @@ def test_a_cambered_strip_carries_its_own_pitching_moment() -> None:
     fr, taur, _ = load(0.0, 0.04, True, wind=-10.0)
     check("flow over the trailing edge: nose down for the edge it meets", fr[2] * taur[1] > 0.0
           and abs(abs(taur[1]) - want) < 1e-3 * want, f"lift {fr[2]:+.3f}, moment {taur[1]:+.4f}")
+    check("and the lift is still towards the convex side", fr[2] * f[2] > 0.0, f"{f[2]:+.3f} forward, {fr[2]:+.3f} reversed")
     _, t0, _ = load(0.0, 0.0, True)
     check("a flat strip has none", np.abs(t0).max() < 1e-12, f"{t0}")
     _, t_off, _ = load(0.0, 0.04, False)
     check("off: no moment about the quarter chord", np.abs(t_off).max() < 1e-12, f"{t_off}")
     _, t45, _ = load(45.0, 0.04, True)
     check("separated flow has none", np.abs(t45).max() < 1e-9, f"{t45}")
+
+
+def test_the_plate_stall_law_is_opt_in_and_reads_the_thin_plate_table() -> None:
+    """`FluidSolver.stall_law = "plate"` (repair R1): a lift limit, a plateau
+    and a camber lift that depends on Reynolds number, for strips with no
+    measured section.  The default stays the law every stored score used."""
+    from dytiscidae.physics.fluid import (CN_LEV, PLATE_CLMAX, PLATE_DROP, camber_lift_factor,
+                                          drag_coefficient, lift_coefficient, skin_friction_cd)
+    print("\nfluid: the thin-plate stall law (opt-in)")
+    one = lambda x: np.array([float(x)])
+    two_d, still = one(1e6), one(0.0)
+    cl = lambda deg, re=1e5, camber=0.0, lev=still, law="plate": float(lift_coefficient(
+        one(math.radians(deg)), one(re), two_d, lev, None, camber, law)[0])
+    check("the default is the legacy law: attached to 11 deg",
+          abs(float(lift_coefficient(one(math.radians(10.0)), one(1e5), two_d, still)[0])
+              - 2 * math.pi * math.radians(10.0) / (1 + 2e-6)) < 1e-9
+          and abs(cl(10.0, law="legacy") - 2 * math.pi * math.radians(10.0) / (1 + 2e-6)) < 1e-9)
+    flat = PLATE_CLMAX[0] - PLATE_DROP[0]
+    check("a flat plate holds its plateau at 15 deg", abs(cl(15.0) - flat) < 1e-9, f"{cl(15.0):.4f} vs {flat:.4f}")
+    arc = min(PLATE_CLMAX[0] + PLATE_CLMAX[1] * 0.05, 1.10) - (PLATE_DROP[0] + PLATE_DROP[1] * 0.05)
+    check("a 5% arc holds a higher one", abs(cl(15.0, 2e4, 0.05) - arc) < 1e-9, f"{cl(15.0, 2e4, 0.05):.4f} vs {arc:.4f}")
+    check("on its other side the arc is a flat plate", abs(cl(-15.0, 2e4, 0.05) + flat) < 1e-9,
+          f"{cl(-15.0, 2e4, 0.05):.4f}")
+    check("a leading-edge vortex takes the plateau away",
+          abs(cl(15.0, lev=one(1.0)) - CN_LEV * math.sin(math.radians(15)) * math.cos(math.radians(15))) < 1e-9)
+    cd = float(drag_coefficient(one(math.radians(15.0)), one(1e5), two_d, one(cl(15.0)), still, 0.0, "plate")[0])
+    want = float(skin_friction_cd(one(1e5))[0]) + flat * math.tan(math.radians(15.0))
+    check("the plateau's drag is its lift times tan(alpha)", abs(cd - want) < 1e-6, f"{cd:.5f} vs {want:.5f}")
+    check("camber lift is 0.3 of theory's at Re 2e4 and 0.9 at 3e5",
+          abs(float(camber_lift_factor(2e4)) - 0.3) < 1e-12 and abs(float(camber_lift_factor(3e5)) - 0.9) < 1e-12
+          and 0.3 < float(camber_lift_factor(8e4)) < 0.9)
+    # through the solver: one strip at zero incidence in a wind
+    m, d = _single_panel_model()
+
+    def lift0(law, wind):
+        panels = _wing_panels(m, 0.0)
+        panels.camber[:] = 0.05
+        solver = FluidSolver(m, panels, MediumField(wind=np.array([wind, 0.0, 0.0])))
+        solver.stall_law, solver.unsteady = law, False
+        d.qvel[:] = 0.0
+        d.xfrc_applied[:] = 0.0
+        mujoco.mj_forward(m, d)
+        solver.apply(d, 0.0)
+        q = 0.5 * 1.225 * wind ** 2 * float(panels.area.sum())
+        re = 1.225 * wind * float(panels.chord[0]) / 1.81e-5
+        b = panels.body_id[0]
+        # less the weight the solver cancels for the air it folds into the strip's mass
+        fz = float(d.xfrc_applied[b, 2]) - (m.body_mass[b] - solver._dry_mass[b]) * 9.80665
+        return abs(fz) / q, re
+    c_leg, _ = lift0("legacy", 1.5)
+    c_pl, re = lift0("plate", 1.5)
+    ratio = c_pl / c_leg
+    check("the solver's camber lift at zero incidence shrinks by that factor",
+          abs(ratio - float(camber_lift_factor(re))) < 0.01, f"ratio {ratio:.3f} at Re {re:.0f}")
 
 
 def test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning() -> None:
@@ -5477,6 +5532,7 @@ def main() -> int:
         test_lift_sign_and_magnitude,
         test_centre_of_pressure_moves_aft_when_the_flow_separates,
         test_a_cambered_strip_carries_its_own_pitching_moment,
+        test_the_plate_stall_law_is_opt_in_and_reads_the_thin_plate_table,
         test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning,
         test_a_measured_section_replaces_the_default_law_where_it_was_measured,
         test_buoyancy,

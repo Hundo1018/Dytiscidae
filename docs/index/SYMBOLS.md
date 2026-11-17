@@ -1566,48 +1566,50 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `chordwise_cop` | function | 293 | `(alpha: np.ndarray, re: np.ndarray, law: str) -> np.ndarray` | Centre of pressure of a strip's lift and drag, as a fraction of chord |
-| `drag_coefficient` | function | 354 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, cl: np.ndarray, lev: np.ndarray \| float=0.0) -> np.ndarray` | Skin friction, plus induced drag, plus separated pressure drag. |
-| `entrainment_reaction` | function | 955 | `(fb: np.ndarray, m_new: np.ndarray, m_old: np.ndarray, lever2: np.ndarray, vel: np.ndarray, h: float) -> None` | The ``-dm/dt v`` half of ``F = -d(m_a v)/dt``, added in place to ``fb`` |
-| `finish_bodies` | function | 931 | `(fb: np.ndarray, fsum_b: np.ndarray, m_body: np.ndarray, limit: float) -> bool` | Per-machine limiter and weight cancellation, in place on ``fb`` (nb, 6). |
-| `FluidDiagnostics` | class | 501 | — | Per-step aggregates, recorded for observability and for scoring. |
-| `FluidSolver` | class | 991 | — | Applies blade-element fluid loads to a MuJoCo model each step. |
-| `ImplicitAeroDamping` | class | 712 | — | Lift and drag made implicit by splitting their damping off. |
-| `InducedFlow` | class | 600 | — | Momentum-theory downwash of a machine's lifting system, one vector. |
-| `lift_coefficient` | function | 320 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, lev: np.ndarray, alpha_e: np.ndarray \| None=None) -> np.ndarray` | Lift coefficient: attached below stall, separated normal force above. |
-| `machine_flow` | function | 703 | `(model, data, medium, t: float) -> np.ndarray` | The flow the machine's root body sees: medium velocity minus its own. |
+| `camber_lift_factor` | function | 310 | `(re)` | The share of thin-airfoil theory's camber lift a thin arc makes at |
+| `chordwise_cop` | function | 374 | `(alpha: np.ndarray, re: np.ndarray, law: str, camber=0.0, ar=None, stall_law: str='legacy') -> np.ndarray` | Centre of pressure of a strip's lift and drag, as a fraction of chord |
+| `drag_coefficient` | function | 434 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, cl: np.ndarray, lev: np.ndarray \| float=0.0, camber: np.ndarray \| float=0.0, law: str='legacy') -> np.ndarray` | Skin friction, plus induced drag, plus separated pressure drag. |
+| `entrainment_reaction` | function | 1035 | `(fb: np.ndarray, m_new: np.ndarray, m_old: np.ndarray, lever2: np.ndarray, vel: np.ndarray, h: float) -> None` | The ``-dm/dt v`` half of ``F = -d(m_a v)/dt``, added in place to ``fb`` |
+| `finish_bodies` | function | 1011 | `(fb: np.ndarray, fsum_b: np.ndarray, m_body: np.ndarray, limit: float) -> bool` | Per-machine limiter and weight cancellation, in place on ``fb`` (nb, 6). |
+| `FluidDiagnostics` | class | 581 | — | Per-step aggregates, recorded for observability and for scoring. |
+| `FluidSolver` | class | 1071 | — | Applies blade-element fluid loads to a MuJoCo model each step. |
+| `ImplicitAeroDamping` | class | 792 | — | Lift and drag made implicit by splitting their damping off. |
+| `InducedFlow` | class | 680 | — | Momentum-theory downwash of a machine's lifting system, one vector. |
+| `lift_coefficient` | function | 402 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, lev: np.ndarray, alpha_e: np.ndarray \| None=None, camber: np.ndarray \| float=0.0, law: str='legacy') -> np.ndarray` | Lift coefficient: attached below stall, separated normal force above. |
+| `machine_flow` | function | 783 | `(model, data, medium, t: float) -> np.ndarray` | The flow the machine's root body sees: medium velocity minus its own. |
 | `PanelSet` | class | 94 | — | The fluid-facing discretisation of a machine. |
-| `rossby_lev` | function | 545 | `(U, chord, omega, s_hat)` | LEV strength from the strip's own Rossby number, ``U / (\|w_perp\| c)``. |
-| `SectionPolar` | class | 382 | — | A wing section's measured lift and drag, for `FluidSolver.section`. |
+| `plate_lift_limit` | function | 316 | `(alpha, re, camber=0.0)` | ``(CLmax, plateau)`` of a thin plate of signed camber ``camber`` (as |
+| `rossby_lev` | function | 625 | `(U, chord, omega, s_hat)` | LEV strength from the strip's own Rossby number, ``U / (\|w_perp\| c)``. |
+| `SectionPolar` | class | 462 | — | A wing section's measured lift and drag, for `FluidSolver.section`. |
 | `skin_friction_cd` | function | 242 | `(re: np.ndarray) -> np.ndarray` | Two-sided skin friction coefficient of a flat plate. |
-| `slam_mass` | function | 917 | `(m_add, rho, chord, dr, is_wing, scale: float=1.0) -> np.ndarray` | The entrained mass the slam diagnostic differences: a wing's *normal* |
-| `strip_damping` | function | 893 | `(q, area, lift, drag, rho, aspect_ratio, is_wing, lift_scale: float=1.0) -> np.ndarray` | Per-strip damping bound ``b_i`` for `ImplicitAeroDamping`, N s/m. |
-| `UnsteadyState` | class | 560 | — | Per-strip history: Wagner lag and chords travelled since reversal. |
-| `FluidSolver.__init__` | method | 1002 | `(self, model, panels: PanelSet, medium: MediumField, *, c_rot: float \| None=None, added_mass_scale: float=1.0, cd_scale: float=1.0, lift_scale: float=1.0, disc_span: float \| None=None) -> None` | — |
-| `FluidSolver.apply` | method | 1216 | `(self, data, t: float) -> FluidDiagnostics` | Compute and accumulate fluid loads into ``data.xfrc_applied``. |
-| `FluidSolver.instantaneous_power` | method | 1729 | `(self, data) -> float` | Mechanical power the machine is currently putting into the fluid, W. |
-| `FluidSolver.reset` | method | 1197 | `(self) -> None` | — |
-| `FluidSolver.steady` | method | 1174 | `(self)` | Context for quasi-static probes (trim, lift and thrust margins). |
-| `ImplicitAeroDamping.__init__` | method | 738 | `(self, model, medium=None, half_height=None) -> None` | — |
-| `ImplicitAeroDamping.apply` | method | 859 | `(self, data, pos: np.ndarray, body_id: np.ndarray, b) -> None` | ``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip -- |
-| `ImplicitAeroDamping.clear` | method | 807 | `(self, data) -> None` | The step's damping with the split off: the dry model's own.  Called |
-| `ImplicitAeroDamping.due` | method | 779 | `(self) -> bool` | Whether this step recomputes B (callers skip forming ``b`` if not). |
-| `ImplicitAeroDamping.projected` | method | 814 | `(self, data, pos, body_id, b) -> np.ndarray` | ``B_k = sum_i b_i \|lin_k + rot_k x r_i\|^2`` over strips on bodies dof |
-| `ImplicitAeroDamping.reset` | method | 799 | `(self) -> None` | — |
-| `InducedFlow.__init__` | method | 629 | `(self, span: float) -> None` | — |
-| `InducedFlow.due` | method | 635 | `(self) -> bool` | — |
-| `InducedFlow.reset` | method | 641 | `(self) -> None` | — |
-| `InducedFlow.tick` | method | 638 | `(self) -> None` | — |
-| `InducedFlow.update` | method | 645 | `(self, F: np.ndarray, V: np.ndarray, rho: float, dt: float) -> np.ndarray` | — |
+| `slam_mass` | function | 997 | `(m_add, rho, chord, dr, is_wing, scale: float=1.0) -> np.ndarray` | The entrained mass the slam diagnostic differences: a wing's *normal* |
+| `strip_damping` | function | 973 | `(q, area, lift, drag, rho, aspect_ratio, is_wing, lift_scale: float=1.0) -> np.ndarray` | Per-strip damping bound ``b_i`` for `ImplicitAeroDamping`, N s/m. |
+| `UnsteadyState` | class | 640 | — | Per-strip history: Wagner lag and chords travelled since reversal. |
+| `FluidSolver.__init__` | method | 1082 | `(self, model, panels: PanelSet, medium: MediumField, *, c_rot: float \| None=None, added_mass_scale: float=1.0, cd_scale: float=1.0, lift_scale: float=1.0, disc_span: float \| None=None) -> None` | — |
+| `FluidSolver.apply` | method | 1305 | `(self, data, t: float) -> FluidDiagnostics` | Compute and accumulate fluid loads into ``data.xfrc_applied``. |
+| `FluidSolver.instantaneous_power` | method | 1819 | `(self, data) -> float` | Mechanical power the machine is currently putting into the fluid, W. |
+| `FluidSolver.reset` | method | 1286 | `(self) -> None` | — |
+| `FluidSolver.steady` | method | 1263 | `(self)` | Context for quasi-static probes (trim, lift and thrust margins). |
+| `ImplicitAeroDamping.__init__` | method | 818 | `(self, model, medium=None, half_height=None) -> None` | — |
+| `ImplicitAeroDamping.apply` | method | 939 | `(self, data, pos: np.ndarray, body_id: np.ndarray, b) -> None` | ``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip -- |
+| `ImplicitAeroDamping.clear` | method | 887 | `(self, data) -> None` | The step's damping with the split off: the dry model's own.  Called |
+| `ImplicitAeroDamping.due` | method | 859 | `(self) -> bool` | Whether this step recomputes B (callers skip forming ``b`` if not). |
+| `ImplicitAeroDamping.projected` | method | 894 | `(self, data, pos, body_id, b) -> np.ndarray` | ``B_k = sum_i b_i \|lin_k + rot_k x r_i\|^2`` over strips on bodies dof |
+| `ImplicitAeroDamping.reset` | method | 879 | `(self) -> None` | — |
+| `InducedFlow.__init__` | method | 709 | `(self, span: float) -> None` | — |
+| `InducedFlow.due` | method | 715 | `(self) -> bool` | — |
+| `InducedFlow.reset` | method | 721 | `(self) -> None` | — |
+| `InducedFlow.tick` | method | 718 | `(self) -> None` | — |
+| `InducedFlow.update` | method | 725 | `(self, F: np.ndarray, V: np.ndarray, rho: float, dt: float) -> np.ndarray` | — |
 | `PanelSet.concat` | method | 213 | `(sets: list['PanelSet']) -> 'PanelSet'` | — |
 | `PanelSet.empty` | method | 191 | `() -> 'PanelSet'` | — |
 | `PanelSet.total_area` | property | 183 | `(self) -> float` | — |
 | `PanelSet.total_volume` | property | 187 | `(self) -> float` | — |
-| `SectionPolar.__init__` | method | 421 | `(self, name: str, tables, lift_tables=None) -> None` | — |
-| `SectionPolar.coefficients` | method | 465 | `(self, alpha, re, ar, lev, alpha_e=None)` | ``(cl, cd)`` for incidence ``alpha`` measured towards the section's |
-| `UnsteadyState.__init__` | method | 568 | `(self, n: int) -> None` | — |
-| `UnsteadyState.reset` | method | 574 | `(self) -> None` | — |
-| `UnsteadyState.update` | method | 580 | `(self, alpha, rev, U, chord, omega, s_hat, dt)` | — |
+| `SectionPolar.__init__` | method | 501 | `(self, name: str, tables, lift_tables=None) -> None` | — |
+| `SectionPolar.coefficients` | method | 545 | `(self, alpha, re, ar, lev, alpha_e=None)` | ``(cl, cd)`` for incidence ``alpha`` measured towards the section's |
+| `UnsteadyState.__init__` | method | 648 | `(self, n: int) -> None` | — |
+| `UnsteadyState.reset` | method | 654 | `(self) -> None` | — |
+| `UnsteadyState.update` | method | 660 | `(self, alpha, rev, U, chord, omega, s_hat, dt)` | — |
 
 ## `physics.jet` — `dytiscidae/physics/jet.py`
 
