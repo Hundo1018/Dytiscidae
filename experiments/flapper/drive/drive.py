@@ -75,6 +75,8 @@ class Drive:
         # dict(mode="passive", k=...): a torsion spring at rest at 0.
         # Psi_deg: the feather amplitude the motor follows or the arm is sized for.
         self.feather = dict(feather) if feather else None
+        # the feather's own motor, where it has one (D2c): the stroke's unless given
+        self.fmotor = dict(self.motor, **((self.feather or {}).get("motor") or {}))
         if self.feather and self.feather["mode"] in ("crank", "crank2") and kind != "FB":
             raise ValueError("the feather arm rides on the four-bar's crankshaft")
         self.undriven = {"stroke"} | ({"feather"} if self.feather else set())
@@ -274,9 +276,10 @@ class Drive:
             self._feather_crank(root, eq, plain, pdat, Rh, ref, rod, mass)
         mt = self.motor
         if fe and fe["mode"] == "motor":
+            fm = self.fmotor
             ET.SubElement(act, "general", name="feather_motor", joint="seg1_wing_jf", gear=f"{fe['N']}",
-                          ctrllimited="true", ctrlrange="-1 1", gainprm=f"{mt['tau_s']}",
-                          biastype="affine", biasprm=f"0 0 {-mt['tau_s'] / mt['omega_0']}")
+                          ctrllimited="true", ctrlrange="-1 1", gainprm=f"{fm['tau_s']}",
+                          biastype="affine", biasprm=f"0 0 {-fm['tau_s'] / fm['omega_0']}")
         ET.SubElement(act, "general", name="drive_motor", joint=self.input_joint, gear=f"{self.N}",
                       ctrllimited="true", ctrlrange="-1 1", gainprm=f"{mt['tau_s']}",
                       biastype="affine", biasprm=f"0 0 {-mt['tau_s'] / mt['omega_0']}")
@@ -289,7 +292,7 @@ class Drive:
                 model.jnt_stiffness[j.id] = self.k
                 model.qpos_spring[j.qposadr[0]] = self.bm
         if fe and fe["mode"] == "motor":
-            model.dof_armature[model.joint("seg1_wing_jf").dofadr[0]] += mt["J_r"] * fe["N"] ** 2
+            model.dof_armature[model.joint("seg1_wing_jf").dofadr[0]] += self.fmotor["J_r"] * fe["N"] ** 2
         if fe and fe["mode"] == "passive":
             for nm in ("seg1_wing_jf", "seg2_wing_jf"):
                 j = model.joint(nm)
@@ -376,7 +379,7 @@ class Drive:
         # follows the pin's and the feather is -Psi cos(phase); rod length for
         # a level mean.  The feather the model then makes is measured.
         up = float(np.sign(horn(0.0, 0.05)[2] - H0[2]))           # +psi raises the horn, or lowers it
-        r2 = c_h * math.sin(Psi)
+        r2 = c_h * math.sin(Psi) * float(fe.get("arm_scale", 1.0))     # D2b: the arm's radius against the frozen rule's
         # pin height r2 sin(ph2 + t) = up c_h sin(psi), psi = -Psi cos(t + th0 - phi)
         ph2 = self.th0 - self.phi - up * math.pi / 2.0
         ph2 = math.atan2(math.sin(ph2), math.cos(ph2))
@@ -394,12 +397,13 @@ class Drive:
         ell = min(ks, key=lambda e_: abs(mean_of[e_]))
         for lo_, hi_ in zip(ks[:-1], ks[1:]):
             if mean_of[lo_] * mean_of[hi_] <= 0.0 and hi_ - lo_ < 0.011 * d0:
+                s_lo = mean_of[lo_]
                 for _ in range(40):
                     mid_ = 0.5 * (lo_ + hi_)
                     f_ = feather_of((r2, ph2, mid_))
                     if f_ is None:
                         break
-                    if f_.mean() * mean_of[lo_] > 0.0:
+                    if f_.mean() * s_lo > 0.0:
                         lo_ = mid_
                     else:
                         hi_ = mid_
@@ -412,9 +416,20 @@ class Drive:
         if f is None:
             raise ValueError("the feather arm as frozen does not close at every crank angle")
         best.fun = float(np.mean((f - -Psi * np.cos(th + self.th0 - self.phi)) ** 2))
+        # how far the loop stays from its toggle: the cosine between the rod and
+        # the way the horn moves when the feather turns (1 square on, 0 at toggle)
+        trans = []
+        for i, t in enumerate(th):
+            k = int(np.clip(np.searchsorted(psis, f[i]), 1, len(psis) - 2))
+            H = Htab[i, k] + (Htab[i, k + 1] - Htab[i, k]) * (f[i] - psis[k]) / (psis[k + 1] - psis[k])
+            dH = Htab[i, k + 1] - Htab[i, k - 1]
+            e_ = H - pin(r2, ph2, t)
+            trans.append(abs(float(e_ @ dH)) / (np.linalg.norm(e_) * np.linalg.norm(dH)))
         self.arm = dict(r2=float(r2), ph2=float(ph2), ell=float(ell), dx=float(dx), c_h=c_h,
                         fit_rms_deg=float(math.degrees(math.sqrt(best.fun))),
-                        psi0=float(f[0]), design_amp_deg=float(math.degrees(f.max() - f.min()) / 2.0))
+                        psi0=float(f[0]), design_amp_deg=float(math.degrees(f.max() - f.min()) / 2.0),
+                        design_min_deg=float(math.degrees(f.min())), design_max_deg=float(math.degrees(f.max())),
+                        transmission_min=float(min(trans)), drop=float(fe.get("drop", 0.08)) if two else None)
         # build both sides; the rod points at the horn's built (psi 0) place and
         # `init_state` turns it to where the loop closes
         hull = next(b for b in root.iter("body") if b.get("name") == "seg0_hull")
@@ -544,7 +559,7 @@ class Drive:
             A = math.radians(fe.get("Psi_deg", 50.0))
             q_r, qd_r, qdd_r = -A * math.cos(ph), A * self.w * math.sin(ph), A * self.w ** 2 * math.cos(ph)
             tq = self.J_fe * (qdd_r + self.wn ** 2 * (q_r - d.qpos[self.q_fe]) + 2 * self.wn * (qd_r - d.qvel[self.v_fe]))
-            u = qd_r * fe["N"] / mt["omega_0"] + tq / (fe["N"] * mt["tau_s"])
+            u = qd_r * fe["N"] / self.fmotor["omega_0"] + tq / (fe["N"] * self.fmotor["tau_s"])
             d.ctrl[self.fid] = min(max(u, -1.0), 1.0)
 
     def after_step(self, m, d, keep):
@@ -554,7 +569,7 @@ class Drive:
         Pfm = Pfe = 0.0
         if self.fid is not None:
             tf, of = float(d.actuator_force[self.fid]), float(d.actuator_velocity[self.fid])
-            Pfm, Pfe = tf * of, tf * of + tf * tf * mt["omega_0"] / mt["tau_s"]
+            Pfm, Pfe = tf * of, tf * of + tf * tf * self.fmotor["omega_0"] / self.fmotor["tau_s"]
         if not keep:
             return tau * om + Pfm
         Pm = tau * om
@@ -625,7 +640,8 @@ class Drive:
                    feather_mode=(self.feather or {}).get("mode", "servo"))
         if self.fid is not None:
             out.update(feather_motor_shaft_W=float(r["Pfm"].mean()), feather_motor_elec_W=float(r["Pfe"].mean()),
-                       feather_motor_at_limit=float(np.mean(np.abs(r["ufe"]) >= 0.999)))
+                       feather_motor_at_limit=float(np.mean(np.abs(r["ufe"]) >= 0.999)),
+                       feather_motor_shaft_peak_W=float(np.abs(r["Pfm"]).max()), feather_motor=self.fmotor)
         out["machine_elec_W"] = out["elec_W"] + float(r["Pfe"].mean())
         if self.feather and self.feather["mode"] in ("crank", "crank2"):
             out["arm"] = self.arm
