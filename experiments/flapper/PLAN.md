@@ -255,6 +255,18 @@ those results and is reopened (decision 4).
      precedents stop at 0.16 kg and are one shot per charge. A take-off run
      has no machine above 13 g.
 
+## Queued by the user (2026-11-17)
+
+- **The stroke's waveform.** Every pass so far flaps a pure sinusoid
+  (`rig.py`, `freerig.py`: stroke `sin`, feather and tip twist `cos`, equal
+  up and down). After the hinge-chain wing, tail and throttle are flown
+  together: a sweep of two parameters only, the downstroke's share of the
+  beat (0.4-0.6) and the feather's timing (+-20 deg of phase), at the 8 m/s
+  cruise, where the outside solver can cross-check. Pre-registered. Not at
+  6 m/s or take-off: the model has no dynamic stall there. The waveform a
+  machine can have is set by its drive (a crank's linkage ratios, or a
+  servo's torque and rate), so it enters the search as mechanism genes.
+
 ## What changed from draft 1, by the review's points
 
 Accepted: no loop (now the spine); bench first; crossings as gates from the
