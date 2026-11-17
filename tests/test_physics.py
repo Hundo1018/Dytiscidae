@@ -1730,6 +1730,10 @@ def test_a_mirrored_wing_is_a_mirror_image() -> None:
         m, d, _acts, panels = compile_phenotype(p)
         solver = FluidSolver(m, panels, MediumField())
         solver.record_state = True
+        # Steady flight, not the first instant of an impulsive start: there the
+        # start-up vortex has every strip on the separated plate, where the
+        # table law (as a measured section) gives camber no say.
+        solver.unsteady = False
         mujoco.mj_resetData(m, d)
         d.qpos[:3] = (0.0, 0.0, 60.0)
         d.qpos[3:7] = (1.0, 0.0, 0.0, 0.0)

@@ -2216,11 +2216,18 @@ MUTATIONS: tuple = (
     Mutation(
         id="device-strip-drops-the-camber",
         path="dytiscidae/envs/devroll/fluid_wp.py",
-        find="            alpha = alpha + T(2.0) * cam",
-        replace="            alpha = alpha",
+        find="            alpha = alpha + T(2.0) * arc",
+        replace="            alpha = alpha + T(0.0) * arc",
         defect="the device strip ignores camber on attached flow, so a cambered section "
                "loses its zero-lift shift",
         suites=("test_devroll",), item="A1a strip kernel"),
+    Mutation(
+        id="device-strip-keeps-the-shift-under-the-table-law",
+        path="dytiscidae/envs/devroll/fluid_wp.py",
+        find="        if law == 0:\n            alpha = alpha + T(2.0) * arc",
+        replace="        if law >= 0:\n            alpha = alpha + T(2.0) * arc",
+        defect="the device strip adds the camber shift on top of tables that carry their own zero-lift angle",
+        suites=("test_devroll",), item="table law"),
     Mutation(
         id="device-wagner-skips-the-lag",
         path="dytiscidae/envs/devroll/fluid_wp.py",

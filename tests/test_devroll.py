@@ -179,6 +179,172 @@ def test_the_strip_kernel_is_the_numpy_strip_loads() -> None:
           near == 0, f"{near} of {len(cos_a)}")
 
 
+def _table_strip_sweep():
+    """A sweep of lifting strips for law "table": the incidence all the way round
+    (through the chord and normal directions and reversed flow), Re 1e3 to 1e6 (set
+    through mu at a fixed speed), the camber of the section, and the lagged pass's
+    own alpha_e and LEV.  Returns the kernel's arguments and ``alpha_e``, ``lev``."""
+    rng = np.random.default_rng(7)
+    theta = np.radians(np.arange(-180.0, 180.0, 3.0) + 0.37)   # off the |cos a| = 0 fold
+    res = np.logspace(3.0, 6.0, 7)
+    cams = np.array([-0.09, -0.03, 0.0, 0.02, 0.0578, 0.09])
+    levs = np.array([0.0, 0.4, 1.0])
+    th, re, cam, lv = (a.reshape(-1) for a in np.meshgrid(theta, res, cams, levs, indexing="ij"))
+    n = len(th)
+    speed, rho, chord = 2.0, 1.2, 0.02
+    rel = speed * np.stack([np.cos(th), np.sin(th), np.zeros(n)], axis=1)
+    s = np.tile([0.0, 0.0, 1.0], (n, 1))
+    c = np.tile([1.0, 0.0, 0.0], (n, 1))
+    nrm = np.tile([0.0, 1.0, 0.0], (n, 1))
+    om = rng.normal(size=(n, 3)) * 5.0
+    ext = rng.uniform(0.01, 0.2, size=(n, 3))
+    dr = rng.uniform(0.01, 0.1, n)
+    args = (rel, s, c, nrm, om, ext, np.full(n, chord), chord * rng.uniform(0.02, 0.1, n), dr,
+            rng.uniform(0.5, 1.2, n), cam, rng.uniform(1.0, 8.0, n), np.ones(n, int),
+            np.full(n, rho), rho * speed * chord / re, 1.0, 1.0, 0.8)
+    return args, lv
+
+
+def table_strip_reference(rel, s, c, n, om, ext, chord, area, dr, cd_bluff, camber, ar, is_wing,
+                          rho, mu, lift_scale, cd_scale, c_rot, *, alpha_e_fn, lev):
+    """``FluidSolver.apply``'s lines for a lifting strip under law "table": no camber shift,
+    ``table_coefficients(alpha, re, ar, lev, alpha_e, arc)`` with ``arc`` signed by the flow
+    direction.  ``alpha_e_fn(alpha)`` is the lagged incidence."""
+    from dytiscidae.physics.fluid import table_coefficients
+
+    def dot(a, b):
+        return np.einsum("ni,ni->n", a, b)
+
+    v_2d = rel - dot(rel, s)[:, None] * s
+    U = np.linalg.norm(v_2d, axis=1)
+    Us = np.maximum(U, 1e-6)
+    d_hat = v_2d / Us[:, None]
+    q = 0.5 * rho * U**2
+    re = rho * U * chord / np.maximum(mu, 1e-12)
+    cos_a = dot(v_2d, c) / Us
+    sin_a = dot(v_2d, n) / Us
+    rev = cos_a < 0.0
+    alpha = np.arctan2(sin_a, np.where(rev, -cos_a, cos_a) + 1e-12)
+    alpha = np.where(rev, -alpha, alpha)
+    arc = np.where(rev, -camber, camber)
+    cl, cd, _ = table_coefficients(alpha, re, ar, lev, alpha_e_fn(alpha), arc)
+    lift_axis = np.cross(s, d_hat)
+    lift_axis /= np.maximum(np.linalg.norm(lift_axis, axis=1, keepdims=True), 1e-12)
+    L = q * area * cl * lift_scale
+    D = q * area * cd * cd_scale
+    f_rot = -c_rot * rho * U * dot(om, s) * chord**2 * dr
+    F = (L + f_rot)[:, None] * lift_axis + D[:, None] * d_hat
+    return {"F": F, "D": D, "cl": cl, "alpha": alpha, "U": U, "rev": rev}
+
+
+def test_the_strip_kernel_under_law_table_is_table_coefficients() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the strip kernel under law table agrees with table_coefficients", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.devroll.fluid_wp import strip_loads
+
+    args, lev = _table_strip_sweep()
+    n = len(lev)
+    ae_fn = lambda a: 0.7 * a + 0.05 * np.sin(3.0 * a)     # a lagged incidence != alpha
+    ref = table_strip_reference(*args, alpha_e_fn=ae_fn, lev=lev)
+    check("the sweep covers reversed flow and both signs of incidence past 80 deg",
+          bool(ref["rev"].any() and (~ref["rev"]).any() and ref["alpha"].max() > np.radians(80.0)
+               and ref["alpha"].min() < -np.radians(80.0)), f"{n} strips")
+    ae = ae_fn(ref["alpha"])
+    check("the lagged incidence differs from alpha", float(np.abs(ae - ref["alpha"]).max()) > 0.05)
+    scale = {k: max(float(np.abs(ref[k]).max()), 1e-30) for k in ("F", "D", "cl")}
+    for dtype, tol_cl, tol in ((wp.float64, 1e-9, 1e-9), (wp.float32, 2e-4 * scale["cl"], 2e-4)):
+        name = "float64" if dtype == wp.float64 else "float32"
+        out = strip_loads(*args, dtype=dtype, law="table", alpha_e=ae, lev=lev)
+        d_cl = float(np.abs(out["cl"] - ref["cl"]).max())
+        check(f"{name}: cl within {tol_cl:g} of table_coefficients over {n} strips",
+              d_cl <= tol_cl, f"max |dcl| {d_cl:.2e} (|cl| max {scale['cl']:.2f})")
+        worst = {k: float(np.abs(out[k] - ref[k]).max()) / scale[k] for k in ("F", "D")}
+        check(f"{name}: force and drag within {tol:g} of their maximum",
+              all(v <= tol for v in worst.values()),
+              ", ".join(f"{k} {v:.2e}" for k, v in worst.items()))
+        check(f"{name}: the incidence is not shifted by the camber",
+              float(np.abs(out["alpha"] - ref["alpha"]).max()) <= (1e-9 if tol < 1e-6 else 1e-5))
+    # the quasi-static pass (no lagged inputs) is the same law on alpha itself
+    qs = strip_loads(*args, dtype=wp.float64, law="table", alpha_e=ref["alpha"], lev=lev)
+    check("a lagged pass on alpha_e = alpha leaves the incidence unchanged",
+          float(np.abs(qs["alpha"] - ref["alpha"]).max()) <= 1e-9)
+    legacy = strip_loads(*args, dtype=wp.float64)
+    check("law table is not the legacy law on this sweep",
+          float(np.abs(legacy["cl"] - qs["cl"]).max()) > 0.05)
+    for bad in ("plate", "nonsense"):
+        try:
+            strip_loads(*args, dtype=wp.float64, law=bad)
+            raised = False
+        except ValueError:
+            raised = True
+        check(f"the device path refuses stall_law {bad!r}", raised)
+
+
+def test_the_device_body_takes_its_stall_law_from_the_solver() -> None:
+    from dytiscidae.envs import devroll
+
+    ok, reason = devroll.usable()
+    if not ok:
+        skip("the device body runs the solver's stall law and refuses plate", reason)
+        return
+    import warp as wp
+
+    from dytiscidae.envs.batchroll import HostFluid, step_batch
+    from dytiscidae.envs.devroll.model_wp import DeviceBody
+
+    name, make = next(f for f in _replay_fixtures() if f[0] == "medusa")
+
+    def device_after(law, steps):
+        envs = make()
+        _round_to_float32(envs)
+        for e in envs:
+            e.solver.stall_law = law
+        body = DeviceBody(envs, dtype=wp.float64)
+        body.load_state([e.data for e in envs])
+        rng = np.random.default_rng(5)
+        for _ in range(steps):
+            body.set_targets([rng.uniform(-0.3, 0.3, len(e.act_names)) for e in envs])
+            body.step(gather=True)
+        return body, envs
+
+    body, envs = device_after("table", 1)
+    check(f"{name}: the body reads law table from e.solver.stall_law",
+          body.stall_law == "table" and body._law == 1)
+    bf = HostFluid(envs)
+    rng = np.random.default_rng(5)
+    step_batch(envs, [rng.uniform(-0.3, 0.3, len(e.act_names)) for e in envs], bf)
+    k, err = _worst(body.resident(), _host_fields(envs))
+    # MJWarp's own state is float32, so the same step under law legacy reads 4e-7 here.
+    check(f"{name}: the first device step under law table is step_batch's within 2e-6",
+          err <= 2e-6, f"worst {k} {err:.2e}")
+    k, err = _worst(device_after("table", 3)[0].resident(), device_after("legacy", 3)[0].resident())
+    check(f"{name}: law table moves the device step away from law legacy",
+          err > 1e-4, f"worst {k} {err:.2e}")
+    envs = make()
+    envs[0].solver.stall_law = "plate"
+    try:
+        DeviceBody(envs, dtype=wp.float64)
+        raised = False
+    except ValueError as err_:
+        raised = "numpy-only" in str(err_)
+    check("a body whose solver runs law plate is refused: numpy-only", raised)
+    if len(envs) > 1:
+        envs = make()
+        envs[0].solver.stall_law = "table"
+        try:
+            DeviceBody(envs, dtype=wp.float64)
+            raised = False
+        except ValueError:
+            raised = True
+        check("worlds with different stall laws are refused", raised)
+
+
 def test_the_wagner_lag_is_the_numpy_unsteady_state() -> None:
     from dytiscidae.envs import devroll
 
@@ -2365,6 +2531,8 @@ def main() -> int:
     functions = [test_the_device_path_reports_why_it_cannot_run,
                  test_the_reason_is_set_when_the_packages_do_not_import,
                  test_the_strip_kernel_is_the_numpy_strip_loads,
+                 test_the_strip_kernel_under_law_table_is_table_coefficients,
+                 test_the_device_body_takes_its_stall_law_from_the_solver,
                  test_the_wagner_lag_is_the_numpy_unsteady_state,
                  test_the_device_medium_and_added_mass_are_the_numpy_ones,
                  test_the_device_assembly_is_the_numpy_finish_bodies,

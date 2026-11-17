@@ -30,7 +30,7 @@ from std.python.bindings import PythonModuleBuilder
 
 from fluid_gpu import (
     added_mass_at, bluff_at, coeff_at, kin_at, strip_at, velocity_at,
-    unsteady_at,
+    unsteady_at, LAW_TABLE,
 )
 from medium_gpu import medium_at
 from assembly_gpu import assembly_at
@@ -39,6 +39,9 @@ from scatter_gpu import fmag_at, gather_body_kernel
 comptime BLOCK = 128
 comptime F64 = DType.float64
 comptime I32 = DType.int32
+#: Room for the table block (`upload_tables`): 4,457 float64 for the tables
+#: baked 2026-11-17 (2 sections x 5 Reynolds numbers x 221 angles).
+comptime TAB_CAP = 16384
 
 
 @always_inline
@@ -160,6 +163,8 @@ def panel_kernel(
     sc18: Float64,
     fmag: UnsafePointer[Float64, MutAnyOrigin],
     fmax: UnsafePointer[Float64, MutAnyOrigin],
+    tab: UnsafePointer[Float64, MutAnyOrigin],
+    law: Int32,
     n: Int32,
 ):
     """Every per-panel stage of a step in one launch: kinematics, medium,
@@ -167,7 +172,9 @@ def panel_kernel(
     added mass, assembly and force magnitude, in the order the eleven separate
     launches ran them.  Each stage reads only its own panel's values and
     per-body inputs, so one thread can run them back to back with nothing
-    shared across threads.  Eleven launches were 90 us of a 215 us step for a
+    shared across threads.  `law` is the lift and drag law (0 legacy, 1
+    table, `fluid_gpu.LAW_*`) and `tab` the table block it reads under 1
+    (`FullPipeline.upload_tables`).  Eleven launches were 90 us of a 215 us step for a
     190-panel shard, almost all of it launch latency (2026-09-27).  The stage
     bodies are the `*_at` functions the separate kernels also call, so there
     is one copy of the physics.
@@ -178,9 +185,9 @@ def panel_kernel(
     kin_at(i, xpos, xmat, body_id, pos_local, span_local, chord_local, normal_local, pos_w, s_hat, c_hat, n_hat)
     medium_at(i, pos_w, half_height, rho, mu, subf, u_flow, sc0, sc1, sc2, sc3, sc4, sc5, sc6, sc7, sc8, sc9, sc10, sc11, sc12, sc13, sc14, sc15)
     velocity_at(i, vel6, xipos, pos_w, u_flow, body_id, omega, v_rel, machine, is_wing, v_ind)
-    strip_at(i, v_rel, s_hat, c_hat, n_hat, omega, rho, mu, chord, camber, u, d_hat, q, re, alpha, rf, lift_axis)
+    strip_at(i, v_rel, s_hat, c_hat, n_hat, omega, rho, mu, chord, camber, u, d_hat, q, re, alpha, rf, lift_axis, law)
     unsteady_at(i, alpha, rf, u, chord, omega, s_hat, st_x0, st_x1, st_s, st_rev, st_primed, ae, lev, sc20, reset_unsteady, unsteady_on)
-    coeff_at(i, alpha, re, ar, lev, is_wing, cl, cd, ae)
+    coeff_at(i, alpha, re, ar, lev, is_wing, cl, cd, ae, camber, rf, tab, law)
     bluff_at(i, v_rel, s_hat, c_hat, n_hat, rho, mu, ext, cd_bluff, is_wing, f_bluff, d_bluff, d_full, sc16)
     added_mass_at(i, v_rel, s_hat, c_hat, n_hat, d_full, rho, ext, chord, dr, volume, is_wing, body_id, m_add, vn, m_body, fz, sc17, has_bluff, wing_tensor)
     assembly_at(i, q, area, cl, cd, lift_axis, d_hat, f_bluff, c_rot, rho, u, omega, s_hat, chord, dr, vol_buoy, subf, fz, is_wing, force, lift, drag, buoy, sc18, sc16, sc8)
@@ -264,6 +271,10 @@ struct FullPipeline(Movable, Writable):
     var n_out: Int
     # Written by gather_body_kernel and never read: the limiter is on the host.
     var clamped: DeviceBuffer[I32]
+    # The thin-plate tables of the table law, `fluid_gpu`'s block layout;
+    # uploaded once by `upload_tables`, read when a launch's law is 1.
+    var tab: DeviceBuffer[F64]
+    var n_tab: Int
 
     def __init__(out self, cap_p: Int, cap_b: Int, cap_m: Int) raises:
         self.ctx = DeviceContext()
@@ -322,6 +333,9 @@ struct FullPipeline(Movable, Writable):
         self.outbuf = c.enqueue_create_buffer[F64](cap_b * 8 + cap_p * 17)
         self.host_out = 0
         self.n_out = 0
+        self.tab = c.enqueue_create_buffer[F64](TAB_CAP)
+        self.tab.enqueue_fill(0.0)
+        self.n_tab = 0
         self.ctx.synchronize()
 
     def write_to(self, mut writer: Some[Writer]):
@@ -377,9 +391,25 @@ struct FullPipeline(Movable, Writable):
         return PythonObject(n)
 
     @staticmethod
+    def upload_tables(self_ptr: UnsafePointer[Self, MutAnyOrigin],
+                      desc: PythonObject) raises -> PythonObject:
+        """The table law's block (layout in `fluid_gpu`, above `_tab_part`):
+        descriptor (int64) 0 host address, 1 length.  Once per process."""
+        var d = UnsafePointer[Int64, MutAnyOrigin](
+            unsafe_from_address=Int(py=desc.ctypes.data))
+        var count = Int(d[unsafe_offset=1])
+        ref s = self_ptr[]
+        if count > TAB_CAP:
+            raise Error("FullPipeline: table block exceeds TAB_CAP")
+        _up_f64(s.ctx, s.tab, Int(d[unsafe_offset=0]), count)
+        s.ctx.synchronize()
+        s.n_tab = count
+        return PythonObject(count)
+
+    @staticmethod
     def launch(self_ptr: UnsafePointer[Self, MutAnyOrigin], desc: PythonObject) raises -> PythonObject:
         """Descriptor (int64): 0 host input block, 1 host output block, 2 scalars
-        (float64[23]), 3 n, 4 nbody, 5 nmachine, 6 has_bluff.
+        (float64[24]), 3 n, 4 nbody, 5 nmachine, 6 has_bluff.
 
         input block  (float64): xpos[nb*3] xmat[nb*9] xipos[nb*3] vel6[nb*6]
                                 v_ind[nm*3]
@@ -391,7 +421,8 @@ struct FullPipeline(Movable, Writable):
         4 khat_y, 5 t, 6 air_rho, 7 air_mu, 8 water_rho, 9 water_mu,
         10-12 current xyz, 13-15 wind xyz, 16 cd_scale, 17 am_scale,
         18 lift_scale, 19 wing added-mass tensor (0/1), 20 dt,
-        21 reset the unsteady history (0/1), 22 unsteady history on (0/1)
+        21 reset the unsteady history (0/1), 22 unsteady history on (0/1),
+        23 lift and drag law (0 legacy, 1 table; table needs `upload_tables`)
         """
         var d = UnsafePointer[Int64, MutAnyOrigin](
             unsafe_from_address=Int(py=desc.ctypes.data))
@@ -404,13 +435,16 @@ struct FullPipeline(Movable, Writable):
         var host_out = UnsafePointer[Float64, MutAnyOrigin](
             unsafe_from_address=Int(d[unsafe_offset=1]))
         # The scalars are read from a float64 array rather than converted from
-        # a Python tuple: 23 conversions a step, for numbers the host already
+        # a Python tuple: 24 conversions a step, for numbers the host already
         # holds in memory.
         var sc = UnsafePointer[Float64, MutAnyOrigin](
             unsafe_from_address=Int(d[unsafe_offset=2]))
         ref s = self_ptr[]
         if n > s.cap_p or nb > s.cap_b or nm > s.cap_m:
             raise Error("FullPipeline: batch exceeds capacity")
+        var law = Int32(Int(sc[unsafe_offset=23]))
+        if law == LAW_TABLE and s.n_tab == 0:
+            raise Error("FullPipeline: the table law needs upload_tables first")
         var ctx = s.ctx
 
         var n_in = nb * 21 + nm * 3
@@ -531,6 +565,8 @@ struct FullPipeline(Movable, Writable):
             sc[unsafe_offset=18],
             p_fmag,
             s.fmax.unsafe_ptr(),
+            s.tab.unsafe_ptr(),
+            law,
             Int32(n), grid_dim=g, block_dim=BLOCK)
         # One thread per body, summing its own panels in index order.  Replaces
         # two atomic scatters whose accumulation order was decided by warp
@@ -575,6 +611,7 @@ def PyInit_full_pipeline() abi("C") -> PythonObject:
             m.add_type[FullPipeline]("FullPipeline")
             .def_py_init[FullPipeline.py_init]()
             .def_method[FullPipeline.upload_static]("upload_static")
+            .def_method[FullPipeline.upload_tables]("upload_tables")
             .def_method[FullPipeline.step]("step")
             .def_method[FullPipeline.launch]("launch")
             .def_method[FullPipeline.wait]("wait")
