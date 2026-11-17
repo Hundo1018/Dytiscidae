@@ -291,7 +291,8 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
     n_beat = int(round(1.0 / (f * dt)))
     n_hold, n_all = hold_beats * n_beat, (hold_beats + beats) * n_beat
     rec = dict(t=[], P=[], Ps=[], tq=[], err=[], hold=[], pos=[], vel=[], pitch=[], tail=[], Pt=[],
-               w=[], ask=[], Ptw=[], tqtw=[], tip=[], hinge=[], stroke=[], com_vel=[], angmom=[])
+               w=[], ask=[], Ptw=[], tqtw=[], tip=[], hinge=[], stroke=[], com_vel=[], angmom=[],
+               Pf=[], tqf=[])
     phase = None
     t = 0.0
     for k in range(n_all):
@@ -388,6 +389,9 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
                 rec["stroke"].append(float(q[role == "stroke"][0]))
             rec["Ps"].append(float(tau[role == "stroke"] @ qd[role == "stroke"]) + P_drive)
             rec["tq"].append(float(np.abs(tau[role == "stroke"]).sum()))
+            fe_ = role == "feather"
+            rec["Pf"].append(float(tau[fe_] @ d.qvel[dof][fe_]))
+            rec["tqf"].append(float(tau[fe_].sum()) if fe_.any() else 0.0)
             trk = ~is_tw if (chn is not None and chn["mode"] != "servo") else np.ones(len(q), bool)
             trk = trk & driven
             rec["err"].append(float(np.abs(q - d.qpos[qad])[trk].max()))
@@ -418,6 +422,11 @@ def run_free(body: dict, V: float, theta_deg: float, f: float, Phi_deg: float, P
            "crank_eq_stroke_only_peak": float((np.abs(rec["Ps"]) / np.array(rec["w"])).max() / K85),
            "crank_eq_min": float((P / np.array(rec["w"])).min() / K85),
            "stroke_torque_peak": float(np.max(rec["tq"])),
+           # the feather servos (both wings): what holds or turns the root feather
+           "feather_power_W": float(np.mean(rec["Pf"])),
+           "feather_power_pos_W": float(np.maximum(rec["Pf"], 0.0).mean()),
+           "feather_torque_peak": float(np.abs(rec["tqf"]).max()) / 2.0,
+           "feather_torque_mean": float(np.mean(rec["tqf"])) / 2.0,
            "track_err_deg": float(math.degrees(np.max(rec["err"]))), "clamped": clamped_any}
     # Net force on the machine, gravity included: from the holder where held,
     # from the motion where released.
