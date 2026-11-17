@@ -13,7 +13,9 @@ At take-off (4.5 Hz, stroke 85 deg by D1's four-bar at 60 mm, feather 50 deg
 a quarter beat ahead), **the root feather needs about 27-29 W of shaft
 power, and how it is delivered sets the bill.** The ideal servo (F0) costs
 28.8 W on top of the stroke motor's 149.4 W: 178.2 W for the machine. A
-second witness motor on the feather (FM) tracks it to 0.6 deg, but its
+second witness motor on the feather (FM) tracks it to 0.6 deg on the
+wing it drives (the other wing's feather, coupled by a joint equality, was
+not recorded, and FM's 2.6-4.2% lift shortfall against F0 is unexplained), but its
 copper loss on a slow, high-torque, reversing load makes the machine 295.5 W
 at its best gear (16). A feather crank driven off the stroke's crank can
 be built only on a shaft of its own (FX, the arm on the stroke crankshaft
@@ -62,11 +64,11 @@ nothing here measures how much.
 
 | | frozen | read | |
 |---|---|---|---|
-| G1 | in a vacuum, input per beat within 1% of the largest motor's peak shaft power, F0, FM, FX | F0 +0.02%; FM -0.05 to -0.25% (the feather motor regenerates what the stroke motor puts in, 7.0 W each way). FX2 (in FX's place, D2a) **+3.2%** at gear 24, with a 2.1 mm gap and 3.35 kN in the loop | holds for F0, FM; **fails for FX2** |
+| G1 | in a vacuum, input per beat within 1% of the largest motor's peak shaft power, F0, FM, FX | F0 +0.02%; FM -0.05 to -0.25% (against the stroke motor's peak: the feather motor's peak was not recorded) (the feather motor regenerates what the stroke motor puts in, 7.0 W each way). FX2 (in FX's place, D2a) **+3.2%** at gear 24, with a 2.1 mm gap and 3.35 kN in the loop | holds for F0, FM; **fails for FX2** |
 | G2 | FM within 3 deg; at least 23 W + copper; machine 175-200 W | amplitude 50.2-50.6; feather motor 148-197 W; **machine 295.5 W** at its best gear | first two hold; **the total is wrong** by half again: I under-counted the copper loss of a reversing load |
 | G3 | FX: amplitude 40-60, lead 70-110, lift within 10% of F0, power within 15% of FM, limit under 10% | FX as frozen does not close at any rod length (0.5-1.5 times the rest distance). FX2: amplitude **61.5-62.1**, lead 72-78, lift **-13 to -26%**, power +2.3% at gear 24 (-28% at 32, +48% at 16), limit **19-89%**, beat 0.83-0.90 | **FX: no candidate. FX2: unreadable (G1)**; as read, amplitude, lift and limit miss |
 | G4 | no spring gives 40 deg with a lead within 30 deg of a quarter beat; best lift under 80% of F0 | k 2: 52 deg at -138; k 4: 29 deg at -100; best lift 47% (k 4) | **holds** |
-| G5 | FX's drawing at four crank angles, checked | drawn for FX2 (`figures/D2_fx2.png`): arm 23.0 mm, rod 82.8, horn 30.0 mm from the hinge at every angle, the loop closed to 0.002-0.082 mm (vacuum, held body, before the mass is set: see below) | holds, with one difference from the text: **the horn is 30 mm aft of the hinge, not ahead**; the hinge is 0.1 chord (26 mm) from the leading edge, so 30 mm ahead would be off the wing |
+| G5 | FX's drawing at four crank angles, checked | drawn for FX2 (`figures/D2_fx2.png`): arm 23.0 mm, rod 82.8, horn 30.0 mm from the hinge at every angle, the loop closed to 0.002-0.082 mm at the four drawn angles (vacuum, held body, no gravity), but **0.98 mm at crank 324 deg** over the same beat, where the feather reaches -60 deg, past its 57 deg stop: the region where the grid's loop opens to 2 mm | dimensions hold, with one difference from the text: **the horn is 30 mm aft of the hinge, not ahead**; the hinge is 0.1 chord (26 mm) from the leading edge, so 30 mm ahead would be off the wing |
 
 ## What happened on the way (disclosed)
 

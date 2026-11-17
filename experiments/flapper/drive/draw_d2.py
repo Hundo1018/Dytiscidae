@@ -41,12 +41,19 @@ def main():
     mine = {m.body(n).id for n in ("fcrank+1", "featherrod+1")}
     targets = [2 * math.pi + k * 0.5 * math.pi for k in range(4)]
     snaps, k = [], 0
-    while targets and k < 40000:
+    worst = (0.0, 0.0)          # largest featherrod gap over the second beat, and its crank angle
+    while (targets or d.qpos[qc] < 4 * math.pi) and k < 40000:
         D.control(m, d, k * 1e-4)
         mujoco.mj_step(m, d)
         d.qpos[:7], d.qvel[:6] = m.qpos0[:7], 0.0
         k += 1
-        if d.qpos[qc] >= targets[0]:
+        if d.qpos[qc] >= 2 * math.pi:
+            b1_ = m.eq_obj1id[i_eq]
+            g_ = float(np.linalg.norm(d.xpos[b1_] + d.xmat[b1_].reshape(3, 3) @ m.eq_data[i_eq, 0:3]
+                                      - d.xpos[wing] - d.xmat[wing].reshape(3, 3) @ m.eq_data[i_eq, 3:6]))
+            if g_ > worst[0]:
+                worst = (g_, math.degrees(d.qpos[qc] - 2 * math.pi), math.degrees(d.qpos[qf]))
+        if targets and d.qpos[qc] >= targets[0]:
             mujoco.mj_forward(m, d)
             o, R = d.xpos[hull], d.xmat[hull].reshape(3, 3)
             segs = []
@@ -92,6 +99,7 @@ def main():
         print("crank %5.0f stroke %+6.1f feather %+6.1f gap %.3f mm  horn-hinge %.1f mm  shaft-horn(rest) %s" % (
             s["crank"], s["stroke"], s["feather"], s["gap_mm"],
             1e3 * np.linalg.norm(s["horn"] - s["hinge"]), np.round(1e3 * (s["horn"] - s["shaft"]), 1)))
+    print("largest gap over the beat %.3f mm at crank %.0f deg, feather %.1f deg" % (1e3 * worst[0], worst[1], worst[2]))
     print("arm", {k_: round(v, 4) if isinstance(v, float) else v for k_, v in a.items()})
     print(out)
 
