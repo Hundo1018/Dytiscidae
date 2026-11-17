@@ -118,3 +118,38 @@ reads -3.5 and -15.0 deg where the yoke reads 0: the four-bar's stroke is
 not symmetric in time between its turning points, which its second harmonic
 (0.044, 0.093) measures. Each loop measured on the model closes within
 0.0001 mm at every angle drawn.
+
+## Addendum D1b: the take-off lever, 40 to 120 mm
+
+Frozen as an addendum to the pre-registration (`ad220aa`) before any run;
+`results/D1b_lever.jsonl` (30 rows, none raised), read beside D1's 40 mm
+rows. Crank and links scale with the lever.
+
+| | 40 mm | 60 mm | 80 mm | 120 mm |
+|---|---|---|---|---|
+| FB gear 24: peak link force | 575 N | 296 N | 210 N | 130 N |
+| FB gear 24: force x lever | 23.0 | 17.7 | 16.8 | 15.5 N m |
+| FB gear 24: error against its kinematics | 0.69 deg | 0.26 | 0.11 | 0.03 |
+| FB gear 24: electrical power | 152.4 W | 149.4 | 148.3 | 147.7 |
+| SY gear 24: peak link force | 951 N | 727 N | 564 N | 361 N |
+| SY gear 24: error against its kinematics | 9.35 deg | 5.09 | 3.06 | 1.33 |
+| SY gear 24: stroke made (85 asked) | 89.2 deg | 88.8 | 87.9 | 86.7 |
+| CT spring 8, gear 24: beat made / slack | 0.955 / 21% | 0.958 / 23% | 0.960 / 25% | 0.962 / 25% |
+| CT spring 16, gear 24: beat made | 0.756 | 0.749 | 0.744 | 0.741 |
+| lowest point below the shoulder | 107 mm | 161 | 214 | 321 |
+
+| | frozen | read | |
+|---|---|---|---|
+| L1 | FB's force x lever constant within 20% | falls 23.0 -> 15.5 (gear 24), 29.6 -> 17.3 (16), 17.9 -> 13.6 (32): a 1.3-1.7 spread | **wrong**: the short lever pays more than 1/a, levelling off from about 80 mm |
+| L2 | SY's error as 1/a^2: under 2.5 deg at 80 mm, 1.2 at 120; holds the stroke from 80 mm | 3.06 and 1.33 (gear 24; 2.74 and 1.17 at gear 32); the stroke is 2.9 deg over at 80 mm, 1.7 at 120 | **wrong** (falls about as a^-1.8); within 2 deg only at 120 mm |
+| L3 | CT does not do take-off at any lever | beat 0.91-0.96 with the amplitude 2.0-2.8 deg short (spring 8), beat 0.74-0.78 (spring 16), slack 21-25% (spring 8) | holds |
+| L4 | FB's power within 10% across levers; limit share within 0.05 | 152.4 -> 147.7 W (3%); 0.553 -> 0.542 at gear 32 | holds |
+| L5 | lowest point 2a + r | 107-321 mm, outside the 40 mm hull at every lever | reported |
+
+What it changes in D1: the four-bar's take-off link force is a choice of
+size, 130-575 N over this range, and its loop is read well from 60 mm on;
+the motor and the power do not depend on the lever. The yoke's compliance
+in this engine stays the largest of the three at every lever and is
+readable only at 120 mm. The cable's failure at take-off is not a matter
+of the lever. A longer lever makes a bigger mechanism: the drawing's
+finding (outside the hull) gets worse with it.
