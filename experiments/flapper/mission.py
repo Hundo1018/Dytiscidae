@@ -130,6 +130,45 @@ class Machine:
         self.n = 0
         self.bad_qacc = 0
 
+    # ------------------------------------------------------------ tip twist
+    def enable_strip_twist(self, body: dict | None = None, share: float = 1.0) -> None:
+        """W6's tip twist as the fluid strips turned (`rig.twist_turn`), per side,
+        a stand-in for D3's tube and rod (which made the servos' twist within
+        0.5 deg and 0.1 W, RESULT_D3): not a mechanism, stated wherever used.
+        After this the feather hinges are held at their offset and
+        ``set_twist(right_deg, left_deg)`` sets the tip's feather each step."""
+        from rig import twist_setup
+        body = dict(body or reference_body())
+        fj = [j for n, j in enumerate(self.jid) if self.role[n] == "feather"]
+        self.tw = twist_setup(self.env, body, fj, dict(tip_deg=0.0, share=share), self.dt)
+        pan = self.env.solver.panels
+        names = [self.mj.mj_id2name(self.m, self.mj.mjtObj.mjOBJ_BODY, int(b)) or "" for b in pan.body_id]
+        # the wing a strip belongs to: the hull's child it hangs from (seg1: one side, seg2: the other)
+        side = np.zeros(pan.n)
+        for i, b in enumerate(pan.body_id):
+            b = int(b)
+            while b and int(self.m.body_parentid[b]) != self.hull:
+                b = int(self.m.body_parentid[b])
+            nm = self.mj.mj_id2name(self.m, self.mj.mjtObj.mjOBJ_BODY, b) or ""
+            side[i] = 1.0 if nm.startswith("seg1_wing") else (-1.0 if nm.startswith("seg2_wing") else 0.0)
+        self.tw_side = side
+
+    def set_twist(self, right_deg: float, left_deg: float) -> None:
+        tw, pan = self.tw, self.env.solver.panels
+        fd = np.where(self.tw_side > 0, right_deg, np.where(self.tw_side < 0, left_deg, 0.0))
+        ang = tw["per_deg"] * (tw["tip"] + tw["fsign"] * tw["share"] * fd)
+        ca, sa = np.cos(ang)[:, None], np.sin(ang)[:, None]
+        pan.chord_local[:] = tw["c0"] * ca + np.cross(tw["s0"], tw["c0"]) * sa
+        pan.normal_local[:] = np.cross(pan.span_local, pan.chord_local)
+
+    def roll_deg(self) -> float:
+        q = self.d.qpos[3:7]
+        return math.degrees(math.atan2(2.0 * (q[0] * q[1] + q[2] * q[3]), 1.0 - 2.0 * (q[1] ** 2 + q[2] ** 2)))
+
+    def yaw_deg(self) -> float:
+        q = self.d.qpos[3:7]
+        return math.degrees(math.atan2(2.0 * (q[0] * q[3] + q[1] * q[2]), 1.0 - 2.0 * (q[2] ** 2 + q[3] ** 2)))
+
     # ------------------------------------------------------------- placement
     def place(self, x=None, y=None, z=None, pitch_deg=None, vx=None, vz=None, q=None):
         d = self.d
