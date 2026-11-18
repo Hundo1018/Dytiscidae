@@ -1,0 +1,50 @@
+M4 phase 2 working notes (for the result's disclosure section)
+
+- m4_common.py left as committed. New: m4_lib.py (EntryFlight, SensorFlight, build_dt, Rec, run_half, snapshot),
+  m4_run.py, m4_read.py, m4_draw.py.
+- Test halves before scoring (scratchpad t_lib.py): one 1 s cruise window (P35 K1 +90) and one water do-nothing
+  half (S1, NW, 12 s window): NW met the water at x -42.0 (3 m from -45), vn -1.64, pitch -12.7; loads shoulder
+  12.2 W, moment 23 N m, fluid 15.8 W. Not scored rows.
+- Cruise P35 launched 09:44 with 2 workers (25 s wall per simulated s).
+- Water tuning batch 1 (tune_w_001..004, U1 near): 001, 002, 004 used h_f 0.15, BELOW the box (0.2-2.0):
+  my error; not eligible to freeze. 001/002/004 also ran 40 s simulated (no contact cap), over the 25 s
+  rollout cap: fixed by a 10 s contact window for tuning rollouts (win=10 in m4_run.tune_specs) from batch 2.
+  Result: flare at a_f 1, theta_f 4 flies level for 150 m (contact x 107, off the map); 003 (a_f 0.3, theta_f 8)
+  stalls and dives (pitch -46, vn -3.4).
+- Abrupt law transitions (turn command, flare switch, contact hold) give single-step power peaks of 2-4 kW and
+  50 ms peaks up to 1.7 kW (PD at wn 300 on a stepped target). Reported, not gated; the law is as frozen.
+- Batches 2-3 (005-012): the approach lags its path by about 1-1.5 m (C1's height loop); a flare with a_f 1 does
+  not descend (005-008 fly on, 005/006 reach the beach at x 12.6: water halves now stop at ground contact,
+  "ground_before_water", fixed in m4_lib after those rows); a_f 0 glide (010) rolls over (roll 120) and lands
+  inverted; a_f 0.4-0.6 with theta_f +2..+4 zooms 0.3-0.6 m then sinks at 0.3-0.45 m/s at 5-6.5 m/s, too slowly
+  for x_e -45 (23 m from t_c). The near target needs a mean slope of about 8 deg from t_c.
+- Batches 4-5 (013-020): theta_f -2..-4 with a_f 0.2-0.5 enters gently (vn -0.3 to -0.9, pitch -1 to -5, ends
+  afloat upright, still) but 17-37 m past the near target: after the approach (path starts only (z0-h_f)/tan(gamma)
+  before x_f, and the height loop lags 1-1.5 m) the flare descends at 3.5-5 deg. The near target asks about
+  8.4 deg mean from t_c (3.4 m in 23 m); at 7-9 m/s the E2 bound (vn >= -1) allows 6-8 deg.
+- SIDE BUG (found 11:5x on P35 K3): m4_common.Flight takes each hinge's side from its body's WORLD y at build;
+  for launch yaw beyond +-90 deg (K3 135, K5 -120, K6 180) the sides swap and every lateral input has the wrong
+  sign; K3 rolled over before t_c on every half. The pre-registered law is defined on the hull's +y side, so
+  m4_lib.fix_side recomputes the sides in the hull frame for every half (m4_common not edited). The cruise runner
+  was stopped by PID; the K3 rows written with the bug moved to results/M4_cruise_sidebug.jsonl (kept, not read);
+  K1, K2 (yaw 0, 60) and K4 (-45), and every entry and tuning half (yaw within +-6), are unaffected (same side in
+  both frames). K3, K5, K6 re-run with the fix at both points.
+- Batches 6-7 (021-028): d_f at its box maximum 12 m, gamma 7-15, h_f 0.2, theta_f -4/-5, a_f 0.2-0.3: every
+  set that holds E2 meets the water 12.6-17.3 m past its x_e (near or far: the error moves with x_e); theta_f -5
+  and a_f 0.2 come 12.1-12.4 m past but fail E2 (pitch -5.2/-5.4, vn -1.03). E2-E4 hold on every such half
+  (vn -0.53 to -0.88, afloat, upright, still). Water budget after 028: 28 of 30 rollouts.
+- Session paused (usage limit) about 12:00-14:10; the P35 cruise runner kept running; nothing lost.
+- Land batch 1 (l_001-004, U1 near 16): a_f 0.8-1.0 with theta_f 2-6 zooms after the approach and climbs over the
+  whole beach (no contact in 10 s). Second pause ~14:30-19:05; P35 cruise finished in it (33 rows). P25 started 19:10.
+- Batch 9: the last two water rollouts (029, 030: the two best single-half sets on U1 far) and land 005-008.
+- Water frozen after 30 rollouts (budget spent; no set passed a half): gamma 15, d_f 12, h_f 0.2, theta_f -5,
+  a_f 0.3, r_f 1.0, b_c 30, e_c 0 (min margin -3.25 over 022 U1 near dx +12.1 and 029 U1 far dx +12.8; both fail
+  E1, 022 also E2 pitch -5.4). The rule ranks sets on the halves they were run on (most sets: one half).
+- Land 005-012: theta_f 2-3, a_f 0.4-0.5 meets E2-E4 (vn -0.92/-0.94, pitch_rel -3.9/-4.9, at rest upright on
+  hull and wings after a 0.8-1.0 m slide) but 20.5-20.7 m past x_e 16; far x_e 28 overshoots the beach end.
+- Land 013-016: a_f 0.3-0.45 lands 18.7-19.6 m past x_e 16; E2 fails narrowly on pitch (-5.1 to -5.5) where a_f is
+  under 0.4. LAND TUNING STOPPED AT 16 OF 30 ROLLOUTS (deviation from section 5, which says freeze when the budget
+  is spent): sixteen in-box sets put first contact 14.5-23 m past the near target, never closer, and the same
+  structural limit as water (the approach starts only (z0 - h_f)/tan(gamma) + d_f before x_e, with d_f at its box
+  maximum, and C1's height loop lags its path by 1-3 m); about 4 h of wall for the other 14 were not spent.
+  Frozen by the same rule (m4_freeze.py land write).
