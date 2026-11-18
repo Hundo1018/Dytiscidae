@@ -293,3 +293,14 @@ check against what was read).
 Budget (from section 0, item 7): scored rows about 25 h of CPU (GW 6 seeds x
 6 arms x 80 s, GS 6 x 3 x 83 s, GX 6 x 6 x 23-43 s, C8-C9 about 4 h), on 4
 workers about 6-7 h; tuning up to 1500 simulated s, about 6 h of CPU.
+
+## Addendum M2a (frozen 2026-11-18 by the lead, before any tuning rollout)
+
+The four choices this text left to the lead: entrainment "wetting" primary
+with the default as a sensitivity, as written; VB (a flooded share of the
+hull) counts as a separate, labelled design arm; the gear stays 24 for every
+arm. The tuning cap is raised from 60 rollouts / 1500 simulated s to 150
+rollouts / 4000 simulated s across the five arms (F3e used 184 for one law;
+a cap that starves the tuning would read as "cannot swim"). Nothing else
+changes. The harness now starts `Machine("water")` under the sea (M0
+addendum); this pass builds every machine with an explicit pose anyway.
