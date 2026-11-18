@@ -1,9 +1,8 @@
 # Pass S0, pre-registration: from a machine that passes every scenario, back to the limits
 
-**DRAFT, 2026-11-19, not frozen.** Two items wait on M2b: rung A5 (the exit
-then flight link) and the water gates' entrainment line. Nothing in this pass
-runs before this file is frozen and committed. Frozen means "the lead commits
-it with M2b's numbers filled in, and the header changed".
+**FROZEN, 2026-11-19**, after M2b's result (1875d71): rung A5, the swim item A5w,
+the posture item A5p and the entrainment line are filled in from it. No scenario ran before this commit;
+probe P1 is disclosed in §0b. Any change after it is a new pre-registration.
 
 ## 0. Question and what hangs on it
 
@@ -40,6 +39,8 @@ It is the only body with measured passes:
 | stand on the ramp | 4/4 | M3 |
 | walk both ways, turn in place (with the sweep hinge, 0.66 kg) | walk 6/6, turn 2/3 at 14 s | M3b, 07fafb5 |
 | water exit | XV 5/6 under "wetting", 0/6 under the default entrainment | M2, cadf9ab |
+| exit then 30 s aloft | XS 1/6 under "wetting", 0/6 under the default (GX30 needs 4/6) | M2b, 1875d71 |
+| swim under water, surface turn | WT 0/6, WT-VB 0/6, ST 0/6 in both modes | M2b, 1875d71 |
 
 Measured failures, and the cause each result names:
 
@@ -49,7 +50,17 @@ Measured failures, and the cause each result names:
 - **Entries.** Placing failed: the water entry lands 8.9-14.3 m past the
   commanded place, and the land arrival is too hard (M4, 0/4 each). The
   glide path is anchored late, and C1's height loop trails it by 1-3 m.
-- **Flight after exit.** It falls back into the water in 4-10 s (M2).
+- **Flight after exit.** It falls back into the water in 4-10 s (M2). In
+  M2b, every XS fall under "wetting" (seeds 10, 12, 14, 15, at 2.7-8.2 s) had
+  the stroke and feather motors on their limit for 76-98% of steps at
+  3.0-3.7 kW. The one seed that stayed up (11, 39.6 s at 4.0 m, 351 W) had
+  no motor on its limit. Under the default the vault never clears the water
+  (CoM peak 0.34-0.46 m, motors on the limit 93-95%).
+- **Swim.** M2b: the flow-angle feather law makes no commanded progress in
+  either mode (|P| <= 0.018 m/s under the default; -0.22 to +0.11 m/s
+  under "wetting", with no depth hold), as built or at 1.08x buoyancy. The
+  rowing turn turns, but stands the hull on its nose or rolls it inverted
+  on 22 of 24 halves. There is no law with a measured swim anywhere.
 
 Rivals for "S0 passes":
 
@@ -104,12 +115,34 @@ that failure. Every rung taken is reported with the scenario that needed it.
     descends at a commanded -0.5 m/s until first contact.
   - This is a law, not structure. It answers M4's failure to place the
     entry.
-- **A5, exit then flight.** *[Waits on M2b's arm (i), the XV exit followed
-  by V+ with a 30 s gate.]*
-  - If M2b passes, A5 is M2b's frozen arm.
-  - If not, A5 is: the exit vault, then V+ from the first moment the hull
-    is clear of the water, with ideal actuators. It is tuned under §5's
-    budget.
+- **A5, exit then flight.** M2b's XS did not pass (1/6 and 0/6). A5 is
+  therefore: M2b's XS law as frozen (the vault, then V+ verbatim from the
+  first moment the hull is clear), now on ideal actuators (A0), and tuned
+  under §5's budget only if it still fails. The measured cause of the
+  "wetting" falls was motors on their limit, which A0 removes. The cause of
+  the default's failure (the vault never clears) is not a motor limit by
+  that reading. If the exit passes only under "wetting", the water<->air
+  verdict is "not established, the modes disagree", never a pass.
+- **A5w, a swim law.** No pre-registered swim law has passed (M2b). If the
+  water scenario's swim or surface turn still fails after A2 (or A3), the
+  WT and ST laws are tuned under §5's budget on ideal actuators. The free
+  parameters are the feather's offset and amplitude relative to the flow
+  angle, the stroke amplitude and frequency (inside §4's band), and for ST
+  the side-to-side amplitude split. Nothing else is free. A swim that fails
+  here goes on to A5p.
+- **A5p, posture in water.** M2b's ST failed on posture (nose-down or
+  inverted on 22 of 24 halves), and WT made no commanded progress. Neither
+  cause is reached by A5w's knobs alone. Taken only if the swim or surface
+  turn still fails after A5w, in this order:
+  1. **Attitude feedback through the A1 sweep.** The two shoulder sweeps,
+     already in the machine from A1, take an offset ``kp * error + kd *
+     rate``: pitch through the common offset, roll through the difference.
+     The gains are tuned under §5's budget.
+  2. **Ballast low.** A2's (or A3's) ballast is placed at the hull's keel,
+     40% of the hull's half-height below the centre of buoyancy, which
+     gives a righting moment in water. The ballast mass is the same; only
+     where it sits changes. This is a body change through `body.built`.
+  A swim that fails after A5p goes on to A6.
 - **A6, wing count and form.** Taken only for a scenario that still fails
   after A0-A5. The candidates are fixed now, in order:
   1. tip chord ×1.5 on the same span;
@@ -153,8 +186,10 @@ Scoring follows the frozen gates:
   starts. Antipodal or commanded pairs are used where the frozen gate
   defines them. Starts are disjoint from every M-series tuning start.
 - **Water.** Every water gate is run under **both** entrainment modes, and
-  passing needs both. *[M2b's co-primary reading is restated here when it
-  lands.]*
+  passing needs both. M2b showed the modes can agree on a verdict while
+  disagreeing on the behaviour (the exit: up to 4.0 m under "wetting",
+  never clear under the default). A gate that passes in one mode and fails
+  in the other is "not established", and S0* cannot be declared on it.
 - **Do-nothing arms.** One per gate: actuators held still, the machine
   dropped, floated or set down as that gate's frozen null. A null that
   passes makes its gate unable to tell, and no verdict rests on that gate.
@@ -236,17 +271,36 @@ Two notes on the failing case:
 - **No gate is loosened at any point.** A limit that cannot close is "not
   found", as TRIPHIBIAN_SPEC says.
 
-## 7. Predictions (to be numbered before freezing)
+## 7. Predictions
 
-- **Q-up: S0* needs A0, A1, A2 and A4.**
-  - Dive and exit close at one fixed b, so A3 is not taken.
-  - A6 is not taken.
-  - Confidence is low on A5 until M2b lands.
-- **The first limit to break is the torque-speed motor.** It breaks at the
-  strike of a standing take-off or of a water exit:
-  - S0*'s recorded peak torque will be ≥ 4 times the witness's 24 N m at the
-    stroke;
-  - the failing step will be k = 1 or 2.
+- **S1, air and land<->air.** Pass at A0 plus A4 (land entry), with A1 for
+  the land legs. (0.7)
+- **S2, land.** Passes at A1, as M3b's K did. (0.8)
+- **S3, the exit under "wetting".** Passes GX30 (>= 4/6) at A0 with XS
+  untuned, because the falls were motor-limited. (0.6)
+- **S4, the exit under the default.** Still fails at A0: the vault does not
+  clear, and ideal motors do not change what the default entrainment
+  holds. It fails through A5's tuning too, so water<->air ends "not
+  established, the modes disagree". (0.55)
+- **S5, swim.** Fails at A0-A2 with the WT law. A5w's tuning gives a pair
+  progress > 0 in both modes, but the depth hold fails in at least one mode,
+  so the water scenario reaches A5p. A5p's low ballast keeps the hull
+  upright (no inverted half in either mode), but the swim still fails the
+  depth hold in one mode, so the scenario reaches A6. (0.5)
+- **S6, buoyancy.** Dive and exit close at one fixed b, so A3 is not taken.
+  (0.6)
+- **S7, the outcome of Q-up.** At least one water scenario is not
+  established or fails after A6, so the outcome is "no step-0 machine on
+  this harness" with the blocking gate named, more likely than an S0*.
+  (0.55)
+- **S8, if S0* exists: the first limit to break is the torque-speed
+  motor.** It breaks at the strike of a standing take-off or of a water
+  exit. S0*'s recorded peak torque will be ≥ 4 times the witness's 24 N m at
+  the stroke, and the failing step will be k = 1 or 2. (0.6)
 - **Rival R2** predicts instead: S0*'s passes rest on X2-regime windows or
   on contact peaks above 10 weights, and the contact ×2 re-run fails. If
   that happens, S0* is not a working point, and the outcome says so.
+
+If S7 holds, Q-down is not run on a machine that does not exist. The pass
+instead reports which gate blocked and the run order of §2 stops there.
+Each scenario's verdict is still reported.
