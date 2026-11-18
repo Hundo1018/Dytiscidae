@@ -72,7 +72,7 @@ class Machine:
             add = mass - float(env.solver._dry_mass.sum())
             env.solver._dry_mass[hull] += add
             m.body_mass[hull] += add
-            mj.mj_setConst(m, d)
+            mj.mj_setConst(m, mj.MjData(m))       # on a scratch: it resets the data it is given to qpos0
         self.mass = float(env.solver._dry_mass.sum())
         # roles, as freerig reads them
         self.aid, self.jid, self.role = [], [], []
@@ -194,6 +194,13 @@ class Machine:
     def pitch_deg(self) -> float:
         q = self.d.qpos[3:7]
         return math.degrees(math.asin(max(-1.0, min(1.0, -2.0 * (q[0] * q[2] - q[3] * q[1])))))
+
+    def com(self) -> np.ndarray:
+        """The machine's centre of mass from its dry masses.  Not ``subtree_com``:
+        the solver writes added mass into ``body_mass`` without ``mj_setConst``,
+        so ``subtree_com`` is off by metres (found in M3's design)."""
+        dry = self.env.solver._dry_mass
+        return (dry[:, None] * self.d.xipos).sum(0) / dry.sum()
 
     def contact_load(self) -> float:
         """Vertical contact force on the machine over its weight (0 airborne)."""

@@ -35,3 +35,41 @@ parameters for M1-M3, not fixed here.
 
 Not in it yet: modelled sensors (M5), the D-series mechanisms (after M5),
 any controller beyond following joint targets.
+
+## Addendum, same day: two harness faults and the sensor model
+
+- `mj_setConst(m, d)` resets the data it is handed to `qpos0`, so every
+  `Machine(domain)` built without `pose=` started at (-6, 0, 1.5) and fell
+  into the sea (found by M2's design). Now called on a scratch `MjData`:
+  land starts at (15, 0, 1.0), water at (-8, 0, -4), air at (-40, 0, 30).
+  The checks above all passed `pose=` or `drop_to_ground` and are unaffected.
+- `data.subtree_com` is not the centre of mass here: the strip solver writes
+  added mass into `body_mass` without `mj_setConst` (found by M3's design).
+  `Machine.com()` gives it from the dry masses. Dynamics are unaffected.
+- `drop_to_ground` leaves the machine about 0.1 m up (it does not subtract a
+  box's half-height); passes let it settle.
+
+`sensors.py` (class `Sensors`): an IMU at a hull mount (gyro and
+accelerometer at 1 kHz with white noise, wandering gyro bias, range
+saturation and a 2 ms delay; the accelerometer reads the specific force at
+its mount, so it feels the hull's motion at the flapping frequency), a
+complementary attitude filter, a pressure sensor (depth in water, height in
+air), a contact switch, joint encoders, and wetness. Noise constants are
+TYPED from memory of a small MEMS IMU and a hobby pressure sensor, not
+checked against a datasheet. Checks (`m0/sens_check.py`, `m0/sens_tau.py`),
+tilt error between the estimate and the truth:
+
+| case | filter time constant | tilt error mean / max |
+|---|---|---|
+| at rest on the beach | 1 s | 0.33 / 0.37 deg |
+| flapping 20 deg on the beach | 1 / 5 / 30 s | 1.40 / 2.88; 0.65 / 1.46; 0.74 / 1.35 deg |
+| free, flapping 40 deg from an 8 m/s launch, tumbling (true tilt to 84 deg), estimate armed before the launch | 1 / 5 / 30 s | 6.52 / 13.8; 1.28 / 3.00; 0.33 / 1.23 deg |
+
+In flight the accelerometer reads the wings' force, not gravity, and the
+filter's pull toward it is wrong: the 1 s filter is off by up to 14 deg.
+The default is 30 s (gyro-led); whether a 30 s filter holds over 15-minute
+flights with the gyro bias walking is for M5 to measure. Two faults fixed on
+the way: the tilt correction's sign (it diverged), and the body acceleration
+read in the inertial frame instead of the hull's; and an estimate initialised
+from a reading that was not 1 g came out upside down, so it now waits for 1 g
+or starts at the true attitude when armed before a launch.
