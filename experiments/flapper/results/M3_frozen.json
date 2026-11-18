@@ -1,0 +1,55 @@
+{
+ "G1": {
+  "D": 0.6,
+  "T": 3.0,
+  "drop": 5,
+  "fa": -20,
+  "fb": 20,
+  "kp": 1,
+  "tail": -20,
+  "th_s": -10,
+  "th_up": 0
+ },
+ "G2": {
+  "D": 0.85,
+  "T": 1.5,
+  "drop": 10,
+  "fa": -20,
+  "fb": 20,
+  "kp": 1,
+  "tail": -20,
+  "th_s": -10,
+  "th_up": 15
+ },
+ "H": {
+  "D": 0.85,
+  "T": 1.5,
+  "drop": 10,
+  "fa": -40,
+  "fb": 0,
+  "kp": 1,
+  "tail": -20,
+  "th_s": -10,
+  "th_up": 10
+ },
+ "H_note": "added after tuning, disclosed: the forward hop of t033 (largest uphill progress), run under the frozen controller and gates; not chosen by the freeze rule",
+ "S": {
+  "f_s": 0,
+  "kr": 1.0,
+  "tail": -20,
+  "th_s": -12
+ },
+ "best": "G1",
+ "best_note": "F (pairing check) uses G1 before scoring; J uses the gait with more passing scored pairs, ties to G1 (prereg)",
+ "margin": {
+  "G1": -4.9327051558146575,
+  "G2": -6.492620914149304,
+  "S": 0.775673084350704
+ },
+ "rule": "The prereg (section 5) says \"the frozen set is the one with the largest smallest\nmargin over the tuning starts' gate quantities\" without a normalisation. Defined\nhere, after tuning began and before any scored row (disclosed in the result):",
+ "tuning_used": {
+  "G1": 114,
+  "G2": 28,
+  "S": 4
+ }
+}
