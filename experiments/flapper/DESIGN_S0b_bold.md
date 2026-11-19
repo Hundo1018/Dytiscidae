@@ -95,3 +95,73 @@ Each is a few rollouts. They decide what the pre-registration freezes.
 If B2 or B3 fails in the default mode with every freedom above, that is the
 first finding about the mechanism, and it goes to the user before anything
 else is built.
+
+## Addendum, 2026-11-19: what probes B0-B4 said, and the level hover
+
+Probes: `results/S0b_probes.md`, `results/S0b_probes.jsonl` (106 rows, 0
+QACC; the solver's fluid-force limiter engaged on 56, which are not
+evidence). T4 as built: 0.918 kg, 1.159 kg with 0.241 kg of low ballast at
+b = 1.0000, 14 hinges (`figures/S0b_T4_built.png`).
+
+- **Hover, nose up, held:** 1.84 weights of thrust, moments on three axes
+  (1.6-2.2 N m), peak torque under the witness stall. Free and untuned it
+  held height 8 s and then diverged sideways.
+- **Water, held at 3 m:** the one limiter-free point (30 deg, 0.5 Hz) gives
+  61-63 N of thrust and 3-4 N m on three axes in both modes.
+- **Water, free:** the hull recoils unless the wings' reactions cancel;
+  only the diagonal phasing (FL+HR against FR+HL) does that, and it needs
+  both pairs.
+- **Breach: fails in both modes.** Best case ("wetting") reaches the surface
+  at 1.55 m/s and the centre of mass peaks 0.17 m above it; clearing needs
+  about 3.6 m/s. The default mode climbs 3.6x slower.
+- **"Ideal actuator" (from S0's A0, 57bc449):** an unlimited hinge PD turns
+  stepped targets into full-force strikes. From here the primary actuator
+  is the witness curve x4 in torque and speed with blended targets; the
+  unlimited motor is a diagnostic twin; a row with limiter steps or torque
+  over 10x the witness stall is not evidence.
+
+**The exit must not need the wings to work at the surface.** Both exits
+tried so far (the vault, the breach) ask a wing to push on water and then on
+air within one manoeuvre, which is where the two entrainment modes disagree
+and where the limiter engages. A spar-buoy float (nose up, fore pair above
+the waterline) does not fit this body: the fore wing spans hull x 0.13-0.39
+of 0.50, so 74% of the hull would have to stand out of the water and the
+most buoyant state is b = 1.26.
+
+**Level hover instead (the sweep as the stroke).** The hull stays level,
+ballast low. The wings are raised to a dihedral above the hull's plane and
+beat fore and aft about the sweep hinge, feathering at each reversal, so the
+stroke plane is near horizontal and the thrust is up: the hover of a
+dragonfly, and the kinematics this solver was checked against (robofly).
+Four wings beating like that are the quad B1 with wings for rotors: pitch
+from the fore-hind difference, roll from left-right, yaw from the feather
+offset.
+
+- **Exit:** ballast out (b up to 1.26), the hull floats level, the raised
+  wings are dry. Lift off as from land. No wing touches water, so the two
+  entrainment modes should not differ; if they do, the float is wetter than
+  drawn and the figure will show it.
+- **Take-off from land:** the same, with no wing strike on the ground, which
+  removes the rigid-contact peaks V+ rests on.
+- **Entries, both:** stop in level hover over the place and descend onto it.
+- **Under water:** ballast in to b = 1.00, diagonal phasing, as probed.
+- **Cruise:** the frozen M4 law on the fore pair if it still holds on T4,
+  or forward flight by tilting the hover.
+
+What this asks of the body beyond T4 as built: the sweep range from ±35 to
+about ±70 deg, a dihedral setting on the stroke hinge held during hover,
+and the two pairs' stroke planes kept apart (different dihedral) so the
+wings do not meet. The solver has no wing-wing interference; that is a
+stated blind spot of any tandem result.
+
+**Probes B5-B8** (before the pre-registration):
+
+- **B5, level hover held.** Force and moment map in air for the sweep
+  stroke at dihedral 20-50 deg, amplitude 40-70 deg, 2.5-6 Hz: thrust in
+  weights, moments per axis, peak torque against the witness x4.
+- **B6, the float.** At b = 1.26 and 1.00, level, wings raised: how many
+  wing strips are wet, at rest and through one stroke, both modes. A figure
+  with the waterline.
+- **B7, lift-off from the float and from the beach**, free, both modes,
+  with a plain attitude and height loop; then a descent back onto each.
+- **B8, still machine** for B5-B7.
