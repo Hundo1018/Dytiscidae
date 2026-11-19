@@ -58,12 +58,15 @@ def body_t4() -> dict:
 
 
 def _compile(keel_mass: float, keel_x: float, keel_z: float, sweep: bool = True,
-             sweep_range_deg: float = SWEEP_RANGE_DEG, feather_range_deg=None, root_cut: float = 0.0):
+             sweep_range_deg: float = SWEEP_RANGE_DEG, feather_range_deg=None, root_cut: float = 0.0,
+             xml_hook=None, panel_hook=None):
     """sweep_range_deg, feather_range_deg (lo, hi): B5-B8's body changes (the level hover beats about the
     sweep hinge; the through-vertical flip needs the feather past 90 deg).
     ``root_cut`` (m): the inner part of each main wing is absent (T4c): the wing's box starts ``root_cut`` out
     from the shoulder (its mass scaled by what is left, if the geom carries one) and the fluid strips whose
-    centre is inside the cut are removed from the panel set.  Defaults are T4 as built for B0-B4."""
+    centre is inside the cut are removed from the panel set.  ``xml_hook(root, hull)`` and
+    ``panel_hook(model, panels) -> panels`` (T5, `s0b_t5_machine`): extra geometry added to the XML before it
+    is compiled, and its fluid elements.  Defaults are T4 as built for B0-B4."""
     import mujoco
     from dytiscidae.core.mjcf import build_model_xml
     from dytiscidae.core.phenotype import build_panels
@@ -113,6 +116,8 @@ def _compile(keel_mass: float, keel_x: float, keel_z: float, sweep: bool = True,
             ET.SubElement(hull, "geom", name="s0b_keel", type="sphere", size="0.008",
                           pos=f"{keel_x:.6f} 0 {keel_z:.6f}", mass=f"{keel_mass:.9g}",
                           contype="0", conaffinity="0", rgba="0.1 0.1 0.9 1")
+        if xml_hook is not None:
+            xml_hook(root, hull)
         model = mujoco.MjModel.from_xml_string(ET.tostring(root, encoding="unicode"))
         pan = build_panels(p, model)
         if root_cut > 0.0:
@@ -123,12 +128,14 @@ def _compile(keel_mass: float, keel_x: float, keel_z: float, sweep: bool = True,
             pan = dataclasses.replace(pan, **{f.name: getattr(pan, f.name)[keep] for f in dataclasses.fields(pan)
                                               if isinstance(getattr(pan, f.name), np.ndarray)
                                               and getattr(pan, f.name).shape[:1] == (n0,)})
+        if panel_hook is not None:
+            pan = panel_hook(model, pan)
         return model, mujoco.MjData(model), list(names) + added, pan
     return comp
 
 
 def _machine(domain, keel=(0.0, 0.25, 0.0), sweep=True, sweep_range_deg=SWEEP_RANGE_DEG, feather_range_deg=None,
-             root_cut=0.0, **kw):
+             root_cut=0.0, xml_hook=None, panel_hook=None, **kw):
     import dytiscidae.envs.triphibian as TR
     from mission import Machine
     mot = {r: dict(IDEAL) for r in ("stroke", "feather", "tail")}
@@ -138,7 +145,8 @@ def _machine(domain, keel=(0.0, 0.25, 0.0), sweep=True, sweep_range_deg=SWEEP_RA
     kw["mass"] = None                               # no ballast at the hull's centre: the keel carries it
     orig = TR.compile_phenotype
     TR.compile_phenotype = _compile(*keel, sweep=sweep, sweep_range_deg=sweep_range_deg,
-                                    feather_range_deg=feather_range_deg, root_cut=root_cut)
+                                    feather_range_deg=feather_range_deg, root_cut=root_cut,
+                                    xml_hook=xml_hook, panel_hook=panel_hook)
     try:
         mc = Machine(domain, motors=mot, **kw)
     finally:

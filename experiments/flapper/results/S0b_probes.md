@@ -670,3 +670,431 @@ placement): 9 rows, every beach row that flew or tried. Over the witness stall
 Not done: contact-x2 and dt/2 re-runs; a wetter/drier tail or a raised tail;
 a hull standing higher (on land) or floating higher (b is fixed by the bare
 mass); scored starts; any optimiser; cruise; under water with this body.
+
+---
+
+# S0b probes B9-B13: T5, wings above and floats below (addendum 2 of DESIGN_S0b_bold.md)
+
+2026-11-19. Probes, not scored; no gate read. Every rollout is a row of
+`results/S0b_probes3.jsonl`. Files: `s0b_t5_machine.py` (T5), `s0b_t5_probe.py`
+(rollouts; B5-B8's `held`, `floatq`, `fly` reused with T5's builder, plus `held_w`
+and `mission`), `s0b_t5_draw.py` (figures), `results/S0b_T5_calib.json`.
+`s0b_machine._compile` gained two optional hooks (`xml_hook`, `panel_hook`, default
+None); the default T4 build and the T4c build are bit-identical before and after
+(sha256 over model arrays, panels and 200 steps: `3d879778...` both times).
+Primary motor "x4"; "ideal" as a named twin. "Not evidence" as in B5-B8.
+
+## T5 as built (`s0b_t5_machine.make`; `figures/S0b_T5_built.png`, `.json`)
+
+T4c (inner 0.11 m of each main wing absent, sweep +-75 deg, feather -150..+60 deg,
+no keel) plus, below the hull:
+
+| part | geometry (hull frame: x from the tail end to the nose, z up) | mass | fluid elements |
+|---|---|---|---|
+| 2 pontoons | capsules, radius 0.030 m, 0.50 m long over all, axis parallel to the hull's at y +-0.20, z -0.160, centred at x 0.235; each its own body welded to the hull | 0.2127 kg each (half spread over the capsule, half at one point 0.018 m under the axis, 0.087 m ahead of the centre) | 8 bluff slices each, built as the hull's own slices (centre, extents, displaced volume, half height; cd 0.20, the hull's value). 1.357 L each |
+| 4 struts | capsules radius 0.004 m: at x 0.110 and 0.360 a post from the hull's underside (z -0.03) down to z -0.160 on the centre line, and a crossbar from pontoon to pontoon at z -0.160 | the tail boom's built mass per length (17.6 g/m): 4.2 g in all | one bluff element each (cd 0.9, the solver's strut value), on the hull body |
+| 2 tanks | the pontoons' own volume; a body at each pontoon's centre, 1 g empty | water: fill x 1025 kg/m3 x 1.357 L each (uniform fill of the capsule, mass and inertia; `body_mass`, the solver's dry mass, `mj_setConst`) | none: the displaced volume does not change with the fill |
+
+No force is typed: buoyancy and drag of the pontoons and struts come from the
+solver's elements above, contact from the capsule geoms (contype/conaffinity as
+every machine geom).
+
+**Masses are closed by the model, not by a material.** The pontoon mass is what
+makes the flooded machine b = 1.00: weight = buoyancy of everything that is not
+pontoon (11.741 N: hull 10.279, four cut wings, tail, struts) plus the unflooded
+share of the pontoons. Whether a pontoon can be built at 0.213 kg is not examined.
+
+| | ballast out (fill 0) | fill 0.95 | fill 1.00 |
+|---|---|---|---|
+| mass | **1.3364 kg** | 3.9795 kg | 4.1186 kg |
+| buoyancy fully submerged | 39.025 N | | |
+| b | 2.978 | **1.0000** | 0.966 |
+| CoM (hull frame) | (0.2349, 0.0000, -0.0561) | (0.2349, 0, -0.1251) | (0.2349, 0, -0.1263) |
+| centre of buoyancy, submerged | x 0.2349 (the pontoon station is solved for this) | | |
+| inertia about the CoM, hull axes (Ixx, Iyy, Izz) | 0.0550, 0.0352, 0.0727 kg m2 | 0.1714, 0.0961, 0.2297 | |
+
+**My additions beyond the specification** (each the smallest change found for a
+stated fact):
+1. *Neutral at fill 0.95, not 1.00.* A machine that is exactly neutral with every
+   tank full cannot leave the surface without thrust. The last 5% of the pontoons'
+   volume (+-0.139 kg, +-1.36 N) is the depth control; this costs 0.139 kg of dry mass.
+2. *Posts and crossbars, not diagonal struts.* Struts running from the hull's
+   flank to each pontoon's top were built first: the wing roots pass through them
+   (-0.007 m at mean sweep -14 deg, A 44 deg). A centre-line post and a crossbar at
+   the pontoons' axis height clear by >= 0.034 m on every stroke scanned.
+3. *Pontoon mass split* half on the capsule, half at a low point: the point's
+   station (0.087 m ahead) is what puts the dry CoM over the pontoons' centre while
+   the pontoons sit under the centre of buoyancy of everything else. Without it the
+   float or the flooded machine is out of trim by 0.02 m (0.23 N m).
+
+### Sizing (kinematic scan on the built model, targets tracked exactly, 120 phases per beat)
+
+Lowest corner of any main-wing box in the hull frame through the hover stroke
+(through-vertical flip, pitch 45, mean sweep -14 / +6 / +26 deg, A 30 / 44 / 55):
+dihedral 25: z -0.106 m; **dihedral 35: -0.074 m**; dihedral 45: -0.041 m (the same at
+every amplitude and mean sweep: it is the trailing edge of the root at the flip).
+Tail: lowest corner -0.005 m at 0 deflection, -0.055 m at its -0.6 rad stop.
+With the pontoon tops at z -0.130: wing to pontoon >= 0.056 m, wing to strut >=
+0.034 m (A 55, sweep -14; 0.066 at A 44), tail to pontoon 0.29 m. The held rows'
+own clearance read (240 phases): wing-wing +0.094, wing-hull/strut +0.071,
+wing-tail +0.102, wing-float +0.056 m at the hover amplitude; +0.048 / +0.043 /
++0.043 / +0.057 at the largest amplitude the law may use (0.9).
+
+## B9, build and float
+
+### Held hover map in air at T5's hover point (4.5 Hz, dihedral 35, pitch 45, through-vertical flip; ids `m_*`)
+
+Hull held level at 30 m, 4 beats after 3. 8 rows: 0 QACC, 0 limiter steps, motor
+never on its curve; the ideal-motor twin of the base row is identical to the last
+digit. Every row X2 share 1.00 (hover).
+
+| row | thrust N (weights of 1.336 kg) | moment N m (roll, pitch, yaw) | peak torque sweep / stroke / feather N m |
+|---|---|---|---|
+| base, amp 0.56 (A 30.8 deg) | 13.79 (1.052) | (0, +0.902, 0) | 6.9 / 4.2 / 5.0 |
+| amp 0.672 | 18.67 (1.425) | (0, +1.202, 0) | 8.7 / 5.4 / 5.3 |
+| amp 0.9 (the law's upper limit) | 31.31 (2.389) | (0, +1.946, 0) | 12.8 / 8.5 / 5.9 |
+| amp_lr 0.2 | 13.91 | roll **+1.418** (7.09 per unit) | 7.7 / 4.5 / 5.1 |
+| sw0 +10 deg | 13.81 | pitch **-0.182** (-6.21 N m/rad) | 6.8 / 4.3 / 5.0 |
+| psi0_lr 10 deg | 13.67 | yaw **+0.903** (5.17 N m/rad) | 7.1 / 4.2 / 5.1 |
+| still, wings raised (B12) | 0.001 | 0 | 0 |
+
+All inside the witness stall (24 / 24 / 16). The machine's weight (13.105 N) is
+carried at amp 0.544 (A 29.9 deg); pitch trim sw0 = +8.3 deg. The pontoons add no
+thrust loss in this model: the solver has no wing-pontoon interference and the
+pontoons sit 0.06-0.25 m under the stroke plane, in the downwash. Stated blind spot.
+
+### The float (free, fill 0, wings raised 35 deg and flat, mean sweep 6.2 deg; ids `float_default`, `float_wetting`)
+
+Settled 12 s from a level start, then pushed 20 deg from the settled state, 8 s each.
+
+| | default | wetting |
+|---|---|---|
+| hull origin z, pitch, roll at 12 s | +0.1626 m, -0.3 deg, 0.0 | +0.1634 m, -0.3, 0.0 |
+| motion in the last second (roll, pitch range) | 0.00, 0.04 deg | 0.00, 0.26 deg |
+| wet main-wing strips (of 32) / tail strips (of 20) / hull slices (of 6) | 0 / 0 / 0 | 0 / 0 / 0 |
+| lowest wing corner at rest | +0.215 m over the water | +0.216 m |
+| what is wet | the pontoons (8 + 8 slices) and the two crossbars (0.31, 0.45 submerged) | the same (0.23, 0.38) |
+| roll +20 deg push | back to 0.03 deg at 8 s (overshoot -6.2) | -0.05 deg (overshoot -6.4) |
+| nose down 20 deg | back to +0.26 deg (overshoot +8.6) | +0.24 (overshoot +8.1) |
+| nose up 20 deg | back to -0.21 deg (overshoot -8.4) | -0.44 (overshoot -7.8) |
+| wet wing strips during any push | 0 | 0 |
+| limiter steps / QACC | 0 / 0 | 0 / 0 |
+
+**Pass**: it floats level, upright, wings, tail and hull dry, and a 20 deg push in
+roll or pitch returns, in both modes, which agree. The pitch return is lightly
+damped (one overshoot of 8 deg).
+
+### The hover stroke held over the float (hull held level at its settled float height, origin z +0.1626 m; ids `stroke_on_float_*`, `still_on_float_*`)
+
+4.5 Hz, 4 beats after 3. The wrench includes the pontoons' buoyancy (12.53 N at
+this height, the still row), so it is not a thrust figure.
+
+| row | default | wetting |
+|---|---|---|
+| hover amplitude (0.544): wet main-wing strips, max | **0** | **0** |
+| limiter steps | **0** | **0** |
+| lowest wing corner over the water through the stroke | +0.088 m | +0.088 m |
+| vertical force (thrust + buoyancy) | 25.71 N | 25.69 N |
+| peak torque sweep / stroke / feather | 6.7 / 4.0 / 5.0 N m | 6.6 / 4.0 / 4.8 |
+| the law's largest amplitude (0.9): wet strips / limiter steps / lowest corner | 0 / 0 / +0.088 m | 0 / 0 / +0.088 m |
+| vertical force | 43.87 N | 43.88 N |
+| still (B12): force, wet strips | 12.53 N (buoyancy only), 0 | 12.53 N, 0 |
+
+**Pass** (targets 0 and 0): no wing strip is wet and the limiter never steps, the
+lowest wing point stays 0.088 m over the water (criterion 0.03), and the two
+entrainment modes agree to 0.1%. 6 rows, 0 QACC.
+
+## B10, lift-off and return: law and tuning (ids `t01`..., probe `B10tune`)
+
+Law: `s0b_laws.Hover4` unchanged, mixed through T5's own map above. Tuning rollouts
+are on other starts than the reported rows (beach 2 m further down the slope; the
+float dropped from 2 cm higher; a release at 10 m in air).
+
+| ids | what | result |
+|---|---|---|
+| t01 (3 rollouts: beach, float default, float wetting) | T4's gains (wn 20 / 12 / 5 rad/s from T5's own inertia, zeta 0.8) | all three leave the surface with no wing contact, no wet strip and no limiter step, reach 2 m, and then lose the roll axis: a 1 Hz roll oscillation that grows to +-40 deg with the roll input on its limit (sat 34-55%), inverted 0.5-3.5 s into the hold |
+| t02-t05 (4, air) | roll / pitch / yaw wn 14.8/9.8/4.2 (zeta 0.6 and 0.8: T4's absolute gains), 12/9/4, 10/8/4 | 14.8: inverted at 5.9 and 11.6 s; 12: holds 10 s, tilt to 50 deg; **10/8/4: holds 10 s, drift 0.06 m, tilt 11.9 deg, 0% saturated** |
+
+Read: the loop works on beat means (0.22 s of lag at 4.5 Hz). T5's roll inertia is
+1.83x T4's (0.055 against 0.030 kg m2, the pontoons at y +-0.20), so gains scaled
+with inertia double the loop gain against the same lag and the roll loop limit-cycles.
+Lower gains hold. Inferred from four rollouts, not isolated.
+
+## B11 (held part): thrust against measured drag under water (hull held level, CoM at 3 m, fill 0.95; ids `w_*`)
+
+The stroke-hinge stroke of B2 (`s0b_laws.targets`), diagonal phasing, 0.5 Hz, 3
+beats after 1. 30 rows, 0 QACC, 0 limiter steps on every one, torques inside the
+witness stall except the reversed-feather row (60 N m feather, 2.5x).
+
+| row | default: axial force N | wetting | note |
+|---|---|---|---|
+| still (B12) | 0.00, net vertical 0.00 (39.025 N of buoyancy = weight) | 0.00 | b = 1.000 |
+| hull moved at +0.3 m/s, wings flat | **drag 2.77**, dorsal +1.63 | 2.77, +1.63 | T4's was 0.94: the pontoons and struts add 1.8 N |
+| hull moved at -0.3 m/s | 2.49, dorsal +1.16, My +0.38 | 2.49, +1.16 | |
+| stroke 10 / 20 / 30 deg, feather 50 deg | **36.6 / 44.1 / 57.3** | 33.6 / 41.9 / 55.4 | 13-21x the drag; nose-down moment 4.6-7.2 N m (the thrust line is 0.125 m over the CoM) |
+| the same with the feather's sign reversed (20 deg) | +17.9 (still forward) | +15.4 | the feather stroke is a paddle hinged near its leading edge: thrust is toward the leading edge whatever the phase. There is no reverse. |
+| throttle a (stroke 20 a, feather 50 a deg): 0.15 / 0.3 / 0.5 | 0.80 / 3.47 / 10.52 | 0.84 / 3.59 / 10.60 | thrust = drag at 0.3 m/s near a 0.27 |
+| at a 0.3: Psi_lr 0.1 rad | yaw -0.570 N m | -0.576 | -5.7 N m/rad: the yaw input |
+| amp_lr 0.4 | yaw -0.127 | -0.124 | weak |
+| stroke bias +0.15 rad | pitch +0.184 (more nose-down), dorsal +0.12 | +0.240, +0.18 | +1.2..1.6 N m/rad |
+| feather offset psi0 +0.1 rad | dorsal **+0.31** | **-0.35** | **the modes disagree in sign: not established**; not used |
+| psi0_lr 0.1 / psi0_fh 0.2 | roll +0.072 / pitch -0.035 | not run | weak |
+
+**Pass, held**: thrust exceeds the measured drag at 0.3 m/s by 13-21x in both
+modes (agreeing within 8%). Two facts for the free swim: (1) thrust pitches the
+machine nose-down, 0.435 N m at the throttle that balances drag, against a static
+righting stiffness of only 0.52 N m/rad (the flooded CoM is 0.013 m under the centre
+of buoyancy: flooded pontoons are neutral, so they right nothing); (2) the antipode
+needs a 180 deg turn, since there is no reverse thrust.
+
+### More tuning (ids t06-t16; 16 rollouts used of 80 in all, B10 and B11 together)
+
+| ids | what | result |
+|---|---|---|
+| t06-t08 (beach, float default, float wetting; tuning starts) | wn 10/8/4, T4's velocity and position gains (k_v 0.3 rad per m/s, k_p 0.3 rad/m) | beach: the whole sequence, upright at the end; float default: the whole sequence, upright; **float wetting: lift-off and 10 s hold, then a lateral oscillation (period 3.3 s) grows through the hold and the descent and it turns over at 0.3 m, before any part touches the water** |
+| t11-t14 (float, default; 1 m, 12 s hold; **a test disturbance at the start of the hold: +1 rad/s of roll rate and +0.3 m/s sideways, a state step, used on tuning rows only**) | k_v / k_p / roll wn: 0.3/0.1/10, 0.2/0.08/10, 0.3/0.1/8, 0.4/0.1/10 | all four hold 12 s and land upright; with wn 10 the roll swings grow to +-30 deg; with wn 8 roll stays within +-4 deg but the sideways swing grows from +-0.1 to +-0.48 m in 12 s (period 6 s) |
+
+Read: t08 and t07 differ only in the entrainment mode, and nothing is in the water
+during the hold. The default-mode row is exactly symmetric (roll 0.0 deg, y 0.00 m
+throughout); the wetting row is not, and the asymmetry grows. So a clean row from a
+symmetric start says the lateral mode was not excited, not that it is stable. The
+lateral position loop on this body is slowly unstable at every gain set tried so
+far; what a reported row shows is how far it gets in the time.
+| t15-t17 (as t11-t14, roll wn 8) | k_v / k_p: 0.3/0, 0.5/0.05, **0.5/0.1** | 0.5/0.05 and 0.5/0.1: the disturbance is gone in 2 s (roll back within 1 deg, y back within 0.01 m) and nothing grows in the 12 s; a steady 0.4-0.6 m offset in x remains (trim). 0.3/0: no return, drifts 0.3 m |
+
+**The law of the reported rows**: wn 8 / 8 / 4 rad/s, zeta 0.8, k_v 0.5 rad per m/s,
+k_p 0.1 rad/m, everything else as B7.
+
+### B10 rows (2 m, 10 s hold, descent at 0.25 m/s, 5 s after; ids `beach_*`, `float_*`)
+
+| row | reached | hold 10 s: z over the start, drift, tilt max | touch-down (beat-mean vz) | after 5 s | peak torque sweep / stroke / feather N m | contact peak, weights: all / wing | wet wing strips flying | limiter / QACC | X2 share |
+|---|---|---|---|---|---|---|---|---|---|
+| **beach_x4** | 2.01 m | 1.81-2.01 m, 0.21 m, 12.2 deg | -0.25 m/s | upright: roll 0.0, pitch +6.8 (the slope), yaw -0.3 | 9.6 / 6.2 / 5.0 | up 35.4, down 37.3, after 36.0 / **0** | - | 0 / 0 | 0.988 |
+| beach_ideal | identical to the last digit | | | | | | | | |
+| **float_default_x4** | 2.01 m | 1.80-2.01, 0.32 m, 12.2 deg | -0.23 m/s | upright: roll 0.0, pitch -0.4, yaw -0.1 | 9.4 / 3.8 / 5.7 | none | **0** | 0 / 0 | 0.988 |
+| **float_wetting_x4** | 2.01 m | 1.80-2.01, 0.15 m, 11.1 deg | -0.23 m/s (0.31 m/s sideways) | upright: roll 0.0, pitch -0.5, yaw -3.5 | 9.2 / 3.8 / 4.9 | none | **0** | 0 / 0 | 0.988 |
+| float_default_ideal, float_wetting_ideal | identical to their x4 rows | | | | | | | | |
+
+Motor never on its curve (at_limit 0), law outputs never on a limit, every torque
+inside the witness stall (24 / 24 / 16), mean positive shaft power 199-213 W.
+
+**Float: pass in both modes, which agree** (lift-off with dry wings, 10 s at 2 m,
+back onto the water upright; limiter 0, wing strips wet 0). **Beach: the sequence
+passes with no wing contact, but on rigid-contact figures**: the pontoons carry
+35-37 weights at peaks on the way up, at touch-down and after (the hull pitches
++-10 deg at 4.5 Hz while the stroke ramps, and the pontoons hammer the sand). B13's
+contact x2 re-run decides whether the beach row is evidence.
+Every flying row is in the X2 regime (0.99), as every hover is.
+
+### B10 with a disturbance (ids `float_kick_default_x4`, `float_kick_wetting_x4`; `mission` rollout, the same law)
+
+The reported float rows start mirror-symmetric, and the default-mode row stays so
+(roll 0.0 deg, y 0.00 m). A twin of each with the tuning rows' state step at the
+start of the hold (+1 rad/s roll rate, +0.3 m/s sideways):
+
+| | default | wetting |
+|---|---|---|
+| hold at 2 m | 10 s, 1.80-2.01 m, drift 0.32 m, tilt max 12.4 deg | **turns over 8.3 s into the hold** (drift 2.95 m, law saturated 5%) |
+| descent, touch-down | -0.23 m/s, upright after 5 s (roll 0.0, pitch -0.4) | - |
+| limiter / QACC / wet wing strips | 0 / 0 / 0 | 0 / 0 / 0 |
+
+**Not established**: after a disturbance the two entrainment modes disagree on a
+hover in air, where nothing is wet. The modes differ in air only through the
+reaction of the air's added mass (reacted in the default mode, not under
+"wetting"). So the lateral stability of this hover rests on a term of the model
+that the two modes treat differently; undisturbed, both pass.
+
+## B11, under and back (free; `mission` rollouts)
+
+Ballast: the fill moves at no more than **0.1 of the pontoons' volume per second
+(0.278 kg/s)**, the rate used; the depth loop is a PD on the CoM depth about fill
+0.95 (0.4 per m, 1.5 per m/s). While sinking the wings are held at the pose of the
+hover stroke's flip (raised 35 deg, chord vertical). The first two rows
+(`flood_hold_*`) held the wings level with the chord vertical instead: that pose
+puts the trailing edges 0.03 m inside the pontoons (the machine's parts do not
+collide in the model), so those two rows are void and were re-run.
+
+### Flood, level at 3 m, hold (ids `flood_hold2_*`; "seed" = the left tank 2% fuller than the right at every fill)
+
+| | default | wetting | default, seed | wetting, seed |
+|---|---|---|---|---|
+| float to within 0.1 m of 3 m and slow | 45.6 s | 43.7 s | 47.8 s | 47.6 s |
+| attitude on arrival (roll, pitch) | 0.0, -16.8 deg | 0.0, -22.9 | -12.5, -15.7 | -19.1, -17.7 |
+| after 10 s more: CoM depth | 2.98 m | 2.97 m | 2.99 m | 2.99 m |
+| roll, pitch | 0.0, -4.6 deg | 0.0, -2.3 | **-17.2**, -6.5 | **-14.7**, -8.0 |
+| limiter / QACC / peak torque N m | 0 / 0 / 1.4 | 0 / 0 / 1.4 | 0 / 0 / 1.6 | 0 / 0 / 1.7 |
+
+**Depth: pass in both modes** (2.97-2.99 m on the ballast alone, which agree).
+**Level: only as far as the tanks match.** It arrives nose-down 16-23 deg and
+comes back to 2-5 deg in 10 s; a 2% left-right mismatch leaves it listing 15-17 deg,
+because the flooded machine's righting stiffness is 0.5 N m/rad (above). The sink
+takes 44-48 s for 3 m: the depth control is 5% of the pontoons' volume (1.36 N).
+
+## B12, still machine (every actuator holding its start pose)
+
+| scenario | row ids | result |
+|---|---|---|
+| held in air, wings raised | `still_air_raised` | force (0, 0, 0.001) N, moment 0 |
+| held over the float, both modes | `still_on_float_*` | 12.53 N = the pontoons' buoyancy at that height; 0 wet wing strips |
+| held at 3 m, fill 0.95, both modes | `w_still_*` | axial 0.00 N, net vertical 0.00 N |
+| free on the beach, 8 s | `still_beach` | stays: where it was put, pitch 6.8 deg (the slope's), contact 1.0 weight (pontoons), no wing contact |
+| free on the float, 10 s, both modes | `still_float_*` | stays: CoM z 0.13 m, roll 0.0, pitch -0.5 deg, 0 wet strips |
+| free at 3 m, fill 0.95, 15 s, both modes | `still_deep_*` | stays: CoM z -3.00 m, attitude 0.0 / 0.0, speed 0. A still machine does not swim on either heading (mean signed speed 0) |
+
+Not run still: the surfacing (the ballast alone brings a still machine up: that is
+the surfacing itself, below) and the flooding (the same).
+
+## B13, the x2 checks (rows that passed)
+
+| row | change | result against the base row |
+|---|---|---|
+| `beach_x4_tc2` | every geom's contact time constant x2 (0.004 -> 0.008 s) | the same sequence: hold 1.80-2.01 m, drift 0.22 m (0.21), tilt 12.3 deg, left upright (roll 0.0, pitch 6.8, yaw -0.2); contact peaks **18.1 / 12.9 / 18.8 weights** up / down / after (35.4 / 37.3 / 36.0): about half. The outcome does not depend on the contact stiffness; the peak loads do, so they are not load figures |
+| `beach_x4_dt2` | dt 5e-5 | the same: hold 1.80-2.01, drift 0.21, upright; contact 35.0 / 25.6 / 36.4 |
+| `float_default_x4_dt2` | dt 5e-5 | the same: hold 1.80-2.01, drift 0.32, tilt 12.2, upright (roll 0.0, pitch -0.4); 0 limiter, 0 wet |
+
+The beach row ends 0.69 m down the slope from where it started (CoM x 19.54 against
+20.23 for the still machine): the law holds a steady 0.4-0.6 m offset in x.
+
+### Surfacing: tuning (ids t18-t26, start at rest at 2.5 m, default mode; "seed" as above)
+
+| ids | what | result |
+|---|---|---|
+| t18 (no seed) | wings raised and flat, tanks blown from 0.95 to 0 at 0.1 /s from depth | **arrives upside down** (roll -178 deg) and stays so: inverted it floats as stably as upright |
+| t19, t20 (seed) | wings raised and flat, rise at fill 0.88 (+1.9 N), then blow at 1.0 or 0.3 /s near the surface | rolled 94 deg before reaching the surface; ends inverted at both rates |
+| t21, t22 (seed) | the same with the wings at the flip pose (chord vertical) | rolled 55 deg on the way up; blown at 1.0 /s it ends inverted, at 0.3 /s it happens to come up right |
+| t23, t24 (seed) | the same with a roll trim by the two tanks' difference (PI on roll, at the fill rate, +-0.15) | worse: inverted before the surface (roll -154 deg), both |
+| **t25** (seed) | **flip pose, rise at fill 0.94 (+0.27 N, 0.03 m/s), blow at 0.3 /s from 0.35 m under** | roll -8 deg on arrival, **afloat upright 3.6 s after the blow starts**, wings dry, roll 0.0 / pitch +0.1 after 6 s |
+| t26 (seed) | the same with the wings flat | rolled 20 deg, ends inverted |
+
+Why (geometry, read on the built model): the float's stability is its waterplane
+(two pontoons 0.40 m apart). Under water there is none, and with the tanks empty
+the buoyancy is the pontoons', 0.16 m under the hull, while the mass is the hull's:
+the CoM is above the centre of buoyancy for every fill under 0.56. Blowing the tanks
+at depth therefore turns the machine over; so does a fast rise, because the wings'
+and hull's drag acts above the CoM when it moves up (it acts as a stabiliser when
+it sinks, which is why the flooding rows are level). What works is to stay heavy
+(fill 0.94: the CoM 0.011 m under the centre of buoyancy), rise slowly, and blow
+only when the pontoons are about to break the surface, fast enough to cross the
+unstable range of fills (0.56 down to about 0.5) in about a second: **0.3 of the
+pontoons' volume per second (0.83 kg/s), three times the rate used for flooding.**
+This is the one place a rate above 0.1 /s was needed. 26 tuning rollouts used so far.
+
+### Free swim on a heading and its antipode (ids `swim_fwd_*`, `swim_anti_*`; tuning t09, t10)
+
+The same start for both (at rest, CoM at 3 m, fill 0.95, wings flat). Law
+(`mission`, kind "swim"): the diagonal stroke at 0.5 Hz, throttle a (stroke 20 a,
+feather 50 a deg) from a PI on the speed along the commanded heading (target 0.3
+m/s, a <= 0.5), yaw by Psi_lr (+-0.15 rad), pitch by the stroke bias (+-0.15 rad:
+more puts the wings inside the pontoons, t09 read -0.035 m at -0.4), depth by the
+ballast. The antipode is a commanded heading 180 deg away (there is no reverse
+thrust). 30 s forward, 45 s antipode. One tuning pair only; the law is not tuned.
+
+| | default | wetting |
+|---|---|---|
+| forward: distance along the command / mean speed over the run / over the last 8 s | 2.13 m / 0.071 / 0.056 m/s | 4.29 m / 0.143 / 0.144 m/s |
+| forward: attitude at the end (roll, pitch, yaw error), depth range | 0.9, -19.1, 1.3 deg; 2.96-3.69 m | 2.5, +6.6, **41.6 deg off heading**; 2.96-3.60 m |
+| antipode: turned | **22 of 180 deg** (error -158 deg at 45 s) | 132 of 180 deg (error 48 deg) |
+| antipode: distance along the command / mean speed / last 8 s | **-0.26 m** / -0.006 / -0.004 m/s | +3.12 m / 0.069 / 0.185 m/s |
+| **mean signed speed** (half the sum of the two, whole run / last 8 s) | **0.033 / 0.026 m/s** | **0.106 / 0.165 m/s** |
+| peak torque stroke / feather N m | 71 / 64 | 63 / 12 |
+| limiter / QACC / wing-to-pontoon clearance min | 0 / 0 / +0.02 m | 0 / 0 / +0.02 m |
+| still machine (B12) | 0.000 m/s | 0.000 m/s |
+
+**Fail against 0.3 m/s in both modes, and the modes disagree by 3-6x: not
+established.** Under the default mode the machine makes a tenth of the held
+thrust's speed, pitches nose-down and does not turn; under "wetting" it moves at
+0.14-0.19 m/s, turns most of the way and wanders 40-50 deg off heading. The held
+thrust (3.5 N at a 0.3, 13-21x drag at full stroke) does not reach the free body,
+as T4's B3 found. Torques 2.6-4.0x the witness stall (under the 10x flag). Depth
+is not held while swimming (0.6-0.7 m of excursion on a 1.36 N ballast margin).
+
+### Surface, settle, lift off (ids `surface_liftoff_seed_*`: from rest at 3 m, 2% tank mismatch, t25's recipe; then 2 m, 5 s hold)
+
+| | default | wetting |
+|---|---|---|
+| rise at fill 0.94 to 0.35 m under | 62.3 s, roll -6.8 deg on arrival | 62.6 s, roll -6.2 |
+| blow at 0.3 /s: afloat | 3.1 s | 3.8 s |
+| after 6 s on the float: roll, pitch; wet wing strips | 0.0, +0.1 deg; **0** | +0.1, +0.3; **0** |
+| lift-off, hold at 2 m | 5 s, 1.81-2.01 m, drift 0.22 m, tilt 12.7 deg | 5 s, 1.80-2.01 m, drift 0.11 m, tilt 11.2 |
+| limiter / QACC | 0 / 0 | 0 / 0 |
+| peak torque sweep N m (in the lift-off) | **106** (4.4x the witness stall, on the x4 curve; not explained; the chain rows' lift-offs read 9-12) | **105** |
+
+**Pass in both modes, which agree**, with the recipe above, seeded. Not evidence of
+robustness: one start, one seed size, and the recipe was found on the sixth try.
+
+### The whole sequence in one rollout (ids `chain_default`, `chain_wetting`; `figures/S0b_T5_mission.png` is chain_wetting)
+
+float 3 s > lift-off, 2 m, 10 s, descent, touch-down > flood to 3 m > hold 5 s >
+wings flat > swim forward 16 s > flip pose > rise at fill 0.94 > blow at 0.3 /s >
+wings raised, 4 s > lift-off, 2 m, 5 s. No seed (mirror-symmetric start).
+
+| phase | default | wetting |
+|---|---|---|
+| first flight | hold 1.80-2.01 m, drift 0.32, tilt 12.2; down at -0.23 m/s, upright (roll 0.0, pitch -0.3) | 1.80-2.01, 0.15, 11.1; -0.23 m/s (0.30 sideways), upright |
+| flood | **stalls at 1.05 m with the tanks full (fill 1.00) for the last part of 70 s; not explained** (the same phase from the float alone reached 3 m in 45.6 s, `flood_hold2_default`) | 2.90 m in 42.4 s; 2.95 m, pitch -8.6 deg after 5 s more |
+| swim 16 s | 0.32 m, 0.02 m/s, nose up 40 deg, at 0.7-0.9 m depth | 2.94 m, 0.15 m/s, 35 deg off heading, depth 2.76-3.47 m |
+| rise, blow | 110 s (the phase's limit) to 0.36 m under; afloat 3.4 s after the blow | 69.7 s; afloat 3.5 s |
+| on the float | roll 0.0, pitch -1.0, wings dry | roll 0.0, pitch +0.1, wings dry |
+| second lift-off | hold 5 s at 1.80-2.01 m, drift 0.22, tilt 12.2 | 5 s, 1.80-2.01, drift 0.10, tilt 11.1 |
+| limiter steps (every phase) / QACC | 0 / 0 | 0 / 0 |
+| peak torque stroke / feather / sweep N m | 41.9 / 29.9 / 12.1 (the swim) | 26.2 / 4.9 / 9.2 |
+| X2 share of the flights | 0.97-0.99 | 0.97-0.99 |
+
+The wetting row runs the whole chain; the default row runs it too but its
+underwater part happens at 1 m, not 3 m.
+
+## Flags, B9-B13
+
+104 rows in `results/S0b_probes3.jsonl` (14 held in air or over the float, 30 held
+under water, 2 float, 22 `fly`, 36 `mission`), 28 of them tuning (t01-t26; t01 is
+three rollouts): **28 of the 80 allowed**. QACC resets: 0. Limiter steps: 0 on
+every row. Peak torque over 10x the witness stall: 0 rows. Over the witness stall
+but under 10x: 17 rows (the swims 2.6-4.0x, the failed surfacings, the seeded
+surfacings' lift-off 4.4x, one reversed-feather held row 3.8x). X2: every flying
+row 0.94-0.99, as any hover. Rigid-contact figures: every beach row (35-37 weights
+on the pontoons; 13-19 at twice the contact time constant; wing contact 0
+everywhere). Mode agreement: float, stroke over the float, lift-off and return,
+held thrust and drag, depth, surfacing agree; **the disturbed hover and the free
+swim do not**. Two rows are void (`flood_hold_default`, `flood_hold_wetting`: a
+wing pose inside the pontoons).
+
+## What limits T5
+
+1. **Float, dry wings: nothing found.** Level within 0.3 deg, wings 0.215 m over
+   the water at rest and 0.086 m at the lowest point of the largest stroke, 20 deg
+   pushes return, modes agree.
+2. **Lift-off and return, float and beach: nothing found undisturbed**, inside the
+   witness stall, wings never wet and never on the sand. Disturbed, the modes
+   split on a hover in air (item below). On the beach the pontoons take the
+   hull's +-10 deg pitch wobble as hammering.
+3. **The lateral mode of the hover.** T5's roll inertia is 1.83x T4's; T4's gains
+   limit-cycle, lower ones hold, and after a kick the default mode recovers while
+   "wetting" turns over. A mirror-symmetric rollout cannot show this.
+4. **Under water the pontoons right nothing.** Flooded they are neutral, so the
+   righting stiffness is 0.5 N m/rad: a 2% tank mismatch lists it 15-17 deg, the
+   thrust at drag-balancing throttle (0.435 N m) is most of a radian of pitch, and
+   the stroke that would trim it puts the wings into the pontoons.
+5. **Free swimming is not shown**: 0.03 m/s (default) against 0.11-0.17 (wetting)
+   mean signed speed, target 0.3; the turn for the antipode happens in one mode only.
+6. **Surfacing is unstable by geometry**: empty tanks under a heavy hull. It comes
+   up right only heavy, slow (60-70 s for 3 m) and with a fast last blow (0.83 kg/s).
+7. **Depth authority** is 1.36 N: 44-48 s to sink 3 m, and not enough to hold
+   depth against a swim.
+8. Unchanged from T4: everything flown is in the X2 regime, on a leading-edge-vortex
+   branch fitted at Re 136, with no interference between the four wings or between
+   the wings' downwash and the pontoons under them.
+
+## Not done
+
+- B13 for the water scenarios (dt/2 of the flood, the surfacing, the chain); the
+  contact x2 of the float rows does not apply (no contact).
+- B12 for the flooding, the surfacing and the chain as separate still rows (the
+  still machine was run on the beach, on the float, held and free at 3 m).
+- Why `chain_default` stalls at 1.05 m; why the seeded lift-offs read 105 N m.
+- Any pontoon geometry other than the first that met the criteria (r 0.030, L 0.50,
+  +-0.20, z -0.160); the smallest one that still passes was not looked for.
+- A disturbed twin of the beach row; a disturbance in pitch or yaw; any second seed.
+- Swim tuning beyond one pair (52 rollouts of the budget unused); a pitch input
+  that clears the pontoons; a turn in place; another stroke under water.
+- Whether a pontoon and its tank can be built at 0.213 kg; the pump the 0.83 kg/s
+  blow implies. No material, construction or drive is chosen.
