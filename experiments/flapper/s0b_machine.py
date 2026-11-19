@@ -57,7 +57,13 @@ def body_t4() -> dict:
     return dict(c1_pilot.body(), hind_u=HIND_U)
 
 
-def _compile(keel_mass: float, keel_x: float, keel_z: float, sweep: bool = True):
+def _compile(keel_mass: float, keel_x: float, keel_z: float, sweep: bool = True,
+             sweep_range_deg: float = SWEEP_RANGE_DEG, feather_range_deg=None, root_cut: float = 0.0):
+    """sweep_range_deg, feather_range_deg (lo, hi): B5-B8's body changes (the level hover beats about the
+    sweep hinge; the through-vertical flip needs the feather past 90 deg).
+    ``root_cut`` (m): the inner part of each main wing is absent (T4c): the wing's box starts ``root_cut`` out
+    from the shoulder (its mass scaled by what is left, if the geom carries one) and the fluid strips whose
+    centre is inside the cut are removed from the panel set.  Defaults are T4 as built for B0-B4."""
     import mujoco
     from dytiscidae.core.mjcf import build_model_xml
     from dytiscidae.core.phenotype import build_panels
@@ -76,7 +82,7 @@ def _compile(keel_mass: float, keel_x: float, keel_z: float, sweep: bool = True)
                 axis = R.T @ np.array([0.0, 0.0, 1.0])          # the hull's z in the wing frame
                 stroke = wb.find("joint")
                 j = ET.Element("joint", name=f"{nm}_js", type="hinge", axis=" ".join(f"{a:.9g}" for a in axis),
-                               range=f"{-math.radians(SWEEP_RANGE_DEG):.6f} {math.radians(SWEEP_RANGE_DEG):.6f}",
+                               range=f"{-math.radians(sweep_range_deg):.6f} {math.radians(sweep_range_deg):.6f}",
                                damping=stroke.get("damping"), armature=stroke.get("armature"))
                 wb.insert(list(wb).index(stroke), j)
                 ref = next(a for a in act if a.get("joint") == f"{nm}_j")
@@ -84,16 +90,45 @@ def _compile(keel_mass: float, keel_x: float, keel_z: float, sweep: bool = True)
                 for k in ("kp", "kv", "forcerange", "ctrlrange"):
                     a.set(k, ref.get(k))
                 added.append(f"{nm}_s")
+        if feather_range_deg is not None:
+            lo, hi = (math.radians(v) for v in feather_range_deg)
+            for nm in WINGS:
+                wb = next(b for b in hull.findall("body") if b.get("name") == nm)
+                jf = next(j for j in wb.findall("joint") if j.get("name") == f"{nm}_jf")
+                jf.set("range", f"{lo:.6f} {hi:.6f}")
+        if root_cut > 0.0:
+            for nm in WINGS:
+                wb = next(b for b in hull.findall("body") if b.get("name") == nm)
+                g = next(x for x in wb.findall("geom") if x.get("name") == f"{nm}_g")
+                sz = [float(v) for v in g.get("size").split()]
+                ps = [float(v) for v in g.get("pos").split()]
+                full = 2.0 * sz[0]
+                assert abs(ps[0] - sz[0]) < 1e-6, "the wing box is expected to run from the shoulder along its x"
+                sz[0], ps[0] = (full - root_cut) / 2.0, root_cut + (full - root_cut) / 2.0
+                g.set("size", " ".join(f"{v:.9g}" for v in sz))
+                g.set("pos", " ".join(f"{v:.9g}" for v in ps))
+                if g.get("mass"):
+                    g.set("mass", f"{float(g.get('mass')) * (full - root_cut) / full:.9g}")
         if keel_mass > 0.0:
             ET.SubElement(hull, "geom", name="s0b_keel", type="sphere", size="0.008",
                           pos=f"{keel_x:.6f} 0 {keel_z:.6f}", mass=f"{keel_mass:.9g}",
                           contype="0", conaffinity="0", rgba="0.1 0.1 0.9 1")
         model = mujoco.MjModel.from_xml_string(ET.tostring(root, encoding="unicode"))
-        return model, mujoco.MjData(model), list(names) + added, build_panels(p, model)
+        pan = build_panels(p, model)
+        if root_cut > 0.0:
+            import dataclasses
+            wid = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, nm) for nm in WINGS]
+            keep = ~(np.isin(pan.body_id, wid) & (pan.pos_local[:, 0] < root_cut - 1e-9))
+            n0 = len(pan.body_id)
+            pan = dataclasses.replace(pan, **{f.name: getattr(pan, f.name)[keep] for f in dataclasses.fields(pan)
+                                              if isinstance(getattr(pan, f.name), np.ndarray)
+                                              and getattr(pan, f.name).shape[:1] == (n0,)})
+        return model, mujoco.MjData(model), list(names) + added, pan
     return comp
 
 
-def _machine(domain, keel=(0.0, 0.25, 0.0), sweep=True, **kw):
+def _machine(domain, keel=(0.0, 0.25, 0.0), sweep=True, sweep_range_deg=SWEEP_RANGE_DEG, feather_range_deg=None,
+             root_cut=0.0, **kw):
     import dytiscidae.envs.triphibian as TR
     from mission import Machine
     mot = {r: dict(IDEAL) for r in ("stroke", "feather", "tail")}
@@ -102,7 +137,8 @@ def _machine(domain, keel=(0.0, 0.25, 0.0), sweep=True, **kw):
     kw.setdefault("body", body_t4())
     kw["mass"] = None                               # no ballast at the hull's centre: the keel carries it
     orig = TR.compile_phenotype
-    TR.compile_phenotype = _compile(*keel, sweep=sweep)
+    TR.compile_phenotype = _compile(*keel, sweep=sweep, sweep_range_deg=sweep_range_deg,
+                                    feather_range_deg=feather_range_deg, root_cut=root_cut)
     try:
         mc = Machine(domain, motors=mot, **kw)
     finally:

@@ -165,3 +165,67 @@ stated blind spot of any tandem result.
 - **B7, lift-off from the float and from the beach**, free, both modes,
   with a plain attitude and height loop; then a descent back onto each.
 - **B8, still machine** for B5-B7.
+
+## Addendum 2, 2026-11-19: what probes B5-B8 said, and T5 (wings above, floats below)
+
+Probes: `results/S0b_probes.md` (B5-B8 part), `results/S0b_probes2.jsonl`
+(223 rows, 0 QACC; limiter on 22, every one with a wing or the tail in
+water, not evidence), `results/S0b_clearance.json`,
+`figures/S0b_T4_float.png`, `figures/S0b_T4_liftoff.png`. Every flying row
+is in the X2 regime (share 0.97-1.00).
+
+- **Level hover in air: yes.** Held, 4.5 Hz, dihedral 35, amplitude 55 deg:
+  4.4 weights out of ground effect at 14.8 N m of sweep torque (witness
+  stall 24); the x4 curve is never reached and the unlimited twin is
+  identical. Roll, pitch and yaw each have their own input (left-right
+  amplitude, common mean sweep, left-right feather offset). Free: 10 s hold,
+  drift 0.08 m.
+- **From the beach: yes, through wing strikes.** 2.01 m, 10 s hold, drift
+  0.07 m, down again and left upright; wings hit the sand at 38 weights on
+  the way up and 21 on the way down (rigid-contact figures). The hull pitches
+  +-10 deg at stroke frequency.
+- **From the float: no.** T4 as built is inverted in 0.6-1.6 s. The float
+  itself fails first: the hull floats awash, the feather flip puts the
+  trailing edge 0.19 m under the spar, so the roots work in water; with the
+  wings raised the float is tail-heavy (nose to 49-76 deg) and, trimmed,
+  top-heavy in roll. With the inner 0.11 m of each wing absent (T4c) the
+  wings are dry, and then the tail and stern are what the modes split on.
+- **Descent onto water: no** (inverted, or left nose-up 28-79 deg).
+- **Wings cross**: the inner 0.10 m of each wing passes through the opposite
+  root and the hull at dihedral 35.
+
+Every failure is one geometric fact: the wings, the tail and the hull share
+one height, and that height is the waterline and the ground.
+
+**T5.** T4's wings, hinges, laws and actuator definition, with the heights
+separated:
+
+- **Floats below.** Two pontoons, parallel to the hull, apart in y and
+  below it on struts. They are the only thing in the water at the float and
+  the only thing on the ground. Sized from the model, not typed: at the
+  float (ballast out) the lowest point of any wing through the whole hover
+  stroke, and of the tail, is at least 0.03 m above the water, and the same
+  above the sand on the beach; a 20 deg push in roll or pitch returns.
+- **Wings above.** Shoulders stay on the hull (now the top of the machine),
+  inner 0.11 m of each wing absent as T4c, or shoulders moved outboard if
+  that clears with the whole wing.
+- **Ballast is floodable volume**, not +-8%: under water b = 1.00 needs the
+  pontoons' spare buoyancy taken up. Mass and fill rate are recorded as a
+  limit for later; no rate is assumed faster than the probe shows is needed.
+- **Under water** the stroke and phasing probed on T4 (diagonal); the
+  pontoons' drag is measured, not assumed.
+
+**Probes B9-B13** (both entrainment modes wherever water is involved,
+witness x4 primary, unlimited twin on the rows that decide):
+
+- **B9, build and float.** Figure from the built model with the waterline;
+  mass and b in both ballast states; wet strips and limiter steps through
+  the hover stroke held over the float (target 0 and 0); push tests.
+- **B10, lift-off and return**, float and beach: hold 10 s at 2 m, descend,
+  left upright; wing contact and limiter steps (target 0).
+- **B11, under and back.** From the float: flood, level at 3 m, hold; held
+  thrust against measured drag at 0.3 m/s; free swim on a heading and its
+  antipode; surface; settle; lift off.
+- **B12, still machine** for B9-B11.
+- **B13, the x2 checks** on the rows that pass: contact time constant x2 for
+  land, dt/2 once per scenario.
