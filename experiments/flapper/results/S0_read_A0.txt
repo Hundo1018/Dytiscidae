@@ -1,0 +1,744 @@
+rung: "A0"
+air:
+  Q1:
+    H: true
+    Hq:
+      trk_err_max: 0.13285905638650775
+      roll_max_hold: 0.669812023473301
+      dz_hold: [0.16554966905824386, 0.2884126170560073]
+      V_hold: [8.654382250824534, 8.810903271306506]
+    flags_H: {"contact_W": 0.0, "rigid": false, "f_Hz": 3.5, "band": true}
+    T: true
+    P_t: 89.99999880559245
+    null_H: false
+    null_T: false
+  Q2:
+    H: true
+    Hq:
+      trk_err_max: 0.261401385783131
+      roll_max_hold: 0.454685467394423
+      dz_hold: [0.14159033457494274, 0.2884107531490656]
+      V_hold: [8.59815099552073, 8.810920262404125]
+    flags_H: {"contact_W": 0.0, "rigid": false, "f_Hz": 3.5, "band": true}
+    T: true
+    P_t: 90.07569030368596
+    null_H: false
+    null_T: false
+land:
+  walk:
+    ('K', 'SW1'): {"ok": true, "pm": 0.3443072048319629, "why": []}
+    ('K', 'SW2'): {"ok": true, "pm": 0.3420396104417827, "why": []}
+    ('U', 'SW1'): {"ok": false, "pm": -0.1741551064979788, "why": ["pair mean -0.1742", "half 0 along -5.109"]}
+    ('U', 'SW2'): {"ok": false, "pm": -0.056558638272699795, "why": ["pair mean -0.0566", "half 90 along -1.062", "half 270 along -0.296"]}
+    ('N0', 'SW1'): {"ok": false, "pm": 0.0, "why": ["pair mean 0.0000", "half 0 along -0.001", "half 180 along 0.001"]}
+    ('N0', 'SW2'): {"ok": false, "pm": 0.0, "why": ["pair mean 0.0000", "half 90 along 0.000", "half 270 along -0.000"]}
+  turn:
+    ('K', 'SR1'): {"ok": true, "why": [], "dyaw": [80.41425303273537, -88.09205925323815], "err": [8.52658767317389, 2.965783328840508]}
+    ('K', 'SR2'): {"ok": true, "why": [], "dyaw": [-80.73205496830133, 77.73246954927126], "err": [10.608983344794385, 10.930968213059526]}
+    ('N0', 'SR1'):
+      ok: false
+      why: ["turn +90 err 89.7/89.7", "turn -90 err 90.3/90.3", "turn -90 wrong sense 0.0"]
+      dyaw: [0.04012464201831845, 0.04012464201831845]
+      err: [89.71776172334121, 90.2822382766588]
+    ('N0', 'SR2'):
+      ok: false
+      why: ["turn +90 err 89.8/89.8", "turn -90 err 90.2/90.2", "turn -90 wrong sense 0.1"]
+      dyaw: [0.1075794585386986, 0.1075794585386986]
+      err: [89.80826773687193, 90.19173226312807]
+  stand:
+    ('KS', 'SS1'): {"ok": true, "why": [], "P": 13.641553078665279}
+    ('KS', 'SS2'): {"ok": true, "why": [], "P": 13.368262622698017}
+    ('N0', 'SS1'): {"ok": false, "why": ["body 0.972/1.000"], "P": 0.06303626704750494}
+  flags:
+    A0_land_SW1_K_h0: {"contact_W": 54.5, "rigid": true}
+    A0_land_SW1_K_h180: {"contact_W": 96.0, "rigid": true}
+    A0_land_SW1_U_h0: {"contact_W": 110.6, "rigid": true}
+    A0_land_SW1_U_h180: {"contact_W": 97.7, "rigid": true}
+    A0_land_SW1_N0_h0: {"contact_W": 54.5, "rigid": true}
+    A0_land_SW2_K_h90: {"contact_W": 56.0, "rigid": true}
+    A0_land_SW2_K_h270: {"contact_W": 99.8, "rigid": true}
+    A0_land_SW2_U_h90: {"contact_W": 69.3, "rigid": true}
+    A0_land_SW2_U_h270: {"contact_W": 76.9, "rigid": true}
+    A0_land_SR1_K_t+90: {"contact_W": 51.1, "rigid": true}
+    A0_land_SW2_N0_h90: {"contact_W": 56.0, "rigid": true}
+    A0_land_SR1_K_t-90: {"contact_W": 51.1, "rigid": true}
+    A0_land_SR1_N0_t+90: {"contact_W": 51.1, "rigid": true}
+    A0_land_SR2_N0_t+90: {"contact_W": 62.6, "rigid": true}
+    A0_land_SR2_K_t-90: {"contact_W": 62.6, "rigid": true}
+    A0_land_SR2_K_t+90: {"contact_W": 62.6, "rigid": true}
+    A0_land_SS1_KS: {"contact_W": 48.6, "rigid": true}
+    A0_land_SS2_KS: {"contact_W": 67.9, "rigid": true}
+    A0_land_SS1_N0s: {"contact_W": 48.6, "rigid": true}
+water:
+  ('D', 'wet'):
+    20: {"ok": false, "depth_end": 7.438713725490196, "min_depth": -2.8247, "tumb": {"dors_min": -1.0, "omega_mean": 25.370503075025404, "ok": false}}
+    21: {"ok": false, "depth_end": 4.463776470588235, "min_depth": -15.5841, "tumb": {"dors_min": -0.9927, "omega_mean": 32.74659105224177, "ok": false}}
+  ('D0', 'wet'):
+    20: {"ok": false, "depth_end": 0.0026176470588235297, "min_depth": 0.0017, "tumb": {"dors_min": 0.9992, "omega_mean": 0.0035419682717444403, "ok": true}}
+    21: {"ok": false, "depth_end": 0.0025117647058823535, "min_depth": 0.0021, "tumb": {"dors_min": 0.999, "omega_mean": 0.005259458314793722, "ok": true}}
+  ('U', 'wet'):
+    20: {"ok": false, "max_depth_35_40": 16.3051, "tumb": {"dors_min": -0.9963, "omega_mean": 38.70635918423612, "ok": false}}
+    21: {"ok": true, "max_depth_35_40": -89.4892, "tumb": {"dors_min": -0.9913, "omega_mean": 43.91640833116209, "ok": false}}
+  ('U0', 'wet'):
+    20: {"ok": true, "max_depth_35_40": 0.0026, "tumb": {"dors_min": 0.8119, "omega_mean": 0.02502754020997942, "ok": true}}
+    21: {"ok": true, "max_depth_35_40": 0.0026, "tumb": {"dors_min": 0.7135, "omega_mean": 0.03163461454038373, "ok": true}}
+  ('GW', 'wet'):
+    20:
+      ok: false
+      P: 0.9510381359116699
+      R: 0.6299282794119933
+      clauses: {"progress": false, "response": true, "held": false, "upright": false}
+      depth: [1.5459568627450984, 0.2756058823529412]
+      target: [4.00832985429545, 1.99167014570455]
+    21:
+      ok: false
+      P: 0.20485279416457502
+      R: -1.458046219578673
+      clauses: {"progress": false, "response": false, "held": false, "upright": false}
+      depth: [-0.21520588235294114, 3.545247058823529]
+      target: [4.289552035690308, 1.7104479643096924]
+  ('W0', 'wet'):
+    20: {"ok": false, "P": 0.0, "R": 0.0, "clauses": {"progress": false, "response": false, "held": false, "upright": true}}
+    21: {"ok": false, "P": 3.469446951953614e-18, "R": 0.0, "clauses": {"progress": false, "response": false, "held": false, "upright": true}}
+  ('GS', 'wet'):
+    20:
+      ok: false
+      P: -0.2640644013447132
+      clauses: {"progress": false, "surface": false, "upright": false}
+      dors_min: [-0.9612, -0.9997]
+      max_depth: [16.7281, 17.3787]
+    21:
+      ok: false
+      P: 0.38582324213584196
+      clauses: {"progress": true, "surface": false, "upright": false}
+      dors_min: [-0.9992, -0.9999]
+      max_depth: [17.0146, 17.5204]
+  ('S0', 'wet'):
+    20: {"ok": false, "P": 0.0, "clauses": {"progress": false, "surface": true, "upright": true}}
+    21: {"ok": false, "P": -3.3881317890172014e-21, "clauses": {"progress": false, "surface": true, "upright": true}}
+  ('D', 'def'):
+    20: {"ok": false, "depth_end": 0.15149607843137256, "min_depth": -0.0355, "tumb": {"dors_min": -0.873, "omega_mean": 6.699555954509809, "ok": false}}
+    21: {"ok": false, "depth_end": 0.002223529411764706, "min_depth": -0.0948, "tumb": {"dors_min": -0.5918, "omega_mean": 6.586240592330365, "ok": false}}
+  ('D0', 'def'):
+    20: {"ok": false, "depth_end": 0.0026039215686274506, "min_depth": 0.0017, "tumb": {"dors_min": 0.9994, "omega_mean": 0.0003464962659301878, "ok": true}}
+    21: {"ok": false, "depth_end": 0.0025607843137254904, "min_depth": 0.0021, "tumb": {"dors_min": 0.9992, "omega_mean": 0.0018477551601526838, "ok": true}}
+  ('U', 'def'):
+    20: {"ok": false, "max_depth_35_40": 2.9604, "tumb": {"dors_min": -0.9925, "omega_mean": 15.75988573964985, "ok": false}}
+    21: {"ok": false, "max_depth_35_40": 3.6083, "tumb": {"dors_min": -0.981, "omega_mean": 14.939964675354293, "ok": false}}
+  ('U0', 'def'):
+    20: {"ok": true, "max_depth_35_40": 0.0034, "tumb": {"dors_min": 0.7557, "omega_mean": 0.03296467431095201, "ok": true}}
+    21: {"ok": true, "max_depth_35_40": 0.0334, "tumb": {"dors_min": 0.4926, "omega_mean": 0.0004143426294820718, "ok": true}}
+  ('GW', 'def'):
+    20:
+      ok: false
+      P: 0.002311846849372022
+      R: 0.0237638155845592
+      clauses: {"progress": false, "response": false, "held": false, "upright": false}
+      depth: [2.641807843137255, 2.59388431372549]
+      target: [4.00832985429545, 1.99167014570455]
+    21:
+      ok: false
+      P: -0.00023436460526581916
+      R: 0.42381338374774813
+      clauses: {"progress": false, "response": false, "held": false, "upright": false}
+      depth: [3.679366666666667, 2.586307843137255]
+      target: [4.289552035690308, 1.7104479643096924]
+  ('W0', 'def'):
+    20: {"ok": false, "P": 0.0, "R": 0.0, "clauses": {"progress": false, "response": false, "held": false, "upright": true}}
+    21: {"ok": false, "P": 1.5246593050577406e-20, "R": 0.0, "clauses": {"progress": false, "response": false, "held": false, "upright": true}}
+  ('GS', 'def'):
+    20:
+      ok: false
+      P: -0.00645288413374804
+      clauses: {"progress": false, "surface": true, "upright": false}
+      dors_min: [-0.8884, -0.0388]
+      max_depth: [0.0093, 0.4145]
+    21:
+      ok: false
+      P: 0.013600339337226576
+      clauses: {"progress": false, "surface": true, "upright": false}
+      dors_min: [-0.2311, -0.3163]
+      max_depth: [0.0821, 0.074]
+  ('S0', 'def'):
+    20: {"ok": false, "P": 0.0, "clauses": {"progress": false, "surface": true, "upright": true}}
+    21: {"ok": false, "P": 8.470329472543003e-22, "clauses": {"progress": false, "surface": true, "upright": true}}
+  flags:
+    A0_water_GW_s20_B_wet: {"contact_W": 333199.3, "rigid": true, "f_Hz": 0.25, "band": false}
+    A0_water_GW_s20_A_wet: {"contact_W": 121392.4, "rigid": true, "f_Hz": 0.25, "band": false}
+    A0_water_D0_s20_wet: {"contact_W": 0.0, "rigid": false}
+    A0_water_D_s20_wet: {"contact_W": 67910.2, "rigid": true, "f_Hz": 0.25, "band": false}
+    A0_water_W0_s20_wet: {"contact_W": 0.0, "rigid": false}
+    A0_water_U0_s20_wet: {"contact_W": 0.0, "rigid": false}
+    A0_water_U_s20_wet: {"contact_W": 105440.5, "rigid": true, "f_Hz": 0.25, "band": false}
+    A0_water_GS_s20_A_wet: {"contact_W": 368157.0, "rigid": true, "f_Hz": 0.6, "band": false}
+    A0_water_D0_s20_def: {"contact_W": 0.0, "rigid": false}
+    A0_water_GS_s20_B_wet: {"contact_W": 200814.7, "rigid": true, "f_Hz": 0.6, "band": false}
+    A0_water_S0_s20_wet: {"contact_W": 0.0, "rigid": false}
+    A0_water_D_s20_def: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.25, "band": false}
+    A0_water_W0_s20_def: {"contact_W": 0.0, "rigid": false}
+    A0_water_GW_s20_A_def: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.25, "band": false}
+    A0_water_GW_s20_B_def: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.25, "band": false}
+    A0_water_U_s20_def: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.25, "band": false}
+    A0_water_U0_s20_def: {"contact_W": 0.0, "rigid": false}
+    A0_water_S0_s20_def: {"contact_W": 0.0, "rigid": false}
+    A0_water_GS_s20_A_def: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.6, "band": false}
+    A0_water_GS_s20_B_def: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.6, "band": false}
+    A0_water_D0_s21_wet: {"contact_W": 0.0, "rigid": false}
+    A0_water_GW_s21_A_wet: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.25, "band": false}
+    A0_water_D_s21_wet: {"contact_W": 141882.2, "rigid": true, "f_Hz": 0.25, "band": false}
+    A0_water_GW_s21_B_wet: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.25, "band": false}
+    A0_water_W0_s21_wet: {"contact_W": 0.0, "rigid": false}
+    A0_water_U0_s21_wet: {"contact_W": 0.0, "rigid": false}
+    A0_water_U_s21_wet: {"contact_W": 332760.7, "rigid": true, "f_Hz": 0.25, "band": false}
+    A0_water_GS_s21_A_wet: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.6, "band": false}
+    A0_water_GS_s21_B_wet: {"contact_W": 336977.8, "rigid": true, "f_Hz": 0.6, "band": false}
+    A0_water_S0_s21_wet: {"contact_W": 0.0, "rigid": false}
+    A0_water_D_s21_def: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.25, "band": false}
+    A0_water_D0_s21_def: {"contact_W": 0.0, "rigid": false}
+    A0_water_W0_s21_def: {"contact_W": 0.0, "rigid": false}
+    A0_water_GW_s21_A_def: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.25, "band": false}
+    A0_water_GW_s21_B_def: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.25, "band": false}
+    A0_water_U_s21_def: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.25, "band": false}
+    A0_water_U0_s21_def: {"contact_W": 0.0, "rigid": false}
+    A0_water_GS_s21_A_def: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.6, "band": false}
+    A0_water_GS_s21_B_def: {"contact_W": 0.0, "rigid": false, "f_Hz": 0.6, "band": false}
+    A0_water_S0_s21_def: {"contact_W": 0.0, "rigid": false}
+landair_takeoff:
+  ('V+', (19.5, 30.0)):
+    ok: false
+    G: [false, false, false, false]
+    t_off: 4.3063
+    H_end: 4.946002354725299
+    wing_contact_W: 1781.499336929524
+    stroke_tq: 2427.299424144003
+    P_peak_W: 20456921.732887086
+    flags: {"contact_W": 1768.8, "rigid": true, "x2": 0.32, "X2": false, "f_Hz": 4.5, "band": true}
+  ('N0', (19.5, 30.0)):
+    ok: false
+    G: [false, false, false, true]
+    t_off: 9.0
+    H_end: -0.00016854016298695207
+    wing_contact_W: 0.0
+    stroke_tq: 0.2602321347638617
+    P_peak_W: 0.15785905518761467
+    flags: {"contact_W": 52.3, "rigid": true, "x2": 0.0, "X2": false, "f_Hz": 4.5, "band": true}
+  ('N0', (26.5, 210.0)):
+    ok: false
+    G: [false, false, false, true]
+    t_off: 9.0
+    H_end: -8.597290906964261e-05
+    wing_contact_W: 0.0
+    stroke_tq: 0.1768599460145506
+    P_peak_W: 0.0659219081855511
+    flags: {"contact_W": 66.1, "rigid": true, "x2": 0.0, "X2": false, "f_Hz": 4.5, "band": true}
+  ('V+', (26.5, 210.0)):
+    ok: false
+    G: [true, true, true, false]
+    t_off: 0.010900000000000132
+    H_end: 3.9214908820593015
+    wing_contact_W: 431.7501214389763
+    stroke_tq: 2427.2728444748564
+    P_peak_W: 20456977.222811796
+    flags: {"contact_W": 857.1, "rigid": true, "x2": 0.61, "X2": true, "f_Hz": 4.5, "band": true}
+landair_cruise:
+  Q1:
+    H: true
+    Hq:
+      trk_err_max: 0.18100270660909246
+      roll_max_hold: 0.9432821103093094
+      dz_hold: [0.0992393098812947, 0.22720312435747658]
+      V_hold: [8.6561852590309, 8.862454282682119]
+    flags_H: {"contact_W": 0.0, "rigid": false, "f_Hz": 3.5, "band": true}
+    null_H: false
+    null_T: false
+  Q2:
+    H: true
+    Hq:
+      trk_err_max: 0.36316790739692806
+      roll_max_hold: 1.0363134431602548
+      dz_hold: [0.06669950439970052, 0.2271967434593165]
+      V_hold: [8.577482076450673, 8.862439796964008]
+    flags_H: {"contact_W": 0.0, "rigid": false, "f_Hz": 3.5, "band": true}
+    null_H: false
+    null_T: false
+landair_landing:
+  ('ES1', 'wet'):
+    ok: false
+    A:
+      end: "rest_window"
+      qacc: 0
+      x: 29.239
+      dx: 13.239
+      vn: -1.325
+      v_h: 7.284
+      roll: -0.014
+      pitch_rel: -9.523
+      phase: "flare"
+      v_max: 0.0
+      om_max: 0.0
+      zbz_min: 0.983
+      x_rest: 31.946
+      share_hull_wing: 0.971
+      slide: 2.707
+      E1: false
+      E2: false
+      E3: true
+      E4: true
+      E5: true
+    B:
+      end: "rest_window"
+      qacc: 0
+      x: 30.446
+      dx: 2.446
+      vn: -1.085
+      v_h: 8.26
+      roll: -0.041
+      pitch_rel: -8.559
+      phase: "flare"
+      v_max: 0.0
+      om_max: 0.0
+      zbz_min: 0.983
+      x_rest: 34.166
+      share_hull_wing: 0.972
+      slide: 3.72
+      E1: true
+      E2: false
+      E3: true
+      E4: true
+      E5: true
+    hash_eq: true
+    P_e: 0.10057756059383838
+    flags: [{"contact_W": 2563.1, "rigid": true, "x2": 0.13, "X2": false}, {"contact_W": 805.5, "rigid": true, "x2": 0.25, "X2": false}]
+    again:
+      [{"ok": false, "G": [false, false, false, false], "t_off": 8.975900000000001, "H_end": -2.564659617880906, "x2": {"share": 0.12611111111111112, "air_share": 0.6617777777777778, "n": 9000}}, {"ok": false, "G": [true, false, false, false], "t_off": 2.8771, "H_end": 1.698988066269341, "x2": {"share": 0.24855555555555556, "air_share": 0.9961111111111111, "n": 9000}}]
+    null: false
+    null_q:
+      end: "rest_window"
+      qacc: 0
+      x: 19.319
+      dx: 3.319
+      vn: -2.835
+      v_h: 8.724
+      roll: -0.157
+      pitch_rel: -20.055
+      phase: "cruise"
+      v_max: 0.0
+      om_max: 0.0
+      zbz_min: 0.984
+      x_rest: 21.495
+      share_hull_wing: 0.972
+      slide: 2.176
+      E1: false
+      E2: false
+      E3: true
+      E4: true
+      E5: true
+    null_again:
+      ok: false
+      G: [false, false, false, false]
+      t_off: 7.005000000000001
+      H_end: -1.7430632158803443
+      x2: {"share": 0.049, "air_share": 0.3065555555555556, "n": 9000}
+  ('ES2', 'wet'):
+    ok: false
+    A:
+      end: "rest_window"
+      qacc: 0
+      x: 28.542
+      dx: 12.542
+      vn: -1.129
+      v_h: 7.36
+      roll: -0.001
+      pitch_rel: -8.567
+      phase: "flare"
+      v_max: 0.0
+      om_max: 0.0
+      zbz_min: 0.983
+      x_rest: 30.79
+      share_hull_wing: 0.971
+      slide: 2.247
+      E1: false
+      E2: false
+      E3: true
+      E4: true
+      E5: true
+    B:
+      end: "rest_window"
+      qacc: 0
+      x: 29.54
+      dx: 1.54
+      vn: -1.076
+      v_h: 8.321
+      roll: -0.019
+      pitch_rel: -8.576
+      phase: "flare"
+      v_max: 0.0
+      om_max: 0.0
+      zbz_min: 0.983
+      x_rest: 32.977
+      share_hull_wing: 0.971
+      slide: 3.437
+      E1: true
+      E2: false
+      E3: true
+      E4: true
+      E5: true
+    hash_eq: true
+    P_e: 0.08316352720423333
+    flags: [{"contact_W": 805.9, "rigid": true, "x2": 0.38, "X2": false}, {"contact_W": 805.5, "rigid": true, "x2": 0.34, "X2": false}]
+    again:
+      [{"ok": false, "G": [false, true, false, false], "t_off": 5.321000000000001, "H_end": 3.7545594185630335, "x2": {"share": 0.38022222222222224, "air_share": 0.9855555555555555, "n": 9000}}, {"ok": false, "G": [false, false, false, false], "t_off": 6.647, "H_end": 4.8304285029830725, "x2": {"share": 0.3403333333333333, "air_share": 0.9653333333333334, "n": 9000}}]
+    null: false
+    null_q:
+      end: "rest_window"
+      qacc: 0
+      x: 19.448
+      dx: 3.448
+      vn: -2.823
+      v_h: 8.609
+      roll: -0.249
+      pitch_rel: -20.135
+      phase: "cruise"
+      v_max: 0.0
+      om_max: 0.0
+      zbz_min: 0.984
+      x_rest: 21.595
+      share_hull_wing: 0.972
+      slide: 2.147
+      E1: false
+      E2: false
+      E3: true
+      E4: true
+      E5: true
+    null_again:
+      ok: false
+      G: [true, false, false, false]
+      t_off: 2.3256
+      H_end: -6.372603423509413
+      x2: {"share": 0.041777777777777775, "air_share": 0.4491111111111111, "n": 9000}
+waterair_exit:
+  ('XS', 'wet'):
+    20:
+      ok: false
+      why: "never clear by 5 s"
+      t_star: null
+      clear_s: 0.0
+      flags: {"contact_W": 31157.4, "rigid": true, "f_Hz": 4.5, "band": true}
+      at_limit: {"feather": 0.0, "stroke": 0.0, "tail": 0.0}
+    21:
+      ok: false
+      why: "never clear by 5 s"
+      t_star: null
+      clear_s: 0.0
+      flags: {"contact_W": 20363.0, "rigid": true, "f_Hz": 4.5, "band": true}
+      at_limit: {"feather": 0.0, "stroke": 0.0, "tail": 0.0}
+  ('X0f', 'def'):
+    20:
+      ok: false
+      why: "never clear by 5 s"
+      t_star: null
+      clear_s: 0.0
+      flags: {"contact_W": 0.0, "rigid": false, "f_Hz": 4.5, "band": true}
+      at_limit: {"feather": 0.0, "stroke": 0.0, "tail": 0.0}
+    21:
+      ok: false
+      why: "never clear by 5 s"
+      t_star: null
+      clear_s: 0.0
+      flags: {"contact_W": 0.0, "rigid": false, "f_Hz": 4.5, "band": true}
+      at_limit: {"feather": 0.0, "stroke": 0.0, "tail": 0.0}
+  ('X0f', 'wet'):
+    20:
+      ok: false
+      why: "never clear by 5 s"
+      t_star: null
+      clear_s: 0.0
+      flags: {"contact_W": 0.0, "rigid": false, "f_Hz": 4.5, "band": true}
+      at_limit: {"feather": 0.0, "stroke": 0.0, "tail": 0.0}
+    21:
+      ok: false
+      why: "never clear by 5 s"
+      t_star: null
+      clear_s: 0.0
+      flags: {"contact_W": 0.0, "rigid": false, "f_Hz": 4.5, "band": true}
+      at_limit: {"feather": 0.0, "stroke": 0.0, "tail": 0.0}
+  ('XS', 'def'):
+    20:
+      ok: true
+      why: null
+      t_star: 4.7
+      clear_s: 35.3
+      flags: {"contact_W": 0.0, "rigid": false, "x2": 0.63, "X2": true, "f_Hz": 4.5, "band": true}
+      at_limit: {"feather": 0.0, "stroke": 0.0, "tail": 0.0}
+    21:
+      ok: false
+      why: "wet again at 7.6 s"
+      t_star: 4.0
+      clear_s: 3.5
+      flags: {"contact_W": 0.0, "rigid": false, "x2": 0.4, "X2": false, "f_Hz": 4.5, "band": true}
+      at_limit: {"feather": 0.0, "stroke": 0.0, "tail": 0.0}
+waterair_entry:
+  ('ES1', 'def'):
+    ok: false
+    A:
+      end: "rest_window"
+      qacc: 0
+      x: -33.177
+      dx: 11.823
+      vn: -0.681
+      v_h: 7.292
+      roll: 3.38
+      pitch_rel: -4.894
+      phase: "flare"
+      com_z_max: 0.019
+      v1_max: 0.004
+      om_mean: 0.025
+      zbz_min: 0.997
+      E1: false
+      E2: true
+      E3: true
+      E4: true
+      E5: true
+    B:
+      end: "rest_window"
+      qacc: 0
+      x: -22.806
+      dx: 10.194
+      vn: -0.858
+      v_h: 7.479
+      roll: -0.622
+      pitch_rel: -4.795
+      phase: "flare"
+      com_z_max: 0.02
+      v1_max: 0.003
+      om_mean: 0.003
+      zbz_min: 1.0
+      E1: false
+      E2: true
+      E3: true
+      E4: true
+      E5: true
+    hash_eq: true
+    P_e: 0.8642846221908297
+    flags: [{"contact_W": 0.0, "rigid": false, "x2": 0.64, "X2": true}, {"contact_W": 0.0, "rigid": false, "x2": 0.55, "X2": true}]
+    again:
+      [{"ok": true, "why": null, "t_star": 4.1, "clear_s": 35.9, "x2": {"share": 0.6375666666666666, "air_share": 1.0, "n": 30000}}, {"ok": false, "why": "wet again at 8.0 s", "t_star": 4.5, "clear_s": 3.4, "x2": {"share": 0.5510333333333334, "air_share": 0.9339333333333333, "n": 30000}}]
+    null: false
+    null_q:
+      end: "rest_window"
+      qacc: 0
+      x: -41.336
+      dx: 3.664
+      vn: -1.642
+      v_h: 8.118
+      roll: 0.301
+      pitch_rel: -12.691
+      phase: "cruise"
+      com_z_max: -0.025
+      v1_max: 0.054
+      om_mean: 0.043
+      zbz_min: 0.841
+      E1: false
+      E2: false
+      E3: true
+      E4: true
+      E5: true
+    null_again: {"ok": true, "why": null, "t_star": 4.7, "clear_s": 35.3, "x2": {"share": 0.6173, "air_share": 1.0, "n": 30000}}
+  ('ES1', 'wet'):
+    ok: false
+    A:
+      end: "rest_window"
+      qacc: 0
+      x: -33.124
+      dx: 11.876
+      vn: -0.83
+      v_h: 7.558
+      roll: 1.274
+      pitch_rel: -4.9
+      phase: "flare"
+      com_z_max: 0.02
+      v1_max: 0.019
+      om_mean: 0.006
+      zbz_min: 1.0
+      E1: false
+      E2: true
+      E3: true
+      E4: true
+      E5: true
+    B:
+      end: "rest_window"
+      qacc: 0
+      x: -20.72
+      dx: 12.28
+      vn: -0.806
+      v_h: 7.401
+      roll: -3.007
+      pitch_rel: -4.838
+      phase: "flare"
+      com_z_max: 0.019
+      v1_max: 0.058
+      om_mean: 0.13
+      zbz_min: 0.922
+      E1: false
+      E2: true
+      E3: true
+      E4: true
+      E5: true
+    hash_eq: true
+    P_e: 1.0336331488597061
+    flags: [{"contact_W": 129332.2, "rigid": true}, {"contact_W": 27077.1, "rigid": true}]
+    again:
+      [{"ok": false, "why": "never clear by 5 s", "t_star": null, "clear_s": 0.0, "x2": null}, {"ok": false, "why": "never clear by 5 s", "t_star": null, "clear_s": 0.0, "x2": null}]
+    null: false
+    null_q:
+      end: "rest_window"
+      qacc: 0
+      x: -40.936
+      dx: 4.064
+      vn: -1.638
+      v_h: 8.126
+      roll: -0.071
+      pitch_rel: -12.685
+      phase: "cruise"
+      com_z_max: -0.009
+      v1_max: 0.129
+      om_mean: 0.086
+      zbz_min: 0.937
+      E1: false
+      E2: false
+      E3: true
+      E4: true
+      E5: true
+    null_again: {"ok": false, "why": "never clear by 5 s", "t_star": null, "clear_s": 0.0, "x2": null}
+  ('ES2', 'def'):
+    ok: false
+    A:
+      end: "rest_window"
+      qacc: 0
+      x: -36.142
+      dx: 8.858
+      vn: -0.709
+      v_h: 7.433
+      roll: 2.533
+      pitch_rel: -5.143
+      phase: "flare"
+      com_z_max: 0.019
+      v1_max: 0.002
+      om_mean: 0.023
+      zbz_min: 0.997
+      E1: false
+      E2: false
+      E3: true
+      E4: true
+      E5: true
+    B:
+      end: "rest_window"
+      qacc: 0
+      x: -24.174
+      dx: 8.826
+      vn: -0.682
+      v_h: 7.352
+      roll: -2.162
+      pitch_rel: -4.879
+      phase: "flare"
+      com_z_max: 0.02
+      v1_max: 0.007
+      om_mean: 0.004
+      zbz_min: 1.0
+      E1: false
+      E2: true
+      E3: true
+      E4: true
+      E5: true
+    hash_eq: true
+    P_e: 0.9973991296028917
+    flags: [{"contact_W": 0.0, "rigid": false, "x2": 0.64, "X2": true}, {"contact_W": 0.0, "rigid": false, "x2": 0.4, "X2": false}]
+    again:
+      [{"ok": true, "why": null, "t_star": 4.5, "clear_s": 35.5, "x2": {"share": 0.6356, "air_share": 1.0, "n": 30000}}, {"ok": false, "why": "wet again at 8.4 s", "t_star": 4.3, "clear_s": 4.0, "x2": {"share": 0.4017, "air_share": 0.7374333333333334, "n": 30000}}]
+    null: false
+    null_q:
+      end: "rest_window"
+      qacc: 0
+      x: -44.612
+      dx: 0.388
+      vn: -1.646
+      v_h: 8.009
+      roll: -0.061
+      pitch_rel: -12.801
+      phase: "cruise"
+      com_z_max: -0.024
+      v1_max: 0.028
+      om_mean: 0.048
+      zbz_min: 0.841
+      E1: true
+      E2: false
+      E3: true
+      E4: true
+      E5: true
+    null_again: {"ok": false, "why": "never clear by 5 s", "t_star": null, "clear_s": 0.0, "x2": null}
+  ('ES2', 'wet'):
+    ok: false
+    A:
+      end: "rest_window"
+      qacc: 0
+      x: -34.376
+      dx: 10.624
+      vn: -0.711
+      v_h: 7.437
+      roll: -2.983
+      pitch_rel: -4.955
+      phase: "flare"
+      com_z_max: 0.019
+      v1_max: 0.06
+      om_mean: 0.086
+      zbz_min: 0.979
+      E1: false
+      E2: true
+      E3: true
+      E4: true
+      E5: true
+    B:
+      end: "rest_window"
+      qacc: 0
+      x: -22.0
+      dx: 11.0
+      vn: -0.696
+      v_h: 7.429
+      roll: -3.217
+      pitch_rel: -5.362
+      phase: "flare"
+      com_z_max: 0.019
+      v1_max: 0.06
+      om_mean: 0.116
+      zbz_min: 0.96
+      E1: false
+      E2: false
+      E3: true
+      E4: true
+      E5: true
+    hash_eq: true
+    P_e: 1.0313021873109307
+    flags: [{"contact_W": 51470.4, "rigid": true}, {"contact_W": 10797.1, "rigid": true, "x2": 0.05, "X2": false}]
+    again:
+      [{"ok": false, "why": "never clear by 5 s", "t_star": null, "clear_s": 0.0, "x2": null}, {"ok": false, "why": "wet again at 6.0 s", "t_star": 3.0, "clear_s": 2.9, "x2": {"share": 0.047234907830261005, "air_share": 0.1891729724324144, "n": 29999}}]
+    null: false
+    null_q:
+      end: "rest_window"
+      qacc: 0
+      x: -40.8
+      dx: 4.2
+      vn: -1.621
+      v_h: 8.019
+      roll: -0.107
+      pitch_rel: -12.617
+      phase: "cruise"
+      com_z_max: -0.01
+      v1_max: 0.127
+      om_mean: 0.082
+      zbz_min: 0.934
+      E1: false
+      E2: false
+      E3: true
+      E4: true
+      E5: true
+    null_again: {"ok": false, "why": "never clear by 5 s", "t_star": null, "clear_s": 0.0, "x2": null}
