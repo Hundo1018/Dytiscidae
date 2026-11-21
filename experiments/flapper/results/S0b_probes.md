@@ -1885,3 +1885,99 @@ dt/2 (5e-5 s) on the two S4 surfacing rows: default `b19_final_S4_default_dt2` u
 B19 surfacing: not met as stated (arrival under 10 deg in no row); recipe R settles upright, dry, and lifts off 2 m for 5 s in 5 of 6 reported starts-and-modes plus the default chain; the failure is a heeled end state in wetting (chain) and one default start. B20: not met (0.299 / 0.214 m/s heading; mean signed 0.10 / 0.205). B21: not met (turn reaches 0-107 of 180 deg; depth swing 0.1-0.4 m). B22: all still rows zero. B23: default complete, wetting stops at the surfacing.
 Rollout ledger for B19+B20+B21: 78 of 80 (B22 and B23 and the dt/2 rows are separate). Held measurements (k1-k5, kf, b20_held, b21_held, b22_held) are not rollouts.
 Hash check after this part: see the report; `s0b_t5b_machine.py`, `s0b_t5b_probe.py`, `s0b_laws.py`, `mission.py` not edited; the T5b calibration store gained keys only for the geometries probed in `kf` (the default key unchanged).
+
+# T5d: S and B24-B29
+
+2026-11-21. Frozen plan: `DESIGN_S0b_bold.md` Addendum 3 (6c02910). Rows: `results/S0b_probes6.jsonl` (184: 168 static rows of probe S, 16 held rows; **0 free rollouts: 0 of the 150 used**).
+New files only: `s0b_t5d_machine.py`, `s0b_t5d_static.py`, `s0b_t5d_envelope.py`, `s0b_t5d_draw.py`; logs in `results/t5d/`. **Probe S stops the stage: the frozen layout meets the static table and the weight bar, and its columns stand in the wings' swept volume (the wings pass up to 0.10 m through them in the hover and the swim strokes); no column layout that clears the wings meets the static table. B24-B29 were not run.**
+
+## T5d as built from the frozen description (`s0b_t5d_machine.py`; `figures/S0b_T5d_built.png`)
+
+T5b unchanged (hull, wings, hinges, pontoons at z -0.23, dorsal float 0.025 / 0.40 / +0.20) plus
+- four columns, vertical cylinders at the pontoon ends (x = xp -+ 0.19 = 0.045 and 0.425, y = +-0.20), from the pontoon top (hull z -0.20) to the dorsal float's axis (+0.20), radius 0.025 or 0.030 m; geoms on the hull, 16 bluff slices each (cd 0.9), buoyancy and drag from the solver;
+- a keel fin, a plate in the hull's xz plane, x -0.12..+0.08, z -0.20..-0.06 (aft of the CoM at x 0.235, at its height -0.14..-0.18), 6 wing strips;
+- one fill scalar over the whole floodable volume (pontoons 2 x 1.357 L + columns 4 x 0.785 L at r 0.025, 4 x 1.131 L at r 0.030), **the pontoons flooding first, then the four columns together from the bottom** (a choice of valve order, stated);
+- masses: column shells and fin at the built main wing's mass per area (0.241 kg/m^2: 16.1 / 19.6 g per column, fin 6.8 g; a bookkeeping figure, no material implied), pontoon mass by neutrality at fill 0.95 of the whole floodable volume.
+
+**Tank model, as built.** A pontoon's water: uniform fill at the capsule's centre (T5's). A column's water: **not a fixed point**: a solid slug standing on the column's foot, height fill x 0.40 m, centre of mass at half that height (the tank body's `body_ipos`, mass and inertia rewritten at each fill change, `mj_setConst`).
+The slug tilts with the column, so two things are left out, both bounded (`free_surface_bound`, N m/rad to subtract from K): a free surface inside each column, rho g pi r^4 / 4 = 0.003 (r 0.025) / 0.006 (r 0.030) each, 0.012 / 0.026 for four: negligible against the K >= 1 bar;
+and flow between columns: with the four columns valved (assumed) nothing; if they were open to each other while part full, the inside water would level and take away the columns' whole waterplane term, **3.16 / 2.85 N m/rad (roll / pitch) at r 0.025, 4.55 / 4.10 at r 0.030**: the layout needs the columns valved, which is a requirement on whatever is built.
+
+## S, the static table (no rollout; `s0b_t5d_static.py table`; ids `S_frozen_r025_*`, `S_frozen_r030_*`, `S_short_r030_*`; method = B19 step 3's `kf`: hull level, heave solved for buoyancy = weight, K from the fluid moment about the dry CoM at +-0.01 rad)
+
+Frozen layout, radius 0.030 m, dry 2.347 kg. Hull origin over the water (m), K pitch / K roll (N m/rad), by fill (p = pontoon fill, c = column fill); wings level at sweep 0.45 (`flat45`, recipe R's pose) / raised (the float pose) / level at sweep 0 give the same drafts within 0.01 m:
+
+| fill (p, c) | hull origin, flat45 | K flat45 | K raised | K flat |
+|---|---|---|---|---|
+| 0.00 (0, 0) | +0.211 | 7.22 / 16.47 | 6.88 / 16.17 | 7.17 / 16.47 |
+| 0.05 (0.13, 0) | +0.203 | 5.06 / 14.71 | 4.74 / 14.41 | 5.03 / 14.71 |
+| 0.10 (0.27, 0) | +0.178 | 2.16 / 2.58 | **1.85** / 2.28 | 2.15 / 2.58 |
+| 0.15 (0.40, 0) | +0.146 | 2.40 / 2.83 | 2.10 / 2.53 | 2.40 / 2.83 |
+| 0.20 | +0.114 | 2.77 / 3.19 | 2.47 / 2.90 | 2.77 / 3.19 |
+| 0.25 | +0.082 | 3.25 / 3.67 | 2.95 / 3.38 | 3.24 / 3.67 |
+| 0.30 | +0.051 | 3.84 / 4.26 | 3.54 / 3.96 | 3.83 / 4.26 |
+| 0.35 (0.93, 0) | +0.025 | 4.80 / 4.99 | 4.51 / 4.69 | 4.81 / 4.99 |
+| 0.40 (1, 0.04) | +0.012 | 7.41 / 8.17 | 7.00 / 5.43 | 7.49 / 8.40 |
+| 0.45 | +0.001 | 12.05 / 14.02 | 10.84 / 6.24 | 12.16 / 14.55 |
+| 0.50 (1, 0.20) | -0.009 | 9.63 / 11.58 | 8.10 / 6.54 | 9.69 / 11.87 |
+| 0.55 | -0.021 | 7.36 / 7.23 | 6.76 / 6.94 | 7.39 / 7.23 |
+| 0.60 | -0.043 | 7.13 / 7.57 | 6.86 / 7.31 | 7.13 / 7.57 |
+| 0.65 | -0.075 | 7.48 / 7.92 | 7.39 / 7.84 | 7.48 / 7.92 |
+| 0.70 | -0.107 | 7.84 / 8.29 | 7.63 / 8.08 | 7.84 / 8.29 |
+| 0.75 | -0.139 | 8.20 / 8.65 | 8.01 / 8.45 | 8.20 / 8.65 |
+| 0.80 | -0.171 | 8.56 / 9.00 | 8.92 / 9.25 | 8.56 / 9.00 |
+| 0.85 | -0.187 | 10.90 / 9.37 | 10.73 / 9.21 | 10.90 / 9.37 |
+| 0.90 (1, 0.84) | -0.201 | 8.07 / 6.27 | 7.02 / 5.56 | 8.07 / 6.27 |
+| 0.95 (1, 0.92) | b = 1.0000, neutral (the solve returns -0.225 / -0.389: any depth) | 5.68 / 5.27 | 5.18 / 5.59 | 5.68 / 5.27 |
+| 1.00 | sinks (b 0.962) | 4.24 / 4.24 | 4.13 / 4.13 | 4.24 / 4.24 |
+
+Against the frozen S line, radius 0.030: **draft step between neighbouring fills at most 0.032 m (bar 0.05): met; K at least +1.85 at every fill and pose (bar +1): met; b = 1.0000 at fill 0.95: met; dry weight 23.02 N against lift 31.31 N at the hover law's amplitude limit, re-measured held on T5d
+(`S_lift_r030_amp0.9`; 20.68 N at amp 0.713, torques sweep 12.9 / stroke 8.8 / feather 5.9 N m): lift / weight 1.36 against 1.3: met** (hover amplitude would be about 0.76 of the 0.9 limit). Dry mass +0.232 kg over T5b: shells 0.078 kg, fin 0.007 kg, the rest the pontoon mass that neutrality at 0.95 of a larger floodable volume asks for.
+Radius 0.025 (dry 2.276 kg, lift / weight 1.40): the draft steps are 0.037 m at most but **K falls under 1 at fills 0.10-0.20: 0.84 / 1.12 (flat45, fill 0.10), 0.54 / 0.83, 0.70 / 0.99, 0.97 / 1.26 (raised, 0.10-0.20)**: not met; the 0.030 m radius is the smallest of the two that passes.
+Drag with the hull moved at 0.3 m/s, hinges held (`S_yaw_*_beta+0_*`): 7.2 N against T5b's 3.29 N: the four columns across the flow more than double the hull drag (thrust margin at 0.7 Hz was +43 to +52 N at 0.3 m/s, so this is not a limit).
+
+**The keel fin, held** (`S_yaw_{nofin,fin}_beta{+10,0,-10}_{default,wetting}`: hull at 3 m, level, moved at 0.3 m/s with 10 deg of sideslip, every hinge held, wings flat): without the fin the yaw moment is +-0.001 N m (yaw stiffness 0.006 N m/rad: **the hull with pontoons and columns is neutral in yaw, which is why a heading error is not corrected by the body**);
+with the fin +-0.275 N m toward the velocity, **+1.58 N m/rad at 0.3 m/s, identical in the two modes** (a still body: no added-mass rate term), side force 2.08 against 1.01 N, roll moment unchanged (0.105 against 0.109 N m: the fin is at the CoM's height), drag +0.02 N. Clearance of the fin: wing 0.069 m at worst (hover amp 0.9, sw0 -0.17), tail 0.160 m. On the float (hull origin +0.211 m) the fin spans water-relative heights +0.01..+0.15 m: dry. So the fin as drawn meets its own line ("positive with margin" was not given a number; 1.58 N m/rad is 0.28 N m at 10 deg against the 3 N m yaw input authority of B15).
+
+## S, the clearance (kinematic, hinge targets tracked exactly; `s0b_t5d_static.py clear`, `s0b_t5d_envelope.py`, `results/S0b_T5d_envelope*.npz`): the finding
+
+The machine's own geoms do not collide in the model, so a wing passes through a column without any force; the only read is geometric (the rule T5b's pontoons were lowered by, R2 of B15: 0.03 m). Smallest wing-column distance on the frozen layout (r 0.025; negative = through):
+
+| stroke or pose | distance, m |
+|---|---|
+| hover stroke, amp 0.713 / 0.9, mean sweep trim and +-0.3 rad | **-0.085 ... -0.097** |
+| swim stroke (20 deg, feather 50 deg), pitch input 0 / +-0.12 | **-0.079 ... -0.084** |
+| raised (float pose) / sink / flat | -0.098 / -0.030 / -0.075 |
+| flat, mean sweep -0.5 ... +0.9 (surfacing) | -0.049 ... -0.093 |
+
+(r 0.030: -0.101 at worst.) It is not the choice of station: with a 0.02 m column from the pontoon top to +0.20 at y = 0.20, every x from -0.30 to +0.85 gives -0.027 ... -0.095 in the hover (`results/b19/t5d_cscan_A.log`); the pontoons span x 0.016-0.454.
+Why, from the built model: the wing discs cover the pontoons. The fore wing is the box x 0.132-0.390, y 0.15-0.70 on a shoulder at (0.325, 0.04), the hind wing x -0.138-0.120 on (0.055, 0.04); the hover stroke sweeps them +-39 to +-50 deg about the shoulders (reach at y = 0.20: x -0.6 to +0.97) at a dihedral of 35 deg with the
+chord passing through vertical at each reversal, and the swim stroke's trailing edges swing 0.15 m under the wing plane. The lower envelope of the wings (lowest wing point over each 1 cm cell, `S0b_T5d_envelope_nominal.npz` for the strokes as flown without control inputs, `S0b_T5d_envelope.npz` with every input at its limit) gives the highest
+top a part of radius 0.025 m may have at 0.03 m of clearance:
+
+| station | y = 0 | y = 0.08-0.15 | y = 0.20 (the pontoons) |
+|---|---|---|---|
+| x 0.07 ... 0.39 (under the wings), nominal strokes | +0.07 ... +0.10 at x -0.01, 0.07, 0.23-0.39; free at x <= -0.09, 0.15 and >= 0.47 | -0.17 ... +0.01 | **-0.117 ... -0.172** |
+| x 0.47 (fore pontoon end) | free | -0.104 | **-0.104** |
+| x -0.25 / +0.63 (0.27 m aft / 0.18 m ahead of the pontoon ends) | free | free / free | -0.019 / -0.027 |
+| with every control input at its limit, y = 0.20 | | | -0.16 ... -0.23 under the wings, -0.104 at x 0.47, -0.040 at x -0.25 and 0.63 |
+
+So at the pontoons' own stations nothing may stand above hull z -0.10 (the pontoon tops are at -0.20), and the band between -0.10 and the dorsal float's +0.175 (the hull tube is at +-0.04) is closed to any part with a lateral arm. **A column "from the pontoon top to at least the height of the dorsal float's axis" at a pontoon end crosses the wings' swept surface wherever it is put.**
+
+**The best static table that clears the wings** (`S_short_r030_*`: columns r 0.030 from -0.20 to -0.12 under the wings' pitch axes, x 0.066 and 0.386, y +-0.20; clearance +0.034 m in the hover and swim strokes, +0.011 m at the swim's pitch input limit; dry 2.161 kg):
+drafts +0.215 ... +0.130 in steps of 0.004-0.016 m while the short columns carry the waterline (fills 0-0.40, K >= 1.04 / 2.64 flat45, 0.73-1.23 pitch raised), then **a step of 0.103 m to +0.027 with K -0.88 / -1.14 (flat45) and -1.16 / -1.44 (raised) at fill 0.45**, roll -1.02 ... +0.65 (raised) through fills 0.50-0.70, **a second step of 0.159 m** to the dorsal float at fill 0.75.
+It fails the S line on both counts, in the same band where T5b failed (T5b: K -1.4 / -1.65 at its fill 0.3). The reason is not the size of the columns: with the waterline between -0.10 and the hull, every buoyant volume is below the dry CoM (z -0.138 dry; pontoons and their water at -0.23), so K = weight stability alone is about (short columns' buoyancy x 0.07 m) - (dry weight x 0.09 m) = -1.5 N m/rad, and the only cure, waterplane area at a lateral arm in that band, is where the wings are.
+
+**S, verdict.** As frozen (columns at the pontoon ends through the waterline): static table met at r 0.030 m, weight bar met (1.36), **not buildable: the wings pass 0.03-0.10 m through the columns in every stroke**. With the columns cut to what clears the wings: static table not met (K -0.9 ... -1.4, draft steps 0.10 and 0.16 m). Under the stop rule this is the finding of the stage and I stopped here: flying the frozen layout would rest every B24-B29 row on a model that is blind to the collision.
+What the envelope leaves open, not designed here (it changes the frozen layout): waterplane volume outside the wing discs (y = 0.20 is free up to -0.02 only 0.18 m ahead of and 0.27 m behind the present pontoon ends, and free of the hover reach only beyond x 0.97 / -0.60); a wing layout whose discs do not cover the floats (shoulders raised above the hull by more than the 0.15 m the trailing edges swing, so the band under the wings is free); or a rest draft sequence that never needs K in the band (which the 0.05 m draft rule forbids as written).
+
+## Predictions (Addendum 3) against this
+
+1. "S is met with columns of 0.02-0.03 m radius and under 0.25 kg of added shell": **held on the static table** (r 0.030, +0.232 kg dry of which 0.078 kg shell; r 0.025 misses K by 0.16-0.46 N m/rad at fills 0.10-0.20) **and void as a design** (the columns are inside the wings' swept volume).
+2. B25 default passes / wetting over 10 deg in at least one start: **not tested** (no rollout).
+3. B27 passes in the default mode by differential thrust: **not tested**.
+4. B26's 25% mode agreement most likely to stay open: **not tested**. One held fact bears on it: the fin gives +1.58 N m/rad of yaw stiffness at 0.3 m/s where the body alone has 0.006, the same in both modes.
+
+Not done: B24-B29, the laws (heave-rate ballast rise, forward U-turn), `figures/S0b_T5d_surface.png`, `S0b_T5d_water.png`, `S0b_T5d_mission.png`. Rollout ledger: 0 of 150. Not-evidence rows: 0 of 184 (0 QACC, 0 limiter steps on the 16 held rows; static rows have no dynamics).
+Measured: every number above with an id or a log (static equilibria and K from the solver's own buoyancy on the built model; clearances by `mj_geomDistance` and by the sampled wing surfaces; lift, drag and the yaw derivative held). Inferred: the weight-stability estimate of K in the band (-1.5; the table's measured values are -0.9 ... -1.4); that no layout with a lateral arm exists (shown for vertical parts at the scanned stations and by the envelope map, not proved for every shape).
+Hash check after the stage (`s0b_t5b_hash.py`): T4 `6070e5a5353cace3`, T4c `281eed84715ae7df`, T5 `f8e72992cbafc736`, T5 at fill 0.95 `6f735d284395364f`, unchanged; T5b by the same digest (not recorded before): `c7c7ee24f45900cd`, at fill 0.95 `9fbb8d2303ae27e1`. `git status` shows no tracked file modified; `mission.py`, `s0b_laws.py` and every T4/T5/T5b/T5c file untouched.
