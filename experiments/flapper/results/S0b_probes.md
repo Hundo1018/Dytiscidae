@@ -1585,3 +1585,303 @@ Inferred: why `InducedFlow.w` holds the sinking machine (not logged); the weathe
 **Figures** (opened and read against the rows): `figures/S0b_T5b_built.png` (+ `.json`; side, top, front, CoM and CoB, the waterline at the float, dry 2.115 kg, 4.758 kg at fill 0.95, K 3.82 N m/rad from the built model);
 `figures/S0b_T5b_water.png` (the four `b16_final_*` swims: displacement, speed, depth, yaw error, attitude; title mean signed speed +0.164 / +0.180 default, +0.112 / -0.205 wetting, the table's numbers);
 `figures/S0b_T5b_mission.png` (`b17_chain_default`: flood, swim, rise, surfacing arrival, the failed second lift-off; the drawn bodies are at a rest pose at the recorded height and attitude).
+
+# B19-B23: surfacing, swim speed, depth-holding turn, still machine, whole chain on T5b
+
+2026-11-21. Rows: `results/S0b_probes5.jsonl` (every free rollout one row; ids `b19_*`, `b20_*` ...; held measurements are not rollouts and are
+not counted in the 80). Harness: `s0b_t5c_surf.py` (new; T5b, `s0b_t5b_machine.py`, `s0b_t5b_probe.py` and everything earlier are not edited).
+Tuning ledger for B19+B20+B21 (80 allowed), rollouts: see the end of the part.
+
+## B19, step 1: why the machine capsizes on the way up (ids `b19_diag_*`; start 3.0 m, 2% tank seed, wings in the sink pose, default and wetting; 0 QACC, 0 limiter steps)
+
+The four diagnostic rollouts (blow at 0.3/s default, wetting, no seed default, blow at 0.1/s default) all arrive inverted, as B17's five recipes did. The traces
+(0.05 s) say the capsize is **a pitch divergence while the machine is fully submerged and rising, not a surface or partial-fill effect**:
+
+- noseed default (exact mirror symmetry, so the seed is not the cause): from rest at -3.0 m the nose-up pitch grows from 0.5 deg at 0.45 s to 5.4 deg at 1.05 s,
+  20.5 deg at 1.85 s, 44.5 deg at 2.65 s, 89.8 deg at 3.65 s (z -2.0 m, still wet: pontoon, dorsal float, hull, wings and tail strips all at wet fraction 1.0;
+  the dorsal float's top at -2.27 m). The fill reaches 0 at 3.2 s (z -2.13 m). The roll angle in the table is an Euler artefact once pitch passes 78 deg: the machine ends nose-over-the-top
+  (roll 180, pitch 67 = pitch 113).
+- The fluid moment about the dry centre of mass is nose-up and grows with the pitch: -0.33 N m at 16 deg, -1.08 N m at 37.5 deg, -1.40 N m at 61 deg (a stiffness of about -1.2 N m/rad),
+  with the vertical force falling from 46.7 N (weight) as the tanks empty and the climb speed 0.23 m/s. The effective centre of vertical force is 0.04-0.05 m ahead of the CoM at 37-60 deg.
+  The static righting stiffness K of the same machine is **positive at every fill** (`righting`, wings sink pose, 5 m: 3.83 N m/rad at fill 0.95, 3.06 at 0.5, 2.14 at 0.2, 1.13 at 0). So a static
+  argument (the one B17 made: pontoons just under the surface at partial fill) does not explain it.
+
+**Measured mechanism (held, steady flow; `/scratchpad` k3/k4 method: the hull pose and velocity rewritten every step, 3000 steps, the last 500 averaged; moment of every body's fluid force about the dry CoM; pitch or
+roll tilt +-0.05 rad; stiffness N m/rad, positive = restoring; fill 0.5, default mode).** (A first version of this probe that called `apply` three times read the
+unsteady start-up state of the tail strips (-1.2 N m each); the stepped average is the one quoted.)
+
+| wing pose (dihedral, feather) | vz m/s | pitch K total | of which wings | roll K total | of which wings |
+|---|---|---|---|---|---|
+| sink (35 deg, -90 deg: raised, chord vertical) | 0 | 2.46 | -0.31 | 3.58 | 0.80 |
+| sink | **0.25** | **-14.48** | **-17.34** | 2.68 | 0.20 |
+| flat (0, 0) | 0 | 3.04 | -0.04 | 3.25 | 0.14 |
+| flat | 0.25 | **+4.92** | +1.73 | 2.93 | 0.14 |
+| 35 deg, feather 0 | 0.25 | 4.14 | 1.34 | **-26.19** | -28.61 |
+| 0, -90 deg | 0.25 | -4.86 | -8.12 | 2.96 | 0.11 |
+| 35 deg, -45 deg | 0.25 | -1.85 | -4.61 | -11.87 | -14.33 |
+
+(fill 0.0 the same pattern: sink pitch -14.35, flat +3.23, roll of 35/feather 0 -26.63.) The hull's own contribution is +4.5 and the pontoons' -1.7 in every row; **the wings carry the whole change.**
+Reading: with the chord vertical (the sink pose: the pose that clears the pontoons when the wing flips) a wing is edge-on to a vertical flow; a nose-up tilt gives it an angle of attack,
+the lift is a horizontal force acting 0.3-0.4 m above the CoM (the wings are on top of the hull, the CoM is low in the pontoons), and the moment is nose-up and quadratic in speed. A flat wing is a plate across the flow: the tilted
+normal force acts the other way (restoring). This is the pendulum-with-a-fin problem: **the sink pose is a destabilising fin in any vertical climb, and the machine's static K (3.83) is the number that does not matter.**
+It also bounds the sink pose's safe speed (the next table). (B17's reading of the fast-blow rows as a partial-fill waterplane effect was wrong for them; the slow-blow rows u18-u20, which stalled at -0.35 m and then heeled to
+-45 deg, are a separate case and are not explained by this.)
+
+### Safe speed of the sink pose (held, same method, fill 0.5, default; pitch K total / of which wings, N m/rad; `results/b19/k4_f05.log`)
+
+| vz m/s | sink pose | flat wings |
+|---|---|---|
+| 0 | 2.46 / -0.31 | 3.04 / -0.04 |
+| 0.05 | 2.34 / -0.44 | 3.32 / +0.20 |
+| 0.10 | 0.20 / -2.58 | 3.52 / +0.39 |
+| 0.15 | -3.33 / -6.13 | 3.85 / +0.71 |
+| 0.25 | -14.48 / -17.34 | 4.92 / +1.73 |
+
+The fin term grows as v^2 (-0.4, -2.9, -6.8, -17 at 0.05, 0.10, 0.15, 0.25 relative to rest): the sink pose is statically safe below about 0.08 m/s of vertical speed
+(K = 1 N m/rad at 0.09), which is why the flood at 0.06-0.08 m/s (B11, B17 chain) stayed upright. The rises of B17 reached 0.2 m/s.
+
+### B19 step 2: flat wings (ids `b19_t1_*`, `b19_t2_*`): the fin is gone and the machine still pitches up, for a second reason
+
+Flat wings (dihedral 0, feather 0, K positive at every speed in the table above) do not cure it: `b19_t1_flat_blow03_{default,wetting}` and `b19_t1_flat_blow01_default`
+(same 3.0 m start) arrive at pitch 68 / 69 / 59 deg and the lift-off inverts (they are tuning rows, `not_evidence` where inverted). The traces (pitch 0.4 deg at 0.8 s, 5.7 deg at 1.7 s,
+28 deg at 3.05 s at 0.03-0.08 m/s of climb) rule the fin out. What is different about a flat wing is **the water it carries**: the solver's entrained mass (body_mass less dry mass,
+the added mass of a plate moving along its normal) is **125 kg for flat wings** (29.4 kg on each main wing, 2.2 kg on each tail surface) against 15.6 kg in the sink pose, on a 2.1-4.8 kg machine
+(`/scratchpad` d2: dry CoM hull x 0.235 m; **centroid of the entrained mass x 0.112 m**, 0.123 m behind the buoyancy and weight lines; sweeping the four wings forward moves it, 0.216 m at +0.3 rad, 0.005 m at -0.3 rad).
+Three things follow, all measured:
+
+1. The vertical acceleration is small (net force 26 N on about 130 kg effective: 0.2 m/s^2; terminal climb speed about 0.135 m/s, where the wings' drag balances the net buoyancy), so the rise takes 8-10 s.
+2. While the net buoyancy is not yet balanced by drag, the net force acts 0.12 m ahead of the inertial centre of the entrained water, a nose-up torque of about F_net x 0.12 m (26 N: 3 N m) on a very large
+   effective pitch inertia: pitch builds with the CoM-line stiffness K = 3 N m/rad unable to hold it.
+3. At terminal speed the same fact is a couple: the wings' drag (about 20 N) acts at their centroid, not at the buoyancy line (held, vz 0.135, fill 0, pitch 0, **moment about the dry CoM**, + = nose down;
+   `results/b19/k5_*.log`):
+
+| mean sweep of all four wings (rad, tips to the nose +) | centroid of entrained mass, hull x m | moment, flat wings | of which wings / tail / pontoons | moment at rest (vz 0) |
+|---|---|---|---|---|
+| 0.00 | 0.107 | **-4.09** | -2.90 / -1.03 / 0.00 | 0.00 |
+| 0.35 | 0.234 | -1.55 | -0.74 / -1.05 / +0.24 | +0.30 |
+| 0.50 | 0.286 | -0.45 | +0.20 / -1.05 / +0.33 | +0.44 |
+| 0.00, dihedral 0.3 | 0.106 | -3.71 | -2.52 / -1.03 / 0 | |
+| 0.35, dihedral 0.3 | 0.226 | -1.16 | -0.34 / -1.05 / +0.23 | |
+| 0.50, dihedral 0.3 | 0.276 | -0.07 | +0.60 / -1.05 / +0.32 | |
+
+(the pontoons' term is the dry CoM moving forward with the wings' mass, a static trim of +0.3-0.4 N m at rest; the tail's -1.05 N m is its drag at 0.135 m/s with its 2.8 kg of entrained water each, x -0.5 m.)
+The sweep is therefore a pitch actuator with a large authority while climbing (7.3 N m per rad of mean sweep at 0.135 m/s; 0.85 N m/rad at rest). Static K (3.04, flat) is not the number that decides the rise either.
+Sweep 0.35 alone (b19_t2_flat_sw35_*): pitch stays under 3.5 deg for the first 3 s (fill emptying), then drifts to 36-40 deg by arrival at terminal speed (default); the wetting-mode row arrived at pitch 42 and, after
+settling on the float, lifted to 2 m and held 5 s (`b19_t2_flat_sw35_wetting`: hold 1.80-2.02 m, tilt 15.4 deg); the default-mode rows at sw 0.25, 0.35, 0.45 all inverted at the lift-off (arrival pitch 49, 35, 27 deg).
+
+### B19 step 3: the sweep as a pitch actuator, and the partial-fill window at the surface (ids `b19_t3_*` ... `b19_t6_*`; tuning rows, 3.0 m and 1.5 m starts, 2% tank seed)
+
+Wings flat (dihedral 0, feather 0), mean sweep of all four wings commanded by a pitch loop while climbing: sw = sw0 + kp x pitch(nose-up, rad) + kd x pitch rate (nose-up), clipped to 0..0.9 rad,
+rate-limited to 0.5 rad/s (`pitch_loop` in `s0b_t5c_surf.py`; the hinge is the sweep hinge of the shoulder, the loop reads the hull attitude: no force is typed, the actuator is a hinge on its motor).
+Blow from the start (fill 0 at 0.3/s), 3.0 m:
+
+| id | sw0, kp, kd | rise time | pitch during the rise | arrival (first sample afloat) | settled 6 s later | lift-off to 2 m, hold 5 s |
+|---|---|---|---|---|---|---|
+| `b19_t3_A_default` | 0.45, 1, 2 | 53 s | within 2 deg | pitch -33, roll -5 | 0.0 / -0.1 | held 1.80-2.02 m, tilt 13.5 deg |
+| `b19_t3_A_wetting` | same | 19 s (wetting climbs 2.8x faster) | | -22 roll, +11.5 pitch | 0.1 / -0.3 | held, tilt 15.3 |
+| `b19_t3_B_default` | 0.55, 1, 2 | 50 s | | pitch -42 | 20 / -69 | inverted |
+| `b19_t3_C_default` | 0.45, 2, 3 | 45 s | within 1.1 deg (trace: -0.2..-1.1) | pitch -17, roll -6 | -0.1 / +0.9 | held, tilt 13.6 |
+
+With the loop the climb is straight (pitch under 1.5 deg for 40 s at 0.07 m/s) and the fin and the entrained-mass offset are both out of the picture. **What is left is the exit**: when the flat wings
+cross the surface (0.4-0.5 s) their 125 kg of entrained water vanishes from the body at once and the machine, still at a net buoyancy of 26 N, goes from 0.06 to 0.48 m/s in 0.5 s (a 0.28 m jump over the float height;
+the solver keeps the velocity when the mass goes), the pontoons leave the water at that speed, and pitch swings -15 deg (V4/C from 1.5 m: peak |pitch| 15.1, |roll| 4.4; the two runs with the loop frozen at -0.6 m, `b19_t4_V1`, `V3`, left the surface nose UP at +28 deg: the loop is what keeps the exit
+tame, and a frozen sweep of 0.45-0.5 rad puts the dry CoM 7 mm ahead of the pontoons' buoyancy: a static +0.3 N m nose-down in the air).
+
+**Floating stability against fill (static, `/scratchpad` kf; hull level, heave solved so that buoyancy = weight, tilt +-0.01 rad about the dry CoM, wings flat; N m/rad):**
+
+| fill | hull origin over water m | K pitch / K roll, flat wings sw 0.45 | raised wings |
+|---|---|---|---|
+| 0.0 | +0.216 | +7.4 / +16.6 | +7.1 / +16.3 |
+| 0.2 | +0.204 | +6.4 / +15.9 | +6.1 / +15.6 |
+| 0.3 | **+0.023** | **-1.4 / -1.65** | -1.7 / -1.95 |
+| 0.4 | +0.008 | +2.9 / +4.8 | +1.7 / -1.3 |
+| 0.5 | -0.004 | +4.9 / +7.3 | +2.6 / -0.7 |
+| 0.6 | -0.016 | +2.2 / +0.3 | +0.5 / -0.1 |
+| 0.7 | -0.180 (submerged) | +3.0 / +1.0 | +2.8 / +0.85 |
+
+Two geometric facts. (1) The floating machine has **two draft branches 0.18 m apart** (fill 0.2: hull +0.204, fill 0.3: +0.023) with no waterplane between them: between pontoon tops (hull -0.20) and the dorsal float
+(hull +0.175..+0.225) there is only the thin hull tube, so the heave stiffness is nil and the buoyancy is nearly constant across the gap. A machine that passes from the lower branch to the upper one (deflating) rises through the gap
+with its net buoyancy unspent and arrives at the pontoons with speed. (2) K is **negative at fill 0.3** (and roll is weak at 0.4-0.6 with the wings raised): the waterplane there is the hull tube. B17's inference (pontoons just under the surface at partial fill) is right for the *floating*
+phase; the failures of the fast-blow rises had the other cause above. With flat wings in the waterplane (hull origin about 0 at fill 0.5-0.6) K is +5 / +7 (the wings are the waterplane).
+Drooping the wings (dihedral -0.2 to -0.6) changes nothing in the table (wings do not reach the water at those drafts).
+
+Deflating on the surface (V6, `b19_t6_*`, loop kept on while the tanks empty, fill 0.5 at rest first, 1.5 m start): 0.3/s arrives pitched -40 deg and inverts at the lift-off; 0.1/s arrives -43 deg, settles -70 (lift-off "held" at tilt 33 deg).
+The trace (r1): pitch goes -1 deg to -54 deg in 1.3 s at fill 0.35-0.2 while the hull jumps from the lower to the upper branch and the pontoons leave the water: the K < 0 window and the jump of fact (1), not the loop.
+
+### B19 step 4: tuning the exit (ids `b19_t4_*` ... `b19_t9_*`, tuning rows on the 1.5 m start, default mode unless stated; 20 rollouts; wetting only where named)
+
+All with flat wings, the sweep pitch loop, 2% tank seed. "Arrival window peak" = largest |pitch| from the first sample with a wing strip dry to 2 s after "afloat" (z over -0.15 and |vz| under 0.05, tanks empty).
+
+| ids | what changed | arrival window peak pitch / roll | afloat attitude | after |
+|---|---|---|---|---|
+| `t4_V4_C` | loop kp 2, kd 3, rate 0.5, fill 0 all the way | 15.1 / 4.4 | -14.2 / -3.6 | upright, lift-off held |
+| `t4_V1`, `V3` | sweep frozen from -0.6 m | 27.9, 28.5 (nose up) | +27.8, +28.4 | settles upright, lift-off held |
+| `t4_V2`, `t5_V5` | fill ramped to 0.5 over the last 0.4 m, rest at fill 0.5 on the surface (hull origin 0.0, wings awash, pitch +-0.1 deg), then tanks emptied at 0.3/s with the wings raised | default 8.0 / 3.9; wetting 17.9 / 8.9 | -1.3 / -0.3; wetting +4.7 / -0.3 | default and wetting settle upright and lift off; `V5b` (ramp from -0.8 m) arrives upright then inverts at the lift-off |
+| `t6_V6` (r = 0.3, 0.1 per s) | rest at fill 0.5, tanks emptied with the loop on | 74.6, 77.2 | -40.5, -42.9 | inverts / settles -70 deg |
+| `t7_V7` (0.3, 1.0 per s; loop off in the deflation) | | 74.3, 21.1 | -30, -20 | inverts / lift-off held; wetting rows never came to rest at fill 0.5 (a +-0.02 m/s heave limit cycle: my 0.02 dwell test never passed; run to T = 100 s, no result) |
+| `t8_E1,E2,E4` | sweep fixed at 0.25 or 0.0 for the last 0.6 m (loop off) | 61.6, 80.1, 52.3 (nose up) | +60, +77, +51 | inverted lift-off, 1,000-1,700 limiter steps (not evidence) |
+| `t8_E3` | dihedral ramp 0 -> 0.5 rad over the last metre (tips out first) | 23.1 / 3.9 | +23.0 | settles, lift-off held |
+| `t9_G1` | loop kp 2, kd 3, rate 2, sweep limit -0.5..0.9 | 16.9 / 1.5 | +4.9 / +0.3 | held |
+| `t9_G2` | kp 3, kd 4, rate 2 | 15.6 / 0.2 | +3.8 / -0.2 | held |
+| **`t9_G3`** | **kp 3, kd 4, rate 1, sweep limit -0.5..0.9** | **13.3 / 3.8** | **+0.1 / -0.1** | **held 1.80-2.02 m, tilt 13.4 deg** |
+| `t9_G4` | G2 + dihedral ramp | 31.1 / 6.1 | +30.9 | held |
+
+What the table says. (a) The sweep loop is what makes the rise and the exit controllable: without it (fixed sweep) the exit is nose-up by 28-80 deg, with it the exit excursion is 13-17 deg and the machine
+settles upright every time. (b) Resting at the surface at fill 0.5 is a clean arrival (peak 8 deg, wings awash and in the waterplane) but **the way from fill 0.5 to the float crosses the fill 0.3 window of K < 0
+and the 0.18 m draft jump, and every recipe tried for it (six rows, two rates, loop on and off) pitched the machine 20-77 deg**; V5 passed by luck of the pose blend and is not repeatable (V5b). I dropped the rest stop.
+(c) The exit excursion (13-17 deg with every loop setting that worked) is the entrained water leaving with the wings plus the pontoons coming out at 0.45 m/s: the sweep has authority over it only while the wings are
+wet (7 N m/rad), then through the dry CoM shift (about 2 N m/rad); I did not find a setting under 10 deg. **The recipe adopted: G3 with fill 0 at 0.3/s from the start** (the plain blow of the first diagnostic runs),
+wings level, sweep loop kp 3 / kd 4 / rate 1 rad/s, limits -0.5..0.9 rad, sw0 0.45.
+
+### B19 step 5: the recipe G3 on three starts, both modes (ids `b19_rep_*`; 8 rollouts; they were meant as the reported rows, they are now tuning rows, see the next step)
+
+Recipe G3: tanks emptied at 0.3/s from the start, wings level, sweep loop (sw0 0.45, kp 3, kd 4, rate 1 rad/s, -0.5..0.9), hinge gains re-read and `InducedFlow` cleared at the lift-off, then wings raised (2 s), settle 4 s, lift-off to 2 m, hold 5 s.
+Starts: S1 2.5 m with 2% tank mismatch; S2 3.5 m, no mismatch, 4 deg initial pitch; S3 2.0 m, 3% mismatch, 3 deg initial roll. 0 QACC everywhere. "Peak" = largest |pitch|, |roll| from the first dry wing strip to 2 s after afloat.
+
+| start, mode | peak pitch / roll deg | afloat attitude (roll, pitch) | 6 s later | wet wing strips on the float | lift-off 2 m, 5 s hold | flags |
+|---|---|---|---|---|---|---|
+| S1 default | 13.8 / 2.8 | -0.1 / +0.1 | -0.1 / -2.3 | 0 | held 1.80-2.02 m, tilt 13.5 | none; sweep 96.5 N m (the x4 stall, 4.0x witness); X2 0.97 |
+| S1 default, unlimited twin | 12.7 / 3.1 | -0.1 / +0.1 | 0.1 / -1.1 | 0 | held | sweep 253 N m = **10.5x witness: not evidence** (the twin only) |
+| S1 wetting | 8.1 / **49.6** | -33.8 / +0.5 | **-45.6** / -1.9 | **16 (one side)** | inverted, 2,322 limiter steps | **fail** |
+| S1 wetting, unlimited twin | 10.7 / 44.3 | -31.4 / -7.0 | -45.6 | 16 | inverted | **fail** (twin torque 32x witness: not evidence either way) |
+| S2 default | 13.5 / 2.2 | -0.1 / +0.1 | 0.0 / -2.2 | 0 | held, tilt 13.5 | sweep 96.5 N m |
+| S2 wetting | 26.3 / 13.1 | -10.9 / +26.2 | -0.2 / -0.8 | 0 | held, tilt 15.3 | peak over 10 deg |
+| S3 default | 2.0 / **38.0** | +3.2 / +0.4 | **+39.7** / -2.6 | **14** | inverted, 1,366 limiter steps | **fail** |
+| S3 wetting | 9.8 / **41.3** | +30.9 / -3.5 | **+44.2** / -3.7 | 16 | inverted | **fail** |
+
+Three of eight rows fail by the same thing: the machine **ends heeled at 40-46 deg on its side with the wings of the low side in the water** (14-16 of 32 strips wet) and stays there, 6 s later and at the lift-off. It is a
+second resting state of the floating machine with the wings out; the upright float is entered only if the roll at the exit is small. The roll before the exit was small in all of them (S1 wetting -0.7 deg at 8 s,
+creeping to -9 deg at 19.5 s with the yaw drifting 2 -> 33 deg; S3 default the initial +2.7 deg unchanged for 22 s: no roll restoring at the climb speed), and the exit multiplies it: a roll of 2.7 deg before the exit ends at 39.7 deg, -9 deg ends at -34..-46.
+The creep in wetting is the lateral mode D1 found unstable without the added-mass reaction (default mode holds roll and yaw to 2-5 deg over the same climb). A pitch loop alone is not a surfacing law; roll needs its own loop.
+
+### B19 step 6: a roll loop, and what the exit is (ids `b19_t10_*` ... `b19_t12_*`; 11 tuning rollouts on a 2.2 m start with 3 deg initial roll and 2% tank mismatch, or the variants named)
+
+Roll loop (`roll_loop`): the wings' dihedral, one side at a time (raising a wing of 0.9 m span moves its entrained water inboard, so the net buoyancy then acts off the inertial centre and rolls the machine; a wing at
+dihedral +-d moves the same way, so only the side to be raised is moved): u = k roll + kd roll rate, left wings raised when u < 0 and right wings when u > 0, limit 0.6 rad, 1 rad/s.
+
+| id | what | peak pitch / roll in the exit window | afloat attitude | 6 s later | lift-off, hold 5 s |
+|---|---|---|---|---|---|
+| `t10_base_default` / `_wetting` | G3, 3 deg initial roll, no roll loop | 1.3 / 38.2; 8.2 / 41.5 | +3.2 / +0.7; +30.1 / -0.9 | **+39.9** / -2.6; **+44.3** / -3.6 (14-16 wet strips) | inverted both |
+| `t10_roll4_default` / `_wetting` | + roll loop k 4, kd 4 | 26.2 / 16.9; 45.1 / 12.0 | +12.4 / +26.2; -4.8 / +44.3 | 0.1 / -0.8; 0.0 / +0.7 | held both |
+| `t11_roll4off6_default` / `_wetting` | loop off above -0.6 m | 15.9 / 17.6; 37.5 / 28.1 | -13.9 / +15.9; +23.7 / +36.3 | 0.2 / -0.6; 0.1 / +0.7 | held both |
+| `t11_roll4off3_default` / `_wetting` | loop off above -0.3 m | 30.3 / 16.6; 47.2 / 12.0 | +0.2 / +30.1; -3.3 / +46.4 | 0.0 / +0.1; 0.0 / -2.7 | held both |
+| `t12_vz08_default` / `_wetting`, `vz05_wetting` | + a fill integrator holding the climb rate to 0.08 / 0.05 m/s | 15.3 / 5.4; 7.0 / **61.1**; 8.8 / **43.6** | -0.3 / +4.5; -42.9 / -2.6; +26.6 / -5.1 | 0.0 / +0.6; **-45.7**; **+45.5** | held; inverted; inverted |
+
+(Peak pitch / roll are over the exit window; afloat attitude is (roll, pitch).) The roll loop turns the "heeled on its side" end state into an upright float in every row that has it alone (6 of 6: `t10_roll4`, `t11_*`) while the same start without it heeled in 2 of 2 and the G3 rows of the previous step heeled in 3 of 8; it does not shrink the excursion at the exit, it adds a pitch kick of its own (peak pitch 26-47 deg in
+the loop-on rows against 1-8 deg without). In wetting mode the climb is **0.33 m/s against 0.07 in the default mode** (no added-mass reaction), the pitch loop pins at its 0.9 rad limit (pitch +22 deg at 6.4 s in `t11_roll4off6_wetting`), and the exit is nose-up 37-47 deg. A fill
+integrator that holds the climb to 0.05-0.08 m/s did not remove the heeled end state in wetting mode (2 of 2 failed), because the exit is not set by the climb speed but by the 0.18 m draft gap and the 26 N buoyancy surplus at the pontoons' exit (below).
+
+**The exit, in numbers.** Net buoyancy of the empty machine is 46.7 N against a dry weight of 20.7 N (b = 2.25); the flat wings carry 125 kg of entrained water until they are clear, then the 2.1 kg machine is accelerated by 26 N (12 m/s^2) while the pontoons
+are still under: a breach of 0.3-0.5 m/s. Between the draft at which the hull tube leaves the surface (hull origin +0.02 m) and the one at which the pontoons' tops come out (+0.15 m) the machine has **no waterplane** (the fill table above): the heave is neutral over 0.11-0.18 m,
+so slowing the tank rate does not slow the breach (the speed at the pontoons goes as the cube root of the rate, 0.32 m/s even at 0.02 /s of fill). Closing the gap needs buoyancy volume at mid-height; neutrality turns every litre into a kilogram of dry shell
+(`/scratchpad` kf, geometry dorsal radius 0.04 / 0.05 at hull z 0.12: dry mass 3.27 / 4.30 kg against T5b's 2.115; K positive at every fill, hull at the surface at fill 0, no draft gap), and the lift available is 31.3 N = 3.19 kg at the law's amplitude limit: **a machine without
+the gap cannot lift off** (3.27 kg dry against 3.19 kg of thrust). That is the geometric fact the surfacing criterion runs into on T5b: a pontoon pair sized by neutrality leaves a draft gap that the breach has to cross.
+
+## B19, the reported rows (ids `b19_final_*`; recipe R; fresh starts S4-S6, none used by a tuning rollout; 8 rollouts; 0 QACC; X2 share 0.97 on every flying row)
+
+**Recipe R** (all of it kinematics and ballast, no typed force): tanks emptied at 0.3/s from the start; the four wings level (dihedral 0, feather 0) at a mean sweep set by the pitch loop
+(sw = 0.45 + 3 pitch + 4 pitch rate, limits -0.5..0.9 rad, 1 rad/s); the left or right wings raised by a roll loop (k 4, kd 4, limit 0.6 rad, 1 rad/s) below -0.6 m; when afloat with the tanks empty (z over -0.15 m, |vz| under 0.05) the InducedFlow state is cleared, the wings go to the raised
+pose (2 s), 4 s of rest, hinge gains re-read, Hover4 (B17's gains) lifts off to 2 m and holds 5 s. Starts: S4 2.8 m, 2% tank mismatch; S5 1.8 m, no mismatch, 4 deg initial pitch and -2 deg roll; S6 3.3 m, 3% mismatch, 3 deg initial roll.
+
+| start, mode | peak pitch / roll in the exit window, deg | afloat attitude (roll, pitch) | after 6 s (roll, pitch), wet wing strips | lift-off 2 m, 5 s hold | notes |
+|---|---|---|---|---|---|
+| S4 default | 17.0 / 16.1 | -12.2 / +17.0 | +0.1 / -1.6, 0 | held 1.80-2.02 m, drift 0.35 m, tilt 13.6 | sweep 96.0-96.6 N m (4.0x witness = the x4 stall) |
+| S4 default, unlimited twin | 20.8 / 10.6 | -7.1 / +18.9 | -0.1 / -0.9, 0 | held | twin torque 10.7x witness: not evidence, agrees |
+| S4 wetting | 37.8 / 32.4 | +27.7 / +34.3 | 0.0 / +0.1, 0 | held 1.81-2.02, drift 0.32, tilt 15.3 | |
+| S4 wetting, unlimited twin | 50.9 / 3.0 | -2.4 / +49.6 | 0.0 / -0.4, 0 | held | twin torque 13x witness: not evidence, agrees |
+| S5 default | 5.6 / **38.3** | -3.1 / +4.6 | **-40.1** / -2.6, **15** | **inverted at the lift-off**, 589 limiter steps | heeled on its side with the low wings wet |
+| S5 wetting | 32.3 / 21.4 | -15.6 / +30.9 | 0.0 / +0.4, 0 | held, drift 0.31, tilt 15.3 | |
+| S6 default | 17.3 / 5.3 | -0.4 / +6.4 | -0.1 / +0.5, 0 | held, drift 0.35, tilt 13.6 | |
+| S6 wetting | 53.5 / 10.1 | +10.0 / +51.8 | -0.2 / +16.2, 0 | held, drift 0.30, tilt 14.6 | still 16 deg nose-up after 6 s, peak 53 deg |
+
+**Against the target (arrives upright, |roll| and |pitch| under 10 deg, wings dry, lifts off to 2 m for 5 s, 3 of 3 starts, both modes): not met.**
+Lift-off and hold: **5 of 6** starts-and-modes (the S5 default heeled), and the settled float is upright and dry in those 5 (|roll|, |pitch| under 2 deg at 6 s except S6 wetting at +16 deg). The arrival itself is not under 10 deg in any row: the exit window peaks are 5.6-53.5 deg of pitch or 5.3-38.3 deg of roll,
+and the afloat attitude is outside 10 deg in 5 of 6. Both modes: default mode peaks 17-21 deg (pitch), wetting 32-54 deg, and the modes disagree on the transient by 2-3x (not established as a law; both settle upright in 5 of 6).
+**What fixes the size of the transient, and why it was not brought under 10 deg by control**: (i) the empty machine floats with 26 N of buoyancy surplus on 2.1 kg, and the 0.11-0.18 m draft gap with no waterplane (fill table above) lets it breach at 0.3-0.5 m/s once the flat wings' 125 kg of entrained water is gone;
+(ii) a roll at the exit grows (the side whose wings clear first loses its entrained mass first and rises, which adds heel: -4.5 deg to -32 deg in 0.8 s in `b19_final_S5_default`) and the sweep and dihedral hinges act only while the wings are in the water; (iii) the one geometry that removes (i) (a dorsal float
+of 0.04-0.05 m radius at hull z 0.12, no draft gap, K > 0 at every fill) is 3.27-4.30 kg dry against 3.19 kg of thrust at the law's amplitude limit: no lift-off. The one lever left unprobed and indicated by the E3/G4 rows (a symmetric dihedral ramp before the exit: roll peaks 3.9 and 6.1 deg
+with the pitch loop alone) is not part of recipe R; it was not run on the reported starts.
+Ledger: the B19 tuning rollouts are 58 (diagnostics 4, t1 3, t2 4, t3 4, t4 4, t5 4, t6 4, t7 4, t8 4, t9 4, the 3-start trial 8, t10 4, t11 4, t12 3), the reported rows 8: **66 of the 80 are gone** (B20 + B21 have 14).
+
+## B20, step 1: held thrust against speed, forward and reversed, 0.5-0.9 Hz, both modes (ids `b20_held_*`; T5b at 3 m, fill 0.95, hull held level and moved at U; stroke 20 deg, feather 50 deg, diagonal phasing, a = 1; 36 held rows, 0 QACC)
+
+Net hull-axis force Fx in N (stroke wrench less the static buoyancy at the same pose; + = toward the nose); U in m/s along the nose (the reverse rows are the wings turned over on their spars, feather offset -180 deg, hull moved backward, U < 0). Rows with limiter steps are not evidence (2: `rev_f07_Um45_default`, `rev_f09_Um45_default`).
+
+| forward, f Hz | default U = 0 / 0.3 / 0.45 | wetting U = 0 / 0.3 / 0.45 | speed where Fx = 0, default / wetting (linear between rows) |
+|---|---|---|---|
+| 0.5 | +43.9 / +10.0 / -21.1 | +41.7 / +16.6 / -8.5 | 0.34 / 0.40 m/s |
+| 0.7 | +86.0 / +42.6 / +12.1 | +81.6 / +51.9 / +26.9 | above 0.45 / above 0.45 |
+| 0.9 | +140.9 / +85.3 / +11.1 (stroke peak 97 N m, sweep 96) | +133.7 / +98.7 / +70.9 | above 0.45 / above 0.45 |
+
+| reversed, f Hz | default U = 0 / -0.3 / -0.45 | wetting U = 0 / -0.3 / -0.45 | speed where Fx = 0, default / wetting |
+|---|---|---|---|
+| 0.5 | -17.7 / **+60.6** / +106.6 | -15.1 / +22.7 / +55.5 | -0.07 / -0.12 m/s |
+| 0.7 | -34.7 / +122.0 / (not evidence) | -29.5 / +15.3 / +52.7 | -0.07 / -0.20 |
+| 0.9 | -57.2 / +163.3 / (not evidence) | -48.3 / +4.9 / +72.0 | -0.08 / -0.27 |
+
+Readings. (1) **Forward thrust is not the limit**: at 0.5 Hz the machine's drag balances the stroke at 0.34 (default) and 0.40 (wetting) m/s, so a whole-run mean of 0.3 is out of reach at 0.5 Hz (the starts-from-rest transient); at 0.7 Hz the balance
+is above 0.45 m/s in both modes with the stroke hinge at 56-72 N m (witness x4 curve stall 96); the two modes differ by 20% at 0.5 Hz and by more at 0.7-0.9 (wetting +12 to +60 N at U = 0.45).
+(2) **The reverse thrust cannot reach 0.3 m/s in the default mode at any frequency**: the force turns against the motion at about 0.07 m/s whatever the frequency (+60, +122, +163 N at U = -0.3 for 0.5, 0.7, 0.9 Hz): turned over, the wings are a paddle that moves the water
+backward at the stroke's tip speed, not a thruster, and once the hull moves backward at 0.07 m/s the same plates are the drag. In wetting mode the same rows cross at -0.12, -0.20 and -0.27 m/s; **the modes disagree by 3x on the reverse swim**, so a reverse antipode is "not established" at best and
+0.07-0.08 m/s in the default mode (as B16 measured: 0.078). The antipode therefore has to be a turn (B21) and a forward swim.
+(3) The pitch moment about the CoM at net thrust is +2.3 N m at +10 N (0.5 Hz, U 0.3), +8.5 N m at +43 N: the thrust line is 0.2 m above the CoM (B15), and at 0.7 Hz it is the tail's 4.9 N m/rad at 0.3 m/s that has to cover it.
+
+## B20 and B21: swim speed and the turn (ids `b20_*`, `b21_*`; the coordinator closed the reverse swim as "not established": the modes disagree 3x, step 1 above)
+
+**Turn in place, held** (`b21_held_turn_*`: left wings turned over, right forward, f 0.8, a 1.0 on the flipped side, forward side at rr x a; hull held, U = 0; N m / N): rr 0.64: net surge -1.3 (default) / +1.8 (wetting), **yaw +17.3 / +17.2**, pitch -0.15 / +0.41, roll +3.1 / +3.0;
+rr 1.0: surge +32.7 / +33.0, yaw +36.7 / +35.4; rr 0.3: surge -19.3 / -15.8, yaw +7.5 / +7.4. The turn couple and its surge balance **agree between the modes to 1-3%**. In the free machine they do not carry the turn:
+
+| id (2.5 m start, heading 30 deg unless noted) | law | result at the end of the turn phase | depth swing |
+|---|---|---|---|
+| `b21_t1_turn_{default,wetting}` | f 0.5, a 0.7, rr 0.5 | 1.9 deg/s (default: 84 deg in 40 s), wetting 0.8 deg/s | 0.06 / 0.10 m |
+| `b21_t2_turn_f08_*` | f 0.8, a 1.0, rr 0.64 | default **pitched -40..-58 deg, no turn**; wetting 105 deg in 45 s while translating backward 18 m (0.39 m/s) | 0.31 / 0.26 m |
+| `b21_t3_turn_f05_*` | f 0.5, a 1.0, rr 0.6 | default **150 deg in 50 s (3 deg/s), depth 0.11 m**; wetting 53 deg in 50 s, translating backward 10 m | 0.11 / 0.19 m |
+| `b20_rep_anti_*` (2.9 m, heading 75 deg; + surge loop ks 2, up to 80 s) | f 0.5, a 1.0, rr 0.6 | default: pitch -53 deg, **no turn (error -179 deg after 80 s)**; wetting: 107 of 180 deg in 80 s (error -30.7 deg), depth 0.17 m | 0.12 / 0.17 m |
+
+The depth swing is under 1 m in every row; the 180 deg is not reached in any: **B21 not met**. What blocks it: turning one side's wings over costs a nose-down 12-18 deg in the flip itself (the left wings' mass and entrained water move chordwise), at rest the tail has no authority and the
+sweep loop has 0.85 N m/rad, and the mode-dependent surge (wetting drives backward where the default pitches down) is what the surge loop would have to cover; the yaw rate that results is 1-3 deg/s against 17 N m of held couple (yaw damping of four large plates). Ledger: 6 (B21 t1-t3) + 2 (t1 forward) + 4 (reported) = 12 on top of B19's 66 = **78 of 80**; I stop here.
+
+**Forward swim** (f 0.7 Hz, stroke 20 deg, feather 50 deg, a 0.3-1.0, speed PI to 0.55 m/s, tail pitch loop, Psi_lr yaw loop limit 0.6, ballast depth PD; start 2.9 m, heading 75 deg, whole run 60 s; 0 QACC, 0 limiter steps):
+
+| row | whole-run speed along the heading | last 8 s | yaw error at the end | depth range | torque stroke / sweep (witness x4 stall 96) |
+|---|---|---|---|---|---|
+| `b20_rep_fwd_default` | **+0.299 m/s** | 0.242 | +31.8 deg | -3.31..-2.90 | 97 / 96 |
+| `b20_rep_fwd_wetting` | **+0.214 m/s** | 0.151 | -50.0 deg | -2.92..-1.99 | 96 / 23 |
+| `b20_rep_anti_default` (turn failed, then 45 s forward) | -0.100 (136 s whole run) | 0.229 | | -3.22..-2.77 | |
+| `b20_rep_anti_wetting` | +0.196 (136 s) | 0.154 | +50 deg | -3.02..-2.15 | |
+
+Mean signed speed (half the sum of heading and antipode): default +0.100, wetting +0.205. **B20 not met** (target 0.3, modes within 25%): the modes differ by 1.4x on the heading (0.299 against 0.214; on the tuning start with a_max 0.8: 0.302 / 0.306, which agreed, so the
+wetting mode's heading loss, not its thrust, is what cut the run) and the antipode needs a turn that does not complete. The thrust is not the limit (held balance speed above 0.45 m/s at 0.7 Hz); the heading hold in wetting and the turn are.
+
+## B22, the still machine (actuators held; ids `b22_*`; separate from the 80, controls)
+
+| row | result, both modes |
+|---|---|
+| `b22_still_surf_hold_*` (2.8 m, wings level, tanks held at 0.95, 30 s) | stays at -2.80 m, attitude within 2 deg: no surfacing |
+| `b22_still_surf_blow_*` (hinges held level at sweep 0.45, tanks emptied at 0.3/s, lift-off law absent) | rises on buoyancy alone (default arrives pitched +68.6 deg, wetting upright at +0.09 m); **no lift-off is possible with the hinges held** (it stays afloat at the surface): the ballast alone is the rise, not the surfacing criterion |
+| `b22_held_still_U{p00,p30,m30}_*` (the b15_still rows: hull held and moved at 0, +0.3, -0.3 m/s, hinges held) | net force 0 at rest; -3.29 N (drag) at +0.3, +2.95 N at -0.3, pitch +-0.26..0.58 N m, no thrust; modes identical |
+| `b22_still_fwd_*`, `b22_still_anti_*` (the B20 phases with every hinge held, ballast PD running) | displacement 0.000 m along both commands in both modes, attitude unchanged (75 deg heading), torque 0.0: speed 0, no turn |
+The B19 still lift-off (hinges held on the float) is `b18_float_still_*` of the previous part.
+
+## B23, the whole chain and dt/2 (ids `b23_chain_*`, `b19_final_S4_*_dt2`; `figures/S0b_T5c_mission.png` = `b23_chain_default`)
+
+Chain (`s0b_t5c_chain.py`, mission3): float 3 s, lift-off to 2 m, 10 s hold, landing at 0.15 m/s, flood to 3 m (InducedFlow cleared at the flood and the rise, hinge gains re-read at the swim and the lift-offs), 5 s, wings level, forward swim 20 s (f 0.7), surfacing by recipe R, wings raised, second lift-off to 2 m, 5 s hold. 0 QACC, 0 limiter steps in every phase of both rows.
+
+| phase | default | wetting |
+|---|---|---|
+| lift-off, hold, landing | held 1.80-2.03 m, upright | held 1.81-2.03 m, upright |
+| flood to 3 m | 39.3 s, upright | 38.3 s, upright |
+| forward swim 20 s | 0.345 m/s last window, yaw error +11.7 deg, depth -2.87 | 0.176 m/s, yaw error -47 deg, depth -2.9..-2.4 |
+| surfacing | arrives pitch +22, settles 0 / -1.3, wings dry; the climb stalled near -0.3 m for about 35 s before the exit (phase 77 s) | **arrives roll -34 deg, heeled -42.6 deg with 15-16 wet strips**, lift-off inverts at 0.6 s |
+| second lift-off, hold 5 s | **held 1.80-2.02 m** (tilt 11 deg) | inverted: **fail** |
+
+**Chain: complete in the default mode (every part, ending in the second lift-off); not complete in wetting (stops at the surfacing, the same heeled end state as `b19_final_S5_default`). Modes disagree: not established.** X2 share (flying phases) 0.98 / 0.76 (the wetting figure includes the failing lift-off). Torque peaks: stroke 97, sweep 97-110, feather 66-71 N m
+(witness x4 stall 96 / 96 / 64; 4.0-4.5x the witness, under the 10x flag); the default row's sweep and stroke sit on the x4 curve during the swim and the surfacing loop.
+
+dt/2 (5e-5 s) on the two S4 surfacing rows: default `b19_final_S4_default_dt2` upright, lift-off held 1.80-2.02 m, exit-window peak 23 / 2 deg (dt 1e-4: 17 / 16), afloat attitude -2.0 / +22.8; wetting `b19_final_S4_wetting_dt2` upright, lift-off held, peak 46 / 16 deg (dt 1e-4: 38 / 32): **the pass/fail outcome is the same, the exit transient differs by 6-14 deg**, so the transients above are not converged to better than that. No swim, turn or chain row passed, so no dt/2 for them.
+
+## Summary of B19-B23 (T5b, no geometry changed, so no `figures/S0b_T5c_built.png`)
+
+B19 surfacing: not met as stated (arrival under 10 deg in no row); recipe R settles upright, dry, and lifts off 2 m for 5 s in 5 of 6 reported starts-and-modes plus the default chain; the failure is a heeled end state in wetting (chain) and one default start. B20: not met (0.299 / 0.214 m/s heading; mean signed 0.10 / 0.205). B21: not met (turn reaches 0-107 of 180 deg; depth swing 0.1-0.4 m). B22: all still rows zero. B23: default complete, wetting stops at the surfacing.
+Rollout ledger for B19+B20+B21: 78 of 80 (B22 and B23 and the dt/2 rows are separate). Held measurements (k1-k5, kf, b20_held, b21_held, b22_held) are not rollouts.
+Hash check after this part: see the report; `s0b_t5b_machine.py`, `s0b_t5b_probe.py`, `s0b_laws.py`, `mission.py` not edited; the T5b calibration store gained keys only for the geometries probed in `kf` (the default key unchanged).
