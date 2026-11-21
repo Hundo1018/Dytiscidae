@@ -229,3 +229,80 @@ witness x4 primary, unlimited twin on the rows that decide):
 - **B12, still machine** for B9-B11.
 - **B13, the x2 checks** on the rows that pass: contact time constant x2 for
   land, dt/2 once per scenario.
+
+## Addendum 3, 2026-11-21: what B14-B23 said about T5b, and T5d (columns through the waterline, a keel fin)
+
+T5b (T5 plus a dorsal float, pontoons 0.07 m lower; built and probed from the
+approved plan of 2026-11-20, never written here) is in
+`results/S0b_probes.md` parts "D1-D2 and B14-B17" and "B19-B23". What stands:
+float, lift-off, landing, flood, still rows. What does not, with the measured
+cause of each:
+
+| failure | measured cause (row or table) |
+|---|---|
+| surfacing arrives at 6-54 deg, one start in six ends heeled at 40 deg | the empty machine has 26 N of surplus buoyancy on 2.1 kg and **no waterplane over 0.11-0.18 m of draft** (fill table: hull +0.204 m at fill 0.2, +0.023 m at 0.3, K -1.4 / -1.65 at 0.3), so it breaches at 0.3-0.5 m/s; a fixed float that closes the gap is 3.27-4.30 kg dry against 3.19 kg of lift |
+| pitch divergence in a fast rise | sink-pose wings are a fin (K +2.46 at rest, -14.5 at 0.25 m/s; safe below 0.08 m/s); flat wings carry 125 kg of water centred 0.12 m aft |
+| turn reaches 0-150 of 180 deg | turning one side's wings over pitches the machine 12-18 deg nose-down and gives a reverse paddle that the two entrainment modes disagree on by 3x; the held couple (17 N m) agrees between modes but does not carry the free machine |
+| swim 0.299 / 0.214 m/s | thrust is not the limit (balance above 0.45 m/s at 0.7 Hz); the wetting mode loses the heading (-50 deg), the lateral mode D1 found undamped without the added-mass reaction |
+
+### T5d: two additions, both freedoms, neither a typed force
+
+1. **Floodable columns through the waterline.** Four vertical columns, one at
+   each end of each pontoon, from the pontoon top to at least the height of the
+   dorsal float's axis, open to the same ballast as the pontoons (flooded they
+   weigh their shell only, so neutrality costs shell mass, not a kilogram per
+   litre). Emptied, they are the waterplane the gap lacks: draft becomes a
+   continuous function of fill, and their spacing in x and y is the waterplane
+   inertia for pitch and roll. Size from the static table (the `kf` method of
+   B19 step 3), not by rule: radius, height and x positions are free; the
+   dorsal float may shrink or go if the columns replace it. The tank model
+   (where the water of a partly filled column sits) is stated as built; if the
+   harness can only place fill mass at a fixed point, say so and bound the
+   error with the two extreme placements.
+2. **A keel fin in the hull's xz plane, aft of the CoM, near its height.** A
+   plate in that plane is edge-on to a vertical climb and to pitch (it cannot
+   become the fin of B19 step 1) and gives side force in sideslip: yaw
+   stiffness and yaw and roll damping in water through the solver's own
+   strips. Size it from the held yaw derivative so that the wetting mode's
+   yaw stiffness at 0.3 m/s is positive with margin; check that it stays dry
+   or harmless on the float and in the hover (held hover derivatives re-read).
+
+Laws that change with them (all hinge kinematics and ballast):
+- **Surfacing is a controlled ballast rise**, not a blow: the fill is driven by
+  a heave-rate loop (rise at or below 0.08 m/s, the measured safe speed of the
+  raised pose), slowing to rest in the columns' waterplane before the wings
+  cross, then to the float. Wing pose during the rise is free (flat with the
+  sweep pitch loop, or raised from the start, or a symmetric dihedral ramp,
+  the lever B19 left unprobed).
+- **The turn is a forward U-turn on differential thrust** (both sides forward,
+  amplitudes unequal, tail and sweep holding pitch, ballast holding depth); no
+  wing is turned over. The antipode of the swim is this turn plus the same
+  forward swim.
+
+### Frozen before any T5d rollout (targets are those of B14, B17, B19-B21; none is loosened)
+
+| probe | passes when |
+|---|---|
+| S (static, no rollout) | at every fill 0, 0.05 ... 1.0 with the wings in each pose the surfacing uses: draft changes by less than 0.05 m between neighbouring fills, K pitch and K roll at least +1 N m/rad; flooded b within 1.000 +- 0.002 at some fill; dry weight at most lift / 1.3 at the hover law's amplitude limit (lift re-measured held on T5d) |
+| B24 float, lift-off, landing | as B14 and B17: every wing and tail strip dry afloat, returns from 20 deg pushes in roll and pitch, lift-off to 2 m, 10 s hold, landing upright, kicked hover recovers; both modes; 0 wing contact |
+| B25 surfacing | 3 of 3 fresh starts S7-S9 (2-3% tank mismatch, 3-4 deg initial roll or pitch, 2-3.5 m deep; not used by any tuning row), both modes: largest roll and pitch from the first dry wing strip to 2 s after afloat under 10 deg, wings dry on the float, lift-off to 2 m held 5 s |
+| B26 swim | 60 s along the heading and 60 s along its antipode after the U-turn: mean signed speed at least 0.3 m/s over the swim phases in both modes, modes within 25%, yaw error at the end under 15 deg |
+| B27 turn | 180 deg (within 15 deg) in at most 80 s with a depth swing under 1 m, both modes |
+| B28 still | every B24-B27 row repeated with hinges held (ballast loops running where the law has them): no lift-off, no turn, speed 0 along both commands; a ballast-only rise may reach the surface but must not count as surfacing |
+| B29 chain | float, lift-off, hold, landing, flood to 3 m, swim, U-turn, swim back, surfacing, lift-off, hold: complete in both modes with 0 QACC and 0 limiter steps; dt/2 on every passing B25-B27 row and on the chain, pass/fail unchanged |
+
+Rules as before: both entrainment modes on every water row and a disagreement
+is "not established"; a row with QACC resets, limiter steps or torque above
+10x the witness stall is not evidence; main actuator the witness curve x4, the
+unlimited motor a twin only; X2 flagged on flying rows; rigid-contact figures
+flagged. Tuning: at most 150 free rollouts over B24-B27, every one a row in
+`results/S0b_probes6.jsonl`, counted; reported rows on starts no tuning row
+used. Stop rules: if S cannot be met within the weight bar, stop and report
+the best static table (that is the finding); if a probe is not met when the
+budget is gone, report it not met.
+
+Predictions (mine, written before the build): S is met with columns of
+0.02-0.03 m radius and under 0.25 kg of added shell; B25 passes in the default
+mode and its exit peak in wetting stays over 10 deg in at least one start; B27
+passes in the default mode by differential thrust; B26's 25% mode agreement is
+the gate most likely to stay open.
