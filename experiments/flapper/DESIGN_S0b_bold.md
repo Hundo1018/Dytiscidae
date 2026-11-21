@@ -306,3 +306,46 @@ Predictions (mine, written before the build): S is met with columns of
 mode and its exit peak in wetting stays over 10 deg in at least one start; B27
 passes in the default mode by differential thrust; B26's 25% mode agreement is
 the gate most likely to stay open.
+
+## Addendum 4, 2026-11-21: T5d stopped on wing clearance (my layout error), and T5e
+
+Probe S on T5d (`results/S0b_probes.md`, part "T5d: S and B24-B29"): the
+static table is met at column radius 0.030 m, but I placed the columns at the
+pontoon ends, inside the wings' swept volume: the wings pass 0.03-0.10 m
+through them in every stroke, and the model has no self-collision, so it would
+have flown. Addendum 3 had no clearance line; that was the omission. Columns
+cut short enough to clear the wings fail the table in the same band T5b did.
+The envelope map (`s0b_t5d_envelope.py`) says where a vertical part may stand:
+at y 0.20 only ahead of hull x 0.97 and behind -0.60 for the whole stroke
+family.
+
+### T5e: the waterplane goes where the wings are not
+
+Two candidate layouts, both judged statically and kinematically (no rollout)
+before either flies; fly the one that passes, A if both do (it leaves the
+thrust line where it is):
+
+- **A, columns fore and aft of the wing discs.** Each pontoon is carried
+  forward and aft (as a longer thin pontoon or as a slender boom, sized by the
+  table and the weight bar) to columns standing outside the envelope; their
+  lateral station is free there (wider than 0.20 m is allowed and buys roll
+  stiffness), the aft pair must also clear the tail surfaces over their whole
+  travel. Long pitch arm, so a smaller column radius may do.
+- **B, shoulders raised** by more than the trailing edges' swing (0.15 m plus
+  clearance), columns at the pontoon ends as in T5d. Costs a higher thrust line
+  and CoM; the float push test and the held swim pitch moment are re-read.
+
+The keel fin of Addendum 3 stays (measured: +1.58 N m/rad at 0.3 m/s, both
+modes, dry on the float). Laws, probes B24-B29, pass conditions, rules, the
+150-rollout budget and the stop rules of Addendum 3 are unchanged. Probe S
+gains one line, frozen now:
+
+| S, added | passes when |
+|---|---|
+| clearance | at least 0.03 m between every wing and tail surface and every fixed part (hull, pontoons, columns, booms, fin, dorsal float) over the full command ranges of the hover, swim, U-turn and surfacing laws including their control-input limits, by the envelope method; reported as the smallest distance and where it occurs |
+
+If neither A nor B passes S with the clearance line and the weight bar
+(lift / dry weight at least 1.3), stop and report both tables: that is the
+finding. Prediction: A passes S with under 0.15 kg added over T5d's 2.347 kg
+is not assured (the bar leaves 0.108 kg); if A fails on weight, B passes S but
+its swim pitch moment grows by more than half.
