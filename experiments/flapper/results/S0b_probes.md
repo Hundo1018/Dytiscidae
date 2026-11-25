@@ -1981,3 +1981,144 @@ What the envelope leaves open, not designed here (it changes the frozen layout):
 Not done: B24-B29, the laws (heave-rate ballast rise, forward U-turn), `figures/S0b_T5d_surface.png`, `S0b_T5d_water.png`, `S0b_T5d_mission.png`. Rollout ledger: 0 of 150. Not-evidence rows: 0 of 184 (0 QACC, 0 limiter steps on the 16 held rows; static rows have no dynamics).
 Measured: every number above with an id or a log (static equilibria and K from the solver's own buoyancy on the built model; clearances by `mj_geomDistance` and by the sampled wing surfaces; lift, drag and the yaw derivative held). Inferred: the weight-stability estimate of K in the band (-1.5; the table's measured values are -0.9 ... -1.4); that no layout with a lateral arm exists (shown for vertical parts at the scanned stations and by the envelope map, not proved for every shape).
 Hash check after the stage (`s0b_t5b_hash.py`): T4 `6070e5a5353cace3`, T4c `281eed84715ae7df`, T5 `f8e72992cbafc736`, T5 at fill 0.95 `6f735d284395364f`, unchanged; T5b by the same digest (not recorded before): `c7c7ee24f45900cd`, at fill 0.95 `9fbb8d2303ae27e1`. `git status` shows no tracked file modified; `mission.py`, `s0b_laws.py` and every T4/T5/T5b/T5c file untouched.
+
+# T5e: S and B24-B29
+
+2026-11-21/22. Frozen plan: `DESIGN_S0b_bold.md` Addenda 3 and 4 (8a08e82). Rows: `results/S0b_probes7.jsonl`. New files only: `s0b_t5e_machine.py`, `s0b_t5e_static.py`, `s0b_t5e_probe.py`, `s0b_t5e_draw.py`; logs in `results/t5e/`. Rollout ledger at the end of the part.
+
+## S: the command ranges, and the body's own clearance (`s0b_t5e_static.py`, `LIM`)
+
+The new S line asks for 0.03 m between every wing and tail surface and every fixed part over the laws' full command ranges, **the hull, pontoons and dorsal float included**. T5b's own body does not meet that over the ranges its hover law had (wn 6 gains, u_lim 0.4 / 0.35 / 0.3): at amplitude 0.9 the wing roots come to **+0.001 m of the hull** (mean sweep +0.38 rad with a left-right amplitude difference of 0.3) and **+0.016 m of the dorsal float** (mean sweep -0.12);
+the surfacing sweep of recipe R at its 0.9 rad limit comes to +0.021 m of the hull (`results/t5e/hover_limits.log`; T4's root geometry, noted in B14 as "wing-hull 0.010"). So the command ranges are part of the design. T5e's laws are built from one dict and cannot command outside it (`HoverE` clips):
+
+| law | range |
+|---|---|
+| hover (`HoverE` = Hover4 clipped) | amplitude 0.2-0.9; mean sweep 0.00-0.22 rad absolute (trim 0.099); left-right amplitude difference +-0.3 up to amplitude 0.8, +-0.15 above; left-right feather offset +-0.3 rad |
+| swim and U-turn | throttle a 0-1 (stroke 20 a deg, feather 50 a deg), left-right feather difference +-0.3 rad, left-right amplitude difference +-1.0, tail +-0.5 rad, no mean-dihedral input |
+| surfacing | wings level at a mean sweep -0.3 ... +0.75 rad, one side raised up to 0.6 rad, tail +-0.5; or the raised pose |
+| poses | raised, sink, flat and the blends between them |
+
+Clearance is read two ways over the grid of those ranges (every 7.5 deg of stroke phase, every corner of the inputs, 11 points per blend; hinge targets clipped to the hinge ranges): `mj_geomDistance` between every wing / tail geom and every fixed geom (`clear`, the number reported), and the envelope of the sampled surfaces per 1 cm cell (`envelope`, used to place the columns: with these ranges a part from -0.23 to +0.20 m may stand, at |y| 0.45, ahead of x 0.935 or behind -0.485; at 0.60, ahead of 0.815 or behind -0.385; anywhere beyond |y| 0.80).
+
+## S: layout A (flown) and layout B, both judged before any rollout
+
+**A** (`GEOM_A`): T5b + the keel fin + four columns of radius 0.022 m from hull z -0.23 to +0.20 at **(x 0.84, y +-0.60) and (x -0.41, y +-0.60)**, each on a boom (the struts' 4 mm radius and linear mass) from the nearer pontoon end at the pontoon axis' height (0.55 and 0.58 m long). Dry 2.362 kg (T5d 2.347: **+0.015 kg**): column shells 0.060 kg, booms 0.039 kg, fin 0.007 kg; floodable 5.34 L (pontoons 2.71, columns 2.62).
+**B** (`GEOM_B2`): T5b + fin + T5d's columns (r 0.030 at the pontoon ends, -0.20..+0.20) with the four shoulders raised 0.40 m on posts (the smallest raise that takes the swim stroke's trailing edges over the column tops with 0.03 m: 0.20 + 0.03 + 0.16). Dry 2.429 kg.
+
+| S line | A | B |
+|---|---|---|
+| draft step between neighbouring fills (bar 0.05 m) | 0.044 m | 0.032 m |
+| K pitch / roll, smallest over fills 0-1 and the poses flat45, raised, flat (bar +1 N m/rad) | +3.97 / +3.97 (at fill 1.0, submerged); afloat at least +21.6 / +19.7 from fill 0.15 to 0.85 | +1.25 / +1.68 |
+| b at fill 0.95 | 1.0000 | 1.0000 |
+| lift at the amplitude limit 0.9, held on the layout / dry weight (bar 1.3) | 31.30 N / 23.16 N = **1.351** (`S_map_A_amp0.9`) | 31.29 / 23.82 = **1.313** (`S_lift_B_amp0.9`) |
+| smallest clearance, where | **+0.033 m**, wing to hull (hover amp 0.9, sweep +0.22, amp_lr -0.15) and wing to dorsal float (amp 0.9, sweep 0, amp_lr +0.15); wing to pontoon +0.041 (swim a 1, both differentials at their limits); **wing to boom +0.060, wing to column +0.064** (surfacing sweep -0.30); tail to anything >= +0.159 (`results/t5e/clear_A.log`) | **+0.062 m**, wing to post; wing to column +0.081, wing to dorsal +0.115, tail >= +0.159 (`clear_B.log`) |
+| verdict | **passes** | **passes** |
+
+Both pass, so **A is flown** (Addendum 4). B's cost, for the record: thrust line 0.40 m higher (not flown, its swim pitch moment not measured), K only 1.25-1.7 in the band, static trim up to 8.6 deg; its posts stand in the hover downwash, which the solver does not see.
+A's static table (ids `S_A_{flat45,raised,flat}_f000..f100`; hull origin over the water, K pitch / roll; the three poses agree within 0.013 m and, afloat, within 8 N m/rad):
+
+| fill (pontoons, columns) | hull origin m | K, flat45 | K, raised |
+|---|---|---|---|
+| 0.00 (0, 0) | +0.215 | 31.2 / 38.5 | 30.8 / 38.2 |
+| 0.10 (0.20, 0) | +0.205 | 31.0 / 38.6 | 30.7 / 38.3 |
+| 0.15 | +0.191 | 21.9 / 20.0 | 21.6 / 19.7 |
+| 0.20 | +0.148 | 22.1 / 20.2 | 21.8 / 19.9 |
+| 0.30 | +0.062 | 22.8 / 20.9 | 22.5 / 20.6 |
+| 0.40 | +0.014 | 25.9 / 22.8 | 25.7 / 21.7 |
+| 0.50 (0.98, 0) | -0.004 | 30.3 / 30.8 | 28.1 / 22.9 |
+| 0.60 (1, 0.18) | -0.027 | 26.5 / 24.3 | 25.9 / 24.0 |
+| 0.70 | -0.105 | 27.0 / 25.2 | 26.9 / 25.1 |
+| 0.80 | -0.180 | 29.9 / 26.1 | 29.7 / 25.9 |
+| 0.85 | -0.193 | 30.3 / 26.5 | 27.9 / 24.6 |
+| 0.90 (1, 0.80) | -0.207 (column tops under: the dorsal float carries the waterline) | 6.7 / 4.7 | 6.7 / 5.2 |
+| 0.95 | neutral, b 1.0000 | 4.9 / 4.9 | 4.8 / 4.8 |
+| 1.00 | sinks, b 0.965 | 4.1 / 4.1 | 4.0 / 4.0 |
+
+Tank model as T5d (slug from each column's foot, valved). What it leaves out on A: a free surface inside the columns 0.007 N m/rad; **if the columns were open to each other the whole waterplane term of their inside water would go: 22.0 (roll) / 23.9 (pitch) N m/rad**, i.e. nearly all of A's afloat stiffness while the columns hold water at a common level. The valving is a hard requirement of this layout.
+Held on A (`S_map_A_*`, `S_yaw_A_*`, `S_thrust_A_*`): hover map at amp 0.75: 22.59 N (weight 23.16: hover amp 0.761), pitch moment +1.08 N m (trim sweep 0.099 rad), roll 12.6 N m per unit amp_lr, pitch -11.0 N m/rad of sweep, yaw 9.1 N m/rad of feather offset, torques sweep 10.3 / stroke 6.6 / feather 5.5 N m; yaw stiffness with the fin at 0.3 m/s **+1.50 N m/rad, both modes**;
+drag 7.33 N at 0.3 m/s (hinges held); net thrust of the swim stroke at 0.7 Hz: +41.6 / +47.7 N at 0.3 m/s and +5.9 / +17.4 N at 0.45 m/s (default / wetting), pitch moment +6.0 / +6.8 N m at 0.3 m/s.
+Blind spots stated: no aerodynamic interference of the columns and booms with the wings' wake; booms and columns are rigid; the wing strips have no buoyancy, so wings in the waterplane add no K.
+
+B's table (`S_B_*`; pose flat45: fill, hull origin or "submerged", K pitch, K roll):
+
+```
+0.00  +0.209  Kp +6.57  Kr +15.82
+0.05  +0.201  Kp +2.22  Kr +8.65
+0.10  +0.171  Kp +1.55  Kr +1.97
+0.15  +0.139  Kp +1.83  Kr +2.25
+0.20  +0.107  Kp +2.21  Kr +2.64
+0.25  +0.075  Kp +2.71  Kr +3.14
+0.30  +0.044  Kp +3.34  Kr +3.76
+0.35  +0.022  Kp +4.33  Kr +4.51
+0.40  +0.009  Kp +7.16  Kr +5.26
+0.45  -0.002  Kp +10.23  Kr +6.08
+0.50  -0.014  Kp +7.97  Kr +6.38
+0.55  -0.028  Kp +6.65  Kr +6.80
+0.60  -0.056  Kp +6.80  Kr +7.20
+0.65  -0.087  Kp +7.21  Kr +7.62
+0.70  -0.119  Kp +7.62  Kr +8.03
+0.75  -0.150  Kp +8.02  Kr +8.43
+0.80  -0.178  Kp +10.14  Kr +8.84
+0.85  -0.192  Kp +10.79  Kr +9.23
+0.90  -0.209  Kp +6.96  Kr +4.96
+0.95  submerged  Kp +5.29  Kr +5.29
+1.00  submerged  Kp +4.28  Kr +4.28
+```
+
+## B24: float, lift-off, landing (ids `b24_*`, tuning `u01`-...)
+
+Float (free, fill 0, wings raised, 12 s, then 20 deg pushes for 8 s; `b24_float_{default,wetting}`; 0 QACC, 0 limiter steps): hull origin **+0.2151 / +0.2152 m** (the static table said +0.215), pitch -0.11 / -0.16 deg, roll 0.00; wet main-wing strips 0, lowest wing corner +0.269 m over the water;
+roll +20 deg returns to +0.01 / -0.59 deg, nose down 20 to -0.16 / -0.26, nose up 20 to -0.20 / +0.07; no wing strip wet in any push. The hover stroke held over the float (`b24_stroke_on_float_{hover,max}_*`, amp 0.761 / 0.9): 0 wet strips, lowest wing point 0.141 m over the water, 0 limiter steps,
+vertical force 46.2 / 54.4 N in both modes (stroke + the pontoons' buoyancy), torques sweep 10.9-13.5 / stroke 6.6-8.5 / feather 5.5-5.9 N m. **Float part: met in both modes, which agree.**
+
+Lift-off, first tries (tuning rows, start 1.8 cm over the settled float; B17's gains wn 6 / 6 / 3):
+- with the first command ranges (mean sweep 0-0.22 rad at every amplitude): **wetting held** (`u01_kick_wetting`: 1.80-2.03 m for 10 s after the kick, drift 0.28 m, tilt 16.6 deg, landed upright, law never saturated); **default inverted at lift-off** (`u01_kick_default`, `u06`, `u07`: a pitch oscillation at the loop's own period, 1.0 s, growing from -10 deg through +24, -35, +58 before the kick; the sweep clipped on 68% of updates).
+- softer pitch loops made it worse (`u04` wn 4, `u05` wn 3: inverted in 2.8 s); a slower climb did not help (`u10`).
+- with the clip opened beyond the clearance range (`u03`, `u09`: diagnostic rows, **not evidence**) default lifts off and holds (1.81-2.03 m, tilt 19.4 deg), and the law then used **mean sweep -0.05 ... +0.25 rad at amplitudes up to 0.88**: the default mode's lift-off needs 0.03 rad more sweep on each side than the first range gave, at an amplitude where the wing roots are closest to the hull.
+So the hover ranges were re-cut along the measured clearance (amplitude, sweep and left-right difference are coupled): **amplitude <= 0.85: mean sweep -0.05 ... +0.25, amp_lr +-0.15; amplitude 0.85-0.9: mean sweep 0 ... +0.25, amp_lr +-0.08**. Clearance re-scanned over the new grid (`results/t5e/clear_A.log`): smallest **+0.032 m** (wing to hull, amp 0.9, sweep +0.25, amp_lr -0.08), wing to dorsal +0.033, the rest as in the S table. S's clearance line stands with these ranges; they are the ranges of every row from `u12` on.
+
+Lift-off with the re-cut ranges (tuning; start 1.8 cm over the settled float; kick = +1 rad/s roll rate and +0.3 m/s sideways at the start of the 10 s hold):
+- `u12_kick_default`, `u13_kick_wetting` (amp > 0.85: sweep 0 ... 0.25): both hold 10 s (1.80-2.06 m), land upright; default tilt 27 deg with the sweep clipped on 6% of updates.
+- `b24_{kick,nokick}_{default,wetting}` (same ranges, from the settled float; first meant as the reported rows, now tuning rows because the range changed once more after them): all four hold 1.80-2.11 m for 10 s and land upright (roll 0.0, pitch -0.1 ... -0.3 deg), 0 wet strips, 0 wing contact, 0 limiter steps; **default pitches to 37 deg in the hold (clip 8.5%), with and without the kick**; wetting tilt 14.0 / 16.1 deg, no clipping.
+- the lift-off after a surfacing failed once in the default mode with these ranges (`u14_surf_default`: clip 65%, 90 deg), which showed the default lift-off was on the edge: the missing piece was sweep below 0 at amplitude over 0.85. Re-scanned: **mean sweep -0.05 ... +0.25 rad at every amplitude (amp_lr +-0.15 up to amplitude 0.85, +-0.08 above) clears by +0.031 m** (wing to hull and wing to dorsal float, amp 0.9, sweep -0.05; `results/t5e/clear_A.log`). These are the final ranges (rows `u16` on, and every reported row).
+- `u16_kick_default` (final ranges): holds 1.81-2.03 m, tilt 20.9 deg, clip 2.8%, roll and pitch envelope per 2 s after the kick 8.7 / 10.4, 2.5 / 3.3, 1.3 / 0.8, 0.9 / 0.4, 0.7 / 0.3 deg: recovers. A slower climb (`u17`, `u18`, `u21`: climb-rate cap 0.4 m/s) is worse in the default mode (clip 20-72%, one loss) and is not used.
+- wetting after the kick (`u13`, `b24_kick_wetting`, `u18`): roll envelope 9.3, 3.7, 3.7, 4.1, 4.4 deg: it stops falling at about 4 deg and creeps up 0.3 deg per 2 s inside the 10 s window (T5b: a 6 deg plateau): bounded in the window, not converged, the lateral mode D1 found without the air added-mass reaction.
+What the pitch margin is: the default mode's lift-off asks for mean sweep between -0.25 and +0.44 rad raw (`law_rng`), the clearance allows -0.05 ... +0.25, i.e. -1.7 ... +1.7 N m of the 11.3 N m/rad; a fore-hind amplitude difference would add +-0.9 N m only where it is not needed (at amplitude 0.9 it is allowed only at mid sweep, `results/t5e/hover_limits_fh.log`, rows `S_map_A_amp_fh*`). **The hover's pitch authority is bounded by the wing roots' distance to the hull and the dorsal float; it is enough in every row with the final ranges, with 3-6% of updates clipped in the default mode.**
+The reported B24 rows with the final ranges are `b24r_*` (below).
+
+## B25: surfacing by the heave-rate ballast rise (ids `b25_S7..S9_{default,wetting}`; tuning `u02`, `u14`, `u15`, `u19`-`u21`)
+
+**Law** (`s0b_t5e_probe.py`, the ``surface`` phase with ``heave``; all ballast and hinge kinematics): wings level, mean sweep by the pitch loop of recipe R inside the cleared range (0.45 + 3 pitch + 4 pitch rate, -0.3 ... +0.75 rad, 1 rad/s), **no roll loop**; the fill is driven by a PI on the hull's climb rate (fill = 0.95 - 1.0 e - integral, integral gain 0.2 /s, e = v_ref - vz),
+v_ref = 0.5 /s x (rest height - hull height) capped at +-0.06 m/s, rest height hull origin -0.10 m (waterline in the columns, wings 0.10 m under); when within 0.03 m of it with the 1 s-filtered climb rate under 0.015 m/s for 2 s, the fill ramps to 0 at 0.1 /s (the draft follows: 0.3 m in 7 s); afloat = fill 0 and |vz| < 0.05.
+Then wings to the raised pose (2 s), 4 s of rest, hinge gains re-read, InducedFlow cleared, `HoverE` lifts off to 2 m, 5 s hold.
+Tuning (7 rollouts, 1.5 m start, 2% tank mismatch, 3 deg initial roll): recipe R's one-sided-dihedral roll loop makes a +-13 deg roll limit cycle of 2 s period during the slow rise (`u14_surf_default`: peak roll 14.3 deg in the exit window) and is not needed: without it (`u15_surf_noroll_*`) peak roll 1.8 / 0.8, pitch 0.7 / 2.1 deg (default / wetting);
+`u02` (first version of the rest test on the unfiltered climb rate) was stopped by me after 25 min of wall time with no row (counted); `u19`, `u20` (with the lift-off): both pass; `u21` (slow hover climb): lift-off lost in the default mode.
+
+**Reported rows**, starts not used by any tuning row: S7 2.8 m, 2% tank mismatch, 3 deg roll; S8 2.0 m, 3%, 4 deg pitch; S9 3.5 m, 2.5%, -4 deg roll and 3 deg pitch. 0 QACC, 0 limiter steps, 0 wing contact on all six; X2 share 0.97 on the flying phase.
+
+| start, mode | rise, s | rest: hull origin m, fill | largest roll / pitch from the first dry wing strip to 2 s after afloat (bar 10 deg) | afloat roll / pitch | wet wing strips on the float | lift-off 2 m, 5 s hold | smallest clearance in the row |
+|---|---|---|---|---|---|---|---|
+| S7 default | 78.8 | -0.079, 0.68 | **0.6 / 1.3** | 0.0 / -0.4 | 0 | held 1.81-2.04 m, drift 0.38 m, tilt 24.1 deg, sweep clipped 7.5% | 0.040 m |
+| S7 wetting | 71.2 | -0.126, 0.74 | **0.4 / 2.3** | 0.0 / -0.5 | 0 | held 1.80-2.04, drift 0.19, tilt 13.8, no clipping | 0.045 |
+| S8 default | 62.9 | -0.091, 0.70 | **2.0 / 1.2** | 0.0 / -0.4 | 0 | held, drift 0.38, tilt 23.9, clip 7.1% | 0.040 |
+| S8 wetting | 61.9 | -0.128, 0.74 | **1.9 / 2.4** | 0.1 / -0.4 | 0 | held, drift 0.18, tilt 13.5 | 0.045 |
+| S9 default | 103.2 | -0.076, 0.69 | **1.2 / 1.4** | 0.0 / -0.4 | 0 | held, drift 0.38, tilt 23.9, clip 7.1% | 0.040 |
+| S9 wetting | 82.7 | -0.124, 0.74 | **1.7 / 2.3** | 0.1 / -0.4 | 0 | held, drift 0.18, tilt 13.5 | 0.045 |
+
+**B25: met, 3 of 3 starts in both modes** (largest roll or pitch in the exit window 2.4 deg against 10; T5b's recipe R: 5.6-53.5). Peak torque: sweep 97 N m in every row (the x4 curve's stall, 4.0x the witness, during the under-water sweep loop), stroke 87-96 N m default / 12 wetting, under the 10x flag.
+Stated: the climb-rate cap is a command; the hull's climb rate peaks at 0.10-0.13 m/s (the pose blend at the start and the last 0.1 m of the float ramp); the yaw is not held during the rise (it wanders 60-150 deg in 60-100 s: nothing commands it); the two modes differ in the rest fill (0.69 / 0.74) and the lift-off tilt (24 / 14 deg) and agree on the outcome.
+The dt/2 repeats are `b25_S*_dt2` (below, with B29).
+
+### B24, the reported rows (ids `b24r_{kick,nokick}_{default,wetting}`; final ranges; from the settled float, 5 s settle; lift-off, 2 m, 10 s hold, descent at 0.15 m/s, stroke ramped out over 1.5 s, 5 s after)
+
+| | kick, default | kick, wetting | no kick, default | no kick, wetting |
+|---|---|---|---|---|
+| hold height over the start, drift, largest tilt | 1.80-2.04 m, 0.54 m, 24.0 deg | 1.80-2.03, 0.30, 17.6 | 1.80-2.04, 0.54, 23.6 | 1.80-2.04, 0.30, 15.3 |
+| roll / pitch envelope per 2 s after the kick, deg | 8.2 / 14.2, 2.6 / 3.4, 1.3 / 1.1, 1.0 / 0.5, 0.7 / 0.4 | 9.3 / 8.2, 3.5 / 2.4, 3.6 / 1.0, 3.9 / 0.5, 4.2 / 0.4 | | |
+| after landing: roll, pitch | 0.0, -0.1 | 0.0, -0.2 | 0.0, -0.1 | 0.0, -0.2 |
+| wet wing strips, wing contact, limiter, QACC | 0, 0, 0, 0 | 0, 0, 0, 0 | 0, 0, 0, 0 | 0, 0, 0, 0 |
+| sweep command clipped (share of updates), smallest clearance | 4.7%, 0.039 m | 0, 0.043 m | 4.7%, 0.039 | 0, 0.043 |
+| peak torque sweep / stroke / feather N m; X2 share | 15 / 7 / 6; 0.99 | 13 / 7 / 5; 0.99 | 15 / 7 / 5; 0.99 | 13 / 7 / 5; 0.99 |
+
+**B24: met in both modes** (float dry and returning from 20 deg pushes; lift-off to 2 m, 10 s hold, landing upright, 0 wing contact; the kicked hover holds and the default mode recovers to under 1 deg). **Flag, as on T5b:** in wetting the roll after the kick stops falling at 3.5 deg and creeps to 4.2 deg by the end of the 10 s window: inside the window, not converged; the modes disagree on the residual (0.7 against 4.2 deg), so "recovers" is established for the default mode and "holds the window" for wetting.
+Every flying row is in the X2 regime (share 0.97-0.99).
