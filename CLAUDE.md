@@ -65,7 +65,7 @@ stopping are withdrawn.
 |---|---|
 | cheap suites above | nothing installed |
 | `test_ppo.py` | numpy, torch (last section wants the evaluator) |
-| `test_physics.py` | MuJoCo, no GPU; one function skips without the GPU extension |
+| `test_physics.py` | MuJoCo, no GPU; one function skips without the GPU extension, and the crossing-gate checks on the open-loop quad skip on a machine where its tumble does not reproduce (2026-11-28: a Xeon and the hosted runner) |
 | `test_search.py` | GPU; a few functions skip without it |
 | `test_devroll.py` | `requirements-device.txt` (mujoco-warp, warp) and a CUDA device; the device-path functions skip without them |
 | `test_devroll_agreement.py` | the same as `test_devroll.py`, and about 9 minutes on a GPU (A5 score agreement; red as of 2026-10-26, see ROADMAP) |

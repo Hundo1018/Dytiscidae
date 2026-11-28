@@ -61,6 +61,21 @@ BLOCKED_MARKERS = (
 )
 
 
+#: Why a skip that is not a missing GPU extension was skipped, by its label.
+SKIP_REASONS: dict[str, str] = {}
+
+
+def skip_checks(label: str, reason: str) -> None:
+    """Count checks that could not be made here as a skip, with the reason.
+
+    For a fixture that does not exist on this machine, not for a check that
+    failed: "could not measure" must not read as "passed" or as "failed".
+    """
+    SKIPPED.append(label)
+    SKIP_REASONS[label] = reason
+    print(f"  [skip] {label}  -- {reason}")
+
+
 def check(name: str, cond: bool, detail: str = "") -> None:
     status = "ok  " if cond else "FAIL"
     print(f"  [{status}] {name}{('  -- ' + detail) if detail else ''}")
@@ -296,10 +311,13 @@ def run_all(functions) -> None:
 def report(label: str) -> int:
     """The summary.  A skip is never folded into the success line."""
     print("\n" + "=" * 68)
-    if SKIPPED:
-        print(f"{len(SKIPPED)} SKIPPED — not a defect; a function skip needs the "
+    blocked = [s for s in SKIPPED if s not in SKIP_REASONS]
+    if blocked:
+        print(f"{len(blocked)} SKIPPED — not a defect; a function skip needs the "
               f"Mojo GPU fluid extension (`cd mojo && pixi run build-all`): "
-              f"{', '.join(SKIPPED)}")
+              f"{', '.join(blocked)}")
+    for label, reason in SKIP_REASONS.items():
+        print(f"1 SKIPPED — not a defect; {label}: {reason}")
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
         return 1
@@ -5167,6 +5185,24 @@ def test_an_open_loop_body_with_thrust_crosses_nothing() -> None:
           f"bad_qacc {reset.bad_qacc}, {reset.failure}")
 
     off = run("0")
+    if not (off.crossed and off.bad_qacc == 0 and off.hold_drift > T.STATION_ZERO
+            and off.exit_upright < 0.0):
+        # The fixture is one chaotic tumble, and it is not the same tumble on
+        # every CPU.  Measured 2026-11-28 at 7c59754 (the commit that added this
+        # test) and at a508541, mujoco 3.15.0, numpy 2.5.1, python 3.12, on a
+        # Xeon: the entry state that leaked on the machine it was found on does not
+        # cross (drift 0.91 / 0.74 m, upright +0.73 / -0.18), and of 24 entry
+        # states 2 / 1 cross and none arrives overturned; a hosted runner reads
+        # a third trajectory (drift 0.97 m, upright +0.96).  Without the leak
+        # the four checks below test nothing: "refused" would be read off a body
+        # that never crossed.  So they are not run and are counted as a skip,
+        # which the summary line carries.
+        skip_checks(
+            "the crossing-gate checks on the open-loop quad",
+            f"the open-loop tumble did not reproduce on this machine (crossed "
+            f"{off.crossed}, drift {off.hold_drift:.2f} m, exit upright "
+            f"{off.exit_upright:+.2f}, {off.failure or 'no failure'})")
+        return
     check("with the gates off the open-loop quad is credited water_to_air (the leak is there)",
           off.crossed and off.bad_qacc == 0 and off.hold_drift > T.STATION_ZERO
           and off.exit_upright < 0.0,
