@@ -2072,11 +2072,13 @@ def test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing() -> None:
     cases = pickle.loads(fx.read_bytes())
     built = {}
 
-    def run(case, **patch):
+    def run(case, law=None, **patch):
         key = (case["index"], case["eval_seed"])
         if key not in built:
             built[key] = TriphibianEnv(build(case["genome"]), seed=case["eval_seed"])
         env = built[key]
+        was = env.solver.stall_law
+        env.solver.stall_law = law or was
         saved = {k: getattr(T, k) if hasattr(T, k) else getattr(T.CrossingTracker, k)
                  for k in patch}
         try:
@@ -2085,6 +2087,7 @@ def test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing() -> None:
             return T.run_transition(env, case["kind"], Controller(params=env.held_still_params()),
                                     back=case["back"])
         finally:
+            env.solver.stall_law = was
             for k, v in saved.items():
                 setattr(T if hasattr(T, k) else T.CrossingTracker, k, v)
 
@@ -2097,7 +2100,10 @@ def test_the_bodies_that_crossed_held_still_in_arch46_cross_nothing() -> None:
           graded <= 0.05, f"max {graded:.3f}")
 
     gliders = [c for c in cases if c["kind"] == "air_to_water"]
-    off = [run(c, energy_height_loss=lambda self: 0.0) for c in gliders]
+    # The leak is shown under the lift law these bodies were bred and recorded
+    # under (arch46, "legacy"): under the table law (2026-11-17) only 2 of the
+    # 5 still coast far enough to show it.
+    off = [run(c, law="legacy", energy_height_loss=lambda self: 0.0) for c in gliders]
     check("with the hold reading height alone, the still gliders cross again",
           sum(t.crossed for t in off) >= 3, f"{sum(t.crossed for t in off)} of {len(gliders)}")
 

@@ -371,6 +371,42 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `Policy.n_out` | property | 681 | `(self) -> int` | — |
 | `Policy.n_weights` | property | 686 | `(self) -> int` | — |
 
+## `control.innerloop` — `dytiscidae/control/innerloop.py`
+
+> The stabilising inner loop of a rotor-and-limb body, and the action it takes.
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `body_model` | function | 157 | `(env) -> BodyModel` | Read the model constants off an environment. |
+| `BodyModel` | class | 79 | — | What either half of the split knows about the body that is not in the |
+| `InnerLoop` | class | 201 | — | ``act(u) -> actuator targets``, every simulation step. |
+| `BodyModel.n` | property | 118 | `(self) -> int` | — |
+| `InnerLoop.__init__` | method | 204 | `(self, env, model: BodyModel)` | — |
+| `InnerLoop.act` | method | 209 | `(self, u) -> np.ndarray` | — |
+
+## `control.outer` — `dytiscidae/control/outer.py`
+
+> The outer law of the split controller: an observation in, an action out.
+
+| symbol | kind | line | signature | summary |
+|---|---|---:|---|---|
+| `_TokenBasis` | class | 350 | — | A mobility basis that hands back one fixed parameter set: the evaluators |
+| `observe` | function | 102 | `(env, commanded, prev_memory, since: float) -> np.ndarray` | The whole of what the outer law is given. |
+| `ShoreMap` | class | 132 | — | Where the mission's places are, as distances from the waterline along |
+| `SplitController` | class | 365 | — | The environment's side of the split: an outer law ``law(o) -> u`` asked |
+| `Teacher` | class | 179 | — | ``teach(o) -> u``.  No attribute is assigned after construction. |
+| `teacher_controller` | function | 476 | `(env, **arms) -> SplitController` | The teacher over the inner loop for the body in ``env``, not yet |
+| `_TokenBasis.__init__` | method | 355 | `(self, token)` | — |
+| `_TokenBasis.command_policy` | method | 358 | `(self, params, action, n, policy)` | — |
+| `_TokenBasis.twist_of` | method | 361 | `(self, coeffs)` | — |
+| `SplitController.__init__` | method | 386 | `(self, law, act, *, every_step: bool=False, feed_memory: bool=True, freeze_command: bool=False)` | — |
+| `SplitController.act` | method | 450 | `(self, obs)` | The evaluators' policy call.  Reads the commanded medium out of the |
+| `SplitController.install` | method | 405 | `(self, env) -> 'SplitController'` | — |
+| `SplitController.installed` | method | 431 | `(self, env)` | — |
+| `SplitController.uninstall` | method | 421 | `(self, env) -> None` | — |
+| `Teacher.__init__` | method | 182 | `(self, model: BodyModel, shore: ShoreMap)` | — |
+| `Teacher.teach` | method | 218 | `(self, o) -> np.ndarray` | — |
+
 ## `control.train` — `dytiscidae/control/train.py`
 
 > Learning a controller for one morphology.
@@ -392,11 +428,12 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `beetle` | function | 235 | `() -> Genome` | Bilateral flapper with swimming paddles.  The diving beetle. |
 | `eel` | function | 375 | `() -> Genome` | A serial chain driven as a travelling wave.  No wings anywhere. |
 | `gannet` | function | 457 | `() -> Genome` | Fixed high-aspect wing with a lifting tail, folding at the shoulder. |
+| `legged_quad` | function | 699 | `() -> Genome` | The reference quad with a pack that closes, a hull that nearly floats and |
 | `medusa` | function | 284 | `() -> Genome` | Radial bell with pulsed jet propulsion, plus a ring of trailing fins. |
 | `quad` | function | 660 | `() -> Genome` | A quadrotor: the control for "can anything fly in this simulator". |
 | `ray` | function | 411 | `() -> Genome` | Wide pectoral membranes driven as a spanwise travelling wave. |
-| `sample_body_plan` | function | 699 | `(rng: np.random.Generator, *, perturb: int=0) -> Genome` | Draw one archetype and optionally mutate it. |
-| `seed_population` | function | 711 | `(rng: np.random.Generator, n: int) -> list[Genome]` | A seed set that covers every archetype before it repeats any. |
+| `sample_body_plan` | function | 771 | `(rng: np.random.Generator, *, perturb: int=0) -> Genome` | Draw one archetype and optionally mutate it. |
+| `seed_population` | function | 783 | `(rng: np.random.Generator, n: int) -> list[Genome]` | A seed set that covers every archetype before it repeats any. |
 | `teal` | function | 542 | `() -> Genome` | Gannet airframe on a two-segment leaping leg: gets off the ground. |
 
 ## `core.cppn` — `dytiscidae/core/cppn.py`
@@ -718,29 +755,29 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `batched_fluid` | function | 634 | `(envs)` | The fluid for a batch: the Mojo kernel when it imports, else `HostFluid`. |
-| `BatchedFluid` | class | 229 | — | One GPU pipeline serving N environments stepped in lockstep. |
-| `evaluate_tier1_batch` | function | 1007 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
-| `finish_segment` | function | 975 | `(e, domain, res, r: dict, start, end, bad_qacc: int, duration: float, mean_power: float, max_overload: float)` | A segment's `SegmentResult` from what was recorded (``r``, the lists |
-| `HostFluid` | class | 584 | — | `BatchedFluid`'s interface over each machine's own numpy `FluidSolver`. |
-| `identify_batch` | function | 718 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
-| `observation_finite` | function | 642 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
-| `rollout_batch` | function | 799 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
-| `run_transition_batch` | function | 1284 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
-| `step_batch` | function | 663 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
+| `batched_fluid` | function | 677 | `(envs)` | The fluid for a batch: the Mojo kernel when it imports, else `HostFluid`. |
+| `BatchedFluid` | class | 269 | — | One GPU pipeline serving N environments stepped in lockstep. |
+| `evaluate_tier1_batch` | function | 1050 | `(phenos, *, spec=None, controllers=None, segment_seconds: float=10.0, identify_axes=False, seed=0, sea_state=None, perturb: dict \| None=None, shared=None, buffer=None, n_modes: int=6, streams=None, groups=None)` | `evaluate_tier1` for a whole generation, sharing one GPU pipeline. |
+| `finish_segment` | function | 1018 | `(e, domain, res, r: dict, start, end, bad_qacc: int, duration: float, mean_power: float, max_overload: float)` | A segment's `SegmentResult` from what was recorded (``r``, the lists |
+| `HostFluid` | class | 627 | — | `BatchedFluid`'s interface over each machine's own numpy `FluidSolver`. |
+| `identify_batch` | function | 761 | `(envs, domain, *, probe_time: float=1.2, n_probes: int=24, seed=0, probe_scale: float=0.35, max_modes: int=6)` | `TriphibianEnv.identify` for a whole batch, one GPU call per timestep. |
+| `observation_finite` | function | 685 | `(obs) -> bool` | Whether a machine's observation can be handed to a policy. |
+| `rollout_batch` | function | 842 | `(envs, bf: BatchedFluid, duration: float, params_list, domain, control_hz: float=25.0, policies=None, bases=None, shared=None, collector=None, noise_rngs=None)` | `TriphibianEnv.rollout` for a whole batch, one GPU call per timestep. |
+| `run_transition_batch` | function | 1327 | `(envs, bf: BatchedFluid, kind: str, ctrls, duration: float=6.0, shared=None, collector=None, noise_rngs=None, back: float=0.0)` | `run_transition` for a whole batch, one GPU call per timestep. |
+| `step_batch` | function | 706 | `(envs, angles_list, bf: BatchedFluid, active=None)` | One timestep for the whole batch.  Returns the updated active mask. |
 | `usable` | function | 104 | `(timeout: float=180.0) -> tuple` | Can the extension actually *run*, or does it only import? |
-| `BatchedFluid.__init__` | method | 240 | `(self, envs)` | — |
-| `BatchedFluid.apply` | method | 380 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
-| `BatchedFluid.finish` | method | 461 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
-| `BatchedFluid.launch` | method | 386 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
-| `BatchedFluid.ready` | method | 376 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
-| `BatchedFluid.reset_slam` | method | 351 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
-| `HostFluid.__init__` | method | 601 | `(self, envs)` | — |
-| `HostFluid.apply` | method | 615 | `(self, t: float, active=None) -> None` | — |
-| `HostFluid.finish` | method | 622 | `(self, t: float, active=None) -> None` | — |
-| `HostFluid.launch` | method | 619 | `(self, t: float, active=None) -> None` | — |
-| `HostFluid.ready` | method | 612 | `(self, t: float) -> bool` | — |
-| `HostFluid.reset_slam` | method | 608 | `(self)` | — |
+| `BatchedFluid.__init__` | method | 280 | `(self, envs)` | — |
+| `BatchedFluid.apply` | method | 422 | `(self, t: float, active=None) -> None` | `launch` then `finish`: the fluid for every environment, written |
+| `BatchedFluid.finish` | method | 504 | `(self, t: float, active=None) -> None` | Wait for the step `launch` started and scatter it into each |
+| `BatchedFluid.launch` | method | 428 | `(self, t: float, active=None) -> None` | Gather every machine's state and start the step on the device. |
+| `BatchedFluid.ready` | method | 418 | `(self, t: float) -> bool` | Whether the step at ``t`` was already launched from this state. |
+| `BatchedFluid.reset_slam` | method | 393 | `(self)` | Clear the slam history, as `FluidSolver.reset` does. |
+| `HostFluid.__init__` | method | 644 | `(self, envs)` | — |
+| `HostFluid.apply` | method | 658 | `(self, t: float, active=None) -> None` | — |
+| `HostFluid.finish` | method | 665 | `(self, t: float, active=None) -> None` | — |
+| `HostFluid.launch` | method | 662 | `(self, t: float, active=None) -> None` | — |
+| `HostFluid.ready` | method | 655 | `(self, t: float) -> bool` | — |
+| `HostFluid.reset_slam` | method | 651 | `(self)` | — |
 
 ## `envs.device` — `dytiscidae/envs/device.py`
 
@@ -788,14 +825,16 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `assemble_bodies` | function | 556 | `(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *, dtype=_wp.float64)` | Buoyancy, panel-to-body assembly and ``finish_bodies``, on the device; numpy out. |
-| `entrain_bodies` | function | 594 | `(fb, m_new, m_old, lever2, vel, h, *, dtype=_wp.float64)` | ``entrainment_reaction`` on the device; returns the new ``fb (nb, 6)``. |
-| `make_kernels` | function | 40 | `(T)` | Return the kernels for precision ``T`` as a dict (``strip``, ``unsteady``, |
-| `medium_and_added_mass` | function | 515 | `(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, ext, chord, dr, volume, is_wing, scale, *, dtype=_wp.float64)` | Flat-calm medium and the strip added mass, on the device; numpy out. |
-| `strip_loads` | function | 424 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
-| `WagnerLag` | class | 464 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
-| `WagnerLag.__init__` | method | 472 | `(self, n: int, dtype=_wp.float64) -> None` | — |
-| `WagnerLag.update` | method | 488 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
+| `assemble_bodies` | function | 704 | `(pos, F, body_id, xipos, subf, vb, rho_w, m_body, limit, *, dtype=_wp.float64)` | Buoyancy, panel-to-body assembly and ``finish_bodies``, on the device; numpy out. |
+| `entrain_bodies` | function | 742 | `(fb, m_new, m_old, lever2, vel, h, *, dtype=_wp.float64)` | ``entrainment_reaction`` on the device; returns the new ``fb (nb, 6)``. |
+| `law_code` | function | 524 | `(law: str) -> int` | The strip kernel's integer switch for ``FluidSolver.stall_law``. |
+| `make_kernels` | function | 56 | `(T)` | Return the kernels for precision ``T`` as a dict (``strip``, ``unsteady``, |
+| `medium_and_added_mass` | function | 663 | `(pos, half_h, wind, current, rel, s_hat, c_hat, n_hat, ext, chord, dr, volume, is_wing, scale, *, dtype=_wp.float64)` | Flat-calm medium and the strip added mass, on the device; numpy out. |
+| `strip_loads` | function | 561 | `(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber, ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64, law='legacy', alpha_e=None, lev=None)` | Run the strip kernel on host arrays; return the outputs as numpy arrays. |
+| `table_arrays` | function | 541 | `(dtype=_wp.float64)` | The baked tables of law "table" as flat device arrays of ``dtype``: |
+| `WagnerLag` | class | 612 | — | Device history of ``physics.fluid.UnsteadyState``: Wagner lag and LEV travel. |
+| `WagnerLag.__init__` | method | 620 | `(self, n: int, dtype=_wp.float64) -> None` | — |
+| `WagnerLag.update` | method | 636 | `(self, alpha, rev, U, chord, omega, s_hat, dt: float)` | — |
 
 ## `envs.devroll.model_wp` — `dytiscidae/envs/devroll/model_wp.py`
 
@@ -807,18 +846,18 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `DeviceBody` | class | 426 | — | W worlds of one body on the device; see the module docstring. |
 | `make_kernels` | function | 78 | `(T)` | The A2 gather, reduction, diagnostic and write kernels for precision ``T``. |
 | `DeviceBody.__init__` | method | 435 | `(self, envs, *, dtype=_wp.float64, njmax: int=NJMAX, nconmax: int=NCONMAX) -> None` | — |
-| `DeviceBody.diagnostics` | method | 962 | `(self) -> dict` | — |
-| `DeviceBody.fluid_and_scatter` | method | 767 | `(self) -> None` | Everything before ``mjw.step``: servo, fluid, damping, jets, rotors, |
-| `DeviceBody.gather` | method | 685 | `(self) -> None` | The step's kinematic inputs from MJWarp's state (float32) into ``state``. |
-| `DeviceBody.hold` | method | 745 | `(self, alive) -> None` | The dead worlds' loads, mass, damping and control at their dry, |
-| `DeviceBody.host_state` | method | 697 | `(self, datas) -> None` | ``state`` from host ``MjData`` in this precision, for the parity tests: |
-| `DeviceBody.load_state` | method | 666 | `(self, datas) -> None` | Each world's ``qpos``, ``qvel``, ``time`` and the solver's warm start |
-| `DeviceBody.reset` | method | 638 | `(self, mask=None) -> None` | ``FluidSolver.reset`` for every world, or for the worlds in ``mask`` |
-| `DeviceBody.resident` | method | 954 | `(self) -> dict` | The same five fields read from the MJWarp ``Model`` and ``Data``. |
-| `DeviceBody.set_targets` | method | 927 | `(self, angles_list, rates=None) -> None` | Host targets (one array per world) into ``targets``: a test and |
-| `DeviceBody.staged` | method | 942 | `(self) -> dict` | What the last step wrote, at the step's precision, per world: |
-| `DeviceBody.step` | method | 728 | `(self, *, gather: bool=True, alive=None) -> None` | One ``step_batch`` step for every world (see the module docstring). |
-| `DeviceBody.subtree_mass` | method | 760 | `(self) -> None` | ``body_subtreemass`` from the ``body_mass`` just written, every world |
+| `DeviceBody.diagnostics` | method | 968 | `(self) -> dict` | — |
+| `DeviceBody.fluid_and_scatter` | method | 773 | `(self) -> None` | Everything before ``mjw.step``: servo, fluid, damping, jets, rotors, |
+| `DeviceBody.gather` | method | 691 | `(self) -> None` | The step's kinematic inputs from MJWarp's state (float32) into ``state``. |
+| `DeviceBody.hold` | method | 751 | `(self, alive) -> None` | The dead worlds' loads, mass, damping and control at their dry, |
+| `DeviceBody.host_state` | method | 703 | `(self, datas) -> None` | ``state`` from host ``MjData`` in this precision, for the parity tests: |
+| `DeviceBody.load_state` | method | 672 | `(self, datas) -> None` | Each world's ``qpos``, ``qvel``, ``time`` and the solver's warm start |
+| `DeviceBody.reset` | method | 644 | `(self, mask=None) -> None` | ``FluidSolver.reset`` for every world, or for the worlds in ``mask`` |
+| `DeviceBody.resident` | method | 960 | `(self) -> dict` | The same five fields read from the MJWarp ``Model`` and ``Data``. |
+| `DeviceBody.set_targets` | method | 933 | `(self, angles_list, rates=None) -> None` | Host targets (one array per world) into ``targets``: a test and |
+| `DeviceBody.staged` | method | 948 | `(self) -> dict` | What the last step wrote, at the step's precision, per world: |
+| `DeviceBody.step` | method | 734 | `(self, *, gather: bool=True, alive=None) -> None` | One ``step_batch`` step for every world (see the module docstring). |
+| `DeviceBody.subtree_mass` | method | 766 | `(self) -> None` | ``body_subtreemass`` from the ``body_mass`` just written, every world |
 
 ## `envs.devroll.rollout_wp` — `dytiscidae/envs/devroll/rollout_wp.py`
 
@@ -930,16 +969,25 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
 | `build_schedule` | function | 167 | `(spec: MissionSpec, rng: np.random.Generator, leg_seconds: float \| None=None) -> list[tuple[Domain, float]]` | Random starting domain, then cycle, as specified. |
-| `continuous_score` | function | 309 | `(result: ContinuousResult, spec: MissionSpec) -> float` | A single number for the continuous mission, in [0, 1]. |
+| `continuous_score` | function | 315 | `(result: ContinuousResult, spec: MissionSpec) -> float` | A single number for the continuous mission, in [0, 1]. |
 | `ContinuousResult` | class | 59 | — | What one unbroken mission produced. |
 | `current_domain` | function | 156 | `(env: TriphibianEnv) -> Domain` | Which domain the machine is physically in right now. |
+| `evaluate_mission` | function | 475 | `(env: TriphibianEnv, controller, start: Domain, seed: int, *, n_legs: int=3, leg_range: tuple[float, float]=LEG_SECONDS_RANGE, on_step=None) -> MissionRead` | Fly one mission from ``start`` and judge it (see the note above). |
 | `LegRecord` | class | 39 | — | One commanded stretch of the mission. |
-| `run_continuous` | function | 178 | `(env: TriphibianEnv, controller, schedule: list[tuple[Domain, float]], *, on_step=None, control_hz: float=25.0, energy_scale: float=1.0, stress_probe=None) -> ContinuousResult` | Fly the whole schedule without ever resetting. |
+| `mission_schedule` | function | 379 | `(start: Domain, seed: int, n_legs: int=3, leg_range: tuple[float, float]=LEG_SECONDS_RANGE) -> list[tuple[Domain, float]]` | ``start`` then the cycle, each leg's duration drawn from ``seed``. |
+| `MissionJudge` | class | 437 | — | ``run_continuous``'s ``on_step``: reads the end of every leg. |
+| `MissionRead` | class | 404 | — | One mission, judged.  ``completed`` is the definition of done for one |
+| `run_continuous` | function | 178 | `(env: TriphibianEnv, controller, schedule: list[tuple[Domain, float]], *, on_step=None, control_hz: float=25.0, energy_scale: float=1.0, stress_probe=None, entry=None) -> ContinuousResult` | Fly the whole schedule without ever resetting. |
+| `settled_in` | function | 390 | `(env: TriphibianEnv, medium: Domain) -> bool` | In ``medium`` right now, as a crossing into it is judged, and upright. |
 | `ContinuousResult.mean_power_w` | property | 101 | `(self) -> float` | Mean draw, on the time base the energy was billed against. |
 | `ContinuousResult.on_task` | property | 86 | `(self) -> float` | Fraction of the whole mission spent in the domain being asked for. |
 | `ContinuousResult.summary` | method | 106 | `(self) -> str` | — |
 | `ContinuousResult.transition_rate` | property | 95 | `(self) -> float` | — |
 | `LegRecord.duration` | property | 54 | `(self) -> float` | — |
+| `MissionJudge.__init__` | method | 440 | `(self, env: TriphibianEnv, schedule: list[tuple[Domain, float]])` | — |
+| `MissionRead.completed` | property | 432 | `(self) -> bool` | — |
+| `MissionRead.transitions_commanded` | property | 421 | `(self) -> int` | — |
+| `MissionRead.transitions_completed` | property | 425 | `(self) -> int` | Leg i's transition: held leg i-1 to its end, and leg i to its end. |
 
 ## `envs.skills` — `dytiscidae/envs/skills.py`
 
@@ -985,17 +1033,19 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `antipode` | function | 265 | `(schedule: TaskSchedule) -> TaskSchedule` | The same script with every cruise heading turned by pi. |
-| `mirror` | function | 234 | `(schedule: TaskSchedule) -> TaskSchedule` | The same air script with the drawn turn the other way. |
-| `pair_of` | function | 253 | `(schedule: TaskSchedule) -> TaskSchedule` | The second half of a paired segment: the antipode in water and on land, |
-| `Phase` | class | 136 | — | One purpose, over one stretch of a segment. |
-| `schedule_for` | function | 189 | `(domain, rng=None, *, trim_speed: float=0.0) -> TaskSchedule` | The two-phase script for one segment in ``domain``. |
-| `task_seed` | function | 295 | `(scatter_seed: int) -> int` | The task draw for one segment, derived from its scatter draw. |
-| `TaskSchedule` | class | 156 | — | The phases one segment is made of, in order. |
-| `Phase.moving` | property | 151 | `(self) -> bool` | — |
-| `TaskSchedule.at` | method | 170 | `(self, frac: float) -> Phase` | — |
-| `TaskSchedule.bounds` | method | 173 | `(self, n: int) -> list` | Sample index ranges ``[(lo, hi), ...]`` for a segment of ``n`` samples. |
-| `TaskSchedule.index_at` | method | 162 | `(self, frac: float) -> int` | The phase in force at ``frac`` of the way through the segment. |
+| `antipode` | function | 266 | `(schedule: TaskSchedule) -> TaskSchedule` | The same script with every cruise heading turned by pi. |
+| `depth_pair` | function | 295 | `() -> bool` | Whether the second half of a water pair is commanded to the *other* side |
+| `mirror` | function | 235 | `(schedule: TaskSchedule) -> TaskSchedule` | The same air script with the drawn turn the other way. |
+| `mirror_depth` | function | 314 | `(depth: float) -> float` | ``depth`` reflected about the release depth, kept under the surface. |
+| `pair_of` | function | 254 | `(schedule: TaskSchedule) -> TaskSchedule` | The second half of a paired segment: the antipode in water and on land, |
+| `Phase` | class | 137 | — | One purpose, over one stretch of a segment. |
+| `schedule_for` | function | 190 | `(domain, rng=None, *, trim_speed: float=0.0) -> TaskSchedule` | The two-phase script for one segment in ``domain``. |
+| `task_seed` | function | 327 | `(scatter_seed: int) -> int` | The task draw for one segment, derived from its scatter draw. |
+| `TaskSchedule` | class | 157 | — | The phases one segment is made of, in order. |
+| `Phase.moving` | property | 152 | `(self) -> bool` | — |
+| `TaskSchedule.at` | method | 171 | `(self, frac: float) -> Phase` | — |
+| `TaskSchedule.bounds` | method | 174 | `(self, n: int) -> list` | Sample index ranges ``[(lo, hi), ...]`` for a segment of ``n`` samples. |
+| `TaskSchedule.index_at` | method | 163 | `(self, frac: float) -> int` | The phase in force at ``frac`` of the way through the segment. |
 
 ## `envs.transitions` — `dytiscidae/envs/transitions.py`
 
@@ -1003,23 +1053,25 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `ashore` | function | 287 | `(env: TriphibianEnv) -> bool` | On land *out of the water*: ``medium_of`` says LAND and the ground under |
-| `CrossingTracker` | class | 325 | — | What a crossing is, shared by ``run_transition`` and the batched path. |
-| `medium_of` | function | 273 | `(env: TriphibianEnv, ground_tol: float=0.0) -> Domain` | Which medium the machine is in: root under water, else on the ground |
-| `reseat_after_scatter` | function | 565 | `(env: TriphibianEnv, kind: str) -> None` | Put a land start back on the ground at the pose ``scatter`` left. |
-| `run_transition` | function | 592 | `(env: TriphibianEnv, kind: str, controller, *, duration: float=6.0, back: float=0.0) -> TransitionResult` | Simulate one crossing and measure it.  ``back``: see ``_place_for``. |
-| `transition_scatter_seed` | function | 223 | `(kind: str) -> int` | The entry-state draw every machine's ``kind`` crossing starts from. |
-| `TransitionResult` | class | 127 | — | One crossing, measured.  Every field is a raw physical quantity or a |
-| `TransitionSet` | class | 799 | — | All crossings attempted in one evaluation. |
-| `CrossingTracker.__init__` | method | 365 | `(self, env: TriphibianEnv, kind: str)` | — |
-| `CrossingTracker.commanded` | method | 398 | `(self, i: int) -> Domain` | The medium the controller is told about at step ``i``. |
-| `CrossingTracker.energy_height_loss` | method | 387 | `(self) -> float \| None` | Energy height lost over the hold, metres, from the fitted slope; |
-| `CrossingTracker.finish` | method | 461 | `(self, env: TriphibianEnv, r: TransitionResult, n_steps: int) -> int` | Set ``r.hold``, ``r.started_in``, ``r.crossed``; return the cross step. |
-| `CrossingTracker.hold_score` | method | 447 | `(self) -> float` | — |
-| `CrossingTracker.observe` | method | 402 | `(self, env: TriphibianEnv, i: int) -> None` | — |
-| `TransitionResult.components` | property | 209 | `(self) -> dict[str, float]` | The scored parts, for the judge to weight. |
-| `TransitionSet.component_means` | method | 810 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
-| `TransitionSet.crossed_fraction` | property | 805 | `(self) -> float` | — |
+| `ashore` | function | 322 | `(env: TriphibianEnv) -> bool` | On land *out of the water*: ``medium_of`` says LAND and the ground under |
+| `crossing_gates` | function | 288 | `() -> bool` | Whether the 2026-11-11 gates apply: station in a water or land hold, and |
+| `CrossingTracker` | class | 360 | — | What a crossing is, shared by ``run_transition`` and the batched path. |
+| `medium_of` | function | 308 | `(env: TriphibianEnv, ground_tol: float=0.0) -> Domain` | Which medium the machine is in: root under water, else on the ground |
+| `reseat_after_scatter` | function | 640 | `(env: TriphibianEnv, kind: str) -> None` | Put a land start back on the ground at the pose ``scatter`` left. |
+| `run_transition` | function | 667 | `(env: TriphibianEnv, kind: str, controller, *, duration: float=6.0, back: float=0.0) -> TransitionResult` | Simulate one crossing and measure it.  ``back``: see ``_place_for``. |
+| `transition_scatter_seed` | function | 235 | `(kind: str) -> int` | The entry-state draw every machine's ``kind`` crossing starts from. |
+| `TransitionResult` | class | 130 | — | One crossing, measured.  Every field is a raw physical quantity or a |
+| `TransitionSet` | class | 881 | — | All crossings attempted in one evaluation. |
+| `CrossingTracker.__init__` | method | 413 | `(self, env: TriphibianEnv, kind: str)` | — |
+| `CrossingTracker.commanded` | method | 451 | `(self, i: int) -> Domain` | The medium the controller is told about at step ``i``. |
+| `CrossingTracker.energy_height_loss` | method | 440 | `(self) -> float \| None` | Energy height lost over the hold, metres, from the fitted slope; |
+| `CrossingTracker.finish` | method | 528 | `(self, env: TriphibianEnv, r: TransitionResult, n_steps: int) -> int` | Set ``r.hold``, ``r.started_in``, ``r.crossed``; return the cross step. |
+| `CrossingTracker.hold_score` | method | 511 | `(self) -> float` | — |
+| `CrossingTracker.observe` | method | 455 | `(self, env: TriphibianEnv, i: int) -> None` | — |
+| `CrossingTracker.upright_at_end` | method | 507 | `(env: TriphibianEnv) -> float` | The root's up axis against the world's: 1 level, 0 on its side. |
+| `TransitionResult.components` | property | 221 | `(self) -> dict[str, float]` | The scored parts, for the judge to weight. |
+| `TransitionSet.component_means` | method | 892 | `(self) -> dict[str, float]` | Mean of each component across the crossings that happened. |
+| `TransitionSet.crossed_fraction` | property | 887 | `(self) -> float` | — |
 
 ## `envs.triphibian` — `dytiscidae/envs/triphibian.py`
 
@@ -1027,7 +1079,7 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `air_task` | function | 3042 | `(turn: float, height: float) -> float` | Air's task score: the turn response, qualified by holding height. |
+| `air_task` | function | 3094 | `(turn: float, height: float) -> float` | Air's task score: the turn response, qualified by holding height. |
 | `airworthiness` | function | 342 | `(p: Phenotype) -> list[str]` | Which flight gates a design fails, as reasons.  Empty means none. |
 | `command_statistics` | function | 114 | `(commands) -> tuple[float, float] \| None` | How much, and how erratically, a controller's commands move. |
 | `Domain` | class | 66 | `(str, Enum)` | — |
@@ -1035,8 +1087,8 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `MissionResult` | class | 183 | — | Aggregate of a whole evaluation, at whatever fidelity produced it. |
 | `MissionSpec` | class | 79 | — | The mission the user specified, with every number left adjustable. |
 | `morphology_channels` | function | 489 | `(*, mass: float, density_ratio: float, wing_area: float, span: float, aspect_ratio: float, wing_loading: float, n_actuated: int, battery_wh: float) -> np.ndarray` | The eight body-identity channels, from scalars rather than a phenotype. |
-| `pair_partner_of` | function | 3075 | `(seg: SegmentResult) -> dict` | What the second half of an antipodal pair needs from the first. |
-| `paired_turn` | function | 3053 | `(signed: float, factor: float, partner: dict \| None) -> tuple` | ``(signed, factor, mean)`` for the air turn as one half of a mirrored pair. |
+| `pair_partner_of` | function | 3127 | `(seg: SegmentResult) -> dict` | What the second half of an antipodal pair needs from the first. |
+| `paired_turn` | function | 3105 | `(signed: float, factor: float, partner: dict \| None) -> tuple` | ``(signed, factor, mean)`` for the air turn as one half of a mirrored pair. |
 | `rotor_lift_ratio` | function | 330 | `(p: Phenotype) -> float` | Static thrust of every propeller at top speed, in air, over the weight. |
 | `SegmentResult` | class | 139 | — | What one stretch of operating in one domain produced. |
 | `TriphibianEnv` | class | 519 | — | A compiled machine in the triphibian world, steppable by a controller. |
@@ -1046,30 +1098,31 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 | `SegmentResult.cost_of_transport` | property | 175 | `(self) -> float` | Dimensionless energy per unit distance per unit weight. |
 | `TriphibianEnv.__init__` | method | 606 | `(self, phenotype: Phenotype, *, sea_state: SeaState \| None=None, current: np.ndarray \| None=None, wind: np.ndarray \| None=None, timestep: float=0.004, seed: int=0, perturb: dict \| None=None, detail: bool=False) -> None` | ``detail`` draws the surfaces as the shape the fluid solver reads |
 | `TriphibianEnv.body_twist` | method | 1352 | `(self) -> np.ndarray` | Root body velocity in its own frame: [vx vy vz wx wy wz]. |
-| `TriphibianEnv.clearance` | method | 1460 | `(self) -> float` | `_clearance_now`, remembered for the state it was computed on. |
-| `TriphibianEnv.clearance_many` | method | 1479 | `(envs, active=None) -> None` | Fill the `clearance` memo of every (active) machine in one array |
-| `TriphibianEnv.depth` | method | 1399 | `(self) -> float` | — |
+| `TriphibianEnv.clearance` | method | 1487 | `(self) -> float` | `_clearance_now`, remembered for the state it was computed on. |
+| `TriphibianEnv.clearance_many` | method | 1506 | `(envs, active=None) -> None` | Fill the `clearance` memo of every (active) machine in one array |
+| `TriphibianEnv.depth` | method | 1426 | `(self) -> float` | — |
 | `TriphibianEnv.flap_travel` | method | 950 | `(self, phases: int=16) -> float` | Peak-to-peak actuated-joint travel over one cycle, in radians. |
 | `TriphibianEnv.flies_level` | method | 1099 | `(self) -> bool` | Whether ``level_margin`` clears ``LEVEL_GATE`` (ROADMAP AD). |
-| `TriphibianEnv.ground_height` | method | 1423 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
-| `TriphibianEnv.ground_heights` | method | 1432 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
-| `TriphibianEnv.held_still_params` | method | 1377 | `(self) -> CPGParams` | The base gait with every actuator held still: the still machine of |
-| `TriphibianEnv.identify` | method | 3002 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
+| `TriphibianEnv.ground_height` | method | 1450 | `(self, x: float, t: float \| None=None) -> float` | Height of whatever is underneath position ``x``: water, or beach. |
+| `TriphibianEnv.ground_heights` | method | 1459 | `(self, xs: np.ndarray, t: float \| None=None) -> np.ndarray` | Vectorised ``ground_height``. |
+| `TriphibianEnv.ground_support` | method | 1377 | `(self) -> float` | Share of the machine's dry weight the terrain is carrying right now. |
+| `TriphibianEnv.held_still_params` | method | 1404 | `(self) -> CPGParams` | The base gait with every actuator held still: the still machine of |
+| `TriphibianEnv.identify` | method | 3054 | `(self, domain: Domain, *, probe_time: float=1.2, n_probes: int=24, seed: int=0, max_modes: int=6) -> MobilityBasis` | Discover this body's control axes in one medium. |
 | `TriphibianEnv.launch_pitch` | property | 920 | `(self) -> float` | Nose-up attitude the air segment begins at, radians. |
 | `TriphibianEnv.launch_speed` | property | 888 | `(self) -> float` | Airspeed the air segment begins at: the speed at which this design's |
 | `TriphibianEnv.level_margin` | method | 1107 | `(self)` | Can this machine hold height *and* speed, with its own actuators? |
 | `TriphibianEnv.lift_margin` | property | 936 | `(self) -> float` | Best lift this body makes at the top of the speed band, over its weight. |
-| `TriphibianEnv.morphology_context` | property | 1563 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
-| `TriphibianEnv.observation` | method | 1602 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
+| `TriphibianEnv.morphology_context` | property | 1590 | `(self) -> np.ndarray` | Who this machine *is*, as eight bounded numbers. |
+| `TriphibianEnv.observation` | method | 1629 | `(self, target: 'Domain \| None'=None) -> np.ndarray` | What the controller senses, plus what it is being asked to do. |
 | `TriphibianEnv.reset` | method | 757 | `(self, domain: Domain, *, randomise: bool=True) -> None` | — |
 | `TriphibianEnv.restore` | method | 1343 | `(self, snap: tuple) -> None` | — |
-| `TriphibianEnv.rollout` | method | 1766 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
-| `TriphibianEnv.root_pos` | method | 1396 | `(self) -> np.ndarray` | — |
+| `TriphibianEnv.rollout` | method | 1793 | `(self, duration: float, *, params: CPGParams \| None=None, policy=None, basis: MobilityBasis \| None=None, domain: Domain=Domain.AIR, control_hz: float=25.0, on_step=None) -> SegmentResult` | Run one segment and measure what happened. |
+| `TriphibianEnv.root_pos` | method | 1423 | `(self) -> np.ndarray` | — |
 | `TriphibianEnv.scatter` | method | 791 | `(self, rng, *, strength: float=1.0, pose=None) -> None` | Widen the initial condition, from a caller-supplied generator. |
-| `TriphibianEnv.servo_command` | method | 1739 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
+| `TriphibianEnv.servo_command` | method | 1766 | `(self, target_angles) -> np.ndarray` | ``ctrl`` for these target angles: the target plus the servo's |
 | `TriphibianEnv.snapshot` | method | 1340 | `(self) -> tuple` | — |
-| `TriphibianEnv.step` | method | 1748 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
-| `TriphibianEnv.task_channels` | method | 1687 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
+| `TriphibianEnv.step` | method | 1775 | `(self, target_angles: np.ndarray) -> bool` | Advance one timestep.  Returns False when the battery is flat. |
+| `TriphibianEnv.task_channels` | method | 1714 | `(self, R=None, ph=None) -> np.ndarray` | Six channels saying what the current phase asks for. |
 | `TriphibianEnv.thrust_margin` | method | 978 | `(self, phases: int=16) -> float` | What the flapping adds forward, over the airframe's own drag. |
 
 ## `evolution.archive` — `dytiscidae/evolution/archive.py`
@@ -1515,44 +1568,52 @@ Search this file before writing a new function.  The reuse ladder is in `CLAUDE.
 
 | symbol | kind | line | signature | summary |
 |---|---|---:|---|---|
-| `drag_coefficient` | function | 327 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, cl: np.ndarray, lev: np.ndarray \| float=0.0) -> np.ndarray` | Skin friction, plus induced drag, plus separated pressure drag. |
-| `entrainment_reaction` | function | 815 | `(fb: np.ndarray, m_new: np.ndarray, m_old: np.ndarray, lever2: np.ndarray, vel: np.ndarray, h: float) -> None` | The ``-dm/dt v`` half of ``F = -d(m_a v)/dt``, added in place to ``fb`` |
-| `finish_bodies` | function | 791 | `(fb: np.ndarray, fsum_b: np.ndarray, m_body: np.ndarray, limit: float) -> bool` | Per-machine limiter and weight cancellation, in place on ``fb`` (nb, 6). |
-| `FluidDiagnostics` | class | 361 | — | Per-step aggregates, recorded for observability and for scoring. |
-| `FluidSolver` | class | 851 | — | Applies blade-element fluid loads to a MuJoCo model each step. |
-| `ImplicitAeroDamping` | class | 572 | — | Lift and drag made implicit by splitting their damping off. |
-| `InducedFlow` | class | 460 | — | Momentum-theory downwash of a machine's lifting system, one vector. |
-| `lift_coefficient` | function | 293 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, lev: np.ndarray, alpha_e: np.ndarray \| None=None) -> np.ndarray` | Lift coefficient: attached below stall, separated normal force above. |
-| `machine_flow` | function | 563 | `(model, data, medium, t: float) -> np.ndarray` | The flow the machine's root body sees: medium velocity minus its own. |
+| `camber_lift_factor` | function | 315 | `(re)` | The share of thin-airfoil theory's camber lift a thin arc makes at |
+| `chordwise_cop` | function | 385 | `(alpha: np.ndarray, re: np.ndarray, law: str, camber=0.0, ar=None, stall_law: str='legacy') -> np.ndarray` | Centre of pressure of a strip's lift and drag, as a fraction of chord |
+| `drag_coefficient` | function | 448 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, cl: np.ndarray, lev: np.ndarray \| float=0.0, camber: np.ndarray \| float=0.0, law: str='legacy') -> np.ndarray` | Skin friction, plus induced drag, plus separated pressure drag. |
+| `entrainment_reaction` | function | 1155 | `(fb: np.ndarray, m_new: np.ndarray, m_old: np.ndarray, lever2: np.ndarray, vel: np.ndarray, h: float) -> None` | The ``-dm/dt v`` half of ``F = -d(m_a v)/dt``, added in place to ``fb`` |
+| `finish_bodies` | function | 1131 | `(fb: np.ndarray, fsum_b: np.ndarray, m_body: np.ndarray, limit: float) -> bool` | Per-machine limiter and weight cancellation, in place on ``fb`` (nb, 6). |
+| `FluidDiagnostics` | class | 701 | — | Per-step aggregates, recorded for observability and for scoring. |
+| `FluidSolver` | class | 1191 | — | Applies blade-element fluid loads to a MuJoCo model each step. |
+| `ImplicitAeroDamping` | class | 912 | — | Lift and drag made implicit by splitting their damping off. |
+| `InducedFlow` | class | 800 | — | Momentum-theory downwash of a machine's lifting system, one vector. |
+| `lift_coefficient` | function | 413 | `(alpha: np.ndarray, re: np.ndarray, ar: np.ndarray, lev: np.ndarray, alpha_e: np.ndarray \| None=None, camber: np.ndarray \| float=0.0, law: str='legacy') -> np.ndarray` | Lift coefficient: attached below stall, separated normal force above. |
+| `machine_flow` | function | 903 | `(model, data, medium, t: float) -> np.ndarray` | The flow the machine's root body sees: medium velocity minus its own. |
 | `PanelSet` | class | 94 | — | The fluid-facing discretisation of a machine. |
-| `rossby_lev` | function | 405 | `(U, chord, omega, s_hat)` | LEV strength from the strip's own Rossby number, ``U / (\|w_perp\| c)``. |
+| `plate_lift_limit` | function | 321 | `(alpha, re, camber=0.0)` | ``(CLmax, plateau)`` of a thin plate of signed camber ``camber`` (as |
+| `rossby_lev` | function | 745 | `(U, chord, omega, s_hat)` | LEV strength from the strip's own Rossby number, ``U / (\|w_perp\| c)``. |
+| `SectionPolar` | class | 484 | — | A wing section's measured lift and drag, for `FluidSolver.section`. |
 | `skin_friction_cd` | function | 242 | `(re: np.ndarray) -> np.ndarray` | Two-sided skin friction coefficient of a flat plate. |
-| `slam_mass` | function | 777 | `(m_add, rho, chord, dr, is_wing, scale: float=1.0) -> np.ndarray` | The entrained mass the slam diagnostic differences: a wing's *normal* |
-| `strip_damping` | function | 753 | `(q, area, lift, drag, rho, aspect_ratio, is_wing, lift_scale: float=1.0) -> np.ndarray` | Per-strip damping bound ``b_i`` for `ImplicitAeroDamping`, N s/m. |
-| `UnsteadyState` | class | 420 | — | Per-strip history: Wagner lag and chords travelled since reversal. |
-| `FluidSolver.__init__` | method | 862 | `(self, model, panels: PanelSet, medium: MediumField, *, c_rot: float \| None=None, added_mass_scale: float=1.0, cd_scale: float=1.0, lift_scale: float=1.0, disc_span: float \| None=None) -> None` | — |
-| `FluidSolver.apply` | method | 1041 | `(self, data, t: float) -> FluidDiagnostics` | Compute and accumulate fluid loads into ``data.xfrc_applied``. |
-| `FluidSolver.instantaneous_power` | method | 1504 | `(self, data) -> float` | Mechanical power the machine is currently putting into the fluid, W. |
-| `FluidSolver.reset` | method | 1023 | `(self) -> None` | — |
-| `FluidSolver.steady` | method | 1000 | `(self)` | Context for quasi-static probes (trim, lift and thrust margins). |
-| `ImplicitAeroDamping.__init__` | method | 598 | `(self, model, medium=None, half_height=None) -> None` | — |
-| `ImplicitAeroDamping.apply` | method | 719 | `(self, data, pos: np.ndarray, body_id: np.ndarray, b) -> None` | ``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip -- |
-| `ImplicitAeroDamping.clear` | method | 667 | `(self, data) -> None` | The step's damping with the split off: the dry model's own.  Called |
-| `ImplicitAeroDamping.due` | method | 639 | `(self) -> bool` | Whether this step recomputes B (callers skip forming ``b`` if not). |
-| `ImplicitAeroDamping.projected` | method | 674 | `(self, data, pos, body_id, b) -> np.ndarray` | ``B_k = sum_i b_i \|lin_k + rot_k x r_i\|^2`` over strips on bodies dof |
-| `ImplicitAeroDamping.reset` | method | 659 | `(self) -> None` | — |
-| `InducedFlow.__init__` | method | 489 | `(self, span: float) -> None` | — |
-| `InducedFlow.due` | method | 495 | `(self) -> bool` | — |
-| `InducedFlow.reset` | method | 501 | `(self) -> None` | — |
-| `InducedFlow.tick` | method | 498 | `(self) -> None` | — |
-| `InducedFlow.update` | method | 505 | `(self, F: np.ndarray, V: np.ndarray, rho: float, dt: float) -> np.ndarray` | — |
+| `slam_mass` | function | 1117 | `(m_add, rho, chord, dr, is_wing, scale: float=1.0) -> np.ndarray` | The entrained mass the slam diagnostic differences: a wing's *normal* |
+| `strip_damping` | function | 1093 | `(q, area, lift, drag, rho, aspect_ratio, is_wing, lift_scale: float=1.0) -> np.ndarray` | Per-strip damping bound ``b_i`` for `ImplicitAeroDamping`, N s/m. |
+| `table_coefficients` | function | 653 | `(alpha, re, ar, lev, alpha_e=None, camber=0.0)` | ``(cl, cd, w)`` of a thin plate of signed camber ``camber`` from two |
+| `UnsteadyState` | class | 760 | — | Per-strip history: Wagner lag and chords travelled since reversal. |
+| `FluidSolver.__init__` | method | 1202 | `(self, model, panels: PanelSet, medium: MediumField, *, c_rot: float \| None=None, added_mass_scale: float=1.0, cd_scale: float=1.0, lift_scale: float=1.0, disc_span: float \| None=None) -> None` | — |
+| `FluidSolver.apply` | method | 1425 | `(self, data, t: float) -> FluidDiagnostics` | Compute and accumulate fluid loads into ``data.xfrc_applied``. |
+| `FluidSolver.instantaneous_power` | method | 1946 | `(self, data) -> float` | Mechanical power the machine is currently putting into the fluid, W. |
+| `FluidSolver.reset` | method | 1406 | `(self) -> None` | — |
+| `FluidSolver.steady` | method | 1383 | `(self)` | Context for quasi-static probes (trim, lift and thrust margins). |
+| `ImplicitAeroDamping.__init__` | method | 938 | `(self, model, medium=None, half_height=None) -> None` | — |
+| `ImplicitAeroDamping.apply` | method | 1059 | `(self, data, pos: np.ndarray, body_id: np.ndarray, b) -> None` | ``pos`` (n, 3) world strip positions, ``b`` (n,) N s/m per strip -- |
+| `ImplicitAeroDamping.clear` | method | 1007 | `(self, data) -> None` | The step's damping with the split off: the dry model's own.  Called |
+| `ImplicitAeroDamping.due` | method | 979 | `(self) -> bool` | Whether this step recomputes B (callers skip forming ``b`` if not). |
+| `ImplicitAeroDamping.projected` | method | 1014 | `(self, data, pos, body_id, b) -> np.ndarray` | ``B_k = sum_i b_i \|lin_k + rot_k x r_i\|^2`` over strips on bodies dof |
+| `ImplicitAeroDamping.reset` | method | 999 | `(self) -> None` | — |
+| `InducedFlow.__init__` | method | 829 | `(self, span: float) -> None` | — |
+| `InducedFlow.due` | method | 835 | `(self) -> bool` | — |
+| `InducedFlow.reset` | method | 841 | `(self) -> None` | — |
+| `InducedFlow.tick` | method | 838 | `(self) -> None` | — |
+| `InducedFlow.update` | method | 845 | `(self, F: np.ndarray, V: np.ndarray, rho: float, dt: float) -> np.ndarray` | — |
 | `PanelSet.concat` | method | 213 | `(sets: list['PanelSet']) -> 'PanelSet'` | — |
 | `PanelSet.empty` | method | 191 | `() -> 'PanelSet'` | — |
 | `PanelSet.total_area` | property | 183 | `(self) -> float` | — |
 | `PanelSet.total_volume` | property | 187 | `(self) -> float` | — |
-| `UnsteadyState.__init__` | method | 428 | `(self, n: int) -> None` | — |
-| `UnsteadyState.reset` | method | 434 | `(self) -> None` | — |
-| `UnsteadyState.update` | method | 440 | `(self, alpha, rev, U, chord, omega, s_hat, dt)` | — |
+| `SectionPolar.__init__` | method | 532 | `(self, name: str, tables, lift_tables=None, drag_past: str='normal') -> None` | — |
+| `SectionPolar.coefficients` | method | 612 | `(self, alpha, re, ar, lev, alpha_e=None)` | ``(cl, cd)`` for incidence ``alpha`` measured towards the section's |
+| `SectionPolar.table_part` | method | 582 | `(self, alpha, re, alpha_e=None)` | ``(cl, cd, w)``: the measured part of `coefficients`, two- |
+| `UnsteadyState.__init__` | method | 768 | `(self, n: int) -> None` | — |
+| `UnsteadyState.reset` | method | 774 | `(self) -> None` | — |
+| `UnsteadyState.update` | method | 780 | `(self, alpha, rev, U, chord, omega, s_hat, dt)` | — |
 
 ## `physics.jet` — `dytiscidae/physics/jet.py`
 

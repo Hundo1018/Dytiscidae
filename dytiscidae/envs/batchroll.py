@@ -210,12 +210,52 @@ MIN_CAP_BODIES = 8192
 MIN_CAP_MACHINES = 256
 
 
+#: `FluidSolver.stall_law` -> the kernel's law switch (`fluid_gpu.LAW_*`).
+#: "plate" is numpy only and has no code: `_law_code` refuses it.
+STALL_LAW_CODE = {"legacy": 0, "table": 1}
+
+
+def _law_code(envs) -> int:
+    """The batch's lift and drag law, which the kernel takes per launch: one
+    law for every machine, as the scales are taken from the first."""
+    law = envs[0].solver.stall_law
+    if law not in STALL_LAW_CODE:
+        raise ValueError(
+            f"stall_law {law!r} has no GPU mirror (the kernel has "
+            f"{sorted(STALL_LAW_CODE)}); score it on the numpy path")
+    for e in envs:
+        if e.solver.stall_law != law:
+            raise ValueError(
+                f"one batch mixes stall_law {law!r} and {e.solver.stall_law!r}; "
+                "the kernel takes one law per launch")
+    return STALL_LAW_CODE[law]
+
+
+def _table_block() -> np.ndarray:
+    """The table law's tables as the one float64 block the kernel reads
+    (layout in `mojo/src/fluid_gpu.mojo`, above `_tab_part`).  The node logs
+    and the two angles are numpy's own values, so the lookup is the same."""
+    from ..physics import thin_plate_tables as T
+    from ..physics.fluid import SEPARATION_COMPLETE, SectionPolar
+    nre, na = T.CL.shape[1], T.CL.shape[2]
+    assert T.CL.shape == T.CD.shape == (2, nre, na) and T.LO.shape == T.TOP.shape == (2, nre)
+    head = [float(T.CAMBER), float(T.ALPHA0), float(T.STEP), nre, na,
+            float(SectionPolar.PLATE_BY), float(SEPARATION_COMPLETE)]
+    return np.ascontiguousarray(np.concatenate([
+        np.asarray(head, float), np.log(T.RE_NODES), np.asarray(T.RE_NODES, float),
+        np.ravel(T.CL), np.ravel(T.CD), np.ravel(T.LO), np.ravel(T.TOP)]).astype(np.float64))
+
+
 def _get_pipeline(n: int, nb: int, nm: int):
     cap = _POOL["cap"]
     if _POOL["pipe"] is None:
         cap = (max(n, MIN_CAP_PANELS), max(nb, MIN_CAP_BODIES),
                max(nm, MIN_CAP_MACHINES))
-        _POOL["pipe"] = _fp.FullPipeline(*cap)
+        pipe = _fp.FullPipeline(*cap)
+        # Once per process, whichever law the batches use: a few kB.
+        tab = _table_block()
+        pipe.upload_tables(np.array([tab.ctypes.data, tab.size], dtype=np.int64))
+        _POOL["pipe"] = pipe
         _POOL["cap"] = cap
     elif n > cap[0] or nb > cap[1] or nm > cap[2]:
         raise RuntimeError(
@@ -286,6 +326,8 @@ class BatchedFluid:
         self.body_start = C(np.searchsorted(
             self.body_id, np.arange(nb + 1), side="left").astype(np.int32))
         self.dry_mass = [e.solver._dry_mass.copy() for e in self.envs]
+        # Refuse a law the kernel has no mirror of before allocating anything.
+        _law_code(self.envs)
         self.dry_inertia = [e.solver._dry_inertia.copy() for e in self.envs]
         self.lever2 = [e.solver._lever2.copy() for e in self.envs]
 
@@ -322,7 +364,7 @@ class BatchedFluid:
             at += n
         self.out["pos_w"] = ob[at:at + 3 * n].reshape(n, 3)
         self.out["force"] = ob[at + 3 * n:at + 6 * n].reshape(n, 3)
-        self._scalars = np.zeros(23)
+        self._scalars = np.zeros(24)
         self._desc = np.array([ib.ctypes.data, ob.ctypes.data,
                                self._scalars.ctypes.data, n, nb, nm, 0],
                               dtype=np.int64)
@@ -452,6 +494,7 @@ class BatchedFluid:
         sc[16:23] = (sol.cd_scale, sol.added_mass_scale, sol.lift_scale,
                      float(bool(sol.wing_added_mass_tensor)), dt_u,
                      float(self._reset_u), float(bool(sol.unsteady)))
+        sc[23] = _law_code(self.envs)
         self.pipe.launch(self._desc)
         _POOL["outstanding"] = self._outbuf
         self._reset_u = False

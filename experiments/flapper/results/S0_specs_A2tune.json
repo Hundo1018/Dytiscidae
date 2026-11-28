@@ -1,0 +1,782 @@
+[
+{
+"id": "A2b1.00_water_D_s200_wet",
+"scenario": "water",
+"leg": "dive",
+"rung": "A2b1.00",
+"cfg": {
+"sweep": true,
+"b": 1.0
+},
+"kind": "water",
+"which": "tuning",
+"arm": "WT",
+"seed": 200,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 200,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A2b1.00_water_D_s200_def",
+"scenario": "water",
+"leg": "dive",
+"rung": "A2b1.00",
+"cfg": {
+"sweep": true,
+"b": 1.0
+},
+"kind": "water",
+"which": "tuning",
+"arm": "WT",
+"seed": 200,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 200,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A2b1.00_water_D_s201_wet",
+"scenario": "water",
+"leg": "dive",
+"rung": "A2b1.00",
+"cfg": {
+"sweep": true,
+"b": 1.0
+},
+"kind": "water",
+"which": "tuning",
+"arm": "WT",
+"seed": 201,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 201,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A2b1.00_water_D_s201_def",
+"scenario": "water",
+"leg": "dive",
+"rung": "A2b1.00",
+"cfg": {
+"sweep": true,
+"b": 1.0
+},
+"kind": "water",
+"which": "tuning",
+"arm": "WT",
+"seed": 201,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 201,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A2b1.00_waterair_XS_s200_wet",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A2b1.00",
+"cfg": {
+"sweep": true,
+"b": 1.0
+},
+"kind": "water",
+"which": "tuning",
+"arm": "XS",
+"seed": 200,
+"mode": "wetting",
+"half": "X",
+"water": {
+"seed": 200,
+"mode": "wetting",
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A2b1.00_waterair_XS_s200_def",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A2b1.00",
+"cfg": {
+"sweep": true,
+"b": 1.0
+},
+"kind": "water",
+"which": "tuning",
+"arm": "XS",
+"seed": 200,
+"mode": true,
+"half": "X",
+"water": {
+"seed": 200,
+"mode": true,
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A2b1.00_waterair_XS_s201_wet",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A2b1.00",
+"cfg": {
+"sweep": true,
+"b": 1.0
+},
+"kind": "water",
+"which": "tuning",
+"arm": "XS",
+"seed": 201,
+"mode": "wetting",
+"half": "X",
+"water": {
+"seed": 201,
+"mode": "wetting",
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A2b1.00_waterair_XS_s201_def",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A2b1.00",
+"cfg": {
+"sweep": true,
+"b": 1.0
+},
+"kind": "water",
+"which": "tuning",
+"arm": "XS",
+"seed": 201,
+"mode": true,
+"half": "X",
+"water": {
+"seed": 201,
+"mode": true,
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A2b0.97_water_D_s200_wet",
+"scenario": "water",
+"leg": "dive",
+"rung": "A2b0.97",
+"cfg": {
+"sweep": true,
+"b": 0.97
+},
+"kind": "water",
+"which": "tuning",
+"arm": "WT",
+"seed": 200,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 200,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A2b0.97_water_D_s200_def",
+"scenario": "water",
+"leg": "dive",
+"rung": "A2b0.97",
+"cfg": {
+"sweep": true,
+"b": 0.97
+},
+"kind": "water",
+"which": "tuning",
+"arm": "WT",
+"seed": 200,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 200,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A2b0.97_water_D_s201_wet",
+"scenario": "water",
+"leg": "dive",
+"rung": "A2b0.97",
+"cfg": {
+"sweep": true,
+"b": 0.97
+},
+"kind": "water",
+"which": "tuning",
+"arm": "WT",
+"seed": 201,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 201,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A2b0.97_water_D_s201_def",
+"scenario": "water",
+"leg": "dive",
+"rung": "A2b0.97",
+"cfg": {
+"sweep": true,
+"b": 0.97
+},
+"kind": "water",
+"which": "tuning",
+"arm": "WT",
+"seed": 201,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 201,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A2b0.97_waterair_XS_s200_wet",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A2b0.97",
+"cfg": {
+"sweep": true,
+"b": 0.97
+},
+"kind": "water",
+"which": "tuning",
+"arm": "XS",
+"seed": 200,
+"mode": "wetting",
+"half": "X",
+"water": {
+"seed": 200,
+"mode": "wetting",
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A2b0.97_waterair_XS_s200_def",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A2b0.97",
+"cfg": {
+"sweep": true,
+"b": 0.97
+},
+"kind": "water",
+"which": "tuning",
+"arm": "XS",
+"seed": 200,
+"mode": true,
+"half": "X",
+"water": {
+"seed": 200,
+"mode": true,
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A2b0.97_waterair_XS_s201_wet",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A2b0.97",
+"cfg": {
+"sweep": true,
+"b": 0.97
+},
+"kind": "water",
+"which": "tuning",
+"arm": "XS",
+"seed": 201,
+"mode": "wetting",
+"half": "X",
+"water": {
+"seed": 201,
+"mode": "wetting",
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A2b0.97_waterair_XS_s201_def",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A2b0.97",
+"cfg": {
+"sweep": true,
+"b": 0.97
+},
+"kind": "water",
+"which": "tuning",
+"arm": "XS",
+"seed": 201,
+"mode": true,
+"half": "X",
+"water": {
+"seed": 201,
+"mode": true,
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A2b1.03_water_D_s200_wet",
+"scenario": "water",
+"leg": "dive",
+"rung": "A2b1.03",
+"cfg": {
+"sweep": true,
+"b": 1.03
+},
+"kind": "water",
+"which": "tuning",
+"arm": "WT",
+"seed": 200,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 200,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A2b1.03_water_D_s200_def",
+"scenario": "water",
+"leg": "dive",
+"rung": "A2b1.03",
+"cfg": {
+"sweep": true,
+"b": 1.03
+},
+"kind": "water",
+"which": "tuning",
+"arm": "WT",
+"seed": 200,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 200,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A2b1.03_water_D_s201_wet",
+"scenario": "water",
+"leg": "dive",
+"rung": "A2b1.03",
+"cfg": {
+"sweep": true,
+"b": 1.03
+},
+"kind": "water",
+"which": "tuning",
+"arm": "WT",
+"seed": 201,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 201,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A2b1.03_water_D_s201_def",
+"scenario": "water",
+"leg": "dive",
+"rung": "A2b1.03",
+"cfg": {
+"sweep": true,
+"b": 1.03
+},
+"kind": "water",
+"which": "tuning",
+"arm": "WT",
+"seed": 201,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 201,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A2b1.03_waterair_XS_s200_wet",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A2b1.03",
+"cfg": {
+"sweep": true,
+"b": 1.03
+},
+"kind": "water",
+"which": "tuning",
+"arm": "XS",
+"seed": 200,
+"mode": "wetting",
+"half": "X",
+"water": {
+"seed": 200,
+"mode": "wetting",
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A2b1.03_waterair_XS_s200_def",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A2b1.03",
+"cfg": {
+"sweep": true,
+"b": 1.03
+},
+"kind": "water",
+"which": "tuning",
+"arm": "XS",
+"seed": 200,
+"mode": true,
+"half": "X",
+"water": {
+"seed": 200,
+"mode": true,
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A2b1.03_waterair_XS_s201_wet",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A2b1.03",
+"cfg": {
+"sweep": true,
+"b": 1.03
+},
+"kind": "water",
+"which": "tuning",
+"arm": "XS",
+"seed": 201,
+"mode": "wetting",
+"half": "X",
+"water": {
+"seed": 201,
+"mode": "wetting",
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A2b1.03_waterair_XS_s201_def",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A2b1.03",
+"cfg": {
+"sweep": true,
+"b": 1.03
+},
+"kind": "water",
+"which": "tuning",
+"arm": "XS",
+"seed": 201,
+"mode": true,
+"half": "X",
+"water": {
+"seed": 201,
+"mode": true,
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+}
+]

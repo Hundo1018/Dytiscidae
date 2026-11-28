@@ -2,7 +2,7 @@
 
 # Modules
 
-112 modules, 43,501 lines, 1,224 indexed symbols.
+115 modules, 45,439 lines, 1,271 indexed symbols.
 
 `depends on` lists modules of this project only; `third party` is
 the outside world.  The three packages named **inner** are the
@@ -65,13 +65,15 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `control.cpg` | Central pattern generator, and the *discovered* control basis. | 706 | — | `numpy` | — |
+| `control.innerloop` | The stabilising inner loop of a rotor-and-limb body, and the action it takes. | 354 | — | `numpy` | `physics.medium`, `physics.rotor` |
+| `control.outer` | The outer law of the split controller: an observation in, an action out. | 480 | — | `numpy` | `control.innerloop`, `core.mjcf`, `envs.evaluate`, `envs.tasks`, `envs.triphibian` |
 | `control.train` | Learning a controller for one morphology. | 257 | — | `numpy` | `control.cpg`, `envs.evaluate`, `envs.mission`, `envs.triphibian`, `evolution.cmaes`, `physics.wake`, `viz.showcase` |
 
 ## `core`
 
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
-| `core.bodyplans` | Body-plan archetypes: the seeds the search starts from. | 731 | — | `numpy` | `core.cppn`, `core.genome`, `core.sdf` |
+| `core.bodyplans` | Body-plan archetypes: the seeds the search starts from. | 803 | — | `numpy` | `core.cppn`, `core.genome`, `core.mjcf`, `core.phenotype`, `core.sdf`, `physics.medium`, `physics.rotor` |
 | `core.cppn` | Compositional Pattern Producing Networks -- the implicit shape representation. | 435 | — | `numpy` | — |
 | `core.genome` | The morphology genome: a recursive module graph plus implicit surface fields. | 1300 | — | `numpy` | `core.cppn`, `core.sdf` |
 | `core.mjcf` | Phenotype -> MJCF.  Builds the MuJoCo model and the triphibian scene. | 853 | — | `mujoco`, `numpy` | `core.genome`, `core.phenotype`, `physics.medium` |
@@ -99,21 +101,21 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `envs.actors` | Several generations' worth of machines, stepped in several processes. | 478 | — | `torch` | `envs`, `envs.batchroll`, `learning.ppo` |
-| `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1435 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor` |
+| `envs.batchroll` | Step several candidates together so their panels share one GPU launch. | 1478 | — | `mujoco`, `numpy` | `control.cpg`, `envs`, `envs.evaluate`, `envs.kernel`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `learning.ppo`, `physics`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.thin_plate_tables` |
 | `envs.device` | Which device a search scores on, and the one condition that allows the CPU. | 98 | — | — | — |
 | `envs.devroll` | On-device evaluation path (IMPL_1010 A): MuJoCo Warp plus Warp fluid kernels. | 76 | — | — | — |
 | `envs.devroll.control_wp` | The controller at a decision step and the CPG every step, on the device (IMPL_1010 A3). | 964 | — | `numpy`, `torch` | `control.cpg`, `core.mjcf`, `envs.tasks`, `envs.triphibian` |
-| `envs.devroll.fluid_wp` | Strip-theory loads on the device (IMPL_1010 A1a). | 618 | — | `numpy` | `physics.fluid`, `physics.medium` |
-| `envs.devroll.model_wp` | One body on the device: its MJWarp ``Model`` and ``Data`` over W worlds, and the | 965 | — | `mujoco`, `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `envs.devroll.scatter_wp`, `physics.fluid` |
+| `envs.devroll.fluid_wp` | Strip-theory loads on the device (IMPL_1010 A1a). | 766 | — | `numpy` | `physics`, `physics.fluid`, `physics.medium`, `physics.thin_plate_tables` |
+| `envs.devroll.model_wp` | One body on the device: its MJWarp ``Model`` and ``Data`` over W worlds, and the | 971 | — | `mujoco`, `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `envs.devroll.scatter_wp`, `physics.fluid` |
 | `envs.devroll.rollout_wp` | Air and water segments on the device, scored on the host (IMPL_1010 A4a). | 715 | — | `numpy` | `envs.batchroll`, `envs.devroll`, `envs.devroll.control_wp`, `envs.devroll.model_wp`, `envs.evaluate`, `envs.tasks`, `envs.triphibian`, `evolution.loop`, `learning.ppo` |
 | `envs.devroll.scatter_wp` | The scatter between two ``mj_step``s on the device (IMPL_1010 A1b). | 1119 | — | `numpy` | `envs.devroll`, `envs.devroll.fluid_wp`, `physics.energy`, `physics.fluid`, `physics.rotor` |
 | `envs.evaluate` | Tier 1 and Tier 2 evaluation, and the scoring that turns them into fitness. | 753 | — | `numpy` | `control.cpg`, `core.phenotype`, `envs.tasks`, `envs.transitions`, `envs.triphibian`, `physics.energy`, `physics.medium` |
 | `envs.kernel` | Is the built GPU kernel the one its source says it should be? | 72 | — | — | — |
-| `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 336 | — | `numpy` | `envs.triphibian` |
+| `envs.mission` | The continuous mission: one unbroken simulation across all three domains. | 506 | — | `numpy` | `envs.transitions`, `envs.triphibian` |
 | `envs.skills` | The actuator skill bench: learning to operate components, not vehicles. | 655 | — | `numpy` | `evolution.cmaes`, `physics.energy`, `physics.materials`, `physics.medium`, `physics.structure` |
-| `envs.tasks` | What a segment asks the machine to do, phase by phase. | 301 | — | — | — |
-| `envs.transitions` | Crossing between media, scored rather than merely survived. | 823 | — | `numpy` | `core.mjcf`, `envs.triphibian` |
-| `envs.triphibian` | The triphibian mission environment. | 3088 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
+| `envs.tasks` | What a segment asks the machine to do, phase by phase. | 333 | — | — | — |
+| `envs.transitions` | Crossing between media, scored rather than merely survived. | 905 | — | `numpy` | `core.mjcf`, `envs.triphibian` |
+| `envs.triphibian` | The triphibian mission environment. | 3144 | — | `mujoco`, `numpy` | `control.cpg`, `core.mjcf`, `core.phenotype`, `envs.tasks`, `physics.energy`, `physics.fluid`, `physics.medium`, `physics.rotor`, `physics.structure` |
 
 ## `evolution`
 
@@ -153,12 +155,13 @@ is what makes a violation visible while reading.
 | module | responsibility | lines | entry | third party | depends on |
 |---|---|---:|---|---|---|
 | `physics.energy` | Electrical power train: actuators, battery, and the mission energy budget. | 432 | — | `numpy` | `physics.materials`, `physics.medium` |
-| `physics.fluid` | Quasi-steady blade-element fluid loads for flapping surfaces and bluff bodies. | 1523 | — | `mujoco`, `numpy` | `physics.medium` |
+| `physics.fluid` | Quasi-steady blade-element fluid loads for flapping surfaces and bluff bodies. | 1965 | — | `mujoco`, `numpy` | `physics`, `physics.medium`, `physics.thin_plate_tables` |
 | `physics.jet` | Pulsed-jet propulsion: medusa bells and squid mantles. | 280 | — | `numpy` | `physics.medium` |
 | `physics.materials` | Material and component property database. | 257 | — | — | — |
 | `physics.medium` | Medium field: air above the free surface, water below, and the blended | 191 | — | `numpy` | — |
 | `physics.rotor` | Propellers: blade-element momentum theory, the comparison to flapping. | 633 | — | `mujoco`, `numpy` | `physics.fluid` |
 | `physics.structure` | Structural feasibility: spars, hulls, seals, and the loads that break them. | 623 | — | `numpy` | `physics.materials`, `physics.medium` |
+| `physics.thin_plate_tables` | Generated by tools/bake_thin_plate.py from experiments/flapper/sections/*.csv. | 53 | — | `numpy` | — |
 | `physics.wake` | Vortex-particle wake, for seeing the flow the solver is actually computing. | 183 | — | `numpy` | `physics.fluid` |
 
 ## `ports`  (inner)

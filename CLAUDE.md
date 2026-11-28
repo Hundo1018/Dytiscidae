@@ -65,7 +65,7 @@ stopping are withdrawn.
 |---|---|
 | cheap suites above | nothing installed |
 | `test_ppo.py` | numpy, torch (last section wants the evaluator) |
-| `test_physics.py` | MuJoCo, no GPU; one function skips without the GPU extension |
+| `test_physics.py` | MuJoCo, no GPU; one function skips without the GPU extension, and the crossing-gate checks on the open-loop quad skip on a machine where its tumble does not reproduce (2026-11-28: a Xeon and the hosted runner) |
 | `test_search.py` | GPU; a few functions skip without it |
 | `test_devroll.py` | `requirements-device.txt` (mujoco-warp, warp) and a CUDA device; the device-path functions skip without them |
 | `test_devroll_agreement.py` | the same as `test_devroll.py`, and about 9 minutes on a GPU (A5 score agreement; red as of 2026-10-26, see ROADMAP) |
@@ -73,8 +73,12 @@ stopping are withdrawn.
 `tools/suite_probe.py --all` re-measures this. `.github/workflows/checks.yml`
 runs the first three rows; `test_search.py` is not in CI.
 
-A headless machine needs `MUJOCO_GL=disable`: MuJoCo 3.15 imports a renderer at
-`import mujoco`.
+`MUJOCO_GL` by purpose (probed 2026-10-31 on this machine): tests and tools set
+`MUJOCO_GL=disable` (MuJoCo 3.15 imports a renderer at `import mujoco`). The
+search launch block below sets nothing, so the run and its postrun films get
+`osmesa` from `dytiscidae/__init__.py` (headless default) — keep it that way;
+`training.py` notes a bad backend kills a worker. `egl` raises `EGLError` here;
+do not use it.
 
 ### Whether a test is worth anything
 
@@ -148,6 +152,25 @@ systemd-run --user --unit archNN --same-dir bash -c \
      --memory-ceiling-mb <MB> --seed 20260901 --run runs/archNN \
      > runs/archNN.log 2>&1 < /dev/null'
 ```
+
+**Launch checklist (scope verbs per `~/.claude/playbooks/10-model-dispatch.md` §7.8):**
+"give me the command" prints the block above and stops; only "launch"/"run it"
+starts it (the guards hook asks otherwise). When launching:
+
+1. Before: `git status` clean in the directory the unit starts in (`--same-dir`,
+   or the pinned worktree); the kernel
+   preflight passes (`.venv/bin/python -c "from dytiscidae.envs import batchroll;
+   print(batchroll.usable())"`); `free -m` leaves headroom above
+   `--memory-ceiling-mb` after the live runs already on the box.
+2. Within 60 s after: `systemctl --user is-active archNN` says `active`, and
+   `runs/archNN.log` is non-empty past the import lines (arch49's first launch had
+   an empty log and nobody noticed).
+3. Report once — unit state, first ~20 log lines, the notes file path — then
+   stop. No polling: a systemd unit sends no completion notice (unlike
+   `run_in_background`), and the user asks when they want status.
+4. ETA: fit the last ~20 generation times from `generations.jsonl` and extrapolate
+   the slope (cost rises ~110 s → ~225 s across a run as rotors accumulate);
+   never multiply the current rate by remaining generations.
 
 - **CPU fallback only without a GPU** (2026-10-12, `envs/device.py`). At t=0
   `run_search` scores on the Mojo kernel if `batchroll.usable()` passes. If it
@@ -265,6 +288,16 @@ then films (`dytiscidae/viz/film.py`) into `runs/<run>/media/`, embedded in
   a drop of more than 10 on water and land. Air holds (222). Water and land are not
   comparable across the upgrade; air is. The 3.11 baseline itself moved between
   2026-10-08 and 2026-10-25, which is not explained yet.
+- **The default lift law, 2026-11-17 (the user's decision; repair R3,
+  `experiments/physics_extremes/RESULT_R3_table.md`).** A lifting strip reads
+  two measured thin sections (UIUC flat plate, Goe 417a; `fluid.table_coefficients`,
+  `fluid.DEFAULT_STALL_LAW = "table"`) on all three paths, in place of the 11 deg
+  stall and the `2 f/c` camber shift (`"legacy"`, still selectable per solver).
+  Every air and water score that a lifting strip contributes to is not comparable
+  across it; land is, where no strip carries load. Known: 0.03-0.29 high in CL for
+  a flat wing at 25-30 deg; under a leading-edge vortex camber no longer acts.
+  After editing a csv in `experiments/flapper/sections/`:
+  `tools/bake_thin_plate.py write` (the suite checks it).
 - `sink_rate` is the difference of two endpoints of the late airborne window, so
   it reads zero for a machine that drops and comes back. `station_keeping` sees
   the path between; where they disagree, trust `station_keeping` (arch37: 10x

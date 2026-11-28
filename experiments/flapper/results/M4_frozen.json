@@ -1,0 +1,37 @@
+{
+ "land": {
+  "E": {
+   "a_f": 0.5,
+   "b_c": 0,
+   "d_f": 12,
+   "e_c": 0,
+   "gamma": 15,
+   "h_f": 0.2,
+   "r_f": 1.0,
+   "theta_f": -2
+  },
+  "halves": [
+   "tune_l_008"
+  ],
+  "min_margin": -3.84488431855754,
+  "rule": "largest smallest margin over the tuning halves run (m4_freeze.py)"
+ },
+ "water": {
+  "E": {
+   "a_f": 0.3,
+   "b_c": 30,
+   "d_f": 12,
+   "e_c": 0,
+   "gamma": 15,
+   "h_f": 0.2,
+   "r_f": 1.0,
+   "theta_f": -5
+  },
+  "halves": [
+   "tune_w_022",
+   "tune_w_029"
+  ],
+  "min_margin": -3.25171932866459,
+  "rule": "largest smallest margin over the tuning halves run (m4_freeze.py)"
+ }
+}

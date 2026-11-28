@@ -1,0 +1,157 @@
+
+== F G1 walk J_r 2e-05: 2 runs, qacc runs 0
+  F pair mean 0.000e+00 m/s (must be |.| < 1e-9), hashes equal True -> PASS
+
+== G1 G1 turn J_r 1e-06: 6 runs, qacc runs 0
+  R1         fail +90:dyaw 2.9 -90:dyaw -2.9  turn +90 err 87.7/88.3,turn -90 err 87.7/88.3
+  R2         fail +90:dyaw 4.2 -90:dyaw -0.1  turn +90 err 90.0/91.7,turn -90 err 87.0/88.4
+  R3         fail +90:dyaw 3.6 -90:dyaw -3.6  turn +90 err 87.0/87.5,turn -90 err 87.0/87.5
+
+== G1 G1 turn J_r 2e-05: 6 runs, qacc runs 0
+  R1         fail -90:dyaw -3.0 +90:dyaw 3.0  turn -90 err 87.6/88.2,turn +90 err 87.6/88.1
+  R2         fail +90:dyaw 4.4 -90:dyaw -0.1  turn +90 err 89.7/91.5,turn -90 err 86.9/88.6
+  R3         fail +90:dyaw 3.8 -90:dyaw -3.8  turn +90 err 86.8/87.4,turn -90 err 86.8/87.3
+
+== G1 G1 turn J_r 5e-06: 6 runs, qacc runs 0
+  R1         fail +90:dyaw 2.9 -90:dyaw -2.9  turn +90 err 87.7/88.2,turn -90 err 87.7/88.2
+  R2         fail +90:dyaw 4.3 -90:dyaw 0.1  turn +90 err 89.8/91.6,turn -90 err 87.1/88.8,turn -90 wrong sense 0.1
+  R3         fail +90:dyaw 3.5 -90:dyaw -3.5  turn +90 err 87.1/87.6,turn -90 err 87.1/87.6
+
+== G1 G1 walk J_r 1e-06: 12 runs, qacc runs 0
+  W1         fail pair 0.0006 halves h0:-0.049/0.000 h180:0.063/-0.000  pair mean 0.0006,half 0 along -0.049
+  W2         fail pair 0.0015 halves h0:-0.097/0.066 h180:0.133/-0.061  pair mean 0.0015,half 0 along -0.097
+  W3         fail pair 0.0004 halves h0:-0.113/-0.055 h180:0.124/0.078  pair mean 0.0004,half 0 along -0.113,half 180 across 0.078
+  W4         fail pair 0.0000 halves h90:0.004/0.136 h270:-0.003/-0.173  pair mean 0.0000,half 90 along 0.004,half 270 along -0.003
+  W5         fail pair 0.0015 halves h90:-0.051/0.173 h270:0.086/-0.186  pair mean 0.0015,half 90 along -0.051,half 270 across -0.186
+  W6         fail pair -0.0012 halves h270:-0.011/-0.179 h90:-0.017/0.146  pair mean -0.0012,half 270 along -0.011,half 90 along -0.017
+
+== G1 G1 walk J_r 2e-05: 12 runs, qacc runs 0
+  W1         fail pair 0.0008 halves h0:-0.048/0.000 h180:0.067/-0.000  pair mean 0.0008,half 0 along -0.048,U 0.0023
+  W2         fail pair 0.0010 halves h0:-0.101/0.067 h180:0.124/-0.066  pair mean 0.0010,half 0 along -0.101,half 180 across -0.066,U 0.0005
+  W3         fail pair 0.0001 halves h0:-0.117/-0.056 h180:0.119/0.083  pair mean 0.0001,half 0 along -0.117,half 180 across 0.083
+  W4         fail pair 0.0002 halves h90:0.006/0.140 h270:-0.002/-0.182  pair mean 0.0002,half 90 along 0.006,half 270 along -0.002
+  W5         fail pair 0.0012 halves h90:-0.054/0.178 h270:0.082/-0.187  pair mean 0.0012,half 90 along -0.054,half 270 across -0.187
+  W6         fail pair -0.0014 halves h90:-0.016/0.149 h270:-0.017/-0.179  pair mean -0.0014,half 90 along -0.016,half 270 along -0.017
+
+== G1 G1 walk J_r 5e-06: 12 runs, qacc runs 0
+  W1         fail pair 0.0007 halves h180:0.065/0.000 h0:-0.049/0.000  pair mean 0.0007,half 0 along -0.049
+  W2         fail pair 0.0013 halves h0:-0.099/0.066 h180:0.130/-0.061  pair mean 0.0013,half 0 along -0.099
+  W3         fail pair 0.0004 halves h180:0.123/0.077 h0:-0.115/-0.055  pair mean 0.0004,half 180 across 0.077,half 0 along -0.115
+  W4         fail pair -0.0001 halves h90:0.003/0.135 h270:-0.004/-0.177  pair mean -0.0001,half 90 along 0.003,half 270 along -0.004
+  W5         fail pair 0.0013 halves h90:-0.052/0.174 h270:0.084/-0.185  pair mean 0.0013,half 90 along -0.052,half 270 across -0.185
+  W6         fail pair -0.0014 halves h90:-0.017/0.147 h270:-0.017/-0.175  pair mean -0.0014,half 90 along -0.017,half 270 along -0.017
+
+== G2 G2 turn J_r 2e-05: 6 runs, qacc runs 0
+  R1         fail +90:dyaw 55.3 -90:dyaw -79.0  turn +90 err 35.0/38.4
+  R2         fail +90:dyaw 62.4 -90:dyaw -66.4  turn +90 err 32.0/43.8,turn -90 err 27.8/33.9
+  R3         fail +90:dyaw 46.7 -90:dyaw -59.4  turn +90 err 39.2/45.7,turn -90 err 36.4/42.6
+
+== G2 G2 walk J_r 2e-05: 12 runs, qacc runs 0
+  W1         fail pair 0.0664 halves h0:0.503/0.603 h180:1.090/0.117  half 0 across 0.603
+  W2         fail pair 0.0655 halves h180:1.122/0.058 h0:0.449/-0.445  half 0 across -0.445
+  W3         fail pair 0.0516 halves h180:1.098/0.054 h0:0.140/-0.945  half 0 across -0.945
+  W4         fail pair 0.1058 halves h90:2.671/1.047 h270:-0.133/-2.266  half 270 along -0.133
+  W5         fail pair 0.0729 halves h270:-0.492/-3.016 h90:2.242/1.864  half 270 along -0.492,half 90 across 1.864
+  W6         fail pair 0.0790 halves h270:-0.666/-2.208 h90:2.561/0.972  half 270 along -0.666
+
+== H G1 turn J_r 2e-05: 6 runs, qacc runs 0
+  R1         fail +90:dyaw 11.1 -90:dyaw -10.8  turn +90 err 80.6/82.8,turn -90 err 80.8/82.9
+  R2         fail +90:dyaw 3.2 -90:dyaw -8.5  turn +90 err 97.5/107.8,turn -90 err 75.6/77.0
+  R3         fail -90:dyaw -48.9 +90:dyaw 62.2  turn -90 err 40.0/41.1,turn +90 err 30.7/32.5
+
+== H G1 walk J_r 2e-05: 12 runs, qacc runs 0
+  W1         fail pair -0.0249 halves h0:1.296/0.052 h180:-1.894/-0.047  pair mean -0.0249,half 180 along -1.894
+  W2         fail pair 0.0106 halves h0:2.249/0.797 h180:-1.995/-0.439  pair mean 0.0106,half 180 along -1.995
+  W3         fail pair 0.0141 halves h0:2.254/-0.578 h180:-1.916/0.450  pair mean 0.0141,half 180 along -1.916
+  W4         fail pair -0.0990 halves h90:2.756/1.004 h270:-5.132/-1.419  pair mean -0.0990,half 270 along -5.132
+  W5         fail pair -0.0797 halves h90:2.852/1.763 h270:-4.764/-1.953  pair mean -0.0797,half 90 across 1.763,half 270 along -4.764
+  W6         fail pair -0.0764 halves h90:3.343/0.429 h270:-5.176/-0.819  pair mean -0.0764,half 270 along -5.176
+
+== N0  stand J_r 2e-05: 4 runs, qacc runs 0
+  yaw0    0 fail drift 0.0007 dyaw 0.000 body 0.960/1.000 P 0.1 W peakP window 0 W, run 178 W  body 0.960/1.000
+  yaw0  180 fail drift 0.0007 dyaw -0.000 body 0.978/1.000 P 0.1 W peakP window 0 W, run 277 W  body 0.978/1.000
+  yaw0   45 fail drift 0.0008 dyaw 0.036 body 0.963/1.000 P 0.1 W peakP window 0 W, run 131 W  body 0.963/1.000
+  yaw0   90 fail drift 0.0012 dyaw 0.073 body 0.969/1.000 P 0.1 W peakP window 0 W, run 164 W  body 0.969/1.000
+
+== N0  turn J_r 2e-05: 3 runs, qacc runs 0
+  R1         fail +90:dyaw 0.0 -90:dyaw 0.0  turn +90 err 90.0/90.0,turn -90 err 90.0/90.0,turn -90 wrong sense 0.0
+  R2         fail +90:dyaw 0.1 -90:dyaw 0.1  turn +90 err 89.7/89.7,turn -90 err 90.3/90.3,turn -90 wrong sense 0.1
+  R3         fail +90:dyaw -0.0 -90:dyaw -0.0  turn +90 err 90.0/90.0,turn +90 wrong sense -0.0,turn -90 err 90.0/90.0
+
+== N0  walk J_r 2e-05: 6 runs, qacc runs 0
+  W1         fail pair 0.0000 halves h0:-0.001/0.000 h180:0.001/-0.000  pair mean 0.0000,half 0 along -0.001,half 180 along 0.001
+  W2         fail pair 0.0000 halves h0:-0.001/0.000 h180:0.001/-0.000  pair mean 0.0000,half 0 along -0.001,half 180 along 0.001
+  W3         fail pair 0.0000 halves h0:-0.001/-0.000 h180:0.001/0.000  pair mean 0.0000,half 0 along -0.001,half 180 along 0.001
+  W4         fail pair 0.0000 halves h90:0.000/0.001 h270:-0.000/-0.001  pair mean 0.0000,half 90 along 0.000,half 270 along -0.000
+  W5         fail pair 0.0000 halves h90:0.000/0.001 h270:-0.000/-0.001  pair mean 0.0000,half 90 along 0.000,half 270 along -0.000
+  W6         fail pair 0.0000 halves h90:0.000/0.001 h270:-0.000/-0.001  pair mean 0.0000,half 90 along 0.000,half 270 along -0.000
+
+== N1 G1 turn J_r 2e-05: 3 runs, qacc runs 0
+  R1         fail +90:dyaw -0.0 -90:dyaw -0.0  turn +90 err 90.0/90.0,turn +90 wrong sense -0.0,turn -90 err 90.0/90.0
+  R2         fail +90:dyaw 0.0 -90:dyaw 0.0  turn +90 err 92.7/92.7,turn -90 err 87.3/87.3,turn -90 wrong sense 0.0
+  R3         fail +90:dyaw -0.0 -90:dyaw -0.0  turn +90 err 90.0/90.0,turn +90 wrong sense -0.0,turn -90 err 90.0/90.0
+
+== N1 G1 walk J_r 2e-05: 6 runs, qacc runs 0
+  W1         fail pair 0.0000 halves h0:-0.004/0.000 h180:0.004/-0.000  pair mean 0.0000,half 0 along -0.004,half 180 along 0.004
+  W2         fail pair 0.0000 halves h0:-0.004/0.000 h180:0.004/-0.000  pair mean 0.0000,half 0 along -0.004,half 180 along 0.004
+  W3         fail pair 0.0000 halves h0:-0.004/-0.000 h180:0.004/0.000  pair mean 0.0000,half 0 along -0.004,half 180 along 0.004
+  W4         fail pair 0.0000 halves h90:0.000/0.004 h270:-0.000/-0.004  pair mean 0.0000,half 90 along 0.000,half 270 along -0.000
+  W5         fail pair 0.0000 halves h90:0.000/0.004 h270:-0.000/-0.004  pair mean 0.0000,half 90 along 0.000,half 270 along -0.000
+  W6         fail pair 0.0000 halves h90:0.000/0.004 h270:-0.000/-0.004  pair mean 0.0000,half 90 along 0.000,half 270 along -0.000
+
+== N1 G2 turn J_r 2e-05: 3 runs, qacc runs 0
+  R1         fail +90:dyaw -0.0 -90:dyaw -0.0  turn +90 err 90.0/90.0,turn +90 wrong sense -0.0,turn -90 err 90.0/90.0
+  R2         fail +90:dyaw 0.0 -90:dyaw 0.0  turn +90 err 92.7/92.7,turn -90 err 87.3/87.3,turn -90 wrong sense 0.0
+  R3         fail +90:dyaw -0.0 -90:dyaw -0.0  turn +90 err 90.0/90.0,turn +90 wrong sense -0.0,turn -90 err 90.0/90.0
+
+== N1 G2 walk J_r 2e-05: 6 runs, qacc runs 0
+  W1         fail pair 0.0000 halves h0:-0.004/0.000 h180:0.004/-0.000  pair mean 0.0000,half 0 along -0.004,half 180 along 0.004
+  W2         fail pair 0.0000 halves h0:-0.004/0.000 h180:0.004/-0.000  pair mean 0.0000,half 0 along -0.004,half 180 along 0.004
+  W3         fail pair 0.0000 halves h0:-0.004/-0.000 h180:0.004/0.000  pair mean 0.0000,half 0 along -0.004,half 180 along 0.004
+  W4         fail pair 0.0000 halves h90:0.000/0.004 h270:-0.000/-0.004  pair mean 0.0000,half 90 along 0.000,half 270 along -0.000
+  W5         fail pair 0.0000 halves h90:0.000/0.004 h270:-0.000/-0.004  pair mean 0.0000,half 90 along 0.000,half 270 along -0.000
+  W6         fail pair 0.0000 halves h90:0.000/0.004 h270:-0.000/-0.004  pair mean 0.0000,half 90 along 0.000,half 270 along -0.000
+
+== S  stand J_r 1e-06: 4 runs, qacc runs 0
+  yaw0    0 PASS drift 0.0034 dyaw 0.000 body 0.000/0.000 P 11.0 W peakP window 11 W, run 143 W  
+  yaw0   45 PASS drift 0.0040 dyaw -0.017 body 0.000/0.000 P 11.0 W peakP window 11 W, run 103 W  
+  yaw0   90 PASS drift 0.0043 dyaw -0.019 body 0.000/0.000 P 10.9 W peakP window 11 W, run 122 W  
+  yaw0  180 PASS drift 0.0034 dyaw -0.000 body 0.000/0.000 P 10.8 W peakP window 11 W, run 219 W  
+
+== S  stand J_r 2e-05: 4 runs, qacc runs 0
+  yaw0    0 PASS drift 0.0036 dyaw -0.001 body 0.000/0.000 P 11.1 W peakP window 14 W, run 178 W  
+  yaw0   90 PASS drift 0.0046 dyaw -0.012 body 0.000/0.000 P 10.9 W peakP window 16 W, run 164 W  
+  yaw0   45 PASS drift 0.0043 dyaw -0.011 body 0.000/0.000 P 11.0 W peakP window 16 W, run 131 W  
+  yaw0  180 PASS drift 0.0035 dyaw -0.001 body 0.000/0.000 P 10.8 W peakP window 13 W, run 277 W  
+
+== S  stand J_r 5e-06: 4 runs, qacc runs 0
+  yaw0    0 PASS drift 0.0034 dyaw -0.000 body 0.000/0.000 P 11.1 W peakP window 11 W, run 155 W  
+  yaw0  180 PASS drift 0.0034 dyaw -0.000 body 0.000/0.000 P 10.8 W peakP window 11 W, run 239 W  
+  yaw0   90 PASS drift 0.0043 dyaw -0.016 body 0.000/0.000 P 10.9 W peakP window 12 W, run 136 W  
+  yaw0   45 PASS drift 0.0040 dyaw -0.013 body 0.000/0.000 P 11.0 W peakP window 12 W, run 113 W  
+
+== U G1 turn J_r 2e-05: 6 runs, qacc runs 0
+  R1         fail -90:dyaw -0.3 +90:dyaw 0.2  turn -90 err 90.1/90.5,turn +90 err 90.1/90.5
+  R2         fail +90:dyaw 2.3 -90:dyaw 1.1  turn +90 err 91.6/93.3,turn -90 err 87.8/89.3,turn -90 wrong sense 1.1
+  R3         fail -90:dyaw 0.2 +90:dyaw -0.2  turn -90 err 90.1/90.3,turn -90 wrong sense 0.2,turn +90 err 90.1/90.3,turn +90 wrong sense -0.2
+
+== U G1 walk J_r 2e-05: 12 runs, qacc runs 0
+  W1         fail pair 0.0023 halves h0:-0.042/-0.000 h180:0.096/-0.002  pair mean 0.0023,half 0 along -0.042
+  W2         fail pair 0.0005 halves h180:0.150/-0.075 h0:-0.138/0.080  pair mean 0.0005,half 180 across -0.075,half 0 along -0.138
+  W3         fail pair -0.0005 halves h0:-0.127/-0.098 h180:0.115/0.087  pair mean -0.0005,half 0 along -0.127,half 180 across 0.087
+  W4         fail pair -0.0006 halves h270:-0.122/-0.406 h90:0.107/0.244  pair mean -0.0006,half 270 along -0.122,half 90 across 0.244
+  W5         fail pair -0.0010 halves h90:-0.015/0.304 h270:-0.009/-0.355  pair mean -0.0010,half 90 along -0.015,half 270 along -0.009
+  W6         fail pair -0.0006 halves h90:0.096/0.264 h270:-0.110/-0.332  pair mean -0.0006,half 90 across 0.264,half 270 along -0.110
+
+== U G2 turn J_r 2e-05: 6 runs, qacc runs 0
+  R1         fail +90:dyaw 9.2 -90:dyaw -1.7  turn +90 err 85.6/88.9,turn -90 err 85.8/103.3
+  R2         fail -90:dyaw -4.3 +90:dyaw -33.2  turn -90 err 79.2/97.3,turn +90 err 131.8/143.8,turn +90 wrong sense -33.2
+  R3         fail +90:dyaw -26.8 -90:dyaw -12.8  turn +90 err 120.9/131.2,turn +90 wrong sense -26.8,turn -90 err 79.0/88.7
+
+== U G2 walk J_r 2e-05: 12 runs, qacc runs 0
+  W1         fail pair -0.0125 halves h0:-0.638/0.058 h180:0.337/-0.374  pair mean -0.0125,half 0 along -0.638,half 180 across -0.374
+  W2         fail pair -0.0104 halves h180:0.522/-0.993 h0:-0.771/0.333  pair mean -0.0104,half 180 across -0.993,half 0 along -0.771
+  W3         fail pair 0.0006 halves h0:-0.538/-0.024 h180:0.553/1.344  pair mean 0.0006,half 0 along -0.538,half 180 across 1.344
+  W4         fail pair -0.0417 halves h90:0.993/1.756 h270:-1.994/-1.285  pair mean -0.0417,half 90 across 1.756,half 270 along -1.994
+  W5         fail pair 0.0284 halves h270:-1.277/-2.613 h90:1.957/1.517  half 270 along -1.277,half 90 across 1.517
+  W6         fail pair -0.0180 halves h270:-1.331/-0.473 h90:0.899/1.507  pair mean -0.0180,half 270 along -1.331,half 90 across 1.507

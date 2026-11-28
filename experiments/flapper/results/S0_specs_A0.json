@@ -1,0 +1,2965 @@
+[
+{
+"id": "A0_water_D_s20_wet",
+"scenario": "water",
+"leg": "dive",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_D0_s20_wet",
+"scenario": "water",
+"leg": "dive",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GW_s20_A_wet",
+"scenario": "water",
+"leg": "swim",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GW_s20_B_wet",
+"scenario": "water",
+"leg": "swim",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 20,
+"mode": "wetting",
+"half": "B",
+"water": {
+"seed": 20,
+"mode": "wetting",
+"half": "B",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_W0_s20_wet",
+"scenario": "water",
+"leg": "swim",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_U_s20_wet",
+"scenario": "water",
+"leg": "surface",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "U",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_U0_s20_wet",
+"scenario": "water",
+"leg": "surface",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "U",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GS_s20_A_wet",
+"scenario": "water",
+"leg": "surface_turn",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "ST",
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "ST",
+"g": {
+"f": 0.6,
+"A_deg": 80,
+"b_deg": -40,
+"down": 0.25,
+"Psi_r_deg": 55,
+"fwd_sign": -1.0,
+"turn_sign": -1.0
+}
+},
+"cmd_from_draw": "GS",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GS_s20_B_wet",
+"scenario": "water",
+"leg": "surface_turn",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "ST",
+"seed": 20,
+"mode": "wetting",
+"half": "B",
+"water": {
+"seed": 20,
+"mode": "wetting",
+"half": "B",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "ST",
+"g": {
+"f": 0.6,
+"A_deg": 80,
+"b_deg": -40,
+"down": 0.25,
+"Psi_r_deg": 55,
+"fwd_sign": -1.0,
+"turn_sign": -1.0
+}
+},
+"cmd_from_draw": "GS",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_S0_s20_wet",
+"scenario": "water",
+"leg": "surface_turn",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 20,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "GS",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_D_s20_def",
+"scenario": "water",
+"leg": "dive",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 20,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 20,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_D0_s20_def",
+"scenario": "water",
+"leg": "dive",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 20,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 20,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GW_s20_A_def",
+"scenario": "water",
+"leg": "swim",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 20,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 20,
+"mode": true,
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GW_s20_B_def",
+"scenario": "water",
+"leg": "swim",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 20,
+"mode": true,
+"half": "B",
+"water": {
+"seed": 20,
+"mode": true,
+"half": "B",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_W0_s20_def",
+"scenario": "water",
+"leg": "swim",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 20,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 20,
+"mode": true,
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_U_s20_def",
+"scenario": "water",
+"leg": "surface",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 20,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 20,
+"mode": true,
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "U",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_U0_s20_def",
+"scenario": "water",
+"leg": "surface",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 20,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 20,
+"mode": true,
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "U",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GS_s20_A_def",
+"scenario": "water",
+"leg": "surface_turn",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "ST",
+"seed": 20,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 20,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "ST",
+"g": {
+"f": 0.6,
+"A_deg": 80,
+"b_deg": -40,
+"down": 0.25,
+"Psi_r_deg": 55,
+"fwd_sign": -1.0,
+"turn_sign": -1.0
+}
+},
+"cmd_from_draw": "GS",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GS_s20_B_def",
+"scenario": "water",
+"leg": "surface_turn",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "ST",
+"seed": 20,
+"mode": true,
+"half": "B",
+"water": {
+"seed": 20,
+"mode": true,
+"half": "B",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "ST",
+"g": {
+"f": 0.6,
+"A_deg": 80,
+"b_deg": -40,
+"down": 0.25,
+"Psi_r_deg": 55,
+"fwd_sign": -1.0,
+"turn_sign": -1.0
+}
+},
+"cmd_from_draw": "GS",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_S0_s20_def",
+"scenario": "water",
+"leg": "surface_turn",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 20,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 20,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "GS",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_D_s21_wet",
+"scenario": "water",
+"leg": "dive",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_D0_s21_wet",
+"scenario": "water",
+"leg": "dive",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GW_s21_A_wet",
+"scenario": "water",
+"leg": "swim",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GW_s21_B_wet",
+"scenario": "water",
+"leg": "swim",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 21,
+"mode": "wetting",
+"half": "B",
+"water": {
+"seed": 21,
+"mode": "wetting",
+"half": "B",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_W0_s21_wet",
+"scenario": "water",
+"leg": "swim",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_U_s21_wet",
+"scenario": "water",
+"leg": "surface",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "U",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_U0_s21_wet",
+"scenario": "water",
+"leg": "surface",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "U",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GS_s21_A_wet",
+"scenario": "water",
+"leg": "surface_turn",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "ST",
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "ST",
+"g": {
+"f": 0.6,
+"A_deg": 80,
+"b_deg": -40,
+"down": 0.25,
+"Psi_r_deg": 55,
+"fwd_sign": -1.0,
+"turn_sign": -1.0
+}
+},
+"cmd_from_draw": "GS",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GS_s21_B_wet",
+"scenario": "water",
+"leg": "surface_turn",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "ST",
+"seed": 21,
+"mode": "wetting",
+"half": "B",
+"water": {
+"seed": 21,
+"mode": "wetting",
+"half": "B",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "ST",
+"g": {
+"f": 0.6,
+"A_deg": 80,
+"b_deg": -40,
+"down": 0.25,
+"Psi_r_deg": 55,
+"fwd_sign": -1.0,
+"turn_sign": -1.0
+}
+},
+"cmd_from_draw": "GS",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_S0_s21_wet",
+"scenario": "water",
+"leg": "surface_turn",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"water": {
+"seed": 21,
+"mode": "wetting",
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "GS",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_D_s21_def",
+"scenario": "water",
+"leg": "dive",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 21,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 21,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_D0_s21_def",
+"scenario": "water",
+"leg": "dive",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 21,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 21,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "D",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GW_s21_A_def",
+"scenario": "water",
+"leg": "swim",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 21,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 21,
+"mode": true,
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GW_s21_B_def",
+"scenario": "water",
+"leg": "swim",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 21,
+"mode": true,
+"half": "B",
+"water": {
+"seed": 21,
+"mode": true,
+"half": "B",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_W0_s21_def",
+"scenario": "water",
+"leg": "swim",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 21,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 21,
+"mode": true,
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_U_s21_def",
+"scenario": "water",
+"leg": "surface",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "WT",
+"seed": 21,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 21,
+"mode": true,
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "U",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_U0_s21_def",
+"scenario": "water",
+"leg": "surface",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 21,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 21,
+"mode": true,
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "U",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GS_s21_A_def",
+"scenario": "water",
+"leg": "surface_turn",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "ST",
+"seed": 21,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 21,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "ST",
+"g": {
+"f": 0.6,
+"A_deg": 80,
+"b_deg": -40,
+"down": 0.25,
+"Psi_r_deg": 55,
+"fwd_sign": -1.0,
+"turn_sign": -1.0
+}
+},
+"cmd_from_draw": "GS",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_GS_s21_B_def",
+"scenario": "water",
+"leg": "surface_turn",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "ST",
+"seed": 21,
+"mode": true,
+"half": "B",
+"water": {
+"seed": 21,
+"mode": true,
+"half": "B",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "ST",
+"g": {
+"f": 0.6,
+"A_deg": 80,
+"b_deg": -40,
+"down": 0.25,
+"Psi_r_deg": 55,
+"fwd_sign": -1.0,
+"turn_sign": -1.0
+}
+},
+"cmd_from_draw": "GS",
+"T": 40.0
+}
+},
+{
+"id": "A0_water_S0_s21_def",
+"scenario": "water",
+"leg": "surface_turn",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "still",
+"seed": 21,
+"mode": true,
+"half": "A",
+"water": {
+"seed": 21,
+"mode": true,
+"half": "A",
+"start": "float",
+"gains": "here",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": "GS",
+"T": 40.0
+}
+},
+{
+"id": "A0_waterair_XS_s20_wet",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "XS",
+"seed": 20,
+"mode": "wetting",
+"half": "X",
+"water": {
+"seed": 20,
+"mode": "wetting",
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A0_waterair_X0f_s20_wet",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "X0f",
+"seed": 20,
+"mode": "wetting",
+"half": "X",
+"water": {
+"seed": 20,
+"mode": "wetting",
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A0_waterair_XS_s20_def",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "XS",
+"seed": 20,
+"mode": true,
+"half": "X",
+"water": {
+"seed": 20,
+"mode": true,
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A0_waterair_X0f_s20_def",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "X0f",
+"seed": 20,
+"mode": true,
+"half": "X",
+"water": {
+"seed": 20,
+"mode": true,
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A0_waterair_XS_s21_wet",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "XS",
+"seed": 21,
+"mode": "wetting",
+"half": "X",
+"water": {
+"seed": 21,
+"mode": "wetting",
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A0_waterair_X0f_s21_wet",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "X0f",
+"seed": 21,
+"mode": "wetting",
+"half": "X",
+"water": {
+"seed": 21,
+"mode": "wetting",
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A0_waterair_XS_s21_def",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "XS",
+"seed": 21,
+"mode": true,
+"half": "X",
+"water": {
+"seed": 21,
+"mode": true,
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "stay",
+"g": {}
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A0_waterair_X0f_s21_def",
+"scenario": "waterair",
+"leg": "exit",
+"rung": "A0",
+"cfg": {},
+"kind": "water",
+"which": "scored",
+"arm": "X0f",
+"seed": 21,
+"mode": true,
+"half": "X",
+"water": {
+"seed": 21,
+"mode": true,
+"half": "X",
+"start": "float",
+"gains": "air",
+"law": {
+"law": "still"
+},
+"cmd_from_draw": null,
+"T": 40.0
+}
+},
+{
+"id": "A0_waterair_water_ES1_E_near_wet",
+"scenario": "waterair",
+"leg": "entry",
+"rung": "A0",
+"cfg": {},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "water",
+"arm": "E",
+"point": "P35",
+"start": [
+3.0,
+2.0,
+8.1,
+0.1
+],
+"start_name": "ES1",
+"cmd": -45.0,
+"E": {
+"a_f": 0.3,
+"b_c": 30,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -5
+},
+"ent": "wetting",
+"id": "A0_waterair_water_ES1_E_near_wet",
+"half": "near"
+},
+"again": "exit",
+"mode": "wetting"
+},
+{
+"id": "A0_waterair_water_ES1_E_far_wet",
+"scenario": "waterair",
+"leg": "entry",
+"rung": "A0",
+"cfg": {},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "water",
+"arm": "E",
+"point": "P35",
+"start": [
+3.0,
+2.0,
+8.1,
+0.1
+],
+"start_name": "ES1",
+"cmd": -33.0,
+"E": {
+"a_f": 0.3,
+"b_c": 30,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -5
+},
+"ent": "wetting",
+"id": "A0_waterair_water_ES1_E_far_wet",
+"half": "far"
+},
+"again": "exit",
+"mode": "wetting"
+},
+{
+"id": "A0_waterair_water_ES1_NW_all_wet",
+"scenario": "waterair",
+"leg": "entry",
+"rung": "A0",
+"cfg": {},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "water",
+"arm": "NW",
+"point": "P35",
+"start": [
+3.0,
+2.0,
+8.1,
+0.1
+],
+"start_name": "ES1",
+"cmd": -45.0,
+"E": {
+"a_f": 0.3,
+"b_c": 30,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -5
+},
+"ent": "wetting",
+"id": "A0_waterair_water_ES1_NW_all_wet",
+"half": "all"
+},
+"again": "exit",
+"mode": "wetting"
+},
+{
+"id": "A0_waterair_water_ES2_E_near_wet",
+"scenario": "waterair",
+"leg": "entry",
+"rung": "A0",
+"cfg": {},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "water",
+"arm": "E",
+"point": "P35",
+"start": [
+-3.0,
+-4.0,
+7.9,
+-0.2
+],
+"start_name": "ES2",
+"cmd": -45.0,
+"E": {
+"a_f": 0.3,
+"b_c": 30,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -5
+},
+"ent": "wetting",
+"id": "A0_waterair_water_ES2_E_near_wet",
+"half": "near"
+},
+"again": "exit",
+"mode": "wetting"
+},
+{
+"id": "A0_waterair_water_ES2_E_far_wet",
+"scenario": "waterair",
+"leg": "entry",
+"rung": "A0",
+"cfg": {},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "water",
+"arm": "E",
+"point": "P35",
+"start": [
+-3.0,
+-4.0,
+7.9,
+-0.2
+],
+"start_name": "ES2",
+"cmd": -33.0,
+"E": {
+"a_f": 0.3,
+"b_c": 30,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -5
+},
+"ent": "wetting",
+"id": "A0_waterair_water_ES2_E_far_wet",
+"half": "far"
+},
+"again": "exit",
+"mode": "wetting"
+},
+{
+"id": "A0_waterair_water_ES2_NW_all_wet",
+"scenario": "waterair",
+"leg": "entry",
+"rung": "A0",
+"cfg": {},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "water",
+"arm": "NW",
+"point": "P35",
+"start": [
+-3.0,
+-4.0,
+7.9,
+-0.2
+],
+"start_name": "ES2",
+"cmd": -45.0,
+"E": {
+"a_f": 0.3,
+"b_c": 30,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -5
+},
+"ent": "wetting",
+"id": "A0_waterair_water_ES2_NW_all_wet",
+"half": "all"
+},
+"again": "exit",
+"mode": "wetting"
+},
+{
+"id": "A0_waterair_water_ES1_E_near_def",
+"scenario": "waterair",
+"leg": "entry",
+"rung": "A0",
+"cfg": {},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "water",
+"arm": "E",
+"point": "P35",
+"start": [
+3.0,
+2.0,
+8.1,
+0.1
+],
+"start_name": "ES1",
+"cmd": -45.0,
+"E": {
+"a_f": 0.3,
+"b_c": 30,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -5
+},
+"ent": true,
+"id": "A0_waterair_water_ES1_E_near_def",
+"half": "near"
+},
+"again": "exit",
+"mode": true
+},
+{
+"id": "A0_waterair_water_ES1_E_far_def",
+"scenario": "waterair",
+"leg": "entry",
+"rung": "A0",
+"cfg": {},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "water",
+"arm": "E",
+"point": "P35",
+"start": [
+3.0,
+2.0,
+8.1,
+0.1
+],
+"start_name": "ES1",
+"cmd": -33.0,
+"E": {
+"a_f": 0.3,
+"b_c": 30,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -5
+},
+"ent": true,
+"id": "A0_waterair_water_ES1_E_far_def",
+"half": "far"
+},
+"again": "exit",
+"mode": true
+},
+{
+"id": "A0_waterair_water_ES1_NW_all_def",
+"scenario": "waterair",
+"leg": "entry",
+"rung": "A0",
+"cfg": {},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "water",
+"arm": "NW",
+"point": "P35",
+"start": [
+3.0,
+2.0,
+8.1,
+0.1
+],
+"start_name": "ES1",
+"cmd": -45.0,
+"E": {
+"a_f": 0.3,
+"b_c": 30,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -5
+},
+"ent": true,
+"id": "A0_waterair_water_ES1_NW_all_def",
+"half": "all"
+},
+"again": "exit",
+"mode": true
+},
+{
+"id": "A0_waterair_water_ES2_E_near_def",
+"scenario": "waterair",
+"leg": "entry",
+"rung": "A0",
+"cfg": {},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "water",
+"arm": "E",
+"point": "P35",
+"start": [
+-3.0,
+-4.0,
+7.9,
+-0.2
+],
+"start_name": "ES2",
+"cmd": -45.0,
+"E": {
+"a_f": 0.3,
+"b_c": 30,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -5
+},
+"ent": true,
+"id": "A0_waterair_water_ES2_E_near_def",
+"half": "near"
+},
+"again": "exit",
+"mode": true
+},
+{
+"id": "A0_waterair_water_ES2_E_far_def",
+"scenario": "waterair",
+"leg": "entry",
+"rung": "A0",
+"cfg": {},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "water",
+"arm": "E",
+"point": "P35",
+"start": [
+-3.0,
+-4.0,
+7.9,
+-0.2
+],
+"start_name": "ES2",
+"cmd": -33.0,
+"E": {
+"a_f": 0.3,
+"b_c": 30,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -5
+},
+"ent": true,
+"id": "A0_waterair_water_ES2_E_far_def",
+"half": "far"
+},
+"again": "exit",
+"mode": true
+},
+{
+"id": "A0_waterair_water_ES2_NW_all_def",
+"scenario": "waterair",
+"leg": "entry",
+"rung": "A0",
+"cfg": {},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "water",
+"arm": "NW",
+"point": "P35",
+"start": [
+-3.0,
+-4.0,
+7.9,
+-0.2
+],
+"start_name": "ES2",
+"cmd": -45.0,
+"E": {
+"a_f": 0.3,
+"b_c": 30,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -5
+},
+"ent": true,
+"id": "A0_waterair_water_ES2_NW_all_def",
+"half": "all"
+},
+"again": "exit",
+"mode": true
+},
+{
+"id": "A0_landair_TO_V+_19.5_30",
+"scenario": "landair",
+"leg": "takeoff",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "takeoff",
+"which": "scored",
+"arm": "V+",
+"entry": [
+19.5,
+30.0
+]
+},
+{
+"id": "A0_landair_TO_N0_19.5_30",
+"scenario": "landair",
+"leg": "takeoff",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "takeoff",
+"which": "scored",
+"arm": "N0",
+"entry": [
+19.5,
+30.0
+]
+},
+{
+"id": "A0_landair_TO_V+_26.5_210",
+"scenario": "landair",
+"leg": "takeoff",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "takeoff",
+"which": "scored",
+"arm": "V+",
+"entry": [
+26.5,
+210.0
+]
+},
+{
+"id": "A0_landair_TO_N0_26.5_210",
+"scenario": "landair",
+"leg": "takeoff",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "takeoff",
+"which": "scored",
+"arm": "N0",
+"entry": [
+26.5,
+210.0
+]
+},
+{
+"id": "A0_landair_Q1_L_H",
+"scenario": "landair",
+"leg": "cruise",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "L",
+"point": "P35",
+"start": [
+3.0,
+30.0,
+8.2
+],
+"start_name": "Q1",
+"cmd": 30.0,
+"id": "A0_landair_Q1_L_H",
+"half": "H"
+}
+},
+{
+"id": "A0_landair_Q1_N_all",
+"scenario": "landair",
+"leg": "cruise",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "N",
+"point": "P35",
+"start": [
+3.0,
+30.0,
+8.2
+],
+"start_name": "Q1",
+"cmd": 30.0,
+"id": "A0_landair_Q1_N_all",
+"half": "all"
+}
+},
+{
+"id": "A0_landair_Q2_L_H",
+"scenario": "landair",
+"leg": "cruise",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "L",
+"point": "P35",
+"start": [
+-4.0,
+-150.0,
+7.8
+],
+"start_name": "Q2",
+"cmd": -150.0,
+"id": "A0_landair_Q2_L_H",
+"half": "H"
+}
+},
+{
+"id": "A0_landair_Q2_N_all",
+"scenario": "landair",
+"leg": "cruise",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "N",
+"point": "P35",
+"start": [
+-4.0,
+-150.0,
+7.8
+],
+"start_name": "Q2",
+"cmd": -150.0,
+"id": "A0_landair_Q2_N_all",
+"half": "all"
+}
+},
+{
+"id": "A0_landair_land_ES1_E_near_wet",
+"scenario": "landair",
+"leg": "landing",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "land",
+"arm": "E",
+"point": "P35",
+"start": [
+3.0,
+2.0,
+8.1,
+0.1
+],
+"start_name": "ES1",
+"cmd": 16.0,
+"E": {
+"a_f": 0.5,
+"b_c": 0,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -2
+},
+"ent": "wetting",
+"id": "A0_landair_land_ES1_E_near_wet",
+"half": "near"
+},
+"again": "takeoff",
+"mode": "wetting"
+},
+{
+"id": "A0_landair_land_ES1_E_far_wet",
+"scenario": "landair",
+"leg": "landing",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "land",
+"arm": "E",
+"point": "P35",
+"start": [
+3.0,
+2.0,
+8.1,
+0.1
+],
+"start_name": "ES1",
+"cmd": 28.0,
+"E": {
+"a_f": 0.5,
+"b_c": 0,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -2
+},
+"ent": "wetting",
+"id": "A0_landair_land_ES1_E_far_wet",
+"half": "far"
+},
+"again": "takeoff",
+"mode": "wetting"
+},
+{
+"id": "A0_landair_land_ES1_NL_all_wet",
+"scenario": "landair",
+"leg": "landing",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "land",
+"arm": "NL",
+"point": "P35",
+"start": [
+3.0,
+2.0,
+8.1,
+0.1
+],
+"start_name": "ES1",
+"cmd": 16.0,
+"E": {
+"a_f": 0.5,
+"b_c": 0,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -2
+},
+"ent": "wetting",
+"id": "A0_landair_land_ES1_NL_all_wet",
+"half": "all"
+},
+"again": "takeoff",
+"mode": "wetting"
+},
+{
+"id": "A0_landair_land_ES2_E_near_wet",
+"scenario": "landair",
+"leg": "landing",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "land",
+"arm": "E",
+"point": "P35",
+"start": [
+-3.0,
+-4.0,
+7.9,
+-0.2
+],
+"start_name": "ES2",
+"cmd": 16.0,
+"E": {
+"a_f": 0.5,
+"b_c": 0,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -2
+},
+"ent": "wetting",
+"id": "A0_landair_land_ES2_E_near_wet",
+"half": "near"
+},
+"again": "takeoff",
+"mode": "wetting"
+},
+{
+"id": "A0_landair_land_ES2_E_far_wet",
+"scenario": "landair",
+"leg": "landing",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "land",
+"arm": "E",
+"point": "P35",
+"start": [
+-3.0,
+-4.0,
+7.9,
+-0.2
+],
+"start_name": "ES2",
+"cmd": 28.0,
+"E": {
+"a_f": 0.5,
+"b_c": 0,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -2
+},
+"ent": "wetting",
+"id": "A0_landair_land_ES2_E_far_wet",
+"half": "far"
+},
+"again": "takeoff",
+"mode": "wetting"
+},
+{
+"id": "A0_landair_land_ES2_NL_all_wet",
+"scenario": "landair",
+"leg": "landing",
+"rung": "A0",
+"cfg": {
+"sweep": true
+},
+"kind": "entry",
+"which": "scored",
+"half": {
+"kind": "land",
+"arm": "NL",
+"point": "P35",
+"start": [
+-3.0,
+-4.0,
+7.9,
+-0.2
+],
+"start_name": "ES2",
+"cmd": 16.0,
+"E": {
+"a_f": 0.5,
+"b_c": 0,
+"d_f": 12,
+"e_c": 0,
+"gamma": 15,
+"h_f": 0.2,
+"r_f": 1.0,
+"theta_f": -2
+},
+"ent": "wetting",
+"id": "A0_landair_land_ES2_NL_all_wet",
+"half": "all"
+},
+"again": "takeoff",
+"mode": "wetting"
+},
+{
+"id": "A0_air_Q1_L_H",
+"scenario": "air",
+"leg": "cruise",
+"rung": "A0",
+"cfg": {},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "L",
+"point": "P35",
+"start": [
+3.0,
+30.0,
+8.2
+],
+"start_name": "Q1",
+"cmd": 30.0,
+"id": "A0_air_Q1_L_H",
+"half": "H"
+}
+},
+{
+"id": "A0_air_Q1_L_Tp",
+"scenario": "air",
+"leg": "cruise",
+"rung": "A0",
+"cfg": {},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "L",
+"point": "P35",
+"start": [
+3.0,
+30.0,
+8.2
+],
+"start_name": "Q1",
+"cmd": 120.0,
+"id": "A0_air_Q1_L_Tp",
+"half": "Tp"
+}
+},
+{
+"id": "A0_air_Q1_L_Tm",
+"scenario": "air",
+"leg": "cruise",
+"rung": "A0",
+"cfg": {},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "L",
+"point": "P35",
+"start": [
+3.0,
+30.0,
+8.2
+],
+"start_name": "Q1",
+"cmd": -60.0,
+"id": "A0_air_Q1_L_Tm",
+"half": "Tm"
+}
+},
+{
+"id": "A0_air_Q1_N_all",
+"scenario": "air",
+"leg": "cruise",
+"rung": "A0",
+"cfg": {},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "N",
+"point": "P35",
+"start": [
+3.0,
+30.0,
+8.2
+],
+"start_name": "Q1",
+"cmd": 30.0,
+"id": "A0_air_Q1_N_all",
+"half": "all"
+}
+},
+{
+"id": "A0_air_Q2_L_H",
+"scenario": "air",
+"leg": "cruise",
+"rung": "A0",
+"cfg": {},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "L",
+"point": "P35",
+"start": [
+-4.0,
+-150.0,
+7.8
+],
+"start_name": "Q2",
+"cmd": -150.0,
+"id": "A0_air_Q2_L_H",
+"half": "H"
+}
+},
+{
+"id": "A0_air_Q2_L_Tp",
+"scenario": "air",
+"leg": "cruise",
+"rung": "A0",
+"cfg": {},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "L",
+"point": "P35",
+"start": [
+-4.0,
+-150.0,
+7.8
+],
+"start_name": "Q2",
+"cmd": -60.0,
+"id": "A0_air_Q2_L_Tp",
+"half": "Tp"
+}
+},
+{
+"id": "A0_air_Q2_L_Tm",
+"scenario": "air",
+"leg": "cruise",
+"rung": "A0",
+"cfg": {},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "L",
+"point": "P35",
+"start": [
+-4.0,
+-150.0,
+7.8
+],
+"start_name": "Q2",
+"cmd": -240.0,
+"id": "A0_air_Q2_L_Tm",
+"half": "Tm"
+}
+},
+{
+"id": "A0_air_Q2_N_all",
+"scenario": "air",
+"leg": "cruise",
+"rung": "A0",
+"cfg": {},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "N",
+"point": "P35",
+"start": [
+-4.0,
+-150.0,
+7.8
+],
+"start_name": "Q2",
+"cmd": -150.0,
+"id": "A0_air_Q2_N_all",
+"half": "all"
+}
+},
+{
+"id": "A0_land_SW1_K_h0",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "walk",
+"pair": "SW1",
+"yaw0_deg": 5,
+"phase": 0.25,
+"x": 20,
+"heading_deg": 0,
+"window_s": 14.0,
+"id": "A0_land_SW1_K_h0",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SW1_K_h180",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "walk",
+"pair": "SW1",
+"yaw0_deg": 5,
+"phase": 0.25,
+"x": 20,
+"heading_deg": 180,
+"window_s": 14.0,
+"id": "A0_land_SW1_K_h180",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SW1_U_h0",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "U",
+"kind": "walk",
+"pair": "SW1",
+"yaw0_deg": 5,
+"phase": 0.25,
+"x": 20,
+"heading_deg": 0,
+"window_s": 14.0,
+"id": "A0_land_SW1_U_h0",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SW1_U_h180",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "U",
+"kind": "walk",
+"pair": "SW1",
+"yaw0_deg": 5,
+"phase": 0.25,
+"x": 20,
+"heading_deg": 180,
+"window_s": 14.0,
+"id": "A0_land_SW1_U_h180",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SW1_N0_h0",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "N0",
+"kind": "walk",
+"pair": "SW1",
+"yaw0_deg": 5,
+"phase": 0.25,
+"x": 20,
+"heading_deg": 0,
+"window_s": 14.0,
+"id": "A0_land_SW1_N0_h0",
+"machine": "sweep",
+"family": "K",
+"gait": {}
+}
+},
+{
+"id": "A0_land_SW2_K_h90",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "walk",
+"pair": "SW2",
+"yaw0_deg": 82,
+"phase": 0.75,
+"x": 26,
+"heading_deg": 90,
+"window_s": 14.0,
+"id": "A0_land_SW2_K_h90",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SW2_K_h270",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "walk",
+"pair": "SW2",
+"yaw0_deg": 82,
+"phase": 0.75,
+"x": 26,
+"heading_deg": 270,
+"window_s": 14.0,
+"id": "A0_land_SW2_K_h270",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SW2_U_h90",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "U",
+"kind": "walk",
+"pair": "SW2",
+"yaw0_deg": 82,
+"phase": 0.75,
+"x": 26,
+"heading_deg": 90,
+"window_s": 14.0,
+"id": "A0_land_SW2_U_h90",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SW2_U_h270",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "U",
+"kind": "walk",
+"pair": "SW2",
+"yaw0_deg": 82,
+"phase": 0.75,
+"x": 26,
+"heading_deg": 270,
+"window_s": 14.0,
+"id": "A0_land_SW2_U_h270",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SW2_N0_h90",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "N0",
+"kind": "walk",
+"pair": "SW2",
+"yaw0_deg": 82,
+"phase": 0.75,
+"x": 26,
+"heading_deg": 90,
+"window_s": 14.0,
+"id": "A0_land_SW2_N0_h90",
+"machine": "sweep",
+"family": "K",
+"gait": {}
+}
+},
+{
+"id": "A0_land_SR1_K_t+90",
+"scenario": "land",
+"leg": "turn",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "turn",
+"pair": "SR1",
+"yaw0_deg": 40,
+"phase": 0.0,
+"x": 20,
+"turn_deg": 90,
+"window_s": 14.0,
+"id": "A0_land_SR1_K_t+90",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SR1_K_t-90",
+"scenario": "land",
+"leg": "turn",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "turn",
+"pair": "SR1",
+"yaw0_deg": 40,
+"phase": 0.0,
+"x": 20,
+"turn_deg": -90,
+"window_s": 14.0,
+"id": "A0_land_SR1_K_t-90",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SR1_N0_t+90",
+"scenario": "land",
+"leg": "turn",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "N0",
+"kind": "turn",
+"pair": "SR1",
+"yaw0_deg": 40,
+"phase": 0.0,
+"x": 20,
+"turn_deg": 90,
+"window_s": 14.0,
+"id": "A0_land_SR1_N0_t+90",
+"machine": "sweep",
+"family": "K",
+"gait": {}
+}
+},
+{
+"id": "A0_land_SR2_K_t+90",
+"scenario": "land",
+"leg": "turn",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "turn",
+"pair": "SR2",
+"yaw0_deg": 130,
+"phase": 0.0,
+"x": 20,
+"turn_deg": 90,
+"window_s": 14.0,
+"id": "A0_land_SR2_K_t+90",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SR2_K_t-90",
+"scenario": "land",
+"leg": "turn",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "turn",
+"pair": "SR2",
+"yaw0_deg": 130,
+"phase": 0.0,
+"x": 20,
+"turn_deg": -90,
+"window_s": 14.0,
+"id": "A0_land_SR2_K_t-90",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SR2_N0_t+90",
+"scenario": "land",
+"leg": "turn",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "N0",
+"kind": "turn",
+"pair": "SR2",
+"yaw0_deg": 130,
+"phase": 0.0,
+"x": 20,
+"turn_deg": 90,
+"window_s": 14.0,
+"id": "A0_land_SR2_N0_t+90",
+"machine": "sweep",
+"family": "K",
+"gait": {}
+}
+},
+{
+"id": "A0_land_SS1_KS",
+"scenario": "land",
+"leg": "stand",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "KS",
+"kind": "stand",
+"pair": "SS1",
+"yaw0_deg": 20,
+"phase": 0.0,
+"x": 19,
+"window_s": 10,
+"id": "A0_land_SS1_KS",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0_land_SS1_N0s",
+"scenario": "land",
+"leg": "stand",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "N0",
+"kind": "stand",
+"pair": "SS1",
+"yaw0_deg": 20,
+"phase": 0.0,
+"x": 19,
+"window_s": 10,
+"id": "A0_land_SS1_N0s",
+"machine": "sweep",
+"family": "K",
+"gait": {}
+}
+},
+{
+"id": "A0_land_SS2_KS",
+"scenario": "land",
+"leg": "stand",
+"rung": "A0",
+"cfg": {
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "KS",
+"kind": "stand",
+"pair": "SS2",
+"yaw0_deg": 200,
+"phase": 0.0,
+"x": 27,
+"window_s": 10,
+"id": "A0_land_SS2_KS",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+}
+]

@@ -111,5 +111,7 @@ jobs:
       - name: the physics suite
         # One function needs the Mojo GPU extension and reports itself as
         # [skip]; the summary line carries the count, so a run that skipped
-        # something cannot be read as a clean pass.
+        # something cannot be read as a clean pass.  The crossing-gate checks
+        # on the open-loop quad skip too where its tumble does not reproduce
+        # (a chaotic fixture; it did not on this runner, 2026-11-25).
         run: PYTHONPATH=. python tests/test_physics.py

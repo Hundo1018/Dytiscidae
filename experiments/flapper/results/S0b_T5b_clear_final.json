@@ -1,0 +1,638 @@
+[
+ {
+  "id": "b2z_bias-0.12_Phi20_Psi50",
+  "P": {
+   "Phi": 0.3490658503988659,
+   "Psi": 0.8726646259971648,
+   "lr_phase": 3.141592653589793,
+   "bias": -0.12,
+   "amp": 1.0
+  },
+  "clr": {
+   "wing_pont": [
+    0.03825931899110131,
+    "seg1_wing_g|t5_pont_L_g",
+    339
+   ],
+   "wing_strut": [
+    0.09469985405417493,
+    "seg1_wing_g|t5_strut_5",
+    318
+   ],
+   "wing_dorsal": [
+    0.149113265812509,
+    "seg1_wing_g|t5b_dorsal",
+    150
+   ],
+   "wing_hull": [
+    0.10088274316537,
+    "seg1_wing_g|seg0_hull_g3",
+    270
+   ],
+   "wing_tail": [
+    0.1315222931454656,
+    "seg4_wing_g|seg7_wing_g",
+    93
+   ],
+   "wing_wing": [
+    0.016932191226634172,
+    "seg1_wing_g|seg3_wing_g",
+    81
+   ]
+  }
+ },
+ {
+  "id": "b2z_bias-0.12_Phi26_Psi65",
+  "P": {
+   "Phi": 0.4537856055185257,
+   "Psi": 1.1344640137963142,
+   "lr_phase": 3.141592653589793,
+   "bias": -0.12,
+   "amp": 1.0
+  },
+  "clr": {
+   "wing_pont": [
+    0.01159291704978848,
+    "seg1_wing_g|t5_pont_L_g",
+    333
+   ],
+   "wing_strut": [
+    0.08349159424702127,
+    "seg2_wing_g|t5_strut_5",
+    123
+   ],
+   "wing_dorsal": [
+    0.13433482629763563,
+    "seg2_wing_g|t5b_dorsal",
+    321
+   ],
+   "wing_hull": [
+    0.10064019583871771,
+    "seg1_wing_g|seg0_hull_g3",
+    270
+   ],
+   "wing_tail": [
+    0.13166495650896334,
+    "seg4_wing_g|seg7_wing_g",
+    93
+   ],
+   "wing_wing": [
+    0.02399658862895441,
+    "seg2_wing_g|seg4_wing_g",
+    258
+   ]
+  }
+ },
+ {
+  "id": "b2z_bias-0.12_Phi10_Psi25",
+  "P": {
+   "Phi": 0.17453292519943295,
+   "Psi": 0.4363323129985824,
+   "lr_phase": 3.141592653589793,
+   "bias": -0.12,
+   "amp": 1.0
+  },
+  "clr": {
+   "wing_pont": [
+    0.0970350998105555,
+    "seg1_wing_g|t5_pont_L_g",
+    345
+   ],
+   "wing_strut": [
+    0.12938060866833997,
+    "seg2_wing_g|t5_strut_5",
+    162
+   ],
+   "wing_dorsal": [
+    0.1809146153325781,
+    "seg1_wing_g|t5b_dorsal",
+    162
+   ],
+   "wing_hull": [
+    0.10134216216147356,
+    "seg1_wing_g|seg0_hull_g3",
+    270
+   ],
+   "wing_tail": [
+    0.13150525962193169,
+    "seg4_wing_g|seg7_wing_g",
+    99
+   ],
+   "wing_wing": [
+    0.012416489401252933,
+    "seg2_wing_g|seg4_wing_g",
+    87
+   ]
+  }
+ },
+ {
+  "id": "b2z_bias0.0_Phi20_Psi50",
+  "P": {
+   "Phi": 0.3490658503988659,
+   "Psi": 0.8726646259971648,
+   "lr_phase": 3.141592653589793,
+   "bias": 0.0,
+   "amp": 1.0
+  },
+  "clr": {
+   "wing_pont": [
+    0.06054437265186273,
+    "seg1_wing_g|t5_pont_L_g",
+    342
+   ],
+   "wing_strut": [
+    0.11383051212616098,
+    "seg2_wing_g|t5_strut_5",
+    141
+   ],
+   "wing_dorsal": [
+    0.12991481851420222,
+    "seg1_wing_g|t5b_dorsal",
+    150
+   ],
+   "wing_hull": [
+    0.10153168707027697,
+    "seg1_wing_g|seg0_hull_g3",
+    270
+   ],
+   "wing_tail": [
+    0.13188356251097413,
+    "seg4_wing_g|seg7_wing_g",
+    90
+   ],
+   "wing_wing": [
+    0.016932191226634155,
+    "seg2_wing_g|seg4_wing_g",
+    261
+   ]
+  }
+ },
+ {
+  "id": "b2z_bias0.0_Phi26_Psi65",
+  "P": {
+   "Phi": 0.4537856055185257,
+   "Psi": 1.1344640137963142,
+   "lr_phase": 3.141592653589793,
+   "bias": 0.0,
+   "amp": 1.0
+  },
+  "clr": {
+   "wing_pont": [
+    0.03494878384358517,
+    "seg2_wing_g|t5_pont_R_g",
+    156
+   ],
+   "wing_strut": [
+    0.10270278635939482,
+    "seg2_wing_g|t5_strut_5",
+    126
+   ],
+   "wing_dorsal": [
+    0.11383968998798485,
+    "seg2_wing_g|t5b_dorsal",
+    324
+   ],
+   "wing_hull": [
+    0.1012329625706651,
+    "seg1_wing_g|seg0_hull_g3",
+    270
+   ],
+   "wing_tail": [
+    0.13218976513956682,
+    "seg3_wing_g|seg6_wing_g",
+    90
+   ],
+   "wing_wing": [
+    0.023996588628954412,
+    "seg2_wing_g|seg4_wing_g",
+    258
+   ]
+  }
+ },
+ {
+  "id": "b2z_bias0.0_Phi10_Psi25",
+  "P": {
+   "Phi": 0.17453292519943295,
+   "Psi": 0.4363323129985824,
+   "lr_phase": 3.141592653589793,
+   "bias": 0.0,
+   "amp": 1.0
+  },
+  "clr": {
+   "wing_pont": [
+    0.11837395194702513,
+    "seg1_wing_g|t5_pont_L_g",
+    348
+   ],
+   "wing_strut": [
+    0.14345453726034074,
+    "seg3_wing_g|t5_strut_4",
+    51
+   ],
+   "wing_dorsal": [
+    0.16547591488878793,
+    "seg1_wing_g|t5b_dorsal",
+    165
+   ],
+   "wing_hull": [
+    0.1020807081549129,
+    "seg1_wing_g|seg0_hull_g3",
+    270
+   ],
+   "wing_tail": [
+    0.13153899901177712,
+    "seg3_wing_g|seg6_wing_g",
+    96
+   ],
+   "wing_wing": [
+    0.012416489401252936,
+    "seg2_wing_g|seg4_wing_g",
+    87
+   ]
+  }
+ },
+ {
+  "id": "b2z_bias0.12_Phi20_Psi50",
+  "P": {
+   "Phi": 0.3490658503988659,
+   "Psi": 0.8726646259971648,
+   "lr_phase": 3.141592653589793,
+   "bias": 0.12,
+   "amp": 1.0
+  },
+  "clr": {
+   "wing_pont": [
+    0.07946508607905492,
+    "seg1_wing_g|t5_pont_L_g",
+    345
+   ],
+   "wing_strut": [
+    0.1299872048555177,
+    "seg1_wing_g|t5_strut_5",
+    330
+   ],
+   "wing_dorsal": [
+    0.11022016448806576,
+    "seg1_wing_g|t5b_dorsal",
+    153
+   ],
+   "wing_hull": [
+    0.10088274373936532,
+    "seg2_wing_g|seg0_hull_g2",
+    270
+   ],
+   "wing_tail": [
+    0.13152229314546557,
+    "seg4_wing_g|seg7_wing_g",
+    273
+   ],
+   "wing_wing": [
+    0.016932191226634172,
+    "seg1_wing_g|seg3_wing_g",
+    261
+   ]
+  }
+ },
+ {
+  "id": "b2z_bias0.12_Phi26_Psi65",
+  "P": {
+   "Phi": 0.4537856055185257,
+   "Psi": 1.1344640137963142,
+   "lr_phase": 3.141592653589793,
+   "bias": 0.12,
+   "amp": 1.0
+  },
+  "clr": {
+   "wing_pont": [
+    0.05499084653534769,
+    "seg1_wing_g|t5_pont_L_g",
+    339
+   ],
+   "wing_strut": [
+    0.12036462290999599,
+    "seg2_wing_g|t5_strut_5",
+    132
+   ],
+   "wing_dorsal": [
+    0.09276123510189613,
+    "seg2_wing_g|t5b_dorsal",
+    324
+   ],
+   "wing_hull": [
+    0.10064019645079873,
+    "seg2_wing_g|seg0_hull_g2",
+    270
+   ],
+   "wing_tail": [
+    0.13166495650896334,
+    "seg3_wing_g|seg6_wing_g",
+    93
+   ],
+   "wing_wing": [
+    0.0239965886289544,
+    "seg2_wing_g|seg4_wing_g",
+    78
+   ]
+  }
+ },
+ {
+  "id": "b2z_bias0.12_Phi10_Psi25",
+  "P": {
+   "Phi": 0.17453292519943295,
+   "Psi": 0.4363323129985824,
+   "lr_phase": 3.141592653589793,
+   "bias": 0.12,
+   "amp": 1.0
+  },
+  "clr": {
+   "wing_pont": [
+    0.1363829083537753,
+    "seg2_wing_g|t5_pont_R_g",
+    171
+   ],
+   "wing_strut": [
+    0.1472131736795141,
+    "seg3_wing_g|t5_strut_4",
+    66
+   ],
+   "wing_dorsal": [
+    0.14963855707153878,
+    "seg2_wing_g|t5b_dorsal",
+    345
+   ],
+   "wing_hull": [
+    0.10134216266854996,
+    "seg2_wing_g|seg0_hull_g2",
+    270
+   ],
+   "wing_tail": [
+    0.1315052596219317,
+    "seg3_wing_g|seg6_wing_g",
+    99
+   ],
+   "wing_wing": [
+    0.012416489401252936,
+    "seg1_wing_g|seg3_wing_g",
+    267
+   ]
+  }
+ },
+ {
+  "id": "hover_amp0.713_sw0-0.3",
+  "P": {
+   "flip": "vert",
+   "A": 0.9599310885968813,
+   "dih": 0.6108652381980153,
+   "Psi": 0.7853981633974483,
+   "sw0": -0.3,
+   "amp": 0.713
+  },
+  "clr": {
+   "wing_pont": [
+    0.1270230339637757,
+    "seg3_wing_g|t5_pont_L_g",
+    90
+   ],
+   "wing_strut": [
+    0.0681324570058841,
+    "seg1_wing_g|t5_strut_4",
+    309
+   ],
+   "wing_dorsal": [
+    0.031174229506923376,
+    "seg1_wing_g|t5b_dorsal",
+    249
+   ],
+   "wing_hull": [
+    0.030869718996516506,
+    "seg2_wing_g|seg0_hull_g2",
+    288
+   ],
+   "wing_tail": [
+    0.03123550582944053,
+    "seg3_wing_g|seg6_wing_g",
+    285
+   ],
+   "wing_wing": [
+    0.02716241157502408,
+    "seg1_wing_g|seg2_wing_g",
+    237
+   ]
+  }
+ },
+ {
+  "id": "hover_amp0.713_sw00.0",
+  "P": {
+   "flip": "vert",
+   "A": 0.9599310885968813,
+   "dih": 0.6108652381980153,
+   "Psi": 0.7853981633974483,
+   "sw0": 0.0,
+   "amp": 0.713
+  },
+  "clr": {
+   "wing_pont": [
+    0.1257217763696279,
+    "seg1_wing_g|t5_pont_L_g",
+    96
+   ],
+   "wing_strut": [
+    0.12916229002009544,
+    "seg2_wing_g|t5_strut_4",
+    306
+   ],
+   "wing_dorsal": [
+    0.05040218940468628,
+    "seg2_wing_g|t5b_dorsal",
+    255
+   ],
+   "wing_hull": [
+    0.060065682468077176,
+    "seg2_wing_g|seg0_hull_g2",
+    282
+   ],
+   "wing_tail": [
+    0.0705129973016124,
+    "seg3_wing_g|seg6_wing_g",
+    291
+   ],
+   "wing_wing": [
+    0.07477374630311973,
+    "seg1_wing_g|seg2_wing_g",
+    246
+   ]
+  }
+ },
+ {
+  "id": "hover_amp0.713_sw00.3",
+  "P": {
+   "flip": "vert",
+   "A": 0.9599310885968813,
+   "dih": 0.6108652381980153,
+   "Psi": 0.7853981633974483,
+   "sw0": 0.3,
+   "amp": 0.713
+  },
+  "clr": {
+   "wing_pont": [
+    0.12572747294459882,
+    "seg1_wing_g|t5_pont_L_g",
+    267
+   ],
+   "wing_strut": [
+    0.12408124097232123,
+    "seg3_wing_g|t5_strut_4",
+    120
+   ],
+   "wing_dorsal": [
+    0.06268510205346789,
+    "seg4_wing_g|t5b_dorsal",
+    66
+   ],
+   "wing_hull": [
+    0.0714073461135714,
+    "seg4_wing_g|seg0_hull_g2",
+    135
+   ],
+   "wing_tail": [
+    0.12256956779765718,
+    "seg4_wing_g|seg5_strut_g",
+    267
+   ],
+   "wing_wing": [
+    0.08419743941725921,
+    "seg1_wing_g|seg3_wing_g",
+    135
+   ]
+  }
+ },
+ {
+  "id": "hover_amp0.9_sw0-0.3",
+  "P": {
+   "flip": "vert",
+   "A": 0.9599310885968813,
+   "dih": 0.6108652381980153,
+   "Psi": 0.7853981633974483,
+   "sw0": -0.3,
+   "amp": 0.9
+  },
+  "clr": {
+   "wing_pont": [
+    0.12600538729645092,
+    "seg1_wing_g|t5_pont_L_g",
+    87
+   ],
+   "wing_strut": [
+    0.03890891809749354,
+    "seg2_wing_g|t5_strut_4",
+    306
+   ],
+   "wing_dorsal": [
+    0.01564672242941135,
+    "seg1_wing_g|t5b_dorsal",
+    249
+   ],
+   "wing_hull": [
+    0.009972585502759828,
+    "seg2_wing_g|seg0_hull_g1",
+    294
+   ],
+   "wing_tail": [
+    0.020081751901437617,
+    "seg3_wing_g|seg6_wing_g",
+    279
+   ],
+   "wing_wing": [
+    0.0033292104553124813,
+    "seg1_wing_g|seg2_wing_g",
+    237
+   ]
+  }
+ },
+ {
+  "id": "hover_amp0.9_sw00.0",
+  "P": {
+   "flip": "vert",
+   "A": 0.9599310885968813,
+   "dih": 0.6108652381980153,
+   "Psi": 0.7853981633974483,
+   "sw0": 0.0,
+   "amp": 0.9
+  },
+  "clr": {
+   "wing_pont": [
+    0.12629680215787625,
+    "seg3_wing_g|t5_pont_L_g",
+    81
+   ],
+   "wing_strut": [
+    0.09983721497082171,
+    "seg2_wing_g|t5_strut_4",
+    303
+   ],
+   "wing_dorsal": [
+    0.04055014314823018,
+    "seg1_wing_g|t5b_dorsal",
+    255
+   ],
+   "wing_hull": [
+    0.04374589708352723,
+    "seg2_wing_g|seg0_hull_g2",
+    282
+   ],
+   "wing_tail": [
+    0.043961505767675636,
+    "seg3_wing_g|seg6_wing_g",
+    285
+   ],
+   "wing_wing": [
+    0.04968371266338098,
+    "seg1_wing_g|seg2_wing_g",
+    243
+   ]
+  }
+ },
+ {
+  "id": "hover_amp0.9_sw00.3",
+  "P": {
+   "flip": "vert",
+   "A": 0.9599310885968813,
+   "dih": 0.6108652381980153,
+   "Psi": 0.7853981633974483,
+   "sw0": 0.3,
+   "amp": 0.9
+  },
+  "clr": {
+   "wing_pont": [
+    0.12625215707703227,
+    "seg2_wing_g|t5_pont_R_g",
+    261
+   ],
+   "wing_strut": [
+    0.11416906897182912,
+    "seg4_wing_g|t5_strut_4",
+    117
+   ],
+   "wing_dorsal": [
+    0.05411564639354823,
+    "seg1_wing_g|t5b_dorsal",
+    66
+   ],
+   "wing_hull": [
+    0.04990994084042401,
+    "seg4_wing_g|seg0_hull_g2",
+    129
+   ],
+   "wing_tail": [
+    0.10571190736619604,
+    "seg3_wing_g|seg6_wing_g",
+    291
+   ],
+   "wing_wing": [
+    0.05211986364389861,
+    "seg2_wing_g|seg4_wing_g",
+    123
+   ]
+  }
+ }
+]

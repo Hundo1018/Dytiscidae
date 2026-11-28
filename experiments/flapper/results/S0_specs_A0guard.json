@@ -1,0 +1,671 @@
+[
+{
+"id": "A0c2_land_SW1_K_h0",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "walk",
+"pair": "SW1",
+"yaw0_deg": 5,
+"phase": 0.25,
+"x": 20,
+"heading_deg": 0,
+"window_s": 14.0,
+"id": "A0c2_land_SW1_K_h0",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SW1_K_h180",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "walk",
+"pair": "SW1",
+"yaw0_deg": 5,
+"phase": 0.25,
+"x": 20,
+"heading_deg": 180,
+"window_s": 14.0,
+"id": "A0c2_land_SW1_K_h180",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SW1_U_h0",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "U",
+"kind": "walk",
+"pair": "SW1",
+"yaw0_deg": 5,
+"phase": 0.25,
+"x": 20,
+"heading_deg": 0,
+"window_s": 14.0,
+"id": "A0c2_land_SW1_U_h0",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SW1_U_h180",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "U",
+"kind": "walk",
+"pair": "SW1",
+"yaw0_deg": 5,
+"phase": 0.25,
+"x": 20,
+"heading_deg": 180,
+"window_s": 14.0,
+"id": "A0c2_land_SW1_U_h180",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SW1_N0_h0",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "N0",
+"kind": "walk",
+"pair": "SW1",
+"yaw0_deg": 5,
+"phase": 0.25,
+"x": 20,
+"heading_deg": 0,
+"window_s": 14.0,
+"id": "A0c2_land_SW1_N0_h0",
+"machine": "sweep",
+"family": "K",
+"gait": {}
+}
+},
+{
+"id": "A0c2_land_SW2_K_h90",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "walk",
+"pair": "SW2",
+"yaw0_deg": 82,
+"phase": 0.75,
+"x": 26,
+"heading_deg": 90,
+"window_s": 14.0,
+"id": "A0c2_land_SW2_K_h90",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SW2_K_h270",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "walk",
+"pair": "SW2",
+"yaw0_deg": 82,
+"phase": 0.75,
+"x": 26,
+"heading_deg": 270,
+"window_s": 14.0,
+"id": "A0c2_land_SW2_K_h270",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SW2_U_h90",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "U",
+"kind": "walk",
+"pair": "SW2",
+"yaw0_deg": 82,
+"phase": 0.75,
+"x": 26,
+"heading_deg": 90,
+"window_s": 14.0,
+"id": "A0c2_land_SW2_U_h90",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SW2_U_h270",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "U",
+"kind": "walk",
+"pair": "SW2",
+"yaw0_deg": 82,
+"phase": 0.75,
+"x": 26,
+"heading_deg": 270,
+"window_s": 14.0,
+"id": "A0c2_land_SW2_U_h270",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SW2_N0_h90",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "N0",
+"kind": "walk",
+"pair": "SW2",
+"yaw0_deg": 82,
+"phase": 0.75,
+"x": 26,
+"heading_deg": 90,
+"window_s": 14.0,
+"id": "A0c2_land_SW2_N0_h90",
+"machine": "sweep",
+"family": "K",
+"gait": {}
+}
+},
+{
+"id": "A0c2_land_SR1_K_t+90",
+"scenario": "land",
+"leg": "turn",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "turn",
+"pair": "SR1",
+"yaw0_deg": 40,
+"phase": 0.0,
+"x": 20,
+"turn_deg": 90,
+"window_s": 14.0,
+"id": "A0c2_land_SR1_K_t+90",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SR1_K_t-90",
+"scenario": "land",
+"leg": "turn",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "turn",
+"pair": "SR1",
+"yaw0_deg": 40,
+"phase": 0.0,
+"x": 20,
+"turn_deg": -90,
+"window_s": 14.0,
+"id": "A0c2_land_SR1_K_t-90",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SR1_N0_t+90",
+"scenario": "land",
+"leg": "turn",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "N0",
+"kind": "turn",
+"pair": "SR1",
+"yaw0_deg": 40,
+"phase": 0.0,
+"x": 20,
+"turn_deg": 90,
+"window_s": 14.0,
+"id": "A0c2_land_SR1_N0_t+90",
+"machine": "sweep",
+"family": "K",
+"gait": {}
+}
+},
+{
+"id": "A0c2_land_SR2_K_t+90",
+"scenario": "land",
+"leg": "turn",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "turn",
+"pair": "SR2",
+"yaw0_deg": 130,
+"phase": 0.0,
+"x": 20,
+"turn_deg": 90,
+"window_s": 14.0,
+"id": "A0c2_land_SR2_K_t+90",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SR2_K_t-90",
+"scenario": "land",
+"leg": "turn",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "turn",
+"pair": "SR2",
+"yaw0_deg": 130,
+"phase": 0.0,
+"x": 20,
+"turn_deg": -90,
+"window_s": 14.0,
+"id": "A0c2_land_SR2_K_t-90",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SR2_N0_t+90",
+"scenario": "land",
+"leg": "turn",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "N0",
+"kind": "turn",
+"pair": "SR2",
+"yaw0_deg": 130,
+"phase": 0.0,
+"x": 20,
+"turn_deg": 90,
+"window_s": 14.0,
+"id": "A0c2_land_SR2_N0_t+90",
+"machine": "sweep",
+"family": "K",
+"gait": {}
+}
+},
+{
+"id": "A0c2_land_SS1_KS",
+"scenario": "land",
+"leg": "stand",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "KS",
+"kind": "stand",
+"pair": "SS1",
+"yaw0_deg": 20,
+"phase": 0.0,
+"x": 19,
+"window_s": 10,
+"id": "A0c2_land_SS1_KS",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0c2_land_SS1_N0s",
+"scenario": "land",
+"leg": "stand",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "N0",
+"kind": "stand",
+"pair": "SS1",
+"yaw0_deg": 20,
+"phase": 0.0,
+"x": 19,
+"window_s": 10,
+"id": "A0c2_land_SS1_N0s",
+"machine": "sweep",
+"family": "K",
+"gait": {}
+}
+},
+{
+"id": "A0c2_land_SS2_KS",
+"scenario": "land",
+"leg": "stand",
+"rung": "A0c2",
+"cfg": {
+"solref_x": 2.0,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "KS",
+"kind": "stand",
+"pair": "SS2",
+"yaw0_deg": 200,
+"phase": 0.0,
+"x": 27,
+"window_s": 10,
+"id": "A0c2_land_SS2_KS",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0dt_land_SW1_K_h0",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0dt",
+"cfg": {
+"dt": 5e-05,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "walk",
+"pair": "SW1",
+"yaw0_deg": 5,
+"phase": 0.25,
+"x": 20,
+"heading_deg": 0,
+"window_s": 14.0,
+"id": "A0dt_land_SW1_K_h0",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0dt_land_SW1_K_h180",
+"scenario": "land",
+"leg": "walk",
+"rung": "A0dt",
+"cfg": {
+"dt": 5e-05,
+"sweep": true,
+"sweep_free": true
+},
+"kind": "land",
+"which": "scored",
+"m3b": {
+"arm": "K",
+"kind": "walk",
+"pair": "SW1",
+"yaw0_deg": 5,
+"phase": 0.25,
+"x": 20,
+"heading_deg": 180,
+"window_s": 14.0,
+"id": "A0dt_land_SW1_K_h180",
+"machine": "sweep",
+"family": "K",
+"gait": {
+"A": 30.0,
+"T": 1.5
+}
+}
+},
+{
+"id": "A0dt_air_Q1_L_H",
+"scenario": "air",
+"leg": "cruise",
+"rung": "A0dt",
+"cfg": {
+"dt": 5e-05
+},
+"kind": "cruise",
+"which": "scored",
+"half": {
+"kind": "cruise",
+"arm": "L",
+"point": "P35",
+"start": [
+3.0,
+30.0,
+8.2
+],
+"start_name": "Q1",
+"cmd": 30.0,
+"id": "A0dt_air_Q1_L_H",
+"half": "H",
+"dt": 5e-05
+}
+},
+{
+"id": "DIAG_M2b_WT_s10_A_wet",
+"scenario": "diag",
+"leg": "swim",
+"rung": "DIAG",
+"cfg": {
+"witness": true,
+"no_I0": true
+},
+"kind": "water",
+"water": {
+"seed": 10,
+"mode": "wetting",
+"half": "A",
+"start": "depth",
+"gains": "here",
+"law": {
+"law": "WT",
+"g": {
+"sgn": 1.0,
+"gain": 0.2,
+"tailfirst": 1,
+"kz_deg": -15,
+"kh": -1.5,
+"dorsal": 1
+}
+},
+"cmd_from_draw": "GW",
+"T": 40.0
+}
+}
+]

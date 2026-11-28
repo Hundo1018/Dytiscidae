@@ -792,7 +792,7 @@ is what changes if the number moves.
 | constant | value | status | units | moves |
 |---|---|---|---|---|
 | finite-wing slope `2 pi/(1+2/AR)` | — | `DERIVED` thin-airfoil + elliptic downwash | 1/rad | all attached lift |
-| camber shift `2 * f/c` | — | `DERIVED` thin-airfoil, parabolic arc | rad | zero-lift angle |
+| camber shift `2 * f/c` | — | `DERIVED` thin-airfoil, parabolic arc | rad | zero-lift angle. Law `"legacy"` only since 2026-11-17 (repair R3): the default reads measured tables, `fluid.table_coefficients` |
 | induced drag `CL^2/(pi e AR)` | — | `DERIVED` elliptic loading | 1 | drag at high CL |
 | Blasius `1.328/sqrt(Re)` | — | `TEXTBOOK` | 1 | friction below transition |
 | 1/7-power `0.074/Re^0.2` | — | `CORRELATION`, valid 5e5-1e7 | 1 | friction above transition |
@@ -800,7 +800,7 @@ is what changes if the number moves.
 | plate normal force `1.98` | — | `TEXTBOOK` flat plate | 1 | post-stall drag, paddling |
 | cross-flow `CD_CROSSFLOW` | `1.1` | `TEXTBOOK` circular cylinder | 1 | hull side force, weathercock stability |
 | `CL_max` | `1.10 + 0.80*lev` | `CALIBRATED` | 1 | all post-stall lift |
-| `alpha_stall` | `11 + 26*lev` deg | `CALIBRATED` | deg | where stall begins |
+| `alpha_stall` | `11 + 26*lev` deg | `CALIBRATED` | deg | where stall begins. Law `"legacy"` only since 2026-11-17 |
 | low-Re knockdown | `0.55 + 0.45 log10(Re)/5` | `CALIBRATED`, anchored Re=1e5 | 1 | small-wing stall |
 | separation width | `16` deg | `CALIBRATED` | deg | **F-05**, closed; an interior minimum against the visited sample. Was a `6` deg logistic width, `HEURISTIC` |
 | `lev` scale | `k/0.30` | `HEURISTIC` | 1 | LEV onset |

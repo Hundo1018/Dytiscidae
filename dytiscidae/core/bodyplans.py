@@ -696,6 +696,78 @@ def quad() -> Genome:
 REFERENCE_PLANS = {"quad": _stamped("quad", quad)}
 
 
+def legged_quad() -> Genome:
+    """The reference quad with a pack that closes, a hull that nearly floats and
+    four jointed limbs: the anchor body of the triphibian diagnosis.
+
+    The body the hand law of `control.outer` completes the mission on
+    (`experiments/triphibian_diagnosis/existence`, E0b's L1 and E0s, 2026-11-11:
+    32, 32 and 31 of 32 missions from the air, the water and the land).  Not a
+    seed and not a reference: no search has produced it and none starts from it.
+
+    Every edit from `quad`:
+
+    - hull 0.40 m long (0.22), radius 0.064 m (0.05): room for propeller discs
+      that do not overlap, and the volume that puts the density ratio near 1
+      (the radius was set by hand for that);
+    - battery 200 Wh of "lis" (60 Wh of "lipo"): the only cell in
+      `physics.materials.CELLS` that closes the pack at this mass;
+    - one fixed dorsal fin (PADDLE, no joint), not for control: a body with no
+      surface and no jet fails `has_propulsor`, a gating check, so Tier-0 would
+      reject a bare multirotor;
+    - two mirrored limb pairs at hull stations 0.42 and 0.58, clear of the
+      discs: a 0.09 m STRUT on a universal joint (stroke +-0.7 rad raises and
+      lowers the foot, the feather hinge sweeps it fore and aft; bldc, 30 g,
+      gear 6) carrying a fixed 0.075 m FOOT straight down from its tip;
+    - base-gait rotor throttle 1.05 x hover for the new mass, because the air
+      score's `level_margin` is measured on the body's own gait.
+
+    The throttle needs the built mass and the rotor's static thrust, so this
+    constructor imports `phenotype.build` and `physics.rotor.bemt` when called.
+    """
+    from ..physics.medium import AIR, GRAVITY
+    from ..physics.rotor import bemt
+    from .mjcf import ROTOR_TIP_SPEED
+    from .phenotype import build
+
+    g = quad()
+    hull, arm = g.parts
+    hull.length, hull.radius = 0.40, 0.064
+    g.battery_wh, g.battery_chem = 200.0, "lis"
+    fin = Part(kind=PADDLE, span=0.12, root_chord=0.05, radius=0.004, material="cfrp",
+               joint="none", actuated=False)
+    upper = Part(kind=STRUT, length=0.09, span=0.09, root_chord=0.15, radius=0.006,
+                 material="cfrp", joint="universal", joint_axis=np.array([0.0, 0.0, 1.0]),
+                 joint_range=(-0.7, 0.7), actuated=True, motor_class="bldc", motor_mass=0.03,
+                 gear_ratio=6.0, sealed=False, stroke_amplitude=0.0, neutral=0.5)
+    lower = Part(kind=FOOT, length=0.075, radius=0.006, material="cfrp", joint="none",
+                 actuated=False)
+    g.parts = [hull, arm, upper, fin, lower]
+    g.edges = list(g.edges) + [
+        Edge(parent=0, child=3, pos_u=0.5, azimuth=math.pi / 2, elevation=0.0,
+             roll=math.pi / 2, scale=1.0, reflect=False),
+    ] + [
+        # roll pi/2 puts the limb's local +Y straight down on both sides, so the
+        # fixed lower part (in the local XY plane) mirrors properly
+        Edge(parent=0, child=2, pos_u=u, azimuth=0.0, elevation=0.0, roll=math.pi / 2,
+             scale=1.0, reflect=True) for u in (0.42, 0.58)
+    ] + [Edge(parent=2, child=4, pos_u=1.0, azimuth=0.0, elevation=0.0, roll=0.0, scale=1.0,
+              reflect=False)]
+    g.lineage = ["quad", "E0-B1", "E0b-L1"]
+    p = build(g)
+    spec = next(s.rotor for s in p.segments if s.rotor is not None)
+    thrust, _ = bemt(spec, 600.0, 0.0, 0.0, AIR.rho, AIR.mu)
+    hover = math.sqrt(1.05 * p.mass * GRAVITY / (4.0 * thrust / 600.0 ** 2))
+    arm.rotor_throttle = float(np.clip(hover / (ROTOR_TIP_SPEED / spec.radius), 0.05, 0.95))
+    return g
+
+
+#: Anchor machines: hand-built bodies a hand-written controller is measured on.
+#: Kept apart from `BODY_PLANS` and `REFERENCE_PLANS` because tests and tools
+#: iterate those two.
+ANCHOR_PLANS = {"legged_quad": _stamped("legged_quad", legged_quad)}
+
+
 def sample_body_plan(rng: np.random.Generator, *, perturb: int = 0) -> Genome:
     """Draw one archetype and optionally mutate it."""
     from .genome import mutate

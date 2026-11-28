@@ -419,9 +419,31 @@ ContinuousMission:
     - envs.mission.run_continuous
     - envs.mission.build_schedule
     - envs.mission.continuous_score
+    - envs.mission.evaluate_mission
+    - envs.mission.mission_schedule
+    - envs.mission.MissionJudge
+    - envs.triphibian.TriphibianEnv.ground_support
   tests:
     - tests.test_search
     - tests.test_search::test_a_mujoco_auto_reset_ends_the_continuous_mission
+    - tests.test_physics::test_the_mission_verdict_reads_the_end_of_every_leg
+  note: `continuous_score` pays presence (a still quad 0.15-0.58, 2026-11-11); `evaluate_mission` is the verdict -- in the commanded medium at the end of every leg, on land with the weight on the ground, entry state and leg durations drawn from the seed
+
+SplitController:
+  implementation:
+    - control.innerloop.InnerLoop
+    - control.innerloop.body_model
+    - control.innerloop.BodyModel
+    - control.outer.observe
+    - control.outer.Teacher
+    - control.outer.ShoreMap
+    - control.outer.SplitController
+    - control.outer.teacher_controller
+    - core.bodyplans.legged_quad
+  tests:
+    - tests.test_physics::test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert
+    - tests.test_physics::test_the_teacher_completes_the_mission_through_the_split
+  note: P0.5/P0.6 (2026-11-11). A stateless outer law `u = teach(o)` at 25 Hz over an inner loop at every step (attitude PD, torque-first mixer, limb gait) on the anchor body `ANCHOR_PLANS["legged_quad"]`; `o` is TriphibianEnv.observation plus 13 channels (OBS_CHANNELS), one memory channel fed back. A hand law, nothing fitted: the teacher and the nulls a learner is measured against. Nothing in the search imports it. Held to the prototype's 688 stored rows field for field by experiments/triphibian_diagnosis/scripts/port_check.py
 
 ActuatorSkills:
   implementation:
@@ -630,6 +652,26 @@ FluidSolver:
     - tests.test_physics::test_pitching_nose_up_adds_lift
     - tests.test_stall_blend
     - tests.test_reduced_frequency
+
+ThinPlateTableLaw:
+  # The default lift and drag of a lifting strip since 2026-11-17 (repair R3):
+  # two measured thin sections, linear in camber.  One law in three places.
+  implementation:
+    - physics.fluid.table_coefficients
+    - physics.fluid.SectionPolar
+    - envs.devroll.fluid_wp.table_arrays
+  tests:
+    - tests.test_physics::test_the_table_law_reads_two_measured_thin_sections
+    - tests.test_gpu_mirror::test_the_kernel_reproduces_table_coefficients
+    - tests.test_devroll::test_the_strip_kernel_under_law_table_is_table_coefficients
+
+PitchingMoment:
+  # Opt-in (`FluidSolver.cop_law`, default None): centre of pressure that moves
+  # aft with separation, and damping of a strip's pitch.  Numpy path only.
+  implementation:
+    - physics.fluid.chordwise_cop
+  tests:
+    - tests.test_physics::test_centre_of_pressure_moves_aft_when_the_flow_separates
 
 AddedMass:
   implementation:

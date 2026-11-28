@@ -170,6 +170,191 @@ def _drag_coefficient(
     return _skin_friction_cd(re) + cd_i + w * cn * sa * sa
 
 
+# --------------------------------------------------------------------------
+# The "table" law (`FluidSolver.stall_law == "table"`, repair R3, 2026-11-17).
+#
+# `law` is 0 for "legacy" (every score stored before 2026-11-17: the camber
+# shift in `strip_at`, `_lift_coefficient`, `_drag_coefficient`) and 1 for
+# "table" (no camber shift, `_table_coefficients`).  "plate" is numpy only;
+# `batchroll` refuses it before a launch.
+#
+# The tables of `physics/thin_plate_tables.py` arrive as one float64 block,
+# packed by `batchroll._table_block` and uploaded once per process:
+#
+#     0 CAMBER  1 ALPHA0  2 STEP  3 n_re  4 n_alpha
+#     5 SectionPolar.PLATE_BY  6 SEPARATION_COMPLETE   (radians, from numpy)
+#     7..          log(RE_NODES)          [n_re]
+#     then         RE_NODES               [n_re]
+#     then         CL                     [2, n_re, n_alpha]  row-major
+#     then         CD                     [2, n_re, n_alpha]
+#     then         LO                     [2, n_re]
+#     then         TOP                    [2, n_re]
+#
+# Section 0 is the UIUC flat plate, section 1 Goe 417a.
+# --------------------------------------------------------------------------
+
+comptime LAW_LEGACY: Int32 = 0
+comptime LAW_TABLE: Int32 = 1
+
+comptime TAB_CAMBER = 0
+comptime TAB_ALPHA0 = 1
+comptime TAB_STEP = 2
+comptime TAB_NRE = 3
+comptime TAB_NA = 4
+comptime TAB_PLATE_BY = 5
+comptime TAB_SEP = 6
+comptime TAB_HEAD = 7
+
+comptime TP_LOG = 0
+comptime TP_RE = 1
+comptime TP_CL = 2
+comptime TP_CD = 3
+comptime TP_LO = 4
+comptime TP_TOP = 5
+
+
+@always_inline
+def _tab_n(tab: UnsafePointer[Float64, MutAnyOrigin], slot: Int) -> Int:
+    """An integer header slot of the table block."""
+    return Int(tab[unsafe_offset=slot])
+
+
+@always_inline
+def _tab_part(tab: UnsafePointer[Float64, MutAnyOrigin], part: Int) -> Int:
+    """Where a part of the table block starts (layout above)."""
+    var nre = _tab_n(tab, TAB_NRE)
+    var grid = 2 * nre * _tab_n(tab, TAB_NA)
+    var o_cl = TAB_HEAD + 2 * nre
+    if part == TP_LOG:
+        return TAB_HEAD
+    if part == TP_RE:
+        return TAB_HEAD + nre
+    if part == TP_CL:
+        return o_cl
+    if part == TP_CD:
+        return o_cl + grid
+    if part == TP_LO:
+        return o_cl + 2 * grid
+    return o_cl + 2 * grid + 2 * nre
+
+
+@always_inline
+def _smoothstep(t_in: Float64) -> Float64:
+    """Mirrors `fluid._smoothstep`."""
+    var t = clampd(t_in, 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+@always_inline
+def _thin_plate(
+    tab: UnsafePointer[Float64, MutAnyOrigin],
+    section: Int,
+    alpha: Float64,
+    alpha_e: Float64,
+    re: Float64,
+    mut cl_o: Float64,
+    mut cd_o: Float64,
+    mut w_o: Float64,
+):
+    """Mirrors `fluid._thin_plate`: one section's baked row values at the
+    lagged angle, bilinear in the angle and in log Re, and the weight by which
+    the strip has left the measured range for the separated plate."""
+    var nre = _tab_n(tab, TAB_NRE)
+    var na = _tab_n(tab, TAB_NA)
+    var o_log = _tab_part(tab, TP_LOG)
+    var x = clampd(logd(re if re > 1.0 else 1.0),
+                   tab[unsafe_offset=o_log], tab[unsafe_offset=o_log + nre - 1])
+    # np.searchsorted(logre, x) - 1, clipped: the nodes strictly below x
+    var j = 0
+    for m in range(nre):
+        if tab[unsafe_offset=o_log + m] < x:
+            j += 1
+    j -= 1
+    if j < 0:
+        j = 0
+    if j > nre - 2:
+        j = nre - 2
+    var l0 = tab[unsafe_offset=o_log + j]
+    var t = (x - l0) / (tab[unsafe_offset=o_log + j + 1] - l0)
+    var u = clampd((alpha_e - tab[unsafe_offset=TAB_ALPHA0]) / tab[unsafe_offset=TAB_STEP],
+                   0.0, Float64(na) - 1.0)
+    var k = Int(u)
+    if k > na - 2:
+        k = na - 2
+    var f = u - Float64(k)
+    var r0 = (section * nre + j) * na + k
+    var r1 = r0 + na
+    var o_cl = _tab_part(tab, TP_CL)
+    var o_cd = _tab_part(tab, TP_CD)
+    var cl_j = (1.0 - f) * tab[unsafe_offset=o_cl + r0] + f * tab[unsafe_offset=o_cl + r0 + 1]
+    var cl_j1 = (1.0 - f) * tab[unsafe_offset=o_cl + r1] + f * tab[unsafe_offset=o_cl + r1 + 1]
+    var cd_j = (1.0 - f) * tab[unsafe_offset=o_cd + r0] + f * tab[unsafe_offset=o_cd + r0 + 1]
+    var cd_j1 = (1.0 - f) * tab[unsafe_offset=o_cd + r1] + f * tab[unsafe_offset=o_cd + r1 + 1]
+    var e = section * nre + j
+    var o_lo = _tab_part(tab, TP_LO)
+    var o_top = _tab_part(tab, TP_TOP)
+    var lo = (1.0 - t) * tab[unsafe_offset=o_lo + e] + t * tab[unsafe_offset=o_lo + e + 1]
+    var top = (1.0 - t) * tab[unsafe_offset=o_top + e] + t * tab[unsafe_offset=o_top + e + 1]
+    var w_hi = _smoothstep((alpha - top) / (tab[unsafe_offset=TAB_PLATE_BY] - top))
+    var w_lo = _smoothstep((lo - alpha) / tab[unsafe_offset=TAB_SEP])
+    cl_o = (1.0 - t) * cl_j + t * cl_j1
+    cd_o = (1.0 - t) * cd_j + t * cd_j1
+    w_o = w_hi if w_hi > w_lo else w_lo
+
+
+@always_inline
+def _table_coefficients(
+    tab: UnsafePointer[Float64, MutAnyOrigin],
+    alpha: Float64,
+    re: Float64,
+    ar: Float64,
+    lev_in: Float64,
+    alpha_e: Float64,
+    camber: Float64,
+    mut cl_o: Float64,
+    mut cd_o: Float64,
+):
+    """Mirrors `fluid.table_coefficients`: the flat plate (read on its
+    positive side and made odd) and Goe 417a, linear in the signed camber
+    between them, the arc's values held past it; the separated plate outside
+    the measured angles and under a leading-edge vortex; the Helmholtz factor
+    on the measured lift; the induced drag.  `camber` is as the flow meets the
+    strip (negated in reversed flow by the caller)."""
+    var lev = clampd(lev_in, 0.0, 1.0)
+    var up = -1.0 if camber < 0.0 else 1.0
+    var share = abs(camber) / tab[unsafe_offset=TAB_CAMBER]
+    share = share if share < 1.0 else 1.0
+    var a = up * alpha
+    var e = up * alpha_e
+    var side = -1.0 if a < 0.0 else 1.0
+    var cl0: Float64 = 0.0
+    var cd0: Float64 = 0.0
+    var w0: Float64 = 0.0
+    var cl1: Float64 = 0.0
+    var cd1: Float64 = 0.0
+    var w1: Float64 = 0.0
+    _thin_plate(tab, 0, side * a, side * e, re, cl0, cd0, w0)
+    _thin_plate(tab, 1, a, e, re, cl1, cd1, w1)
+    var ar_c = ar if ar > 0.5 else 0.5
+    var k = 1.0 / (1.0 + 2.0 / ar_c)
+    var cn = 1.98 + (3.4 - 1.98) * lev
+    var sa = sind(a)
+    var ca = cosd(a)
+    var cf = _skin_friction_cd(re)
+    var o_re = _tab_part(tab, TP_RE)
+    var off = cf - _skin_friction_cd(clampd(
+        re, tab[unsafe_offset=o_re], tab[unsafe_offset=o_re + _tab_n(tab, TAB_NRE) - 1]))
+    w0 = w0 + (1.0 - w0) * lev
+    w1 = w1 + (1.0 - w1) * lev
+    var cl_a = (1.0 - w0) * k * side * cl0 + w0 * cn * sa * ca
+    var cl_b = (1.0 - w1) * k * cl1 + w1 * cn * sa * ca
+    var cd_a = (1.0 - w0) * (cd0 + off) + w0 * (cf + cn * sa * sa)
+    var cd_b = (1.0 - w1) * (cd1 + off) + w1 * (cf + cn * sa * sa)
+    var cl = up * ((1.0 - share) * cl_a + share * cl_b)
+    cl_o = cl
+    cd_o = (1.0 - share) * cd_a + share * cd_b + cl * cl / (PI_D * 0.75 * ar_c)
+
+
 @always_inline
 def unsteady_at(
     i: Int,
@@ -573,8 +758,16 @@ def coeff_at(
     cl_out: UnsafePointer[Float64, MutAnyOrigin],
     cd_out: UnsafePointer[Float64, MutAnyOrigin],
     alpha_e: UnsafePointer[Float64, MutAnyOrigin],
+    camber: UnsafePointer[Float64, MutAnyOrigin],
+    rf: UnsafePointer[Float64, MutAnyOrigin],
+    tab: UnsafePointer[Float64, MutAnyOrigin],
+    law: Int32,
 ):
-    """`coeff_kernel`'s work for panel `i`, callable from a fused kernel."""
+    """`coeff_kernel`'s work for panel `i`, callable from a fused kernel.
+
+    `camber` is the strip's own (static) camber and `rf` the reversal flag
+    `strip_at` wrote; they and the table block `tab` are read under the
+    table law only (`law` 1)."""
     # np.where(is_wing, ..., 0.0): bluff elements get their drag from the
     # cross-flow model instead, not from strip theory.
     if is_wing[unsafe_offset=i] == 0:
@@ -585,6 +778,18 @@ def coeff_at(
     var r = re[unsafe_offset=i]
     var arv = ar[unsafe_offset=i]
     var lv = lev[unsafe_offset=i]
+    if law == LAW_TABLE:
+        # `arc` in `FluidSolver.apply`: reversed flow sees the arc from its
+        # other end, so its sign flips with the lift axis.
+        var cam = camber[unsafe_offset=i]
+        if rf[unsafe_offset=i] != 0.0:
+            cam = -cam
+        var cl_t: Float64 = 0.0
+        var cd_t: Float64 = 0.0
+        _table_coefficients(tab, a, r, arv, lv, alpha_e[unsafe_offset=i], cam, cl_t, cd_t)
+        cl_out[unsafe_offset=i] = cl_t
+        cd_out[unsafe_offset=i] = cd_t
+        return
     var cl = _lift_coefficient(a, r, arv, lv, alpha_e[unsafe_offset=i])
     cl_out[unsafe_offset=i] = cl
     cd_out[unsafe_offset=i] = _drag_coefficient(a, r, arv, cl, lv)
@@ -604,7 +809,31 @@ def coeff_kernel(
     var i = Int(global_idx.x)
     if Int32(i) >= n:
         return
-    coeff_at(i, alpha, re, ar, lev, is_wing, cl_out, cd_out, alpha_e)
+    # The legacy law, which reads none of the last three pointers.
+    coeff_at(i, alpha, re, ar, lev, is_wing, cl_out, cd_out, alpha_e, re, re, re, LAW_LEGACY)
+
+
+def coeff_law_kernel(
+    alpha: UnsafePointer[Float64, MutAnyOrigin],
+    re: UnsafePointer[Float64, MutAnyOrigin],
+    ar: UnsafePointer[Float64, MutAnyOrigin],
+    lev: UnsafePointer[Float64, MutAnyOrigin],
+    is_wing: UnsafePointer[Int32, MutAnyOrigin],
+    cl_out: UnsafePointer[Float64, MutAnyOrigin],
+    cd_out: UnsafePointer[Float64, MutAnyOrigin],
+    alpha_e: UnsafePointer[Float64, MutAnyOrigin],
+    camber: UnsafePointer[Float64, MutAnyOrigin],
+    rf: UnsafePointer[Float64, MutAnyOrigin],
+    tab: UnsafePointer[Float64, MutAnyOrigin],
+    law: Int32,
+    n: Int32,
+):
+    """`coeff_at` with every input given: the lagged incidence, the strip's
+    camber and reversal flag, the table block and the law."""
+    var i = Int(global_idx.x)
+    if Int32(i) >= n:
+        return
+    coeff_at(i, alpha, re, ar, lev, is_wing, cl_out, cd_out, alpha_e, camber, rf, tab, law)
 
 
 @always_inline
@@ -635,8 +864,13 @@ def strip_at(
     alpha_out: UnsafePointer[Float64, MutAnyOrigin],
     rf_out: UnsafePointer[Float64, MutAnyOrigin],
     lift_axis: UnsafePointer[Float64, MutAnyOrigin],
+    law: Int32,
 ):
-    """`strip_kernel`'s work for panel `i`, callable from a fused kernel."""
+    """`strip_kernel`'s work for panel `i`, callable from a fused kernel.
+
+    `law` 0 (legacy) shifts the incidence by the camber, ``2 f``; `law` 1
+    (table) does not: the measured tables carry their own zero-lift angle,
+    and `coeff_at` reads the camber itself."""
     var j = i * 3
 
     var vx = v_rel[unsafe_offset=j + 0]
@@ -705,7 +939,10 @@ def strip_at(
     if rev:
         alpha = -alpha
         cam = -cam
-    alpha_out[unsafe_offset=i] = alpha + 2.0 * cam
+    if law == LAW_TABLE:
+        alpha_out[unsafe_offset=i] = alpha
+    else:
+        alpha_out[unsafe_offset=i] = alpha + 2.0 * cam
 
     var ws = (
         omega[unsafe_offset=j + 0] * sx
@@ -752,11 +989,12 @@ def strip_kernel(
 ):
     """Strip theory, the block marked `--- strip theory` in `fluid.py`.
 
-    One thread per panel."""
+    One thread per panel.  The legacy law's camber shift; the fused
+    `full_pipeline.panel_kernel` passes the launch's law instead."""
     var i = Int(global_idx.x)
     if Int32(i) >= n:
         return
-    strip_at(i, v_rel, s_hat, c_hat, n_hat, omega, rho, mu, chord, camber, u_out, d_hat, q_out, re_out, alpha_out, rf_out, lift_axis)
+    strip_at(i, v_rel, s_hat, c_hat, n_hat, omega, rho, mu, chord, camber, u_out, d_hat, q_out, re_out, alpha_out, rf_out, lift_axis, LAW_LEGACY)
 
 
 @always_inline
@@ -942,6 +1180,56 @@ def coefficients(desc: PythonObject) raises -> PythonObject:
     return PythonObject(n)
 
 
+def coefficients_law(desc: PythonObject) raises -> PythonObject:
+    """Lift and drag coefficients on the GPU under either law, every input
+    given (`coefficients` is the legacy law with no lag and no camber).
+
+    `desc` (int64): 0 alpha, 1 alpha_e, 2 re, 3 ar, 4 lev, 5 camber (the
+    strip's own), 6 reversal flag (1.0 when the flow arrives over the
+    trailing edge), 7 is_wing (int32), 8 cl_out, 9 cd_out, 10 table block,
+    11 its length, 12 law (0 legacy, 1 table), 13 n.  The table block's
+    layout is the one above `_tab_part`.
+    """
+    var d = UnsafePointer[Int64, MutAnyOrigin](
+        unsafe_from_address=Int(py=desc.ctypes.data)
+    )
+    var n = Int(d[unsafe_offset=13])
+    var ctx = DeviceContext()
+
+    var alpha = _f64(ctx, Int(d[unsafe_offset=0]), n)
+    var ae = _f64(ctx, Int(d[unsafe_offset=1]), n)
+    var re = _f64(ctx, Int(d[unsafe_offset=2]), n)
+    var ar = _f64(ctx, Int(d[unsafe_offset=3]), n)
+    var lev = _f64(ctx, Int(d[unsafe_offset=4]), n)
+    var cam = _f64(ctx, Int(d[unsafe_offset=5]), n)
+    var rf = _f64(ctx, Int(d[unsafe_offset=6]), n)
+    var tab = _f64(ctx, Int(d[unsafe_offset=10]), Int(d[unsafe_offset=11]))
+
+    var wing = ctx.enqueue_create_buffer[DType.int32](n)
+    ctx.enqueue_copy(
+        dst_buf=wing,
+        src_ptr=UnsafePointer[Int32, MutAnyOrigin](
+            unsafe_from_address=Int(d[unsafe_offset=7])
+        ),
+    )
+    var cl = ctx.enqueue_create_buffer[DType.float64](n)
+    var cd = ctx.enqueue_create_buffer[DType.float64](n)
+
+    ctx.enqueue_function[coeff_law_kernel](
+        alpha.unsafe_ptr(), re.unsafe_ptr(), ar.unsafe_ptr(), lev.unsafe_ptr(),
+        wing.unsafe_ptr(), cl.unsafe_ptr(), cd.unsafe_ptr(), ae.unsafe_ptr(),
+        cam.unsafe_ptr(), rf.unsafe_ptr(), tab.unsafe_ptr(),
+        Int32(Int(d[unsafe_offset=12])),
+        Int32(n),
+        grid_dim=ceildiv(n, BLOCK),
+        block_dim=BLOCK,
+    )
+    _dl(ctx, cl, Int(d[unsafe_offset=8]))
+    _dl(ctx, cd, Int(d[unsafe_offset=9]))
+    ctx.synchronize()
+    return PythonObject(n)
+
+
 def bluff_drag(desc: PythonObject, cd_scale: PythonObject) raises -> PythonObject:
     """Bluff-body drag on the GPU.
 
@@ -1058,6 +1346,7 @@ def PyInit_fluid_gpu() abi("C") -> PythonObject:
         m.def_function[body_to_world]("body_to_world")
         m.def_function[strip_theory]("strip_theory")
         m.def_function[coefficients]("coefficients")
+        m.def_function[coefficients_law]("coefficients_law")
         m.def_function[bluff_drag]("bluff_drag")
         m.def_function[added_mass]("added_mass")
         return m.finalize()

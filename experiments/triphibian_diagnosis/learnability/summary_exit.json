@@ -1,0 +1,211 @@
+{
+ "info": {
+  "rows": 274247,
+  "exit_rows": 31769,
+  "memory_on_rows": 9510
+ },
+ "fit_W": {
+  "train_rows": 266595,
+  "held_rows": 7652,
+  "train_cont_rmse_std": [
+   0.2458811953509677,
+   0.29614720532767635,
+   0.2670022806114006,
+   0.14622931845471818,
+   0.06557713141749913,
+   0.21713813171591262
+  ],
+  "train_flag_acc": [
+   1.0,
+   0.9981920141037904,
+   1.0,
+   0.9962489919165776
+  ],
+  "held_cont_rmse_std": [
+   0.14181414442219295,
+   0.11334150876213438,
+   0.20902261389024204,
+   0.10545156981677957,
+   0.0741197333046094,
+   0.10450064015035722
+  ],
+  "held_flag_acc": [
+   1.0,
+   0.9990852064819655,
+   1.0,
+   0.9984317825405122
+  ]
+ },
+ "S": {
+  "air": {
+   "completed": 22,
+   "of": 32,
+   "transitions": 48,
+   "failed": 6
+  },
+  "water": {
+   "completed": 24,
+   "of": 32,
+   "transitions": 48,
+   "failed": 3
+  },
+  "land": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  }
+ },
+ "S_trace_completed": {
+  "missions": 46,
+  "with_any_flag_miss": 16,
+  "flag_miss_decisions": [
+   0,
+   0,
+   0,
+   24
+  ],
+  "exit_decisions": 2306,
+  "cont_max_median": 1.9489069832714527,
+  "cont_mean": 0.42359892848298963
+ },
+ "S_trace_missed": {
+  "missions": 18,
+  "with_any_flag_miss": 9,
+  "flag_miss_decisions": [
+   0,
+   0,
+   0,
+   10
+  ],
+  "exit_decisions": 1612,
+  "cont_max_median": 3.5674822932897854,
+  "cont_mean": 0.5359403319115975
+ },
+ "M": {
+  "air": {
+   "completed": 19,
+   "of": 32,
+   "transitions": 45,
+   "failed": 6
+  },
+  "water": {
+   "completed": 24,
+   "of": 32,
+   "transitions": 48,
+   "failed": 3
+  },
+  "land": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  }
+ },
+ "F": {
+  "air": {
+   "completed": 19,
+   "of": 32,
+   "transitions": 46,
+   "failed": 5
+  },
+  "water": {
+   "completed": 25,
+   "of": 32,
+   "transitions": 50,
+   "failed": 3
+  },
+  "land": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  }
+ },
+ "C": {
+  "air": {
+   "completed": 30,
+   "of": 32,
+   "transitions": 61,
+   "failed": 1
+  },
+  "water": {
+   "completed": 25,
+   "of": 32,
+   "transitions": 50,
+   "failed": 3
+  },
+  "land": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  }
+ },
+ "X": {
+  "air": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  },
+  "water": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  },
+  "land": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  }
+ },
+ "W": {
+  "air": {
+   "completed": 13,
+   "of": 32,
+   "transitions": 40,
+   "failed": 5
+  },
+  "water": {
+   "completed": 26,
+   "of": 32,
+   "transitions": 52,
+   "failed": 4
+  },
+  "land": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  }
+ },
+ "W_trace_completed": {
+  "missions": 39,
+  "with_any_flag_miss": 32,
+  "flag_miss_decisions": [
+   0,
+   0,
+   0,
+   73
+  ],
+  "exit_decisions": 1800,
+  "cont_max_median": 1.7984651110066634,
+  "cont_mean": 0.3372617225908724
+ },
+ "W_trace_missed": {
+  "missions": 25,
+  "with_any_flag_miss": 17,
+  "flag_miss_decisions": [
+   0,
+   0,
+   0,
+   142
+  ],
+  "exit_decisions": 3747,
+  "cont_max_median": 2.369814392671195,
+  "cont_mean": 0.3672661804129004
+ }
+}

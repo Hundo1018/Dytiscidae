@@ -508,7 +508,13 @@ class DeviceBody:
                                           for e in envs]))
         self.cd_scale, self.lift_scale = float(sol0.cd_scale), float(sol0.lift_scale)
         self.added_mass_scale = float(sol0.added_mass_scale)
+        # The lift and drag law, from the same solver as the scales: one for all worlds.
+        self.stall_law = sol0.stall_law
+        self._law = _fluid_wp.law_code(self.stall_law)
+        self._tables = _fluid_wp.table_arrays(dtype)
         for e in envs:
+            if e.solver.stall_law != self.stall_law:
+                raise ValueError("DeviceBody's worlds share one stall_law")
             if (e.solver.cd_scale, e.solver.lift_scale, e.solver.added_mass_scale) != (
                     self.cd_scale, self.lift_scale, self.added_mass_scale):
                 raise ValueError("DeviceBody's worlds share the auditor's coefficient scales")
@@ -807,7 +813,7 @@ class DeviceBody:
                 self._is_wing, bf["rho"], bf["mu"], T(self.lift_scale), T(self.cd_scale),
                 self._c_rot, lagged, bf["alpha_e"], bf["lev_u"],
                 bf["F"], bf["D"], bf["cl"], bf["alpha"], bf["U"], bf["lev"], bf["rev"],
-                bf["q"], bf["L"]])
+                bf["q"], bf["L"], self._law, *self._tables])
         strip(0)
         if self.envs[0].solver.unsteady:
             a1, a2 = (float(x) for x in WAGNER_A)

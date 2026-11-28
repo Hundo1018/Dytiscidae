@@ -12,7 +12,14 @@ half is invisible.  These checks need neither: they read both files as text.
 
 They catch one class of drift, not all of it: a constant changed on one side
 and not the other, and a provenance comment that no longer points at anything.
-Agreement of the *formulas* is `test_search.py`'s job and stays there.
+Agreement of the *formulas* across a whole evaluation is `test_search.py`'s
+job and stays there.
+
+The table law (`FluidSolver.stall_law == "table"`, 2026-11-17) is also checked
+numerically here, against the built kernel at run time: its coefficients over
+the angles, Reynolds numbers, cambers, lags and vortex strengths a strip meets,
+and one fused pipeline step against `FluidSolver.apply`.  Those checks print
+`[skip]` without the extension.
 
 The provenance comments were line numbers -- `fluid.py:256-289` -- and six of
 the eight had drifted off their target by the time this was written.
@@ -45,6 +52,23 @@ FUNCTION_MIRRORS = {
     "_lift_coefficient": "lift_coefficient",
     "_drag_coefficient": "drag_coefficient",
     "_stall_weight": "_stall",
+    "_smoothstep": "_smoothstep",
+    "_thin_plate": "_thin_plate",
+    "_table_coefficients": "table_coefficients",
+}
+
+#: Python-only numbers a pair may carry, and why.  Only this direction: a
+#: number the Mojo has and the Python lacks is always a failure.
+PYTHON_ONLY = {
+    # law "plate" (repair R1) is numpy only (`batchroll._law_code` refuses
+    # it): its 45-degree plateau limit and its 4-degree separation width
+    "drag_coefficient": {0.25},
+    # ... and the 1e12 is `_stall`'s table branch, whose weight the kernel
+    # takes from `_table_coefficients` directly
+    "_stall": {4.0, 1e12},
+    # SEPARATION_COMPLETE (np.radians(6.0)) reaches the kernel as a value in
+    # the table block `batchroll._table_block` packs, not as a typed number
+    "_thin_plate": {6.0},
 }
 
 #: Block markers a Mojo docstring may name.  Each must exist in `fluid.py`.
@@ -56,6 +80,7 @@ BLOCK_MARKERS = (
 )
 
 FAILURES: list[str] = []
+SKIPS: list[str] = []
 
 
 def check(name: str, cond: bool, detail: str = "") -> None:
@@ -170,7 +195,8 @@ def test_the_pairs_carry_the_same_constants() -> None:
     for mojo_name, py_name in FUNCTION_MIRRORS.items():
         a = python_numbers(py_src, py_name)
         b = mojo_numbers(mj_src, mojo_name)
-        only_py, only_mj = sorted(a - b), sorted(b - a)
+        only_py = sorted(a - b - PYTHON_ONLY.get(py_name, set()))
+        only_mj = sorted(b - a)
         # Counts legitimately differ -- `1.0 - w` in one language may be
         # spelled with an extra literal in the other -- so this is set
         # equality, which is what catches a value changed on one side.
@@ -195,11 +221,209 @@ def test_the_mirrored_set_is_the_whole_set() -> None:
           f"{len(FUNCTION_MIRRORS)} pairs")
 
 
+def skip(name: str, why: str) -> None:
+    print(f"  [skip] {name}  -- {why}")
+    SKIPS.append(name)
+
+
+def _fluid_gpu():
+    """The built `fluid_gpu` extension, or None."""
+    from dytiscidae.envs import batchroll
+    if batchroll._BUILD_DIR not in sys.path:
+        sys.path.insert(0, batchroll._BUILD_DIR)
+    try:
+        import fluid_gpu
+    except Exception:                                             # noqa: BLE001
+        return None
+    return fluid_gpu if hasattr(fluid_gpu, "coefficients_law") else None
+
+
+def _rel(a, b) -> float:
+    """The existing GPU checks' measure: relative, with a floor of 1."""
+    import numpy as np
+    return float((np.abs(a - b) / np.maximum(np.abs(a), 1.0)).max())
+
+
+def test_the_kernel_reproduces_table_coefficients() -> None:
+    """`_table_coefficients` against `fluid.table_coefficients`, both run now.
+
+    Every strip a wing can present: incidence over the whole folded range
+    with both flow directions, Re 1e3..1e6 (the tables span 6e4..2e5, so
+    both holds), the cambers the tables blend between and past (+-), a lag
+    between the incidence and the Wagner angle, and the vortex strength from
+    none through clipped.  `coefficients_law` runs `coeff_at`, the stage the
+    fused pipeline calls."""
+    print("\ngpu mirror: the table law, kernel against numpy")
+    import numpy as np
+    from dytiscidae.physics import fluid
+    from dytiscidae.physics import thin_plate_tables as T
+    from dytiscidae.envs import batchroll
+    fg = _fluid_gpu()
+    if fg is None:
+        skip("table coefficients agree", "fluid_gpu with coefficients_law is not built")
+        return
+    # an extension can import and still not run (batchroll.usable's NVML case)
+    if batchroll.usable()[0] is not True:
+        skip("table coefficients agree", "the GPU kernel is not usable here")
+        return
+    from dytiscidae.envs.batchroll import _table_block
+    rng = np.random.default_rng(20261117)
+    cambers = np.array([-0.09, -0.03, 0.0, 0.02, 0.0578, 0.09])
+    # a grid on every camber, then random strips; the grid sits on the
+    # table's own Re nodes, its measured-angle ends and the folded range's ends
+    a_grid = np.radians(np.linspace(-90.0, 90.0, 721))
+    re_grid = np.concatenate([[1e3, 1e4, 1e6], T.RE_NODES, [7.3e4, 1.5e5]])
+    A, R, Cm = (x.ravel() for x in np.meshgrid(a_grid, re_grid, cambers, indexing="ij"))
+    m = 200000
+    alpha = np.concatenate([A, rng.uniform(-np.pi / 2, np.pi / 2, m),
+                            T.LO.ravel(), T.TOP.ravel(), -T.LO.ravel(), -T.TOP.ravel()])
+    k = len(alpha) - len(A) - m
+    re = np.concatenate([R, 10 ** rng.uniform(3.0, 6.0, m), np.tile(T.RE_NODES, 8)[:k]])
+    camber = np.concatenate([Cm, rng.choice(cambers, m), rng.choice(cambers, k)])
+    n = len(alpha)
+    rev = (rng.uniform(size=n) < 0.5).astype(float)
+    # the Wagner angle lags the incidence: from equal (a quarter of the
+    # strips) to a quarter of it and a few degrees off
+    lag = rng.uniform(0.25, 1.0, n) * alpha + rng.normal(0.0, 0.05, n)
+    alpha_e = np.where(rng.uniform(size=n) < 0.25, alpha, lag)
+    lev = rng.choice([0.0, 1.0, 1.3, -0.2], n)
+    lev = np.where(rng.uniform(size=n) < 0.5, rng.uniform(0.0, 1.0, n), lev)
+    ar = np.where(rng.uniform(size=n) < 0.3, fluid.INFLOW_AR, rng.uniform(0.2, 12.0, n))
+    is_wing = np.ones(n, np.int32)
+    tab = _table_block()
+    C = np.ascontiguousarray
+    alpha, alpha_e, re, ar, lev, camber, rev = (C(x, dtype=float) for x in
+                                                (alpha, alpha_e, re, ar, lev, camber, rev))
+
+    def run(law):
+        cl, cd = np.zeros(n), np.zeros(n)
+        got = fg.coefficients_law(np.array(
+            [x.ctypes.data for x in (alpha, alpha_e, re, ar, lev, camber, rev, is_wing, cl, cd, tab)]
+            + [tab.size, law, n], dtype=np.int64))
+        return got, cl, cd
+
+    # what `FluidSolver.apply` passes under "table": the unshifted angle and
+    # the camber as the flow meets it
+    arc = np.where(rev != 0.0, -camber, camber)
+    cl_ref, cd_ref, _ = fluid.table_coefficients(alpha, re, ar, lev, alpha_e, arc)
+    got, cl, cd = run(1)
+    e_cl, e_cd = _rel(cl_ref, cl), _rel(cd_ref, cd)
+    check("the table law's lift and drag agree with numpy",
+          got == n and e_cl < 1e-12 and e_cd < 1e-12,
+          f"{n} strips; cl {e_cl:.2e}, cd {e_cd:.2e} (bar 1e-12, test_coeff_gpu's)")
+    w = fluid.table_coefficients(alpha, re, ar, lev, alpha_e, arc)[2]
+    check("and the sample spans the attached, blended and separated strips",
+          (w < 1e-9).sum() > 1000 and ((w > 0.01) & (w < 0.99)).sum() > 1000
+          and (w > 1.0 - 1e-9).sum() > 1000,
+          f"w=0: {(w < 1e-9).sum()}, between: {((w > 0.01) & (w < 0.99)).sum()}, "
+          f"w=1: {(w > 1.0 - 1e-9).sum()}")
+    # The same entry under law 0 is the legacy pair, lag included (the
+    # standalone `coefficients` has no lag), and reads no camber.
+    _, cl0, cd0 = run(0)
+    cl0_ref = fluid.lift_coefficient(alpha, re, ar, lev, alpha_e)
+    cd0_ref = fluid.drag_coefficient(alpha, re, ar, cl0_ref, lev)
+    e0 = max(_rel(cl0_ref, cl0), _rel(cd0_ref, cd0))
+    check("law 0 through the same stage is the legacy law", e0 < 1e-12, f"{e0:.2e}")
+    check("and the two laws differ (the switch reaches the stage)",
+          float(np.abs(cl0 - cl).max()) > 0.1, f"max |cl difference| {np.abs(cl0 - cl).max():.3f}")
+
+
+def test_one_pipeline_step_under_the_table_law() -> None:
+    """The fused pipeline (`full_pipeline`, through `batchroll.BatchedFluid`)
+    against `FluidSolver.apply`, both with ``stall_law = "table"``: the strip
+    stage's missing camber shift, the camber and reversal reaching the
+    coefficients, and the table block's upload.  `mojo/tests/test_full_gpu.py`'s
+    fixture and bar; the legacy law is run beside it on the same poses."""
+    print("\ngpu mirror: one fused step under each law, against FluidSolver")
+    from dytiscidae.envs import batchroll
+    if not batchroll.AVAILABLE or batchroll.usable()[0] is not True:
+        skip("fused step under the table law", "the GPU pipeline is not usable here")
+        return
+    import zlib
+    import mujoco
+    import numpy as np
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    def pose(env, seed, law):
+        env.solver.stall_law = law
+        rng = np.random.default_rng(seed)
+        env.reset(Domain.WATER, randomise=False)
+        nq = env.model.nq
+        if nq >= 7:
+            q = rng.normal(size=4)
+            env.data.qpos[3:7] = q / np.linalg.norm(q)
+            env.data.qpos[0:3] = rng.normal(scale=1.5, size=3)
+            env.data.qpos[2] = rng.uniform(-3.0, 1.0)
+        if nq > 7:
+            env.data.qpos[7:] = rng.uniform(-0.7, 0.7, nq - 7)
+        env.data.qvel[:] = rng.normal(scale=2.0, size=env.model.nv)
+        mujoco.mj_forward(env.model, env.data)
+        return env
+
+    seeds = {k: zlib.crc32(k.encode()) % 9973 for k in BODY_PLANS}
+    worst, first = {}, {}
+    for law in ("legacy", "table"):
+        batched = [pose(TriphibianEnv(build(p())), seeds[k], law) for k, p in BODY_PLANS.items()]
+        single = [pose(TriphibianEnv(build(p())), seeds[k], law) for k, p in BODY_PLANS.items()]
+        b = batchroll.BatchedFluid(batched)
+        wf = wm = 0.0
+        dt = batched[0].model.opt.timestep
+        # three steps, so the unsteady history (lag, vortex travel) is live
+        for step in range(3):
+            t = step * dt
+            b.apply(t)
+            for eb, e in zip(batched, single):
+                e.data.xfrc_applied[:] = 0.0
+                e.solver.apply(e.data, t)
+                if e.jets.n:
+                    e.jets.apply(e.model, e.data, e.medium, t, e.timestep)
+                if e.rotors.n:
+                    e.rotors.apply(e.model, e.data, e.medium, t)
+                ref = e.data.xfrc_applied
+                wf = max(wf, float(np.abs(ref - eb.data.xfrc_applied).max())
+                         / max(float(np.abs(ref).max()), 1e-12))
+                sm = max(float(np.abs(e.model.body_mass - e.solver._dry_mass).max()), 1e-12)
+                wm = max(wm, float(np.abs(e.model.body_mass - eb.model.body_mass).max()) / sm)
+            if step == 0:
+                first[law] = np.concatenate([e.data.xfrc_applied.ravel() for e in single])
+                cam = np.concatenate([e.solver.panels.camber for e in single])
+            for e in batched + single:
+                mujoco.mj_step(e.model, e.data)
+        worst[law] = (wf, wm)
+    for law, (wf, wm) in worst.items():
+        check(f"{law}: three fused steps agree with FluidSolver.apply",
+              wf < 1e-9 and wm < 1e-12,
+              f"xfrc {wf:.2e}, added mass {wm:.2e} (test_full_gpu's bars 1e-9, 1e-12)")
+
+    gap = float(np.abs(first["legacy"] - first["table"]).max())
+    check("and the two laws load the same poses differently (the law reached the solver)",
+          gap > 1e-3 and np.abs(cam).max() > 0.0,
+          f"max |xfrc difference| {gap:.3g} N; cambered strips {int((cam != 0).sum())}")
+
+    def refused(law_of):
+        envs = [TriphibianEnv(build(p())) for p in list(BODY_PLANS.values())[:2]]
+        for i, e in enumerate(envs):
+            e.solver.stall_law = law_of(i)
+        try:
+            batchroll.BatchedFluid(envs)
+        except ValueError as exc:
+            return str(exc)
+        return ""
+    why = refused(lambda i: "plate")
+    check("a batch under the numpy-only plate law is refused", "plate" in why, why[:80])
+    why = refused(lambda i: ("legacy", "table")[i])
+    check("and so is a batch mixing two laws", "mixes" in why, why[:80])
+
+
 def main() -> int:
     test_no_line_number_references_came_back()
     test_each_marker_is_unique()
     test_the_pairs_carry_the_same_constants()
     test_the_mirrored_set_is_the_whole_set()
+    test_the_kernel_reproduces_table_coefficients()
+    test_one_pipeline_step_under_the_table_law()
     print()
     if FAILURES:
         print(f"{len(FAILURES)} checks failed:")
@@ -208,7 +432,8 @@ def main() -> int:
         print("\nThe formulas themselves are tests/test_search.py's job and "
               "need the built extension; these checks do not.")
         return 1
-    print("gpu mirror checks passed")
+    print("gpu mirror checks passed"
+          + (f", {len(SKIPS)} skipped" if SKIPS else ""))
     return 0
 
 

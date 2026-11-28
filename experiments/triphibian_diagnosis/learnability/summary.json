@@ -1,0 +1,334 @@
+{
+ "prereg_sha256": "627a91ac6caf2dfde3ca12e4803d7ac60f8920281c04c21d46bb0e8c18a1eb43",
+ "teacher_val": {
+  "air": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  },
+  "water": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  },
+  "land": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  }
+ },
+ "flags_binary": true,
+ "flag_means_round0": [
+  0.0,
+  0.773266613483429,
+  1.0,
+  0.005307767074555159
+ ],
+ "round0": {
+  "fit": {
+   "train_rows": 64318,
+   "held_rows": 7652,
+   "train_cont_rmse_std": [
+    0.08173264868284538,
+    0.15954255786722102,
+    0.21006784307302978,
+    0.07160757869384729,
+    0.060988262257591186,
+    0.1284336795523586
+   ],
+   "train_flag_acc": [
+    1.0,
+    0.9990982306663765,
+    1.0,
+    0.9990671351721135
+   ],
+   "held_cont_rmse_std": [
+    0.09877082633050621,
+    0.5695985261255206,
+    0.3149280842216016,
+    0.07731452266565884,
+    0.06886124554746784,
+    0.12942393044219613
+   ],
+   "held_flag_acc": [
+    1.0,
+    0.9990852064819655,
+    1.0,
+    0.9990852064819655
+   ]
+  },
+  "val": {
+   "air": {
+    "completed": 1,
+    "of": 32,
+    "transitions": 23,
+    "failed": 10
+   },
+   "water": {
+    "completed": 0,
+    "of": 32,
+    "transitions": 0,
+    "failed": 12
+   },
+   "land": {
+    "completed": 27,
+    "of": 32,
+    "transitions": 56,
+    "failed": 3
+   }
+  },
+  "rows": 71970,
+  "elapsed_s": 399
+ },
+ "blind": {
+  "air": {
+   "completed": 0,
+   "of": 32,
+   "transitions": 0,
+   "failed": 24
+  },
+  "water": {
+   "completed": 0,
+   "of": 32,
+   "transitions": 0,
+   "failed": 6
+  },
+  "land": {
+   "completed": 0,
+   "of": 32,
+   "transitions": 0,
+   "failed": 24
+  }
+ },
+ "collect1": {
+  "air": {
+   "completed": 1,
+   "of": 32,
+   "transitions": 20,
+   "failed": 9
+  },
+  "water": {
+   "completed": 1,
+   "of": 32,
+   "transitions": 2,
+   "failed": 20
+  },
+  "land": {
+   "completed": 28,
+   "of": 32,
+   "transitions": 59,
+   "failed": 1
+  }
+ },
+ "round1": {
+  "fit": {
+   "train_rows": 127462,
+   "held_rows": 7652,
+   "train_cont_rmse_std": [
+    0.18644458838252098,
+    0.22246523101180754,
+    0.21058227183041534,
+    0.13575106856353422,
+    0.07260551819879356,
+    0.1424953095654794
+   ],
+   "train_flag_acc": [
+    1.0,
+    0.9984152139461173,
+    1.0,
+    0.9983916775195745
+   ],
+   "held_cont_rmse_std": [
+    0.08365752923901149,
+    0.10961810809162965,
+    0.16728362035690678,
+    0.09779877077301874,
+    0.08209369170862274,
+    0.11563569487663025
+   ],
+   "held_flag_acc": [
+    1.0,
+    0.9990852064819655,
+    1.0,
+    0.9990852064819655
+   ]
+  },
+  "val": {
+   "air": {
+    "completed": 10,
+    "of": 32,
+    "transitions": 36,
+    "failed": 6
+   },
+   "water": {
+    "completed": 4,
+    "of": 32,
+    "transitions": 8,
+    "failed": 2
+   },
+   "land": {
+    "completed": 32,
+    "of": 32,
+    "transitions": 64,
+    "failed": 0
+   }
+  },
+  "rows": 135114,
+  "elapsed_s": 799
+ },
+ "collect2": {
+  "air": {
+   "completed": 10,
+   "of": 32,
+   "transitions": 33,
+   "failed": 9
+  },
+  "water": {
+   "completed": 3,
+   "of": 32,
+   "transitions": 6,
+   "failed": 1
+  },
+  "land": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  }
+ },
+ "round2": {
+  "fit": {
+   "train_rows": 197687,
+   "held_rows": 7652,
+   "train_cont_rmse_std": [
+    0.18860427225328824,
+    0.21446395186930992,
+    0.2296855802225533,
+    0.1274620450525443,
+    0.062023085269671666,
+    0.15566026875138
+   ],
+   "train_flag_acc": [
+    1.0,
+    0.9989478316733017,
+    1.0,
+    0.9956294546429457
+   ],
+   "held_cont_rmse_std": [
+    0.09717887276726542,
+    0.08123504187059123,
+    0.17509629264767582,
+    0.09160152893965855,
+    0.09158931946499094,
+    0.10806578968942408
+   ],
+   "held_flag_acc": [
+    1.0,
+    0.9996079456351281,
+    1.0,
+    0.9990852064819655
+   ]
+  },
+  "val": {
+   "air": {
+    "completed": 21,
+    "of": 32,
+    "transitions": 43,
+    "failed": 10
+   },
+   "water": {
+    "completed": 20,
+    "of": 32,
+    "transitions": 40,
+    "failed": 2
+   },
+   "land": {
+    "completed": 32,
+    "of": 32,
+    "transitions": 64,
+    "failed": 0
+   }
+  },
+  "rows": 205339,
+  "elapsed_s": 1093
+ },
+ "collect3": {
+  "air": {
+   "completed": 23,
+   "of": 32,
+   "transitions": 51,
+   "failed": 4
+  },
+  "water": {
+   "completed": 23,
+   "of": 32,
+   "transitions": 46,
+   "failed": 7
+  },
+  "land": {
+   "completed": 32,
+   "of": 32,
+   "transitions": 64,
+   "failed": 0
+  }
+ },
+ "round3": {
+  "fit": {
+   "train_rows": 266595,
+   "held_rows": 7652,
+   "train_cont_rmse_std": [
+    0.18099202865592617,
+    0.2185802506575586,
+    0.22430135400954526,
+    0.11897437734383949,
+    0.0638174088674401,
+    0.2063951292597935
+   ],
+   "train_flag_acc": [
+    1.0,
+    0.9984320786211295,
+    1.0,
+    0.9963015060297455
+   ],
+   "held_cont_rmse_std": [
+    0.09754444886795746,
+    0.10584380932228486,
+    0.16712375035175464,
+    0.08074965586207185,
+    0.07358800002229753,
+    0.11675112518458616
+   ],
+   "held_flag_acc": [
+    1.0,
+    0.9994772608468374,
+    1.0,
+    0.9990852064819655
+   ]
+  },
+  "val": {
+   "air": {
+    "completed": 22,
+    "of": 32,
+    "transitions": 48,
+    "failed": 6
+   },
+   "water": {
+    "completed": 24,
+    "of": 32,
+    "transitions": 48,
+    "failed": 3
+   },
+   "land": {
+    "completed": 32,
+    "of": 32,
+    "transitions": 64,
+    "failed": 0
+   }
+  },
+  "rows": 274247,
+  "elapsed_s": 1394
+ }
+}

@@ -1,0 +1,83 @@
+# source: Williamson, McGranahan, Broughton, Deters, Brandt, Selig, "Summary of Low-Speed Airfoil Data, Volume 5", UIUC, 2012
+# program: UIUC Low-Speed Airfoil Tests (M. S. Selig et al.), UIUC subsonic wind tunnel, 2D model spanning the test section between splitter plates, nominal 12 in chord
+# url_fetched: https://m-selig.ae.illinois.edu/pd/pub/lsat/volume05.zip
+# date_fetched: 2026-11-16
+# raw_file: raw/volume05.zip member volume05/s1223_lift.dat
+# airfoil_as_labelled: S1223 | builder: Y. Tinel | comment: Clean
+# run_note: Tabulated from data in file kt06087.dat & reduced using program C10.20
+# reynolds_number: 250201.3 (run average, as given in the source)
+# measured_or_computed: MEASURED (wind tunnel)
+# method: lift and pitching moment (about quarter chord) from the force balance; NO drag in this file
+# row order is the run order: where alpha goes up and then comes back down both branches are kept (hysteresis loop), not sorted, not merged
+# corrections: as published by UIUC; nothing applied here
+# columns: alpha_deg,cl,cm  (cd not measured in lift runs)
+alpha_deg,cl,cm
+-10.08,-0.19,0.0035
+-9.03,-0.19,0.0083
+-8.03,-0.17,0.0100
+-6.99,-0.13,-0.0019
+-5.99,-0.05,-0.0203
+-5.11,0.06,-0.0515
+-4.05,0.24,-0.0996
+-3.06,0.40,-0.1402
+-2.02,0.83,-0.2535
+-1.02,0.94,-0.2559
+0.01,1.07,-0.2590
+1.03,1.17,-0.2557
+2.08,1.28,-0.2543
+3.16,1.37,-0.2484
+4.15,1.46,-0.2431
+5.11,1.54,-0.2364
+6.19,1.63,-0.2307
+7.21,1.72,-0.2243
+8.25,1.79,-0.2179
+9.27,1.87,-0.2102
+10.29,1.95,-0.2042
+11.35,2.02,-0.1963
+12.33,2.08,-0.1884
+13.39,2.15,-0.1797
+14.38,2.20,-0.1713
+15.42,2.25,-0.1601
+16.43,2.24,-0.1494
+17.36,2.17,-0.1548
+18.36,2.10,-0.1605
+19.32,2.05,-0.1634
+20.37,2.00,-0.1671
+21.28,1.96,-0.1753
+22.31,1.96,-0.1849
+23.30,1.94,-0.1934
+24.31,1.91,-0.2017
+23.76,1.93,-0.1933
+22.77,1.95,-0.1845
+21.87,1.96,-0.1751
+20.78,1.98,-0.1662
+19.85,2.00,-0.1607
+18.91,2.07,-0.1579
+17.89,2.12,-0.1537
+16.90,2.21,-0.1463
+15.92,2.25,-0.1507
+14.84,2.23,-0.1627
+13.86,2.18,-0.1719
+12.83,2.12,-0.1814
+11.83,2.05,-0.1896
+10.76,1.99,-0.1976
+9.72,1.92,-0.2046
+8.73,1.84,-0.2125
+7.66,1.76,-0.2194
+6.63,1.67,-0.2254
+5.62,1.58,-0.2310
+4.59,1.49,-0.2365
+3.58,1.41,-0.2437
+2.50,1.32,-0.2481
+1.53,1.22,-0.2521
+0.49,1.13,-0.2551
+-0.53,1.01,-0.2534
+-1.54,0.89,-0.2511
+-2.55,0.76,-0.2445
+-3.54,0.31,-0.1150
+-4.47,0.19,-0.0846
+-5.48,0.01,-0.0302
+-6.48,-0.08,-0.0058
+-7.50,-0.14,0.0086
+-8.50,-0.16,0.0113
+-9.57,-0.17,0.0080

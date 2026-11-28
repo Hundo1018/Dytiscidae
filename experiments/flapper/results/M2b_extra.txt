@@ -1,0 +1,132 @@
+C5 ST wetting seed 10 A: max 5 s turn rate 7.3 deg/s; to heading-or-reverse: start 9, best by 15 s 1 deg | nose steeper than 44 deg 26% of samples, min dorsal z -0.99
+C5 ST wetting seed 10 B: max 5 s turn rate 13.7 deg/s; to heading-or-reverse: start 9, best by 15 s 4 deg | nose steeper than 44 deg 26% of samples, min dorsal z -0.99
+C5 ST wetting seed 11 A: max 5 s turn rate 10.0 deg/s; to heading-or-reverse: start 88, best by 15 s 0 deg | nose steeper than 44 deg 30% of samples, min dorsal z -0.94
+C5 ST wetting seed 11 B: max 5 s turn rate 7.6 deg/s; to heading-or-reverse: start 88, best by 15 s 23 deg | nose steeper than 44 deg 7% of samples, min dorsal z -1.00
+C5 ST wetting seed 12 A: max 5 s turn rate 12.9 deg/s; to heading-or-reverse: start 84, best by 15 s 15 deg | nose steeper than 44 deg 47% of samples, min dorsal z -0.49
+C5 ST wetting seed 12 B: max 5 s turn rate 30.6 deg/s; to heading-or-reverse: start 84, best by 15 s 14 deg | nose steeper than 44 deg 20% of samples, min dorsal z -0.95
+C5 ST wetting seed 13 A: max 5 s turn rate 28.3 deg/s; to heading-or-reverse: start 64, best by 15 s 22 deg | nose steeper than 44 deg 37% of samples, min dorsal z -1.00
+C5 ST wetting seed 13 B: max 5 s turn rate 10.9 deg/s; to heading-or-reverse: start 64, best by 15 s 31 deg | nose steeper than 44 deg 9% of samples, min dorsal z -1.00
+C5 ST wetting seed 14 A: max 5 s turn rate 3.6 deg/s; to heading-or-reverse: start 76, best by 15 s 3 deg | nose steeper than 44 deg 35% of samples, min dorsal z -1.00
+C5 ST wetting seed 14 B: max 5 s turn rate 14.7 deg/s; to heading-or-reverse: start 76, best by 15 s 1 deg | nose steeper than 44 deg 18% of samples, min dorsal z -0.92
+C5 ST wetting seed 15 A: max 5 s turn rate 22.7 deg/s; to heading-or-reverse: start 65, best by 15 s 0 deg | nose steeper than 44 deg 41% of samples, min dorsal z -0.97
+C5 ST wetting seed 15 B: max 5 s turn rate 25.0 deg/s; to heading-or-reverse: start 65, best by 15 s 0 deg | nose steeper than 44 deg 58% of samples, min dorsal z -0.86
+C5 ST wetting: seeds with a half within 45 deg by 15 s: 6 of 6
+
+C5 ST default seed 10 A: max 5 s turn rate 5.3 deg/s; to heading-or-reverse: start 9, best by 15 s 8 deg | nose steeper than 44 deg 11% of samples, min dorsal z -0.96
+C5 ST default seed 10 B: max 5 s turn rate 10.9 deg/s; to heading-or-reverse: start 9, best by 15 s 8 deg | nose steeper than 44 deg 62% of samples, min dorsal z -0.75
+C5 ST default seed 11 A: max 5 s turn rate 0.7 deg/s; to heading-or-reverse: start 88, best by 15 s 15 deg | nose steeper than 44 deg 38% of samples, min dorsal z -0.78
+C5 ST default seed 11 B: max 5 s turn rate 3.6 deg/s; to heading-or-reverse: start 88, best by 15 s 22 deg | nose steeper than 44 deg 26% of samples, min dorsal z -1.00
+C5 ST default seed 12 A: max 5 s turn rate 15.1 deg/s; to heading-or-reverse: start 85, best by 15 s 59 deg | nose steeper than 44 deg 0% of samples, min dorsal z +0.66
+C5 ST default seed 12 B: max 5 s turn rate 15.1 deg/s; to heading-or-reverse: start 85, best by 15 s 59 deg | nose steeper than 44 deg 0% of samples, min dorsal z +0.66
+C5 ST default seed 13 A: max 5 s turn rate nan deg/s; to heading-or-reverse: start 64, best by 15 s 53 deg | nose steeper than 44 deg 73% of samples, min dorsal z -0.66
+C5 ST default seed 13 B: max 5 s turn rate 5.9 deg/s; to heading-or-reverse: start 64, best by 15 s 53 deg | nose steeper than 44 deg 54% of samples, min dorsal z -0.99
+C5 ST default seed 14 A: max 5 s turn rate 14.2 deg/s; to heading-or-reverse: start 76, best by 15 s 49 deg | nose steeper than 44 deg 15% of samples, min dorsal z -1.00
+C5 ST default seed 14 B: max 5 s turn rate 14.2 deg/s; to heading-or-reverse: start 76, best by 15 s 49 deg | nose steeper than 44 deg 17% of samples, min dorsal z -0.99
+C5 ST default seed 15 A: max 5 s turn rate nan deg/s; to heading-or-reverse: start 65, best by 15 s 7 deg | nose steeper than 44 deg 43% of samples, min dorsal z -0.57
+C5 ST default seed 15 B: max 5 s turn rate 7.6 deg/s; to heading-or-reverse: start 65, best by 15 s 0 deg | nose steeper than 44 deg 4% of samples, min dorsal z -1.00
+C5 ST default: seeds with a half within 45 deg by 15 s: 3 of 6
+
+C5 SF wetting seed 10 A: max 5 s turn rate 7.3 deg/s; to heading-or-reverse: start 9, best by 15 s 1 deg | nose steeper than 44 deg 26% of samples, min dorsal z -0.99
+C5 SF wetting seed 11 A: max 5 s turn rate 10.0 deg/s; to heading-or-reverse: start 88, best by 15 s 0 deg | nose steeper than 44 deg 30% of samples, min dorsal z -0.94
+C5 SF wetting seed 12 A: max 5 s turn rate 12.9 deg/s; to heading-or-reverse: start 84, best by 15 s 15 deg | nose steeper than 44 deg 47% of samples, min dorsal z -0.49
+C5 SF wetting seed 13 A: max 5 s turn rate 28.3 deg/s; to heading-or-reverse: start 64, best by 15 s 22 deg | nose steeper than 44 deg 37% of samples, min dorsal z -1.00
+C5 SF wetting seed 14 A: max 5 s turn rate 3.6 deg/s; to heading-or-reverse: start 76, best by 15 s 3 deg | nose steeper than 44 deg 35% of samples, min dorsal z -1.00
+C5 SF wetting seed 15 A: max 5 s turn rate 22.7 deg/s; to heading-or-reverse: start 65, best by 15 s 0 deg | nose steeper than 44 deg 41% of samples, min dorsal z -0.97
+C5 SF wetting: seeds with a half within 45 deg by 15 s: 6 of 6
+
+C5 SF default seed 10 A: max 5 s turn rate 5.3 deg/s; to heading-or-reverse: start 9, best by 15 s 8 deg | nose steeper than 44 deg 11% of samples, min dorsal z -0.96
+C5 SF default seed 11 A: max 5 s turn rate 0.7 deg/s; to heading-or-reverse: start 88, best by 15 s 15 deg | nose steeper than 44 deg 38% of samples, min dorsal z -0.78
+C5 SF default seed 12 A: max 5 s turn rate 15.1 deg/s; to heading-or-reverse: start 85, best by 15 s 59 deg | nose steeper than 44 deg 0% of samples, min dorsal z +0.66
+C5 SF default seed 13 A: max 5 s turn rate nan deg/s; to heading-or-reverse: start 64, best by 15 s 53 deg | nose steeper than 44 deg 73% of samples, min dorsal z -0.66
+C5 SF default seed 14 A: max 5 s turn rate 14.2 deg/s; to heading-or-reverse: start 76, best by 15 s 49 deg | nose steeper than 44 deg 15% of samples, min dorsal z -1.00
+C5 SF default seed 15 A: max 5 s turn rate nan deg/s; to heading-or-reverse: start 65, best by 15 s 7 deg | nose steeper than 44 deg 43% of samples, min dorsal z -0.57
+C5 SF default: seeds with a half within 45 deg by 15 s: 3 of 6
+
+C5 S0 wetting seed 10 A: max 5 s turn rate 0.0 deg/s; to heading-or-reverse: start 9, best by 15 s 9 deg | nose steeper than 44 deg 0% of samples, min dorsal z +1.00
+C5 S0 wetting seed 11 A: max 5 s turn rate 0.0 deg/s; to heading-or-reverse: start 88, best by 15 s 88 deg | nose steeper than 44 deg 0% of samples, min dorsal z +1.00
+C5 S0 wetting seed 12 A: max 5 s turn rate 0.1 deg/s; to heading-or-reverse: start 84, best by 15 s 84 deg | nose steeper than 44 deg 0% of samples, min dorsal z +0.99
+C5 S0 wetting seed 13 A: max 5 s turn rate 0.4 deg/s; to heading-or-reverse: start 64, best by 15 s 64 deg | nose steeper than 44 deg 0% of samples, min dorsal z +0.98
+C5 S0 wetting seed 14 A: max 5 s turn rate 0.0 deg/s; to heading-or-reverse: start 76, best by 15 s 76 deg | nose steeper than 44 deg 0% of samples, min dorsal z +1.00
+C5 S0 wetting seed 15 A: max 5 s turn rate 0.0 deg/s; to heading-or-reverse: start 65, best by 15 s 65 deg | nose steeper than 44 deg 0% of samples, min dorsal z +1.00
+C5 S0 wetting: seeds with a half within 45 deg by 15 s: 1 of 6
+
+C5 S0 default seed 10 A: max 5 s turn rate 0.0 deg/s; to heading-or-reverse: start 9, best by 15 s 9 deg | nose steeper than 44 deg 0% of samples, min dorsal z +1.00
+C5 S0 default seed 11 A: max 5 s turn rate 0.0 deg/s; to heading-or-reverse: start 88, best by 15 s 88 deg | nose steeper than 44 deg 0% of samples, min dorsal z +1.00
+C5 S0 default seed 12 A: max 5 s turn rate 0.1 deg/s; to heading-or-reverse: start 85, best by 15 s 84 deg | nose steeper than 44 deg 0% of samples, min dorsal z +0.99
+C5 S0 default seed 13 A: max 5 s turn rate 0.2 deg/s; to heading-or-reverse: start 64, best by 15 s 63 deg | nose steeper than 44 deg 0% of samples, min dorsal z +0.97
+C5 S0 default seed 14 A: max 5 s turn rate 0.0 deg/s; to heading-or-reverse: start 76, best by 15 s 76 deg | nose steeper than 44 deg 0% of samples, min dorsal z +1.00
+C5 S0 default seed 15 A: max 5 s turn rate 0.0 deg/s; to heading-or-reverse: start 65, best by 15 s 65 deg | nose steeper than 44 deg 0% of samples, min dorsal z +1.00
+C5 S0 default: seeds with a half within 45 deg by 15 s: 1 of 6
+
+depth W0 wetting seed 10 A: CoM depth at 40.0 s 0.00 m (target 4.04)
+depth W0 wetting seed 11 A: CoM depth at 40.0 s 0.00 m (target 4.25)
+depth W0 wetting seed 12 A: CoM depth at 40.0 s 0.00 m (target 4.33)
+depth W0 wetting seed 13 A: CoM depth at 40.0 s 0.00 m (target 4.34)
+depth W0 wetting seed 14 A: CoM depth at 40.0 s 0.00 m (target 4.04)
+depth W0 wetting seed 15 A: CoM depth at 40.0 s 0.00 m (target 4.17)
+depth W0 default seed 10 A: CoM depth at 40.0 s 0.00 m (target 4.04)
+depth W0 default seed 11 A: CoM depth at 40.0 s 0.00 m (target 4.25)
+depth W0 default seed 12 A: CoM depth at 40.0 s 0.03 m (target 4.33)
+depth W0 default seed 13 A: CoM depth at 40.0 s 0.00 m (target 4.34)
+depth W0 default seed 14 A: CoM depth at 40.0 s 0.03 m (target 4.04)
+depth W0 default seed 15 A: CoM depth at 40.0 s 0.00 m (target 4.17)
+depth VB-W0 wetting seed 10 A: CoM depth at 40.0 s 0.16 m (target 4.04)
+depth VB-W0 wetting seed 11 A: CoM depth at 40.0 s 0.16 m (target 4.25)
+depth VB-W0 wetting seed 12 A: CoM depth at 40.0 s 0.16 m (target 4.33)
+depth VB-W0 wetting seed 13 A: CoM depth at 40.0 s 0.17 m (target 4.34)
+depth VB-W0 wetting seed 14 A: CoM depth at 40.0 s 0.15 m (target 4.04)
+depth VB-W0 wetting seed 15 A: CoM depth at 40.0 s 0.15 m (target 4.17)
+depth VB-W0 default seed 10 A: CoM depth at 40.0 s 0.19 m (target 4.04)
+depth VB-W0 default seed 11 A: CoM depth at 40.0 s 0.15 m (target 4.25)
+depth VB-W0 default seed 12 A: CoM depth at 40.0 s 0.18 m (target 4.33)
+depth VB-W0 default seed 13 A: CoM depth at 40.0 s 0.18 m (target 4.34)
+depth VB-W0 default seed 14 A: CoM depth at 40.0 s 0.16 m (target 4.04)
+depth VB-W0 default seed 15 A: CoM depth at 40.0 s 0.18 m (target 4.17)
+depth WT wetting seed 10 A: CoM depth at 40.0 s -0.02 m (target 4.04)
+depth WT wetting seed 10 B: CoM depth at 40.0 s -0.09 m (target 1.96)
+depth WT wetting seed 11 A: CoM depth at 40.0 s -0.00 m (target 4.25)
+depth WT wetting seed 11 B: CoM depth at 40.0 s 0.07 m (target 1.75)
+depth WT wetting seed 12 A: CoM depth at 40.0 s 3.29 m (target 4.33)
+depth WT wetting seed 12 B: CoM depth at 40.0 s 0.15 m (target 1.67)
+depth WT wetting seed 13 A: CoM depth at 40.0 s 0.12 m (target 4.34)
+depth WT wetting seed 13 B: CoM depth at 40.0 s 0.01 m (target 1.66)
+depth WT wetting seed 14 A: CoM depth at 40.0 s 1.28 m (target 4.04)
+depth WT wetting seed 14 B: CoM depth at 40.0 s 0.34 m (target 1.96)
+depth WT wetting seed 15 A: CoM depth at 40.0 s 0.04 m (target 4.17)
+depth WT wetting seed 15 B: CoM depth at 40.0 s 0.03 m (target 1.83)
+depth WT default seed 10 A: CoM depth at 40.0 s 2.43 m (target 4.04)
+depth WT default seed 10 B: CoM depth at 40.0 s 2.78 m (target 1.96)
+depth WT default seed 11 A: CoM depth at 40.0 s 3.59 m (target 4.25)
+depth WT default seed 11 B: CoM depth at 40.0 s 3.55 m (target 1.75)
+depth WT default seed 12 A: CoM depth at 40.0 s 3.29 m (target 4.33)
+depth WT default seed 12 B: CoM depth at 40.0 s 2.40 m (target 1.67)
+depth WT default seed 13 A: CoM depth at 40.0 s 2.36 m (target 4.34)
+depth WT default seed 13 B: CoM depth at 40.0 s 2.97 m (target 1.66)
+depth WT default seed 14 A: CoM depth at 40.0 s 3.29 m (target 4.04)
+depth WT default seed 14 B: CoM depth at 40.0 s 2.83 m (target 1.96)
+depth WT default seed 15 A: CoM depth at 40.0 s 3.34 m (target 4.17)
+depth WT default seed 15 B: CoM depth at 40.0 s 3.28 m (target 1.83)
+depth WT-VB wetting seed 10 A: CoM depth at 40.0 s 6.14 m (target 4.04)
+depth WT-VB wetting seed 10 B: CoM depth at 40.0 s 0.16 m (target 1.96)
+depth WT-VB wetting seed 11 A: CoM depth at 40.0 s 8.71 m (target 4.25)
+depth WT-VB wetting seed 11 B: CoM depth at 40.0 s 5.37 m (target 1.75)
+depth WT-VB wetting seed 12 A: CoM depth at 40.0 s 6.96 m (target 4.33)
+depth WT-VB wetting seed 12 B: CoM depth at 40.0 s 2.15 m (target 1.67)
+depth WT-VB wetting seed 13 A: CoM depth at 40.0 s 5.17 m (target 4.34)
+depth WT-VB wetting seed 13 B: CoM depth at 40.0 s 0.06 m (target 1.66)
+depth WT-VB wetting seed 14 A: CoM depth at 40.0 s 4.38 m (target 4.04)
+depth WT-VB wetting seed 14 B: CoM depth at 40.0 s 3.23 m (target 1.96)
+depth WT-VB wetting seed 15 A: CoM depth at 40.0 s 5.55 m (target 4.17)
+depth WT-VB wetting seed 15 B: CoM depth at 40.0 s 5.16 m (target 1.83)
+depth WT-VB default seed 10 A: CoM depth at 40.0 s 2.42 m (target 4.04)
+depth WT-VB default seed 10 B: CoM depth at 40.0 s 3.71 m (target 1.96)
+depth WT-VB default seed 11 A: CoM depth at 40.0 s 3.36 m (target 4.25)
+depth WT-VB default seed 11 B: CoM depth at 40.0 s 3.60 m (target 1.75)
+depth WT-VB default seed 12 A: CoM depth at 40.0 s 2.68 m (target 4.33)
+depth WT-VB default seed 12 B: CoM depth at 40.0 s 2.46 m (target 1.67)
+depth WT-VB default seed 13 A: CoM depth at 40.0 s 2.91 m (target 4.34)
+depth WT-VB default seed 13 B: CoM depth at 40.0 s 2.36 m (target 1.66)
+depth WT-VB default seed 14 A: CoM depth at 40.0 s 3.46 m (target 4.04)
+depth WT-VB default seed 14 B: CoM depth at 40.0 s 3.17 m (target 1.96)
+depth WT-VB default seed 15 A: CoM depth at 40.0 s 2.91 m (target 4.17)
+depth WT-VB default seed 15 B: CoM depth at 40.0 s 3.37 m (target 1.83)

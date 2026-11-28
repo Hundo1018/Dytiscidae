@@ -1,0 +1,83 @@
+{"run": "arch49", "unit": "c83b645e549f73cd", "kind": "air_to_water", "arm": "base", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch49", "unit": "e44f7a927d179232", "kind": "air_to_water", "arm": "base", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch49", "unit": "3739ed2a4d52d7b6", "kind": "air_to_water", "arm": "base", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "6e5f521b2705da86", "kind": "water_to_land", "arm": "base", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "2b343fabb44b10c7", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "2b343fabb44b10c7", "kind": "land_to_air", "arm": "base", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "9dbfdd9dbf6f42e3", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "9dbfdd9dbf6f42e3", "kind": "water_to_land", "arm": "base", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "1fcbbdd9ee767932", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "1fcbbdd9ee767932", "kind": "water_to_air", "arm": "base", "pre_crossed": false, "pre_failure": "never crossed the boundary", "pre_hold": 1.0, "pre_approach": 0.34026666666666666}
+{"run": "arch51", "unit": "e13734d5eca13138", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "e13734d5eca13138", "kind": "air_to_water", "arm": "base", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "c64bde838a459b0f", "kind": "water_to_air", "arm": "still", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "c64bde838a459b0f", "kind": "water_to_land", "arm": "still", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "4e197bfaed50e1fc", "kind": "water_to_air", "arm": "base", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "4e197bfaed50e1fc", "kind": "water_to_land", "arm": "base", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "dd60782795ecfe03", "kind": "water_to_land", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "35f8809393fd821a", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "35f8809393fd821a", "kind": "air_to_water", "arm": "base", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "4fcc7ae68859a86e", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "4fcc7ae68859a86e", "kind": "land_to_air", "arm": "base", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "0bdfb85527f5c9af", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch49", "unit": "c5ae94928312bec5", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "0cb3149cc2cece90", "kind": "air_to_water", "arm": "base", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "0cb3149cc2cece90", "kind": "air_to_water", "arm": "still", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch56", "unit": "426a274eb9cbc772", "kind": "water_to_land", "arm": "base", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch49", "unit": "7de1f829c7f36670", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch56", "unit": "fda5d014b47bc42c", "kind": "water_to_land", "arm": "base", "pre_crossed": false, "pre_failure": "never crossed the boundary", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "be8cb462b7f6a985", "kind": "water_to_land", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "ab56e7353b29cf51", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "f185bb2ea6f8ea96", "kind": "water_to_land", "arm": "own", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "38fdc7661a72db5c", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "38fdc7661a72db5c", "kind": "land_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "e4df6c9ddc613b1d", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "5697f663fd6f7a06", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "5697f663fd6f7a06", "kind": "land_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "61e99de84ccfa0e8", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "61e99de84ccfa0e8", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "e65191f412ec7540", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "e65191f412ec7540", "kind": "land_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "ecfa3947e742df99", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "abbf717f491ea18e", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "abbf717f491ea18e", "kind": "water_to_land", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "604fed4233638796", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "never crossed the boundary", "pre_hold": 1.0, "pre_approach": 0.33546666666666664}
+{"run": "arch51", "unit": "e7b0b3b0c55a9635", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "e7b0b3b0c55a9635", "kind": "water_to_land", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "e7b0b3b0c55a9635", "kind": "land_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "1c33e881b9c301a6", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "55eafa8baf55ac59", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "e335871286202f17", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "e335871286202f17", "kind": "water_to_land", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "7269f991b39a23ba", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "bfd1228cc1aa4f33", "kind": "water_to_land", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "86f75ef354092573", "kind": "land_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "never crossed the boundary", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "2c5bb17f1b3a823c", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "never crossed the boundary", "pre_hold": 1.0, "pre_approach": 0.4168}
+{"run": "arch51", "unit": "b6d9e2e67aa6d088", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "36db3a81a939f00e", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "never crossed the boundary", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "36db3a81a939f00e", "kind": "water_to_land", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "8aa1141909cf18be", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "184443e0ba949654", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "d6ad7e8253d1d4ce", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "bb52c721fc39c86d", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "never crossed the boundary", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "c7e52645a41f6e90", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "14aa6f93a185171c", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "74b2bcbb58f0ff75", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "1a5264bc639f4dd2", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "bb5519a706219705", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "never crossed the boundary", "pre_hold": 1.0, "pre_approach": 0.37333333333333335}
+{"run": "arch51", "unit": "bb5519a706219705", "kind": "land_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "1f4e3ef2db7788cc", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "bc76b3d19f8a884d", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "bc76b3d19f8a884d", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "1101db900dcc6bd8", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "1101db900dcc6bd8", "kind": "water_to_land", "arm": "own", "pre_crossed": false, "pre_failure": "diverged", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "1101db900dcc6bd8", "kind": "land_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "never crossed the boundary", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "b30aa6c494a02da4", "kind": "water_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "b30aa6c494a02da4", "kind": "water_to_land", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "bc6bcc462e207199", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "510e5221a5c986c8", "kind": "land_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "never crossed the boundary", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "b085695a3248b970", "kind": "land_to_air", "arm": "own", "pre_crossed": false, "pre_failure": "never crossed the boundary", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "cdbb22ba64bbb192", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "3c4270f6921c4c89", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "e70daf241f292d16", "kind": "water_to_land", "arm": "own", "pre_crossed": false, "pre_failure": "battery exhausted mid-transition", "pre_hold": 0.0, "pre_approach": 0.0}
+{"run": "arch51", "unit": "74e7593d555a50dc", "kind": "air_to_water", "arm": "own", "pre_crossed": false, "pre_failure": "did not hold before the command to cross", "pre_hold": 0.0, "pre_approach": 0.0}

@@ -1,0 +1,965 @@
+[
+ {
+  "check": "E1",
+  "case": "air U 0.05 m/s, 5 deg",
+  "measured": 0.0,
+  "expected": 0.0,
+  "tol": 1e-06,
+  "ok": true,
+  "note": "|F| 2.6e-05 N"
+ },
+ {
+  "check": "E1",
+  "case": "air U 0.05 m/s, 45 deg",
+  "measured": 4.453340066385068e-11,
+  "expected": 0.0,
+  "tol": 1e-06,
+  "ok": true,
+  "note": "|F| 7.31e-05 N"
+ },
+ {
+  "check": "E1",
+  "case": "air U 8 m/s, 5 deg",
+  "measured": 0.0,
+  "expected": 0.0,
+  "tol": 1e-06,
+  "ok": true,
+  "note": "|F| 0.627 N"
+ },
+ {
+  "check": "E1",
+  "case": "air U 8 m/s, 45 deg",
+  "measured": 5.957424154429518e-11,
+  "expected": 0.0,
+  "tol": 1e-06,
+  "ok": true,
+  "note": "|F| 1.78 N"
+ },
+ {
+  "check": "E1",
+  "case": "air U 80 m/s, 5 deg",
+  "measured": 0.0,
+  "expected": 0.0,
+  "tol": 1e-06,
+  "ok": true,
+  "note": "|F| 62.5 N"
+ },
+ {
+  "check": "E1",
+  "case": "air U 80 m/s, 45 deg",
+  "measured": 5.673090490471021e-11,
+  "expected": 0.0,
+  "tol": 1e-06,
+  "ok": true,
+  "note": "|F| 178 N"
+ },
+ {
+  "check": "E1",
+  "case": "freshwater U 0.05 m/s, 5 deg",
+  "measured": 0.0,
+  "expected": 0.0,
+  "tol": 1e-06,
+  "ok": true,
+  "note": "|F| 0.02 N"
+ },
+ {
+  "check": "E1",
+  "case": "freshwater U 0.05 m/s, 45 deg",
+  "measured": 2.4473002264760854e-11,
+  "expected": 0.0,
+  "tol": 1e-06,
+  "ok": true,
+  "note": "|F| 0.0572 N"
+ },
+ {
+  "check": "E1",
+  "case": "freshwater U 8 m/s, 5 deg",
+  "measured": 0.0,
+  "expected": 0.0,
+  "tol": 1e-06,
+  "ok": true,
+  "note": "|F| 178 N"
+ },
+ {
+  "check": "E1",
+  "case": "freshwater U 8 m/s, 45 deg",
+  "measured": 4.64974042920211e-10,
+  "expected": 0.0,
+  "tol": 1e-06,
+  "ok": true,
+  "note": "|F| 178 N"
+ },
+ {
+  "check": "E1",
+  "case": "freshwater U 80 m/s, 5 deg",
+  "measured": 0.0,
+  "expected": 0.0,
+  "tol": 1e-06,
+  "ok": true,
+  "note": "|F| 178 N"
+ },
+ {
+  "check": "E1",
+  "case": "freshwater U 80 m/s, 45 deg",
+  "measured": 4.471621300927833e-08,
+  "expected": 0.0,
+  "tol": 1e-06,
+  "ok": true,
+  "note": "|F| 178 N"
+ },
+ {
+  "check": "E2",
+  "case": "translate 5 deg, chord x0.02: CL",
+  "measured": 0.4000382034062246,
+  "expected": 0.399191518945131,
+  "tol": 0.001,
+  "ok": false,
+  "note": "rel 2.12e-03"
+ },
+ {
+  "check": "E2",
+  "case": "translate 5 deg, chord x0.02: CD",
+  "measured": 0.04377642069610202,
+  "expected": 0.043622545322270466,
+  "tol": 0.001,
+  "ok": false,
+  "note": "rel 3.53e-03"
+ },
+ {
+  "check": "E2",
+  "case": "translate 5 deg, chord x50: CL",
+  "measured": 0.39919151895059074,
+  "expected": 0.399191518945131,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 1.37e-11"
+ },
+ {
+  "check": "E2",
+  "case": "translate 5 deg, chord x50: CD",
+  "measured": 0.043622545322740895,
+  "expected": 0.043622545322270466,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 1.08e-11"
+ },
+ {
+  "check": "E3",
+  "case": "translate 5 deg, fresh water: CL",
+  "measured": 0.39919151894660915,
+  "expected": 0.399191518945131,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 3.70e-12"
+ },
+ {
+  "check": "E3",
+  "case": "translate 5 deg, fresh water: CD",
+  "measured": 0.04362254532239784,
+  "expected": 0.043622545322270466,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 2.92e-12"
+ },
+ {
+  "check": "E2",
+  "case": "translate 20 deg, chord x0.02: CL",
+  "measured": 0.7972338521939244,
+  "expected": 0.7965663972695658,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 8.38e-04"
+ },
+ {
+  "check": "E2",
+  "case": "translate 20 deg, chord x0.02: CD",
+  "measured": 0.2988237656866564,
+  "expected": 0.29724870222949895,
+  "tol": 0.001,
+  "ok": false,
+  "note": "rel 5.30e-03"
+ },
+ {
+  "check": "E2",
+  "case": "translate 20 deg, chord x50: CL",
+  "measured": 0.7965663972705829,
+  "expected": 0.7965663972695658,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 1.28e-12"
+ },
+ {
+  "check": "E2",
+  "case": "translate 20 deg, chord x50: CD",
+  "measured": 0.2972487022298186,
+  "expected": 0.29724870222949895,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 1.08e-12"
+ },
+ {
+  "check": "E3",
+  "case": "translate 20 deg, fresh water: CL",
+  "measured": 0.7965663972699448,
+  "expected": 0.7965663972695658,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 4.76e-13"
+ },
+ {
+  "check": "E3",
+  "case": "translate 20 deg, fresh water: CD",
+  "measured": 0.297248702229619,
+  "expected": 0.29724870222949895,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 4.04e-13"
+ },
+ {
+  "check": "E2",
+  "case": "translate 60 deg, chord x0.02: CL",
+  "measured": 0.6651389223190828,
+  "expected": 0.6651389221866709,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 1.99e-10"
+ },
+ {
+  "check": "E2",
+  "case": "translate 60 deg, chord x0.02: CD",
+  "measured": 1.160284393972292,
+  "expected": 1.1602843938040281,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 1.45e-10"
+ },
+ {
+  "check": "E2",
+  "case": "translate 60 deg, chord x50: CL",
+  "measured": 0.6651389221873324,
+  "expected": 0.6651389221866709,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 9.94e-13"
+ },
+ {
+  "check": "E2",
+  "case": "translate 60 deg, chord x50: CD",
+  "measured": 1.1602843938051715,
+  "expected": 1.1602843938040281,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 9.85e-13"
+ },
+ {
+  "check": "E3",
+  "case": "translate 60 deg, fresh water: CL",
+  "measured": 0.6651389221870463,
+  "expected": 0.6651389221866709,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 5.64e-13"
+ },
+ {
+  "check": "E3",
+  "case": "translate 60 deg, fresh water: CD",
+  "measured": 1.160284393804687,
+  "expected": 1.1602843938040281,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 5.68e-13"
+ },
+ {
+  "check": "E2",
+  "case": "revolve 40 deg, chord x0.02: Cv",
+  "measured": 1.1360419025392614,
+  "expected": 1.431562125747642,
+  "tol": 0.001,
+  "ok": false,
+  "note": "rel 2.06e-01"
+ },
+ {
+  "check": "E2",
+  "case": "revolve 40 deg, chord x0.02: Ch",
+  "measured": 0.9633216521953025,
+  "expected": 1.2131139224854377,
+  "tol": 0.001,
+  "ok": false,
+  "note": "rel 2.06e-01"
+ },
+ {
+  "check": "E2",
+  "case": "revolve 40 deg, chord x50: Cv",
+  "measured": 1.4075201639124484,
+  "expected": 1.431562125747642,
+  "tol": 0.001,
+  "ok": false,
+  "note": "rel 1.68e-02"
+ },
+ {
+  "check": "E2",
+  "case": "revolve 40 deg, chord x50: Ch",
+  "measured": 1.193014803631086,
+  "expected": 1.2131139224854377,
+  "tol": 0.001,
+  "ok": false,
+  "note": "rel 1.66e-02"
+ },
+ {
+  "check": "E3",
+  "case": "revolve 40 deg, fresh water: Cv",
+  "measured": 1.4315621257484012,
+  "expected": 1.431562125747642,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 5.30e-13"
+ },
+ {
+  "check": "E3",
+  "case": "revolve 40 deg, fresh water: Ch",
+  "measured": 1.2131139224860679,
+  "expected": 1.2131139224854377,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 5.19e-13"
+ },
+ {
+  "check": "E2",
+  "case": "heave kr 0.25, chord x0.02: CL mean",
+  "measured": 0.5014788782038458,
+  "expected": 0.5455330569153807,
+  "tol": 0.001,
+  "ok": false,
+  "note": "rel 8.08e-02"
+ },
+ {
+  "check": "E2",
+  "case": "heave kr 0.25, chord x0.02: CL swing",
+  "measured": 0.7481265851831017,
+  "expected": 0.6044200543657858,
+  "tol": 0.001,
+  "ok": false,
+  "note": "rel 2.38e-01"
+ },
+ {
+  "check": "E2",
+  "case": "heave kr 0.25, chord x0.02: CD mean",
+  "measured": 0.11280782682977594,
+  "expected": 0.10780291173734813,
+  "tol": 0.001,
+  "ok": false,
+  "note": "rel 4.64e-02"
+ },
+ {
+  "check": "E2",
+  "case": "heave kr 0.25, chord x50: CL mean",
+  "measured": 0.545533056916696,
+  "expected": 0.5455330569153807,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 2.41e-12"
+ },
+ {
+  "check": "E2",
+  "case": "heave kr 0.25, chord x50: CL swing",
+  "measured": 0.6044200543661139,
+  "expected": 0.6044200543657858,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 5.43e-13"
+ },
+ {
+  "check": "E2",
+  "case": "heave kr 0.25, chord x50: CD mean",
+  "measured": 0.10780291173761201,
+  "expected": 0.10780291173734813,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 2.45e-12"
+ },
+ {
+  "check": "E3",
+  "case": "heave kr 0.25, fresh water: CL mean",
+  "measured": 0.545533056915666,
+  "expected": 0.5455330569153807,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 5.23e-13"
+ },
+ {
+  "check": "E3",
+  "case": "heave kr 0.25, fresh water: CL swing",
+  "measured": 0.6044200543658105,
+  "expected": 0.6044200543657858,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 4.08e-14"
+ },
+ {
+  "check": "E3",
+  "case": "heave kr 0.25, fresh water: CD mean",
+  "measured": 0.1078029117374056,
+  "expected": 0.10780291173734813,
+  "tol": 0.001,
+  "ok": true,
+  "note": "rel 5.33e-13"
+ },
+ {
+  "check": "E9",
+  "case": "AR 0.5: least CD - CL^2/(pi AR), 2-8 deg",
+  "measured": 0.009022722437323301,
+  "expected": ">= 0",
+  "tol": 0.0,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E9",
+  "case": "AR 0.5: lift slope per rad",
+  "measured": 1.2461274152605266,
+  "expected": 0.7734954581120356,
+  "tol": "15%",
+  "ok": false,
+  "note": "ratio 1.611"
+ },
+ {
+  "check": "E9",
+  "case": "AR 1: least CD - CL^2/(pi AR), 2-8 deg",
+  "measured": 0.009588833191981951,
+  "expected": ">= 0",
+  "tol": 0.0,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E9",
+  "case": "AR 1: lift slope per rad",
+  "measured": 2.1202442114526843,
+  "expected": 1.4832588477222797,
+  "tol": "15%",
+  "ok": false,
+  "note": "ratio 1.429"
+ },
+ {
+  "check": "E9",
+  "case": "AR 2: least CD - CL^2/(pi AR), 2-8 deg",
+  "measured": 0.010670750183281116,
+  "expected": ">= 0",
+  "tol": 0.0,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E9",
+  "case": "AR 2: lift slope per rad",
+  "measured": 3.327992322856356,
+  "expected": 2.602580569137146,
+  "tol": "15%",
+  "ok": false,
+  "note": "ratio 1.279"
+ },
+ {
+  "check": "E9",
+  "case": "AR 4: least CD - CL^2/(pi AR), 2-8 deg",
+  "measured": 0.012258208251132016,
+  "expected": ">= 0",
+  "tol": 0.0,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E9",
+  "case": "AR 4: lift slope per rad",
+  "measured": 4.666168652217646,
+  "expected": 3.8832220774509327,
+  "tol": "15%",
+  "ok": false,
+  "note": "ratio 1.202"
+ },
+ {
+  "check": "E9",
+  "case": "AR 8: least CD - CL^2/(pi AR), 2-8 deg",
+  "measured": 0.013936512261336922,
+  "expected": ">= 0",
+  "tol": 0.0,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E9",
+  "case": "AR 8: lift slope per rad",
+  "measured": 5.78842002349559,
+  "expected": 4.905762844912698,
+  "tol": "15%",
+  "ok": false,
+  "note": "ratio 1.180"
+ },
+ {
+  "check": "E9",
+  "case": "AR 16: least CD - CL^2/(pi AR), 2-8 deg",
+  "measured": 0.015251325228715817,
+  "expected": ">= 0",
+  "tol": 0.0,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E9",
+  "case": "AR 16: lift slope per rad",
+  "measured": 6.590135177286998,
+  "expected": 5.54668426495308,
+  "tol": "15%",
+  "ok": false,
+  "note": "ratio 1.188"
+ },
+ {
+  "check": "E9",
+  "case": "AR 40: least CD - CL^2/(pi AR), 2-8 deg",
+  "measured": 0.016449454963697863,
+  "expected": ">= 0",
+  "tol": 0.0,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E9",
+  "case": "AR 40: lift slope per rad",
+  "measured": 7.206430618833655,
+  "expected": 5.976875120842412,
+  "tol": "15%",
+  "ok": false,
+  "note": "ratio 1.206"
+ },
+ {
+  "check": "E10",
+  "case": "normal to the plate: added mass, kg",
+  "measured": 7.825048264615659,
+  "expected": 7.838273670706536,
+  "tol": "15%",
+  "ok": true,
+  "note": "pi rho c^2 b / 4; ratio 0.998"
+ },
+ {
+  "check": "E10",
+  "case": "edge-on: added mass, kg",
+  "measured": 0.07852360946232234,
+  "expected": "< 5% of 7.84",
+  "tol": 0.3919136835353268,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E11",
+  "case": "neutral, 50 m under: speed after 1 s, m/s",
+  "measured": 0.0009354084020791616,
+  "expected": 0.0,
+  "tol": 0.000980665,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E11",
+  "case": "half density, at the surface: centre above the waterline, m",
+  "measured": -0.0006285569474652926,
+  "expected": 0.0,
+  "tol": 0.002,
+  "ok": true,
+  "note": "speed -1.16e-03 m/s"
+ },
+ {
+  "check": "E12",
+  "case": "lift / steady at s = 2 semi-chords",
+  "measured": 0.5843848477065431,
+  "expected": 0.6655001796101223,
+  "tol": 0.1,
+  "ok": true,
+  "note": "steady CL 0.505 (2 pi a = 0.548)"
+ },
+ {
+  "check": "E12",
+  "case": "lift / steady at s = 4 semi-chords",
+  "measured": 0.5843806451240403,
+  "expected": 0.761555717840816,
+  "tol": 0.1,
+  "ok": false,
+  "note": "steady CL 0.505 (2 pi a = 0.548)"
+ },
+ {
+  "check": "E12",
+  "case": "lift / steady at s = 8 semi-chords",
+  "measured": 0.8681770562021883,
+  "expected": 0.8549524385154665,
+  "tol": 0.1,
+  "ok": true,
+  "note": "steady CL 0.505 (2 pi a = 0.548)"
+ },
+ {
+  "check": "E12",
+  "case": "lift / steady at s = 16 semi-chords",
+  "measured": 0.9326454120762573,
+  "expected": 0.9175688622709254,
+  "tol": 0.1,
+  "ok": true,
+  "note": "steady CL 0.505 (2 pi a = 0.548)"
+ },
+ {
+  "check": "E12",
+  "case": "lift / steady at s = 40 semi-chords",
+  "measured": 0.9821633256427498,
+  "expected": 0.9732636927847712,
+  "tol": 0.1,
+  "ok": true,
+  "note": "steady CL 0.505 (2 pi a = 0.548)"
+ },
+ {
+  "check": "E14",
+  "case": "AR 1 at 90 deg: CD",
+  "measured": 0.7459184953775173,
+  "expected": 1.17,
+  "tol": "10%",
+  "ok": false,
+  "note": "disc and square plate, TYPED_CONSTANTS_SOURCES.md C"
+ },
+ {
+  "check": "E14",
+  "case": "2D at 90 deg: CD",
+  "measured": 1.9887659409727436,
+  "expected": 1.98,
+  "tol": "10%",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E4",
+  "case": "cruise: largest side force / vertical force",
+  "measured": 2.1940389869719512e-11,
+  "expected": 0.0,
+  "tol": 0.0001,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E4",
+  "case": "cruise: largest rolling moment / vertical force",
+  "measured": 1.4753690608421098e-05,
+  "expected": 0.0,
+  "tol": 0.0001,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E4",
+  "case": "cruise: largest yawing moment / vertical force",
+  "measured": 1.2676410352287093e-06,
+  "expected": 0.0,
+  "tol": 0.0001,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E4",
+  "case": "take-off: largest side force / vertical force",
+  "measured": 9.511722148925131e-11,
+  "expected": 0.0,
+  "tol": 0.0001,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E4",
+  "case": "take-off: largest rolling moment / vertical force",
+  "measured": 4.426740116603936e-09,
+  "expected": 0.0,
+  "tol": 0.0001,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E4",
+  "case": "take-off: largest yawing moment / vertical force",
+  "measured": 8.268768276847793e-06,
+  "expected": 0.0,
+  "tol": 0.0001,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E5",
+  "case": "vacuum: change of the centre of mass's forward speed / hull's in-beat swing",
+  "measured": 0.00011328744003351206,
+  "expected": 0.0,
+  "tol": 0.001,
+  "ok": true,
+  "note": "swing 1.94 m/s"
+ },
+ {
+  "check": "E5",
+  "case": "vacuum: change of the centre of mass's vertical + g t speed / hull's in-beat swing",
+  "measured": 9.736499193163671e-05,
+  "expected": 0.0,
+  "tol": 0.001,
+  "ok": true,
+  "note": "swing 1.94 m/s"
+ },
+ {
+  "check": "E5",
+  "case": "vacuum: change of angular momentum (pitch) / (mass x swing x span/4)",
+  "measured": 0.0002622184842166319,
+  "expected": 0.0,
+  "tol": 0.001,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E5",
+  "case": "vacuum, as frozen (the hull, not the centre of mass): forward speed",
+  "measured": 0.034916939948839466,
+  "expected": 0.0,
+  "tol": 0.001,
+  "ok": true,
+  "note": "superseded; reported"
+ },
+ {
+  "check": "E5",
+  "case": "vacuum, as frozen (the hull, not the centre of mass): vertical speed + g t",
+  "measured": 0.013610829018740044,
+  "expected": 0.0,
+  "tol": 0.001,
+  "ok": true,
+  "note": "superseded; reported"
+ },
+ {
+  "check": "E5",
+  "case": "control in air: the same, forward",
+  "measured": 1.5438446696103383,
+  "expected": "> 0.01",
+  "tol": 0.01,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E5",
+  "case": "control in air: the same, vertical + g t",
+  "measured": 2.2303076321005517,
+  "expected": "> 0.01",
+  "tol": 0.01,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E5",
+  "case": "control in air: the same, angular momentum",
+  "measured": 9.976806510839134,
+  "expected": "> 0.01",
+  "tol": 0.01,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E6",
+  "case": "runs with negative mean drive power, of 60",
+  "measured": 0,
+  "expected": 0,
+  "tol": 0,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E6",
+  "case": "runs that did not stay finite",
+  "measured": 0,
+  "expected": 0,
+  "tol": 0,
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E6",
+  "case": "runs in which the load limiter bound (reported)",
+  "measured": 18,
+  "expected": "-",
+  "tol": "-",
+  "ok": true,
+  "note": "E6 08 air section mass 0.264 kg; E6 09 air chain6 mass 0.0622 kg; E6 11 air slender mass 0.0943 kg; E6 14 air section mass 0.00878 kg; E6 17 air slender mass 0.0998 kg; E6 24 air flat mass 0.0746 kg; E6 33 air chain6 mass 0.0104 kg; E6 41 water slender mass 0.0289 kg"
+ },
+ {
+  "check": "E6",
+  "case": "largest tracking error of the drives, deg (reported)",
+  "measured": 27.872760076412977,
+  "expected": "-",
+  "tol": "-",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "check": "E7",
+  "case": "E6 air runs (limiter not bound): power below the actuator-disc bound, of 33",
+  "measured": 0,
+  "expected": 0,
+  "tol": 0,
+  "ok": true,
+  "note": "least power/bound 2.30 (E6 36 air flat)"
+ },
+ {
+  "check": "E7",
+  "case": "stored rows at rest (W6, W7): below the bound, of 1524",
+  "measured": 0,
+  "expected": 0,
+  "tol": 0,
+  "ok": true,
+  "note": "least power/bound 5.45, median 7.67"
+ },
+ {
+  "check": "E8",
+  "case": "stored cruise rows (W6, W7): power below thrust x V + induced, of 1645",
+  "measured": 0,
+  "expected": 0,
+  "tol": 0,
+  "ok": true,
+  "note": "least margin 1.91 W"
+ },
+ {
+  "check": "E8",
+  "case": "new held runs at 2 m/s: below the bound, of 32",
+  "measured": 0,
+  "expected": 0,
+  "tol": 0,
+  "ok": true,
+  "note": "least margin 1.93 W at f 2.0 stroke 40 feather 15 offset 0: P 2.15, Fx 0.111, lift 0.0266 N"
+ },
+ {
+  "check": "E8",
+  "case": "new held runs at 3 m/s: below the bound, of 32",
+  "measured": 0,
+  "expected": 0,
+  "tol": 0,
+  "ok": true,
+  "note": "least margin 1.92 W at f 2.0 stroke 40 feather 15 offset 0: P 2.22, Fx 0.097, lift 0.0848 N"
+ },
+ {
+  "check": "E8",
+  "case": "new held runs at 20 m/s: below the bound, of 32",
+  "measured": 0,
+  "expected": 0,
+  "tol": 0,
+  "ok": true,
+  "note": "least margin 67.6 W at f 2.0 stroke 40 feather 0 offset -10: P 19, Fx -7.71, lift 89.2 N"
+ },
+ {
+  "check": "E8",
+  "case": "new held runs at 40 m/s: below the bound, of 32",
+  "measured": 0,
+  "expected": 0,
+  "tol": 0,
+  "ok": true,
+  "note": "least margin 464 W at f 2.0 stroke 40 feather 0 offset -10: P 17.3, Fx -30, lift 337 N"
+ },
+ {
+  "check": "E13",
+  "case": "freerig cruise (S6): power_W, coarse against fine",
+  "measured": 7.094232484444099,
+  "expected": 7.108340372799626,
+  "tol": "2%",
+  "ok": true,
+  "note": "rel -0.20%"
+ },
+ {
+  "check": "E13",
+  "case": "freerig cruise (S6): lift_over_weight, coarse against fine",
+  "measured": 1.0008706209839666,
+  "expected": 1.0009189500200888,
+  "tol": "2%",
+  "ok": true,
+  "note": "rel -0.00%"
+ },
+ {
+  "check": "E13",
+  "case": "freerig take-off: power_W, coarse against fine",
+  "measured": 129.08110939508597,
+  "expected": 129.21872748017014,
+  "tol": "2%",
+  "ok": true,
+  "note": "rel -0.11%"
+ },
+ {
+  "check": "E13",
+  "case": "freerig take-off: lift_over_weight, coarse against fine",
+  "measured": 1.8560976072814979,
+  "expected": 1.8565941793845122,
+  "tol": "2%",
+  "ok": true,
+  "note": "rel -0.03%"
+ },
+ {
+  "check": "E13",
+  "case": "rig cruise: aero_power_W, coarse against fine",
+  "measured": 7.236749345398809,
+  "expected": 7.236749345398809,
+  "tol": "3%",
+  "ok": true,
+  "note": "rel +0.00%"
+ },
+ {
+  "check": "E13",
+  "case": "rig cruise: Fz, coarse against fine",
+  "measured": 5.9259513055897886,
+  "expected": 5.9259513055897886,
+  "tol": "3%",
+  "ok": true,
+  "note": "rel +0.00%"
+ },
+ {
+  "check": "E13",
+  "case": "rig take-off: aero_power_W, coarse against fine",
+  "measured": 131.5784433272568,
+  "expected": 131.5784433272568,
+  "tol": "5%",
+  "ok": true,
+  "note": "rel +0.00%"
+ },
+ {
+  "check": "E13",
+  "case": "rig take-off: Fz, coarse against fine",
+  "measured": 11.038503472488467,
+  "expected": 11.038503472488467,
+  "tol": "5%",
+  "ok": true,
+  "note": "rel +0.00%"
+ },
+ {
+  "check": "E13",
+  "case": "rig cruise, 1 ms against 0.2 ms (repair): aero_power_W, coarse against fine",
+  "measured": 7.236749345398809,
+  "expected": 7.2656323618319645,
+  "tol": "3%",
+  "ok": true,
+  "note": "rel -0.40%"
+ },
+ {
+  "check": "E13",
+  "case": "rig cruise, 1 ms against 0.2 ms (repair): Fz, coarse against fine",
+  "measured": 5.9259513055897886,
+  "expected": 5.925753455151753,
+  "tol": "3%",
+  "ok": true,
+  "note": "rel +0.00%"
+ },
+ {
+  "check": "E13",
+  "case": "rig take-off, 1 ms against 0.11 ms (repair): aero_power_W, coarse against fine",
+  "measured": 131.5784433272568,
+  "expected": 132.22461359145936,
+  "tol": "5%",
+  "ok": true,
+  "note": "rel -0.49%"
+ },
+ {
+  "check": "E13",
+  "case": "rig take-off, 1 ms against 0.11 ms (repair): Fz, coarse against fine",
+  "measured": 11.038503472488467,
+  "expected": 11.038017478209651,
+  "tol": "5%",
+  "ok": true,
+  "note": "rel +0.00%"
+ }
+]

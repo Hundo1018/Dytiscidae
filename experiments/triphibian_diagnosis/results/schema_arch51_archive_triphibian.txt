@@ -1,0 +1,124 @@
+top-level: {'axes': 'list[4]', 'summary': 'dict[10]', 'history': 'list[112]', 'elites': 'list[37]'}
+summary: dict[10]
+  generation: int = 899
+  filled: int = 37
+  capacity: int = 625
+  coverage: float = 0.0592
+  qd_score: float = 8.02704754689522
+  best_fitness: float = 0.9904761904761905
+  mean_fitness: float = 0.21694723099716812
+  best_cell: list[4] of int e.g. [1, 1, 2, 2]
+  best_meta: dict[53]
+    mass: float = 7.487
+    span: float = 2.048
+    wing_area: float = 0.3377
+    aspect_ratio: float = 12.41
+    wing_loading: float = 217.4
+    density_ratio: float = 1.09
+    battery_wh: float = 288.5
+    flap_hz: float = 7.67
+    dof: int = 6
+    n_rotors: int = 0
+    body_plan: str = "random"
+    feasible: bool = true
+    air_gates: list[0] of ?
+    margin: float = 0.164
+    worst_check: str = "can_submerge"
+    mission_fraction: float = 0.0
+    energy_margin: float = -0.572
+    tier: int = 1
+    air: float = 0.0
+    water: float = 0.18
+    land: float = 0.091
+    max_depth: float = 4.71
+    mobility_rank: dict[0]
+    mobility_cond: dict[0]
+    mobility_underdetermined: dict[0]
+    mobility_axes: dict[0]
+    mobility_basis: dict[2]
+    policy: list[238] of float e.g. [0.0, 0.0, 0.0, 0.0]
+    eval_seed: int = 683886520
+    gen: int = 830
+    scored_with_shared_policy: bool = true
+    features: list[16] of float e.g. [0.3333333333333333, 0.3333333333333333, 0.3333333333333333, 5.726841510578218]
+    objectives: dict[3]
+    island: str = "triphibian"
+    stage: int = 0
+    stage_name: str = "second"
+    rungs: dict[4]
+    judged: dict[4]
+    ladder_measurements: dict[4]
+    critic_discount: float = 1.0
+    critic_features: list[16] of float e.g. [0.0, 0.0, 0.1797109001129225, 0.09136665987731231]
+    score_parts: dict[7]
+    novelty: float = 0.1281
+    fitness: float = 0.9904761904761905
+    n_parts: int = 5
+    cppn_complexity: int = 60
+    distance_to_next_rung: float = 0.7019
+    scout_features: list[17] of float e.g. [0.9904761904761905, 0.1281, 0.0, 0.0]
+    tier1_5: list[3] of str e.g. ["water", 0.0453, 0.18]
+    tier2_fitness: float = 0.10822442579106659
+    tier2_gen: int = 846
+    policy_promoted: list[238] of float e.g. [0.0, 0.0, 0.0, 0.0]
+    policy_refined: int = 6
+  tainted_cells: int = 0
+===== elite
+cell: list[4] of int e.g. [1, 1, 2, 2]
+descriptor: list[4] of float e.g. [-0.6824389547965706, 0.01064960177711044, 0.26936980786062714, 0.00225629921206
+fitness: float = 0.9904761904761905
+tier: int = 2
+improvements: int = 4
+curiosity: float = 0.6190476190476191
+meta: dict[43]
+  mass: float = 7.487
+  span: float = 2.048
+  wing_area: float = 0.3377
+  aspect_ratio: float = 12.41
+  wing_loading: float = 217.4
+  density_ratio: float = 1.09
+  battery_wh: float = 288.5
+  flap_hz: float = 7.67
+  dof: int = 6
+  n_rotors: int = 0
+  body_plan: str = "random"
+  feasible: bool = true
+  air_gates: list[0] of ?
+  margin: float = 0.164
+  worst_check: str = "can_submerge"
+  mission_fraction: float = 0.0
+  energy_margin: float = -0.572
+  tier: int = 1
+  air: float = 0.0
+  water: float = 0.18
+  land: float = 0.091
+  max_depth: float = 4.71
+  policy: list[238] of float e.g. [0.0, 0.0, 0.0, 0.0]
+  eval_seed: int = 683886520
+  gen: int = 830
+  scored_with_shared_policy: bool = true
+  features: list[16] of float e.g. [0.3333333333333333, 0.3333333333333333, 0.3333333333333333, 5.726841510578218]
+  island: str = "triphibian"
+  stage: int = 0
+  stage_name: str = "second"
+  critic_discount: float = 1.0
+  critic_features: list[16] of float e.g. [0.0, 0.0, 0.1797109001129225, 0.09136665987731231]
+  novelty: float = 0.1281
+  fitness: float = 0.9904761904761905
+  n_parts: int = 5
+  cppn_complexity: int = 60
+  distance_to_next_rung: float = 0.7019
+  scout_features: list[17] of float e.g. [0.9904761904761905, 0.1281, 0.0, 0.0]
+  tier1_5: list[3] of str e.g. ["water", 0.0453, 0.18]
+  tier2_fitness: float = 0.10822442579106659
+  tier2_gen: int = 846
+  policy_promoted: list[238] of float e.g. [0.0, 0.0, 0.0, 0.0]
+  policy_refined: int = 6
+draws: list[1] of dict
+  base: float = 0.9904761904761905
+  fit: float = 0.9904761904761905
+  eval_seed: int = 683886520
+  gen: int = 830
+  air: float = 0.0
+  water: float = 0.18
+  land: float = 0.091

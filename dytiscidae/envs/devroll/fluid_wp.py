@@ -6,7 +6,10 @@ or on the Wagner-lagged incidence and the LEV of ``unsteady_update``), the
 bluff-body drag of a volume, the Kramer rotational lift, the flat calm medium,
 the added mass, buoyancy and the assembly onto bodies.  This is
 ``FluidSolver.apply`` (physics/fluid.py); ``model_wp.DeviceBody`` runs the
-kernels in its order on W worlds of one body.
+kernels in its order on W worlds of one body.  The lift and drag law of a strip
+is ``FluidSolver.stall_law``: "legacy" or "table" (``table_coefficients`` on the
+baked ``thin_plate_tables``, no camber shift), an integer switch of the strip
+kernel; "plate" is numpy-only and refused.
 
 The kernels are built per precision by :func:`make_kernels`, because a Warp
 kernel cannot take a float32 literal in a float64 expression.  Constants come
@@ -17,11 +20,13 @@ import numpy as _np
 
 import warp as _wp
 
+from dytiscidae.physics import thin_plate_tables as _TT
 from dytiscidae.physics.fluid import (
     CD_CROSSFLOW,
     CN_LEV,
     CN_PLATE,
     SEPARATION_COMPLETE,
+    SectionPolar,
     WAGNER_A,
     WAGNER_B,
 )
@@ -33,6 +38,17 @@ _SEP = float(SEPARATION_COMPLETE)
 _CN_PLATE = float(CN_PLATE)
 _CN_LEV = float(CN_LEV)
 _CD_CROSSFLOW = float(CD_CROSSFLOW)
+_PLATE_BY = float(SectionPolar.PLATE_BY)
+# The baked tables of law "table" (physics/thin_plate_tables.py): shape (2, NRE, NK).
+_NRE = int(_TT.CL.shape[1])
+_NK = int(_TT.CL.shape[2])
+_ALPHA0 = float(_TT.ALPHA0)
+_STEP = float(_TT.STEP)
+_TAB_CAMBER = float(_TT.CAMBER)
+_RE_LO = float(_TT.RE_NODES[0])
+_RE_HI = float(_TT.RE_NODES[-1])
+#: The integer law switch of the strip kernel: FluidSolver.stall_law -> int.
+LAWS = {"legacy": 0, "table": 1}
 _WAGNER_A = tuple(float(x) for x in WAGNER_A)
 _WAGNER_B = tuple(float(x) for x in WAGNER_B)
 
@@ -89,6 +105,81 @@ def make_kernels(T):
         return cd_f + cd_i + w * cn * sa * sa
 
     @_wp.func
+    def smoothstep(t: T) -> T:
+        # fluid._smoothstep
+        u = _wp.clamp(t, T(0.0), T(1.0))
+        return u * u * (T(3.0) - T(2.0) * u)
+
+    @_wp.func
+    def thin_plate(
+        section: _wp.int32, alpha: T, ae: T, re: T, tab_x: _wp.array(dtype=T),
+        tab_cl: _wp.array(dtype=T), tab_cd: _wp.array(dtype=T),
+        tab_lo: _wp.array(dtype=T), tab_top: _wp.array(dtype=T),
+    ):
+        # fluid._thin_plate: the baked row values at the lagged angle ``ae`` (bilinear in
+        # log Re and angle) and the share ``w`` of the separated plate.  The tables are
+        # flat: row (section, re node) starts at ``(section * NRE + node) * NK``.
+        x = _wp.clamp(_wp.log(_wp.max(re, T(1.0))), tab_x[0], tab_x[_NRE - 1])
+        i = int(0)
+        for q in range(_NRE):
+            if tab_x[q] < x:  # searchsorted(logre, x), side left
+                i = i + 1
+        j = _wp.clamp(i - 1, 0, _NRE - 2)
+        t = (x - tab_x[j]) / (tab_x[j + 1] - tab_x[j])
+        u = _wp.clamp((ae - T(_ALPHA0)) / T(_STEP), T(0.0), T(_NK - 1))
+        k = _wp.min(int(u), _NK - 2)
+        f = u - T(k)
+        r0 = (section * _NRE + j) * _NK + k
+        r1 = (section * _NRE + j + 1) * _NK + k
+        cl0 = (T(1.0) - f) * tab_cl[r0] + f * tab_cl[r0 + 1]
+        cl1 = (T(1.0) - f) * tab_cl[r1] + f * tab_cl[r1 + 1]
+        cd0 = (T(1.0) - f) * tab_cd[r0] + f * tab_cd[r0 + 1]
+        cd1 = (T(1.0) - f) * tab_cd[r1] + f * tab_cd[r1 + 1]
+        lo = (T(1.0) - t) * tab_lo[section * _NRE + j] + t * tab_lo[section * _NRE + j + 1]
+        top = (T(1.0) - t) * tab_top[section * _NRE + j] + t * tab_top[section * _NRE + j + 1]
+        w = _wp.max(smoothstep((alpha - top) / (T(_PLATE_BY) - top)),
+                    smoothstep((lo - alpha) / T(_SEP)))
+        return (T(1.0) - t) * cl0 + t * cl1, (T(1.0) - t) * cd0 + t * cd1, w
+
+    @_wp.func
+    def table_coefficients(
+        alpha: T, ae: T, re: T, ar: T, lev_in: T, camber: T, tab_x: _wp.array(dtype=T),
+        tab_cl: _wp.array(dtype=T), tab_cd: _wp.array(dtype=T),
+        tab_lo: _wp.array(dtype=T), tab_top: _wp.array(dtype=T),
+    ):
+        # fluid.table_coefficients, without the returned ``w``: ``(cl, cd)`` of a thin
+        # plate of signed camber from the flat plate (section 0, odd) and Goe 417a
+        # (section 1), linear in the camber between them, the arc's values held past it.
+        lev = _wp.clamp(lev_in, T(0.0), T(1.0))
+        up = T(1.0)
+        if camber < T(0.0):
+            up = T(-1.0)
+        share = _wp.min(_wp.abs(camber) / T(_TAB_CAMBER), T(1.0))
+        a = up * alpha
+        e = up * ae
+        side = T(1.0)
+        if a < T(0.0):
+            side = T(-1.0)  # the flat plate is odd: read on its positive side
+        cl0, cd0, w0 = thin_plate(0, side * a, side * e, re, tab_x, tab_cl, tab_cd, tab_lo, tab_top)
+        cl1, cd1, w1 = thin_plate(1, a, e, re, tab_x, tab_cl, tab_cd, tab_lo, tab_top)
+        k = T(1.0) / (T(1.0) + T(2.0) / _wp.max(ar, T(0.5)))
+        cn = T(_CN_PLATE) + (T(_CN_LEV) - T(_CN_PLATE)) * lev
+        sa = _wp.sin(a)
+        ca = _wp.cos(a)
+        cf = skin_friction(re)
+        off = cf - skin_friction(_wp.clamp(re, T(_RE_LO), T(_RE_HI)))
+        w0 = w0 + (T(1.0) - w0) * lev
+        w1 = w1 + (T(1.0) - w1) * lev
+        cl_a = (T(1.0) - w0) * k * side * cl0 + w0 * cn * sa * ca
+        cl_b = (T(1.0) - w1) * k * cl1 + w1 * cn * sa * ca
+        cd_a = (T(1.0) - w0) * (cd0 + off) + w0 * (cf + cn * sa * sa)
+        cd_b = (T(1.0) - w1) * (cd1 + off) + w1 * (cf + cn * sa * sa)
+        cl = up * ((T(1.0) - share) * cl_a + share * cl_b)
+        cd = (T(1.0) - share) * cd_a + share * cd_b \
+            + cl * cl / (T(3.141592653589793) * T(0.75) * _wp.max(ar, T(0.5)))
+        return cl, cd
+
+    @_wp.func
     def rossby_lev(U: T, chord: T, om: V, s: V) -> T:
         c = _wp.max(chord, T(1e-6))
         w_perp = om - _wp.dot(om, s) * s
@@ -109,7 +200,11 @@ def make_kernels(T):
         alpha_out: _wp.array(dtype=T), U_out: _wp.array(dtype=T), lev_out: _wp.array(dtype=T),
         rev_out: _wp.array(dtype=_wp.int32), q_out: _wp.array(dtype=T),
         L_out: _wp.array(dtype=T),
+        law: _wp.int32, tab_x: _wp.array(dtype=T), tab_cl: _wp.array(dtype=T),
+        tab_cd: _wp.array(dtype=T), tab_lo: _wp.array(dtype=T), tab_top: _wp.array(dtype=T),
     ):
+        # ``law`` 0: the legacy lift and drag; 1: ``table_coefficients`` on the baked
+        # tables ``tab_*`` (no camber shift, the signed camber goes to the tables).
         # ``lagged`` 0: quasi-static (alpha, Rossby LEV), the incidence pass.
         # ``lagged`` 1: the attached branch on ``alpha_e_in`` and the LEV
         # ``lev_in`` that ``unsteady_update`` formed from this pass's outputs,
@@ -142,12 +237,14 @@ def make_kernels(T):
         alpha = _wp.atan2(sin_a, cos_f + T(1e-12))
         if rev:
             alpha = -alpha
-        # Camber shifts the zero-lift angle; reversed flow sees the other end.
+        # Camber shifts the zero-lift angle; reversed flow sees the other end.  Law
+        # "table" carries its own zero-lift angle: no shift (fluid.py, ``shift = 0``).
         cam = camber[i]
+        arc = cam
         if rev:
-            alpha = alpha + T(2.0) * (-cam)
-        else:
-            alpha = alpha + T(2.0) * cam
+            arc = -cam
+        if law == 0:
+            alpha = alpha + T(2.0) * arc
 
         omega_s = _wp.dot(omg, s)
         lev = rossby_lev(U, ch, omg, s)
@@ -167,6 +264,9 @@ def make_kernels(T):
         if is_w:
             cl = lift_coefficient(alpha, ae, re, ar_i, lev)
             cd = drag_coefficient(alpha, re, ar_i, cl, lev)
+            if law == 1:
+                cl, cd = table_coefficients(alpha, ae, re, ar_i, lev, arc, tab_x, tab_cl,
+                                            tab_cd, tab_lo, tab_top)
             L = q * area[i] * cl * lift_scale
             D_i = q * area[i] * cd * cd_scale
             F_i = F_i + L * lift_axis + D_i * d_hat
@@ -421,14 +521,58 @@ def make_kernels(T):
     return _KERNELS[T]
 
 
+def law_code(law: str) -> int:
+    """The strip kernel's integer switch for ``FluidSolver.stall_law``.
+
+    Law "plate" is numpy-only: it has no kernel, so the device path refuses it
+    instead of scoring a different law than the host.
+    """
+    if law == "plate":
+        raise ValueError('stall_law "plate" is numpy-only: the device path implements '
+                         '"legacy" and "table"')
+    if law not in LAWS:
+        raise ValueError(f"unknown stall_law {law!r}: the device path implements {sorted(LAWS)}")
+    return LAWS[law]
+
+
+_TABLES: dict = {}
+
+
+def table_arrays(dtype=_wp.float64):
+    """The baked tables of law "table" as flat device arrays of ``dtype``:
+    ``(log Re nodes, CL, CD, LO, TOP)``, the kernel's ``tab_*`` arguments.
+
+    Row ``(section, node)`` of CL and CD starts at ``(section * NRE + node) * NK``.
+    Cached per precision and device; the arrays are never written.
+    """
+    key = (dtype, str(_wp.get_device()))
+    if key not in _TABLES:
+        npdt = _np.float64 if dtype == _wp.float64 else _np.float32
+
+        def sc(a):
+            return _wp.array(_np.ascontiguousarray(_np.asarray(a).reshape(-1), dtype=npdt),
+                             dtype=dtype)
+
+        _TABLES[key] = (sc(_np.log(_TT.RE_NODES)), sc(_TT.CL), sc(_TT.CD), sc(_TT.LO),
+                        sc(_TT.TOP))
+    return _TABLES[key]
+
+
 def strip_loads(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff, camber,
-                ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64):
+                ar, is_wing, rho, mu, lift_scale, cd_scale, c_rot, *, dtype=_wp.float64,
+                law="legacy", alpha_e=None, lev=None):
     """Run the strip kernel on host arrays; return the outputs as numpy arrays.
 
     Inputs are numpy arrays: vectors ``(N, 3)``, scalars ``(N,)``, ``is_wing`` as
     integers (``WING`` = 0, ``BLUFF`` = 1 in physics.fluid, so ``is_wing`` here
     is 1 for a lifting strip).  Returns ``F (N,3), D, cl, alpha, U, lev``.
+    ``law`` is ``FluidSolver.stall_law`` ("legacy" or "table").  Give ``alpha_e``
+    and ``lev`` (both ``(N,)``) for the lagged pass: the attached branch on that
+    incidence and that LEV, as after ``WagnerLag.update``.
     """
+    code = law_code(law)
+    if (alpha_e is None) != (lev is None):
+        raise ValueError("the lagged pass takes alpha_e and lev together")
     K = make_kernels(dtype)
     kern, V = K["strip"], K["V"]
     npdt = _np.float64 if dtype == _wp.float64 else _np.float32
@@ -445,20 +589,24 @@ def strip_loads(rel, s_hat, c_hat, n_hat, omega, ext, chord, area, dr, cd_bluff,
     cl = _wp.zeros(n, dtype=dtype)
     al = _wp.zeros(n, dtype=dtype)
     U = _wp.zeros(n, dtype=dtype)
-    lev = _wp.zeros(n, dtype=dtype)
-    unused = _wp.zeros(n, dtype=dtype)
+    lev_out = _wp.zeros(n, dtype=dtype)
+    if alpha_e is None:
+        lagged, ae_in, lev_in = 0, _wp.zeros(n, dtype=dtype), _wp.zeros(n, dtype=dtype)
+    else:
+        lagged, ae_in, lev_in = 1, sc(alpha_e), sc(lev)
     _wp.launch(kern, dim=n, inputs=[
         vec(rel), vec(s_hat), vec(c_hat), vec(n_hat), vec(omega), vec(ext),
         sc(chord), sc(area), sc(dr), sc(cd_bluff), sc(camber), sc(ar),
         _wp.array(_np.asarray(is_wing, dtype=_np.int32), dtype=_wp.int32),
         sc(rho), sc(mu),
         dtype(lift_scale), dtype(cd_scale), sc(_np.broadcast_to(c_rot, (n,))),
-        0, unused, unused,
-        F, D, cl, al, U, lev, _wp.zeros(n, dtype=_wp.int32), _wp.zeros(n, dtype=dtype),
+        lagged, ae_in, lev_in,
+        F, D, cl, al, U, lev_out, _wp.zeros(n, dtype=_wp.int32), _wp.zeros(n, dtype=dtype),
         _wp.zeros(n, dtype=dtype),
+        code, *table_arrays(dtype),
     ])
     return {"F": F.numpy(), "D": D.numpy(), "cl": cl.numpy(), "alpha": al.numpy(),
-            "U": U.numpy(), "lev": lev.numpy()}
+            "U": U.numpy(), "lev": lev_out.numpy()}
 
 
 class WagnerLag:

@@ -36,6 +36,7 @@ from dytiscidae.physics.fluid import (  # noqa: E402
     WING,
     FluidSolver,
     PanelSet,
+    chordwise_cop,
     lift_coefficient,
 )
 from dytiscidae.physics.materials import CFRP_TUBE, PETG  # noqa: E402
@@ -58,6 +59,21 @@ BLOCKED_MARKERS = (
     "Failed to initialize NVML",
     "cannot be constructed",
 )
+
+
+#: Why a skip that is not a missing GPU extension was skipped, by its label.
+SKIP_REASONS: dict[str, str] = {}
+
+
+def skip_checks(label: str, reason: str) -> None:
+    """Count checks that could not be made here as a skip, with the reason.
+
+    For a fixture that does not exist on this machine, not for a check that
+    failed: "could not measure" must not read as "passed" or as "failed".
+    """
+    SKIPPED.append(label)
+    SKIP_REASONS[label] = reason
+    print(f"  [skip] {label}  -- {reason}")
 
 
 def check(name: str, cond: bool, detail: str = "") -> None:
@@ -295,10 +311,13 @@ def run_all(functions) -> None:
 def report(label: str) -> int:
     """The summary.  A skip is never folded into the success line."""
     print("\n" + "=" * 68)
-    if SKIPPED:
-        print(f"{len(SKIPPED)} SKIPPED — not a defect; a function skip needs the "
+    blocked = [s for s in SKIPPED if s not in SKIP_REASONS]
+    if blocked:
+        print(f"{len(blocked)} SKIPPED — not a defect; a function skip needs the "
               f"Mojo GPU fluid extension (`cd mojo && pixi run build-all`): "
-              f"{', '.join(SKIPPED)}")
+              f"{', '.join(blocked)}")
+    for label, reason in SKIP_REASONS.items():
+        print(f"1 SKIPPED — not a defect; {label}: {reason}")
     if FAILURES:
         print(f"{len(FAILURES)} FAILED: {', '.join(FAILURES)}")
         return 1
@@ -421,6 +440,412 @@ def test_lift_sign_and_magnitude() -> None:
         3.0 < lift < 14.0,
         f"L={lift:.2f} N (expected ~7.7 N)",
     )
+
+
+def test_centre_of_pressure_moves_aft_when_the_flow_separates() -> None:
+    """`FluidSolver.cop_law`: the pitching moment a free pitch hinge reads.
+
+    One strip, its quarter chord on the body's centre of mass, in a +X wind:
+    the torque about the span over the chordwise lever of the force gives the
+    centre of pressure.  Off, the torque is zero and nothing else moves."""
+    print("\nfluid: centre of pressure moves aft when the flow separates")
+    m, d = _single_panel_model()
+    c = 0.2
+
+    def load(alpha, law, wind=10.0, spin=0.0):
+        panels = _wing_panels(m, alpha)
+        solver = FluidSolver(m, panels, MediumField(wind=np.array([wind, 0.0, 0.0])))
+        solver.cop_law = law
+        d.qvel[:] = 0.0
+        d.qvel[4] = spin                                     # about +Y, the span
+        d.xfrc_applied[:] = 0.0
+        mujoco.mj_forward(m, d)
+        solver.apply(d, 0.0)
+        b = panels.body_id[0]
+        a = math.radians(alpha)
+        c_hat = np.array([math.cos(a), 0.0, -math.sin(a)])
+        f, tau = d.xfrc_applied[b, :3].copy(), d.xfrc_applied[b, 3:].copy()
+        lever = float(np.cross(c_hat, f)[1])
+        return f, tau, (0.25 + tau[1] / (lever * c) if abs(lever) > 1e-9 else float("nan"))
+
+    f0, t0, _ = load(45.0, None)
+    for law in ("plate", "insect"):
+        f1, t1, x = load(45.0, law)
+        check(f"{law}: the force is unchanged, only its point", np.allclose(f0, f1),
+              f"{f0} vs {f1}")
+        re = np.array([1.225 * 10.0 * c / 1.81e-5])
+        want = float(chordwise_cop(np.array([math.radians(45.0)]), re, law)[0])
+        check(f"{law}: centre of pressure at 45 deg is the law's", abs(x - want) < 0.01,
+              f"{x:.3f} vs {want:.3f}")
+    check("off: no moment about the quarter chord", np.abs(t0).max() < 1e-9, f"{t0}")
+    _, _, x5 = load(5.0, "plate")
+    check("attached flow keeps the quarter chord", abs(x5 - 0.25) < 0.01, f"{x5:.3f}")
+    _, _, x80 = load(80.0, "plate")
+    check("near broadside it sits near mid-chord", 0.45 < x80 < 0.5, f"{x80:.3f}")
+    # Flow over the trailing edge: the same law measured from the other edge.
+    _, _, xr = load(45.0, "plate", wind=-10.0)
+    check("reversed flow measures it from the trailing edge", abs(xr - (1.0 - 0.415)) < 0.02,
+          f"{xr:.3f}")
+    # Pitching in still air: damped, about the span, by 1/2 rho C w|w| 82/1024 c^4.
+    _, ts_off, _ = load(0.0, None, wind=0.0, spin=20.0)
+    _, ts_on, _ = load(0.0, "plate", wind=0.0, spin=20.0)
+    ar = 5.0
+    want = -0.5 * 1.225 * 2 * math.pi * ar / (2 + math.sqrt(ar * ar + 4)) * 400.0 * 82 / 1024 * c**4
+    got = ts_on[1] - ts_off[1]
+    check("rotation is damped by the plate's broadside drag", abs(got - want) < 0.02 * abs(want),
+          f"{got:.3e} vs {want:.3e} N m")
+
+
+def test_a_cambered_strip_carries_its_own_pitching_moment() -> None:
+    """`FluidSolver.camber_moment`: thin-airfoil theory's ``Cm = -pi f`` about
+    the quarter chord of a parabolic arc, in attached flow only."""
+    print("\nfluid: a cambered strip's pitching moment about its quarter chord")
+    m, d = _single_panel_model()
+
+    def load(alpha, camber, on, wind=10.0):
+        panels = _wing_panels(m, alpha)
+        panels.camber[:] = camber
+        solver = FluidSolver(m, panels, MediumField(wind=np.array([wind, 0.0, 0.0])))
+        solver.camber_moment = on
+        solver.unsteady = False          # a strip that has just started carries a leading-edge vortex
+        d.qvel[:] = 0.0
+        d.xfrc_applied[:] = 0.0
+        mujoco.mj_forward(m, d)
+        solver.apply(d, 0.0)
+        b = panels.body_id[0]
+        return d.xfrc_applied[b, :3].copy(), d.xfrc_applied[b, 3:].copy(), panels
+
+    f, tau, panels = load(0.0, 0.04, True)
+    q = 0.5 * 1.225 * 10.0 ** 2
+    want = math.pi * 0.04 * q * float(panels.chord[0]) * float(panels.area.sum())
+    check("its size is pi f q c S", abs(abs(tau[1]) - want) < 1e-3 * want, f"{abs(tau[1]):.5f} vs {want:.5f}")
+    # the chord runs +X (aft), so +Y turns the trailing edge down: nose up
+    check("it is nose down for an arc that lifts upwards", f[2] * tau[1] < 0.0, f"lift {f[2]:+.3f}, moment {tau[1]:+.4f}")
+    f_, tau_, _ = load(0.0, -0.04, True)
+    check("the other camber mirrors it", abs(tau_[1] + tau[1]) < 1e-9 and f_[2] * tau_[1] < 0.0, f"{tau_[1]:+.5f}")
+    fr, taur, _ = load(0.0, 0.04, True, wind=-10.0)
+    check("flow over the trailing edge: nose down for the edge it meets", fr[2] * taur[1] > 0.0
+          and abs(abs(taur[1]) - want) < 1e-3 * want, f"lift {fr[2]:+.3f}, moment {taur[1]:+.4f}")
+    check("and the lift is still towards the convex side", fr[2] * f[2] > 0.0, f"{f[2]:+.3f} forward, {fr[2]:+.3f} reversed")
+    _, t0, _ = load(0.0, 0.0, True)
+    check("a flat strip has none", np.abs(t0).max() < 1e-12, f"{t0}")
+    _, t_off, _ = load(0.0, 0.04, False)
+    check("off: no moment about the quarter chord", np.abs(t_off).max() < 1e-12, f"{t_off}")
+    _, t45, _ = load(45.0, 0.04, True)
+    check("separated flow has none", np.abs(t45).max() < 1e-9, f"{t45}")
+
+
+def test_a_sections_drag_can_follow_its_table_to_the_lifts_peak() -> None:
+    """`SectionPolar(drag_past=)` (pass W8): between the drag table's end and
+    the angle the lift run peaks at, "normal" charges ``cl tan a``, "extend"
+    continues the table's end slope and "hold" its last value; all three stall
+    the drag at the lift's peak or before, and agree elsewhere."""
+    from dytiscidae.physics.fluid import SEPARATION_COMPLETE, SectionPolar, skin_friction_cd
+    print("\nfluid: a section's drag between its drag run's end and its lift's peak")
+    a_d = np.radians(np.arange(0.0, 11.0, 1.0))                     # drag run: 0-10 deg
+    cl_d = 0.3 + 0.1 * np.degrees(a_d)
+    cd_d = 0.02 + 0.002 * np.maximum(np.degrees(a_d) - 6.0, 0.0)    # end slope 0.002 per deg
+    a_l = np.radians(np.arange(0.0, 21.0, 1.0))                     # lift run: peak at 13 deg
+    cl_l = np.where(np.degrees(a_l) <= 13.0, 0.3 + 0.1 * np.degrees(a_l), 1.6 - 0.05 * (np.degrees(a_l) - 13.0))
+    sec = {k: SectionPolar("t", [(1e5, a_d, cl_d, cd_d)], [(1e5, a_l, cl_l)], k) for k in ("normal", "extend", "hold")}
+    one = lambda x: np.array([float(x)])
+    cd = lambda k, deg: float(sec[k].coefficients(one(math.radians(deg)), one(1e5), one(1e9), one(0.0))[1][0])
+    check("inside the drag run the three agree", cd("normal", 5.0) == cd("extend", 5.0) == cd("hold", 5.0))
+    check("hold keeps the last measured drag up to the peak", abs(cd("hold", 12.0) - 0.028) < 1e-9, f"{cd('hold', 12.0):.5f}")
+    check("extend continues the table's end slope", abs(cd("extend", 12.0) - (0.028 + 0.002 * 2.0)) < 1e-9,
+          f"{cd('extend', 12.0):.5f}")
+    check("normal has gone over to cl tan a there", cd("normal", 12.0) > 3.0 * cd("extend", 12.0),
+          f"{cd('normal', 12.0):.4f} against {cd('extend', 12.0):.4f}")
+    past = 13.0 + math.degrees(SEPARATION_COMPLETE)
+    want = float(skin_friction_cd(one(1e5))[0]) + (1.6 - 0.05 * (past - 13.0)) * math.tan(math.radians(past))
+    check("a handover's width past the peak all three are cl tan a",
+          all(abs(cd(k, past) - want) < 1e-9 for k in sec), f"{[round(cd(k, past), 5) for k in sec]} vs {want:.5f}")
+    check("the drag does not fall as the incidence rises through the peak",
+          all(cd(k, 13.5) >= cd(k, 13.0) >= cd(k, 12.5) for k in ("extend", "hold")))
+
+
+def test_the_plate_stall_law_is_opt_in_and_reads_the_thin_plate_table() -> None:
+    """`FluidSolver.stall_law = "plate"` (repair R1): a lift limit, a plateau
+    and a camber lift that depends on Reynolds number, for strips with no
+    measured section.  The default stays the law every stored score used."""
+    from dytiscidae.physics.fluid import (CN_LEV, PLATE_CLMAX, PLATE_DROP, camber_lift_factor,
+                                          drag_coefficient, lift_coefficient, skin_friction_cd)
+    print("\nfluid: the thin-plate stall law (opt-in)")
+    one = lambda x: np.array([float(x)])
+    two_d, still = one(1e6), one(0.0)
+    cl = lambda deg, re=1e5, camber=0.0, lev=still, law="plate": float(lift_coefficient(
+        one(math.radians(deg)), one(re), two_d, lev, None, camber, law)[0])
+    check("the default is the legacy law: attached to 11 deg",
+          abs(float(lift_coefficient(one(math.radians(10.0)), one(1e5), two_d, still)[0])
+              - 2 * math.pi * math.radians(10.0) / (1 + 2e-6)) < 1e-9
+          and abs(cl(10.0, law="legacy") - 2 * math.pi * math.radians(10.0) / (1 + 2e-6)) < 1e-9)
+    flat = PLATE_CLMAX[0] - PLATE_DROP[0]
+    check("a flat plate holds its plateau at 15 deg", abs(cl(15.0) - flat) < 1e-9, f"{cl(15.0):.4f} vs {flat:.4f}")
+    arc = min(PLATE_CLMAX[0] + PLATE_CLMAX[1] * 0.05, 1.10) - (PLATE_DROP[0] + PLATE_DROP[1] * 0.05)
+    check("a 5% arc holds a higher one", abs(cl(15.0, 2e4, 0.05) - arc) < 1e-9, f"{cl(15.0, 2e4, 0.05):.4f} vs {arc:.4f}")
+    check("on its other side the arc is a flat plate", abs(cl(-15.0, 2e4, 0.05) + flat) < 1e-9,
+          f"{cl(-15.0, 2e4, 0.05):.4f}")
+    check("a leading-edge vortex takes the plateau away",
+          abs(cl(15.0, lev=one(1.0)) - CN_LEV * math.sin(math.radians(15)) * math.cos(math.radians(15))) < 1e-9)
+    cd = float(drag_coefficient(one(math.radians(15.0)), one(1e5), two_d, one(cl(15.0)), still, 0.0, "plate")[0])
+    want = float(skin_friction_cd(one(1e5))[0]) + flat * math.tan(math.radians(15.0))
+    check("the plateau's drag is its lift times tan(alpha)", abs(cd - want) < 1e-6, f"{cd:.5f} vs {want:.5f}")
+    check("camber lift is 0.3 of theory's at Re 2e4 and 0.9 at 3e5",
+          abs(float(camber_lift_factor(2e4)) - 0.3) < 1e-12 and abs(float(camber_lift_factor(3e5)) - 0.9) < 1e-12
+          and 0.3 < float(camber_lift_factor(8e4)) < 0.9)
+    # through the solver: one strip at zero incidence in a wind
+    m, d = _single_panel_model()
+
+    def lift0(law, wind):
+        panels = _wing_panels(m, 0.0)
+        panels.camber[:] = 0.05
+        solver = FluidSolver(m, panels, MediumField(wind=np.array([wind, 0.0, 0.0])))
+        solver.stall_law, solver.unsteady = law, False
+        d.qvel[:] = 0.0
+        d.xfrc_applied[:] = 0.0
+        mujoco.mj_forward(m, d)
+        solver.apply(d, 0.0)
+        q = 0.5 * 1.225 * wind ** 2 * float(panels.area.sum())
+        re = 1.225 * wind * float(panels.chord[0]) / 1.81e-5
+        b = panels.body_id[0]
+        # less the weight the solver cancels for the air it folds into the strip's mass
+        fz = float(d.xfrc_applied[b, 2]) - (m.body_mass[b] - solver._dry_mass[b]) * 9.80665
+        return abs(fz) / q, re
+    c_leg, _ = lift0("legacy", 1.5)
+    c_pl, re = lift0("plate", 1.5)
+    ratio = c_pl / c_leg
+    check("the solver's camber lift at zero incidence shrinks by that factor",
+          abs(ratio - float(camber_lift_factor(re))) < 0.01, f"ratio {ratio:.3f} at Re {re:.0f}")
+
+
+def test_the_table_law_reads_two_measured_thin_sections() -> None:
+    """`FluidSolver.stall_law = "table"` (repair R3): the UIUC flat plate and
+    Goe 417a, linear in camber between them, towards the convex side.  Every
+    expectation is read from the csv files or from the law's own symmetries
+    at run time."""
+    from dytiscidae.physics import thin_plate_tables as T
+    from dytiscidae.physics.fluid import CN_LEV, skin_friction_cd, table_coefficients
+    root = Path(__file__).resolve().parents[1]
+    for extra in (root / "tools", root / "experiments" / "flapper"):
+        if str(extra) not in sys.path:
+            sys.path.insert(0, str(extra))
+    import bake_thin_plate
+    import sections
+    print("\nfluid: the table law")
+
+    def law(a, re, camber, lev=0.0, ae=None, ar=1e12):
+        a = np.atleast_1d(np.asarray(a, float))
+        return table_coefficients(a, np.full(a.shape, float(re)), np.full(a.shape, ar), lev,
+                                  None if ae is None else np.full(a.shape, float(ae)), camber)
+
+    built = bake_thin_plate.build()
+    worst = max(float(np.max(np.abs(built[k] - getattr(T, k)))) for k in ("CL", "CD", "LO", "TOP"))
+    check("the baked grid is what the csv files give", worst < 1e-6 and abs(built["CAMBER"] - T.CAMBER) < 1e-6,
+          f"largest difference {worst:.1e}")
+    worst = 0.0
+    for re_, a, cl in bake_thin_plate.flat_runs(sections):
+        worst = max(worst, float(np.max(np.abs(law(a, re_, 0.0)[0] - cl))))
+    check("a flat strip reads the flat plate's lift runs", worst < 0.01, f"largest difference {worst:.4f}")
+    w_l = w_d = 0.0
+    for re_, a, cl, cd in sections.tables("goe417a"):
+        m_cl, m_cd, _ = law(a, re_, T.CAMBER)
+        w_l, w_d = max(w_l, float(np.max(np.abs(m_cl - cl)))), max(w_d, float(np.max(np.abs(m_cd - cd))))
+    check("a strip of Goe 417a's camber reads its drag runs", w_l < 0.01 and w_d < 0.002,
+          f"lift {w_l:.4f}, drag {w_d:.5f}")
+    a = np.radians(np.arange(-20.0, 28.1, 1.0))
+    flat, arc, half = law(a, 1e5, 0.0), law(a, 1e5, T.CAMBER), law(a, 1e5, 0.5 * T.CAMBER)
+    check("half that camber is half way between them, in lift and in drag",
+          np.allclose(half[0], 0.5 * (flat[0] + arc[0]), rtol=0, atol=1e-12)
+          and np.allclose(half[1], 0.5 * (flat[1] + arc[1]), rtol=0, atol=1e-9)
+          and float(np.max(np.abs(arc[0] - flat[0]))) > 0.3)
+    more = law(a, 1e5, 0.09)
+    check("past it the arc's values are held",
+          np.allclose(more[0], arc[0], rtol=0, atol=1e-12) and np.allclose(more[1], arc[1], rtol=0, atol=1e-12))
+    check("the flat plate is odd", np.allclose(law(-a, 1e5, 0.0)[0], -flat[0], rtol=0, atol=1e-12)
+          and np.allclose(law(-a, 1e5, 0.0)[1], flat[1], rtol=0, atol=1e-12))
+    other = law(-a, 1e5, -T.CAMBER)
+    check("an arc turned over lifts towards its convex side all the same",
+          np.allclose(other[0], -arc[0], rtol=0, atol=1e-12) and np.allclose(other[1], arc[1], rtol=0, atol=1e-12)
+          and float(law(0.0, 1e5, -T.CAMBER)[0][0]) < -0.1 < 0.1 < float(law(0.0, 1e5, T.CAMBER)[0][0]))
+    cf = lambda re: float(skin_friction_cd(np.array([float(re)]))[0])
+    five = math.radians(5.0)
+    f_cl, f_cd, _ = law(five, 1e5, 0.0)
+    check("the flat plate's drag is friction and its lift's share normal to the chord",
+          abs(float(f_cd[0]) - cf(1e5) - float(f_cl[0]) * math.tan(five)) < 2e-3,
+          f"{float(f_cd[0]):.4f} vs {cf(1e5) + float(f_cl[0]) * math.tan(five):.4f}")
+    lo, edge = law(five, 1e4, T.CAMBER), law(five, T.RE_NODES[0], T.CAMBER)
+    check("below the measured Reynolds numbers the lift is held and the drag moves by the friction",
+          abs(float(lo[0][0] - edge[0][0])) < 1e-12
+          and abs(float(lo[1][0] - edge[1][0]) - (cf(1e4) - cf(T.RE_NODES[0]))) < 1e-12,
+          f"drag +{float(lo[1][0] - edge[1][0]):.4f}")
+    mid = law(five, 9e4, T.CAMBER)[0][0]
+    a80, a100 = law(five, 8e4, T.CAMBER)[0][0], law(five, 1e5, T.CAMBER)[0][0]
+    t = (math.log(9e4) - math.log(8e4)) / (math.log(1e5) - math.log(8e4))
+    check("between two Reynolds numbers it is linear in log Re",
+          abs(float(mid) - ((1 - t) * float(a80) + t * float(a100))) < 1e-12 and abs(float(a80 - a100)) > 1e-3)
+    sc = CN_LEV * math.sin(five) * math.cos(five)
+    check("a leading-edge vortex takes the strip to the separated plate", abs(float(law(five, 1e5, 0.03, lev=1.0)[0][0]) - sc) < 1e-12)
+    check("the lift is read at the lagged angle",
+          abs(float(law(math.radians(8.0), 1e5, 0.03, ae=five)[0][0]) - float(law(five, 1e5, 0.03)[0][0])) < 1e-12)
+    ninety = law(math.radians(90.0), 1e5, 0.03)
+    check("broadside it is the plate", abs(float(ninety[0][0])) < 1e-9 and abs(float(ninety[1][0]) - 1.98 - cf(1e5)) < 1e-9)
+
+    # through the solver: one cambered strip at zero incidence in a wind
+    m, d = _single_panel_model()
+    panels = _wing_panels(m, 0.0)
+    panels.camber[:] = 0.03
+    wind = 12.0
+    solver = FluidSolver(m, panels, MediumField(wind=np.array([wind, 0.0, 0.0])))
+    solver.stall_law, solver.unsteady, solver.inflow = "table", False, False
+    d.qvel[:] = 0.0
+    d.xfrc_applied[:] = 0.0
+    mujoco.mj_forward(m, d)
+    solver.apply(d, 0.0)
+    q = 0.5 * 1.225 * wind ** 2 * float(panels.area.sum())
+    b = panels.body_id[0]
+    fz = float(d.xfrc_applied[b, 2]) - (m.body_mass[b] - solver._dry_mass[b]) * 9.80665
+    re = 1.225 * wind * float(panels.chord[0]) / 1.81e-5
+    want = float(table_coefficients(np.zeros(1), np.array([re]), panels.aspect_ratio[:1], 0.0, None, 0.03)[0][0])
+    check("the solver reads it, with no camber shift of its own", abs(abs(fz) / q - abs(want)) < 0.02 * abs(want) and abs(want) > 0.03,
+          f"{abs(fz) / q:.4f} vs {abs(want):.4f} at Re {re:.0f}")
+
+
+def test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning() -> None:
+    """`FluidSolver.entrainment = "wetting"`: the reaction ``-dm/dt v`` for the
+    growth a strip's density brings, and none for the growth of a submerged
+    wing's tensor projection when the flow turns from edge-on to broadside.
+
+    One strip, two calls a step apart; the second call's force is read."""
+    print("\nfluid: the wetting entrainment mode")
+    m, d = _single_panel_model()
+    h = m.opt.timestep
+    bid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "wing")
+
+    def second(mode, first, then):
+        solver = FluidSolver(m, _wing_panels(m, 0.0), MediumField())
+        solver.entrainment = mode
+        for k, (z, v) in enumerate((first, then)):
+            mujoco.mj_resetData(m, d)
+            d.qpos[2] = z
+            d.qvel[:3] = v
+            mujoco.mj_forward(m, d)
+            d.xfrc_applied[:] = 0.0
+            solver.apply(d, k * h)
+        f = d.xfrc_applied[bid, :3].copy()
+        grown = float(m.body_mass[bid] - solver._dry_mass[bid])
+        solver.reset()
+        return f, grown
+
+    edge, broad = (-5.0, [2.0, 0.0, 0.0]), (-5.0, [0.0, 0.0, 2.0])
+    off, _ = second(False, edge, broad)
+    wet, _ = second("wetting", edge, broad)
+    on, grown = second(True, edge, broad)
+    check("submerged, the flow turning broadside: the default reacts the projection's growth",
+          on[2] - off[2] < -0.5 * grown * 2.0 / h, f"{on[2] - off[2]:.0f} N, {grown:.1f} kg grown")
+    check("submerged, the flow turning broadside: wetting reacts nothing",
+          np.allclose(wet, off, rtol=0, atol=1e-9), f"{np.abs(wet - off).max():.2e} N")
+
+    above, below = (1.0, [0.0, 0.0, -2.0]), (-1.0, [0.0, 0.0, -2.0])
+    off, _ = second(False, above, below)
+    wet, grown = second("wetting", above, below)
+    on, _ = second(True, above, below)
+    rho_w, rho_a = MediumField().water.rho, MediumField().air.rho
+    want = grown * (1.0 - rho_a / rho_w) * 2.0 / h
+    check("entering water: wetting reacts the water that arrived",
+          abs((wet[2] - off[2]) - want) < 0.01 * want,
+          f"{wet[2] - off[2]:.0f} N against {want:.0f} N")
+    check("entering water: wetting and the default react the same",
+          abs(wet[2] - on[2]) < 1e-6 * want, f"{wet[2] - on[2]:.2e} N")
+    off, _ = second(False, below, (1.0, [0.0, 0.0, 2.0]))
+    wet, _ = second("wetting", below, (1.0, [0.0, 0.0, 2.0]))
+    check("leaving water: wetting reacts nothing (shed water takes its momentum)",
+          np.allclose(wet, off, rtol=0, atol=1e-9), f"{np.abs(wet - off).max():.2e} N")
+
+
+def test_a_measured_section_replaces_the_default_law_where_it_was_measured() -> None:
+    """`SectionPolar` and `FluidSolver.section`: inside the measured range the
+    coefficients are the table's; past it the strip goes to the separated
+    plate; the camber's sign picks the upper side; no camber, no section."""
+    print("\nfluid: a measured section")
+    from dytiscidae.physics.fluid import CN_PLATE, SectionPolar, skin_friction_cd
+    a = np.radians(np.array([-4.0, 0.0, 4.0, 10.0]))
+    lo = SectionPolar("t", [(1e5, a, np.array([-0.1, 0.3, 0.7, 1.3]), np.array([0.05, 0.03, 0.02, 0.03]))])
+    two = SectionPolar("t2", [(1e5, a, np.array([-0.1, 0.3, 0.7, 1.3]), np.array([0.05, 0.03, 0.02, 0.03])),
+                              (4e5, a, np.array([-0.1, 0.3, 0.7, 1.3]), np.array([0.03, 0.01, 0.01, 0.01]))])
+    big, zero = np.array([1e6]), np.array([0.0])
+    cl, cd = lo.coefficients(np.radians([2.0]), np.array([1e5]), big, zero)
+    check("inside the range: the table's lift and drag, interpolated",
+          abs(cl[0] - 0.5) < 1e-5 and abs(cd[0] - 0.025) < 1e-5, f"cl {cl[0]:.4f} cd {cd[0]:.4f}")
+    cl, cd = two.coefficients(np.radians([0.0]), np.array([2e5]), big, zero)
+    check("between two Reynolds numbers: linear in log Re", abs(cd[0] - 0.02) < 1e-6, f"cd {cd[0]:.5f}")
+    cl, cd = two.coefficients(np.radians([0.0]), np.array([1e7]), big, zero)
+    check("outside them: the nearest table", abs(cd[0] - 0.01) < 1e-6, f"cd {cd[0]:.5f}")
+    al = np.radians([30.0])
+    cl, cd = lo.coefficients(al, np.array([1e5]), big, zero)
+    want = CN_PLATE * math.sin(al[0]) * math.cos(al[0])
+    wantd = float(skin_friction_cd(np.array([1e5]))[0]) + CN_PLATE * math.sin(al[0]) ** 2
+    check("far past the measured range: the separated plate",
+          abs(cl[0] - want) < 1e-6 and abs(cd[0] - wantd) < 1e-6, f"cl {cl[0]:.3f} cd {cd[0]:.3f}")
+    cl, cd = lo.coefficients(np.radians([2.0]), np.array([1e5]), big, np.array([1.0]))
+    check("a full leading-edge vortex takes it to the vortex's normal force at any angle",
+          abs(cl[0] - 3.4 * math.sin(math.radians(2)) * math.cos(math.radians(2))) < 1e-6, f"cl {cl[0]:.3f}")
+
+    # The lift run carried past the drag table (pass W5): measured lift to its
+    # last angle, the drag that lift implies normal to the chord, the plate by
+    # 30 deg.
+    la = np.radians(np.array([0.0, 10.0, 14.0, 20.0]))
+    ext = SectionPolar("t+", [(1e5, a, np.array([-0.1, 0.3, 0.7, 1.3]), np.array([0.05, 0.03, 0.02, 0.03]))],
+                       [(1e5, la, np.array([0.3, 1.3, 1.2, 1.1]))])
+    al = np.radians([18.0])
+    cl, cd = ext.coefficients(al, np.array([1e5]), big, zero)
+    cl0, _ = lo.coefficients(al, np.array([1e5]), big, zero)
+    cf = float(skin_friction_cd(np.array([1e5]))[0])
+    check("past the drag table, inside the lift run: the measured lift",
+          abs(cl[0] - (1.2 + (1.1 - 1.2) * 4 / 6)) < 1e-5 and cl0[0] < 0.7,
+          f"cl {cl[0]:.4f}; without the lift run {cl0[0]:.3f}")
+    check("its drag there is the lift's normal-force drag and skin friction",
+          abs(cd[0] - (cf + cl[0] * math.tan(al[0]))) < 1e-5, f"cd {cd[0]:.4f}")
+    cl, cd = ext.coefficients(np.radians([2.0]), np.array([1e5]), big, zero)
+    check("inside the drag table nothing changes", abs(cl[0] - 0.5) < 1e-5 and abs(cd[0] - 0.025) < 1e-5,
+          f"cl {cl[0]:.4f} cd {cd[0]:.4f}")
+    al = np.radians([25.0])
+    cl, _ = ext.coefficients(al, np.array([1e5]), big, zero)
+    plate = CN_PLATE * math.sin(al[0]) * math.cos(al[0])
+    check("between the lift run's end and 30 deg: between the measurement and the plate",
+          plate < cl[0] < 1.1 and abs(cl[0] - 0.5 * (plate + 1.1)) < 1e-5, f"cl {cl[0]:.4f}, plate {plate:.4f}")
+    al = np.radians([30.0, 40.0])
+    cl, _ = ext.coefficients(al, np.full(2, 1e5), np.full(2, 1e6), np.zeros(2))
+    check("from 30 deg: the plate", np.allclose(cl, CN_PLATE * np.sin(al) * np.cos(al), atol=1e-9), f"cl {cl}")
+    cl, _ = ext.coefficients(np.radians([-12.0]), np.array([1e5]), big, zero)
+    cln, _ = lo.coefficients(np.radians([-12.0]), np.array([1e5]), big, zero)
+    check("below the table (the lower side stalled) the lift run changes nothing", cl[0] == cln[0], f"{cl[0]:.4f}")
+
+    m, d = _single_panel_model()
+    bid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "wing")
+
+    def lift(camber, section):
+        panels = _wing_panels(m, 0.0)
+        panels.camber[:] = camber
+        solver = FluidSolver(m, panels, MediumField(wind=np.array([10.0, 0.0, 0.0])))
+        solver.section = section
+        with solver.steady():
+            mujoco.mj_resetData(m, d)
+            mujoco.mj_forward(m, d)
+            d.xfrc_applied[:] = 0.0
+            solver.apply(d, 0.0)
+        out = float(d.xfrc_applied[bid, 2])
+        solver.reset()
+        return out
+
+    plain = lift(0.0, None)                     # the strip's buoyancy in air, nothing else
+    up, down, flat = lift(0.04, lo) - plain, lift(-0.04, lo) - plain, lift(0.0, lo) - plain
+    law = lift(0.04, None) - plain              # the default law's side for a positive camber
+    check("in the solver at zero incidence: the section lifts towards its upper side",
+          up * law > 0 and abs(up) > 0.5 and abs(up + down) < 1e-9 * abs(up),
+          f"{up:+.2f} and {down:+.2f} N; the default law's camber shift gives {law:+.2f} N")
+    check("a strip with no camber keeps the default law", flat == 0.0, f"{flat:+.3e} N")
+    check("the camber's size is not used: the table has the zero-lift angle",
+          abs(lift(0.08, lo) - plain - up) < 1e-12, f"{lift(0.08, lo) - plain:+.4f} against {up:+.4f} N")
 
 
 def test_buoyancy() -> None:
@@ -1323,6 +1748,10 @@ def test_a_mirrored_wing_is_a_mirror_image() -> None:
         m, d, _acts, panels = compile_phenotype(p)
         solver = FluidSolver(m, panels, MediumField())
         solver.record_state = True
+        # Steady flight, not the first instant of an impulsive start: there the
+        # start-up vortex has every strip on the separated plate, where the
+        # table law (as a measured section) gives camber no say.
+        solver.unsteady = False
         mujoco.mj_resetData(m, d)
         d.qpos[:3] = (0.0, 0.0, 60.0)
         d.qpos[3:7] = (1.0, 0.0, 0.0, 0.0)
@@ -4703,6 +5132,521 @@ def test_an_evaluation_counts_the_steps_it_took() -> None:
           rep["steps"].get("main.identify") == 2 * want["identify"])
 
 
+def test_an_open_loop_body_with_thrust_crosses_nothing() -> None:
+    """The tenth instance (2026-11-11, `experiments/triphibian_diagnosis`, E0n).
+
+    The reference quad on its open-loop base gait -- rest throttle, no policy,
+    nothing that reads the command -- was credited a ``water_to_air`` crossing
+    from one entry state in eight: it tumbles out of the water during the hold
+    and is upside down, clear by more than 0.5 m, at the last step.  The water
+    hold read only which medium the root was in.
+
+    With ``crossing_gates()`` on, the hold is a station and the arrival has to
+    be the right way up.  Each gate is checked with the other taken out, and
+    the leak is checked to be there with both out, so this cannot go quiet.
+    """
+    print("\ntransitions: an open-loop body with thrust crosses nothing")
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.core.bodyplans import REFERENCE_PLANS
+    from dytiscidae.envs import transitions as T
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import TriphibianEnv
+
+    env = TriphibianEnv(build(REFERENCE_PLANS["quad"]()), seed=0)
+    ctrl = Controller(params=env.cpg.base, policy=None, bases=None)
+    draw = T.transition_scatter_seed
+
+    def run(gates: str, **patch):
+        saved = {k: getattr(T, k) if hasattr(T, k) else T.CrossingTracker.__dict__[k]
+                 for k in patch}
+        old = os.environ.get("DYTISCIDAE_CROSSING_GATES")
+        try:
+            os.environ["DYTISCIDAE_CROSSING_GATES"] = gates
+            # The entry state that leaked: the repo's draw for this kind, moved.
+            T.transition_scatter_seed = lambda kind: (draw(kind) + 7919) & 0x7FFFFFFF
+            for k, v in patch.items():
+                setattr(T if hasattr(T, k) else T.CrossingTracker, k, v)
+            return T.run_transition(env, "water_to_air", ctrl)
+        finally:
+            T.transition_scatter_seed = draw
+            for k, v in saved.items():
+                setattr(T if hasattr(T, k) else T.CrossingTracker, k, v)
+            if old is None:
+                os.environ.pop("DYTISCIDAE_CROSSING_GATES", None)
+            else:
+                os.environ["DYTISCIDAE_CROSSING_GATES"] = old
+
+    # A MuJoCo auto-reset mid-crossing: the batched path has always read the
+    # counter, the single path did not until 2026-11-11.
+    reset = T.run_transition(env, "air_to_water", ctrl)
+    check("a crossing probe that MuJoCo reset is unstable on the single path too",
+          reset.bad_qacc > 0 and reset.failure == "unstable" and not reset.crossed
+          and reset.hold == 0.0,
+          f"bad_qacc {reset.bad_qacc}, {reset.failure}")
+
+    off = run("0")
+    if not (off.crossed and off.bad_qacc == 0 and off.hold_drift > T.STATION_ZERO
+            and off.exit_upright < 0.0):
+        # The fixture is one chaotic tumble, and it is not the same tumble on
+        # every CPU.  Measured 2026-11-28 at 7c59754 (the commit that added this
+        # test) and at a508541, mujoco 3.15.0, numpy 2.5.1, python 3.12, on a
+        # Xeon: the entry state that leaked on the machine it was found on does not
+        # cross (drift 0.91 / 0.74 m, upright +0.73 / -0.18), and of 24 entry
+        # states 2 / 1 cross and none arrives overturned; a hosted runner reads
+        # a third trajectory (drift 0.97 m, upright +0.96).  Without the leak
+        # the four checks below test nothing: "refused" would be read off a body
+        # that never crossed.  So they are not run and are counted as a skip,
+        # which the summary line carries.
+        skip_checks(
+            "the crossing-gate checks on the open-loop quad",
+            f"the open-loop tumble did not reproduce on this machine (crossed "
+            f"{off.crossed}, drift {off.hold_drift:.2f} m, exit upright "
+            f"{off.exit_upright:+.2f}, {off.failure or 'no failure'})")
+        return
+    check("with the gates off the open-loop quad is credited water_to_air (the leak is there)",
+          off.crossed and off.bad_qacc == 0 and off.hold_drift > T.STATION_ZERO
+          and off.exit_upright < 0.0,
+          f"crossed {off.crossed}, drift {off.hold_drift:.2f} m, exit upright "
+          f"{off.exit_upright:+.2f}, {off.failure}")
+    on = run("1")
+    check("with the gates on it is not",
+          not on.crossed and on.hold == 0.0 and on.components["crossed"] == 0.0,
+          f"crossed {on.crossed}, hold {on.hold:.2f}, approach {on.components['crossed']:.3f}")
+    station = run("1", upright_at_end=staticmethod(lambda env: 1.0))
+    check("the station gate alone refuses it: it strayed through the hold",
+          not station.crossed and station.hold < T.HOLD_PASS,
+          f"hold {station.hold:.2f} at drift {station.hold_drift:.2f} m")
+    upright = run("1", STATION_FULL=1e9, STATION_ZERO=2e9)
+    check("the arrival gate alone refuses it: it is upside down at the end",
+          not upright.crossed and upright.hold >= T.HOLD_PASS
+          and upright.failure == "arrived overturned",
+          f"hold {upright.hold:.2f}, {upright.failure}")
+
+
+def test_the_mission_verdict_reads_the_end_of_every_leg() -> None:
+    """P0.3 (2026-11-11, `experiments/triphibian_diagnosis`): the mission as a
+    verdict.  ``continuous_score`` paid a quad with its rotors stopped
+    0.15-0.58; ``evaluate_mission`` asks whether the machine is in the
+    commanded medium at the end of every leg, and on land with its weight on
+    the ground.  The still machine is the check: it holds the leg it was put
+    in and no other.
+    """
+    print("\nmission: the verdict reads the end of every leg")
+    from dytiscidae.core.bodyplans import REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import mission as M
+    from dytiscidae.envs.evaluate import Controller
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    a = M.mission_schedule(Domain.WATER, 3)
+    lo, hi = M.LEG_SECONDS_RANGE
+    check("a schedule is the cycle from its start, each leg's duration drawn from the seed",
+          [d for d, _ in a] == [Domain.WATER, Domain.LAND, Domain.AIR]
+          and all(lo <= s <= hi for _, s in a) and a == M.mission_schedule(Domain.WATER, 3)
+          and a != M.mission_schedule(Domain.WATER, 4)
+          and [s for _, s in a] != [s for _, s in M.mission_schedule(Domain.LAND, 3)],
+          ", ".join(f"{d.value} {s:.2f}s" for d, s in a))
+
+    read = M.MissionRead(Domain.AIR, 0, M.mission_schedule(Domain.AIR, 0),
+                         held=[False, True, True])
+    check("a transition counts only if the leg before it was held to its end",
+          read.transitions_completed == 1 and not read.completed,
+          f"{read.transitions_completed} of {read.transitions_commanded}")
+    read = M.MissionRead(Domain.AIR, 0, M.mission_schedule(Domain.AIR, 0),
+                         held=[True, True], failure="unstable")
+    check("a mission that failed measured nothing",
+          read.transitions_completed == 0 and not read.completed)
+
+    env = TriphibianEnv(build(REFERENCE_PLANS["quad"]()), seed=0)
+    still = Controller(params=env.held_still_params(), policy=None, bases=None)
+    short = (1.5, 2.5)
+
+    env.reset(Domain.AIR, randomise=False)
+    check("a machine in the air is carried by no ground",
+          env.ground_support() == 0.0, f"{env.ground_support():.3f}")
+
+    land = M.evaluate_mission(env, still, Domain.LAND, 0, leg_range=short)
+    check("the still quad holds the land leg it was put on, with its weight on the ground",
+          land.held == [True, False, False] and land.transitions_completed == 0
+          and not land.completed and not land.failure
+          and land.supports[0] is not None and 0.95 <= land.supports[0] <= 1.05,
+          f"held {land.held}, support {land.supports[0]}")
+    again = M.evaluate_mission(env, still, Domain.LAND, 0, leg_range=short)
+    check("the same seed is the same mission",
+          again.shares == land.shares and again.supports == land.supports
+          and again.result.energy_wh == land.result.energy_wh)
+
+    floated = type(env).ground_support
+    try:
+        type(env).ground_support = lambda self: 0.0
+        taxi = M.evaluate_mission(env, still, Domain.LAND, 0, leg_range=short)
+    finally:
+        type(env).ground_support = floated
+    check("ashore without the weight on the ground is not on land",
+          taxi.held[0] is False and taxi.shares[0] >= M.ARRIVAL_SHARE,
+          f"held {taxi.held}, share {taxi.shares[0]:.2f}, support {taxi.supports[0]}")
+
+    water = M.evaluate_mission(env, still, Domain.WATER, 0, leg_range=short)
+    check("and from the water it holds the water leg and makes no transition",
+          water.held == [True, False, False] and water.transitions_completed == 0,
+          f"held {water.held}, shares {water.shares}")
+
+
+def _assigned_after_construction(cls) -> list:
+    """Every ``self.x = ...`` (plain, augmented, annotated, or through setattr)
+    in a method of ``cls`` other than ``__init__``."""
+    import ast
+    import inspect
+    import textwrap
+
+    found = []
+    for fn in ast.parse(textwrap.dedent(inspect.getsource(cls))).body[0].body:
+        if not isinstance(fn, ast.FunctionDef) or fn.name == "__init__":
+            continue
+        for sub in ast.walk(fn):
+            targets = []
+            if isinstance(sub, ast.Assign):
+                targets = sub.targets
+            elif isinstance(sub, (ast.AugAssign, ast.AnnAssign)):
+                targets = [sub.target]
+            elif isinstance(sub, ast.Call) and getattr(sub.func, "id", "") == "setattr":
+                found.append(f"{fn.name}: setattr")
+            for tg in targets:
+                for leaf in ast.walk(tg):
+                    if (isinstance(leaf, ast.Attribute) and isinstance(leaf.value, ast.Name)
+                            and leaf.value.id == "self"):
+                        found.append(f"{fn.name}: self.{leaf.attr}")
+    return found
+
+
+def test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert() -> None:
+    """P0.5/P0.6 (2026-11-11, `experiments/triphibian_diagnosis`, E0s): the
+    hand law split into an outer law that reads an observation and an inner
+    loop that keeps the body the right way up.  What the split promises is
+    checked here on the anchor body: the zero action does nothing, the inner
+    loop cannot tell where on the map it is, the observation tells the outer
+    law only how far it is from the waterline, and the memory and the command
+    clock are the environment's to keep.
+    """
+    print("\nsplit controller: a zero action is inert and the inner loop reads no position")
+    from dytiscidae.control import innerloop as IL
+    from dytiscidae.control import outer as O
+    from dytiscidae.core.bodyplans import ANCHOR_PLANS, BODY_PLANS, REFERENCE_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import mission as M
+    from dytiscidae.envs.evaluate import evaluate_tier0
+    from dytiscidae.envs.triphibian import Domain, MissionSpec, TriphibianEnv
+    from dytiscidae.evolution.loop import SearchConfig
+
+    p = build(ANCHOR_PLANS["legged_quad"]())
+    t0 = evaluate_tier0(p, MissionSpec())
+    check("the anchor body passes Tier-0 as the search applies it, and is in neither plan table",
+          p.report.gate_margin >= SearchConfig().tier0_gate and t0.mission_fraction > 0.0
+          and "legged_quad" not in BODY_PLANS and "legged_quad" not in REFERENCE_PLANS
+          and p.genome.body_plan == "legged_quad",
+          f"gate margin {p.report.gate_margin:.3f} against {SearchConfig().tier0_gate}, "
+          f"Tier-0 mission fraction {t0.mission_fraction:.3f}")
+
+    env = TriphibianEnv(p, seed=0)
+    model = IL.body_model(env)
+    inner = IL.InnerLoop(env, model)
+    rot, stroke, feather = model.irot, model.istroke, model.ifeather
+    check("the model finds four rotors and four limbs, each with a stroke and a feather",
+          len(rot) == 4 and len(stroke) == 4 and len(feather) == 4
+          and sorted(rot + stroke + feather) == list(range(model.n_act)),
+          f"{len(rot)} rotors, {len(stroke)} strokes, {len(feather)} feathers of {model.n_act}")
+
+    # -- the constants are the body's, not the history's
+    used = TriphibianEnv(p, seed=0)
+    used.reset(Domain.AIR, randomise=False)
+    used.rollout(0.3, params=used.cpg.base, policy=None, basis=None, domain=Domain.AIR)
+    after = IL.body_model(used)
+    check("the model read off an environment that has flown is the model read off a fresh one",
+          np.array_equal(after.hubs_body, model.hubs_body) and after.side == model.side
+          and after.yaw_ok == model.yaw_ok and np.array_equal(after.ipos, model.ipos)
+          and float(np.abs(used.data.qpos[7:]).max()) > 1.0,
+          f"hub lever arms differ by {float(np.abs(after.hubs_body - model.hubs_body).max()):.1e} "
+          f"with the joints up to {float(np.abs(used.data.qpos[7:]).max()):.1f} rad from reference")
+
+    # -- the zero action
+    env.reset(Domain.AIR, randomise=False)
+    z = inner.act(np.zeros(IL.N_ACT))
+    check("u = 0: every rotor command is 0 and the limbs are at rest",
+          np.all(z[rot] == 0.0) and np.all(z[stroke] == IL.GAIT["rest"])
+          and np.all(z[feather] == 0.0),
+          f"rotors {z[rot]}, strokes {z[stroke]}")
+    push = np.zeros(IL.N_ACT)
+    push[IL.U_ACC:IL.U_ACC + 3], push[IL.U_TILT] = (2.0, -1.0, 3.0), 30.0
+    off = inner.act(push)
+    push[IL.U_ON] = 1.0
+    on = inner.act(push)
+    check("an acceleration is asked of the rotors only while they are switched on",
+          np.all(off[rot] == 0.0) and np.all(on[rot] > 0.0),
+          f"off {off[rot]}, on {np.round(on[rot], 1)}")
+
+    # -- no position: the same body state somewhere else
+    def place(dx, dy):
+        env.reset(Domain.AIR, randomise=False)
+        d = env.data
+        d.qpos[0] += dx
+        d.qpos[1] += dy
+        d.qpos[3:7] = np.array([0.97, 0.12, -0.15, 0.14]) / np.linalg.norm([0.97, 0.12, -0.15, 0.14])
+        # Climbing fast enough that the advance-ratio correction is active
+        # (J > 0.07): the torque solve alone does not change when every lever
+        # arm is shifted by one vector, the flow through each rotor does.
+        d.qvel[:6] = (1.5, -0.7, 12.0, 0.3, -0.2, 0.5)
+        env._mj.mj_forward(env.model, d)
+
+    push[IL.U_DRIVE], push[IL.U_TURN] = 0.8, -0.3
+    place(0.0, 0.0)
+    here, o_here = inner.act(push), O.observe(env, Domain.AIR, np.zeros(O.K), 0.0)
+    place(3.0, -2.0)
+    there = inner.act(push)
+    check("the inner loop gives the same actuator targets 3 m and -2 m away",
+          np.all(here[rot] > 0.0) and float(np.max(np.abs(there - here))) < 1e-6,
+          f"largest difference {float(np.max(np.abs(there - here))):.2e} on targets up to "
+          f"{float(np.max(np.abs(here))):.0f}")
+    place(0.0, -2.0)
+    o_along = O.observe(env, Domain.AIR, np.zeros(O.K), 0.0)
+    place(3.0, 0.0)
+    o_across = O.observe(env, Domain.AIR, np.zeros(O.K), 0.0)
+    moved = np.flatnonzero(np.abs(o_across - o_here) > 1e-9)
+    check("the observation is unchanged along the shore, and across it only the "
+          "waterline distance moves",
+          float(np.max(np.abs(o_along - o_here))) < 1e-9 and list(moved) == [O.I_DW]
+          and abs(o_across[O.I_DW] - o_here[O.I_DW] - 3.0) < 1e-9
+          and len(o_here) == O.N_OBS == len(O.OBS_CHANNELS),
+          f"along: {float(np.max(np.abs(o_along - o_here))):.1e}; across: channels "
+          f"{[int(i) for i in moved]} "
+          f"by {o_across[O.I_DW] - o_here[O.I_DW]:.3f}")
+
+    # -- the limbs carry the body
+    def settled(pose):
+        """Mean ground support over the second half of 2 s in a held pose, and
+        the share of the final support that comes up through the hull."""
+        env.reset(Domain.LAND, randomise=False)
+        u = np.zeros(IL.N_ACT)
+        u[IL.U_POSE] = pose
+        n, sup = int(round(2.0 / env.timestep)), []
+        for i in range(n):
+            env.step(inner.act(u))
+            if i >= n // 2:
+                sup.append(env.ground_support())
+        m, d, f6, hull, total = env.model, env.data, np.zeros(6), 0.0, 0.0
+        for i in range(d.ncon):
+            c = d.contact[i]
+            b1, b2 = m.geom_bodyid[c.geom1], m.geom_bodyid[c.geom2]
+            if (b1 == 0) == (b2 == 0):
+                continue
+            env._mj.mj_contactForce(m, d, i, f6)
+            fz = float(np.asarray(c.frame, float).reshape(3, 3).T[2] @ f6[:3])
+            fz = fz if b1 == 0 else -fz
+            total += fz
+            hull += fz if env.root_body in (b1, b2) else 0.0
+        return float(np.mean(sup)), hull / total
+
+    stand, hull_stand = settled(1.0)
+    rest, hull_rest = settled(0.0)
+    check("standing, the ground carries the anchor body's weight through its limbs; "
+          "at rest it lies on its hull",
+          0.95 <= stand <= 1.05 and 0.95 <= rest <= 1.05 and hull_stand < 0.25
+          and hull_rest > 0.95,
+          f"support {stand:.3f} standing with {hull_stand:.2f} of it through the hull, "
+          f"{rest:.3f} at rest with {hull_rest:.2f}")
+
+    # -- no attribute after construction
+    left = {c.__name__: _assigned_after_construction(c) for c in (O.Teacher, IL.InnerLoop)}
+    check("neither the teacher nor the inner loop assigns an attribute after construction",
+          not any(left.values()), f"{left}")
+
+    # -- what the environment's side keeps
+    zero = O.SplitController(lambda o: np.zeros(IL.N_ACT), inner.act)
+    zero.log = []
+    own = env.cpg.command
+    with zero.installed(env):
+        still = env.held_still_params()
+        check("installed, any other parameter set still reaches the body's own generator",
+              np.array_equal(env.cpg.command(still, 0.3), own(still, 0.3)))
+        try:
+            O.SplitController(lambda o: np.zeros(IL.N_ACT), inner.act).install(env)
+            twice = False
+        except RuntimeError:
+            twice = True
+        check("a second controller on the same environment is an error, not a stack", twice)
+        short = (1.5, 2.5)
+        read = M.evaluate_mission(env, zero.controller, Domain.WATER, 0, leg_range=short)
+    check("uninstalled, the environment's command is the one that was replaced",
+          "command" not in vars(env.cpg) and zero.env is None)
+    check("a mission from the water under u = 0 makes no transition",
+          read.transitions_completed == 0 and not read.completed and read.held[1:] == [False, False],
+          f"held {read.held}, {read.transitions_completed} of {read.transitions_commanded}")
+    cmd = [int(np.argmax(o[11:14])) for _, o, _ in zero.log]
+    since = [float(o[O.I_SINCE]) for _, o, _ in zero.log]
+    change = [i for i in range(1, len(cmd)) if cmd[i] != cmd[i - 1]]
+    check("the command clock runs between commands and restarts at each new one",
+          len(change) == 2 and since[0] == 0.0 and all(since[i] == 0.0 for i in change)
+          and all(since[i - 1] > 1.0 for i in change)
+          and all(since[i] > since[i - 1] for i in range(1, change[0])),
+          f"{len(zero.log)} decisions, command changed at {change}, clock before each "
+          f"{[round(since[i - 1], 2) for i in change]}")
+
+    def remember(o):
+        u = np.zeros(IL.N_ACT)
+        u[IL.U_MEM] = 1.0
+        return u
+
+    seen = {}
+    for fed in (True, False):
+        ctl = O.SplitController(remember, inner.act, feed_memory=fed)
+        ctl.log = []
+        with ctl.installed(env):
+            M.evaluate_mission(env, ctl.controller, Domain.WATER, 0, n_legs=1, leg_range=(1.0, 1.0))
+        seen[fed] = [float(o[O.I_MEM]) for _, o, _ in ctl.log]
+    check("the law is handed its own memory output at the next decision, 0 at the first",
+          len(seen[True]) > 10 and seen[True][0] == 0.0 and all(m == 1.0 for m in seen[True][1:])
+          and all(m == 0.0 for m in seen[False]),
+          f"fed back: {seen[True][:3]}..., not fed back: {set(seen[False])}")
+
+
+def test_the_teacher_completes_the_mission_through_the_split() -> None:
+    """The stateless teacher over the inner loop completes the mission from
+    every start (E0s: 32, 32, 31 of 32 seeds), and it is the command that it
+    follows: shown its first command for the whole mission it completes none
+    (0 of 96).  A fresh teacher at every decision and a fresh inner loop at
+    every step are the same rollout, which is what "stateless" means.
+    """
+    print("\nsplit controller: the teacher completes the mission, and only by reading the command")
+    from dytiscidae.control import innerloop as IL
+    from dytiscidae.control import outer as O
+    from dytiscidae.core.bodyplans import ANCHOR_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import mission as M
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    env = TriphibianEnv(build(ANCHOR_PLANS["legged_quad"]()), seed=0)
+    done, frozen = {}, {}
+    for start in (Domain.AIR, Domain.WATER, Domain.LAND):
+        with O.teacher_controller(env).installed(env) as ctl:
+            done[start.value] = M.evaluate_mission(env, ctl.controller, start, 0)
+        with O.teacher_controller(env, freeze_command=True).installed(env) as ctl:
+            frozen[start.value] = M.evaluate_mission(env, ctl.controller, start, 0)
+    check("the teacher completes the mission from the air, the water and the land (seed 0)",
+          all(r.completed and not r.failure for r in done.values()),
+          "; ".join(f"{k}: held {r.held}" for k, r in done.items()))
+    check("on land its weight is on the ground",
+          all(s is None or s > 0.8 for r in done.values() for s in r.supports)
+          and all(any(s is not None for s in r.supports) for r in done.values()),
+          "; ".join(f"{k}: {[None if s is None else round(s, 2) for s in r.supports]}"
+                    for k, r in done.items()))
+    check("shown only its first command, it completes none and makes no transition",
+          not any(r.completed for r in frozen.values())
+          and all(r.transitions_completed == 0 for r in frozen.values()),
+          "; ".join(f"{k}: held {r.held}" for k, r in frozen.items()))
+
+    model = IL.body_model(env)
+    shore = O.ShoreMap()
+    reused = (O.Teacher(model, shore).teach, IL.InnerLoop(env, model).act)
+    arms = {
+        "reused": reused,
+        "a fresh teacher at every decision": (lambda o: O.Teacher(model, shore).teach(o), reused[1]),
+        "a fresh inner loop at every step": (reused[0], lambda u: IL.InnerLoop(env, model).act(u)),
+    }
+    got = {}
+    for name, (law, act) in arms.items():
+        with O.SplitController(law, act).installed(env) as ctl:
+            r = M.evaluate_mission(env, ctl.controller, Domain.LAND, 0, leg_range=(1.5, 2.5))
+            got[name] = (r.held, r.shares, r.supports, r.failure, float(r.result.energy_wh),
+                         [float(x) for x in env.data.qpos[:7]], ctl.decisions)
+    check("a fresh teacher at every decision and a fresh inner loop at every step are the "
+          "same rollout, to the last bit",
+          got["reused"][6] > 50 and got["reused"][4] > 0.0
+          and all(v == got["reused"] for v in got.values()),
+          f"{got['reused'][6]} decisions, energy {got['reused'][4]!r} Wh, held {got['reused'][0]}")
+
+
+def test_a_depth_command_is_answerable_both_ways() -> None:
+    """The water hold, paired (2026-11-12, `tasks.depth_pair`).
+
+    Every commanded depth is below the release depth, so a body that only
+    sinks is at the commanded depth for a while: the gannet held still is paid
+    0.013 of a hold on the default draw, and the two-pair flapper held still
+    0.072 (`experiments/flapper/RESULT_F3c.md`).  With the switch on the second
+    half of the pair is told the depth on the other side of the release depth
+    and the hold is scaled by the response between the halves.
+    """
+    print("\nwater: a depth command is answerable both ways")
+    from dytiscidae.core.bodyplans import BODY_PLANS
+    from dytiscidae.core.phenotype import build
+    from dytiscidae.envs import tasks as TK
+    from dytiscidae.envs.evaluate import Controller, _scatter_seed, run_segment
+    from dytiscidae.envs.triphibian import Domain, TriphibianEnv
+
+    def with_switch(value, fn):
+        old = os.environ.get("DYTISCIDAE_DEPTH_PAIR")
+        os.environ["DYTISCIDAE_DEPTH_PAIR"] = value
+        try:
+            return fn()
+        finally:
+            if old is None:
+                os.environ.pop("DYTISCIDAE_DEPTH_PAIR", None)
+            else:
+                os.environ["DYTISCIDAE_DEPTH_PAIR"] = old
+
+    check("the release depth the mirror turns about is the water spawn's",
+          TK.WATER_START_DEPTH == -TriphibianEnv.SPAWN[Domain.WATER][2],
+          f"{TK.WATER_START_DEPTH} against {-TriphibianEnv.SPAWN[Domain.WATER][2]}")
+    w = TK.schedule_for("water", np.random.default_rng(3))
+    off = with_switch("0", lambda: TK.antipode(w))
+    on = with_switch("1", lambda: TK.antipode(w))
+    d0 = w.phases[0].depth
+    turned = all(abs(math.cos(a.heading) + math.cos(b.heading)) < 1e-12
+                 for a, b in zip(w.phases, on.phases) if a.kind == TK.CRUISE)
+    check("off, the antipode keeps the depth; on, it is the other side of the release depth",
+          all(ph.depth == d0 for ph in off.phases)
+          and all(abs(ph.depth - (2 * TK.WATER_START_DEPTH - d0)) < 1e-12 for ph in on.phases)
+          and turned and on.phases[0].depth < TK.WATER_START_DEPTH < d0,
+          f"drawn {d0:.2f} m, pair {on.phases[0].depth:.2f} m")
+    land = TK.schedule_for("land", np.random.default_rng(3))
+    check("a land pair is not touched, and a mirrored depth stays under the surface",
+          with_switch("1", lambda: TK.antipode(land)) == TK.antipode(land)
+          and TK.mirror_depth(9.0) == 0.5)
+
+    env = TriphibianEnv(build(BODY_PLANS["gannet"]()), seed=0)
+    still = Controller(params=env.held_still_params(), policy=None, bases=None)
+
+    def seg():
+        ss = _scatter_seed(0, Domain.WATER)
+        t = TK.schedule_for(Domain.WATER, np.random.default_rng(TK.task_seed(ss)))
+        return run_segment(env, Domain.WATER, 8.0, still, scatter_seed=ss, task=t)
+
+    leak = with_switch("0", seg)
+    shut = with_switch("1", seg)
+    check("off, the gannet held still is paid for a hold by sinking (the leak is there)",
+          leak.measurements["pair_second"] > 0.005 and "pair_depth_response" not in leak.measurements,
+          f"pair hold {leak.measurements['pair_second']:.4f}, competence {leak.competence:.4f}")
+    check("on, it answers nothing and is paid nothing",
+          abs(shut.measurements["pair_depth_response"]) < 1e-9
+          and shut.measurements["pair_second"] == 0.0 and shut.competence < 1e-12,
+          f"response {shut.measurements['pair_depth_response']:+.1e}, competence {shut.competence}")
+
+    cruise = {"measured": False}
+    env.pair_partner = {"second": 0.6, "hold_cmd": 2.0, "hold_depth": 2.0}
+    try:
+        half = env._paired(dict(cruise), 0.8, hold={"cmd": 6.0, "depth": 4.0})[3]
+        full = env._paired(dict(cruise), 0.8, hold={"cmd": 6.0, "depth": 6.5})[3]
+        wrong = env._paired(dict(cruise), 0.8, hold={"cmd": 6.0, "depth": 1.0})[3]
+        unread = env._paired(dict(cruise), 0.8, hold={"cmd": 6.0})[3]
+        env.pair_partner = {"second": 0.6, "hold_cmd": 6.0, "hold_depth": 2.0}
+        same = env._paired(dict(cruise), 0.8, hold={"cmd": 6.0, "depth": 6.0})[3]
+    finally:
+        env.pair_partner = None
+    check("the pair's hold is the mean scaled by the share of the commanded difference made",
+          abs(half - 0.35) < 1e-12 and abs(full - 0.7) < 1e-12 and wrong == 0.0,
+          f"half the way {half:.3f}, all of it and more {full:.3f}, the wrong way {wrong:.3f}")
+    check("a hold not measured is no answer, and one depth for both halves is not gated",
+          unread == 0.0 and abs(same - 0.7) < 1e-12, f"unmeasured {unread}, same command {same:.3f}")
+
+
 def main() -> int:
     print("=" * 68)
     print("Dytiscidae physics verification")
@@ -4747,6 +5691,13 @@ def main() -> int:
         test_the_gait_gain_can_stop_a_machine,
         test_a_film_is_the_evaluation,
         test_lift_sign_and_magnitude,
+        test_centre_of_pressure_moves_aft_when_the_flow_separates,
+        test_a_cambered_strip_carries_its_own_pitching_moment,
+        test_a_sections_drag_can_follow_its_table_to_the_lifts_peak,
+        test_the_plate_stall_law_is_opt_in_and_reads_the_thin_plate_table,
+        test_the_table_law_reads_two_measured_thin_sections,
+        test_wetting_entrainment_reacts_water_arriving_not_the_flow_turning,
+        test_a_measured_section_replaces_the_default_law_where_it_was_measured,
         test_buoyancy,
         test_bluff_drag_is_orientation_dependent,
         test_generated_bodies_reach_the_fluid,
@@ -4786,6 +5737,11 @@ def main() -> int:
         test_takeoff_is_measured_where_the_machine_starts_on_the_ground,
         test_depth_is_a_gain_not_a_spawn,
         test_an_evaluation_counts_the_steps_it_took,
+        test_an_open_loop_body_with_thrust_crosses_nothing,
+        test_the_mission_verdict_reads_the_end_of_every_leg,
+        test_a_depth_command_is_answerable_both_ways,
+        test_the_inner_loop_reads_no_position_and_a_zero_action_is_inert,
+        test_the_teacher_completes_the_mission_through_the_split,
     ])
     return report("all physics checks passed")
 

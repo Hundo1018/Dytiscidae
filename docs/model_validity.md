@@ -22,7 +22,7 @@ in `derivations/`. The measurements are in `experiments/`.
 |---|---|---|
 | dynamic pressure `q = rho U^2/2` | **derived** | Bernoulli |
 | finite-wing lift slope `2 pi/(1+2/AR)` | **derived** | thin-airfoil theory + elliptic downwash |
-| zero-lift angle from camber `-2 f/c` | **derived** | thin-airfoil theory, parabolic arc |
+| zero-lift angle from camber `-2 f/c` | **derived** | thin-airfoil theory, parabolic arc. Law `"legacy"` only since 2026-11-17: the default (`"table"`) reads the lift and drag of two measured thin sections, UIUC flat plate and Goe 417a, linear in camber (`experiments/physics_extremes/RESULT_R3_table.md`) |
 | induced drag `CL^2/(pi e AR)` | **derived** | elliptic loading; `e = 0.75` is calibrated |
 | laminar skin friction `1.328/sqrt(Re)` | **derived** | Blasius |
 | turbulent skin friction `0.074/Re^0.2` | **correlation** | 1/7-power, valid 5e5 < Re < 1e7 |
@@ -34,7 +34,7 @@ in `derivations/`. The measurements are in `experiments/`.
 | jet thrust `rho Q^2/A` | **derived** | momentum flux |
 | bluff axial + cross-flow split | **textbook** | Munk slender-body + Allen & Perkins cross-flow |
 | `CL_max = 1.10 + 0.80 lev` | **calibrated** | no source |
-| `alpha_stall = 11 + 26 lev` degrees | **calibrated** | no source |
+| `alpha_stall = 11 + 26 lev` degrees | **calibrated** | no source. Law `"legacy"` only since 2026-11-17 |
 | low-Re stall knockdown | **calibrated** | anchored at `Re = 1e5` |
 | the 16-degree separation width | **calibrated** | `experiments/stall_blend`; replaced a 6-degree logistic that cost 11% of the attached lift slope (F-05) |
 | `lev = clip(k/0.30, 0, 1)` | **heuristic** | no source, and `k` here is a pitch rate |

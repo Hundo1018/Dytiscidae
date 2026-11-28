@@ -1,0 +1,155 @@
+rows: 168 QACC: []
+GX30 XS wetting seed 10: met False (GX3 True) t* 0.5 clear 5.4 s z_max 3.74 wet again at 6.0 s | P 3308 W peak 4200 W lim {'feather': 0.83, 'stroke': 0.85, 'tail': 0.0} clamp 469
+GX30 XS wetting seed 11: met True (GX3 True) t* 0.4 clear 39.6 s z_max 4.03  | P 351 W peak 2463 W lim {'feather': 0.0, 'stroke': 0.01, 'tail': 0.0} clamp 0
+GX30 XS wetting seed 12: met False (GX3 False) t* 0.5 clear 2.1 s z_max 2.08 wet again at 2.7 s | P 3528 W peak 4250 W lim {'feather': 0.9, 'stroke': 0.93, 'tail': 0.0} clamp 732
+GX30 XS wetting seed 13: met False (GX3 False) t* None clear 0.0 s z_max 0.45 never clear by 5 s | P 3680 W peak 4190 W lim {'feather': 0.94, 'stroke': 0.98, 'tail': 0.0} clamp 1564
+GX30 XS wetting seed 14: met False (GX3 True) t* 0.4 clear 7.7 s z_max 3.97 wet again at 8.2 s | P 3041 W peak 4277 W lim {'feather': 0.76, 'stroke': 0.79, 'tail': 0.0} clamp 104
+GX30 XS wetting seed 15: met False (GX3 True) t* 0.5 clear 4.3 s z_max 3.66 wet again at 4.9 s | P 3343 W peak 4208 W lim {'feather': 0.84, 'stroke': 0.88, 'tail': 0.0} clamp 1471
+GX30 XS default seed 10: met False (GX3 False) t* None clear 0.0 s z_max 0.42 never clear by 5 s | P 3772 W peak 4006 W lim {'feather': 0.93, 'stroke': 0.95, 'tail': 0.0} clamp 0
+GX30 XS default seed 11: met False (GX3 False) t* None clear 0.0 s z_max 0.44 never clear by 5 s | P 3769 W peak 4004 W lim {'feather': 0.93, 'stroke': 0.95, 'tail': 0.0} clamp 0
+GX30 XS default seed 12: met False (GX3 False) t* None clear 0.0 s z_max 0.38 never clear by 5 s | P 3773 W peak 4013 W lim {'feather': 0.93, 'stroke': 0.95, 'tail': 0.0} clamp 0
+GX30 XS default seed 13: met False (GX3 False) t* None clear 0.0 s z_max 0.34 never clear by 5 s | P 3774 W peak 4001 W lim {'feather': 0.93, 'stroke': 0.95, 'tail': 0.0} clamp 0
+GX30 XS default seed 14: met False (GX3 False) t* None clear 0.0 s z_max 0.46 never clear by 5 s | P 3769 W peak 4005 W lim {'feather': 0.93, 'stroke': 0.95, 'tail': 0.0} clamp 0
+GX30 XS default seed 15: met False (GX3 False) t* None clear 0.0 s z_max 0.41 never clear by 5 s | P 3774 W peak 4010 W lim {'feather': 0.93, 'stroke': 0.95, 'tail': 0.0} clamp 0
+GX30 XS: wetting 1, default 0 -> not met in both modes
+
+GX30 X0f wetting seed 10: met False (GX3 False) t* None clear 0.0 s z_max 0.00 never clear by 5 s | P 0 W peak 0 W lim {'feather': 0.0, 'stroke': 0.0, 'tail': 0.0} clamp 0
+GX30 X0f wetting seed 11: met False (GX3 False) t* None clear 0.0 s z_max 0.00 never clear by 5 s | P 0 W peak 0 W lim {'feather': 0.0, 'stroke': 0.0, 'tail': 0.0} clamp 0
+GX30 X0f wetting seed 12: met False (GX3 False) t* None clear 0.0 s z_max 0.00 never clear by 5 s | P 0 W peak 0 W lim {'feather': 0.0, 'stroke': 0.0, 'tail': 0.0} clamp 0
+GX30 X0f wetting seed 13: met False (GX3 False) t* None clear 0.0 s z_max -0.00 never clear by 5 s | P 0 W peak 0 W lim {'feather': 0.0, 'stroke': 0.0, 'tail': 0.0} clamp 0
+GX30 X0f wetting seed 14: met False (GX3 False) t* None clear 0.0 s z_max 0.00 never clear by 5 s | P 0 W peak 0 W lim {'feather': 0.0, 'stroke': 0.0, 'tail': 0.0} clamp 0
+GX30 X0f wetting seed 15: met False (GX3 False) t* None clear 0.0 s z_max 0.00 never clear by 5 s | P 0 W peak 0 W lim {'feather': 0.0, 'stroke': 0.0, 'tail': 0.0} clamp 0
+GX30 X0f default seed 10: met False (GX3 False) t* None clear 0.0 s z_max 0.00 never clear by 5 s | P 0 W peak 0 W lim {'feather': 0.0, 'stroke': 0.0, 'tail': 0.0} clamp 0
+GX30 X0f default seed 11: met False (GX3 False) t* None clear 0.0 s z_max 0.00 never clear by 5 s | P 0 W peak 0 W lim {'feather': 0.0, 'stroke': 0.0, 'tail': 0.0} clamp 0
+GX30 X0f default seed 12: met False (GX3 False) t* None clear 0.0 s z_max 0.00 never clear by 5 s | P 0 W peak 0 W lim {'feather': 0.0, 'stroke': 0.0, 'tail': 0.0} clamp 0
+GX30 X0f default seed 13: met False (GX3 False) t* None clear 0.0 s z_max -0.00 never clear by 5 s | P 0 W peak 0 W lim {'feather': 0.0, 'stroke': 0.0, 'tail': 0.0} clamp 0
+GX30 X0f default seed 14: met False (GX3 False) t* None clear 0.0 s z_max 0.00 never clear by 5 s | P 0 W peak 1 W lim {'feather': 0.0, 'stroke': 0.0, 'tail': 0.0} clamp 0
+GX30 X0f default seed 15: met False (GX3 False) t* None clear 0.0 s z_max 0.00 never clear by 5 s | P 0 W peak 0 W lim {'feather': 0.0, 'stroke': 0.0, 'tail': 0.0} clamp 0
+GX30 X0f: wetting 0, default 0 -> not met in both modes
+
+GW WT wetting seed 10: met False P -0.096 (A -0.174 B -0.018) R +0.07 depth A 0.11/4.04 B -0.03/1.96 clauses ---- | P_el 1621/1519 W peak 4006 W
+GW WT wetting seed 11: met False P -0.141 (A -0.100 B -0.183) R -0.01 depth A -0.02/4.25 B -0.00/1.75 clauses ---- | P_el 1443/1552 W peak 4108 W
+GW WT wetting seed 12: met False P +0.055 (A +0.210 B -0.100) R +1.59 depth A 4.23/4.33 B 0.01/1.67 clauses -+-- | P_el 1767/1318 W peak 3958 W
+GW WT wetting seed 13: met False P -0.007 (A +0.013 B -0.027) R -0.11 depth A -0.01/4.34 B 0.28/1.66 clauses ---- | P_el 1432/1556 W peak 3997 W
+GW WT wetting seed 14: met False P -0.222 (A -0.202 B -0.243) R +0.32 depth A 1.53/4.04 B 0.85/1.96 clauses ---+ | P_el 1718/1610 W peak 4019 W
+GW WT wetting seed 15: met False P +0.107 (A +0.158 B +0.055) R +0.00 depth A 0.00/4.17 B -0.00/1.83 clauses +--- | P_el 1621/1513 W peak 4113 W
+GW WT default seed 10: met False P -0.018 (A -0.043 B +0.007) R -0.21 depth A 2.42/4.04 B 2.85/1.96 clauses ---+ | P_el 1486/2092 W peak 3961 W
+GW WT default seed 11: met False P -0.015 (A -0.032 B +0.002) R +0.01 depth A 3.47/4.25 B 3.44/1.75 clauses ---+ | P_el 1988/1620 W peak 4106 W
+GW WT default seed 12: met False P -0.005 (A -0.021 B +0.011) R +0.34 depth A 3.31/4.33 B 2.42/1.67 clauses ---- | P_el 1954/1358 W peak 4173 W
+GW WT default seed 13: met False P -0.008 (A +0.010 B -0.026) R -0.25 depth A 2.29/4.34 B 2.95/1.66 clauses ---+ | P_el 1470/1910 W peak 3933 W
+GW WT default seed 14: met False P -0.012 (A -0.033 B +0.010) R +0.21 depth A 3.24/4.04 B 2.81/1.96 clauses ---+ | P_el 2083/1654 W peak 4120 W
+GW WT default seed 15: met False P -0.005 (A -0.023 B +0.013) R +0.06 depth A 3.31/4.17 B 3.16/1.83 clauses ---+ | P_el 1950/1691 W peak 4118 W
+GW WT: wetting 0, default 0 -> not met in both modes
+
+GW WT-VB wetting seed 10: met False P -0.025 (A -0.037 B -0.013) R +2.71 depth A 5.67/4.04 B 0.02/1.96 clauses -+-- | P_el 1756/1457 W peak 4085 W
+GW WT-VB wetting seed 11: met False P -0.043 (A +0.018 B -0.104) R +1.27 depth A 8.33/4.25 B 5.15/1.75 clauses -+-+ | P_el 1551/1402 W peak 4092 W
+GW WT-VB wetting seed 12: met False P -0.011 (A +0.073 B -0.095) R +1.72 depth A 6.53/4.33 B 1.98/1.67 clauses -+-- | P_el 1596/1495 W peak 4089 W
+GW WT-VB wetting seed 13: met False P +0.044 (A -0.065 B +0.152) R +1.80 depth A 4.83/4.34 B 0.02/1.66 clauses -+-- | P_el 1431/1502 W peak 3854 W
+GW WT-VB wetting seed 14: met False P +0.070 (A +0.114 B +0.027) R +0.56 depth A 4.33/4.04 B 3.17/1.96 clauses ++-+ | P_el 1594/1447 W peak 3921 W
+GW WT-VB wetting seed 15: met False P -0.085 (A -0.092 B -0.078) R +0.17 depth A 5.36/4.17 B 4.95/1.83 clauses ---- | P_el 1817/1490 W peak 4166 W
+GW WT-VB default seed 10: met False P -0.003 (A -0.025 B +0.020) R -0.54 depth A 2.51/4.04 B 3.63/1.96 clauses ---+ | P_el 1487/2108 W peak 3936 W
+GW WT-VB default seed 11: met False P -0.016 (A -0.035 B +0.002) R -0.09 depth A 3.30/4.25 B 3.52/1.75 clauses ---+ | P_el 1982/1495 W peak 3978 W
+GW WT-VB default seed 12: met False P -0.014 (A -0.031 B +0.002) R +0.08 depth A 2.70/4.33 B 2.49/1.67 clauses ---+ | P_el 2100/1406 W peak 4031 W
+GW WT-VB default seed 13: met False P -0.006 (A -0.016 B +0.003) R +0.14 depth A 2.82/4.34 B 2.44/1.66 clauses ---+ | P_el 1418/1933 W peak 3951 W
+GW WT-VB default seed 14: met False P -0.011 (A -0.039 B +0.016) R +0.10 depth A 3.41/4.04 B 3.20/1.96 clauses ---+ | P_el 1955/1469 W peak 4134 W
+GW WT-VB default seed 15: met False P -0.009 (A -0.039 B +0.021) R -0.19 depth A 2.86/4.17 B 3.31/1.83 clauses ---+ | P_el 2057/1504 W peak 4135 W
+GW WT-VB: wetting 0, default 0 -> not met in both modes
+
+GW W0 wetting seed 10: met False P +0.000 (A +0.018 B -0.018) R +0.00 depth A 0.00/4.04 B 0.00/1.96 clauses ---+ | P_el 0/0 W peak 3 W
+GW W0 wetting seed 11: met False P +0.000 (A +0.002 B -0.002) R +0.00 depth A 0.00/4.25 B 0.00/1.75 clauses ---+ | P_el 1/1 W peak 4 W
+GW W0 wetting seed 12: met False P +0.000 (A +0.010 B -0.010) R +0.00 depth A 0.00/4.33 B 0.00/1.67 clauses ---+ | P_el 0/0 W peak 4 W
+GW W0 wetting seed 13: met False P +0.000 (A +0.017 B -0.017) R +0.00 depth A 0.00/4.34 B 0.00/1.66 clauses ---+ | P_el 1/1 W peak 4 W
+GW W0 wetting seed 14: met False P +0.000 (A +0.005 B -0.005) R +0.00 depth A 0.00/4.04 B 0.00/1.96 clauses ---+ | P_el 1/1 W peak 27 W
+GW W0 wetting seed 15: met False P +0.000 (A +0.011 B -0.011) R +0.00 depth A 0.00/4.17 B 0.00/1.83 clauses ---+ | P_el 1/1 W peak 4 W
+GW W0 default seed 10: met False P +0.000 (A +0.008 B -0.008) R +0.00 depth A 0.00/4.04 B 0.00/1.96 clauses ---+ | P_el 0/0 W peak 3 W
+GW W0 default seed 11: met False P +0.000 (A +0.000 B -0.000) R +0.00 depth A 0.00/4.25 B 0.00/1.75 clauses ---+ | P_el 1/1 W peak 79 W
+GW W0 default seed 12: met False P +0.000 (A +0.000 B -0.000) R +0.00 depth A 0.03/4.33 B 0.03/1.67 clauses ---+ | P_el 1/1 W peak 86 W
+GW W0 default seed 13: met False P +0.000 (A +0.004 B -0.004) R +0.00 depth A 0.00/4.34 B 0.00/1.66 clauses ---+ | P_el 1/1 W peak 3 W
+GW W0 default seed 14: met False P +0.000 (A +0.000 B -0.000) R +0.00 depth A 0.03/4.04 B 0.03/1.96 clauses ---+ | P_el 0/0 W peak 7 W
+GW W0 default seed 15: met False P +0.000 (A +0.001 B -0.001) R +0.00 depth A 0.00/4.17 B 0.00/1.83 clauses ---+ | P_el 1/1 W peak 118 W
+GW W0: wetting 0, default 0 -> not met in both modes
+
+GW VB-W0 wetting seed 10: met False P -0.000 (A +0.004 B -0.004) R +0.00 depth A 0.17/4.04 B 0.17/1.96 clauses ---+ | P_el 0/0 W peak 0 W
+GW VB-W0 wetting seed 11: met False P +0.000 (A -0.002 B +0.002) R +0.00 depth A 0.13/4.25 B 0.13/1.75 clauses ---+ | P_el 0/0 W peak 0 W
+GW VB-W0 wetting seed 12: met False P +0.000 (A +0.029 B -0.029) R +0.00 depth A 0.16/4.33 B 0.16/1.67 clauses ---+ | P_el 0/0 W peak 0 W
+GW VB-W0 wetting seed 13: met False P -0.000 (A +0.026 B -0.026) R +0.00 depth A 0.17/4.34 B 0.17/1.66 clauses ---+ | P_el 0/0 W peak 0 W
+GW VB-W0 wetting seed 14: met False P +0.000 (A +0.012 B -0.012) R +0.00 depth A 0.14/4.04 B 0.14/1.96 clauses ---+ | P_el 0/0 W peak 0 W
+GW VB-W0 wetting seed 15: met False P +0.000 (A +0.031 B -0.031) R +0.00 depth A 0.16/4.17 B 0.16/1.83 clauses ---+ | P_el 0/0 W peak 0 W
+GW VB-W0 default seed 10: met False P -0.000 (A +0.006 B -0.006) R +0.00 depth A 0.19/4.04 B 0.19/1.96 clauses ---+ | P_el 0/0 W peak 0 W
+GW VB-W0 default seed 11: met False P +0.000 (A -0.003 B +0.003) R +0.00 depth A 0.15/4.25 B 0.15/1.75 clauses ---+ | P_el 0/0 W peak 0 W
+GW VB-W0 default seed 12: met False P +0.000 (A +0.024 B -0.024) R +0.00 depth A 0.18/4.33 B 0.18/1.67 clauses ---+ | P_el 0/0 W peak 0 W
+GW VB-W0 default seed 13: met False P +0.000 (A +0.023 B -0.023) R +0.00 depth A 0.19/4.34 B 0.19/1.66 clauses ---+ | P_el 0/0 W peak 0 W
+GW VB-W0 default seed 14: met False P +0.000 (A +0.010 B -0.010) R +0.00 depth A 0.16/4.04 B 0.16/1.96 clauses ---+ | P_el 0/0 W peak 0 W
+GW VB-W0 default seed 15: met False P +0.000 (A +0.027 B -0.027) R +0.00 depth A 0.18/4.17 B 0.18/1.83 clauses ---+ | P_el 0/0 W peak 0 W
+GW VB-W0: wetting 0, default 0 -> not met in both modes
+
+GW WTF wetting seed 10: met False P +0.000 (A -0.174 B +0.174) R +0.00 depth A 0.11/4.04 B 0.11/1.96 clauses ---- | P_el 1621/1621 W peak 4006 W
+GW WTF wetting seed 11: met False P -0.000 (A -0.100 B +0.100) R +0.00 depth A -0.02/4.25 B -0.02/1.75 clauses ---- | P_el 1443/1443 W peak 3939 W
+GW WTF wetting seed 12: met False P +0.000 (A +0.210 B -0.210) R +0.00 depth A 4.23/4.33 B 4.23/1.67 clauses ---- | P_el 1767/1767 W peak 3958 W
+GW WTF wetting seed 13: met False P -0.000 (A +0.013 B -0.013) R +0.00 depth A -0.01/4.34 B -0.01/1.66 clauses ---- | P_el 1432/1432 W peak 3997 W
+GW WTF wetting seed 14: met False P +0.000 (A -0.202 B +0.202) R +0.00 depth A 1.53/4.04 B 1.53/1.96 clauses ---+ | P_el 1718/1718 W peak 4019 W
+GW WTF wetting seed 15: met False P +0.000 (A +0.158 B -0.158) R +0.00 depth A 0.00/4.17 B 0.00/1.83 clauses ---- | P_el 1621/1621 W peak 4113 W
+GW WTF default seed 10: met False P +0.000 (A -0.043 B +0.043) R +0.00 depth A 2.42/4.04 B 2.42/1.96 clauses ---+ | P_el 1486/1486 W peak 3032 W
+GW WTF default seed 11: met False P +0.000 (A -0.032 B +0.032) R +0.00 depth A 3.47/4.25 B 3.47/1.75 clauses ---+ | P_el 1988/1988 W peak 4106 W
+GW WTF default seed 12: met False P +0.000 (A -0.021 B +0.021) R +0.00 depth A 3.31/4.33 B 3.31/1.67 clauses ---- | P_el 1954/1954 W peak 4173 W
+GW WTF default seed 13: met False P -0.000 (A +0.010 B -0.010) R +0.00 depth A 2.29/4.34 B 2.29/1.66 clauses ---+ | P_el 1470/1470 W peak 3933 W
+GW WTF default seed 14: met False P +0.000 (A -0.033 B +0.033) R +0.00 depth A 3.24/4.04 B 3.24/1.96 clauses ---+ | P_el 2083/2083 W peak 4120 W
+GW WTF default seed 15: met False P +0.000 (A -0.023 B +0.023) R +0.00 depth A 3.31/4.17 B 3.31/1.83 clauses ---+ | P_el 1950/1950 W peak 4118 W
+GW WTF: wetting 0, default 0 -> not met in both modes
+
+GW WTF-VB wetting seed 10: met False P +0.000 (A -0.037 B +0.037) R +0.00 depth A 5.67/4.04 B 5.67/1.96 clauses ---- | P_el 1756/1756 W peak 4078 W
+GW WTF-VB wetting seed 11: met False P -0.000 (A +0.018 B -0.018) R +0.00 depth A 8.33/4.25 B 8.33/1.75 clauses ---+ | P_el 1551/1551 W peak 2886 W
+GW WTF-VB wetting seed 12: met False P +0.000 (A +0.073 B -0.073) R +0.00 depth A 6.53/4.33 B 6.53/1.67 clauses ---- | P_el 1596/1596 W peak 4026 W
+GW WTF-VB wetting seed 13: met False P +0.000 (A -0.065 B +0.065) R +0.00 depth A 4.83/4.34 B 4.83/1.66 clauses ---+ | P_el 1431/1431 W peak 3854 W
+GW WTF-VB wetting seed 14: met False P -0.000 (A +0.114 B -0.114) R +0.00 depth A 4.33/4.04 B 4.33/1.96 clauses ---+ | P_el 1594/1594 W peak 2923 W
+GW WTF-VB wetting seed 15: met False P -0.000 (A -0.092 B +0.092) R +0.00 depth A 5.36/4.17 B 5.36/1.83 clauses ---- | P_el 1817/1817 W peak 4166 W
+GW WTF-VB default seed 10: met False P +0.000 (A -0.025 B +0.025) R +0.00 depth A 2.51/4.04 B 2.51/1.96 clauses ---+ | P_el 1487/1487 W peak 3843 W
+GW WTF-VB default seed 11: met False P -0.000 (A -0.035 B +0.035) R +0.00 depth A 3.30/4.25 B 3.30/1.75 clauses ---+ | P_el 1982/1982 W peak 3978 W
+GW WTF-VB default seed 12: met False P -0.000 (A -0.031 B +0.031) R +0.00 depth A 2.70/4.33 B 2.70/1.67 clauses ---+ | P_el 2100/2100 W peak 4031 W
+GW WTF-VB default seed 13: met False P -0.000 (A -0.016 B +0.016) R +0.00 depth A 2.82/4.34 B 2.82/1.66 clauses ---+ | P_el 1418/1418 W peak 3272 W
+GW WTF-VB default seed 14: met False P +0.000 (A -0.039 B +0.039) R +0.00 depth A 3.41/4.04 B 3.41/1.96 clauses ---+ | P_el 1955/1955 W peak 4134 W
+GW WTF-VB default seed 15: met False P -0.000 (A -0.039 B +0.039) R +0.00 depth A 2.86/4.17 B 2.86/1.83 clauses ---+ | P_el 2057/2057 W peak 4135 W
+GW WTF-VB: wetting 0, default 0 -> not met in both modes
+
+GS ST wetting seed 10: met False P -0.036 (A +0.019 B -0.091) clauses --- | P_el 978/1277 W peak 4132 W
+GS ST wetting seed 11: met False P -0.013 (A -0.025 B -0.001) clauses --- | P_el 1225/442 W peak 4110 W
+GS ST wetting seed 12: met False P +0.071 (A +0.060 B +0.082) clauses +-- | P_el 1767/1211 W peak 4127 W
+GS ST wetting seed 13: met False P +0.080 (A +0.121 B +0.038) clauses +-- | P_el 1559/463 W peak 4077 W
+GS ST wetting seed 14: met False P +0.002 (A +0.007 B -0.003) clauses --- | P_el 298/672 W peak 4039 W
+GS ST wetting seed 15: met False P +0.031 (A +0.074 B -0.013) clauses --- | P_el 1511/1640 W peak 4135 W
+GS ST default seed 10: met False P +0.010 (A -0.004 B +0.025) clauses -+- | P_el 340/481 W peak 4060 W
+GS ST default seed 11: met False P +0.005 (A -0.000 B +0.010) clauses -+- | P_el 156/216 W peak 2955 W
+GS ST default seed 12: met False P -0.000 (A -0.006 B +0.006) clauses --- | P_el 2167/2167 W peak 4027 W
+GS ST default seed 13: met False P -0.000 (A -0.006 B +0.006) clauses -+- | P_el 633/472 W peak 3996 W
+GS ST default seed 14: met False P -0.000 (A +0.011 B -0.012) clauses -+- | P_el 1490/1721 W peak 4030 W
+GS ST default seed 15: met False P +0.027 (A +0.038 B +0.017) clauses -+- | P_el 824/520 W peak 3926 W
+GS ST: wetting 0, default 0 -> not met in both modes
+
+GS S0 wetting seed 10: met False P +0.000 (A -0.000 B +0.000) clauses -++ | P_el 0/0 W peak 0 W
+GS S0 wetting seed 11: met False P -0.000 (A -0.000 B +0.000) clauses -++ | P_el 0/0 W peak 0 W
+GS S0 wetting seed 12: met False P +0.000 (A +0.000 B -0.000) clauses -++ | P_el 0/0 W peak 0 W
+GS S0 wetting seed 13: met False P -0.000 (A +0.000 B -0.000) clauses -++ | P_el 0/0 W peak 0 W
+GS S0 wetting seed 14: met False P -0.000 (A -0.000 B +0.000) clauses -++ | P_el 0/0 W peak 0 W
+GS S0 wetting seed 15: met False P -0.000 (A -0.000 B +0.000) clauses -++ | P_el 0/0 W peak 0 W
+GS S0 default seed 10: met False P +0.000 (A +0.000 B -0.000) clauses -++ | P_el 0/0 W peak 0 W
+GS S0 default seed 11: met False P +0.000 (A +0.000 B +0.000) clauses -++ | P_el 0/0 W peak 0 W
+GS S0 default seed 12: met False P +0.000 (A +0.000 B -0.000) clauses -++ | P_el 0/0 W peak 0 W
+GS S0 default seed 13: met False P +0.000 (A +0.000 B -0.000) clauses -++ | P_el 0/0 W peak 0 W
+GS S0 default seed 14: met False P -0.000 (A -0.000 B +0.000) clauses -++ | P_el 0/0 W peak 1 W
+GS S0 default seed 15: met False P +0.000 (A +0.000 B +0.000) clauses -++ | P_el 0/0 W peak 0 W
+GS S0: wetting 0, default 0 -> not met in both modes
+
+GS SF wetting seed 10: met False P +0.000 (A +0.019 B -0.019) clauses --- | P_el 978/978 W peak 4132 W
+GS SF wetting seed 11: met False P -0.000 (A -0.025 B +0.025) clauses --- | P_el 1225/1225 W peak 4110 W
+GS SF wetting seed 12: met False P +0.000 (A +0.060 B -0.060) clauses --- | P_el 1767/1767 W peak 4126 W
+GS SF wetting seed 13: met False P -0.000 (A +0.121 B -0.121) clauses --- | P_el 1559/1559 W peak 4077 W
+GS SF wetting seed 14: met False P +0.000 (A +0.007 B -0.007) clauses -+- | P_el 298/298 W peak 3160 W
+GS SF wetting seed 15: met False P +0.000 (A +0.074 B -0.074) clauses --- | P_el 1511/1511 W peak 4111 W
+GS SF default seed 10: met False P -0.000 (A -0.004 B +0.004) clauses -+- | P_el 340/340 W peak 4060 W
+GS SF default seed 11: met False P -0.000 (A -0.000 B +0.000) clauses -+- | P_el 156/156 W peak 2955 W
+GS SF default seed 12: met False P -0.000 (A -0.006 B +0.006) clauses --- | P_el 2167/2167 W peak 4027 W
+GS SF default seed 13: met False P -0.000 (A -0.006 B +0.006) clauses -+- | P_el 633/633 W peak 3996 W
+GS SF default seed 14: met False P +0.000 (A +0.011 B -0.011) clauses -+- | P_el 1490/1490 W peak 4025 W
+GS SF default seed 15: met False P +0.000 (A +0.038 B -0.038) clauses -++ | P_el 824/824 W peak 3926 W
+GS SF: wetting 0, default 0 -> not met in both modes
+

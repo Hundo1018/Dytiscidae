@@ -184,6 +184,7 @@ def run_continuous(
     control_hz: float = 25.0,
     energy_scale: float = 1.0,
     stress_probe=None,
+    entry=None,
 ) -> ContinuousResult:
     """Fly the whole schedule without ever resetting.
 
@@ -194,6 +195,9 @@ def run_continuous(
     ``on_step(env, commanded, actual, t)`` is called every step, which is how
     the renderer gets its frames without this module knowing anything about
     rendering.
+
+    ``entry(env)`` is called once, after the only placement and before the
+    first step: ``evaluate_mission`` draws the entry state there.
     """
     t0 = time.time()
     result = ContinuousResult()
@@ -202,6 +206,8 @@ def run_continuous(
 
     # Start in the first commanded domain -- the only placement in the run.
     env.reset(schedule[0][0], randomise=False)
+    if entry is not None:
+        entry(env)
     # MuJoCo's answer to a bad acceleration is to *reset the state* and carry
     # on: the machine is teleported to its default pose mid-mission, which is
     # finite and inside 400 m, so the position check below never sees it -- and
@@ -334,3 +340,167 @@ def continuous_score(result: ContinuousResult, spec: MissionSpec) -> float:
             1.0,
         )
     )
+
+
+# --------------------------------------------------------------------------
+# The mission as a verdict (2026-11-11, experiments/triphibian_diagnosis P0.3)
+# --------------------------------------------------------------------------
+#
+# ``continuous_score`` pays presence: measured 2026-11-11 it gave a quad with
+# its rotors stopped 0.15-0.58 and three arms that do not read the command
+# 0.11-0.49, because the first leg is spent where the machine was put and the
+# depth term is paid for sinking.  And ``run_continuous`` counts a transition
+# at the first half second in the commanded domain, by ``current_domain``,
+# whose LAND is any contact and whose AIR is no contact.
+#
+# The verdict below asks one thing, and asks it of the end of every leg: is
+# the machine in the medium it was told to be in, by the crossing probe's own
+# tests (``transitions.CrossingTracker``), the right way up, and on land with
+# its weight on the ground.  The end of leg i is the instant of command i+1,
+# so "held until told to go" and "arrived and stayed" are one test.  A still
+# machine passes the first leg and no other.  A machine that crosses before it
+# is told has left the leg it was told to hold.  Leg durations are drawn from
+# the seed, so a script on a clock cannot know when the command comes.
+
+#: Each leg's duration is drawn uniformly from this range, seconds.  The low
+#: end is what the hand law needs to cross and settle (entry at 5.4 s on the
+#: 8 s legs of E0); the width is what a clock cannot follow.
+LEG_SECONDS_RANGE = (7.0, 13.0)
+#: The window at the end of a leg the verdict reads, and the share of it the
+#: machine has to spend in the commanded medium.
+ARRIVAL_WINDOW = 0.5
+ARRIVAL_SHARE = 0.9
+#: On land, the mean share of the weight the ground carries over that window.
+#: Between what was measured: a rotor-borne taxi 0.00, a skid on 94% thrust
+#: 0.08, a walker 1.00 (E0b, 2026-11-11).
+SUPPORT_PASS = 0.5
+
+
+def mission_schedule(start: Domain, seed: int, n_legs: int = 3,
+                     leg_range: tuple[float, float] = LEG_SECONDS_RANGE,
+                     ) -> list[tuple[Domain, float]]:
+    """``start`` then the cycle, each leg's duration drawn from ``seed``."""
+    i0 = DOMAIN_CYCLE.index(start)
+    rng = np.random.default_rng([int(seed), i0, 0x4D495353])
+    lo, hi = leg_range
+    return [(DOMAIN_CYCLE[(i0 + k) % len(DOMAIN_CYCLE)], float(rng.uniform(lo, hi)))
+            for k in range(n_legs)]
+
+
+def settled_in(env: TriphibianEnv, medium: Domain) -> bool:
+    """In ``medium`` right now, as a crossing into it is judged, and upright."""
+    from .transitions import CrossingTracker, ashore, medium_of
+
+    if CrossingTracker.upright_at_end(env) <= 0.0:
+        return False
+    if medium is Domain.AIR:
+        return float(env.clearance()) > 0.5
+    if medium is Domain.WATER:
+        return medium_of(env) is Domain.WATER
+    return ashore(env)
+
+
+@dataclass
+class MissionRead:
+    """One mission, judged.  ``completed`` is the definition of done for one
+    seed; a mission with a ``failure`` measured nothing and is not a zero."""
+
+    start: Domain
+    seed: int
+    schedule: list[tuple[Domain, float]]
+    #: Per leg that ran to its end: share of the last ARRIVAL_WINDOW settled in
+    #: the commanded medium, and on a land leg the mean ground support there
+    #: (``None`` off land).
+    shares: list[float] = field(default_factory=list)
+    supports: list[float | None] = field(default_factory=list)
+    held: list[bool] = field(default_factory=list)
+    failure: str = ""
+    result: ContinuousResult | None = None
+
+    @property
+    def transitions_commanded(self) -> int:
+        return max(len(self.schedule) - 1, 0)
+
+    @property
+    def transitions_completed(self) -> int:
+        """Leg i's transition: held leg i-1 to its end, and leg i to its end."""
+        if self.failure:
+            return 0
+        return sum(1 for i in range(1, len(self.held)) if self.held[i - 1] and self.held[i])
+
+    @property
+    def completed(self) -> bool:
+        return (not self.failure and len(self.held) == len(self.schedule)
+                and all(self.held))
+
+
+class MissionJudge:
+    """``run_continuous``'s ``on_step``: reads the end of every leg."""
+
+    def __init__(self, env: TriphibianEnv, schedule: list[tuple[Domain, float]]):
+        self.ends = list(np.cumsum([int(sec / env.timestep) for _, sec in schedule]))
+        self.media = [dom for dom, _ in schedule]
+        self.window_n = max(int(round(ARRIVAL_WINDOW / env.timestep)), 1)
+        self.leg = 0
+        self.flags: deque = deque(maxlen=self.window_n)
+        self.support: deque = deque(maxlen=self.window_n)
+        self.shares: list[float] = []
+        self.supports: list[float | None] = []
+        self.held: list[bool] = []
+
+    def __call__(self, env, commanded, actual, clock, step_i) -> None:
+        if self.leg >= len(self.ends):
+            return
+        medium = self.media[self.leg]
+        # Only the window is read, so only the window is measured.
+        if step_i > self.ends[self.leg] - self.window_n:
+            self.flags.append(settled_in(env, medium))
+            if medium is Domain.LAND:
+                self.support.append(env.ground_support())
+        if step_i == self.ends[self.leg]:
+            full = len(self.flags) == self.window_n
+            share = sum(self.flags) / self.window_n if full else 0.0
+            sup = float(np.mean(self.support)) if self.support else None
+            ok = full and share >= ARRIVAL_SHARE
+            if medium is Domain.LAND:
+                ok = ok and sup is not None and sup >= SUPPORT_PASS
+            self.shares.append(share)
+            self.supports.append(sup)
+            self.held.append(bool(ok))
+            self.flags.clear()
+            self.support.clear()
+            self.leg += 1
+
+
+def evaluate_mission(env: TriphibianEnv, controller, start: Domain, seed: int, *,
+                     n_legs: int = 3,
+                     leg_range: tuple[float, float] = LEG_SECONDS_RANGE,
+                     on_step=None) -> MissionRead:
+    """Fly one mission from ``start`` and judge it (see the note above).
+
+    The entry state and the leg durations are drawn from ``seed``; the same
+    seed is the same mission.  Headless, unrounded, no score: a verdict and
+    what it was read from.
+    """
+    from .transitions import reseat_after_scatter
+
+    schedule = mission_schedule(start, seed, n_legs, leg_range)
+    judge = MissionJudge(env, schedule)
+    params = controller.params if controller is not None else env.cpg.base
+
+    def entry(e: TriphibianEnv) -> None:
+        e.scatter(np.random.default_rng([int(seed), DOMAIN_CYCLE.index(start), 0x454E5452]),
+                  pose=params)
+        if start is Domain.LAND:
+            # Back on the ground at the pose the draw left (see the function).
+            reseat_after_scatter(e, "land_to_air")
+
+    def step(e, commanded, actual, clock, step_i) -> None:
+        judge(e, commanded, actual, clock, step_i)
+        if on_step is not None:
+            on_step(e, commanded, actual, clock, step_i)
+
+    res = run_continuous(env, controller, schedule, on_step=step, entry=entry)
+    return MissionRead(start=start, seed=int(seed), schedule=schedule,
+                       shares=judge.shares, supports=judge.supports, held=judge.held,
+                       failure=res.failure, result=res)

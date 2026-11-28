@@ -1,0 +1,20 @@
+# Source: Ostowari & Naik, "Post-stall wind tunnel data for NACA 44XX series airfoil sections", SERI/STR-217-2559 (1985), Fig. A.16(a) lift and A.16(b) drag, report p. 66-67. https://www.osti.gov/servlets/purl/5791328
+# Non-rotating rectangular blade, NACA 4409 (9% thick, 4% camber), aspect ratio 6, chord Re 0.25e6 (square symbols; the only Re carried past 60 deg). Re 0.5e6-1.0e6 points lie about 0.04 lower in CL between 25 and 50 deg.
+# PROVENANCE: read BY EYE from the plotted figure (report has no tables); uncertainty about +-0.03 in CL and +-0.04 in CD.
+alpha_deg,CL,CD
+10,0.72,0.06
+14,0.90,0.10
+18,1.07,0.16
+20,1.07,0.20
+25,0.90,0.40
+30,0.84,0.46
+35,0.84,0.57
+40,0.84,0.68
+45,0.84,0.80
+50,0.84,0.92
+60,0.73,1.14
+70,0.57,1.30
+80,0.34,1.43
+90,0.06,1.43
+100,-0.19,1.46
+110,-0.46,1.38

@@ -1,0 +1,23 @@
+# Source: Kruyt, Quicazan-Rubio, van Heijst, Altshuler, Lentink 2014, J R Soc Interface 11:20140585, Fig. 6a caption (harmonic fits to spinner measurements of Calypte anna wings). https://pmc.ncbi.nlm.nih.gov/articles/PMC4233735/
+# Real hummingbird wing (cambered, AR about 4), revolving; C. anna wing Re quoted as 14,000 in Kruyt et al. 2015 Fig. 1c. Coefficients from a blade-element reduction using second/third moments of area (R2, R3).
+# PROVENANCE: EVALUATED HERE from the fit equations printed in the caption (alpha in degrees): CL = 0.0031 + 1.5842 cos(0.0301 a + 4.7124); CD = 8.3171 + 8.1909 cos(0.0073 a + 3.1416), valid 0<=a<=90. Not raw data points.
+alpha_deg,CL_fit,CD_fit
+0,0.003,0.126
+5,0.241,0.132
+10,0.473,0.148
+15,0.694,0.175
+20,0.900,0.213
+25,1.086,0.262
+30,1.247,0.322
+35,1.380,0.392
+40,1.482,0.473
+45,1.550,0.564
+50,1.584,0.666
+55,1.582,0.778
+60,1.544,0.899
+65,1.471,1.031
+70,1.365,1.173
+75,1.228,1.324
+80,1.064,1.484
+85,0.875,1.653
+90,0.667,1.831
